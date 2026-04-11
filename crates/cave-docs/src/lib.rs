@@ -1,22 +1,14 @@
 //! API spec registry — replaces Apicurio + openapi-diff
 //!
-//! Replaces: Apicurio + openapi-diff
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Upstream tracking: apicurio + openapi-diff
+//! Features: OpenAPI/AsyncAPI spec storage, breaking change detection, schema versioning
 
 pub mod routes;
 
 use axum::Router;
-use cave_db::CavePool;
-use std::sync::Arc;
 
-/// Module state.
-pub struct State {
-    pub pool: Arc<CavePool>,
-}
-
-/// Create the axum router for this module.
-pub fn router(state: Arc<State>) -> Router {
-    routes::create_router(state)
+pub fn router() -> Router {
+    routes::create_router()
 }
 
 pub const MODULE_NAME: &str = "docs";
