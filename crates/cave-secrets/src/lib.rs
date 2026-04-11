@@ -1,21 +1,27 @@
-//! Secret detection — replaces Trufflehog + gitleaks
+//! CAVE Secrets — Secret detection engine.
 //!
 //! Replaces: Trufflehog + gitleaks
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Pre-commit and CI secret scanning. Regex + entropy-based detection.
 
+pub mod detector;
 pub mod routes;
 
 use axum::Router;
-use cave_db::CavePool;
 use std::sync::Arc;
 
-/// Module state.
-pub struct State {
-    pub pool: Arc<CavePool>,
+pub struct SecretsState {
+    pub detectors: Vec<detector::SecretDetector>,
 }
 
-/// Create the axum router for this module.
-pub fn router(state: Arc<State>) -> Router {
+impl Default for SecretsState {
+    fn default() -> Self {
+        Self {
+            detectors: detector::builtin_detectors(),
+        }
+    }
+}
+
+pub fn router(state: Arc<SecretsState>) -> Router {
     routes::create_router(state)
 }
 

@@ -1,22 +1,16 @@
-//! Migration trait — each module implements this to declare its DB migrations.
+//! Migration runner — each module declares its migrations as (version, sql) pairs.
 
 use crate::CavePool;
 
-/// Trait for module migrations.
-#[async_trait::async_trait]
-pub trait CaveMigrations {
-    /// Module name (used as schema name prefix).
-    fn module_name(&self) -> &'static str;
-
-    /// List of (version, sql) pairs in order.
-    fn migrations(&self) -> Vec<(i32, &'static str)>;
-
-    /// Run all pending migrations.
-    async fn run(&self, pool: &CavePool) -> Result<(), String> {
-        pool.ensure_schema(self.module_name()).await?;
-        for (version, sql) in self.migrations() {
-            pool.migrate(self.module_name(), version, sql).await?;
-        }
-        Ok(())
+/// Run all pending migrations for a module.
+pub async fn run_migrations(
+    pool: &CavePool,
+    module: &str,
+    migrations: &[(i32, &str)],
+) -> Result<(), String> {
+    pool.ensure_schema(module).await?;
+    for (version, sql) in migrations {
+        pool.migrate(module, *version, sql).await?;
     }
+    Ok(())
 }

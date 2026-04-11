@@ -1,23 +1,17 @@
 //! HTTP routes for cave-changelog.
 
-use crate::State;
-use axum::{
-    extract::State as AxumState,
-    routing::get,
-    Json, Router,
-};
-use std::sync::Arc;
+use axum::{routing::get, Json, Router};
 
-pub fn create_router(state: Arc<State>) -> Router {
+pub fn create_router() -> Router {
     Router::new()
         .route("/api/changelog/health", get(health))
-        .with_state(state)
 }
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-changelog",
         "status": "ok",
-        "upstream": "Custom"
+        "upstream": "custom",
+        "features": "Auto-generated changelogs from git commits + SBOM diffs per deployment"
     }))
 }

@@ -1,21 +1,27 @@
-//! Config & image linting — replaces Hadolint + Checkov + Pluto + kubent
+//! CAVE Lint — Config & image linting engine.
 //!
 //! Replaces: Hadolint + Checkov + Pluto + kubent
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Dockerfile linting, K8s manifest validation, deprecated API detection.
 
+pub mod rules;
 pub mod routes;
 
 use axum::Router;
-use cave_db::CavePool;
 use std::sync::Arc;
 
-/// Module state.
-pub struct State {
-    pub pool: Arc<CavePool>,
+pub struct LintState {
+    pub rules: Vec<rules::LintRule>,
 }
 
-/// Create the axum router for this module.
-pub fn router(state: Arc<State>) -> Router {
+impl Default for LintState {
+    fn default() -> Self {
+        Self {
+            rules: rules::builtin_rules(),
+        }
+    }
+}
+
+pub fn router(state: Arc<LintState>) -> Router {
     routes::create_router(state)
 }
 

@@ -1,23 +1,17 @@
 //! HTTP routes for cave-status.
 
-use crate::State;
-use axum::{
-    extract::State as AxumState,
-    routing::get,
-    Json, Router,
-};
-use std::sync::Arc;
+use axum::{routing::get, Json, Router};
 
-pub fn create_router(state: Arc<State>) -> Router {
+pub fn create_router() -> Router {
     Router::new()
         .route("/api/status/health", get(health))
-        .with_state(state)
 }
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-status",
         "status": "ok",
-        "upstream": "Custom"
+        "upstream": "custom",
+        "features": "Public/internal status page, auto-generation from probes, incident integration"
     }))
 }

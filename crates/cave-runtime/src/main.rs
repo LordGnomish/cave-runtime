@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "cave_runtime=info,cave_flags=info,tower_http=info".into()),
+                .unwrap_or_else(|_| "cave_runtime=info,tower_http=info".into()),
         )
         .json()
         .init();
@@ -42,35 +42,36 @@ async fn main() -> anyhow::Result<()> {
         "Starting CAVE Unified Runtime"
     );
 
-    // TODO: Load config from file
-    // let config = CaveConfig::load(&cli.config)?;
+    // Initialize module states
+    let secrets_state = Arc::new(cave_secrets::SecretsState::default());
+    let lint_state = Arc::new(cave_lint::LintState::default());
 
-    // TODO: Initialize shared services
-    // let db = Arc::new(CavePool::new(&config.database)?);
-    // let auth = Arc::new(CaveAuthLayer::new(...));
-
-    // Build the unified router
+    // Build the unified router with all Phase 1 modules
     let app = Router::new()
-        // Health endpoint
+        // Core health endpoints
         .route("/health", axum::routing::get(health))
         .route("/ready", axum::routing::get(ready))
-        // Module routers will be nested here:
-        // .merge(cave_flags::router(flags_state))
-        // .merge(cave_secrets::router(secrets_state))
-        // .merge(cave_lint::router(lint_state))
-        // ...
+        // Phase 1 module routers
+        .merge(cave_secrets::router(secrets_state))
+        .merge(cave_lint::router(lint_state))
+        .merge(cave_docs::router())
+        .merge(cave_status::router())
+        .merge(cave_changelog::router())
+        .merge(cave_certs::router())
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive()); // TODO: restrict in production
 
     let port = cli.port.unwrap_or(8080);
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
-        .await?;
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
-    info!("Modules: flags, secrets, lint, docs, status, changelog, certs");
-    info!("Upstream tracking: 26 projects monitored");
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!(
+        "Upstream tracking: {} projects",
+        cave_upstream::TRACKED_PROJECTS.len()
+    );
 
     axum::serve(listener, app).await?;
 
@@ -82,15 +83,14 @@ async fn health() -> axum::Json<serde_json::Value> {
         "status": "ok",
         "runtime": "cave-runtime",
         "version": env!("CARGO_PKG_VERSION"),
+        "upstream_tracked": cave_upstream::TRACKED_PROJECTS.len(),
     }))
 }
 
 async fn ready() -> axum::Json<serde_json::Value> {
-    // TODO: check DB, auth, and module readiness
     axum::Json(serde_json::json!({
         "ready": true,
         "modules": {
-            "flags": true,
             "secrets": true,
             "lint": true,
             "docs": true,
