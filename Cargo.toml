@@ -1,0 +1,104 @@
+[workspace]
+resolver = "2"
+members = [
+    # === Shared Infrastructure ===
+    "crates/cave-core",
+    "crates/cave-auth",
+    "crates/cave-db",
+    "crates/cave-ebpf-common",
+    # === Phase 1: Quick Wins ===
+    "crates/cave-flags",
+    "crates/cave-secrets",
+    "crates/cave-lint",
+    "crates/cave-docs",
+    "crates/cave-status",
+    "crates/cave-changelog",
+    "crates/cave-certs",
+    # === Phase 2: Security Core ===
+    "crates/cave-vulns",
+    "crates/cave-sbom",
+    "crates/cave-uptime",
+    "crates/cave-cost",
+    "crates/cave-sign",
+    "crates/cave-forensics",
+    # === Phase 3: Platform Intelligence ===
+    "crates/cave-devlake",
+    "crates/cave-ai-obs",
+    "crates/cave-pii",
+    "crates/cave-incidents",
+    "crates/cave-chat",
+    "crates/cave-slo",
+    "crates/cave-alerts",
+    "crates/cave-profiler",
+    # === Phase 4: Heavy Hitters ===
+    "crates/cave-registry",
+    "crates/cave-workflows",
+    "crates/cave-scan",
+    "crates/cave-portal",
+    "crates/cave-scaffold",
+    "crates/cave-chaos",
+    "crates/cave-policy",
+    "crates/cave-dast",
+    "crates/cave-backup",
+    "crates/cave-pam",
+    # === Runtime Binary ===
+    "crates/cave-runtime",
+    # === Upstream Tracker ===
+    "crates/cave-upstream",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/btartan/cave-runtime"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+# Database
+deadpool-postgres = "0.14"
+tokio-postgres = { version = "0.7", features = ["with-serde_json-1", "with-uuid-1", "with-chrono-0_4"] }
+# Auth / JWT
+jsonwebtoken = "9"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = "0.27"
+opentelemetry-otlp = "0.27"
+prometheus-client = "0.23"
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+config = "0.14"
+clap = { version = "4", features = ["derive"] }
+# Security scanning
+aho-corasick = "1"
+regex = "1"
+tree-sitter = "0.24"
+# Kubernetes
+kube = { version = "0.97", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.23", features = ["latest"] }
+# Crypto / Signing
+ring = "0.17"
+ed25519-dalek = "2"
+# HTTP client (for upstream tracking, uptime probes)
+reqwest-middleware = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

@@ -1,0 +1,63 @@
+name: Upstream Tracker
+
+on:
+  schedule:
+    # Every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  track:
+    name: Check Upstream Projects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upstream releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== CAVE Upstream Tracker ==="
+          echo "Checking 26 tracked open source projects..."
+          echo ""
+          # TODO: Replace with cave-upstream binary
+          # For now, check via GitHub API directly
+          PROJECTS=(
+            "Unleash/unleash"
+            "DefectDojo/django-DefectDojo"
+            "DependencyTrack/dependency-track"
+            "SonarSource/sonarqube"
+            "pulp/pulpcore"
+            "trufflesecurity/trufflehog"
+            "hadolint/hadolint"
+            "microsoft/presidio"
+            "backstage/backstage"
+            "apache/incubator-devlake"
+            "louislam/uptime-kuma"
+            "opencost/opencost"
+            "langfuse/langfuse"
+            "n8n-io/n8n"
+            "danny-avila/LibreChat"
+            "grafana/oncall"
+            "Apicurio/apicurio-registry"
+            "cert-manager/cert-manager"
+            "sigstore/cosign"
+            "cilium/tetragon"
+            "chaos-mesh/chaos-mesh"
+            "open-policy-agent/gatekeeper"
+            "vmware-tanzu/velero"
+            "gravitational/teleport"
+            "grafana/pyroscope"
+            "zaproxy/zaproxy"
+          )
+
+          for repo in "${PROJECTS[@]}"; do
+            LATEST=$(gh api repos/$repo/releases/latest --jq '.tag_name' 2>/dev/null || echo "no release")
+            echo "  $repo: $LATEST"
+          done
+
+      - name: Generate upstream report
+        run: |
+          echo "TODO: AI-assisted triage (Claude API)"
+          echo "TODO: Auto-create issues for ADOPT items"
+          echo "TODO: Post weekly digest to Slack"
