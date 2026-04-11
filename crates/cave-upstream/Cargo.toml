@@ -1,0 +1,16 @@
+[package]
+name = "cave-upstream"
+description = "Upstream open source project tracker — monitors releases, triages changes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-db = { path = "../cave-db" }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,34 @@
+[package]
+name = "cave-runtime"
+description = "CAVE Unified Runtime — single binary hosting all platform modules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-runtime"
+path = "src/main.rs"
+
+[dependencies]
+# Shared
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../cave-db" }
+cave-upstream = { path = "../cave-upstream" }
+# Phase 1 modules
+cave-flags = { path = "../cave-flags" }
+cave-secrets = { path = "../cave-secrets" }
+cave-lint = { path = "../cave-lint" }
+cave-docs = { path = "../cave-docs" }
+cave-status = { path = "../cave-status" }
+cave-changelog = { path = "../cave-changelog" }
+cave-certs = { path = "../cave-certs" }
+# Framework
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
