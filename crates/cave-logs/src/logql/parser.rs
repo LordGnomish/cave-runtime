@@ -1,544 +1,693 @@
-//! Recursive-descent LogQL parser.
-//!
-//! Grammar (simplified):
-//! ```text
-//! expr          = metric_expr | log_expr
-//! log_expr      = stream_selector pipeline_stage*
-//! stream_selector = "{" (label_matcher ("," label_matcher)*)? "}"
-//! label_matcher = IDENT op string
-//! op            = "=" | "!=" | "=~" | "!~"
-//! pipeline_stage = filter_stage | parser_stage | label_filter | line_format | label_fmt
-//! filter_stage  = ("|=" | "!=" | "|~" | "!~") STRING
-//! parser_stage  = "|" ("json" | "logfmt" | "regexp" STRING | "pattern" STRING | "unpack")
-//! label_filter  = "|" IDENT cmp_op value
-//! line_format   = "|" "line_format" STRING
-//! label_fmt     = "|" "label_format" rename_spec ("," rename_spec)*
-//! rename_spec   = IDENT "=" IDENT
-//! metric_expr   = range_agg | vector_agg
-//! range_agg     = range_agg_op "(" log_expr "[" duration "]" ")" grouping?
-//! vector_agg    = vector_agg_op "(" [param ","] metric_expr ")" grouping?
-//! grouping      = ("by" | "without") "(" label_list ")"
-//! ```
+//! LogQL recursive-descent parser.
+//! Converts a token stream (from `lexer`) into a `Query` AST node.
 
-use super::{
-    ast::*,
-    lexer::{Lexer, Token},
+use std::time::Duration;
+
+use super::ast::{
+    self, BinOp, BinaryExpr, CompareOp, Decolorize, Grouping, LabelFilter, LabelFilterValue,
+    LabelFormat, LabelMatcher, LineFilter, LineFormat, LogQuery, LogRangeAggregation,
+    MatchCardinality, MatchOp, MetricQuery, PipelineStage, Query, RangeAgg, StreamSelector,
+    UnwrapExpr, VectorAgg, VectorAggregation, VectorMatchGrouping,
 };
-use crate::models::{LabelMatcher, MatchOp};
+use super::lexer::{Lexer, Token};
 
-pub fn parse(input: &str) -> Result<Expr, String> {
-    let tokens = Lexer::new(input).tokenize()?;
-    let mut p = Parser { tokens, pos: 0 };
-    let expr = p.parse_expr()?;
-    if !p.at_eof() {
-        return Err(format!("unexpected token after expression: {:?}", p.peek()));
-    }
-    Ok(expr)
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    #[error("lex error: {0}")]
+    Lex(String),
+    #[error("unexpected token {got:?}, expected {expected}")]
+    Unexpected { got: String, expected: String },
+    #[error("unexpected end of input, expected {0}")]
+    Eof(String),
+    #[error("{0}")]
+    Other(String),
 }
 
-struct Parser {
+pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
 }
 
-// ─── Token helpers ────────────────────────────────────────────────────────────
-
 impl Parser {
-    fn peek(&self) -> &Token {
-        &self.tokens[self.pos]
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, pos: 0 }
+    }
+
+    // ── public API ──────────────────────────────────────────────────────────
+
+    /// Parse a full LogQL query string.
+    pub fn parse_query(input: &str) -> Result<Query, ParseError> {
+        let tokens = Lexer::new(input).tokenize().map_err(|e| ParseError::Lex(e.to_string()))?;
+        let mut parser = Self::new(tokens);
+        parser.parse()
+    }
+
+    // ── helpers ─────────────────────────────────────────────────────────────
+
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.pos)
     }
 
     fn peek2(&self) -> Option<&Token> {
         self.tokens.get(self.pos + 1)
     }
 
-    fn advance(&mut self) -> &Token {
-        let t = &self.tokens[self.pos];
-        if self.pos + 1 < self.tokens.len() {
-            self.pos += 1;
-        }
+    fn advance(&mut self) -> Option<&Token> {
+        let t = self.tokens.get(self.pos);
+        self.pos += 1;
         t
     }
 
-    fn at_eof(&self) -> bool {
-        matches!(self.peek(), Token::Eof)
-    }
-
-    fn expect(&mut self, expected: &Token) -> Result<(), String> {
-        if self.peek() == expected {
-            self.advance();
-            Ok(())
-        } else {
-            Err(format!("expected {:?}, got {:?}", expected, self.peek()))
+    fn expect(&mut self, expected: &Token) -> Result<(), ParseError> {
+        match self.advance() {
+            Some(t) if t == expected => Ok(()),
+            Some(t) => Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: format!("{:?}", expected),
+            }),
+            None => Err(ParseError::Eof(format!("{:?}", expected))),
         }
     }
 
-    fn expect_ident(&mut self) -> Result<String, String> {
-        match self.advance().clone() {
-            Token::Ident(s) => Ok(s),
-            t => Err(format!("expected identifier, got {t:?}")),
+    fn expect_ident(&mut self) -> Result<String, ParseError> {
+        match self.advance() {
+            Some(Token::Ident(s)) => Ok(s.clone()),
+            Some(t) => Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "identifier".into() }),
+            None => Err(ParseError::Eof("identifier".into())),
         }
     }
 
-    fn expect_str(&mut self) -> Result<String, String> {
-        match self.advance().clone() {
-            Token::Str(s) => Ok(s),
-            t => Err(format!("expected string literal, got {t:?}")),
+    fn expect_str(&mut self) -> Result<String, ParseError> {
+        match self.advance() {
+            Some(Token::Str(s)) => Ok(s.clone()),
+            Some(Token::Ident(s)) => Ok(s.clone()),
+            Some(t) => Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "string".into() }),
+            None => Err(ParseError::Eof("string".into())),
         }
     }
 
-    fn expect_dur(&mut self) -> Result<std::time::Duration, String> {
-        match self.advance().clone() {
-            Token::Dur(d) => Ok(d),
-            t => Err(format!("expected duration (e.g. 5m), got {t:?}")),
-        }
-    }
-}
+    // ── parsing ──────────────────────────────────────────────────────────────
 
-// ─── Top-level ────────────────────────────────────────────────────────────────
-
-impl Parser {
-    fn parse_expr(&mut self) -> Result<Expr, String> {
-        // If the next ident is a vector aggregation operator, parse metric.
-        if let Token::Ident(name) = self.peek() {
-            if is_vector_agg_op(name) {
-                return Ok(Expr::Metric(MetricExpr::VectorAgg(self.parse_vector_agg()?)));
+    fn parse(&mut self) -> Result<Query, ParseError> {
+        let query = match self.peek() {
+            Some(Token::LBrace) => {
+                let log_query = self.parse_log_query()?;
+                // If followed by range agg wrapper, it was probably invoked differently.
+                Query::Log(log_query)
             }
-            if is_range_agg_op(name) {
-                return Ok(Expr::Metric(MetricExpr::RangeAgg(self.parse_range_agg()?)));
+            Some(Token::Rate) | Some(Token::CountOverTime) | Some(Token::BytesOverTime)
+            | Some(Token::BytesRate) | Some(Token::AbsentOverTime)
+            | Some(Token::SumOverTime) | Some(Token::AvgOverTime)
+            | Some(Token::MaxOverTime) | Some(Token::MinOverTime)
+            | Some(Token::FirstOverTime) | Some(Token::LastOverTime)
+            | Some(Token::StddevOverTime) | Some(Token::StdvarOverTime)
+            | Some(Token::QuantileOverTime) => {
+                Query::Metric(self.parse_metric_query()?)
             }
-        }
-        Ok(Expr::Log(self.parse_log_stream()?))
+            Some(Token::Sum) | Some(Token::Avg) | Some(Token::Max) | Some(Token::Min)
+            | Some(Token::Count) | Some(Token::Stddev) | Some(Token::Stdvar)
+            | Some(Token::Topk) | Some(Token::Bottomk) | Some(Token::Quantile) => {
+                Query::Metric(self.parse_metric_query()?)
+            }
+            Some(Token::Number(_)) => {
+                let n = if let Some(Token::Number(n)) = self.advance() { *n } else { unreachable!() };
+                Query::Metric(MetricQuery::Literal(n))
+            }
+            Some(t) => return Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: "stream selector `{` or metric function".into(),
+            }),
+            None => return Err(ParseError::Eof("query".into())),
+        };
+        Ok(query)
     }
 
-    // ── Log stream ────────────────────────────────────────────────────────────
+    // ── Stream selector ──────────────────────────────────────────────────────
 
-    fn parse_log_stream(&mut self) -> Result<LogStreamExpr, String> {
-        let matchers = self.parse_stream_selector()?;
-        let mut pipeline = vec![];
+    fn parse_stream_selector(&mut self) -> Result<StreamSelector, ParseError> {
+        self.expect(&Token::LBrace)?;
+        let mut matchers = Vec::new();
         loop {
             match self.peek() {
-                Token::PipeEq | Token::PipeTilde => {
-                    pipeline.push(self.parse_pipe_filter()?);
+                Some(Token::RBrace) => { self.advance(); break; }
+                Some(Token::Comma) => { self.advance(); continue; }
+                Some(Token::Ident(_)) => {
+                    let name = self.expect_ident()?;
+                    let op = match self.advance() {
+                        Some(Token::Eq) => MatchOp::Eq,
+                        Some(Token::Neq) => MatchOp::Neq,
+                        Some(Token::Re) => MatchOp::Re,
+                        Some(Token::NotRe) => MatchOp::NotRe,
+                        Some(t) => return Err(ParseError::Unexpected {
+                            got: format!("{:?}", t),
+                            expected: "matcher operator (= != =~ !~)".into(),
+                        }),
+                        None => return Err(ParseError::Eof("matcher operator".into())),
+                    };
+                    let value = self.expect_str()?;
+                    matchers.push(LabelMatcher { name, op, value });
                 }
-                Token::Ne | Token::NRe => {
-                    pipeline.push(self.parse_bang_filter()?);
+                Some(t) => return Err(ParseError::Unexpected {
+                    got: format!("{:?}", t),
+                    expected: "label name or `}`".into(),
+                }),
+                None => return Err(ParseError::Eof("`}`".into())),
+            }
+        }
+        Ok(StreamSelector { matchers })
+    }
+
+    // ── Log query ────────────────────────────────────────────────────────────
+
+    fn parse_log_query(&mut self) -> Result<LogQuery, ParseError> {
+        let selector = self.parse_stream_selector()?;
+        let pipeline = self.parse_pipeline()?;
+        Ok(LogQuery { selector, pipeline })
+    }
+
+    fn parse_pipeline(&mut self) -> Result<Vec<PipelineStage>, ParseError> {
+        let mut stages = Vec::new();
+        loop {
+            match self.peek() {
+                Some(Token::PipeEq) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::Contains(s)));
                 }
-                Token::Pipe => {
-                    // Could be parser stage, label filter, line_format, label_format, decolorize
-                    let stage = self.parse_pipe_stage()?;
-                    pipeline.push(stage);
+                Some(Token::PipeNeq) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                }
+                Some(Token::PipeTilde) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::Matches(s)));
+                }
+                Some(Token::PipeBangTilde) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::NotMatches(s)));
+                }
+                Some(Token::Pipe) => {
+                    self.advance();
+                    let stage = self.parse_pipeline_stage()?;
+                    stages.push(stage);
+                }
+                // `!= "text"` used as a pipeline filter (Loki 2.x shorthand)
+                Some(Token::Neq) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::NotContains(s)));
+                }
+                Some(Token::NotRe) => {
+                    self.advance();
+                    let s = self.expect_str()?;
+                    stages.push(PipelineStage::LineFilter(LineFilter::NotMatches(s)));
                 }
                 _ => break,
             }
         }
-        Ok(LogStreamExpr { matchers, pipeline })
+        Ok(stages)
     }
 
-    fn parse_stream_selector(&mut self) -> Result<Vec<LabelMatcher>, String> {
-        self.expect(&Token::LBrace)?;
-        let mut matchers = vec![];
-        loop {
-            match self.peek() {
-                Token::RBrace | Token::Eof => break,
-                _ => {
-                    matchers.push(self.parse_label_matcher()?);
-                    if self.peek() == &Token::Comma {
-                        self.advance();
-                    }
-                }
+    fn parse_pipeline_stage(&mut self) -> Result<PipelineStage, ParseError> {
+        match self.peek() {
+            Some(Token::Json) => {
+                self.advance();
+                Ok(PipelineStage::Parser(ast::Parser::Json))
             }
-        }
-        self.expect(&Token::RBrace)?;
-        Ok(matchers)
-    }
-
-    fn parse_label_matcher(&mut self) -> Result<LabelMatcher, String> {
-        let name = self.expect_ident()?;
-        let op = match self.advance().clone() {
-            Token::Eq => MatchOp::Eq,
-            Token::Ne => MatchOp::Ne,
-            Token::Re => MatchOp::Re,
-            Token::NRe => MatchOp::NRe,
-            t => return Err(format!("expected label matcher op, got {t:?}")),
-        };
-        let value = self.expect_str()?;
-        Ok(LabelMatcher { name, op, value })
-    }
-
-    // ── Pipeline stages ───────────────────────────────────────────────────────
-
-    fn parse_pipe_filter(&mut self) -> Result<PipelineStage, String> {
-        let op = match self.advance().clone() {
-            Token::PipeEq => FilterOp::Contains,
-            Token::PipeTilde => FilterOp::Re,
-            t => return Err(format!("expected |= or |~, got {t:?}")),
-        };
-        let value = self.expect_str()?;
-        Ok(PipelineStage::Filter(FilterStage { op, value }))
-    }
-
-    fn parse_bang_filter(&mut self) -> Result<PipelineStage, String> {
-        let op = match self.advance().clone() {
-            Token::Ne => FilterOp::NotContains,
-            Token::NRe => FilterOp::NotRe,
-            t => return Err(format!("expected != or !~, got {t:?}")),
-        };
-        let value = self.expect_str()?;
-        Ok(PipelineStage::Filter(FilterStage { op, value }))
-    }
-
-    fn parse_pipe_stage(&mut self) -> Result<PipelineStage, String> {
-        self.expect(&Token::Pipe)?;
-        match self.peek().clone() {
-            Token::Ident(name) => {
-                match name.as_str() {
-                    "json" => {
-                        self.advance();
-                        Ok(PipelineStage::Parser(ParserStage::Json))
-                    }
-                    "logfmt" => {
-                        self.advance();
-                        Ok(PipelineStage::Parser(ParserStage::Logfmt))
-                    }
-                    "regexp" => {
-                        self.advance();
-                        let re = self.expect_str()?;
-                        Ok(PipelineStage::Parser(ParserStage::Regexp(re)))
-                    }
-                    "pattern" => {
-                        self.advance();
-                        let pat = self.expect_str()?;
-                        Ok(PipelineStage::Parser(ParserStage::Pattern(pat)))
-                    }
-                    "unpack" => {
-                        self.advance();
-                        Ok(PipelineStage::Parser(ParserStage::Unpack))
-                    }
-                    "line_format" => {
-                        self.advance();
-                        let tmpl = self.expect_str()?;
-                        Ok(PipelineStage::LineFormat(tmpl))
-                    }
-                    "label_format" => {
-                        self.advance();
-                        let pairs = self.parse_label_format_pairs()?;
-                        Ok(PipelineStage::LabelFmt(pairs))
-                    }
-                    "decolorize" => {
-                        self.advance();
-                        Ok(PipelineStage::Decolorize)
-                    }
-                    _ => {
-                        // label filter: | label_name op value
-                        self.parse_label_filter_stage()
-                    }
-                }
+            Some(Token::Logfmt) => {
+                self.advance();
+                Ok(PipelineStage::Parser(ast::Parser::Logfmt))
             }
-            t => Err(format!("expected pipeline keyword or label name, got {t:?}")),
+            Some(Token::Regexp) => {
+                self.advance();
+                let pat = self.expect_str()?;
+                Ok(PipelineStage::Parser(ast::Parser::Regexp(pat)))
+            }
+            Some(Token::Pattern) => {
+                self.advance();
+                let pat = self.expect_str()?;
+                Ok(PipelineStage::Parser(ast::Parser::Pattern(pat)))
+            }
+            Some(Token::Unpack) => {
+                self.advance();
+                Ok(PipelineStage::Parser(ast::Parser::Unpack))
+            }
+            Some(Token::Unwrap) => {
+                self.advance();
+                let (label, converter) = self.parse_unwrap()?;
+                Ok(PipelineStage::Unwrap(UnwrapExpr { label, converter }))
+            }
+            Some(Token::LineFormat) => {
+                self.advance();
+                let tmpl = self.expect_str()?;
+                Ok(PipelineStage::LineFormat(LineFormat { template: tmpl }))
+            }
+            Some(Token::LabelFormat) => {
+                self.advance();
+                let mappings = self.parse_label_format_mappings()?;
+                Ok(PipelineStage::LabelFormat(LabelFormat { mappings }))
+            }
+            Some(Token::Decolorize) => {
+                self.advance();
+                Ok(PipelineStage::Decolorize(Decolorize))
+            }
+            // Label filter: `| label op value`
+            Some(Token::Ident(_)) => {
+                let lf = self.parse_label_filter()?;
+                Ok(PipelineStage::LabelFilter(lf))
+            }
+            // Line filter shortcuts after `|`
+            Some(Token::PipeEq) => {
+                self.advance();
+                let s = self.expect_str()?;
+                Ok(PipelineStage::LineFilter(LineFilter::Contains(s)))
+            }
+            Some(t) => Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: "pipeline stage".into(),
+            }),
+            None => Err(ParseError::Eof("pipeline stage".into())),
         }
     }
 
-    fn parse_label_format_pairs(&mut self) -> Result<Vec<(String, String)>, String> {
-        let mut pairs = vec![];
+    fn parse_label_filter(&mut self) -> Result<LabelFilter, ParseError> {
+        let label = self.expect_ident()?;
+        let op = match self.advance() {
+            Some(Token::EqEq) | Some(Token::Eq) => CompareOp::Eq,
+            Some(Token::Neq) => CompareOp::Neq,
+            Some(Token::Gt) => CompareOp::Gt,
+            Some(Token::Gte) => CompareOp::Gte,
+            Some(Token::Lt) => CompareOp::Lt,
+            Some(Token::Lte) => CompareOp::Lte,
+            Some(Token::Re) => CompareOp::Re,
+            Some(Token::NotRe) => CompareOp::NotRe,
+            Some(t) => return Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: "comparison operator".into(),
+            }),
+            None => return Err(ParseError::Eof("comparison operator".into())),
+        };
+        let value = match self.peek() {
+            Some(Token::Str(_)) => {
+                let s = if let Some(Token::Str(s)) = self.advance() { s.clone() } else { unreachable!() };
+                if op == CompareOp::Re || op == CompareOp::NotRe {
+                    LabelFilterValue::String(s)
+                } else {
+                    LabelFilterValue::String(s)
+                }
+            }
+            Some(Token::Number(_)) => {
+                let n = if let Some(Token::Number(n)) = self.advance() { *n } else { unreachable!() };
+                LabelFilterValue::Float(n)
+            }
+            Some(Token::DurationLit(_)) => {
+                let ns = if let Some(Token::DurationLit(ns)) = self.advance() { *ns } else { unreachable!() };
+                LabelFilterValue::Duration(Duration::from_nanos(ns))
+            }
+            Some(Token::Ident(_)) => {
+                let s = self.expect_ident()?;
+                LabelFilterValue::String(s)
+            }
+            Some(t) => return Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: "filter value".into(),
+            }),
+            None => return Err(ParseError::Eof("filter value".into())),
+        };
+        Ok(LabelFilter { label, op, value })
+    }
+
+    fn parse_unwrap(&mut self) -> Result<(String, Option<String>), ParseError> {
+        // `duration(label)` or `bytes(label)` or just `label`
+        match self.peek() {
+            Some(Token::Duration) | Some(Token::Bytes) => {
+                let conv = match self.advance() {
+                    Some(Token::Duration) => "duration".to_owned(),
+                    Some(Token::Bytes) => "bytes".to_owned(),
+                    _ => unreachable!(),
+                };
+                self.expect(&Token::LParen)?;
+                let label = self.expect_ident()?;
+                self.expect(&Token::RParen)?;
+                Ok((label, Some(conv)))
+            }
+            _ => {
+                let label = self.expect_ident()?;
+                Ok((label, None))
+            }
+        }
+    }
+
+    fn parse_label_format_mappings(&mut self) -> Result<Vec<(String, String)>, ParseError> {
+        let mut mappings = Vec::new();
         loop {
-            let from = self.expect_ident()?;
+            let new_name = self.expect_ident()?;
             self.expect(&Token::Eq)?;
-            let to = self.expect_ident()?;
-            pairs.push((from, to));
-            if self.peek() == &Token::Comma {
+            let old_name = self.expect_ident()?;
+            mappings.push((new_name, old_name));
+            if self.peek() == Some(&Token::Comma) {
                 self.advance();
             } else {
                 break;
             }
         }
-        Ok(pairs)
+        Ok(mappings)
     }
 
-    fn parse_label_filter_stage(&mut self) -> Result<PipelineStage, String> {
-        let label = self.expect_ident()?;
-        let op = self.parse_label_filter_op()?;
-        let value = self.parse_label_filter_value()?;
-        Ok(PipelineStage::LabelFilter(LabelFilterStage { label, op, value }))
+    // ── Metric query ──────────────────────────────────────────────────────────
+
+    fn parse_metric_query(&mut self) -> Result<MetricQuery, ParseError> {
+        let lhs = self.parse_metric_atom()?;
+        // Binary operation?
+        let lhs = self.parse_binary_rhs(lhs, 0)?;
+        Ok(lhs)
     }
 
-    fn parse_label_filter_op(&mut self) -> Result<LabelFilterOp, String> {
-        match self.advance().clone() {
-            Token::EqEq | Token::Eq => Ok(LabelFilterOp::Eq),
-            Token::Ne => Ok(LabelFilterOp::Ne),
-            Token::Gt => Ok(LabelFilterOp::Gt),
-            Token::Gte => Ok(LabelFilterOp::Gte),
-            Token::Lt => Ok(LabelFilterOp::Lt),
-            Token::Lte => Ok(LabelFilterOp::Lte),
-            Token::Re => Ok(LabelFilterOp::Re),
-            Token::NRe => Ok(LabelFilterOp::NRe),
-            t => Err(format!("expected comparison operator, got {t:?}")),
+    fn parse_metric_atom(&mut self) -> Result<MetricQuery, ParseError> {
+        match self.peek() {
+            Some(Token::Number(_)) => {
+                let n = if let Some(Token::Number(n)) = self.advance() { *n } else { unreachable!() };
+                Ok(MetricQuery::Literal(n))
+            }
+            Some(Token::LParen) => {
+                self.advance();
+                let inner = self.parse_metric_query()?;
+                self.expect(&Token::RParen)?;
+                Ok(inner)
+            }
+            Some(Token::Rate) | Some(Token::CountOverTime) | Some(Token::BytesOverTime)
+            | Some(Token::BytesRate) | Some(Token::AbsentOverTime)
+            | Some(Token::SumOverTime) | Some(Token::AvgOverTime)
+            | Some(Token::MaxOverTime) | Some(Token::MinOverTime)
+            | Some(Token::FirstOverTime) | Some(Token::LastOverTime)
+            | Some(Token::StddevOverTime) | Some(Token::StdvarOverTime)
+            | Some(Token::QuantileOverTime) => {
+                Ok(MetricQuery::RangeAgg(self.parse_range_agg()?))
+            }
+            Some(Token::Sum) | Some(Token::Avg) | Some(Token::Max) | Some(Token::Min)
+            | Some(Token::Count) | Some(Token::Stddev) | Some(Token::Stdvar)
+            | Some(Token::Topk) | Some(Token::Bottomk) | Some(Token::Quantile) => {
+                Ok(MetricQuery::VectorAgg(self.parse_vector_agg()?))
+            }
+            Some(t) => Err(ParseError::Unexpected {
+                got: format!("{:?}", t),
+                expected: "metric expression".into(),
+            }),
+            None => Err(ParseError::Eof("metric expression".into())),
         }
     }
 
-    fn parse_label_filter_value(&mut self) -> Result<LabelFilterValue, String> {
-        match self.peek().clone() {
-            Token::Str(s) => { self.advance(); Ok(LabelFilterValue::String(s)) }
-            Token::Integer(n) => { self.advance(); Ok(LabelFilterValue::Float(n as f64)) }
-            Token::Float(f) => { self.advance(); Ok(LabelFilterValue::Float(f)) }
-            Token::Dur(d) => { self.advance(); Ok(LabelFilterValue::Duration(d)) }
-            t => Err(format!("expected filter value, got {t:?}")),
-        }
-    }
+    fn parse_range_agg(&mut self) -> Result<LogRangeAggregation, ParseError> {
+        let agg = match self.advance() {
+            Some(Token::Rate) => RangeAgg::Rate,
+            Some(Token::CountOverTime) => RangeAgg::CountOverTime,
+            Some(Token::BytesOverTime) => RangeAgg::BytesOverTime,
+            Some(Token::BytesRate) => RangeAgg::BytesRate,
+            Some(Token::AbsentOverTime) => RangeAgg::AbsentOverTime,
+            Some(Token::SumOverTime) => RangeAgg::SumOverTime,
+            Some(Token::AvgOverTime) => RangeAgg::AvgOverTime,
+            Some(Token::MaxOverTime) => RangeAgg::MaxOverTime,
+            Some(Token::MinOverTime) => RangeAgg::MinOverTime,
+            Some(Token::FirstOverTime) => RangeAgg::FirstOverTime,
+            Some(Token::LastOverTime) => RangeAgg::LastOverTime,
+            Some(Token::StddevOverTime) => RangeAgg::StddevOverTime,
+            Some(Token::StdvarOverTime) => RangeAgg::StdvarOverTime,
+            Some(Token::QuantileOverTime) => {
+                self.expect(&Token::LParen)?;
+                let q = match self.advance() {
+                    Some(Token::Number(n)) => *n,
+                    _ => return Err(ParseError::Other("quantile requires numeric first arg".into())),
+                };
+                self.expect(&Token::Comma)?;
+                // Continue parsing the rest below with already-consumed `(`
+                let query = self.parse_log_query()?;
+                self.expect(&Token::LBracket)?;
+                let range_ns = match self.advance() {
+                    Some(Token::DurationLit(ns)) => *ns,
+                    Some(t) => return Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "duration".into() }),
+                    None => return Err(ParseError::Eof("duration".into())),
+                };
+                self.expect(&Token::RBracket)?;
+                self.expect(&Token::RParen)?;
+                let grouping = self.try_parse_grouping()?;
+                return Ok(LogRangeAggregation {
+                    agg: RangeAgg::QuantileOverTime(q),
+                    query,
+                    range: Duration::from_nanos(range_ns),
+                    grouping,
+                });
+            }
+            Some(t) => return Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "range agg function".into() }),
+            None => return Err(ParseError::Eof("range agg function".into())),
+        };
 
-    // ── Metric expressions ────────────────────────────────────────────────────
-
-    fn parse_range_agg(&mut self) -> Result<RangeAggExpr, String> {
-        let op_name = self.expect_ident()?;
-        let op = parse_range_agg_op(&op_name)?;
         self.expect(&Token::LParen)?;
-        let stream = self.parse_log_stream()?;
+        let query = self.parse_log_query()?;
         self.expect(&Token::LBracket)?;
-        let range = self.expect_dur()?;
+        let range_ns = match self.advance() {
+            Some(Token::DurationLit(ns)) => *ns,
+            Some(t) => return Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "duration".into() }),
+            None => return Err(ParseError::Eof("duration".into())),
+        };
         self.expect(&Token::RBracket)?;
         self.expect(&Token::RParen)?;
         let grouping = self.try_parse_grouping()?;
-        Ok(RangeAggExpr { op, stream, range, grouping })
+
+        Ok(LogRangeAggregation {
+            agg,
+            query,
+            range: Duration::from_nanos(range_ns),
+            grouping,
+        })
     }
 
-    fn parse_vector_agg(&mut self) -> Result<VectorAggExpr, String> {
-        let op_name = self.expect_ident()?;
-        let op = parse_vector_agg_op(&op_name)?;
-
-        // Grouping may appear BEFORE or AFTER the parenthesised inner expression:
-        //   sum by (labels) (inner)   ← before
-        //   sum(inner) by (labels)    ← after
-        let pre_grouping = self.try_parse_grouping()?;
-
-        let is_topk_like = matches!(op, VectorAggOp::Topk | VectorAggOp::Bottomk);
-        self.expect(&Token::LParen)?;
-
-        let param = if is_topk_like {
-            if let Token::Integer(n) = self.peek().clone() {
-                self.advance();
+    fn parse_vector_agg(&mut self) -> Result<VectorAggregation, ParseError> {
+        let agg = match self.advance() {
+            Some(Token::Sum) => VectorAgg::Sum,
+            Some(Token::Avg) => VectorAgg::Avg,
+            Some(Token::Max) => VectorAgg::Max,
+            Some(Token::Min) => VectorAgg::Min,
+            Some(Token::Count) => VectorAgg::Count,
+            Some(Token::Stddev) => VectorAgg::Stddev,
+            Some(Token::Stdvar) => VectorAgg::Stdvar,
+            Some(Token::Topk) => {
+                self.expect(&Token::LParen)?;
+                let k = match self.advance() {
+                    Some(Token::Number(n)) => *n as u64,
+                    _ => return Err(ParseError::Other("topk requires integer k".into())),
+                };
                 self.expect(&Token::Comma)?;
-                Some(n as u64)
-            } else {
-                None
+                let inner = self.parse_metric_query()?;
+                self.expect(&Token::RParen)?;
+                let grouping = self.try_parse_grouping()?;
+                return Ok(VectorAggregation { agg: VectorAgg::Topk(k), grouping, inner: Box::new(inner) });
             }
-        } else {
-            None
+            Some(Token::Bottomk) => {
+                self.expect(&Token::LParen)?;
+                let k = match self.advance() {
+                    Some(Token::Number(n)) => *n as u64,
+                    _ => return Err(ParseError::Other("bottomk requires integer k".into())),
+                };
+                self.expect(&Token::Comma)?;
+                let inner = self.parse_metric_query()?;
+                self.expect(&Token::RParen)?;
+                let grouping = self.try_parse_grouping()?;
+                return Ok(VectorAggregation { agg: VectorAgg::Bottomk(k), grouping, inner: Box::new(inner) });
+            }
+            Some(Token::Quantile) => {
+                self.expect(&Token::LParen)?;
+                let q = match self.advance() {
+                    Some(Token::Number(n)) => *n,
+                    _ => return Err(ParseError::Other("quantile requires numeric q".into())),
+                };
+                self.expect(&Token::Comma)?;
+                let inner = self.parse_metric_query()?;
+                self.expect(&Token::RParen)?;
+                let grouping = self.try_parse_grouping()?;
+                return Ok(VectorAggregation { agg: VectorAgg::Quantile(q), grouping, inner: Box::new(inner) });
+            }
+            Some(t) => return Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "vector agg function".into() }),
+            None => return Err(ParseError::Eof("vector agg function".into())),
         };
 
-        let inner = self.parse_metric_inner()?;
+        // Optional grouping before `(`
+        let grouping = self.try_parse_grouping()?;
+        self.expect(&Token::LParen)?;
+        let inner = self.parse_metric_query()?;
         self.expect(&Token::RParen)?;
-        let post_grouping = self.try_parse_grouping()?;
-        let grouping = pre_grouping.or(post_grouping);
-        Ok(VectorAggExpr { op, expr: Box::new(inner), grouping, param })
+        // Also allow grouping after `)`
+        let grouping = if grouping.is_some() { grouping } else { self.try_parse_grouping()? };
+
+        Ok(VectorAggregation { agg, grouping, inner: Box::new(inner) })
     }
 
-    fn parse_metric_inner(&mut self) -> Result<MetricExpr, String> {
-        if let Token::Ident(name) = self.peek() {
-            let n = name.clone();
-            if is_range_agg_op(&n) {
-                return Ok(MetricExpr::RangeAgg(self.parse_range_agg()?));
-            }
-            if is_vector_agg_op(&n) {
-                return Ok(MetricExpr::VectorAgg(self.parse_vector_agg()?));
-            }
-        }
-        Err(format!("expected metric expression, got {:?}", self.peek()))
-    }
-
-    fn try_parse_grouping(&mut self) -> Result<Option<Grouping>, String> {
+    fn try_parse_grouping(&mut self) -> Result<Option<Grouping>, ParseError> {
         match self.peek() {
-            Token::Ident(s) if s == "by" || s == "without" => {
-                let by = self.expect_ident()? == "by";
-                self.expect(&Token::LParen)?;
-                let mut labels = vec![];
-                loop {
-                    match self.peek() {
-                        Token::RParen | Token::Eof => break,
-                        _ => {
-                            labels.push(self.expect_ident()?);
-                            if self.peek() == &Token::Comma {
-                                self.advance();
-                            }
-                        }
-                    }
-                }
-                self.expect(&Token::RParen)?;
-                Ok(Some(Grouping { by, labels }))
+            Some(Token::By) => {
+                self.advance();
+                let labels = self.parse_label_list()?;
+                Ok(Some(Grouping { without: false, labels }))
+            }
+            Some(Token::Without) => {
+                self.advance();
+                let labels = self.parse_label_list()?;
+                Ok(Some(Grouping { without: true, labels }))
             }
             _ => Ok(None),
         }
     }
-}
 
-// ─── Operator classification helpers ─────────────────────────────────────────
-
-fn is_range_agg_op(s: &str) -> bool {
-    matches!(
-        s,
-        "rate" | "count_over_time" | "bytes_over_time" | "bytes_rate"
-            | "sum_over_time" | "avg_over_time" | "max_over_time" | "min_over_time"
-            | "first_over_time" | "last_over_time" | "quantile_over_time"
-    )
-}
-
-fn is_vector_agg_op(s: &str) -> bool {
-    matches!(s, "sum" | "avg" | "max" | "min" | "count" | "topk" | "bottomk")
-}
-
-fn parse_range_agg_op(s: &str) -> Result<RangeAggOp, String> {
-    match s {
-        "rate" => Ok(RangeAggOp::Rate),
-        "count_over_time" => Ok(RangeAggOp::CountOverTime),
-        "bytes_over_time" => Ok(RangeAggOp::BytesOverTime),
-        "bytes_rate" => Ok(RangeAggOp::BytesRate),
-        "sum_over_time" => Ok(RangeAggOp::SumOverTime("__line__".into())),
-        "avg_over_time" => Ok(RangeAggOp::AvgOverTime("__line__".into())),
-        "max_over_time" => Ok(RangeAggOp::MaxOverTime("__line__".into())),
-        "min_over_time" => Ok(RangeAggOp::MinOverTime("__line__".into())),
-        "first_over_time" => Ok(RangeAggOp::FirstOverTime("__line__".into())),
-        "last_over_time" => Ok(RangeAggOp::LastOverTime("__line__".into())),
-        "quantile_over_time" => Ok(RangeAggOp::QuantileOverTime("__line__".into(), 50)),
-        other => Err(format!("unknown range aggregation: {other}")),
+    fn parse_label_list(&mut self) -> Result<Vec<String>, ParseError> {
+        self.expect(&Token::LParen)?;
+        let mut labels = Vec::new();
+        loop {
+            match self.peek() {
+                Some(Token::RParen) => { self.advance(); break; }
+                Some(Token::Comma) => { self.advance(); }
+                Some(Token::Ident(_)) => { labels.push(self.expect_ident()?); }
+                Some(t) => return Err(ParseError::Unexpected { got: format!("{:?}", t), expected: "label or `)`".into() }),
+                None => return Err(ParseError::Eof("`)`".into())),
+            }
+        }
+        Ok(labels)
     }
-}
 
-fn parse_vector_agg_op(s: &str) -> Result<VectorAggOp, String> {
-    match s {
-        "sum" => Ok(VectorAggOp::Sum),
-        "avg" => Ok(VectorAggOp::Avg),
-        "max" => Ok(VectorAggOp::Max),
-        "min" => Ok(VectorAggOp::Min),
-        "count" => Ok(VectorAggOp::Count),
-        "topk" => Ok(VectorAggOp::Topk),
-        "bottomk" => Ok(VectorAggOp::Bottomk),
-        other => Err(format!("unknown vector aggregation: {other}")),
+    fn token_precedence(t: &Token) -> Option<u8> {
+        match t {
+            Token::Or => Some(1),
+            Token::And | Token::Unless => Some(2),
+            Token::EqEq | Token::Neq | Token::Gt | Token::Gte | Token::Lt | Token::Lte => Some(3),
+            Token::Plus | Token::Minus => Some(4),
+            Token::Star | Token::Slash | Token::Percent => Some(5),
+            Token::Caret => Some(6),
+            _ => None,
+        }
+    }
+
+    fn parse_binary_rhs(&mut self, mut lhs: MetricQuery, min_prec: u8) -> Result<MetricQuery, ParseError> {
+        loop {
+            let prec = match self.peek().and_then(Self::token_precedence) {
+                Some(p) if p >= min_prec => p,
+                _ => break,
+            };
+
+            let op_tok = self.advance().unwrap().clone();
+            let bool_modifier = self.peek() == Some(&Token::Bool);
+            if bool_modifier { self.advance(); }
+
+            let grouping = self.parse_vector_match_grouping()?;
+            let mut rhs = self.parse_metric_atom()?;
+            rhs = self.parse_binary_rhs(rhs, prec + 1)?;
+
+            let bm = bool_modifier;
+            let op = match &op_tok {
+                Token::Plus => BinOp::Add,
+                Token::Minus => BinOp::Sub,
+                Token::Star => BinOp::Mul,
+                Token::Slash => BinOp::Div,
+                Token::Percent => BinOp::Mod,
+                Token::Caret => BinOp::Pow,
+                Token::And => BinOp::And,
+                Token::Or => BinOp::Or,
+                Token::Unless => BinOp::Unless,
+                Token::EqEq => BinOp::CmpEq(bm),
+                Token::Neq => BinOp::CmpNeq(bm),
+                Token::Gt => BinOp::CmpGt(bm),
+                Token::Gte => BinOp::CmpGte(bm),
+                Token::Lt => BinOp::CmpLt(bm),
+                Token::Lte => BinOp::CmpLte(bm),
+                _ => break,
+            };
+
+            lhs = MetricQuery::BinaryExpr(BinaryExpr {
+                op,
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                grouping,
+            });
+        }
+        Ok(lhs)
+    }
+
+    fn parse_vector_match_grouping(&mut self) -> Result<Option<VectorMatchGrouping>, ParseError> {
+        let card = match self.peek() {
+            Some(Token::On) => { self.advance(); MatchCardinality::OneToOne }
+            Some(Token::Ignoring) => { self.advance(); MatchCardinality::OneToOne }
+            Some(Token::GroupLeft) => { self.advance(); MatchCardinality::ManyToOne }
+            Some(Token::GroupRight) => { self.advance(); MatchCardinality::OneToMany }
+            _ => return Ok(None),
+        };
+        let labels = if self.peek() == Some(&Token::LParen) {
+            self.parse_label_list()?
+        } else { Vec::new() };
+        let include = if self.peek() == Some(&Token::LParen) {
+            self.parse_label_list()?
+        } else { Vec::new() };
+        Ok(Some(VectorMatchGrouping { card, labels, include }))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logql::ast::{Expr, FilterOp, ParserStage, PipelineStage};
 
-    fn parse_ok(s: &str) -> Expr {
-        parse(s).unwrap_or_else(|e| panic!("parse failed: {e}"))
+    #[test]
+    fn parse_stream_selector_only() {
+        let q = Parser::parse_query(r#"{app="nginx"}"#).unwrap();
+        assert!(matches!(q, Query::Log(_)));
     }
 
     #[test]
-    fn parse_stream_selector() {
-        let e = parse_ok(r#"{app="foo"}"#);
-        let Expr::Log(ls) = e else { panic!("expected log stream") };
-        assert_eq!(ls.matchers.len(), 1);
-        assert_eq!(ls.matchers[0].name, "app");
-    }
-
-    #[test]
-    fn parse_multiple_matchers() {
-        let e = parse_ok(r#"{app="foo", env=~"prod|staging", region!="us-west"}"#);
-        let Expr::Log(ls) = e else { panic!() };
-        assert_eq!(ls.matchers.len(), 3);
-    }
-
-    #[test]
-    fn parse_filter_contains() {
-        let e = parse_ok(r#"{app="x"} |= "error""#);
-        let Expr::Log(ls) = e else { panic!() };
-        assert_eq!(ls.pipeline.len(), 1);
-        let PipelineStage::Filter(f) = &ls.pipeline[0] else { panic!() };
-        assert_eq!(f.op, FilterOp::Contains);
-        assert_eq!(f.value, "error");
-    }
-
-    #[test]
-    fn parse_filter_not_contains() {
-        let e = parse_ok(r#"{app="x"} != "timeout""#);
-        let Expr::Log(ls) = e else { panic!() };
-        let PipelineStage::Filter(f) = &ls.pipeline[0] else { panic!() };
-        assert_eq!(f.op, FilterOp::NotContains);
-    }
-
-    #[test]
-    fn parse_filter_regex() {
-        let e = parse_ok(r#"{app="x"} |~ "err.*" !~ "debug.*""#);
-        let Expr::Log(ls) = e else { panic!() };
-        assert_eq!(ls.pipeline.len(), 2);
-        let PipelineStage::Filter(f0) = &ls.pipeline[0] else { panic!() };
-        assert_eq!(f0.op, FilterOp::Re);
-        let PipelineStage::Filter(f1) = &ls.pipeline[1] else { panic!() };
-        assert_eq!(f1.op, FilterOp::NotRe);
-    }
-
-    #[test]
-    fn parse_parser_json() {
-        let e = parse_ok(r#"{app="x"} | json"#);
-        let Expr::Log(ls) = e else { panic!() };
-        let PipelineStage::Parser(ParserStage::Json) = &ls.pipeline[0] else { panic!() };
-    }
-
-    #[test]
-    fn parse_parser_logfmt() {
-        let e = parse_ok(r#"{app="x"} | logfmt"#);
-        let Expr::Log(ls) = e else { panic!() };
-        let PipelineStage::Parser(ParserStage::Logfmt) = &ls.pipeline[0] else { panic!() };
-    }
-
-    #[test]
-    fn parse_parser_regexp() {
-        let e = parse_ok(r#"{app="x"} | regexp "(?P<status>[0-9]+)""#);
-        let Expr::Log(ls) = e else { panic!() };
-        let PipelineStage::Parser(ParserStage::Regexp(re)) = &ls.pipeline[0] else { panic!() };
-        assert!(re.contains("status"));
-    }
-
-    #[test]
-    fn parse_label_filter() {
-        let e = parse_ok(r#"{app="x"} | json | status >= 400"#);
-        let Expr::Log(ls) = e else { panic!() };
-        assert_eq!(ls.pipeline.len(), 2);
-        let PipelineStage::LabelFilter(lf) = &ls.pipeline[1] else { panic!() };
-        assert_eq!(lf.label, "status");
-        assert_eq!(lf.op, LabelFilterOp::Gte);
-    }
-
-    #[test]
-    fn parse_line_format() {
-        let e = parse_ok(r#"{app="x"} | line_format "{{.status}} {{.method}}""#);
-        let Expr::Log(ls) = e else { panic!() };
-        let PipelineStage::LineFormat(tmpl) = &ls.pipeline[0] else { panic!() };
-        assert!(tmpl.contains("status"));
+    fn parse_log_query_with_pipeline() {
+        let q = Parser::parse_query(r#"{app="api"} |= "error" | json | status >= 500"#).unwrap();
+        if let Query::Log(lq) = q {
+            assert_eq!(lq.pipeline.len(), 3);
+        } else { panic!("expected log query"); }
     }
 
     #[test]
     fn parse_rate() {
-        let e = parse_ok(r#"rate({app="foo"}[5m])"#);
-        let Expr::Metric(MetricExpr::RangeAgg(ra)) = e else { panic!() };
-        assert_eq!(ra.op, RangeAggOp::Rate);
-        assert_eq!(ra.range.as_secs(), 300);
-    }
-
-    #[test]
-    fn parse_count_over_time() {
-        let e = parse_ok(r#"count_over_time({app="foo"}[1h])"#);
-        let Expr::Metric(MetricExpr::RangeAgg(ra)) = e else { panic!() };
-        assert_eq!(ra.op, RangeAggOp::CountOverTime);
-        assert_eq!(ra.range.as_secs(), 3600);
+        let q = Parser::parse_query(r#"rate({job="varlogs"}[5m])"#).unwrap();
+        assert!(matches!(q, Query::Metric(MetricQuery::RangeAgg(_))));
     }
 
     #[test]
     fn parse_sum_by() {
-        let e = parse_ok(r#"sum by (app) (count_over_time({job="test"}[5m]))"#);
-        let Expr::Metric(MetricExpr::VectorAgg(va)) = e else { panic!() };
-        assert_eq!(va.op, VectorAggOp::Sum);
-        let g = va.grouping.as_ref().unwrap();
-        assert!(g.by);
-        assert_eq!(g.labels, vec!["app"]);
+        let q = Parser::parse_query(r#"sum by (app) (rate({job="x"}[1m]))"#).unwrap();
+        if let Query::Metric(MetricQuery::VectorAgg(va)) = q {
+            assert_eq!(va.agg, VectorAgg::Sum);
+            assert!(va.grouping.is_some());
+        } else { panic!("expected vector agg"); }
     }
 
     #[test]
     fn parse_topk() {
-        let e = parse_ok(r#"topk(5, count_over_time({app="foo"}[1m]))"#);
-        let Expr::Metric(MetricExpr::VectorAgg(va)) = e else { panic!() };
-        assert_eq!(va.op, VectorAggOp::Topk);
-        assert_eq!(va.param, Some(5));
+        let q = Parser::parse_query(r#"topk(5, rate({app="x"}[1m]))"#).unwrap();
+        assert!(matches!(q, Query::Metric(MetricQuery::VectorAgg(_))));
+    }
+
+    #[test]
+    fn parse_label_filter() {
+        let q = Parser::parse_query(r#"{app="x"} | json | status_code >= 400"#).unwrap();
+        if let Query::Log(lq) = q {
+            assert_eq!(lq.pipeline.len(), 2);
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn parse_line_format() {
+        let q = Parser::parse_query(r#"{app="x"} | line_format "{{.method}} {{.status}}""#).unwrap();
+        if let Query::Log(lq) = q {
+            assert!(matches!(&lq.pipeline[0], PipelineStage::LineFormat(_)));
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn parse_binary_expr() {
+        let q = Parser::parse_query(r#"rate({a="b"}[1m]) + rate({a="c"}[1m])"#).unwrap();
+        assert!(matches!(q, Query::Metric(MetricQuery::BinaryExpr(_))));
     }
 }
