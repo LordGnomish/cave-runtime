@@ -23,6 +23,7 @@ cave-docs = { path = "../cave-docs" }
 cave-status = { path = "../cave-status" }
 cave-changelog = { path = "../cave-changelog" }
 cave-certs = { path = "../cave-certs" }
+<<<<<<< HEAD
 # Platform governance modules
 cave-tracker = { path = "../cave-tracker" }
 cave-compliance = { path = "../cave-compliance" }
@@ -30,6 +31,9 @@ cave-cost-alloc = { path = "../cave-cost-alloc" }
 cave-runbook = { path = "../cave-runbook" }
 cave-gitops-config = { path = "../cave-gitops-config" }
 cave-llm-gateway = { path = "../cave-llm-gateway" }
+=======
+cave-pg = { path = "../cave-pg" }
+>>>>>>> claude/bold-hamilton
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }
