@@ -84,6 +84,7 @@ members = [
     "crates/cave-artifacts",
     # === Phase 5: Developer Experience ===
     # === Platform ===
+    # === Infrastructure ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===
@@ -163,6 +164,11 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 async-trait = "0.1"
 # Markdown rendering
 pulldown-cmark = "0.12"
+# Encoding
+base64 = "0.22"
+# Random number generation
+rand = { version = "0.8", features = ["std"] }
+# async traits
 
 [profile.release]
 opt-level = 3
