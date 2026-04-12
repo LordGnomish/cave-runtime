@@ -10,7 +10,7 @@ name = "cave-runtime"
 path = "src/main.rs"
 
 [dependencies]
-# Shared
+# Shared infrastructure
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
@@ -23,17 +23,69 @@ cave-docs = { path = "../cave-docs" }
 cave-status = { path = "../cave-status" }
 cave-changelog = { path = "../cave-changelog" }
 cave-certs = { path = "../cave-certs" }
-<<<<<<< HEAD
-# Platform governance modules
+# Phase 2 modules
+cave-vulns = { path = "../cave-vulns" }
+cave-sbom = { path = "../cave-sbom" }
+cave-uptime = { path = "../cave-uptime" }
+cave-cost = { path = "../cave-cost" }
+cave-sign = { path = "../cave-sign" }
+cave-forensics = { path = "../cave-forensics" }
+# Phase 3 modules
+cave-devlake = { path = "../cave-devlake" }
+cave-ai-obs = { path = "../cave-ai-obs" }
+cave-pii = { path = "../cave-pii" }
+cave-incidents = { path = "../cave-incidents" }
+cave-chat = { path = "../cave-chat" }
+cave-slo = { path = "../cave-slo" }
+cave-alerts = { path = "../cave-alerts" }
+cave-profiler = { path = "../cave-profiler" }
+# Phase 4 modules
+cave-registry = { path = "../cave-registry" }
+cave-workflows = { path = "../cave-workflows" }
+cave-scan = { path = "../cave-scan" }
+cave-portal = { path = "../cave-portal" }
+cave-scaffold = { path = "../cave-scaffold" }
+cave-chaos = { path = "../cave-chaos" }
+cave-policy = { path = "../cave-policy" }
+cave-dast = { path = "../cave-dast" }
+cave-backup = { path = "../cave-backup" }
+cave-pam = { path = "../cave-pam" }
+# LLM Gateway
+cave-llm-gateway = { path = "../cave-llm-gateway" }
+# Infrastructure & Networking
+cave-gateway = { path = "../cave-gateway" }
+cave-dns = { path = "../cave-dns" }
+cave-mesh = { path = "../cave-mesh" }
+cave-cluster = { path = "../cave-cluster" }
+cave-ha = { path = "../cave-ha" }
+cave-infra = { path = "../cave-infra" }
+# Data & Storage
+cave-pg = { path = "../cave-pg" }
+cave-cache = { path = "../cave-cache" }
+cave-store = { path = "../cave-store" }
+cave-streams = { path = "../cave-streams" }
+# Observability
+cave-metrics = { path = "../cave-metrics" }
+cave-logs = { path = "../cave-logs" }
+cave-trace = { path = "../cave-trace" }
+# Security & Admission
+cave-admission = { path = "../cave-admission" }
+cave-security = { path = "../cave-security" }
+cave-vault = { path = "../cave-vault" }
+# Developer Experience
+cave-dashboard = { path = "../cave-dashboard" }
+cave-docs-site = { path = "../cave-docs-site" }
+cave-deploy = { path = "../cave-deploy" }
+cave-pipelines = { path = "../cave-pipelines" }
+cave-rollouts = { path = "../cave-rollouts" }
+# Asset Management
+cave-artifacts = { path = "../cave-artifacts" }
+# Governance
 cave-tracker = { path = "../cave-tracker" }
-cave-compliance = { path = "../cave-compliance" }
-cave-cost-alloc = { path = "../cave-cost-alloc" }
 cave-runbook = { path = "../cave-runbook" }
 cave-gitops-config = { path = "../cave-gitops-config" }
-cave-llm-gateway = { path = "../cave-llm-gateway" }
-=======
-cave-pg = { path = "../cave-pg" }
->>>>>>> claude/bold-hamilton
+cave-compliance = { path = "../cave-compliance" }
+cave-cost-alloc = { path = "../cave-cost-alloc" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }

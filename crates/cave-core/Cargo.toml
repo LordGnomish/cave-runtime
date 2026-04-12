@@ -12,14 +12,6 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-<<<<<<< HEAD
 tokio-postgres = { workspace = true }
 config = { workspace = true }
 tracing = { workspace = true }
-tokio-postgres = { workspace = true }
-anyhow = { workspace = true }
-=======
-config = { workspace = true }
-tracing = { workspace = true }
-tokio-postgres = { workspace = true }
->>>>>>> claude/bold-hamilton
