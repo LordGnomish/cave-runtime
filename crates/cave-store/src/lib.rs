@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
 //! cave-store — MinIO replacement for object storage management.
 //!
 //! Replaces: MinIO, AWS S3 (dev/platform use)
@@ -36,6 +39,7 @@ pub fn router(state: Arc<StoreState>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "store";
+<<<<<<< HEAD
 =======
 //! cave-store — Object storage, S3/MinIO replacement.
 
@@ -400,3 +404,5 @@ mod tests {
     }
 }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday

@@ -65,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -118,6 +119,12 @@ async fn main() -> anyhow::Result<()> {
     let trace_state    = Arc::new(cave_trace::TraceState { pool: Arc::clone(&pool) });
 
     // Build the unified router with all modules
+=======
+    let cache_state = Arc::new(cave_cache::CacheState::new());
+    let store_state = Arc::new(cave_store::StoreState::new());
+
+    // Build the unified router with all Phase 1 modules + data services
+>>>>>>> claude/jovial-faraday
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
@@ -133,6 +140,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -184,6 +192,11 @@ async fn main() -> anyhow::Result<()> {
 =======
         .merge(cave_infra::router(infra_state))
 >>>>>>> claude/interesting-khorana
+=======
+        // Data services
+        .merge(cave_cache::router(cache_state))
+        .merge(cave_store::router(store_state))
+>>>>>>> claude/jovial-faraday
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -212,6 +225,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -227,6 +241,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Infrastructure module: infra (replaces Terraform + Crossplane)");
 >>>>>>> claude/interesting-khorana
+=======
+    info!("Data services: cache (Redis replacement), store (MinIO replacement)");
+>>>>>>> claude/jovial-faraday
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -259,6 +276,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -270,6 +288,10 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "infra": true,
 >>>>>>> claude/interesting-khorana
+=======
+            "cache": true,
+            "store": true,
+>>>>>>> claude/jovial-faraday
         }
     }))
 }

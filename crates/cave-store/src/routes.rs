@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
 //! HTTP routes for cave-store.
 
 use crate::models::{AccessPolicy, LifecycleRule, ReplicationRule, StorageObject};
@@ -112,6 +115,7 @@ struct ReplicationRuleInput {
 #[derive(Deserialize)]
 struct PutReplicationRequest {
     rules: Vec<ReplicationRuleInput>,
+<<<<<<< HEAD
 =======
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -210,6 +214,8 @@ async fn get_policy(
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
@@ -217,6 +223,9 @@ struct ListObjectsQuery {
     prefix: Option<String>,
     max_keys: Option<usize>,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
@@ -467,6 +476,7 @@ async fn list_objects(
             Ok(Json(serde_json::json!({ "objects": meta, "count": meta.len() })))
         }
         Err(e) => Err(store_err(e)),
+<<<<<<< HEAD
 =======
     continuation_token: Option<String>,
     delimiter: Option<String>,
@@ -510,11 +520,16 @@ async fn list_objects(
         }
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
     }
 }
 
 async fn put_object(
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
     State(state): State<Arc<StoreState>>,
     Json(req): Json<PutObjectRequest>,
 ) -> ApiResult<serde_json::Value> {
@@ -525,6 +540,7 @@ async fn put_object(
             Ok(Json(serde_json::json!({ "object": meta })))
         }
         Err(e) => Err(store_err(e)),
+<<<<<<< HEAD
 =======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
@@ -548,11 +564,16 @@ async fn put_object(
         .into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
     }
 }
 
 async fn get_object(
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
     Path((bucket, key)): Path<(String, String)>,
     Query(q): Query<GetObjectQuery>,
     State(state): State<Arc<StoreState>>,
@@ -571,6 +592,7 @@ async fn get_object(
             "content": obj.content,
         }))),
         None => Err(err_not_found(&format!("object '{key}' not found in '{bucket}'"))),
+<<<<<<< HEAD
 =======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
@@ -587,11 +609,16 @@ async fn get_object(
             .into_response(),
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
     }
 }
 
 async fn delete_object(
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
     Path((bucket, key)): Path<(String, String)>,
     State(state): State<Arc<StoreState>>,
 ) -> ApiResult<serde_json::Value> {
@@ -697,6 +724,7 @@ async fn list_multipart(
         .collect();
     Json(serde_json::json!({ "uploads": uploads, "count": uploads.len() }))
 }
+<<<<<<< HEAD
 =======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
@@ -804,3 +832,5 @@ async fn abort_upload(
     }
 }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
