@@ -1,10 +1,6 @@
 [package]
 name = "cave-logs"
 description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
-description = "Log aggregation & query — replaces Loki. Loki-compatible push and LogQL query API."
-description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
-description = "Log aggregation — Grafana Loki + ELK replacement with full LogQL support, push API, WebSocket tail"
-description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -22,24 +18,6 @@ thiserror = { workspace = true }
 regex = { workspace = true }
 cave-auth = { path = "../cave-auth" }
 cave-db   = { path = "../cave-db" }
-axum       = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-tokio      = { workspace = true }
-tracing    = { workspace = true }
-uuid       = { workspace = true }
-chrono     = { workspace = true }
-thiserror  = { workspace = true }
-cave-db   = { path = "../cave-db" }
-axum        = { workspace = true, features = ["ws"] }
-tokio       = { workspace = true }
-serde       = { workspace = true }
-serde_json  = { workspace = true }
-tracing     = { workspace = true }
-chrono      = { workspace = true }
-uuid        = { workspace = true }
-thiserror   = { workspace = true }
-regex       = { workspace = true }
 bytes        = "1"
 snap         = "1"
 prost        = "0.13"

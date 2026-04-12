@@ -106,8 +106,6 @@ pub enum TransitKeyType {
 }
 
 /// Token/secret lease info
-//! Shared data models.
-/// Vault token metadata stored in the token store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseInfo {
     pub lease_id: String,
@@ -160,17 +158,6 @@ pub struct AuditEntry {
 }
 
 /// Vault seal / unseal status (mirrors /v1/sys/seal-status)
-    pub lease_duration: u64,
-    pub expire_time: DateTime<Utc>,
-impl LeaseInfo {
-    pub fn new(duration_secs: u64, renewable: bool) -> Self {
-        Self {
-            lease_id: format!("lease/{}", Uuid::new_v4()),
-            renewable,
-            lease_duration: duration_secs,
-            expire_time: Utc::now() + chrono::Duration::seconds(duration_secs as i64),
-    pub fn is_expired(&self) -> bool {
-        Utc::now() > self.expire_time
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SealStatus {
     pub sealed: bool,
@@ -185,18 +172,4 @@ pub struct SealStatus {
     pub version: String,
     pub cluster_name: String,
     pub cluster_id: String,
-    pub t: u8,
-    pub n: u8,
-    pub progress: u8,
-}
-/// Result returned from any auth method.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AuthResult {
-    pub client_token: String,
-    pub accessor: String,
-    pub policies: Vec<String>,
-    pub lease_duration: u64,
-    pub renewable: bool,
-    pub token_type: String,
-    pub metadata: std::collections::HashMap<String, String>,
 }

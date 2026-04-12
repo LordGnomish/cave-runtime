@@ -1,7 +1,6 @@
 [package]
 name = "cave-streams"
 description = "CAVE Streams — cloud-native event streaming platform, Kafka-compatible without JVM or ZooKeeper"
-description = "Cloud-native event streaming platform — replaces Kafka + Confluent Platform"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

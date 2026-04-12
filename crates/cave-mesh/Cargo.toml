@@ -25,13 +25,4 @@ prometheus-client = { workspace = true }
 jsonwebtoken     = { workspace = true }
 reqwest          = { workspace = true }
 regex            = { workspace = true }
-description = "Service mesh — replaces Istio + Linkerd. mTLS, traffic management, observability."
-axum = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
-thiserror = { workspace = true }
 ring = { workspace = true }

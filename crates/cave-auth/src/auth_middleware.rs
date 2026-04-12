@@ -15,12 +15,12 @@
 //!
 //! ## Usage in route handlers
 //!
-//! ```rust
+//! ```rust,no_run
 //! use cave_auth::auth_middleware::{AuthCtx, AuthContext};
 //!
-//! async fn my_handler(AuthCtx(ctx): AuthCtx) -> impl IntoResponse {
-//!     require_permission!(ctx, "cave-flags:write");
-//!     Json(json!({ "ok": true }))
+//! async fn my_handler(AuthCtx(ctx): AuthCtx) -> impl axum::response::IntoResponse {
+//!     // require_permission!(ctx, "cave-flags:write");
+//!     axum::Json(serde_json::json!({ "ok": true }))
 //! }
 //! ```
 //!
@@ -135,8 +135,10 @@ struct AuthState {
 /// Tower `Layer` that enforces authentication on every request.
 ///
 /// Add to your axum router with:
-/// ```rust
-/// app.layer(auth_layer)
+/// ```rust,no_run
+/// # let app: axum::Router = axum::Router::new();
+/// # let auth_layer = cave_auth::auth_middleware::AuthLayer::dev_bypass();
+/// app.layer(auth_layer);
 /// ```
 #[derive(Clone)]
 pub struct AuthLayer {
