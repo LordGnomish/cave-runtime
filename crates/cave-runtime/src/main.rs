@@ -59,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
     let lint_state = Arc::new(cave_lint::LintState::default());
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -73,6 +74,17 @@ async fn main() -> anyhow::Result<()> {
     // All module routes are wrapped with AuthLayer.  Every handler can use
     // `cave_auth::AuthCtx` extractor or `require_permission!` macro.
     let protected = Router::new()
+=======
+    let cluster_state = Arc::new(cave_cluster::ClusterState::default());
+
+    // Build the unified router with all Phase 1 modules
+    let app = Router::new()
+        // Core health endpoints
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        // Platform modules
+        .merge(cave_cluster::router(cluster_state))
+>>>>>>> claude/cranky-wozniak
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
@@ -117,6 +129,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!(port = port, "CAVE Runtime listening");
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
@@ -125,6 +138,9 @@ async fn main() -> anyhow::Result<()> {
         "Auth layer active"
     );
 =======
+=======
+    info!("Platform modules: cluster");
+>>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana

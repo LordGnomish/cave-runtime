@@ -73,6 +73,7 @@ members = [
     # === Asset & Artifact Management ===
     "crates/cave-artifacts",
     # === Phase 5: Developer Experience ===
+    # === Platform ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
