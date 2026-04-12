@@ -31,6 +31,9 @@ members = [
     "crates/cave-alerts",
     "crates/cave-profiler",
     # === Phase 4: Heavy Hitters ===
+    "crates/cave-pipelines",
+    "crates/cave-deploy",
+    "crates/cave-artifacts",
     "crates/cave-registry",
     "crates/cave-workflows",
     "crates/cave-scan",
