@@ -28,6 +28,8 @@ cave-cache = { path = "../cave-cache" }
 cave-store = { path = "../cave-store" }
 # Platform API
 cave-gitops-config = { path = "../cave-gitops-config" }
+# Phase 4 modules
+cave-tracker = { path = "../cave-tracker" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }

@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -84,6 +85,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let gitops_config_state = Arc::new(cave_gitops_config::AppState::default());
 >>>>>>> claude/modest-yonath
+=======
+    let tracker_state = Arc::new(cave_tracker::TrackerState::default());
+>>>>>>> claude/peaceful-bell
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -152,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -206,6 +211,10 @@ async fn main() -> anyhow::Result<()> {
         // Platform API
         .merge(cave_gitops_config::router(gitops_config_state))
 >>>>>>> claude/modest-yonath
+=======
+        // Phase 4 module routers
+        .merge(cave_tracker::router(tracker_state))
+>>>>>>> claude/peaceful-bell
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -236,6 +245,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -257,6 +267,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Platform API: gitops-config (Promises, Compositions, Environments, Claims)");
 >>>>>>> claude/modest-yonath
+=======
+    info!("Phase 4 modules: tracker");
+>>>>>>> claude/peaceful-bell
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -291,6 +304,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -309,6 +323,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "gitops-config": true,
 >>>>>>> claude/modest-yonath
+=======
+            "tracker": true,
+>>>>>>> claude/peaceful-bell
         }
     }))
 }
