@@ -70,6 +70,7 @@ pub struct Permission {
 }
 
 impl CaveIdentity {
+<<<<<<< HEAD
     /// Check if this identity has the required permission.
     /// Falls back to role-based evaluation when no explicit permissions are set.
     pub fn has_permission(&self, module: &str, action: &str) -> bool {
@@ -81,6 +82,24 @@ impl CaveIdentity {
             || self.permissions.contains(&"*".to_string())
         {
             return true;
+=======
+    /// Check if this identity has the required permission
+    pub fn has_permission(&self, _module: &str, action: &str) -> bool {
+        match self.roles.first() {
+            Some(CaveRole::PlatformAdmin) => true,
+            Some(CaveRole::TenantAdmin) => {
+                // Tenant admins can do anything within their tenant scope
+                !action.contains("platform:")
+            }
+            Some(CaveRole::TenantDeveloper) => {
+                // Developers can read and write, but not admin
+                !action.contains("admin") && !action.contains("platform:")
+            }
+            Some(CaveRole::TenantViewer) | Some(CaveRole::PlatformViewer) => {
+                action.contains("read") || action.contains("list")
+            }
+            None => false,
+>>>>>>> claude/heuristic-payne
         }
 
         // Fall back to coarse role evaluation
