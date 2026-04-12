@@ -45,8 +45,9 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let security_state = Arc::new(cave_security::SecurityState::default());
 
-    // Build the unified router with all Phase 1 modules
+    // Build the unified router with all Phase 1 + security modules
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
@@ -58,6 +59,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+        // Phase 2: Security (Falco + Trivy parity)
+        .merge(cave_security::router(security_state))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
@@ -68,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!(port = port, "CAVE Runtime listening");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Phase 2 modules: security (Falco + Trivy)");
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
