@@ -83,6 +83,8 @@ members = [
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === HA/DR ===
+    "crates/cave-ha",
 ]
 
 [workspace.package]
