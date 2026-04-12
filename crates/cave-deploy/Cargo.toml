@@ -1,17 +1,13 @@
 [package]
 name = "cave-deploy"
-<<<<<<< HEAD
 description = "GitOps continuous delivery — replaces ArgoCD + Flux"
-=======
 description = "GitOps deploy engine — full ArgoCD replacement. Git sync, drift detection, health assessment, ApplicationSets, multi-cluster, RBAC, notifications."
->>>>>>> claude/thirsty-snyder
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -20,10 +16,8 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-=======
 cave-auth = { path = "../cave-auth" }
 cave-db   = { path = "../cave-db" }
-
 axum          = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
@@ -42,4 +36,3 @@ deadpool-postgres = { workspace = true }
 tokio-postgres    = { workspace = true }
 regex         = { workspace = true }
 http          = "1"
->>>>>>> claude/thirsty-snyder

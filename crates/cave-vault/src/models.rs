@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Data models for cave-vault.
 //!
 //! Mirrors HashiCorp Vault's API response shapes for drop-in compatibility.
@@ -107,20 +106,12 @@ pub enum TransitKeyType {
 }
 
 /// Token/secret lease info
-=======
 //! Shared data models.
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 /// Vault token metadata stored in the token store.
->>>>>>> claude/frosty-wiles
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseInfo {
     pub lease_id: String,
     pub renewable: bool,
-<<<<<<< HEAD
     pub lease_duration: u64, // seconds
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
@@ -169,11 +160,8 @@ pub struct AuditEntry {
 }
 
 /// Vault seal / unseal status (mirrors /v1/sys/seal-status)
-=======
     pub lease_duration: u64,
     pub expire_time: DateTime<Utc>,
-}
-
 impl LeaseInfo {
     pub fn new(duration_secs: u64, renewable: bool) -> Self {
         Self {
@@ -181,20 +169,12 @@ impl LeaseInfo {
             renewable,
             lease_duration: duration_secs,
             expire_time: Utc::now() + chrono::Duration::seconds(duration_secs as i64),
-        }
-    }
-
     pub fn is_expired(&self) -> bool {
         Utc::now() > self.expire_time
-    }
-}
-
->>>>>>> claude/frosty-wiles
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SealStatus {
     pub sealed: bool,
     pub initialized: bool,
-<<<<<<< HEAD
     /// Unseal key threshold
     pub t: u32,
     /// Total unseal key shares
@@ -205,14 +185,10 @@ pub struct SealStatus {
     pub version: String,
     pub cluster_name: String,
     pub cluster_id: String,
-=======
     pub t: u8,
     pub n: u8,
     pub progress: u8,
-    pub cluster_id: String,
-    pub version: String,
 }
-
 /// Result returned from any auth method.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthResult {
@@ -223,5 +199,4 @@ pub struct AuthResult {
     pub renewable: bool,
     pub token_type: String,
     pub metadata: std::collections::HashMap<String, String>,
->>>>>>> claude/frosty-wiles
 }

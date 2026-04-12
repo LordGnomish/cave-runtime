@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/elastic-ellis
 //! cave-trace — distributed tracing, Jaeger/Tempo replacement.
 //!
 //! Ingests spans, builds trace trees, detects anomalies, and exposes
@@ -10,7 +5,6 @@
 
 pub mod analyzer;
 pub mod collector;
-=======
 //! CAVE Trace — distributed tracing backend.
 //!
 //! Replaces Jaeger / Grafana Tempo with a Rust-native implementation.
@@ -26,13 +20,10 @@ pub mod collector;
 //! - GitHub: https://github.com/open-telemetry/opentelemetry-collector
 //! - Spec:   https://opentelemetry.io/docs/specs/otlp/
 //! - Tracked: OTLP/HTTP receiver protocol
-
->>>>>>> claude/gallant-cartwright
 pub mod models;
 pub mod routes;
 
 use axum::Router;
-<<<<<<< HEAD
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -61,26 +52,15 @@ impl Default for TraceState {
 }
 
 /// Return the axum sub-router for all tracing endpoints.
-=======
 use cave_db::CavePool;
-use std::sync::Arc;
-
 /// Module state shared across request handlers.
-pub struct TraceState {
     pub pool: Arc<CavePool>,
-}
-
 /// Create the axum router for the trace module.
->>>>>>> claude/gallant-cartwright
 pub fn router(state: Arc<TraceState>) -> Router {
     routes::create_router(state)
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 //! CAVE Trace — Jaeger replacement.
-
 pub mod error;
 pub mod types;
 pub mod storage;
@@ -90,12 +70,6 @@ pub mod dependency;
 pub mod sampling;
 pub mod comparison;
 pub mod routes;
-
 pub use storage::TraceStore;
 pub use error::{TraceError, TraceResult};
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/elastic-ellis
-=======
->>>>>>> claude/gallant-cartwright
 pub const MODULE_NAME: &str = "trace";

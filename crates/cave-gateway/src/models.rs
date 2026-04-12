@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Data models for cave-gateway — Kong + Gravitee unified.
 
 use chrono::{DateTime, Utc};
@@ -7,18 +6,11 @@ use serde_json::Value;
 use uuid::Uuid;
 
 // ── Kong-side models ──────────────────────────────────────────────────────────
-=======
 //! Data models for the CAVE Gateway — Kong + Gravitee compatible types.
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
-
 // ─────────────────────────────────────────────
 //  Protocols
 // ─────────────────────────────────────────────
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Protocol {
@@ -32,11 +24,9 @@ pub enum Protocol {
     Ws,
     Wss,
 }
-
 // ─────────────────────────────────────────────
 //  Service (upstream backend definition)
 // ─────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
     pub id: Uuid,
@@ -55,7 +45,6 @@ pub struct Service {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
-
 impl Service {
     pub fn base_url(&self) -> String {
         let proto = match self.protocol {
@@ -66,16 +55,13 @@ impl Service {
         format!("{proto}://{}:{}{path}", self.host, self.port)
     }
 }
-
 // ─────────────────────────────────────────────
 //  Route
 // ─────────────────────────────────────────────
->>>>>>> claude/silly-wescoff
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Route {
     pub id: Uuid,
-<<<<<<< HEAD
     pub name: String,
     pub path_prefix: String,
     pub methods: Vec<String>,
@@ -291,12 +277,10 @@ pub struct ApiSpec {
     /// Raw YAML or JSON content of the spec.
     pub content: String,
     pub description: Option<String>,
-=======
     pub name: Option<String>,
     pub service_id: Uuid,
     pub protocols: Vec<Protocol>,
     /// HTTP methods: GET, POST, … (empty = all)
-    pub methods: Vec<String>,
     /// Host patterns (empty = all)
     pub hosts: Vec<String>,
     /// Path patterns — prefix (`/api`) or regex (`~/api/v[0-9]+`)
@@ -312,13 +296,11 @@ pub struct ApiSpec {
     /// Higher = evaluated first when multiple routes match
     pub regex_priority: i32,
     pub path_handling: PathHandling,
->>>>>>> claude/silly-wescoff
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-<<<<<<< HEAD
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ApiFormat {
     OpenApi30,
@@ -396,23 +378,16 @@ pub struct SubscriptionPlan {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PlanTier {
-=======
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PathHandling {
     #[default]
     V0,
     V1,
-}
-
 // ─────────────────────────────────────────────
 //  Upstream (load-balanced pool)
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Upstream {
-    pub id: Uuid,
-    pub name: String,
     pub algorithm: LoadBalancingAlgorithm,
     pub hash_on: HashOn,
     pub hash_fallback: HashFallback,
@@ -420,10 +395,7 @@ pub struct Upstream {
     pub hash_on_header: Option<String>,
     pub healthchecks: HealthCheckConfig,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadBalancingAlgorithm {
@@ -432,8 +404,6 @@ pub enum LoadBalancingAlgorithm {
     ConsistentHashing,
     LeastConnections,
     LatencyAware,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum HashOn {
@@ -443,8 +413,6 @@ pub enum HashOn {
     Header,
     Cookie,
     Path,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum HashFallback {
@@ -453,19 +421,12 @@ pub enum HashFallback {
     Ip,
     Header,
     Cookie,
-}
-
 // ─────────────────────────────────────────────
 //  Health check config (attached to Upstream)
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthCheckConfig {
     pub active: ActiveHealthCheck,
     pub passive: PassiveHealthCheck,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActiveHealthCheck {
     pub enabled: bool,
     pub interval_secs: u64,
@@ -474,23 +435,15 @@ pub struct ActiveHealthCheck {
     pub https_verify_certificate: bool,
     pub healthy: HealthThreshold,
     pub unhealthy: HealthThreshold,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PassiveHealthCheck {
     pub enabled: bool,
     pub healthy: HealthThreshold,
     pub unhealthy: HealthThreshold,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthThreshold {
     pub http_statuses: Vec<u16>,
     pub successes: u32,
     pub failures: u32,
     pub timeouts: u32,
-}
-
 impl Default for HealthCheckConfig {
     fn default() -> Self {
         Self {
@@ -528,27 +481,17 @@ impl Default for HealthCheckConfig {
                     timeouts: 3,
                 },
             },
-        }
-    }
-}
-
 // ─────────────────────────────────────────────
 //  Target (individual upstream host:port)
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Target {
-    pub id: Uuid,
     pub upstream_id: Uuid,
     /// "host:port" string
     pub target: String,
     pub weight: u32,
     pub health: TargetHealth,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TargetHealth {
@@ -556,38 +499,22 @@ pub enum TargetHealth {
     Healthy,
     Unhealthy,
     Degraded,
-}
-
 // ─────────────────────────────────────────────
 //  Consumer
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Consumer {
-    pub id: Uuid,
     pub username: Option<String>,
     pub custom_id: Option<String>,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 // ─────────────────────────────────────────────
 //  Credentials
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyAuthCredential {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     pub key: String,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtCredential {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     /// Identifies the credential (used as JWT `iss` or `kid`)
     pub key: String,
@@ -595,50 +522,27 @@ pub struct JwtCredential {
     pub secret: String,
     pub algorithm: String,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BasicAuthCredential {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     pub username: String,
     /// Stored as plain for simplicity; in production use bcrypt/argon2
     pub password_hash: String,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HmacAuthCredential {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     pub username: String,
     pub secret: String,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuth2Credential {
-    pub id: Uuid,
     pub consumer_id: Uuid,
-    pub name: String,
     pub client_id: String,
     pub client_secret: String,
     pub redirect_uris: Vec<String>,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-}
-
 // ─────────────────────────────────────────────
 //  Plugin
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plugin {
-    pub id: Uuid,
-    pub name: String,
     pub service_id: Option<Uuid>,
     pub route_id: Option<Uuid>,
     pub consumer_id: Option<Uuid>,
@@ -646,27 +550,17 @@ pub struct Plugin {
     pub enabled: bool,
     pub protocols: Vec<Protocol>,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 // ─────────────────────────────────────────────
 //  API Versioning / Lifecycle
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiVersion {
-    pub id: Uuid,
     pub service_id: Uuid,
-    pub version: String,
     pub status: ApiVersionStatus,
     pub deprecated_at: Option<DateTime<Utc>>,
     pub sunset_at: Option<DateTime<Utc>>,
     pub changelog: String,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ApiVersionStatus {
@@ -674,37 +568,27 @@ pub enum ApiVersionStatus {
     Active,
     Deprecated,
     Retired,
-}
-
 // ─────────────────────────────────────────────
 //  Developer Portal (Gravitee-inspired)
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortalSubscription {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     pub service_id: Uuid,
     pub plan: SubscriptionPlan,
     pub status: SubscriptionStatus,
     /// Provisioned API key for this subscription
     pub api_key: Option<String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SubscriptionPlan {
     #[default]
->>>>>>> claude/silly-wescoff
     Free,
     Basic,
     Pro,
     Enterprise,
 }
 
-<<<<<<< HEAD
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiConsumer {
     pub id: Uuid,
@@ -1111,30 +995,22 @@ pub struct PolicyFlow {
     pub route: Vec<PolicyStep>,
     pub post_route: Vec<PolicyStep>,
     pub error: Vec<PolicyStep>,
-=======
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SubscriptionStatus {
-    Pending,
     #[default]
     Active,
     Suspended,
     Cancelled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiDoc {
-    pub id: Uuid,
     pub service_id: Uuid,
     pub title: String,
     pub content: String,
     pub format: DocFormat,
->>>>>>> claude/silly-wescoff
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-<<<<<<< HEAD
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyStep {
     pub id: Uuid,
@@ -1190,7 +1066,6 @@ pub struct EvaluateFlowRequest {
     pub path: String,
     pub method: String,
     pub headers: Option<std::collections::HashMap<String, String>>,
-=======
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DocFormat {
@@ -1199,15 +1074,10 @@ pub enum DocFormat {
     OpenApi,
     AsyncApi,
     Graphql,
-}
-
 // ─────────────────────────────────────────────
 //  Monetization / Usage tracking
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageRecord {
-    pub id: Uuid,
     pub consumer_id: Uuid,
     pub service_id: Uuid,
     pub route_id: Option<Uuid>,
@@ -1216,9 +1086,6 @@ pub struct UsageRecord {
     pub response_bytes: u64,
     pub latency_ms: u64,
     pub status_code: u16,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageSummary {
     pub consumer_id: Uuid,
     pub service_id: Uuid,
@@ -1227,15 +1094,10 @@ pub struct UsageSummary {
     pub avg_latency_ms: f64,
     pub period_start: DateTime<Utc>,
     pub period_end: DateTime<Utc>,
-}
-
 // ─────────────────────────────────────────────
 //  Request / Response DTOs
 // ─────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateServiceRequest {
-    pub name: String,
     pub protocol: Option<Protocol>,
     pub host: String,
     pub port: Option<u16>,
@@ -1246,9 +1108,6 @@ pub struct CreateServiceRequest {
     pub read_timeout: Option<u64>,
     pub tags: Option<Vec<String>>,
     pub enabled: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateRouteRequest {
     pub name: Option<String>,
     pub service_id: Uuid,
@@ -1262,101 +1121,59 @@ pub struct CreateRouteRequest {
     pub preserve_host: Option<bool>,
     pub regex_priority: Option<i32>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateUpstreamRequest {
-    pub name: String,
     pub algorithm: Option<LoadBalancingAlgorithm>,
     pub hash_on: Option<HashOn>,
     pub hash_on_header: Option<String>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateTargetRequest {
     pub target: String,
     pub weight: Option<u32>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateConsumerRequest {
     pub username: Option<String>,
     pub custom_id: Option<String>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreatePluginRequest {
-    pub name: String,
     pub service_id: Option<Uuid>,
     pub route_id: Option<Uuid>,
     pub consumer_id: Option<Uuid>,
     pub config: Option<serde_json::Value>,
     pub enabled: Option<bool>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateKeyAuthRequest {
     pub key: Option<String>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateJwtRequest {
     pub key: Option<String>,
     pub secret: Option<String>,
     pub algorithm: Option<String>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateBasicAuthRequest {
     pub username: String,
     pub password: String,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateHmacAuthRequest {
     pub username: String,
     pub secret: Option<String>,
     pub tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListResponse<T> {
     pub data: Vec<T>,
     pub total: usize,
     pub next: Option<String>,
-}
-
 impl<T> ListResponse<T> {
     pub fn new(data: Vec<T>) -> Self {
         let total = data.len();
         Self { data, total, next: None }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSubscriptionRequest {
     pub consumer_id: Uuid,
     pub service_id: Uuid,
     pub plan: Option<SubscriptionPlan>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateVersionRequest {
     pub version: String,
     pub changelog: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateDocRequest {
     pub title: String,
     pub content: String,
     pub format: Option<DocFormat>,
->>>>>>> claude/silly-wescoff
 }

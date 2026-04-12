@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! HTTP route handlers for cave-vault.
 //!
 //! Exposes a Vault-compatible REST API under /api/v1/vault/...
@@ -9,18 +8,12 @@ use crate::{
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-=======
 //! HTTP routes — Vault v1 API compatible paths.
-
-use axum::{
-    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
->>>>>>> claude/frosty-wiles
     routing::{delete, get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-<<<<<<< HEAD
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -520,12 +513,8 @@ async fn transit_datakey(
         "data": {
             "plaintext": B64.encode(&plaintext),
             "ciphertext": ciphertext,
-=======
 use serde_json::Value;
-use std::collections::HashMap;
-
 use base64::Engine as _;
-
 use crate::{
     audit::AuditEntry,
     auth::AuthEngine,
@@ -535,26 +524,17 @@ use crate::{
     policy::Capability,
     transit::TransitKeyType,
     SharedVaultState,
-};
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
 fn extract_token(headers: &HeaderMap) -> Option<String> {
     headers
         .get("x-vault-token")
         .or_else(|| headers.get("X-Vault-Token"))
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
-}
-
 fn token_or_err(headers: &HeaderMap) -> Result<String, VaultError> {
     extract_token(headers).ok_or(VaultError::InvalidToken)
-}
-
 // ── Router ────────────────────────────────────────────────────────────────────
-
 pub fn create_router(state: SharedVaultState) -> Router {
-    Router::new()
         // === Sys ===
         .route("/v1/sys/health",       get(sys_health))
         .route("/v1/sys/seal-status",  get(sys_seal_status))
@@ -614,10 +594,7 @@ pub fn create_router(state: SharedVaultState) -> Router {
         .route("/v1/sys/leases/renew",  put(lease_renew))
         .route("/v1/sys/leases/revoke", put(lease_revoke))
         .with_state(state)
-}
-
 // ── Sys handlers ──────────────────────────────────────────────────────────────
-
 async fn sys_health(State(state): State<SharedVaultState>) -> Json<Value> {
     let s = state.read().await;
     Json(serde_json::json!({
@@ -626,19 +603,12 @@ async fn sys_health(State(state): State<SharedVaultState>) -> Json<Value> {
         "version": env!("CARGO_PKG_VERSION"),
         "cluster_id": s.cluster_id,
     }))
-}
-
 async fn sys_seal_status(State(state): State<SharedVaultState>) -> Json<Value> {
     let s = state.read().await;
     Json(serde_json::to_value(s.seal_status()).unwrap())
-}
-
-#[derive(Deserialize)]
 struct InitRequest {
     secret_shares: u8,
     secret_threshold: u8,
-}
-
 async fn sys_init(
     State(state): State<SharedVaultState>,
     Json(req): Json<InitRequest>,
@@ -649,8 +619,6 @@ async fn sys_init(
         "keys": shares,
         "root_token": root_token,
     })))
-}
-
 async fn sys_seal(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -660,13 +628,8 @@ async fn sys_seal(
     s.authenticate(&token)?; // must be authenticated to seal
     s.seal();
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(Deserialize)]
 struct UnsealRequest {
     key: String,
-}
-
 async fn sys_unseal(
     State(state): State<SharedVaultState>,
     Json(req): Json<UnsealRequest>,
@@ -680,8 +643,6 @@ async fn sys_unseal(
         "n": s.seal_config.secret_shares,
         "unsealed": done,
     })))
-}
-
 async fn sys_list_policies(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -690,12 +651,9 @@ async fn sys_list_policies(
     let token = token_or_err(&headers)?;
     s.authenticate(&token)?;
     Ok(Json(serde_json::json!({ "policies": s.policy.list() })))
-}
-
 async fn sys_get_policy(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
     let token = token_or_err(&headers)?;
@@ -703,17 +661,11 @@ async fn sys_get_policy(
     let policy = s.policy.get(&name)
         .ok_or_else(|| VaultError::NotFound(format!("policy '{name}'")))?;
     Ok(Json(serde_json::to_value(policy).unwrap()))
-}
-
-#[derive(Deserialize)]
 struct PolicyRequest {
     paths: Vec<crate::policy::PolicyPath>,
-}
-
 async fn sys_put_policy(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<PolicyRequest>,
 ) -> Result<StatusCode, VaultError> {
     let mut s = state.write().await;
@@ -726,12 +678,9 @@ async fn sys_put_policy(
         paths: req.paths,
     });
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn sys_delete_policy(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<StatusCode, VaultError> {
     let mut s = state.write().await;
     let token = token_or_err(&headers)?;
@@ -740,8 +689,6 @@ async fn sys_delete_policy(
         .map_err(|_| VaultError::PermissionDenied("sys/policy delete".into()))?;
     s.policy.delete(&name);
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn sys_audit_log(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -753,19 +700,13 @@ async fn sys_audit_log(
         .map_err(|_| VaultError::PermissionDenied("sys/audit read".into()))?;
     let entries = s.audit.entries();
     Ok(Json(serde_json::json!({ "entries": entries })))
-}
-
 // ── Auth: Token ───────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct TokenCreateRequest {
     policies: Option<Vec<String>>,
     ttl: Option<u64>,
     renewable: Option<bool>,
     display_name: Option<String>,
     meta: Option<HashMap<String, String>>,
-}
-
 async fn auth_token_create(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -776,7 +717,6 @@ async fn auth_token_create(
     let caller_policies = s.authenticate(&token_str)?;
     s.policy.check(&caller_policies, "auth/token/create", &Capability::Create)
         .map_err(|_| VaultError::PermissionDenied("auth/token/create".into()))?;
-
     let new_token = s.auth.mint_token(
         req.display_name.as_deref().unwrap_or("token"),
         req.policies.unwrap_or_else(|| vec!["default".into()]),
@@ -791,12 +731,10 @@ async fn auth_token_create(
             "policies": new_token.policies,
             "lease_duration": new_token.ttl,
             "renewable": new_token.renewable,
->>>>>>> claude/frosty-wiles
         }
     })))
 }
 
-<<<<<<< HEAD
 #[derive(Deserialize)]
 struct RewrapRequest {
     ciphertext: String,
@@ -829,7 +767,6 @@ async fn auth_token_lookup(
     let guard = store.lock().unwrap();
     let result = auth::token_auth(&guard.tokens, &req.token).map_err(|e| err(StatusCode::UNAUTHORIZED, e))?;
     Ok(Json(json!({ "auth": result })))
-=======
 async fn auth_token_lookup_self(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -838,13 +775,8 @@ async fn auth_token_lookup_self(
     let token_str = token_or_err(&headers)?;
     let info = s.auth.lookup_token(&token_str)?;
     Ok(Json(serde_json::to_value(info).unwrap()))
-}
-
-#[derive(Deserialize)]
 struct RenewRequest {
     increment: Option<u64>,
-}
-
 async fn auth_token_renew_self(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -858,10 +790,7 @@ async fn auth_token_renew_self(
             "client_token": info.token_id,
             "lease_duration": info.ttl,
             "renewable": info.renewable,
-        }
     })))
-}
-
 async fn auth_token_revoke_self(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -870,15 +799,9 @@ async fn auth_token_revoke_self(
     let token_str = token_or_err(&headers)?;
     s.auth.revoke_token(&token_str)?;
     Ok(StatusCode::NO_CONTENT)
-}
-
 // ── Auth: Userpass ────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct UserpassLoginRequest {
     password: String,
-}
-
 async fn auth_userpass_login(
     State(state): State<SharedVaultState>,
     Path(username): Path<String>,
@@ -887,15 +810,10 @@ async fn auth_userpass_login(
     let mut s = state.write().await;
     let result = s.auth.userpass_login(&username, &req.password)?;
     Ok(Json(serde_json::json!({ "auth": result })))
-}
-
-#[derive(Deserialize)]
 struct UserpassCreateRequest {
     password: String,
     policies: Option<Vec<String>>,
     token_ttl: Option<u64>,
-}
-
 async fn auth_userpass_create(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -912,8 +830,6 @@ async fn auth_userpass_create(
         req.token_ttl.unwrap_or(3600),
     );
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn auth_userpass_delete(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -924,19 +840,13 @@ async fn auth_userpass_delete(
     s.authenticate(&token)?;
     s.auth.userpass.remove(&username);
     Ok(StatusCode::NO_CONTENT)
-}
-
 // ── Auth: AppRole ─────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct AppRoleCreateRequest {
     policies: Option<Vec<String>>,
     token_ttl: Option<u64>,
     token_max_ttl: Option<u64>,
     secret_id_ttl: Option<u64>,
     bind_secret_id: Option<bool>,
-}
-
 async fn approle_create_role(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -955,8 +865,6 @@ async fn approle_create_role(
         req.bind_secret_id.unwrap_or(true),
     );
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn approle_get_role_id(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -968,8 +876,6 @@ async fn approle_get_role_id(
     let role = s.auth.approles.get(&role_name)
         .ok_or_else(|| VaultError::NotFound(format!("approle '{role_name}'")))?;
     Ok(Json(serde_json::json!({ "data": { "role_id": role.role_id } })))
-}
-
 async fn approle_gen_secret_id(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -980,7 +886,6 @@ async fn approle_gen_secret_id(
     s.authenticate(&token)?;
     let secret_id = s.auth.approle_generate_secret_id(&role_name, HashMap::new())?;
     Ok(Json(serde_json::json!({ "data": { "secret_id": secret_id } })))
->>>>>>> claude/frosty-wiles
 }
 
 #[derive(Deserialize)]
@@ -989,7 +894,6 @@ struct AppRoleLoginRequest {
     secret_id: String,
 }
 
-<<<<<<< HEAD
 async fn auth_approle_login(
     State(store): State<SharedVaultStore>,
     Json(req): Json<AppRoleLoginRequest>,
@@ -1016,23 +920,17 @@ async fn auth_kubernetes_login(
         .map_err(|e| err(StatusCode::UNAUTHORIZED, e))?;
     Ok(Json(json!({ "auth": result })))
 }
-=======
 async fn approle_login(
     State(state): State<SharedVaultState>,
-    Json(req): Json<AppRoleLoginRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let mut s = state.write().await;
     let result = s.auth.approle_login(&req.role_id, &req.secret_id)?;
     Ok(Json(serde_json::json!({ "auth": result })))
-}
-
 // ── Auth: OIDC ────────────────────────────────────────────────────────────────
->>>>>>> claude/frosty-wiles
 
 #[derive(Deserialize)]
 struct OidcCallbackRequest {
     code: String,
-<<<<<<< HEAD
     role: String,
 }
 
@@ -1178,26 +1076,16 @@ fn append_audit_noop(guard: &std::sync::MutexGuard<crate::VaultStore>, op: &str,
     // takes an immutable guard (read path). Audit writes happen in the
     // mutable handlers. This is a no-op placeholder so callers compile.
     let _ = (guard, op, path, code);
-=======
     state: String,
-}
-
-async fn auth_oidc_callback(
     State(state): State<SharedVaultState>,
-    Json(req): Json<OidcCallbackRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let mut s = state.write().await;
     let result = s.auth.oidc_login(&req.code, &req.state, vec!["default".into()])?;
     Ok(Json(serde_json::json!({ "auth": result })))
-}
-
 // ── KV v2 ─────────────────────────────────────────────────────────────────────
-
 #[derive(Deserialize, Default)]
 struct VersionQuery {
     version: Option<u32>,
-}
-
 async fn kv_v2_read(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1209,7 +1097,6 @@ async fn kv_v2_read(
     let policies = s.authenticate(&token)?;
     let full_path = format!("secret/data/{path}");
     s.policy.check(&policies, &full_path, &Capability::Read)?;
-
     let entry = s.kv_v2.get(&path)
         .ok_or_else(|| VaultError::NotFound(path.clone()))?;
     let version_data = entry.get(q.version)?;
@@ -1221,22 +1108,12 @@ async fn kv_v2_read(
                 "version": version_data.version,
                 "destroyed": version_data.destroyed,
                 "deletion_time": version_data.deletion_time,
-            }
-        }
     })))
-}
-
-#[derive(Deserialize)]
 struct KVWriteRequest {
     data: HashMap<String, Value>,
     options: Option<KVWriteOptions>,
-}
-
-#[derive(Deserialize)]
 struct KVWriteOptions {
     cas: Option<u32>,
-}
-
 async fn kv_v2_write(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1249,17 +1126,13 @@ async fn kv_v2_write(
     let full_path = format!("secret/data/{path}");
     s.policy.check(&policies, &full_path, &Capability::Create)
         .or_else(|_| s.policy.check(&policies, &full_path, &Capability::Update))?;
-
     let cas = req.options.as_ref().and_then(|o| o.cas);
     let entry = s.kv_v2.entry(path.clone()).or_insert_with(|| KVEntry::new(10));
     let version = entry.put(req.data, cas)?;
     Ok(Json(serde_json::json!({
         "data": { "version": version, "created_time": Utc::now() }
     })))
-}
-
 use chrono::Utc;
-
 async fn kv_v2_delete_latest(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1271,10 +1144,7 @@ async fn kv_v2_delete_latest(
     s.policy.check(&policies, &format!("secret/data/{path}"), &Capability::Delete)?;
     if let Some(entry) = s.kv_v2.get_mut(&path) {
         entry.delete_latest();
-    }
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v2_metadata(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1287,15 +1157,10 @@ async fn kv_v2_metadata(
     let entry = s.kv_v2.get(&path)
         .ok_or_else(|| VaultError::NotFound(path.clone()))?;
     Ok(Json(serde_json::to_value(entry.metadata()).unwrap()))
-}
-
-#[derive(Deserialize)]
 struct KVMetaUpdateRequest {
     max_versions: Option<u32>,
     cas_required: Option<bool>,
     custom_metadata: Option<HashMap<String, String>>,
-}
-
 async fn kv_v2_update_metadata(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1311,8 +1176,6 @@ async fn kv_v2_update_metadata(
     if let Some(cas) = req.cas_required { entry.cas_required = cas; }
     if let Some(meta) = req.custom_metadata { entry.custom_metadata = meta; }
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v2_delete_all(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1324,13 +1187,8 @@ async fn kv_v2_delete_all(
     s.policy.check(&policies, &format!("secret/metadata/{path}"), &Capability::Delete)?;
     s.kv_v2.remove(&path);
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(Deserialize)]
 struct VersionsRequest {
     versions: Vec<u32>,
-}
-
 async fn kv_v2_soft_delete(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1343,10 +1201,7 @@ async fn kv_v2_soft_delete(
     s.policy.check(&policies, &format!("secret/delete/{path}"), &Capability::Delete)?;
     if let Some(entry) = s.kv_v2.get_mut(&path) {
         entry.soft_delete(&req.versions);
-    }
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v2_undelete(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1359,10 +1214,7 @@ async fn kv_v2_undelete(
     s.policy.check(&policies, &format!("secret/undelete/{path}"), &Capability::Update)?;
     if let Some(entry) = s.kv_v2.get_mut(&path) {
         entry.undelete(&req.versions);
-    }
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v2_destroy(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1375,10 +1227,7 @@ async fn kv_v2_destroy(
     s.policy.check(&policies, &format!("secret/destroy/{path}"), &Capability::Delete)?;
     if let Some(entry) = s.kv_v2.get_mut(&path) {
         entry.destroy(&req.versions);
-    }
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v2_list(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1398,10 +1247,7 @@ async fn kv_v2_list(
         .collect();
     keys.sort();
     Ok(Json(serde_json::json!({ "data": { "keys": keys } })))
-}
-
 // ── KV v1 ────────────────────────────────────────────────────────────────────
-
 async fn kv_v1_read(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1414,8 +1260,6 @@ async fn kv_v1_read(
     let entry = s.kv_v1.get(&path)
         .ok_or_else(|| VaultError::NotFound(path.clone()))?;
     Ok(Json(serde_json::json!({ "data": entry.data })))
-}
-
 async fn kv_v1_write(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1430,8 +1274,6 @@ async fn kv_v1_write(
     let entry = s.kv_v1.entry(path).or_insert_with(|| KVV1Entry::new(HashMap::new()));
     entry.update(data);
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn kv_v1_delete(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1443,17 +1285,11 @@ async fn kv_v1_delete(
     s.policy.check(&policies, &format!("kv/{path}"), &Capability::Delete)?;
     s.kv_v1.remove(&path);
     Ok(StatusCode::NO_CONTENT)
-}
-
 // ── Transit ────────────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct TransitCreateKeyRequest {
     name: String,
     #[serde(rename = "type")]
     key_type: Option<String>,
-}
-
 async fn transit_create_key(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1471,12 +1307,9 @@ async fn transit_create_key(
     let entry = crate::transit::TransitKeyEntry::create(&req.name, kt)?;
     s.transit.insert(req.name, entry);
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn transit_get_key(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
     let token = token_or_err(&headers)?;
@@ -1484,12 +1317,9 @@ async fn transit_get_key(
     let entry = s.transit.get(&name)
         .ok_or_else(|| VaultError::KeyNotFound(name.clone()))?;
     Ok(Json(serde_json::to_value(&entry.meta).unwrap()))
-}
-
 async fn transit_delete_key(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<StatusCode, VaultError> {
     let mut s = state.write().await;
     let token = token_or_err(&headers)?;
@@ -1498,15 +1328,11 @@ async fn transit_delete_key(
         .ok_or_else(|| VaultError::KeyNotFound(name.clone()))?;
     if !entry.meta.deletion_allowed {
         return Err(VaultError::InvalidRequest("deletion_allowed is false".into()));
-    }
     s.transit.remove(&name);
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn transit_rotate_key(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<StatusCode, VaultError> {
     let mut s = state.write().await;
     let token = token_or_err(&headers)?;
@@ -1515,18 +1341,12 @@ async fn transit_rotate_key(
         .ok_or_else(|| VaultError::KeyNotFound(name.clone()))?;
     entry.rotate()?;
     Ok(StatusCode::NO_CONTENT)
-}
-
-#[derive(Deserialize)]
 struct TransitEncryptRequest {
     plaintext: String,  // base64-encoded
     context: Option<String>,
-}
-
 async fn transit_encrypt(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<TransitEncryptRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1543,18 +1363,12 @@ async fn transit_encrypt(
         .transpose()?;
     let ct = entry.encrypt(&pt, ctx.as_deref())?;
     Ok(Json(serde_json::json!({ "data": { "ciphertext": ct } })))
-}
-
-#[derive(Deserialize)]
 struct TransitDecryptRequest {
     ciphertext: String,
     context: Option<String>,
-}
-
 async fn transit_decrypt(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<TransitDecryptRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1570,12 +1384,9 @@ async fn transit_decrypt(
     Ok(Json(serde_json::json!({
         "data": { "plaintext": base64::engine::general_purpose::STANDARD.encode(&pt) }
     })))
-}
-
 async fn transit_rewrap(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<TransitDecryptRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1585,17 +1396,11 @@ async fn transit_rewrap(
         .ok_or_else(|| VaultError::KeyNotFound(name.clone()))?;
     let new_ct = entry.rewrap(&req.ciphertext, None)?;
     Ok(Json(serde_json::json!({ "data": { "ciphertext": new_ct } })))
-}
-
-#[derive(Deserialize)]
 struct TransitSignRequest {
     input: String,   // base64
-}
-
 async fn transit_sign(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<TransitSignRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1608,18 +1413,12 @@ async fn transit_sign(
         .map_err(|_| VaultError::InvalidRequest("invalid base64".into()))?;
     let sig = entry.sign(&data)?;
     Ok(Json(serde_json::json!({ "data": { "signature": sig } })))
-}
-
-#[derive(Deserialize)]
 struct TransitVerifyRequest {
     input: String,
     signature: String,
-}
-
 async fn transit_verify(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<TransitVerifyRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1632,17 +1431,11 @@ async fn transit_verify(
         .map_err(|_| VaultError::InvalidRequest("invalid base64".into()))?;
     let valid = entry.verify(&data, &req.signature)?;
     Ok(Json(serde_json::json!({ "data": { "valid": valid } })))
-}
-
-#[derive(Deserialize)]
 struct DataKeyRequest {
     bits: Option<u32>,
-}
-
 async fn transit_datakey(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<DataKeyRequest>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
@@ -1655,19 +1448,12 @@ async fn transit_datakey(
         "data": {
             "plaintext": base64::engine::general_purpose::STANDARD.encode(&pt),
             "ciphertext": ct,
-        }
     })))
-}
-
 // ── PKI ───────────────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct PkiRootRequest {
     common_name: String,
     organization: Option<String>,
     ttl_days: Option<i64>,
-}
-
 async fn pki_generate_root(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1682,8 +1468,6 @@ async fn pki_generate_root(
         req.ttl_days.unwrap_or(3650),
     )?;
     Ok(Json(serde_json::json!({ "data": { "certificate": pem } })))
-}
-
 async fn pki_generate_intermediate(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1698,16 +1482,11 @@ async fn pki_generate_intermediate(
         req.ttl_days.unwrap_or(1825),
     )?;
     Ok(Json(serde_json::json!({ "data": { "ca_chain": chain } })))
-}
-
-#[derive(Deserialize)]
 struct PkiIssueRequest {
     common_name: String,
     alt_names: Option<Vec<String>>,
     ttl_days: Option<i64>,
     private_key_format: Option<String>,
-}
-
 async fn pki_issue(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1724,13 +1503,8 @@ async fn pki_issue(
         include_key,
     )?;
     Ok(Json(serde_json::to_value(&cert).unwrap()))
-}
-
-#[derive(Deserialize)]
 struct PkiRevokeRequest {
     serial_number: String,
-}
-
 async fn pki_revoke(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1741,20 +1515,14 @@ async fn pki_revoke(
     s.authenticate(&token)?;
     let ts = s.pki.revoke(&req.serial_number)?;
     Ok(Json(serde_json::json!({ "data": { "revocation_time": ts } })))
-}
-
 async fn pki_crl(State(state): State<SharedVaultState>) -> Json<Value> {
     let s = state.read().await;
     Json(s.pki.generate_crl())
-}
-
 async fn pki_ca(State(state): State<SharedVaultState>) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
     let ca = s.pki.root_ca.as_ref()
         .ok_or_else(|| VaultError::NotFound("root CA".into()))?;
     Ok(Json(serde_json::json!({ "data": { "certificate": ca.cert_pem } })))
-}
-
 async fn pki_cert(
     State(state): State<SharedVaultState>,
     Path(serial): Path<String>,
@@ -1763,11 +1531,7 @@ async fn pki_cert(
     let cert = s.pki.certs.get(&serial)
         .ok_or_else(|| VaultError::NotFound(format!("serial {serial}")))?;
     Ok(Json(serde_json::to_value(cert).unwrap()))
-}
-
 // ── Database ──────────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct DbRoleRequest {
     db_name: String,
     db_type: Option<String>,
@@ -1775,12 +1539,9 @@ struct DbRoleRequest {
     revocation_statements: Option<Vec<String>>,
     default_ttl: Option<u64>,
     max_ttl: Option<u64>,
-}
-
 async fn db_create_role(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
     Json(req): Json<DbRoleRequest>,
 ) -> Result<StatusCode, VaultError> {
     let mut s = state.write().await;
@@ -1800,12 +1561,9 @@ async fn db_create_role(
         max_ttl: req.max_ttl.unwrap_or(86400),
     });
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn db_get_role(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<Json<Value>, VaultError> {
     let s = state.read().await;
     let token = token_or_err(&headers)?;
@@ -1813,12 +1571,9 @@ async fn db_get_role(
     let role = s.db.roles.get(&name)
         .ok_or_else(|| VaultError::NotFound(format!("db role '{name}'")))?;
     Ok(Json(serde_json::to_value(role).unwrap()))
-}
-
 async fn db_generate_creds(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
-    Path(name): Path<String>,
 ) -> Result<Json<Value>, VaultError> {
     let mut s = state.write().await;
     let token = token_or_err(&headers)?;
@@ -1828,13 +1583,10 @@ async fn db_generate_creds(
         "data": {
             "username": creds.username,
             "password": creds.password,
-        },
         "lease_id": creds.lease.lease_id,
         "lease_duration": creds.lease.lease_duration,
         "renewable": creds.lease.renewable,
     })))
-}
-
 async fn db_revoke_creds(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1845,16 +1597,10 @@ async fn db_revoke_creds(
     s.authenticate(&token)?;
     s.db.revoke_credentials(&lease_id)?;
     Ok(StatusCode::NO_CONTENT)
-}
-
 // ── Leases ────────────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct LeaseRenewRequest {
     lease_id: String,
     increment: Option<u64>,
-}
-
 async fn lease_renew(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1869,13 +1615,8 @@ async fn lease_renew(
         "renewable": entry.renewable,
         "lease_duration": entry.remaining_secs(),
     })))
-}
-
-#[derive(Deserialize)]
 struct LeaseRevokeRequest {
     lease_id: String,
-}
-
 async fn lease_revoke(
     State(state): State<SharedVaultState>,
     headers: HeaderMap,
@@ -1886,5 +1627,4 @@ async fn lease_revoke(
     s.authenticate(&token)?;
     s.leases.revoke(&req.lease_id)?;
     Ok(StatusCode::NO_CONTENT)
->>>>>>> claude/frosty-wiles
 }

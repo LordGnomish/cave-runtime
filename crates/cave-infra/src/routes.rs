@@ -1,6 +1,5 @@
 //! HTTP routes for cave-infra.
 
-<<<<<<< HEAD
 use crate::executor;
 use crate::intent;
 use crate::models::{ExecutionPlan, McpProvider};
@@ -323,7 +322,6 @@ async fn estimate_cost(
         "breakdown": cost.breakdown,
     }))
 }
-=======
 use crate::executor::{dry_run, execute_plan};
 use serde::Serialize;
 use crate::intent::{parse_intent, validate_intent};
@@ -331,17 +329,9 @@ use crate::mcp_bridge::{discover_capabilities, health_check};
 use crate::models::{InfraResource, McpProvider};
 use crate::planner::{estimate_cost, evaluate_policies, generate_plan};
 use crate::InfraState as AppState;
-use axum::{
     extract::{Path, State as AxumState},
-    routing::{get, post},
-    Json, Router,
-};
 use serde::Deserialize;
-use std::sync::Arc;
-use uuid::Uuid;
-
 pub fn create_router(state: Arc<AppState>) -> Router {
-    Router::new()
         // Health
         .route("/api/infra/health", get(health))
         // Intent
@@ -367,27 +357,19 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/infra/import", post(import_resource))
         // Cost
         .route("/api/infra/cost", post(estimate_cost_route))
-        .with_state(state)
-}
-
 // ── Health ────────────────────────────────────────────────────────────────────
->>>>>>> claude/silly-matsumoto
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-infra",
         "status": "ok",
-<<<<<<< HEAD
         "upstream": "Terraform + Crossplane",
         "approach": "LLM+MCP-native IaC",
-=======
         "replaces": ["Terraform", "Crossplane"],
         "approach": "LLM+MCP intent-driven IaC"
     }))
 }
-
 // ── Intent ────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct SubmitIntentRequest {
     name: String,
@@ -396,7 +378,6 @@ struct SubmitIntentRequest {
     content: String,
     provider_hint: Option<String>,
 }
-
 #[derive(Debug, Serialize)]
 struct SubmitIntentResponse {
     intent_id: String,
@@ -405,7 +386,6 @@ struct SubmitIntentResponse {
     warnings: Vec<String>,
     is_structured: bool,
 }
-
 async fn submit_intent(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<SubmitIntentRequest>,
@@ -417,13 +397,10 @@ async fn submit_intent(
         }
     };
     intent.provider_hint = req.provider_hint;
-
     let warnings = validate_intent(&intent).unwrap_or_default();
     let is_structured = intent.structured.is_some();
     let intent_id = intent.id.to_string();
-
     state.intents.lock().await.push(intent);
-
     Json(serde_json::json!({
         "intent_id": intent_id,
         "name": req.name,
@@ -432,14 +409,11 @@ async fn submit_intent(
         "is_structured": is_structured,
     }))
 }
-
 // ── Plan ──────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct CreatePlanRequest {
     intent_id: String,
 }
-
 async fn create_plan(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<CreatePlanRequest>,
@@ -448,32 +422,26 @@ async fn create_plan(
         Ok(id) => id,
         Err(_) => return Json(serde_json::json!({ "error": "invalid intent_id" })),
     };
-
     let intents = state.intents.lock().await;
     let intent = match intents.iter().find(|i| i.id == intent_id) {
         Some(i) => i.clone(),
         None => return Json(serde_json::json!({ "error": "intent not found" })),
     };
     drop(intents);
-
     let store = state.store.lock().await;
     let infra_state = store.current.clone();
     drop(store);
-
     let plan = match generate_plan(&intent, &infra_state) {
         Ok(p) => p,
         Err(e) => return Json(serde_json::json!({ "error": e.to_string() })),
     };
-
     let policies = evaluate_policies(&plan);
     let plan_id = plan.id.to_string();
     let risk = plan.risk_score;
     let cost = plan.cost_estimate.clone();
     let explanation = plan.explanation.clone();
     let steps_count = plan.steps.len();
-
     state.plans.lock().await.push(plan);
-
     Json(serde_json::json!({
         "plan_id": plan_id,
         "steps": steps_count,
@@ -483,14 +451,11 @@ async fn create_plan(
         "policy_checks": policies,
     }))
 }
-
 // ── Apply ─────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct ApplyRequest {
     plan_id: String,
 }
-
 async fn apply_plan(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<ApplyRequest>,
@@ -499,19 +464,16 @@ async fn apply_plan(
         Ok(id) => id,
         Err(_) => return Json(serde_json::json!({ "error": "invalid plan_id" })),
     };
-
     let plans = state.plans.lock().await;
     let plan = match plans.iter().find(|p| p.id == plan_id) {
         Some(p) => p.clone(),
         None => return Json(serde_json::json!({ "error": "plan not found" })),
     };
     drop(plans);
-
     let exec = match execute_plan(&plan, Arc::clone(&state.registry), Arc::clone(&state.store)).await {
         Ok(e) => e,
         Err(e) => return Json(serde_json::json!({ "error": e.to_string() })),
     };
-
     Json(serde_json::json!({
         "execution_id": exec.id.to_string(),
         "plan_id": plan_id.to_string(),
@@ -522,14 +484,11 @@ async fn apply_plan(
         "dry_run": false,
     }))
 }
-
 // ── Destroy ───────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct DestroyRequest {
     resource_names: Vec<String>,
 }
-
 async fn destroy_resources(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<DestroyRequest>,
@@ -543,9 +502,7 @@ async fn destroy_resources(
         "status": "queued — run apply to reconcile",
     }))
 }
-
 // ── Dry Run ───────────────────────────────────────────────────────────────────
-
 async fn run_dry_run(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<ApplyRequest>,
@@ -554,19 +511,16 @@ async fn run_dry_run(
         Ok(id) => id,
         Err(_) => return Json(serde_json::json!({ "error": "invalid plan_id" })),
     };
-
     let plans = state.plans.lock().await;
     let plan = match plans.iter().find(|p| p.id == plan_id) {
         Some(p) => p.clone(),
         None => return Json(serde_json::json!({ "error": "plan not found" })),
     };
     drop(plans);
-
     let exec = match dry_run(&plan, Arc::clone(&state.registry), Arc::clone(&state.store)).await {
         Ok(e) => e,
         Err(e) => return Json(serde_json::json!({ "error": e.to_string() })),
     };
-
     Json(serde_json::json!({
         "execution_id": exec.id.to_string(),
         "plan_id": plan_id.to_string(),
@@ -575,9 +529,7 @@ async fn run_dry_run(
         "steps": exec.steps.len(),
     }))
 }
-
 // ── State ─────────────────────────────────────────────────────────────────────
-
 async fn get_state(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_json::Value> {
     let store = state.store.lock().await;
     Json(serde_json::json!({
@@ -589,7 +541,6 @@ async fn get_state(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_jso
         "last_synced": store.current.last_synced,
     }))
 }
-
 async fn get_history(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_json::Value> {
     let store = state.store.lock().await;
     let history: Vec<serde_json::Value> = store
@@ -605,7 +556,6 @@ async fn get_history(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_j
         .collect();
     Json(serde_json::json!({ "history": history }))
 }
-
 async fn rollback_state(
     AxumState(state): AxumState<Arc<AppState>>,
     Path(version): Path<u64>,
@@ -616,9 +566,7 @@ async fn rollback_state(
         Err(e) => Json(serde_json::json!({ "error": e.to_string() })),
     }
 }
-
 // ── Drift ─────────────────────────────────────────────────────────────────────
-
 async fn get_drift(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_json::Value> {
     let store = state.store.lock().await;
     let report = store.detect_drift();
@@ -631,9 +579,7 @@ async fn get_drift(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_jso
         "generated_at": report.generated_at,
     }))
 }
-
 // ── Providers ─────────────────────────────────────────────────────────────────
-
 async fn list_providers(AxumState(state): AxumState<Arc<AppState>>) -> Json<serde_json::Value> {
     let reg = state.registry.lock().await;
     let providers: Vec<serde_json::Value> = reg
@@ -653,20 +599,17 @@ async fn list_providers(AxumState(state): AxumState<Arc<AppState>>) -> Json<serd
         .collect();
     Json(serde_json::json!({ "providers": providers }))
 }
-
 #[derive(Debug, Deserialize)]
 struct RegisterProviderRequest {
     name: String,
     provider: String,
     endpoint: String,
 }
-
 async fn register_provider(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<RegisterProviderRequest>,
 ) -> Json<serde_json::Value> {
     let mut provider = McpProvider::new(&req.name, &req.provider, &req.endpoint);
-
     // Discover capabilities from the endpoint.
     match discover_capabilities(&req.endpoint).await {
         Ok((tools, caps)) => {
@@ -678,11 +621,9 @@ async fn register_provider(
             provider.healthy = false;
         }
     }
-
     let provider_id = provider.id.to_string();
     let healthy = provider.healthy;
     state.registry.lock().await.register(provider);
-
     Json(serde_json::json!({
         "provider_id": provider_id,
         "name": req.name,
@@ -691,7 +632,6 @@ async fn register_provider(
         "status": "registered",
     }))
 }
-
 async fn provider_health(
     AxumState(state): AxumState<Arc<AppState>>,
     Path(id): Path<String>,
@@ -700,7 +640,6 @@ async fn provider_health(
         Ok(id) => id,
         Err(_) => return Json(serde_json::json!({ "error": "invalid provider id" })),
     };
-
     let endpoint = {
         let reg = state.registry.lock().await;
         reg.list()
@@ -708,7 +647,6 @@ async fn provider_health(
             .find(|p| p.id == provider_id)
             .map(|p| p.endpoint.clone())
     };
-
     match endpoint {
         None => Json(serde_json::json!({ "error": "provider not found" })),
         Some(ep) => {
@@ -718,9 +656,7 @@ async fn provider_health(
         }
     }
 }
-
 // ── Import ────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct ImportRequest {
     name: String,
@@ -729,7 +665,6 @@ struct ImportRequest {
     remote_id: String,
     config: Option<serde_json::Value>,
 }
-
 async fn import_resource(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<ImportRequest>,
@@ -742,7 +677,6 @@ async fn import_resource(
             }
         }
     }
-
     let resource_id = resource.id.to_string();
     let mut store = state.store.lock().await;
     match store.import_resource(resource, &req.remote_id) {
@@ -755,9 +689,7 @@ async fn import_resource(
         Err(e) => Json(serde_json::json!({ "error": e.to_string() })),
     }
 }
-
 // ── Cost ──────────────────────────────────────────────────────────────────────
-
 async fn estimate_cost_route(
     AxumState(state): AxumState<Arc<AppState>>,
     Json(req): Json<ApplyRequest>,
@@ -766,14 +698,12 @@ async fn estimate_cost_route(
         Ok(id) => id,
         Err(_) => return Json(serde_json::json!({ "error": "invalid plan_id" })),
     };
-
     let plans = state.plans.lock().await;
     let plan = match plans.iter().find(|p| p.id == plan_id) {
         Some(p) => p.clone(),
         None => return Json(serde_json::json!({ "error": "plan not found" })),
     };
     drop(plans);
-
     let cost = estimate_cost(&plan);
     Json(serde_json::json!({
         "plan_id": plan_id.to_string(),
@@ -782,6 +712,5 @@ async fn estimate_cost_route(
         "confidence": cost.confidence,
         "currency": cost.currency,
         "notes": cost.notes,
->>>>>>> claude/silly-matsumoto
     }))
 }

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! HTTP REST API for cave-streams — REST proxy + admin endpoints.
 //!
 //! All endpoints are prefixed with `/api/v1/streams`.
@@ -345,122 +344,74 @@ async fn fetch_records(
                     "key": h.key,
                     "value": String::from_utf8_lossy(&h.value),
                 })).collect::<Vec<_>>(),
-=======
 //! HTTP routes for cave-streams — all under /api/v1/streams (and /api/v1/*).
-
 use crate::{models::*, StreamsState};
-use axum::{
-    extract::{Path, Query, State},
-    http::StatusCode,
     routing::{get, post, put},
-    Json, Router,
-};
 use chrono::Utc;
 use serde::Deserialize;
-use std::sync::Arc;
-use uuid::Uuid;
-
 type ApiResult<T> = Result<Json<T>, (StatusCode, Json<serde_json::Value>)>;
 type StatusResult<T> = Result<(StatusCode, Json<T>), (StatusCode, Json<serde_json::Value>)>;
-
 fn not_found(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": msg })),
-    )
-}
-
 fn bad_request(msg: &str) -> (StatusCode, Json<serde_json::Value>) {
     (
         StatusCode::BAD_REQUEST,
         Json(serde_json::json!({ "error": msg })),
-    )
-}
-
 pub fn create_router(state: Arc<StreamsState>) -> Router {
-    Router::new()
         // ── Health ────────────────────────────────────────────────────────
         .route("/api/v1/streams/health", get(health))
         // ── Streams ───────────────────────────────────────────────────────
         // NOTE: literal sub-paths (/health, /backpressure-all) are registered
         // before the /:id wildcard so axum prefers them in matching.
         .route("/api/v1/streams", post(create_stream).get(list_streams))
-        .route(
             "/api/v1/streams/:id",
             get(get_stream).delete(delete_stream),
-        )
         .route("/api/v1/streams/:id/stats", get(stream_stats))
         .route("/api/v1/streams/:id/throttle", put(throttle_stream))
         // ── Subscriptions (nested) ────────────────────────────────────────
-        .route(
             "/api/v1/streams/:stream_id/subscriptions",
             post(create_subscription).get(list_subscriptions),
-        )
-        .route(
             "/api/v1/streams/:stream_id/subscriptions/:sub_id",
             get(get_subscription).delete(delete_subscription),
-        )
-        .route(
             "/api/v1/streams/:stream_id/subscriptions/:sub_id/pause",
             put(pause_subscription),
-        )
-        .route(
             "/api/v1/streams/:stream_id/subscriptions/:sub_id/resume",
             put(resume_subscription),
-        )
         // ── Messages ──────────────────────────────────────────────────────
         .route("/api/v1/streams/:stream_id/publish", post(publish_message))
         .route("/api/v1/streams/:stream_id/pull", post(pull_messages))
-        .route(
             "/api/v1/streams/:stream_id/subscriptions/:sub_id/ack",
             post(ack_messages),
-        )
         // ── Schema Registry ───────────────────────────────────────────────
         .route("/api/v1/schemas", post(register_schema).get(list_schemas))
-        .route(
             "/api/v1/schemas/validate",
             post(validate_schema),
-        )
-        .route(
             "/api/v1/schemas/:id",
             get(get_schema).delete(delete_schema),
-        )
         // ── Connectors ────────────────────────────────────────────────────
-        .route(
             "/api/v1/connectors",
             post(create_connector).get(list_connectors),
-        )
-        .route(
             "/api/v1/connectors/:id",
             get(get_connector)
                 .patch(patch_connector)
                 .delete(delete_connector),
-        )
         // ── Dead Letter Queue ─────────────────────────────────────────────
         .route("/api/v1/dlq", get(list_dlq))
         .route("/api/v1/dlq/:id", get(get_dlq_entry).delete(discard_dlq_entry))
         .route("/api/v1/dlq/:id/retry", post(retry_dlq_entry))
         // ── Tiered Storage ────────────────────────────────────────────────
-        .route(
             "/api/v1/storage/config",
             get(get_storage_config).put(update_storage_config),
-        )
         .route("/api/v1/storage/tiers", get(storage_tier_stats))
         // ── Metrics ───────────────────────────────────────────────────────
         .route("/api/v1/streams/:id/metrics", get(stream_metrics))
         .route("/api/v1/metrics", get(platform_metrics))
         // ── Backpressure ──────────────────────────────────────────────────
         .route("/api/v1/backpressure", get(backpressure_status))
-        .with_state(state)
-}
-
 // ── Health ────────────────────────────────────────────────────────────────────
-
-async fn health() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
         "module": "cave-streams",
-        "status": "ok",
-        "version": env!("CARGO_PKG_VERSION"),
         "replaces": [
             "Apache Kafka",
             "Confluent Platform",
@@ -477,12 +428,7 @@ async fn health() -> Json<serde_json::Value> {
             "built_in_schema_registry": true,
             "partition_less": true,
             "jvm_free": true
-        }
-    }))
-}
-
 // ── Streams ───────────────────────────────────────────────────────────────────
-
 async fn create_stream(
     State(state): State<Arc<StreamsState>>,
     Json(req): Json<CreateStreamRequest>,
@@ -503,18 +449,12 @@ async fn create_stream(
         labels: req.labels.unwrap_or_default(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    };
     let mut store = state.store.lock().unwrap();
     store.streams.insert(stream.id, stream.clone());
     (StatusCode::CREATED, Json(stream))
-}
-
-#[derive(Deserialize)]
 struct NamespaceFilter {
     namespace: Option<String>,
     label: Option<String>,
-}
-
 async fn list_streams(
     State(state): State<Arc<StreamsState>>,
     Query(filter): Query<NamespaceFilter>,
@@ -534,14 +474,11 @@ async fn list_streams(
                             s.labels.get(k).map(|val| val == v).unwrap_or(false)
                         } else {
                             s.labels.contains_key(kv.as_str())
-                        }
                     })
         })
         .cloned()
         .collect();
     Json(streams)
-}
-
 async fn get_stream(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -553,12 +490,9 @@ async fn get_stream(
         .cloned()
         .map(Json)
         .ok_or_else(|| not_found("stream not found"))
-}
-
 async fn delete_stream(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     // Reject if active subscriptions exist.
     let has_subs = store.subscriptions.values().any(|s| s.stream_id == id);
@@ -566,14 +500,11 @@ async fn delete_stream(
         return Err(bad_request(
             "cannot delete stream with active subscriptions; delete subscriptions first",
         ));
-    }
     store
         .streams
         .remove(&id)
         .map(|s| Json(serde_json::json!({ "deleted": s.id, "name": s.name })))
         .ok_or_else(|| not_found("stream not found"))
-}
-
 async fn stream_stats(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -593,9 +524,6 @@ async fn stream_stats(
         throughput_limit: s.throughput_limit.clone(),
         storage_tier: s.storage_tier.clone(),
         retention: s.retention.clone(),
-    }))
-}
-
 async fn throttle_stream(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -609,13 +537,9 @@ async fn throttle_stream(
     stream.throughput_limit = Some(ThroughputLimit {
         messages_per_second: req.messages_per_second,
         bytes_per_second: req.bytes_per_second,
-    });
     stream.updated_at = Utc::now();
     Ok(Json(stream.clone()))
-}
-
 // ── Subscriptions ─────────────────────────────────────────────────────────────
-
 async fn create_subscription(
     State(state): State<Arc<StreamsState>>,
     Path(stream_id): Path<Uuid>,
@@ -624,12 +548,10 @@ async fn create_subscription(
     let mut store = state.store.lock().unwrap();
     if !store.streams.contains_key(&stream_id) {
         return Err(not_found("stream not found"));
-    }
     let cursor = match req.delivery_policy.as_ref().unwrap_or(&DeliveryPolicy::Latest) {
         DeliveryPolicy::Earliest => 0,
         DeliveryPolicy::BySequence(seq) => *seq,
         _ => store.stream_sequences.get(&stream_id).copied().unwrap_or(0),
-    };
     let sub = Subscription {
         id: Uuid::new_v4(),
         stream_id,
@@ -647,17 +569,11 @@ async fn create_subscription(
         status: SubscriptionStatus::Active,
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    };
     store.subscriptions.insert(sub.id, sub.clone());
     store.refresh_subscriber_count(stream_id);
     Ok((StatusCode::CREATED, Json(sub)))
-}
-
-#[derive(Deserialize)]
 struct StreamIdFilter {
     stream_id: Option<Uuid>,
-}
-
 async fn list_subscriptions(
     State(state): State<Arc<StreamsState>>,
     Path(stream_id): Path<Uuid>,
@@ -665,7 +581,6 @@ async fn list_subscriptions(
     let store = state.store.lock().unwrap();
     if !store.streams.contains_key(&stream_id) {
         return Err(not_found("stream not found"));
-    }
     let subs: Vec<Subscription> = store
         .subscriptions
         .values()
@@ -673,8 +588,6 @@ async fn list_subscriptions(
         .cloned()
         .collect();
     Ok(Json(subs))
-}
-
 async fn get_subscription(
     State(state): State<Arc<StreamsState>>,
     Path((stream_id, sub_id)): Path<(Uuid, Uuid)>,
@@ -686,14 +599,10 @@ async fn get_subscription(
         .ok_or_else(|| not_found("subscription not found"))?;
     if sub.stream_id != stream_id {
         return Err(not_found("subscription not found on this stream"));
-    }
     Ok(Json(sub.clone()))
-}
-
 async fn delete_subscription(
     State(state): State<Arc<StreamsState>>,
     Path((stream_id, sub_id)): Path<(Uuid, Uuid)>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     let sub = store
         .subscriptions
@@ -701,12 +610,9 @@ async fn delete_subscription(
         .ok_or_else(|| not_found("subscription not found"))?;
     if sub.stream_id != stream_id {
         return Err(not_found("subscription not found on this stream"));
-    }
     store.subscriptions.remove(&sub_id);
     store.refresh_subscriber_count(stream_id);
     Ok(Json(serde_json::json!({ "deleted": sub_id })))
-}
-
 async fn pause_subscription(
     State(state): State<Arc<StreamsState>>,
     Path((stream_id, sub_id)): Path<(Uuid, Uuid)>,
@@ -718,12 +624,9 @@ async fn pause_subscription(
         .ok_or_else(|| not_found("subscription not found"))?;
     if sub.stream_id != stream_id {
         return Err(not_found("subscription not found on this stream"));
-    }
     sub.status = SubscriptionStatus::Paused;
     sub.updated_at = Utc::now();
     Ok(Json(sub.clone()))
-}
-
 async fn resume_subscription(
     State(state): State<Arc<StreamsState>>,
     Path((stream_id, sub_id)): Path<(Uuid, Uuid)>,
@@ -735,25 +638,18 @@ async fn resume_subscription(
         .ok_or_else(|| not_found("subscription not found"))?;
     if sub.stream_id != stream_id {
         return Err(not_found("subscription not found on this stream"));
-    }
     sub.status = SubscriptionStatus::Active;
     sub.updated_at = Utc::now();
     Ok(Json(sub.clone()))
-}
-
 // ── Messages ──────────────────────────────────────────────────────────────────
-
 async fn publish_message(
     State(state): State<Arc<StreamsState>>,
     Path(stream_id): Path<Uuid>,
     Json(req): Json<PublishRequest>,
 ) -> StatusResult<PublishResponse> {
     let mut store = state.store.lock().unwrap();
-
     if !store.streams.contains_key(&stream_id) {
         return Err(not_found("stream not found"));
-    }
-
     // Exactly-once deduplication check.
     if let Some(dedup_id) = req.deduplication_id {
         if store.is_duplicate(dedup_id) {
@@ -770,13 +666,9 @@ async fn publish_message(
                     deduplicated: true,
                 }),
             ));
-        }
-    }
-
     let seq = store.next_sequence(stream_id);
     let ts = Utc::now();
     let msg_id = Uuid::new_v4();
-
     let msg = Message {
         id: msg_id,
         stream_id,
@@ -788,16 +680,12 @@ async fn publish_message(
         schema_id: req.schema_id,
         storage_tier: StorageTierHint::Hot,
         delivery_count: 0,
-    };
     store.messages.push(msg);
-
     // Update stream counters.
     if let Some(stream) = store.streams.get_mut(&stream_id) {
         stream.message_count += 1;
         stream.sequence = seq;
         stream.updated_at = ts;
-    }
-
     Ok((
         StatusCode::CREATED,
         Json(PublishResponse {
@@ -809,27 +697,20 @@ async fn publish_message(
             deduplicated: false,
         }),
     ))
-}
-
 async fn pull_messages(
     State(state): State<Arc<StreamsState>>,
     Path(stream_id): Path<Uuid>,
     Json(req): Json<PullRequest>,
 ) -> ApiResult<Vec<Message>> {
     let store = state.store.lock().unwrap();
-
     let sub = store
         .subscriptions
         .get(&req.subscription_id)
         .ok_or_else(|| not_found("subscription not found"))?;
-
     if sub.stream_id != stream_id {
         return Err(bad_request("subscription does not belong to this stream"));
-    }
-
     let limit = req.max_messages.unwrap_or(100) as usize;
     let cursor = sub.cursor;
-
     let messages: Vec<Message> = store
         .messages
         .iter()
@@ -837,17 +718,13 @@ async fn pull_messages(
         .take(limit)
         .cloned()
         .collect();
-
     Ok(Json(messages))
-}
-
 async fn ack_messages(
     State(state): State<Arc<StreamsState>>,
     Path((stream_id, sub_id)): Path<(Uuid, Uuid)>,
     Json(req): Json<AckRequest>,
 ) -> ApiResult<AckResponse> {
     let mut store = state.store.lock().unwrap();
-
     // Validate ownership immutably first.
     {
         let sub = store
@@ -856,16 +733,11 @@ async fn ack_messages(
             .ok_or_else(|| not_found("subscription not found"))?;
         if sub.stream_id != stream_id {
             return Err(not_found("subscription not found on this stream"));
-        }
-    }
-
     // Collect all immutable data before any mutation.
     let known_ids: std::collections::HashSet<Uuid> =
         store.messages.iter().map(|m| m.id).collect();
-
     let (acked, not_found_ids): (Vec<Uuid>, Vec<Uuid>) =
         req.message_ids.into_iter().partition(|id| known_ids.contains(id));
-
     let max_seq = store
         .messages
         .iter()
@@ -873,31 +745,23 @@ async fn ack_messages(
         .map(|m| m.sequence)
         .max()
         .unwrap_or(0);
-
     let stream_seq = store
         .stream_sequences
         .get(&stream_id)
         .copied()
         .unwrap_or(0);
-
     // Now mutate subscription in a single borrow.
     let sub = store.subscriptions.get_mut(&sub_id).unwrap();
     if max_seq > sub.cursor {
         sub.cursor = max_seq;
-    }
     let cursor = sub.cursor;
     sub.lag = stream_seq.saturating_sub(cursor);
     sub.updated_at = Utc::now();
-
     Ok(Json(AckResponse {
         acked,
         not_found: not_found_ids,
         cursor_advanced_to: cursor,
-    }))
-}
-
 // ── Schema Registry ───────────────────────────────────────────────────────────
-
 async fn register_schema(
     State(state): State<Arc<StreamsState>>,
     Json(req): Json<RegisterSchemaRequest>,
@@ -916,11 +780,8 @@ async fn register_schema(
         stream_count: 0,
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    };
     store.schemas.insert(schema.id, schema.clone());
     (StatusCode::CREATED, Json(schema))
-}
-
 async fn list_schemas(
     State(state): State<Arc<StreamsState>>,
     Query(filter): Query<StreamIdFilter>,
@@ -932,7 +793,6 @@ async fn list_schemas(
             .streams
             .get(&sid)
             .and_then(|s| s.schema_id)
-            .into_iter()
             .collect();
         store
             .schemas
@@ -942,10 +802,7 @@ async fn list_schemas(
             .collect()
     } else {
         store.schemas.values().cloned().collect()
-    };
     Json(schemas)
-}
-
 async fn get_schema(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -957,33 +814,26 @@ async fn get_schema(
         .cloned()
         .map(Json)
         .ok_or_else(|| not_found("schema not found"))
-}
-
 async fn delete_schema(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     let in_use = store.streams.values().any(|s| s.schema_id == Some(id));
     if in_use {
         return Err(bad_request(
             "schema is in use by one or more streams; update streams first",
         ));
-    }
     store
         .schemas
         .remove(&id)
         .map(|_| Json(serde_json::json!({ "deleted": id })))
         .ok_or_else(|| not_found("schema not found"))
-}
-
 async fn validate_schema(
     State(state): State<Arc<StreamsState>>,
     Json(req): Json<ValidateSchemaRequest>,
 ) -> Json<ValidateSchemaResponse> {
     let store = state.store.lock().unwrap();
     let existing = store.schemas.values().find(|s| s.subject == req.subject);
-
     let (compatible, errors) = match existing {
         None => (true, vec![]),
         Some(schema) => {
@@ -998,19 +848,12 @@ async fn validate_schema(
                     schema.subject, schema.version, schema.compatibility
                 );
                 (false, vec![msg])
-            }
-        }
-    };
-
     Json(ValidateSchemaResponse {
         valid: true, // syntactic validity requires format-specific parse
         compatible,
         errors,
     })
-}
-
 // ── Connectors ────────────────────────────────────────────────────────────────
-
 async fn create_connector(
     State(state): State<Arc<StreamsState>>,
     Json(req): Json<CreateConnectorRequest>,
@@ -1018,7 +861,6 @@ async fn create_connector(
     let mut store = state.store.lock().unwrap();
     if !store.streams.contains_key(&req.stream_id) {
         return Err(not_found("stream not found"));
-    }
     let connector = Connector {
         id: Uuid::new_v4(),
         name: req.name,
@@ -1032,11 +874,8 @@ async fn create_connector(
         messages_processed: 0,
         created_at: Utc::now(),
         updated_at: Utc::now(),
-    };
     store.connectors.insert(connector.id, connector.clone());
     Ok((StatusCode::CREATED, Json(connector)))
-}
-
 async fn list_connectors(
     State(state): State<Arc<StreamsState>>,
     Query(filter): Query<StreamIdFilter>,
@@ -1049,8 +888,6 @@ async fn list_connectors(
         .cloned()
         .collect();
     Json(connectors)
-}
-
 async fn get_connector(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -1062,8 +899,6 @@ async fn get_connector(
         .cloned()
         .map(Json)
         .ok_or_else(|| not_found("connector not found"))
-}
-
 async fn patch_connector(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -1076,38 +911,26 @@ async fn patch_connector(
         .ok_or_else(|| not_found("connector not found"))?;
     if let Some(status) = req.status {
         connector.status = status;
-    }
     if let Some(config) = req.config {
         connector.config = config;
-    }
     if let Some(dsl) = req.transform_dsl {
         connector.transform_dsl = Some(dsl);
-    }
     connector.updated_at = Utc::now();
     Ok(Json(connector.clone()))
-}
-
 async fn delete_connector(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     store
         .connectors
         .remove(&id)
         .map(|_| Json(serde_json::json!({ "deleted": id })))
         .ok_or_else(|| not_found("connector not found"))
-}
-
 // ── Dead Letter Queue ─────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
 struct DlqFilter {
     stream_id: Option<Uuid>,
     status: Option<String>,
     limit: Option<u32>,
-}
-
 async fn list_dlq(
     State(state): State<Arc<StreamsState>>,
     Query(filter): Query<DlqFilter>,
@@ -1127,8 +950,6 @@ async fn list_dlq(
         .cloned()
         .collect();
     Json(entries)
-}
-
 async fn get_dlq_entry(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -1140,59 +961,44 @@ async fn get_dlq_entry(
         .cloned()
         .map(Json)
         .ok_or_else(|| not_found("DLQ entry not found"))
-}
-
 async fn retry_dlq_entry(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     let entry = store
         .dlq
         .get_mut(&id)
         .ok_or_else(|| not_found("DLQ entry not found"))?;
-
     if entry.status == DlqStatus::Discarded {
         return Err(bad_request("cannot retry a discarded DLQ entry"));
-    }
     if entry.retry_count >= entry.retry_policy.max_retries {
         entry.status = DlqStatus::Exhausted;
         return Err(bad_request("retry limit exhausted"));
-    }
-
     entry.retry_count += 1;
     entry.status = DlqStatus::Retrying;
     entry.last_retry_at = Some(Utc::now());
-
     // Compute next retry with exponential backoff.
     let delay_ms = match entry.retry_policy.backoff {
         BackoffStrategy::Fixed => entry.retry_policy.initial_delay_ms,
         BackoffStrategy::Linear => {
             entry.retry_policy.initial_delay_ms * entry.retry_count as u64
-        }
         BackoffStrategy::Exponential | BackoffStrategy::Jittered => {
             (entry.retry_policy.initial_delay_ms
                 * 2u64.pow(entry.retry_count.saturating_sub(1)))
             .min(entry.retry_policy.max_delay_ms)
-        }
-    };
     entry.next_retry_at = Some(
         Utc::now()
             + chrono::Duration::milliseconds(delay_ms as i64),
     );
-
     Ok(Json(serde_json::json!({
         "id": id,
         "retry_count": entry.retry_count,
         "next_retry_at": entry.next_retry_at,
         "status": entry.status,
     })))
-}
-
 async fn discard_dlq_entry(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
     let mut store = state.store.lock().unwrap();
     let entry = store
         .dlq
@@ -1200,17 +1006,12 @@ async fn discard_dlq_entry(
         .ok_or_else(|| not_found("DLQ entry not found"))?;
     entry.status = DlqStatus::Discarded;
     Ok(Json(serde_json::json!({ "discarded": id })))
-}
-
 // ── Tiered Storage ────────────────────────────────────────────────────────────
-
 async fn get_storage_config(
     State(state): State<Arc<StreamsState>>,
 ) -> Json<StorageTierConfig> {
     let store = state.store.lock().unwrap();
     Json(store.storage_config.clone())
-}
-
 async fn update_storage_config(
     State(state): State<Arc<StreamsState>>,
     Json(config): Json<StorageTierConfig>,
@@ -1218,8 +1019,6 @@ async fn update_storage_config(
     let mut store = state.store.lock().unwrap();
     store.storage_config = config.clone();
     Json(config)
-}
-
 async fn storage_tier_stats(
     State(state): State<Arc<StreamsState>>,
 ) -> Json<StorageTierStats> {
@@ -1241,10 +1040,7 @@ async fn storage_tier_stats(
         auto_tier_enabled: store.storage_config.auto_tier_enabled,
         config: store.storage_config.clone(),
     })
-}
-
 // ── Metrics ───────────────────────────────────────────────────────────────────
-
 async fn stream_metrics(
     State(state): State<Arc<StreamsState>>,
     Path(id): Path<Uuid>,
@@ -1252,7 +1048,6 @@ async fn stream_metrics(
     let store = state.store.lock().unwrap();
     if !store.streams.contains_key(&id) {
         return Err(not_found("stream not found"));
-    }
     // Return stored metrics or a zero snapshot.
     let m = store.metrics.get(&id).cloned().unwrap_or(StreamMetrics {
         stream_id: id,
@@ -1274,10 +1069,7 @@ async fn stream_metrics(
         publish_latency_ms_p99: 0.0,
         end_to_end_latency_ms_p99: 0.0,
         exactly_once_dedup_count: store.dedup_hit_count,
-    });
     Ok(Json(m))
-}
-
 async fn platform_metrics(
     State(state): State<Arc<StreamsState>>,
 ) -> Json<PlatformMetrics> {
@@ -1306,12 +1098,10 @@ async fn platform_metrics(
                 publish_latency_ms_p99: 0.0,
                 end_to_end_latency_ms_p99: 0.0,
                 exactly_once_dedup_count: store.dedup_hit_count,
->>>>>>> claude/youthful-babbage
             })
         })
         .collect();
 
-<<<<<<< HEAD
     ok(serde_json::json!({ "records": out }))
 }
 
@@ -1725,7 +1515,6 @@ async fn check_compat_no_path(
         .check_compatibility(&subject, &SchemaType::JsonSchema, &definition)
         .map_err(ApiError)?;
     ok(serde_json::json!({ "compatible": result.compatible }))
-=======
     Json(PlatformMetrics {
         timestamp: Utc::now(),
         total_streams: store.streams.len() as u64,
@@ -1737,10 +1526,7 @@ async fn check_compat_no_path(
         dedup_cache_size: store.dedup_ids.len() as u64,
         per_stream,
     })
-}
-
 // ── Backpressure ──────────────────────────────────────────────────────────────
-
 async fn backpressure_status(
     State(state): State<Arc<StreamsState>>,
 ) -> Json<Vec<BackpressureStatus>> {
@@ -1760,7 +1546,6 @@ async fn backpressure_status(
                     status: s.status.clone(),
                 })
                 .collect();
-
             let throttle_active = stream.throughput_limit.is_some();
             let recommended = if slow_subs.len() > 3 {
                 BackpressureAction::ThrottlePublishers
@@ -1770,8 +1555,6 @@ async fn backpressure_status(
                 BackpressureAction::MoveToColdTier
             } else {
                 BackpressureAction::None
-            };
-
             BackpressureStatus {
                 stream_id: stream.id,
                 stream_name: stream.name.clone(),
@@ -1779,9 +1562,7 @@ async fn backpressure_status(
                 current_limit: stream.throughput_limit.clone(),
                 slow_subscriptions: slow_subs,
                 recommended_action: recommended,
-            }
         })
         .collect();
     Json(statuses)
->>>>>>> claude/youthful-babbage
 }

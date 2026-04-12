@@ -11,15 +11,11 @@
 //!
 //! Replaces: OPA Gatekeeper + OPAL
 
-<<<<<<< HEAD
 pub mod engine;
 pub mod models;
-=======
 pub mod admission;
 pub mod bundle;
 pub mod decision_log;
-pub mod engine;
->>>>>>> claude/wizardly-goldstine
 pub mod routes;
 
 use axum::Router;

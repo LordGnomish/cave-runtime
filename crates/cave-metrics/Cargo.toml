@@ -1,10 +1,5 @@
 [package]
 name = "cave-metrics"
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/nostalgic-leavitt
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -33,13 +28,10 @@ snap = "1"
 parking_lot = "0.12"
 dashmap = "6"
 crc32fast = "1"
-<<<<<<< HEAD
-=======
 description = "Metrics ingestion & query — replaces Prometheus/Thanos. Prometheus-compatible remote_write and query API."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-
 [dependencies]
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
@@ -52,15 +44,10 @@ tracing    = { workspace = true }
 uuid       = { workspace = true }
 chrono     = { workspace = true }
 thiserror  = { workspace = true }
->>>>>>> claude/gallant-cartwright
-=======
->>>>>>> claude/nostalgic-leavitt
-=======
 description = "Metrics collection and querying — Prometheus/Thanos replacement"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-
 [dependencies]
 axum = { workspace = true }
 serde = { workspace = true }
@@ -71,4 +58,3 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 reqwest = { workspace = true }
->>>>>>> claude/relaxed-nash

@@ -23,16 +23,10 @@ use crate::{
     BackupState,
 };
 use axum::{
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/heuristic-payne
     routing::get,
-=======
     extract::{Path, State},
     http::StatusCode,
     routing::{delete, get, post, put},
->>>>>>> claude/gallant-meninsky
     Json, Router,
 };
 use serde::{Deserialize, Serialize};

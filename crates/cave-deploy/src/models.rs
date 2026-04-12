@@ -1,15 +1,11 @@
-<<<<<<< HEAD
 //! Domain models for cave-deploy.
-=======
 //! Data models for cave-deploy — full ArgoCD CRD parity.
->>>>>>> claude/thirsty-snyder
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-<<<<<<< HEAD
 // ─── Sources ─────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,10 +61,7 @@ pub enum SyncStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-=======
 // ─── Application ──────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Application {
     pub id: Uuid,
@@ -82,8 +75,6 @@ pub struct Application {
     pub created_by: Option<String>,
     /// Finalizers — e.g. "resources-finalizer.argocd.argoproj.io"
     pub finalizers: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSpec {
@@ -100,12 +91,9 @@ pub struct ApplicationSpec {
     #[serde(default)]
     pub info: Vec<AppInfo>,
     pub revision_history_limit: Option<u32>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSource {
-    pub repo_url: String,
     pub path: Option<String>,
     /// Branch name, tag, or commit SHA.
     pub target_revision: Option<String>,
@@ -117,11 +105,8 @@ pub struct ApplicationSource {
     /// Named reference for multi-source apps.
     #[serde(rename = "ref")]
     pub ref_name: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct HelmSource {
     pub release_name: Option<String>,
     /// Inline values YAML.
     pub values: Option<String>,
@@ -129,24 +114,17 @@ pub struct HelmSource {
     pub value_files: Vec<String>,
     #[serde(default)]
     pub parameters: Vec<HelmParameter>,
-    pub version: Option<String>,
     #[serde(default)]
     pub pass_credentials: bool,
     #[serde(default)]
     pub ignore_missing_value_files: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelmParameter {
     pub name: String,
     pub value: String,
     #[serde(default)]
     pub force_string: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct KustomizeSource {
     pub name_prefix: Option<String>,
     pub name_suffix: Option<String>,
     #[serde(default)]
@@ -155,11 +133,8 @@ pub struct KustomizeSource {
     pub common_labels: HashMap<String, String>,
     #[serde(default)]
     pub common_annotations: HashMap<String, String>,
-    pub version: Option<String>,
     #[serde(default)]
     pub patches: Vec<serde_json::Value>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DirectorySource {
@@ -168,8 +143,6 @@ pub struct DirectorySource {
     pub jsonnet: Option<JsonnetSource>,
     pub exclude: Option<String>,
     pub include: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct JsonnetSource {
     #[serde(default)]
@@ -178,16 +151,11 @@ pub struct JsonnetSource {
     pub tlas: Vec<JsonnetVar>,
     #[serde(default)]
     pub ext_vars: Vec<JsonnetVar>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonnetVar {
     pub name: String,
     pub value: String,
     #[serde(default)]
     pub code: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApplicationDestination {
     /// Kubernetes API server URL; "https://kubernetes.default.svc" for in-cluster.
@@ -195,8 +163,6 @@ pub struct ApplicationDestination {
     /// Cluster name alias (resolved from cluster secrets).
     pub name: Option<String>,
     pub namespace: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncPolicy {
@@ -205,8 +171,6 @@ pub struct SyncPolicy {
     pub sync_options: Vec<String>,
     pub retry: Option<RetryStrategy>,
     pub managed_namespace_metadata: Option<ManagedNamespaceMetadata>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AutomatedSync {
@@ -216,32 +180,22 @@ pub struct AutomatedSync {
     pub self_heal: bool,
     #[serde(default)]
     pub allow_empty: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryStrategy {
     /// Max retries; -1 = infinite.
     pub limit: i32,
     pub backoff: Option<BackoffPolicy>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BackoffPolicy {
     /// Initial backoff duration string, e.g. "5s".
     pub duration: String,
     pub factor: Option<f64>,
     pub max_duration: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ManagedNamespaceMetadata {
     #[serde(default)]
     pub labels: HashMap<String, String>,
     #[serde(default)]
     pub annotations: HashMap<String, String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceIgnoreDifference {
@@ -255,16 +209,10 @@ pub struct ResourceIgnoreDifference {
     pub jq_path_expressions: Vec<String>,
     #[serde(default)]
     pub managed_fields_managers: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppInfo {
     pub name: String,
     pub value: String,
-}
-
 // ─── Application Status ───────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationStatus {
@@ -283,10 +231,7 @@ pub struct ApplicationStatus {
     #[serde(default)]
     pub retry_count: i32,
     pub reconciled_at: Option<DateTime<Utc>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
->>>>>>> claude/thirsty-snyder
 pub enum HealthStatus {
     Healthy,
     Progressing,
@@ -296,7 +241,6 @@ pub enum HealthStatus {
     Unknown,
 }
 
-<<<<<<< HEAD
 // ─── Application ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -465,7 +409,6 @@ pub struct CreateRolloutRequest {
     pub strategy: RolloutStrategy,
     pub canary_revision: String,
     pub steps: Vec<RolloutStepRequest>,
-=======
 impl std::fmt::Display for HealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -477,9 +420,6 @@ impl std::fmt::Display for HealthStatus {
             HealthStatus::Unknown => "Unknown",
         };
         write!(f, "{s}")
-    }
-}
-
 impl std::str::FromStr for HealthStatus {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -491,16 +431,11 @@ impl std::str::FromStr for HealthStatus {
             "Missing" => HealthStatus::Missing,
             _ => HealthStatus::Unknown,
         })
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SyncStatus {
     Synced,
     OutOfSync,
     Unknown,
-}
-
 impl std::fmt::Display for SyncStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -509,44 +444,29 @@ impl std::fmt::Display for SyncStatus {
             SyncStatus::Unknown => "Unknown",
         };
         write!(f, "{s}")
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatusDetail {
     pub status: String,
     pub compared_to: Option<ComparedTo>,
-    pub revision: Option<String>,
     #[serde(default)]
     pub revisions: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ComparedTo {
-    pub source: ApplicationSource,
     #[serde(default)]
     pub sources: Vec<ApplicationSource>,
     pub destination: ApplicationDestination,
     #[serde(default)]
     pub ignore_differences: Vec<ResourceIgnoreDifference>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HealthStatusDetail {
     pub status: String,
-    pub message: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceStatus {
     pub group: Option<String>,
     pub version: String,
-    pub kind: String,
     pub namespace: Option<String>,
-    pub name: String,
     pub status: Option<String>,
     pub health: Option<HealthStatusDetail>,
     #[serde(default)]
@@ -555,40 +475,24 @@ pub struct ResourceStatus {
     pub require_pruning: bool,
     #[serde(default)]
     pub sync_wave: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RevisionHistory {
     pub id: u64,
-    pub revision: String,
-    pub deployed_at: DateTime<Utc>,
-    pub source: ApplicationSource,
     #[serde(default)]
     pub sources: Vec<ApplicationSource>,
     pub deploy_started_at: Option<DateTime<Utc>>,
     pub initiator: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationCondition {
     pub r#type: String,
-    pub message: String,
     pub last_transition_time: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationState {
     pub phase: OperationPhase,
-    pub message: Option<String>,
     pub sync_result: Option<SyncOperationResult>,
     pub started_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
     #[serde(default)]
     pub retry_count: i32,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum OperationPhase {
     Running,
@@ -596,8 +500,6 @@ pub enum OperationPhase {
     Error,
     Succeeded,
     Terminating,
-}
-
 impl std::fmt::Display for OperationPhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -608,42 +510,27 @@ impl std::fmt::Display for OperationPhase {
             OperationPhase::Terminating => "Terminating",
         };
         write!(f, "{s}")
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncOperationResult {
-    pub revision: String,
     #[serde(default)]
     pub revisions: Vec<String>,
-    pub source: Option<ApplicationSource>,
     #[serde(default)]
     pub resources: Vec<ResourceResult>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceResult {
     pub group: Option<String>,
     pub version: String,
-    pub kind: String,
     pub namespace: Option<String>,
-    pub name: String,
     pub status: ResourceSyncStatus,
-    pub message: Option<String>,
     pub hook_phase: Option<HookPhase>,
     pub hook_type: Option<SyncHookType>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ResourceSyncStatus {
     Synced,
     SyncFailed,
     Pruned,
     PruneSkipped,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum SyncHookType {
     PreSync,
@@ -651,8 +538,6 @@ pub enum SyncHookType {
     PostSync,
     SyncFail,
     Skip,
-}
-
 impl std::fmt::Display for SyncHookType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -663,33 +548,21 @@ impl std::fmt::Display for SyncHookType {
             SyncHookType::Skip => "Skip",
         };
         write!(f, "{s}")
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum HookPhase {
     Running,
     Failed,
     Error,
     Succeeded,
-    Pending,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApplicationSummary {
     #[serde(default)]
     pub external_urls: Vec<String>,
     #[serde(default)]
     pub images: Vec<String>,
-}
-
 // ─── AppProject ───────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppProject {
-    pub id: Uuid,
-    pub name: String,
     pub description: Option<String>,
     #[serde(default)]
     pub source_repos: Vec<String>,
@@ -708,19 +581,10 @@ pub struct AppProject {
     #[serde(default)]
     pub sync_windows: Vec<SyncWindow>,
     pub orphaned_resources: Option<OrphanedResourcesMonitor>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupKind {
     pub group: String,
-    pub kind: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProjectRole {
-    pub name: String,
     pub description: Option<String>,
     /// Casbin-style policies: "p, role:name, resource, action, allow"
     #[serde(default)]
@@ -728,9 +592,6 @@ pub struct ProjectRole {
     /// SSO group names mapped to this role.
     #[serde(default)]
     pub groups: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncWindow {
     pub kind: SyncWindowKind,
     /// Cron expression.
@@ -745,36 +606,22 @@ pub struct SyncWindow {
     pub clusters: Vec<String>,
     #[serde(default)]
     pub manual_sync: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SyncWindowKind {
     Allow,
     Deny,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrphanedResourcesMonitor {
     #[serde(default)]
     pub warn: bool,
     #[serde(default)]
     pub ignore: Vec<OrphanedResourceKey>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OrphanedResourceKey {
     pub group: Option<String>,
     pub kind: Option<String>,
-    pub name: Option<String>,
-}
-
 // ─── Cluster ──────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Cluster {
-    pub id: Uuid,
-    pub name: String,
     pub server: String,
     pub config: ClusterConfig,
     #[serde(default)]
@@ -783,10 +630,6 @@ pub struct Cluster {
     pub annotations: HashMap<String, String>,
     pub info: ClusterInfo,
     pub project: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterConfig {
@@ -795,8 +638,6 @@ pub struct ClusterConfig {
     pub bearer_token: Option<String>,
     pub tls_client_config: Option<TlsClientConfig>,
     pub aws_auth_config: Option<AwsAuthConfig>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TlsClientConfig {
@@ -806,16 +647,11 @@ pub struct TlsClientConfig {
     pub cert_data: Option<String>,
     pub key_data: Option<String>,
     pub ca_data: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AwsAuthConfig {
     pub cluster_name: String,
     pub role_arn: Option<String>,
     pub profile: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterInfo {
@@ -825,32 +661,20 @@ pub struct ClusterInfo {
     pub applications_count: u32,
     #[serde(default)]
     pub api_versions: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectionState {
     pub status: ConnectionStatus,
-    pub message: Option<String>,
     pub attempted_at: Option<DateTime<Utc>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ConnectionStatus {
     Unknown,
     Failed,
     Successful,
-}
-
 // ─── Repository ───────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Repository {
-    pub id: Uuid,
     /// Repository URL (HTTP/S or SSH).
     pub repo: String,
-    pub name: Option<String>,
     pub username: Option<String>,
     /// Stored encrypted at rest.
     pub password: Option<String>,
@@ -864,31 +688,15 @@ pub struct Repository {
     pub repo_type: RepoType,
     pub project: Option<String>,
     pub connection_state: Option<ConnectionState>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum RepoType {
     Git,
     Helm,
-}
-
 // ─── ApplicationSet ───────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSet {
-    pub id: Uuid,
-    pub name: String,
-    pub namespace: String,
     pub spec: ApplicationSetSpec,
     pub status: ApplicationSetStatus,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSetSpec {
     pub generators: Vec<ApplicationSetGenerator>,
@@ -900,18 +708,13 @@ pub struct ApplicationSetSpec {
     pub preserve_resources_on_deletion: bool,
     #[serde(default)]
     pub go_template: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSetTemplate {
     pub metadata: ApplicationSetTemplateMetadata,
     pub spec: ApplicationSpec,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApplicationSetTemplateMetadata {
-    pub name: String,
     pub namespace: Option<String>,
     #[serde(default)]
     pub labels: HashMap<String, String>,
@@ -919,45 +722,27 @@ pub struct ApplicationSetTemplateMetadata {
     pub annotations: HashMap<String, String>,
     #[serde(default)]
     pub finalizers: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSetSyncPolicy {
     #[serde(default)]
     pub preserve_resources_on_deletion: bool,
     pub applications_sync: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationSetStrategy {
     pub r#type: String,
     pub rolling_sync: Option<RollingSync>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RollingSync {
     pub steps: Vec<RollingSyncStep>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RollingSyncStep {
     #[serde(default)]
     pub match_expressions: Vec<LabelMatchExpression>,
     pub max_update: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LabelMatchExpression {
     pub key: String,
     pub operator: String,
     #[serde(default)]
     pub values: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ApplicationSetGenerator {
     List(ListGenerator),
@@ -966,22 +751,16 @@ pub enum ApplicationSetGenerator {
     Matrix(MatrixGenerator),
     Merge(MergeGenerator),
     PullRequest(PullRequestGenerator),
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ListGenerator {
     pub elements: Vec<serde_json::Value>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ClusterGenerator {
     pub selector: Option<LabelSelector>,
     #[serde(default)]
     pub values: HashMap<String, String>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct LabelSelector {
@@ -989,8 +768,6 @@ pub struct LabelSelector {
     pub match_labels: HashMap<String, String>,
     #[serde(default)]
     pub match_expressions: Vec<LabelMatchExpression>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitGenerator {
@@ -999,39 +776,25 @@ pub struct GitGenerator {
     pub directories: Vec<GitDirectoryGeneratorItem>,
     #[serde(default)]
     pub files: Vec<GitFileGeneratorItem>,
-    pub revision: Option<String>,
     #[serde(default)]
     pub values: HashMap<String, String>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitDirectoryGeneratorItem {
     pub path: String,
     #[serde(default)]
     pub exclude: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitFileGeneratorItem {
     pub path: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatrixGenerator {
     /// Exactly 2 generators whose parameter sets are combined.
     pub generators: Vec<ApplicationSetGenerator>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MergeGenerator {
     pub merge_keys: Vec<String>,
     pub generators: Vec<ApplicationSetGenerator>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PullRequestGenerator {
@@ -1041,8 +804,6 @@ pub struct PullRequestGenerator {
     pub filters: Vec<PullRequestFilter>,
     pub requeue_after_seconds: Option<u64>,
     pub template: Option<ApplicationSetTemplate>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitHubPullRequestSource {
@@ -1052,8 +813,6 @@ pub struct GitHubPullRequestSource {
     pub token_ref: Option<SecretKeyRef>,
     #[serde(default)]
     pub labels: Vec<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitLabPullRequestSource {
@@ -1063,59 +822,37 @@ pub struct GitLabPullRequestSource {
     #[serde(default)]
     pub labels: Vec<String>,
     pub pull_request_state: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PullRequestFilter {
     pub branch_match: Option<String>,
     pub target_branch_match: Option<String>,
     #[serde(default)]
     pub labels: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretKeyRef {
     pub secret_name: String,
     pub key: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApplicationSetStatus {
     #[serde(default)]
     pub conditions: Vec<ApplicationSetCondition>,
     #[serde(default)]
     pub application_status: Vec<AppSetApplicationStatus>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApplicationSetCondition {
     pub r#type: String,
-    pub message: String,
     pub reason: Option<String>,
     pub status: String,
     pub last_transition_time: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSetApplicationStatus {
     pub application: String,
     pub last_transition_time: Option<DateTime<Utc>>,
-    pub message: Option<String>,
     pub status: String,
     pub step: Option<String>,
-}
-
 // ─── Diff ─────────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceDiff {
     pub group: Option<String>,
     pub version: String,
-    pub kind: String,
     pub namespace: Option<String>,
-    pub name: String,
     pub diff_type: DiffType,
     /// What the desired state looks like (from Git).
     pub desired: Option<serde_json::Value>,
@@ -1123,23 +860,16 @@ pub struct ResourceDiff {
     pub live: Option<serde_json::Value>,
     /// Human-readable unified-diff patch.
     pub patch: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DiffType {
     Added,
     Removed,
     Modified,
     Unchanged,
-}
-
 // ─── Manifest (in-memory parsed form) ─────────────────────────────────────────
-
 #[derive(Debug, Clone)]
 pub struct Manifest {
     pub api_version: String,
-    pub kind: String,
-    pub name: String,
     pub namespace: Option<String>,
     pub raw: serde_json::Value,
     /// argocd.argoproj.io/sync-wave
@@ -1148,71 +878,42 @@ pub struct Manifest {
     pub hook_type: Option<SyncHookType>,
     /// argocd.argoproj.io/hook-delete-policy
     pub hook_delete_policy: Option<String>,
-}
-
 // ─── API Request / Response types ────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateApplicationRequest {
-    pub name: String,
     pub namespace: Option<String>,
     pub project: String,
     pub spec: ApplicationSpec,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateApplicationRequest {
     pub spec: ApplicationSpec,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct SyncRequest {
-    pub revision: Option<String>,
     #[serde(default)]
     pub dry_run: bool,
     #[serde(default)]
     pub prune: bool,
     pub strategy: Option<SyncStrategySpec>,
     pub resources: Option<Vec<SyncOperationResource>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SyncStrategySpec {
     #[serde(default)]
     pub apply_force: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncOperationResource {
     pub group: Option<String>,
-    pub kind: String,
-    pub name: String,
     pub namespace: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct RollbackRequest {
     /// ID from revision history.
     pub id: u64,
     #[serde(default)]
     pub dry_run: bool,
     #[serde(default)]
     pub prune: bool,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResourceTrackingConfig {
     pub method: ResourceTrackingMethod,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum ResourceTrackingMethod {
     #[default]
     Label,
     Annotation,
     AnnotationAndLabel,
->>>>>>> claude/thirsty-snyder
 }

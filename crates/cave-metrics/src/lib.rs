@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/nostalgic-leavitt
 //! cave-metrics: Prometheus + Thanos replacement.
 //! Provides TSDB, PromQL evaluation, remote_write, scraping, rules, and Alertmanager integration.
 
@@ -509,55 +504,19 @@ http_latency_sum 45.3
         assert_eq!(alerts[0].name, "HighErrorRate");
     }
 }
-<<<<<<< HEAD
-=======
-//! CAVE Metrics — time-series metrics ingestion and query engine.
-//!
-//! Replaces Prometheus + Thanos with a Rust-native implementation.
-//! Supports remote_write ingestion, PromQL-compatible query API,
-//! series metadata, and Prometheus exposition format for self-metrics.
-//!
-//! ## Upstream Compatibility: Prometheus
-//! - Remote Write: POST /api/v1/write (Prometheus remote_write protobuf)
-//! - Query API:    GET  /api/v1/query, /api/v1/query_range
-//! - Metadata:     GET  /api/v1/series, /api/v1/labels, /api/v1/label/:name/values
-//! - Self-metrics: GET  /metrics (Prometheus exposition format)
-//! - Response envelope: {"status":"success","data":{"resultType":"...","result":[...]}}
-//!
-//! ## Upstream Tracking: Prometheus
-//! - GitHub: https://github.com/prometheus/prometheus
-//! - Tracked: remote_write protocol v1/v2, HTTP API spec, exposition format
-
-pub mod models;
-pub mod routes;
-
-use axum::Router;
-use cave_db::CavePool;
-use std::sync::Arc;
-
-/// Module state shared across request handlers.
-pub struct MetricsState {
-    pub pool: Arc<CavePool>,
-}
-
-/// Create the axum router for the metrics module.
-=======
 //! Metrics collection and querying — Prometheus/Thanos replacement.
 //!
 //! Replaces: Prometheus, Thanos, Alertmanager
 //! PromQL-like querying, scrape targets, alert/recording rules, time series storage.
-
 pub mod alerting;
 pub mod models;
 pub mod query;
 pub mod routes;
 pub mod scraper;
 pub mod storage;
-
 use axum::Router;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
 /// Shared state for cave-metrics.
 pub struct MetricsState {
     pub store: Arc<Mutex<storage::TimeSeriesStore>>,
@@ -566,7 +525,6 @@ pub struct MetricsState {
     pub scrape_targets: Arc<Mutex<Vec<models::ScrapeTarget>>>,
     pub metadata: Arc<Mutex<Vec<models::MetricMetadata>>>,
 }
-
 impl MetricsState {
     pub fn new() -> Self {
         Self {
@@ -578,22 +536,50 @@ impl MetricsState {
         }
     }
 }
-
 impl Default for MetricsState {
     fn default() -> Self {
         Self::new()
     }
 }
-
->>>>>>> claude/relaxed-nash
 pub fn router(state: Arc<MetricsState>) -> Router {
     routes::create_router(state)
 }
 
 pub const MODULE_NAME: &str = "metrics";
-<<<<<<< HEAD
->>>>>>> claude/gallant-cartwright
-=======
->>>>>>> claude/nostalgic-leavitt
-=======
->>>>>>> claude/relaxed-nash
+//! Metrics collection and querying — Prometheus/Thanos replacement.
+//!
+//! Replaces: Prometheus, Thanos, Alertmanager
+//! PromQL-like querying, scrape targets, alert/recording rules, time series storage.
+pub mod alerting;
+pub mod models;
+pub mod query;
+pub mod routes;
+pub mod scraper;
+pub mod storage;
+use axum::Router;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+/// Shared state for cave-metrics.
+pub struct MetricsState {
+    pub store: Arc<Mutex<storage::TimeSeriesStore>>,
+    pub alert_rules: Arc<Mutex<Vec<models::AlertRule>>>,
+    pub recording_rules: Arc<Mutex<Vec<models::RecordingRule>>>,
+    pub scrape_targets: Arc<Mutex<Vec<models::ScrapeTarget>>>,
+    pub metadata: Arc<Mutex<Vec<models::MetricMetadata>>>,
+}
+impl MetricsState {
+    pub fn new() -> Self {
+        Self {
+            store: Arc::new(Mutex::new(storage::TimeSeriesStore::default())),
+            alert_rules: Arc::new(Mutex::new(Vec::new())),
+            recording_rules: Arc::new(Mutex::new(Vec::new())),
+            scrape_targets: Arc::new(Mutex::new(Vec::new())),
+            metadata: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+}
+impl Default for MetricsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}

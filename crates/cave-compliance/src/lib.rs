@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! CAVE Compliance — SOC2 Type II and ISO 27001 compliance management.
 //!
 //! Replaces: Vanta, Drata, Tugboat Logic
@@ -17,29 +16,19 @@ pub use store::ComplianceStore;
 
 pub struct ComplianceState {
     pub store: Arc<ComplianceStore>,
-=======
 //! CAVE Compliance — SOC2/ISO27001/GDPR/HIPAA/PCI-DSS tracking.
-//!
 //! Provides automated evidence collection, control assessment, gap detection,
 //! and compliance reporting across the CAVE module graph.
-//!
 //! ## Upstream Tracking: Vanta / Drata / Tugboat Logic
 //! - Replaces point-in-time manual audits with continuous automated checks.
 //! - Controls mapped directly to CAVE module state (cave-auth, cave-vault, …).
-
 pub mod engine;
 pub mod mapping;
-pub mod models;
-pub mod routes;
-
-use axum::Router;
 use models::{Assessment, AuditTrail, Evidence, PolicyDocument, Remediation, Risk};
 use std::sync::{Arc, Mutex};
-
 // ────────────────────────────────────────────────────────────────────────────
 // In-memory store
 // ────────────────────────────────────────────────────────────────────────────
-
 /// All in-memory compliance data.
 ///
 /// Seeded with the built-in control library at startup.
@@ -53,7 +42,6 @@ pub struct ComplianceStore {
     pub policy_documents: Vec<PolicyDocument>,
     pub remediations: Vec<Remediation>,
 }
-
 impl Default for ComplianceStore {
     fn default() -> Self {
         Self {
@@ -67,30 +55,22 @@ impl Default for ComplianceStore {
         }
     }
 }
-
 // ────────────────────────────────────────────────────────────────────────────
 // Module state
 // ────────────────────────────────────────────────────────────────────────────
-
 /// State shared across all compliance request handlers.
-pub struct ComplianceState {
     pub store: Mutex<ComplianceStore>,
->>>>>>> claude/zen-poincare
 }
 
 impl Default for ComplianceState {
     fn default() -> Self {
         Self {
-<<<<<<< HEAD
             store: Arc::new(ComplianceStore::new()),
-=======
             store: Mutex::new(ComplianceStore::default()),
->>>>>>> claude/zen-poincare
         }
     }
 }
 
-<<<<<<< HEAD
 pub fn router(state: Arc<ComplianceState>) -> Router {
     routes::create_router(state.store.clone())
 }
@@ -453,16 +433,9 @@ mod tests {
         }
     }
 }
-=======
 // ────────────────────────────────────────────────────────────────────────────
 // Public API
 // ────────────────────────────────────────────────────────────────────────────
-
 /// Create the axum router for the compliance module.
-pub fn router(state: Arc<ComplianceState>) -> Router {
     routes::create_router(state)
-}
-
 /// Module name used for logging and future DB schema namespacing.
-pub const MODULE_NAME: &str = "compliance";
->>>>>>> claude/zen-poincare

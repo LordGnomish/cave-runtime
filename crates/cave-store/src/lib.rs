@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
 //! cave-store — MinIO replacement for object storage management.
 //!
 //! Replaces: MinIO, AWS S3 (dev/platform use)
@@ -39,10 +35,7 @@ pub fn router(state: Arc<StoreState>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "store";
-<<<<<<< HEAD
-=======
 //! cave-store — Object storage, S3/MinIO replacement.
-
 pub mod encryption;
 pub mod error;
 pub mod lifecycle;
@@ -54,17 +47,13 @@ pub mod routes;
 pub mod store;
 pub mod types;
 pub mod versioning;
-
 pub use error::{StoreError, StoreResult};
 pub use store::ObjectStore;
-
 pub const MODULE_NAME: &str = "store";
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use chrono::Duration;
-
     use super::encryption::EncryptionEngine;
     use super::lifecycle::{LifecycleAction, LifecycleManager};
     use super::notification::NotificationDispatcher;
@@ -75,11 +64,9 @@ mod tests {
         BucketPolicy, CannedAcl, LifecycleRule, NotificationConfig, PolicyStatement,
         QueueConfig, VersioningState,
     };
-
     async fn fresh_store() -> ObjectStore {
         ObjectStore::new()
     }
-
     // ── Test 1: create_bucket ───────────────────────────────────────────────
     #[tokio::test]
     async fn test_create_bucket() {
@@ -89,7 +76,6 @@ mod tests {
         assert_eq!(info.name, "my-bucket");
         assert_eq!(info.region, "us-east-1");
     }
-
     // ── Test 2: delete_bucket ───────────────────────────────────────────────
     #[tokio::test]
     async fn test_delete_bucket() {
@@ -99,7 +85,6 @@ mod tests {
         let result = store.head_bucket("del-bucket").await;
         assert!(result.is_err());
     }
-
     // ── Test 3: list_buckets ────────────────────────────────────────────────
     #[tokio::test]
     async fn test_list_buckets() {
@@ -109,7 +94,6 @@ mod tests {
         let buckets = store.list_buckets().await;
         assert_eq!(buckets.len(), 2);
     }
-
     // ── Test 4: put_object + get_object ────────────────────────────────────
     #[tokio::test]
     async fn test_put_get_object() {
@@ -121,7 +105,6 @@ mod tests {
         assert_eq!(version.content_type, "text/plain");
         assert_eq!(version.size, 11);
     }
-
     // ── Test 5: delete_object ───────────────────────────────────────────────
     #[tokio::test]
     async fn test_delete_object() {
@@ -132,7 +115,6 @@ mod tests {
         let result = store.get_object("bkt", "k", None).await;
         assert!(result.is_err());
     }
-
     // ── Test 6: head_object ─────────────────────────────────────────────────
     #[tokio::test]
     async fn test_head_object() {
@@ -143,7 +125,6 @@ mod tests {
         assert_eq!(info.size, 4);
         assert_eq!(info.content_type, "text/plain");
     }
-
     // ── Test 7: copy_object ─────────────────────────────────────────────────
     #[tokio::test]
     async fn test_copy_object() {
@@ -155,7 +136,6 @@ mod tests {
         let (_, data) = store.get_object("dst", "copy", None).await.unwrap();
         assert_eq!(data, b"content".to_vec());
     }
-
     // ── Test 8: list_objects_v2 with prefix ─────────────────────────────────
     #[tokio::test]
     async fn test_list_objects_prefix() {
@@ -164,54 +144,42 @@ mod tests {
         store.put_object("bkt", "docs/a.txt", b"a".to_vec(), "text/plain", HashMap::new(), None).await.unwrap();
         store.put_object("bkt", "docs/b.txt", b"b".to_vec(), "text/plain", HashMap::new(), None).await.unwrap();
         store.put_object("bkt", "images/c.png", b"c".to_vec(), "image/png", HashMap::new(), None).await.unwrap();
-
         let result = store.list_objects_v2("bkt", Some("docs/"), None, None, None).await.unwrap();
         assert_eq!(result.objects.len(), 2);
         assert!(result.objects.iter().all(|o| o.key.starts_with("docs/")));
     }
-
     // ── Test 9: object versioning ───────────────────────────────────────────
     #[tokio::test]
     async fn test_versioning() {
         let store = fresh_store().await;
         store.create_bucket("bkt", "us-east-1").await.unwrap();
         store.set_bucket_versioning("bkt", VersioningState::Enabled).await.unwrap();
-
         let info1 = store.put_object("bkt", "k", b"v1".to_vec(), "text/plain", HashMap::new(), None).await.unwrap();
         let info2 = store.put_object("bkt", "k", b"v2".to_vec(), "text/plain", HashMap::new(), None).await.unwrap();
-
         let vid1 = info1.version_id.unwrap();
         let _vid2 = info2.version_id.unwrap();
-
         // Latest version
         let (_, latest) = store.get_object("bkt", "k", None).await.unwrap();
         assert_eq!(latest, b"v2".to_vec());
-
         // Get by version_id
         let (_, v1) = store.get_object("bkt", "k", Some(&vid1)).await.unwrap();
         assert_eq!(v1, b"v1".to_vec());
     }
-
     // ── Test 10: multipart upload ───────────────────────────────────────────
     #[tokio::test]
     async fn test_multipart_upload() {
         let store = fresh_store().await;
         store.create_bucket("bkt", "us-east-1").await.unwrap();
-
         let upload_id = store.create_multipart_upload("bkt", "big-file", HashMap::new()).await.unwrap();
-
         let etag1 = store.upload_part(&upload_id, 1, b"part1-data".to_vec()).await.unwrap();
         let etag2 = store.upload_part(&upload_id, 2, b"part2-data".to_vec()).await.unwrap();
         let etag3 = store.upload_part(&upload_id, 3, b"part3-data".to_vec()).await.unwrap();
-
         let parts: Vec<(u32, String)> = vec![(1, etag1), (2, etag2), (3, etag3)];
         let info = store.complete_multipart_upload(&upload_id, parts).await.unwrap();
-
         let (_, data) = store.get_object("bkt", "big-file", None).await.unwrap();
         assert_eq!(data, b"part1-datapart2-datapart3-data".to_vec());
         assert_eq!(info.size, 30);
     }
-
     // ── Test 11: abort_multipart_upload ─────────────────────────────────────
     #[tokio::test]
     async fn test_abort_multipart() {
@@ -223,7 +191,6 @@ mod tests {
         let result = store.abort_multipart_upload(&upload_id).await;
         assert!(result.is_err()); // already removed
     }
-
     // ── Test 12: presigned URL generation + verify ──────────────────────────
     #[test]
     fn test_presigned_url() {
@@ -239,7 +206,6 @@ mod tests {
         assert!(url.url.contains("X-Signature="));
         assert!(config.verify(&url.url));
     }
-
     // ── Test 13: lifecycle should_expire ────────────────────────────────────
     #[test]
     fn test_lifecycle_should_expire() {
@@ -256,7 +222,6 @@ mod tests {
         assert!(LifecycleManager::should_expire(&rule, 31));
         assert!(!LifecycleManager::should_expire(&rule, 29));
     }
-
     // ── Test 14: lifecycle evaluate_rules ───────────────────────────────────
     #[test]
     fn test_lifecycle_evaluate_rules() {
@@ -281,7 +246,6 @@ mod tests {
         assert_eq!(actions[0].0, "logs/old.log");
         assert!(matches!(actions[0].1, LifecycleAction::Expire));
     }
-
     // ── Test 15: policy evaluation (allow/deny) ─────────────────────────────
     #[test]
     fn test_policy_evaluation() {
@@ -302,7 +266,6 @@ mod tests {
                 },
             ],
         };
-
         let effect = PolicyEvaluator::evaluate(
             &policy,
             "s3:GetObject",
@@ -310,7 +273,6 @@ mod tests {
             "user123",
         );
         assert!(matches!(effect, PolicyEffect::Allow));
-
         let effect = PolicyEvaluator::evaluate(
             &policy,
             "s3:DeleteObject",
@@ -318,7 +280,6 @@ mod tests {
             "anyone",
         );
         assert!(matches!(effect, PolicyEffect::Deny));
-
         let effect = PolicyEvaluator::evaluate(
             &policy,
             "s3:PutObject",
@@ -327,7 +288,6 @@ mod tests {
         );
         assert!(matches!(effect, PolicyEffect::NoMatch));
     }
-
     // ── Test 16: encryption SSE-S3 roundtrip ────────────────────────────────
     #[test]
     fn test_encryption_sse_s3_roundtrip() {
@@ -337,7 +297,6 @@ mod tests {
         let decrypted = EncryptionEngine::decrypt_sse_s3(&encrypted, "key-id-abc");
         assert_eq!(decrypted, plaintext);
     }
-
     // ── Test 17: notification should_notify ─────────────────────────────────
     #[test]
     fn test_notification_should_notify() {
@@ -359,13 +318,11 @@ mod tests {
             &config, "s3:ObjectRemoved:Delete", "uploads/file.txt"
         ));
     }
-
     // ── Test 18: bucket policy + acl set/get ────────────────────────────────
     #[tokio::test]
     async fn test_bucket_policy_acl() {
         let store = fresh_store().await;
         store.create_bucket("bkt", "us-east-1").await.unwrap();
-
         let policy = BucketPolicy {
             version: "2012-10-17".to_string(),
             statements: vec![PolicyStatement {
@@ -378,10 +335,8 @@ mod tests {
         store.put_bucket_policy("bkt", policy).await.unwrap();
         let fetched = store.get_bucket_policy("bkt").await.unwrap();
         assert_eq!(fetched.statements.len(), 1);
-
         store.put_bucket_acl("bkt", CannedAcl::PublicRead).await.unwrap();
     }
-
     // ── Bonus: versioning state set/get ─────────────────────────────────────
     #[tokio::test]
     async fn test_versioning_state() {
@@ -391,7 +346,6 @@ mod tests {
         store.set_bucket_versioning("bkt", VersioningState::Enabled).await.unwrap();
         assert_eq!(store.get_bucket_versioning("bkt").await.unwrap(), VersioningState::Enabled);
     }
-
     // ── Bonus: SSE-C encryption roundtrip ───────────────────────────────────
     #[test]
     fn test_encryption_sse_c_roundtrip() {
@@ -403,6 +357,3 @@ mod tests {
         assert_eq!(decrypted, plaintext);
     }
 }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday

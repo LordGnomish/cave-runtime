@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
 //! Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki.
 //!
 //! Replaces: Elasticsearch + Logstash + Kibana / Grafana Loki
@@ -43,8 +38,6 @@ impl Default for LogsState {
 }
 
 /// Create the axum router for this module.
-<<<<<<< HEAD
-=======
 //! CAVE Logs — structured log ingestion and query engine.
 //!
 //! Replaces Loki with a Rust-native implementation.
@@ -61,22 +54,16 @@ impl Default for LogsState {
 //! ## Upstream Tracking: Grafana Loki
 //! - GitHub: https://github.com/grafana/loki
 //! - Tracked: push API, LogQL query API, label API
-
 pub mod models;
 pub mod routes;
-
 use axum::Router;
 use cave_db::CavePool;
 use std::sync::Arc;
-
 /// Module state shared across request handlers.
 pub struct LogsState {
     pub pool: Arc<CavePool>,
 }
-
 /// Create the axum router for the logs module.
->>>>>>> claude/gallant-cartwright
-=======
 //! CAVE Logs — production-grade log aggregation with full Loki/LogQL feature parity.
 //!
 //! ## Implemented upstream features
@@ -101,7 +88,6 @@ pub struct LogsState {
 //! | Structured metadata | per-entry key/value | ✓ |
 //! | Log-based alerting | rule evaluation loop | ✓ |
 //! | Chunk retention | configurable TTL + pruning | ✓ |
-
 pub mod alerting;
 pub mod logql;
 pub mod models;
@@ -109,21 +95,17 @@ pub mod push;
 pub mod routes;
 pub mod store;
 pub mod tail;
-
 use axum::Router;
 use chrono::Duration;
 use std::sync::Arc;
-
 pub use alerting::AlertManager;
 pub use store::LogStore;
-
 /// Shared module state — injected into every route handler.
 pub struct LogsState {
     pub store: Arc<LogStore>,
     pub alert_manager: Arc<AlertManager>,
     pub default_limit: usize,
 }
-
 impl LogsState {
     pub fn new(retention_days: i64, default_limit: usize) -> Arc<Self> {
         let store = Arc::new(LogStore::new(Duration::days(retention_days)));
@@ -131,24 +113,15 @@ impl LogsState {
         Arc::new(Self { store, alert_manager, default_limit })
     }
 }
-
 /// Build the axum router for the logs module.
 ///
 /// Mount at the root or under a prefix — Loki clients use `/loki/api/v1/*`.
->>>>>>> claude/inspiring-pascal
-=======
->>>>>>> claude/sharp-wiles
 pub fn router(state: Arc<LogsState>) -> Router {
     routes::create_router(state)
 }
 
 pub const MODULE_NAME: &str = "logs";
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
 // ─── Integration tests ────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,15 +130,12 @@ mod tests {
     use crate::store::LogStore;
     use chrono::{Duration, Utc};
     use std::collections::HashMap;
-
     fn make_store() -> Arc<LogStore> {
         Arc::new(LogStore::new(Duration::days(7)))
     }
-
     fn sample_labels(app: &str) -> Labels {
         Labels::new([("app".into(), app.into())].into())
     }
-
     fn make_entry(line: &str, offset_secs: i64) -> LogEntry {
         LogEntry {
             timestamp: Utc::now() - Duration::seconds(offset_secs),
@@ -173,9 +143,7 @@ mod tests {
             structured_metadata: HashMap::new(),
         }
     }
-
     // ── Push: JSON format ─────────────────────────────────────────────────────
-
     #[test]
     fn push_json_single_stream() {
         let store = make_store();
@@ -190,7 +158,6 @@ mod tests {
         assert_eq!(store.stream_count(), 1);
         assert_eq!(store.entry_count(), 1);
     }
-
     #[test]
     fn push_json_multi_stream() {
         let store = make_store();
@@ -210,7 +177,6 @@ mod tests {
         ingest_json(&store, req, None);
         assert_eq!(store.stream_count(), 2);
     }
-
     #[test]
     fn push_json_with_structured_metadata() {
         let store = make_store();
@@ -228,14 +194,11 @@ mod tests {
         ingest_json(&store, req, None);
         assert_eq!(store.entry_count(), 1);
     }
-
     // ── Push: Protobuf format ─────────────────────────────────────────────────
-
     #[test]
     fn push_proto_roundtrip() {
         use crate::models::proto::{EntryAdapter, PushRequest as ProtoPush, StreamAdapter};
         use prost::Message;
-
         let ts_proto = prost_types::Timestamp {
             seconds: Utc::now().timestamp(),
             nanos: 0,
@@ -251,48 +214,37 @@ mod tests {
                 hash: String::new(),
             }],
         };
-
         // Encode protobuf
         let mut buf = Vec::new();
         req.encode(&mut buf).unwrap();
-
         // Compress with snappy
         let mut enc = snap::raw::Encoder::new();
         let compressed = enc.compress_vec(&buf).unwrap();
-
         let store = make_store();
         ingest_proto(&store, bytes::Bytes::from(compressed), None).unwrap();
         assert_eq!(store.stream_count(), 1);
         assert_eq!(store.entry_count(), 1);
     }
-
     // ── Multi-tenant isolation ────────────────────────────────────────────────
-
     #[test]
     fn multi_tenant_isolation() {
         let store = make_store();
         let labels = sample_labels("shared-name");
-
         store.push(labels.clone(), vec![make_entry("tenant-a log", 10)], Some("tenant-a".into()));
         store.push(labels.clone(), vec![make_entry("tenant-b log", 10)], Some("tenant-b".into()));
-
         let now = Utc::now();
         let start = now - Duration::hours(1);
         let use_matchers: Vec<crate::models::LabelMatcher> = vec![];
-
         let a_streams =
             store.query_streams(&use_matchers, start, now, 100, true, Some("tenant-a"));
         let b_streams =
             store.query_streams(&use_matchers, start, now, 100, true, Some("tenant-b"));
-
         assert_eq!(a_streams.len(), 1);
         assert!(a_streams[0].1[0].line.contains("tenant-a"));
         assert_eq!(b_streams.len(), 1);
         assert!(b_streams[0].1[0].line.contains("tenant-b"));
     }
-
     // ── Label queries ─────────────────────────────────────────────────────────
-
     #[test]
     fn label_names_query() {
         let store = make_store();
@@ -301,13 +253,11 @@ mod tests {
             vec![make_entry("line", 5)],
             None,
         );
-
         let now = Utc::now();
         let names = store.label_names(now - Duration::hours(1), now, None);
         assert!(names.contains(&"app".into()));
         assert!(names.contains(&"env".into()));
     }
-
     #[test]
     fn label_values_query() {
         let store = make_store();
@@ -321,21 +271,17 @@ mod tests {
             vec![make_entry("l2", 5)],
             None,
         );
-
         let now = Utc::now();
         let values = store.label_values("env", now - Duration::hours(1), now, None);
         assert!(values.contains(&"prod".into()));
         assert!(values.contains(&"staging".into()));
     }
-
     // ── Stream selection ──────────────────────────────────────────────────────
-
     #[test]
     fn stream_selection_exact() {
         let store = make_store();
         store.push(sample_labels("foo"), vec![make_entry("foo line", 5)], None);
         store.push(sample_labels("bar"), vec![make_entry("bar line", 5)], None);
-
         let now = Utc::now();
         let matchers = logql::parser::parse(r#"{app="foo"}"#)
             .map(|e| match e { crate::logql::ast::Expr::Log(ls) => ls.matchers, _ => vec![] })
@@ -344,7 +290,6 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert!(results[0].1[0].line.contains("foo"));
     }
-
     #[test]
     fn stream_selection_regex() {
         let store = make_store();
@@ -363,7 +308,6 @@ mod tests {
             vec![make_entry("dev log", 5)],
             None,
         );
-
         let now = Utc::now();
         let matchers = logql::parser::parse(r#"{env=~"prod.*|staging"}"#)
             .map(|e| match e { crate::logql::ast::Expr::Log(ls) => ls.matchers, _ => vec![] })
@@ -371,9 +315,7 @@ mod tests {
         let results = store.query_streams(&matchers, now - Duration::hours(1), now, 100, true, None);
         assert_eq!(results.len(), 2, "should match production and staging");
     }
-
     // ── Retention ─────────────────────────────────────────────────────────────
-
     #[test]
     fn retention_prunes_old_entries() {
         let store = Arc::new(LogStore::new(Duration::seconds(1)));
@@ -387,14 +329,11 @@ mod tests {
             }],
             None,
         );
-
         assert_eq!(store.entry_count(), 1);
         store.prune();
         assert_eq!(store.entry_count(), 0, "old entry should be pruned");
     }
-
     // ── Series API ────────────────────────────────────────────────────────────
-
     #[test]
     fn series_returns_matching_label_sets() {
         let store = make_store();
@@ -405,7 +344,6 @@ mod tests {
                 None,
             );
         }
-
         let matchers = logql::parser::parse(r#"{ns="default"}"#)
             .map(|e| match e { crate::logql::ast::Expr::Log(ls) => ls.matchers, _ => vec![] })
             .unwrap();
@@ -413,9 +351,7 @@ mod tests {
         let series = store.series(&matchers, now - Duration::hours(1), now, None);
         assert_eq!(series.len(), 3);
     }
-
     // ── Logfmt parser ─────────────────────────────────────────────────────────
-
     #[test]
     fn logfmt_extracts_fields() {
         let mut entry = crate::logql::eval::ProcessedEntry {
@@ -430,6 +366,3 @@ mod tests {
         assert_eq!(entry.extracted.get("status"), Some(&"200".into()));
     }
 }
->>>>>>> claude/inspiring-pascal
-=======
->>>>>>> claude/sharp-wiles

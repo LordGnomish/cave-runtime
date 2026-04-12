@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
 //! HTTP routes for cave-store.
 
 use crate::models::{AccessPolicy, LifecycleRule, ReplicationRule, StorageObject};
@@ -115,8 +111,6 @@ struct ReplicationRuleInput {
 #[derive(Deserialize)]
 struct PutReplicationRequest {
     rules: Vec<ReplicationRuleInput>,
-<<<<<<< HEAD
-=======
 use std::collections::HashMap;
 use std::sync::Arc;
 use axum::{
@@ -131,9 +125,7 @@ use axum::{
 use serde::Deserialize;
 use crate::store::ObjectStore;
 use crate::types::BucketPolicy;
-
 pub type StoreState = Arc<ObjectStore>;
-
 pub fn store_router(state: StoreState) -> Router {
     Router::new()
         .route("/api/store/health", get(health))
@@ -153,11 +145,9 @@ pub fn store_router(state: StoreState) -> Router {
         .route("/api/store/:bucket/multipart/:upload_id", delete(abort_upload))
         .with_state(state)
 }
-
 async fn health() -> impl IntoResponse {
     Json(serde_json::json!({"status": "ok", "service": "cave-store"}))
 }
-
 async fn list_buckets(State(store): State<StoreState>) -> impl IntoResponse {
     let buckets = store.list_buckets().await;
     let list: Vec<serde_json::Value> = buckets
@@ -166,12 +156,10 @@ async fn list_buckets(State(store): State<StoreState>) -> impl IntoResponse {
         .collect();
     Json(serde_json::json!({"buckets": list}))
 }
-
 #[derive(Deserialize)]
 struct CreateBucketQuery {
     region: Option<String>,
 }
-
 async fn create_bucket(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -183,7 +171,6 @@ async fn create_bucket(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn delete_bucket(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -193,7 +180,6 @@ async fn delete_bucket(
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn put_policy(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -204,7 +190,6 @@ async fn put_policy(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn get_policy(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -213,19 +198,12 @@ async fn get_policy(
         Ok(policy) => Json(policy).into_response(),
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
 struct ListObjectsQuery {
     prefix: Option<String>,
     max_keys: Option<usize>,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
@@ -476,12 +454,9 @@ async fn list_objects(
             Ok(Json(serde_json::json!({ "objects": meta, "count": meta.len() })))
         }
         Err(e) => Err(store_err(e)),
-<<<<<<< HEAD
-=======
     continuation_token: Option<String>,
     delimiter: Option<String>,
 }
-
 async fn list_objects(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -519,17 +494,10 @@ async fn list_objects(
             .into_response()
         }
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday
     }
 }
 
 async fn put_object(
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
     State(state): State<Arc<StoreState>>,
     Json(req): Json<PutObjectRequest>,
 ) -> ApiResult<serde_json::Value> {
@@ -540,8 +508,6 @@ async fn put_object(
             Ok(Json(serde_json::json!({ "object": meta })))
         }
         Err(e) => Err(store_err(e)),
-<<<<<<< HEAD
-=======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
     headers: HeaderMap,
@@ -552,7 +518,6 @@ async fn put_object(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream")
         .to_string();
-
     match store
         .put_object(&bucket, &key, body.to_vec(), &content_type, HashMap::new(), None)
         .await
@@ -563,17 +528,10 @@ async fn put_object(
         })))
         .into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday
     }
 }
 
 async fn get_object(
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
     Path((bucket, key)): Path<(String, String)>,
     Query(q): Query<GetObjectQuery>,
     State(state): State<Arc<StoreState>>,
@@ -592,8 +550,6 @@ async fn get_object(
             "content": obj.content,
         }))),
         None => Err(err_not_found(&format!("object '{key}' not found in '{bucket}'"))),
-<<<<<<< HEAD
-=======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -608,17 +564,10 @@ async fn get_object(
         )
             .into_response(),
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday
     }
 }
 
 async fn delete_object(
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
     Path((bucket, key)): Path<(String, String)>,
     State(state): State<Arc<StoreState>>,
 ) -> ApiResult<serde_json::Value> {
@@ -724,8 +673,6 @@ async fn list_multipart(
         .collect();
     Json(serde_json::json!({ "uploads": uploads, "count": uploads.len() }))
 }
-<<<<<<< HEAD
-=======
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -734,7 +681,6 @@ async fn list_multipart(
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn head_object(
     State(store): State<StoreState>,
     Path((bucket, key)): Path<(String, String)>,
@@ -752,13 +698,11 @@ async fn head_object(
         Err(e) => (StatusCode::NOT_FOUND, e.to_string()).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct MultipartActionQuery {
     action: Option<String>,
     key: Option<String>,
 }
-
 async fn multipart_action(
     State(store): State<StoreState>,
     Path(bucket): Path<String>,
@@ -775,12 +719,10 @@ async fn multipart_action(
         _ => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "unknown action"}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct UploadPartQuery {
     part: Option<u32>,
 }
-
 async fn upload_part(
     State(store): State<StoreState>,
     Path((_bucket, upload_id)): Path<(String, String)>,
@@ -793,17 +735,14 @@ async fn upload_part(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct CompleteActionQuery {
     action: Option<String>,
 }
-
 #[derive(Deserialize)]
 struct CompleteParts {
     parts: Vec<(u32, String)>,
 }
-
 async fn complete_or_abort(
     State(store): State<StoreState>,
     Path((_bucket, upload_id)): Path<(String, String)>,
@@ -821,7 +760,6 @@ async fn complete_or_abort(
         _ => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": "unknown action"}))).into_response(),
     }
 }
-
 async fn abort_upload(
     State(store): State<StoreState>,
     Path((_bucket, upload_id)): Path<(String, String)>,
@@ -831,6 +769,3 @@ async fn abort_upload(
         Err(e) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday

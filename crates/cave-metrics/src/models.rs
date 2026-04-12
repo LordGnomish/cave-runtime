@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Prometheus-compatible data models.
 //!
 //! Mirrors the Prometheus HTTP API response envelope and data types
@@ -158,24 +157,16 @@ pub struct LabelValuesParams {
     pub matchers: Option<Vec<String>>,
     pub start: Option<String>,
     pub end: Option<String>,
-=======
 //! Data models for cave-metrics.
-
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
-
 /// Metric type.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
 pub enum MetricType {
     Counter,
     Gauge,
     Histogram,
     Summary,
-}
-
 /// A metric descriptor (metadata about a metric).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metric {
@@ -186,8 +177,6 @@ pub struct Metric {
     pub help: String,
     pub unit: String,
     pub created_at: DateTime<Utc>,
-}
-
 impl Metric {
     pub fn new(name: impl Into<String>, metric_type: MetricType) -> Self {
         Self {
@@ -198,17 +187,11 @@ impl Metric {
             help: String::new(),
             unit: String::new(),
             created_at: Utc::now(),
-        }
-    }
-}
-
 /// A single data point.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Sample {
     pub timestamp: DateTime<Utc>,
     pub value: f64,
-}
-
 /// A time series: metric identity + ordered samples.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeSeries {
@@ -216,8 +199,6 @@ pub struct TimeSeries {
     pub metric_name: String,
     pub labels: HashMap<String, String>,
     pub samples: Vec<Sample>,
-}
-
 impl TimeSeries {
     pub fn new(metric_name: impl Into<String>, labels: HashMap<String, String>) -> Self {
         Self {
@@ -225,9 +206,6 @@ impl TimeSeries {
             metric_name: metric_name.into(),
             labels,
             samples: Vec::new(),
-        }
-    }
-
     /// Fingerprint: name + sorted label pairs.
     pub fn fingerprint(metric_name: &str, labels: &HashMap<String, String>) -> String {
         let mut pairs: Vec<_> = labels.iter().collect();
@@ -238,9 +216,6 @@ impl TimeSeries {
             .collect::<Vec<_>>()
             .join(",");
         format!("{metric_name}{{{label_str}}}")
-    }
-}
-
 /// PromQL-like query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricQuery {
@@ -248,17 +223,12 @@ pub struct MetricQuery {
     pub start: Option<DateTime<Utc>>,
     pub end: Option<DateTime<Utc>>,
     pub step_seconds: Option<u64>,
-}
-
 /// Alert state.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
 pub enum AlertState {
     Inactive,
     Pending,
     Firing,
-}
-
 /// Alert rule definition.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertRule {
@@ -273,8 +243,6 @@ pub struct AlertRule {
     pub last_evaluated: Option<DateTime<Utc>>,
     pub fired_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
-}
-
 impl AlertRule {
     pub fn new(name: impl Into<String>, group: impl Into<String>, expr: impl Into<String>) -> Self {
         Self {
@@ -289,10 +257,6 @@ impl AlertRule {
             last_evaluated: None,
             fired_at: None,
             created_at: Utc::now(),
-        }
-    }
-}
-
 /// Recording rule — pre-compute expensive queries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordingRule {
@@ -304,8 +268,6 @@ pub struct RecordingRule {
     pub interval_seconds: u64,
     pub last_evaluated: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
-}
-
 impl RecordingRule {
     pub fn new(name: impl Into<String>, group: impl Into<String>, expr: impl Into<String>) -> Self {
         Self {
@@ -317,10 +279,6 @@ impl RecordingRule {
             interval_seconds: 60,
             last_evaluated: None,
             created_at: Utc::now(),
-        }
-    }
-}
-
 /// A scrape target (Prometheus-compatible).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScrapeTarget {
@@ -336,8 +294,6 @@ pub struct ScrapeTarget {
     pub last_scrape: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
     pub created_at: DateTime<Utc>,
-}
-
 impl ScrapeTarget {
     pub fn new(job: impl Into<String>, address: impl Into<String>) -> Self {
         Self {
@@ -353,14 +309,8 @@ impl ScrapeTarget {
             last_scrape: None,
             last_error: None,
             created_at: Utc::now(),
-        }
-    }
-
     pub fn url(&self) -> String {
         format!("{}://{}{}", self.scheme, self.address, self.metrics_path)
-    }
-}
-
 /// Metadata about a metric (type, help, unit).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricMetadata {
@@ -368,56 +318,30 @@ pub struct MetricMetadata {
     pub metric_type: MetricType,
     pub help: String,
     pub unit: String,
-}
-
 // ---- DTOs ----
-
-#[derive(Debug, Deserialize)]
 pub struct WriteRequest {
     pub metric_name: String,
     pub labels: HashMap<String, String>,
     pub samples: Vec<SampleRequest>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct SampleRequest {
     pub timestamp: Option<DateTime<Utc>>,
     pub value: f64,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct QueryRequest {
     pub expr: String,
     pub time: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct RangeQueryRequest {
     pub expr: String,
     pub start: DateTime<Utc>,
     pub end: DateTime<Utc>,
     pub step: u64,
-}
-
-#[derive(Debug, Serialize)]
 pub struct QueryResult {
     pub status: String,
     pub data: QueryData,
-}
-
-#[derive(Debug, Serialize)]
 pub struct QueryData {
     pub result_type: String,
     pub result: Vec<SeriesResult>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct SeriesResult {
-    pub metric: HashMap<String, String>,
     pub values: Vec<[serde_json::Value; 2]>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct CreateAlertRuleRequest {
     pub name: String,
     pub group: String,
@@ -425,18 +349,12 @@ pub struct CreateAlertRuleRequest {
     pub for_duration_seconds: Option<u64>,
     pub labels: Option<HashMap<String, String>>,
     pub annotations: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct CreateRecordingRuleRequest {
     pub name: String,
     pub group: String,
     pub expr: String,
     pub interval_seconds: Option<u64>,
     pub labels: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct CreateScrapeTargetRequest {
     pub job: String,
     pub address: String,
@@ -445,5 +363,4 @@ pub struct CreateScrapeTargetRequest {
     pub scrape_interval_seconds: Option<u64>,
     pub scrape_timeout_seconds: Option<u64>,
     pub labels: Option<HashMap<String, String>>,
->>>>>>> claude/relaxed-nash
 }

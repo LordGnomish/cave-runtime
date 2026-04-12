@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/interesting-khorana
 //! Intent engine — parse, resolve dependencies, validate, diff state.
 
 use crate::models::{
@@ -246,18 +241,12 @@ pub enum IntentError {
     ParseError(String),
     #[error("validation error: {0}")]
     ValidationError(String),
-<<<<<<< HEAD
-=======
 //! Intent parsing — from natural language to structured `ParsedIntent`.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
 use crate::providers::ResourceType;
-
 // ── InfraIntent ───────────────────────────────────────────────────────────────
-
 /// A user's natural-language infrastructure request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfraIntent {
@@ -270,7 +259,6 @@ pub struct InfraIntent {
     /// Populated after the intent is parsed.
     pub parsed: Option<ParsedIntent>,
 }
-
 impl InfraIntent {
     pub fn new(description: &str, tenant_id: &str, submitted_by: Uuid) -> Self {
         Self {
@@ -282,15 +270,12 @@ impl InfraIntent {
             parsed: None,
         }
     }
-
     pub fn with_parsed(mut self, parsed: ParsedIntent) -> Self {
         self.parsed = Some(parsed);
         self
     }
 }
-
 // ── ParsedIntent ──────────────────────────────────────────────────────────────
-
 /// Structured representation of what the user asked for.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedIntent {
@@ -301,9 +286,7 @@ pub struct ParsedIntent {
     /// Cross-cutting constraints (e.g. "high-availability", "cost-optimized").
     pub constraints: Vec<String>,
 }
-
 // ── ResourceRequest ───────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceRequest {
     pub resource_type: ResourceType,
@@ -312,26 +295,21 @@ pub struct ResourceRequest {
     /// Type-specific spec — shape depends on `resource_type`.
     pub spec: serde_json::Value,
 }
-
 // ── IntentParser ──────────────────────────────────────────────────────────────
-
 /// Keyword-based intent parser.
 ///
 /// A production implementation would call an LLM here; this version
 /// uses simple string matching so the crate compiles and tests pass
 /// without external dependencies.
 pub struct IntentParser;
-
 impl IntentParser {
     pub fn new() -> Self {
         Self
     }
-
     /// Parse a raw `InfraIntent` into a `ParsedIntent`.
     pub fn parse(&self, intent: &InfraIntent) -> ParsedIntent {
         let desc = intent.description.to_lowercase();
         let mut resources = Vec::new();
-
         // Detect compute resources.
         if desc.contains("vm")
             || desc.contains("server")
@@ -347,7 +325,6 @@ impl IntentParser {
                 spec: serde_json::json!({ "inferred": true }),
             });
         }
-
         // Detect networking resources.
         if desc.contains("vpc")
             || desc.contains("network")
@@ -360,7 +337,6 @@ impl IntentParser {
                 spec: serde_json::json!({ "inferred": true }),
             });
         }
-
         // Detect block / object storage.
         if desc.contains("storage")
             || desc.contains("disk")
@@ -373,7 +349,6 @@ impl IntentParser {
                 spec: serde_json::json!({ "inferred": true }),
             });
         }
-
         // Detect DNS resources.
         if desc.contains("dns") || desc.contains("domain") {
             resources.push(ResourceRequest {
@@ -383,7 +358,6 @@ impl IntentParser {
                 spec: serde_json::json!({ "inferred": true }),
             });
         }
-
         // Provider hints.
         let all_providers = [
             "hetzner", "azure", "aws", "gcp", "digitalocean", "cloudflare",
@@ -394,7 +368,6 @@ impl IntentParser {
             .filter(|p| desc.contains(**p))
             .map(|p| p.to_string())
             .collect();
-
         // Environment detection.
         let environment = if desc.contains("prod") || desc.contains("production") {
             "production"
@@ -406,7 +379,6 @@ impl IntentParser {
             "unknown"
         }
         .to_string();
-
         // Constraint extraction.
         let mut constraints = Vec::new();
         if desc.contains("high-availability") || desc.contains("ha ") || desc.contains(" ha") {
@@ -415,7 +387,6 @@ impl IntentParser {
         if desc.contains("cost") || desc.contains("cheap") || desc.contains("budget") {
             constraints.push("cost-optimized".to_string());
         }
-
         ParsedIntent {
             resources,
             provider_hints,
@@ -423,7 +394,6 @@ impl IntentParser {
             constraints,
         }
     }
-
     /// Extract the first integer found in the description, e.g. "3 vms" → 3.
     fn count_from_description(desc: &str) -> u32 {
         let mut digits = String::new();
@@ -437,19 +407,15 @@ impl IntentParser {
         digits.parse().unwrap_or(1)
     }
 }
-
 impl Default for IntentParser {
     fn default() -> Self {
         Self::new()
     }
 }
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_parse_vm_intent() {
         let parser = IntentParser::new();
@@ -459,18 +425,14 @@ mod tests {
             "tenant-1",
             user,
         );
-
         let parsed = parser.parse(&intent);
-
         // Should detect VMs (nodes) and storage.
         let types: Vec<&ResourceType> = parsed.resources.iter().map(|r| &r.resource_type).collect();
         assert!(types.contains(&&ResourceType::Vm), "should have VM resource");
         assert!(types.contains(&&ResourceType::BlockStorage), "should have storage resource");
-
         // Should recognise Hetzner as provider hint.
         assert!(parsed.provider_hints.contains(&"hetzner".to_string()));
     }
-
     #[test]
     fn test_parse_network_intent() {
         let parser = IntentParser::new();
@@ -480,25 +442,17 @@ mod tests {
             "tenant-2",
             user,
         );
-
         let parsed = parser.parse(&intent);
-
         let types: Vec<&ResourceType> = parsed.resources.iter().map(|r| &r.resource_type).collect();
         assert!(types.contains(&&ResourceType::Vpc), "should have VPC resource");
         assert!(parsed.provider_hints.contains(&"aws".to_string()));
         assert_eq!(parsed.environment, "production");
     }
->>>>>>> claude/great-sanderson
-=======
->>>>>>> claude/interesting-khorana
-=======
 //! Intent parsing, dependency resolution, validation, and state diffing.
-
 use crate::models::{DriftItem, DriftReport, InfraIntent, InfraResource, InfraState};
 use anyhow::{bail, Result};
 use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
-
 /// Parse a raw string into an `InfraIntent`.
 ///
 /// Accepts either:
@@ -511,7 +465,6 @@ pub fn parse_intent(
 ) -> Result<InfraIntent> {
     let trimmed = raw.trim();
     let mut intent = InfraIntent::new(name, environment);
-
     // Try YAML first (YAML is a superset of JSON).
     match serde_yaml::from_str::<serde_json::Value>(trimmed) {
         Ok(val) if val.is_object() || val.is_array() => {
@@ -525,26 +478,20 @@ pub fn parse_intent(
             intent.natural_language = Some(trimmed.to_string());
         }
     }
-
     Ok(intent)
 }
-
 /// Validate an intent for obvious problems.
 pub fn validate_intent(intent: &InfraIntent) -> Result<Vec<String>> {
     let mut warnings = Vec::new();
-
     if intent.natural_language.is_none() && intent.structured.is_none() {
         bail!("intent has neither natural_language nor structured content");
     }
-
     if intent.environment.is_empty() {
         bail!("intent environment must not be empty");
     }
-
     if intent.environment == "prod" || intent.environment == "production" {
         warnings.push("targeting production environment — apply with caution".into());
     }
-
     if let Some(ref s) = intent.structured {
         if let Some(obj) = s.as_object() {
             if !obj.contains_key("resources") && !obj.contains_key("resource") {
@@ -554,10 +501,8 @@ pub fn validate_intent(intent: &InfraIntent) -> Result<Vec<String>> {
             }
         }
     }
-
     Ok(warnings)
 }
-
 /// Topologically sort resources respecting their `dependencies` field.
 ///
 /// Returns resources in execution order (dependencies first).
@@ -565,11 +510,9 @@ pub fn validate_intent(intent: &InfraIntent) -> Result<Vec<String>> {
 pub fn resolve_dependencies(resources: &[InfraResource]) -> Result<Vec<InfraResource>> {
     let by_id: HashMap<Uuid, &InfraResource> =
         resources.iter().map(|r| (r.id, r)).collect();
-
     // Kahn's algorithm.
     let mut in_degree: HashMap<Uuid, usize> = resources.iter().map(|r| (r.id, 0)).collect();
     let mut adj: HashMap<Uuid, Vec<Uuid>> = resources.iter().map(|r| (r.id, vec![])).collect();
-
     for r in resources {
         for &dep in &r.dependencies {
             if !by_id.contains_key(&dep) {
@@ -584,22 +527,18 @@ pub fn resolve_dependencies(resources: &[InfraResource]) -> Result<Vec<InfraReso
             *in_degree.entry(r.id).or_default() += 1;
         }
     }
-
     let mut queue: VecDeque<Uuid> = in_degree
         .iter()
         .filter_map(|(&id, &deg)| if deg == 0 { Some(id) } else { None })
         .collect();
-
     let mut ordered = Vec::with_capacity(resources.len());
     let mut visited = HashSet::new();
-
     while let Some(id) = queue.pop_front() {
         if visited.contains(&id) {
             continue;
         }
         visited.insert(id);
         ordered.push((*by_id[&id]).clone());
-
         for &next in adj.get(&id).into_iter().flatten() {
             let deg = in_degree.entry(next).or_default();
             *deg = deg.saturating_sub(1);
@@ -608,14 +547,11 @@ pub fn resolve_dependencies(resources: &[InfraResource]) -> Result<Vec<InfraReso
             }
         }
     }
-
     if ordered.len() != resources.len() {
         bail!("dependency cycle detected among resources");
     }
-
     Ok(ordered)
 }
-
 /// Compute the diff between current and desired state.
 ///
 /// Returns a tuple of `(to_create, to_update, to_delete)` resource lists.
@@ -624,11 +560,9 @@ pub fn diff_state(state: &InfraState) -> (Vec<InfraResource>, Vec<InfraResource>
         state.actual.iter().map(|r| (r.name.as_str(), r)).collect();
     let desired_by_name: HashMap<&str, &InfraResource> =
         state.desired.iter().map(|r| (r.name.as_str(), r)).collect();
-
     let mut to_create = Vec::new();
     let mut to_update = Vec::new();
     let mut to_delete = Vec::new();
-
     for desired in &state.desired {
         match actual_by_name.get(desired.name.as_str()) {
             None => to_create.push(desired.clone()),
@@ -639,16 +573,13 @@ pub fn diff_state(state: &InfraState) -> (Vec<InfraResource>, Vec<InfraResource>
             }
         }
     }
-
     for actual in &state.actual {
         if !desired_by_name.contains_key(actual.name.as_str()) {
             to_delete.push(actual.clone());
         }
     }
-
     (to_create, to_update, to_delete)
 }
-
 /// Determine whether a resource needs an update by comparing configs.
 fn needs_update(desired: &InfraResource, actual: &InfraResource) -> bool {
     if desired.resource_type != actual.resource_type || desired.provider != actual.provider {
@@ -659,16 +590,13 @@ fn needs_update(desired: &InfraResource, actual: &InfraResource) -> bool {
     let a = serde_json::to_string(&actual.config).unwrap_or_default();
     d != a
 }
-
 /// Build a `DriftReport` by comparing desired vs actual state.
 pub fn detect_drift(state: &InfraState) -> DriftReport {
     let mut report = DriftReport::new();
-
     let actual_by_name: HashMap<&str, &InfraResource> =
         state.actual.iter().map(|r| (r.name.as_str(), r)).collect();
     let desired_by_name: HashMap<&str, &InfraResource> =
         state.desired.iter().map(|r| (r.name.as_str(), r)).collect();
-
     for desired in &state.desired {
         match actual_by_name.get(desired.name.as_str()) {
             None => {
@@ -692,20 +620,16 @@ pub fn detect_drift(state: &InfraState) -> DriftReport {
             }
         }
     }
-
     for actual in &state.actual {
         if !desired_by_name.contains_key(actual.name.as_str()) {
             report.orphaned.push(actual.name.clone());
         }
     }
-
     report
 }
-
 /// Return field names whose values differ between desired and actual configs.
 fn find_drifted_fields(desired: &InfraResource, actual: &InfraResource) -> Vec<String> {
     let mut drifted = Vec::new();
-
     for (key, desired_val) in &desired.config {
         match actual.config.get(key) {
             None => drifted.push(key.clone()),
@@ -716,14 +640,11 @@ fn find_drifted_fields(desired: &InfraResource, actual: &InfraResource) -> Vec<S
             }
         }
     }
-
     // Keys present in actual but absent in desired are also drift.
     for key in actual.config.keys() {
         if !desired.config.contains_key(key) {
             drifted.push(key.clone());
         }
     }
-
     drifted
->>>>>>> claude/silly-matsumoto
 }

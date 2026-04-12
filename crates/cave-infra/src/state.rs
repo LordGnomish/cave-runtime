@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/interesting-khorana
 //! State management — persistent tracking, locking, drift detection, import, history.
 
 use crate::models::{DriftReport, InfraResource, InfraState, ResourceDrift, ResourceState};
@@ -46,9 +41,7 @@ impl InfraStateStore {
                 self.state.locked_by = None;
                 self.state.lock_acquired_at = None;
                 info!(owner = %owner, "State lock released");
-=======
 //! In-memory infrastructure state store with locking and history.
-
 use crate::intent::detect_drift;
 use crate::models::{DriftReport, InfraResource, InfraState, ResourceState};
 use anyhow::{bail, Result};
@@ -56,10 +49,8 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use tracing::info;
-
 /// Maximum number of state snapshots retained in history.
 const MAX_HISTORY: usize = 50;
-
 /// A versioned snapshot of the infrastructure state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
@@ -68,14 +59,12 @@ pub struct StateSnapshot {
     pub comment: String,
     pub taken_at: chrono::DateTime<Utc>,
 }
-
 /// In-memory state store with optimistic locking and history.
 #[derive(Debug)]
 pub struct InfraStateStore {
     pub current: InfraState,
     history: VecDeque<StateSnapshot>,
 }
-
 impl Default for InfraStateStore {
     fn default() -> Self {
         Self {
@@ -84,14 +73,11 @@ impl Default for InfraStateStore {
         }
     }
 }
-
 impl InfraStateStore {
     pub fn new() -> Self {
         Self::default()
     }
-
     // ── Locking ───────────────────────────────────────────────────────────────
-
     /// Acquire a write lock on the state.
     pub fn lock(&mut self, holder: impl Into<String>) -> Result<()> {
         if self.current.locked {
@@ -105,7 +91,6 @@ impl InfraStateStore {
         info!(holder = ?self.current.lock_holder, "State locked");
         Ok(())
     }
-
     /// Release the write lock.
     pub fn unlock(&mut self) -> Result<()> {
         if !self.current.locked {
@@ -116,9 +101,7 @@ impl InfraStateStore {
         self.current.lock_holder = None;
         Ok(())
     }
-
     // ── Mutations ─────────────────────────────────────────────────────────────
-
     /// Snapshot current state before a mutation, then apply `f`.
     pub fn with_snapshot<F>(&mut self, comment: impl Into<String>, f: F) -> Result<()>
     where
@@ -135,13 +118,11 @@ impl InfraStateStore {
             self.history.pop_front();
         }
         self.history.push_back(snap);
-
         f(&mut self.current)?;
         self.current.version += 1;
         self.current.last_synced = Some(Utc::now());
         Ok(())
     }
-
     /// Upsert a resource into desired state.
     pub fn upsert_desired(&mut self, resource: InfraResource, comment: impl Into<String>) -> Result<()> {
         let name = resource.name.clone();
@@ -154,7 +135,6 @@ impl InfraStateStore {
             Ok(())
         })
     }
-
     /// Remove a resource from desired state by name.
     pub fn remove_desired(&mut self, name: &str, comment: impl Into<String>) -> Result<()> {
         self.with_snapshot(comment, |state| {
@@ -162,7 +142,6 @@ impl InfraStateStore {
             Ok(())
         })
     }
-
     /// Update the actual (observed) state for a resource.
     pub fn update_actual(&mut self, resource: InfraResource) -> Result<()> {
         let name = resource.name.clone();
@@ -175,16 +154,12 @@ impl InfraStateStore {
             Ok(())
         })
     }
-
     // ── Drift Detection ───────────────────────────────────────────────────────
-
     /// Compute current drift between desired and actual state.
     pub fn detect_drift(&self) -> DriftReport {
         detect_drift(&self.current)
     }
-
     // ── Import ────────────────────────────────────────────────────────────────
-
     /// Import an externally-managed resource into desired state.
     pub fn import_resource(
         &mut self,
@@ -195,9 +170,7 @@ impl InfraStateStore {
         let name = resource.name.clone();
         resource.remote_id = Some(remote_id.clone());
         resource.state = ResourceState::Synced;
-
         info!(name = %name, remote_id = %remote_id, "Importing resource");
-
         // Add to both desired and actual (it already exists remotely).
         let actual = resource.clone();
         self.with_snapshot(format!("import '{}'", name), |state| {
@@ -209,14 +182,11 @@ impl InfraStateStore {
             Ok(())
         })
     }
-
     // ── History ───────────────────────────────────────────────────────────────
-
     /// Return the state history (newest first).
     pub fn state_history(&self) -> Vec<&StateSnapshot> {
         self.history.iter().rev().collect()
     }
-
     /// Rollback to a specific version.
     pub fn rollback_to_version(&mut self, version: u64) -> Result<()> {
         let snap = self
@@ -225,122 +195,23 @@ impl InfraStateStore {
             .rev()
             .find(|s| s.version == version)
             .cloned();
-
         match snap {
             None => bail!("No snapshot found for version {}", version),
             Some(s) => {
                 info!(version = version, "Rolling back state");
                 self.current = s.state;
->>>>>>> claude/silly-matsumoto
                 Ok(())
             }
         }
     }
-<<<<<<< HEAD
-
-    /// Detect drift between desired state and actual cloud resources.
-    ///
-    /// In production: calls MCP tools to query actual resource state and
-    /// compares against `self.state.resources`. Here we report resources
-    /// already marked `Drifted` in state.
-    pub async fn detect_drift(&self) -> DriftReport {
-        let drifted: Vec<ResourceDrift> = self
-            .state
-            .resources
-            .values()
-            .filter(|r| r.state == ResourceState::Drifted)
-            .map(|r| ResourceDrift {
-                resource_id: r.id,
-                resource_name: r.name.clone(),
-                field: "state".to_string(),
-                desired: serde_json::Value::String("Active".to_string()),
-                actual: serde_json::Value::String("Drifted".to_string()),
-            })
-            .collect();
-
-        let total = drifted.len();
-        DriftReport {
-            id: Uuid::new_v4(),
-            detected_at: Utc::now(),
-            drifted_resources: drifted,
-            total_drifted: total,
-        }
-    }
-
-    /// Import an existing cloud resource into state without going through a plan.
-    pub fn import_resource(
-        &mut self,
-        name: String,
-        provider: String,
-        resource_type: String,
-        actual_id: String,
-        config: HashMap<String, serde_json::Value>,
-    ) -> InfraResource {
-        let now = Utc::now();
-        let resource = InfraResource {
-            id: Uuid::new_v4(),
-            name: name.clone(),
-            provider,
-            resource_type,
-            config,
-            state: ResourceState::Active,
-            dependencies: vec![],
-            actual_id: Some(actual_id),
-            created_at: now,
-            updated_at: now,
-        };
-        info!(resource = %name, "Resource imported into state");
-        self.state.resources.insert(resource.id, resource.clone());
-        resource
-    }
-
-    /// Return the full versioned state history.
-    pub fn state_history(&self) -> &[StateSnapshot] {
-        &self.history
-    }
-
-    /// Snapshot the current state before a mutation. Increments state version.
-    pub fn snapshot(&mut self) {
-        self.history.push(StateSnapshot {
-            version: self.state.version,
-            snapshotted_at: Utc::now(),
-            resource_count: self.state.resources.len(),
-        });
-        self.state.version += 1;
-    }
-}
-
-/// Lightweight state snapshot stored in history.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct StateSnapshot {
-    pub version: u64,
-    pub snapshotted_at: DateTime<Utc>,
-    pub resource_count: usize,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StateError {
-    #[error("state already locked by: {0}")]
-    AlreadyLocked(String),
-    #[error("state is not locked")]
-    NotLocked,
-    #[error("lock owner mismatch: expected '{expected}', held by '{actual}'")]
-    LockOwnerMismatch { expected: String, actual: String },
-<<<<<<< HEAD
-=======
 //! Infrastructure state management — tracks desired vs. actual state.
-
 use std::collections::HashMap;
 use std::sync::Arc;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
-
 use crate::providers::ResourceType;
-
 // ── ResourceState ─────────────────────────────────────────────────────────────
-
 /// Lifecycle state of a managed resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -353,7 +224,6 @@ pub enum ResourceState {
     Destroyed,
     Failed(String),
 }
-
 impl PartialEq for ResourceState {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -368,11 +238,8 @@ impl PartialEq for ResourceState {
         }
     }
 }
-
 impl Eq for ResourceState {}
-
 // ── InfraResource ─────────────────────────────────────────────────────────────
-
 /// A single managed infrastructure resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfraResource {
@@ -391,7 +258,6 @@ pub struct InfraResource {
     /// External ID assigned by the cloud provider.
     pub provider_id: Option<String>,
 }
-
 impl InfraResource {
     pub fn new(
         id: &str,
@@ -416,7 +282,6 @@ impl InfraResource {
             provider_id: None,
         }
     }
-
     /// Returns true when the actual observed state diverges from the desired spec.
     /// Simplified: drift exists when `actual` is `None` or differs from `spec`.
     pub fn has_drift(&self) -> bool {
@@ -426,9 +291,7 @@ impl InfraResource {
         }
     }
 }
-
 // ── InfraState ────────────────────────────────────────────────────────────────
-
 /// Aggregate state for a single tenant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfraState {
@@ -437,7 +300,6 @@ pub struct InfraState {
     pub last_applied: Option<DateTime<Utc>>,
     pub schema_version: u32,
 }
-
 impl InfraState {
     pub fn new(tenant_id: &str) -> Self {
         Self {
@@ -447,16 +309,13 @@ impl InfraState {
             schema_version: 1,
         }
     }
-
     pub fn resource_count(&self) -> usize {
         self.resources.len()
     }
-
     /// Returns resources whose actual state differs from desired spec.
     pub fn drifted_resources(&self) -> Vec<&InfraResource> {
         self.resources.values().filter(|r| r.has_drift()).collect()
     }
-
     /// Returns resources currently in the given state.
     pub fn resources_in_state(&self, state: &ResourceState) -> Vec<&InfraResource> {
         self.resources
@@ -464,30 +323,24 @@ impl InfraState {
             .filter(|r| &r.state == state)
             .collect()
     }
-
     pub fn to_json(&self) -> serde_json::Value {
         serde_json::to_value(self).unwrap_or_default()
     }
-
     pub fn from_json(v: &serde_json::Value) -> Option<Self> {
         serde_json::from_value(v.clone()).ok()
     }
 }
-
 // ── StateManager ──────────────────────────────────────────────────────────────
-
 /// Thread-safe manager for tenant infrastructure states.
 pub struct StateManager {
     states: Arc<RwLock<HashMap<String, InfraState>>>,
 }
-
 impl StateManager {
     pub fn new() -> Self {
         Self {
             states: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-
     /// Return the tenant's state, creating an empty one if it doesn't exist yet.
     pub async fn get_or_create(&self, tenant_id: &str) -> InfraState {
         {
@@ -502,7 +355,6 @@ impl StateManager {
             .or_insert_with(|| InfraState::new(tenant_id))
             .clone()
     }
-
     /// Insert or replace a resource in the tenant's state.
     pub async fn upsert_resource(&self, tenant_id: &str, resource: InfraResource) {
         let mut guard = self.states.write().await;
@@ -511,7 +363,6 @@ impl StateManager {
             .or_insert_with(|| InfraState::new(tenant_id));
         state.resources.insert(resource.id.clone(), resource);
     }
-
     pub async fn get_resource(
         &self,
         tenant_id: &str,
@@ -523,7 +374,6 @@ impl StateManager {
             .and_then(|s| s.resources.get(resource_id))
             .cloned()
     }
-
     /// Transition a resource to a new state.
     pub async fn update_resource_state(
         &self,
@@ -543,7 +393,6 @@ impl StateManager {
         resource.updated_at = Utc::now();
         Ok(())
     }
-
     /// Record the provider-observed actual state for a resource.
     pub async fn update_actual(
         &self,
@@ -563,7 +412,6 @@ impl StateManager {
         resource.updated_at = Utc::now();
         Ok(())
     }
-
     /// Return all drifted resources for the tenant.
     pub async fn detect_drift(&self, tenant_id: &str) -> Vec<InfraResource> {
         let guard = self.states.read().await;
@@ -578,26 +426,21 @@ impl StateManager {
             })
             .unwrap_or_default()
     }
-
     /// Serialise the tenant's full state to JSON for persistence / inspection.
     pub async fn snapshot(&self, tenant_id: &str) -> Option<serde_json::Value> {
         let guard = self.states.read().await;
         guard.get(tenant_id).map(|s| s.to_json())
     }
 }
-
 impl Default for StateManager {
     fn default() -> Self {
         Self::new()
     }
 }
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
     fn make_resource(id: &str, tenant: &str) -> InfraResource {
         InfraResource::new(
             id,
@@ -608,62 +451,47 @@ mod tests {
             serde_json::json!({ "cpu_cores": 2 }),
         )
     }
-
     #[tokio::test]
     async fn test_upsert_and_get_resource() {
         let mgr = StateManager::new();
         let res = make_resource("r1", "tenant-x");
         mgr.upsert_resource("tenant-x", res.clone()).await;
-
         let fetched = mgr.get_resource("tenant-x", "r1").await.unwrap();
         assert_eq!(fetched.id, "r1");
         assert_eq!(fetched.tenant_id, "tenant-x");
         assert_eq!(fetched.name, "my-vm");
-
         let state = mgr.get_or_create("tenant-x").await;
         assert_eq!(state.resource_count(), 1);
     }
-
     #[tokio::test]
     async fn test_detect_drift() {
         let mgr = StateManager::new();
-
         // Resource with no actual state → drifted
         let r1 = make_resource("r1", "t1");
         mgr.upsert_resource("t1", r1).await;
-
         // Resource with matching actual state → not drifted
         let mut r2 = make_resource("r2", "t1");
         r2.actual = Some(r2.spec.clone());
         mgr.upsert_resource("t1", r2).await;
-
         // Resource with different actual state → drifted
         let mut r3 = make_resource("r3", "t1");
         r3.actual = Some(serde_json::json!({ "cpu_cores": 99 }));
         mgr.upsert_resource("t1", r3).await;
-
         let drifted = mgr.detect_drift("t1").await;
         assert_eq!(drifted.len(), 2);
         let ids: Vec<&str> = drifted.iter().map(|r| r.id.as_str()).collect();
         assert!(ids.contains(&"r1"));
         assert!(ids.contains(&"r3"));
     }
-
     #[tokio::test]
     async fn test_snapshot_serialize_deserialize() {
         let mgr = StateManager::new();
         let res = make_resource("snap-r1", "tenant-snap");
         mgr.upsert_resource("tenant-snap", res).await;
-
         let snap = mgr.snapshot("tenant-snap").await.expect("snapshot present");
         let restored = InfraState::from_json(&snap).expect("deserializes");
         assert_eq!(restored.tenant_id, "tenant-snap");
         assert_eq!(restored.resource_count(), 1);
         assert!(restored.resources.contains_key("snap-r1"));
     }
->>>>>>> claude/great-sanderson
-=======
->>>>>>> claude/interesting-khorana
-=======
->>>>>>> claude/silly-matsumoto
 }

@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/thirsty-lederberg
 use crate::models::{BackupRecord, BackupSchedule, BackupStatus};
 use chrono::Utc;
 
@@ -43,14 +39,10 @@ pub fn latest_successful<'a>(records: &'a [BackupRecord]) -> Option<&'a BackupRe
 /// Validate a cron expression (simple: must have 5 space-separated fields)
 pub fn is_valid_cron(expr: &str) -> bool {
     expr.split_whitespace().count() == 5
-<<<<<<< HEAD
-=======
 //! Core backup/restore engine logic.
 //!
 //! Pure functions for phase transitions, validation, and retention enforcement.
-
 use crate::types::{Backup, BackupPhase, RetentionPolicy};
-
 /// Validate a backup name: non-empty, alphanumeric + hyphens, ≤ 63 chars.
 pub fn validate_backup_name(name: &str) -> bool {
     if name.is_empty() || name.len() > 63 {
@@ -61,7 +53,6 @@ pub fn validate_backup_name(name: &str) -> bool {
         && name.starts_with(|c: char| c.is_ascii_alphanumeric())
         && name.ends_with(|c: char| c.is_ascii_alphanumeric())
 }
-
 /// Transition a backup to a new phase, enforcing allowed transitions.
 /// Returns `true` if the transition was applied.
 pub fn transition_phase(backup: &mut Backup, new_phase: BackupPhase) -> bool {
@@ -84,7 +75,6 @@ pub fn transition_phase(backup: &mut Backup, new_phase: BackupPhase) -> bool {
         false
     }
 }
-
 /// Apply a retention policy to a list of completed backups.
 /// Backups are sorted oldest-first; the ones that should be deleted are returned.
 pub fn apply_retention<'a>(
@@ -95,12 +85,9 @@ pub fn apply_retention<'a>(
         .iter()
         .filter(|b| b.phase == BackupPhase::Completed)
         .collect();
-
     // Oldest first.
     completed.sort_by_key(|b| b.created_at);
-
     let mut to_delete: Vec<&Backup> = Vec::new();
-
     // TTL-based deletion.
     if let Some(ttl_hours) = policy.ttl_hours {
         let cutoff = chrono::Utc::now() - chrono::Duration::hours(ttl_hours as i64);
@@ -110,7 +97,6 @@ pub fn apply_retention<'a>(
             }
         }
     }
-
     // Count-based deletion (keep newest N).
     if let Some(max) = policy.max_backups {
         let max = max as usize;
@@ -123,20 +109,12 @@ pub fn apply_retention<'a>(
             }
         }
     }
-
     to_delete
->>>>>>> claude/gallant-meninsky
-=======
->>>>>>> claude/thirsty-lederberg
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/thirsty-lederberg
     use uuid::Uuid;
     use chrono::{Duration, Utc};
 
@@ -236,14 +214,11 @@ mod tests {
         assert!(!is_valid_cron("bad"));
         assert!(!is_valid_cron("0 2 * *"));
         assert!(!is_valid_cron("0 2 * * * *"));
-<<<<<<< HEAD
-=======
     use crate::types::{
         BackupScope, BackupSpec, BackupTarget, EncryptionConfig, RetentionPolicy,
         VolumeSnapshotConfig,
     };
     use std::collections::HashMap;
-
     fn minimal_spec() -> BackupSpec {
         BackupSpec {
             scope: BackupScope::FullCluster,
@@ -257,26 +232,22 @@ mod tests {
             labels: HashMap::new(),
         }
     }
-
     fn completed_backup(name: &str, age_hours: i64) -> Backup {
         let mut b = Backup::new(name, minimal_spec());
         b.phase = BackupPhase::Completed;
         b.created_at = chrono::Utc::now() - chrono::Duration::hours(age_hours);
         b
     }
-
     #[test]
     fn test_validate_backup_name_valid() {
         assert!(validate_backup_name("daily-backup"));
         assert!(validate_backup_name("backup1"));
         assert!(validate_backup_name("a"));
     }
-
     #[test]
     fn test_validate_backup_name_invalid_empty() {
         assert!(!validate_backup_name(""));
     }
-
     #[test]
     fn test_validate_backup_name_invalid_chars() {
         assert!(!validate_backup_name("backup_with_underscores"));
@@ -284,7 +255,6 @@ mod tests {
         assert!(!validate_backup_name("ends-with-dash-"));
         assert!(!validate_backup_name("has spaces"));
     }
-
     #[test]
     fn test_validate_backup_name_too_long() {
         let long = "a".repeat(64);
@@ -292,7 +262,6 @@ mod tests {
         let ok = "a".repeat(63);
         assert!(validate_backup_name(&ok));
     }
-
     #[test]
     fn test_transition_new_to_in_progress() {
         let mut b = Backup::new("test", minimal_spec());
@@ -300,7 +269,6 @@ mod tests {
         assert!(transition_phase(&mut b, BackupPhase::InProgress));
         assert_eq!(b.phase, BackupPhase::InProgress);
     }
-
     #[test]
     fn test_transition_in_progress_to_completed() {
         let mut b = Backup::new("test", minimal_spec());
@@ -308,7 +276,6 @@ mod tests {
         assert!(transition_phase(&mut b, BackupPhase::Completed));
         assert_eq!(b.phase, BackupPhase::Completed);
     }
-
     #[test]
     fn test_transition_invalid_skipped() {
         let mut b = Backup::new("test", minimal_spec());
@@ -316,7 +283,6 @@ mod tests {
         assert!(!transition_phase(&mut b, BackupPhase::Completed));
         assert_eq!(b.phase, BackupPhase::New);
     }
-
     #[test]
     fn test_backup_phase_is_terminal() {
         assert!(BackupPhase::Completed.is_terminal());
@@ -325,7 +291,6 @@ mod tests {
         assert!(!BackupPhase::InProgress.is_terminal());
         assert!(!BackupPhase::New.is_terminal());
     }
-
     #[test]
     fn test_apply_retention_max_backups_removes_oldest() {
         let backups = vec![
@@ -338,7 +303,6 @@ mod tests {
         assert_eq!(to_delete.len(), 1);
         assert_eq!(to_delete[0].name, "b1");
     }
-
     #[test]
     fn test_apply_retention_ttl_removes_expired() {
         let backups = vec![
@@ -351,7 +315,6 @@ mod tests {
         assert_eq!(to_delete.len(), 1);
         assert_eq!(to_delete[0].name, "old");
     }
-
     #[test]
     fn test_apply_retention_no_removal_within_ttl() {
         let backups = vec![completed_backup("recent", 1)];
@@ -359,7 +322,6 @@ mod tests {
         let to_delete = apply_retention(&backups, &policy);
         assert!(to_delete.is_empty());
     }
-
     #[test]
     fn test_apply_retention_no_policy_removes_nothing() {
         let backups = vec![
@@ -372,8 +334,5 @@ mod tests {
         };
         let to_delete = apply_retention(&backups, &policy);
         assert!(to_delete.is_empty());
->>>>>>> claude/gallant-meninsky
-=======
->>>>>>> claude/thirsty-lederberg
     }
 }

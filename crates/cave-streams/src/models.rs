@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 //! Core domain models for cave-streams.
-=======
 //! Domain models for cave-streams.
 //!
 //! Core abstractions:
@@ -10,14 +8,12 @@
 //!   Schema      — built-in Avro/Protobuf/JSON schema registry
 //!   Connector   — source/sink bridge to external systems
 //!   DeadLetterEntry — exhausted-retry message with replay support
->>>>>>> claude/youthful-babbage
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-<<<<<<< HEAD
 // ─── Record / Message ────────────────────────────────────────────────────────
 
 /// A single event record in a partition log.
@@ -116,16 +112,12 @@ impl Default for TopicConfig {
             compression_type: CompressionType::None,
             max_message_bytes: 1_048_576, // 1 MiB
             segment_bytes: 1_073_741_824, // 1 GiB
-=======
 // ── Stream ────────────────────────────────────────────────────────────────────
-
 /// A partition-less, auto-scaling event channel.
 /// Unlike Kafka topics, streams have no explicit partition count —
 /// the platform handles horizontal scaling transparently.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Stream {
     pub id: Uuid,
-    pub name: String,
     pub namespace: String,
     pub description: Option<String>,
     pub storage_tier: StorageTierHint,
@@ -139,10 +131,7 @@ pub struct Stream {
     /// Monotonic sequence counter for ordering within this stream.
     pub sequence: u64,
     pub labels: HashMap<String, String>,
-    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 /// Hint to the tiering engine for initial placement.
 /// The platform will still tier down automatically based on age/pressure.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -157,29 +146,20 @@ pub enum StorageTierHint {
     /// Let the platform decide based on access patterns.
     #[default]
     Auto,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetentionPolicy {
     pub max_age_seconds: Option<u64>,
     pub max_bytes: Option<u64>,
     pub max_messages: Option<u64>,
     pub on_full: OnFullPolicy,
-}
-
 impl Default for RetentionPolicy {
-    fn default() -> Self {
-        Self {
             max_age_seconds: Some(86400 * 7), // 7 days
             max_bytes: None,
             max_messages: None,
             on_full: OnFullPolicy::DropOldest,
->>>>>>> claude/youthful-babbage
         }
     }
 }
 
-<<<<<<< HEAD
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum CleanupPolicy {
@@ -273,22 +253,13 @@ impl ConsumerGroup {
             leader_id: None,
             protocol: RebalanceProtocol::Eager,
             state: GroupState::Empty,
-=======
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OnFullPolicy {
     DropOldest,
     Reject,
-    Compact,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThroughputLimit {
     pub messages_per_second: u64,
     pub bytes_per_second: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateStreamRequest {
     pub name: String,
     pub namespace: Option<String>,
@@ -299,15 +270,9 @@ pub struct CreateStreamRequest {
     pub max_message_size_bytes: Option<u32>,
     pub throughput_limit: Option<ThroughputLimit>,
     pub labels: Option<HashMap<String, String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThrottleRequest {
     pub messages_per_second: u64,
     pub bytes_per_second: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamStats {
     pub stream_id: Uuid,
     pub name: String,
@@ -318,13 +283,9 @@ pub struct StreamStats {
     pub throughput_limit: Option<ThroughputLimit>,
     pub storage_tier: StorageTierHint,
     pub retention: RetentionPolicy,
-}
-
 // ── Subscription ──────────────────────────────────────────────────────────────
-
 /// A named consumer binding on a stream with integrated retry and DLQ policy.
 /// Unlike Kafka consumer groups, subscriptions own their retry/DLQ lifecycle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Subscription {
     pub id: Uuid,
     pub stream_id: Uuid,
@@ -347,9 +308,6 @@ pub struct Subscription {
     pub status: SubscriptionStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubscriptionType {
     /// Platform pushes to a configured webhook endpoint.
@@ -358,9 +316,6 @@ pub enum SubscriptionType {
     Pull,
     /// Broadcast — every active consumer receives every message.
     Fanout,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryPolicy {
     /// Start from the newest message at subscription creation.
@@ -371,16 +326,10 @@ pub enum DeliveryPolicy {
     BySequence(u64),
     /// Resume from a specific wall-clock timestamp.
     ByTimestamp(DateTime<Utc>),
-}
-
 impl Default for DeliveryPolicy {
     fn default() -> Self {
         Self::Latest
-    }
-}
-
 /// Integrated retry policy — no external retry framework needed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryPolicy {
     pub max_retries: u32,
     pub backoff: BackoffStrategy,
@@ -388,23 +337,18 @@ pub struct RetryPolicy {
     pub max_delay_ms: u64,
     /// Move to DLQ after all retries are exhausted.
     pub dead_letter_after_retries: bool,
-}
-
 impl Default for RetryPolicy {
     fn default() -> Self {
-        Self {
             max_retries: 3,
             backoff: BackoffStrategy::Exponential,
             initial_delay_ms: 1_000,
             max_delay_ms: 60_000,
             dead_letter_after_retries: true,
->>>>>>> claude/youthful-babbage
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-<<<<<<< HEAD
 pub struct GroupMember {
     pub member_id: String,
     pub client_id: String,
@@ -511,7 +455,6 @@ pub enum SchemaType {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CompatibilityMode {
     #[default]
-=======
 #[serde(rename_all = "snake_case")]
 pub enum BackoffStrategy {
     Fixed,
@@ -519,9 +462,6 @@ pub enum BackoffStrategy {
     Exponential,
     /// Exponential + random jitter to avoid thundering herd.
     Jittered,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SubscriptionStatus {
     Active,
@@ -529,9 +469,6 @@ pub enum SubscriptionStatus {
     /// Consumer is too slow; platform is shedding or buffering.
     Backpressure,
     Error,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateSubscriptionRequest {
     pub name: String,
     pub subscription_type: SubscriptionType,
@@ -541,12 +478,8 @@ pub struct CreateSubscriptionRequest {
     pub filter_expression: Option<String>,
     pub ack_deadline_seconds: Option<u32>,
     pub exactly_once: Option<bool>,
-}
-
 // ── Message ───────────────────────────────────────────────────────────────────
-
 /// An individual event stored in a stream.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: Uuid,
     pub stream_id: Uuid,
@@ -562,9 +495,6 @@ pub struct Message {
     pub storage_tier: StorageTierHint,
     /// Number of times this message has been delivered (for retry tracking).
     pub delivery_count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublishRequest {
     pub key: Option<String>,
     pub payload: serde_json::Value,
@@ -573,9 +503,6 @@ pub struct PublishRequest {
     /// Supply a stable UUID to enable exactly-once semantics.
     /// Duplicate publishes with the same ID are silently dropped.
     pub deduplication_id: Option<Uuid>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PublishResponse {
     pub message_id: Uuid,
     pub stream_id: Uuid,
@@ -584,39 +511,22 @@ pub struct PublishResponse {
     pub storage_tier: StorageTierHint,
     /// True if this message was a duplicate and was not stored again.
     pub deduplicated: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullRequest {
     pub subscription_id: Uuid,
     pub max_messages: Option<u32>,
     pub ack_deadline_seconds: Option<u32>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AckRequest {
     pub message_ids: Vec<Uuid>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AckResponse {
     pub acked: Vec<Uuid>,
     pub not_found: Vec<Uuid>,
     pub cursor_advanced_to: u64,
-}
-
 // ── Schema Registry ───────────────────────────────────────────────────────────
-
 /// Built-in schema registry — not a separate service.
 /// Supports Avro, Protobuf, JSON Schema, and raw bytes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Schema {
     pub id: Uuid,
     /// Namespace-qualified name, e.g. `orders.v2`.
-    pub subject: String,
     pub format: SchemaFormat,
-    pub version: u32,
-    pub definition: String,
     pub compatibility: CompatibilityMode,
     /// FNV-1a fingerprint for content-based deduplication.
     pub fingerprint: String,
@@ -624,29 +534,15 @@ pub struct Schema {
     pub stream_count: u32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SchemaFormat {
-    Avro,
-    Protobuf,
-    JsonSchema,
     Raw,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum CompatibilityMode {
     None,
->>>>>>> claude/youthful-babbage
     Backward,
     BackwardTransitive,
     Forward,
     ForwardTransitive,
     Full,
     FullTransitive,
-<<<<<<< HEAD
     None,
 }
 
@@ -671,42 +567,24 @@ pub enum ConnectorDirection {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ConnectorStatus {
-=======
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterSchemaRequest {
     pub subject: String,
     pub format: SchemaFormat,
     pub definition: String,
     pub compatibility: Option<CompatibilityMode>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidateSchemaRequest {
     pub subject: String,
     pub definition: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidateSchemaResponse {
     pub valid: bool,
     pub compatible: bool,
     pub errors: Vec<String>,
-}
-
 // ── Connector ─────────────────────────────────────────────────────────────────
-
 /// Bridge to external systems. Supports lightweight DSL transforms.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Connector {
     pub id: Uuid,
-    pub name: String,
     /// Human-readable class name, e.g. `postgres-cdc`, `s3-sink`, `http-source`.
-    pub connector_class: String,
-    pub direction: ConnectorDirection,
     pub stream_id: Uuid,
-    pub status: ConnectorStatus,
     pub config: serde_json::Value,
     /// Optional transformation DSL applied before write/after read.
     pub transform_dsl: Option<String>,
@@ -714,28 +592,17 @@ pub struct Connector {
     pub messages_processed: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ConnectorDirection {
-    Source,
-    Sink,
     Bidirectional,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum ConnectorStatus {
     Provisioning,
->>>>>>> claude/youthful-babbage
     Running,
     Paused,
     Failed,
     Stopped,
 }
 
-<<<<<<< HEAD
 // ─── Tiered storage ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -744,8 +611,6 @@ pub struct StorageTierConfig {
     pub warm: WarmTierConfig,
     pub cold: ColdTierConfig,
     pub enabled: bool,
-=======
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateConnectorRequest {
     pub name: String,
     pub connector_class: String,
@@ -754,19 +619,14 @@ pub struct CreateConnectorRequest {
     pub config: serde_json::Value,
     pub transform_dsl: Option<String>,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PatchConnectorRequest {
     pub status: Option<ConnectorStatus>,
     pub config: Option<serde_json::Value>,
     pub transform_dsl: Option<String>,
 }
-
 // ── Dead Letter Queue ─────────────────────────────────────────────────────────
-
 /// A message that has exhausted its retry policy.
 /// Can be replayed individually or in bulk.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeadLetterEntry {
     pub id: Uuid,
     pub original_message_id: Uuid,
@@ -782,7 +642,6 @@ pub struct DeadLetterEntry {
     pub status: DlqStatus,
     pub created_at: DateTime<Utc>,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum DlqStatus {
@@ -797,13 +656,9 @@ pub enum DlqStatus {
     /// Successfully replayed.
     Resolved,
 }
-
 // ── Tiered Storage ────────────────────────────────────────────────────────────
-
 /// Platform-wide tiered storage configuration.
 /// hot → warm → cold promotion happens automatically.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StorageTierConfig {
     pub hot: HotStorageConfig,
     pub warm: WarmStorageConfig,
     pub cold: ColdStorageConfig,
@@ -812,13 +667,11 @@ pub struct StorageTierConfig {
     pub hot_to_warm_threshold_percent: u8,
     /// Move warm→cold after this many seconds.
     pub warm_to_cold_age_seconds: u64,
->>>>>>> claude/youthful-babbage
 }
 
 impl Default for StorageTierConfig {
     fn default() -> Self {
         Self {
-<<<<<<< HEAD
             hot: HotTierConfig {
                 max_bytes: 512 * 1024 * 1024,
                 max_age_ms: 3_600_000,
@@ -838,16 +691,12 @@ impl Default for StorageTierConfig {
                 compression: CompressionType::Zstd,
             },
             enabled: false,
-=======
             hot: HotStorageConfig {
                 max_memory_bytes: 512 * 1024 * 1024,
                 target_retention_seconds: 300,
-            },
             warm: WarmStorageConfig {
                 path: "/var/lib/cave-streams/warm".to_string(),
-                max_bytes: 10 * 1024 * 1024 * 1024,
                 compression: WarmCompression::Lz4,
-            },
             cold: ColdStorageConfig {
                 provider: ObjectStorageProvider::S3Compatible,
                 endpoint: "http://minio:9000".to_string(),
@@ -855,17 +704,14 @@ impl Default for StorageTierConfig {
                 prefix: "events/".to_string(),
                 region: "us-east-1".to_string(),
                 compression: ColdCompression::Zstd,
-            },
             auto_tier_enabled: true,
             hot_to_warm_threshold_percent: 80,
             warm_to_cold_age_seconds: 3600,
->>>>>>> claude/youthful-babbage
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-<<<<<<< HEAD
 pub struct HotTierConfig {
     /// Maximum bytes to keep in memory.
     pub max_bytes: u64,
@@ -1004,57 +850,34 @@ pub struct RecordMetadata {
     pub partition: u32,
     pub offset: i64,
     pub timestamp_ms: i64,
-=======
 pub struct HotStorageConfig {
     /// Maximum bytes to keep in RAM across all streams.
     pub max_memory_bytes: u64,
     /// Target how long messages stay in hot tier before spill.
     pub target_retention_seconds: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WarmStorageConfig {
     pub path: String,
-    pub max_bytes: u64,
     pub compression: WarmCompression,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WarmCompression {
     None,
     Lz4,
     Snappy,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColdStorageConfig {
     pub provider: ObjectStorageProvider,
-    pub endpoint: String,
-    pub bucket: String,
     pub prefix: String,
-    pub region: String,
     pub compression: ColdCompression,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ObjectStorageProvider {
     S3Compatible,
     Gcs,
     AzureBlob,
     Local,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ColdCompression {
     None,
     Zstd,
     Gzip,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageTierStats {
     pub hot_message_count: u64,
     pub warm_message_count: u64,
@@ -1064,11 +887,7 @@ pub struct StorageTierStats {
     pub cold_estimated_bytes: u64,
     pub auto_tier_enabled: bool,
     pub config: StorageTierConfig,
-}
-
 // ── Metrics ───────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamMetrics {
     pub stream_id: Uuid,
     pub timestamp: DateTime<Utc>,
@@ -1085,9 +904,6 @@ pub struct StreamMetrics {
     pub publish_latency_ms_p99: f64,
     pub end_to_end_latency_ms_p99: f64,
     pub exactly_once_dedup_count: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformMetrics {
     pub timestamp: DateTime<Utc>,
     pub total_streams: u64,
@@ -1098,11 +914,7 @@ pub struct PlatformMetrics {
     pub active_schemas: u64,
     pub dedup_cache_size: u64,
     pub per_stream: Vec<StreamMetrics>,
-}
-
 // ── Backpressure ──────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackpressureStatus {
     pub stream_id: Uuid,
     pub stream_name: String,
@@ -1110,17 +922,10 @@ pub struct BackpressureStatus {
     pub current_limit: Option<ThroughputLimit>,
     pub slow_subscriptions: Vec<SlowSubscription>,
     pub recommended_action: BackpressureAction,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SlowSubscription {
     pub subscription_id: Uuid,
-    pub name: String,
     pub lag: u64,
     pub status: SubscriptionStatus,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BackpressureAction {
     None,
@@ -1128,5 +933,4 @@ pub enum BackpressureAction {
     ScaleConsumers,
     MoveToColdTier,
     AlertOnly,
->>>>>>> claude/youthful-babbage
 }
