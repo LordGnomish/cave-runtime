@@ -45,12 +45,15 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let cluster_state = Arc::new(cave_cluster::ClusterState::default());
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
         .route("/ready", axum::routing::get(ready))
+        // Platform modules
+        .merge(cave_cluster::router(cluster_state))
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
@@ -67,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
+    info!("Platform modules: cluster");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
     info!(
         "Upstream tracking: {} projects",
