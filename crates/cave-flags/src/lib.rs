@@ -31,6 +31,7 @@ pub mod models;
 pub mod pool;
 pub mod routes;
 pub mod store;
+pub mod unleash;
 
 use axum::Router;
 <<<<<<< HEAD
@@ -130,8 +131,12 @@ impl FlagsState {
 // ================================================================
 
 /// Create the axum router for the flags module.
+///
+/// Merges cave-native routes with the Unleash-compatible API so that
+/// any Unleash client SDK can use this service as a drop-in replacement.
 pub fn router(state: Arc<FlagsState>) -> Router {
-    routes::create_router(state)
+    routes::create_router(Arc::clone(&state))
+        .merge(unleash::unleash_router(state))
 }
 <<<<<<< HEAD
 =======
