@@ -1,60 +1,30 @@
-//! Pre/post backup hook validation.
+//! Backup and restore hook validation utilities.
 
-use crate::types::{BackupHook, ExecHook, HookErrorMode};
-use thiserror::Error;
+use crate::models::{BackupHook, ExecHook, HookErrorMode};
 
-#[derive(Error, Debug, PartialEq)]
-pub enum HookValidationError {
-    #[error("Hook '{name}' has empty command")]
-    EmptyCommand { name: String },
-    #[error("Hook '{name}' has zero timeout")]
-    ZeroTimeout { name: String },
-    #[error("Hook '{name}' has empty container")]
-    EmptyContainer { name: String },
-}
-
-/// Validate a single exec hook.
-pub fn validate_exec_hook(hook_name: &str, exec: &ExecHook) -> Result<(), HookValidationError> {
-    if exec.container.is_empty() {
-        return Err(HookValidationError::EmptyContainer {
-            name: hook_name.to_string(),
-        });
-    }
-    if exec.command.is_empty() {
-        return Err(HookValidationError::EmptyCommand {
-            name: hook_name.to_string(),
-        });
-    }
-    if exec.timeout_seconds == 0 {
-        return Err(HookValidationError::ZeroTimeout {
-            name: hook_name.to_string(),
-        });
-    }
-    Ok(())
-}
-
-/// Validate all hooks in a backup hook spec.
-pub fn validate_backup_hook(hook: &BackupHook) -> Vec<HookValidationError> {
+/// Validate hooks, returning a list of error strings for any misconfigured hooks.
+pub fn validate_hooks(hooks: &[BackupHook]) -> Vec<String> {
     let mut errors = Vec::new();
-    for exec in &hook.pre_hooks {
-        if let Err(e) = validate_exec_hook(&hook.name, exec) {
-            errors.push(e);
+    for hook in hooks {
+        for pre in &hook.pre {
+            if pre.command.is_empty() {
+                errors.push(format!("hook {}: pre-exec command is empty", hook.name));
+            }
         }
-    }
-    for exec in &hook.post_hooks {
-        if let Err(e) = validate_exec_hook(&hook.name, exec) {
-            errors.push(e);
+        for post in &hook.post {
+            if post.command.is_empty() {
+                errors.push(format!("hook {}: post-exec command is empty", hook.name));
+            }
         }
     }
     errors
 }
 
-/// Build a minimal valid exec hook for testing.
-#[cfg(test)]
-pub fn valid_exec_hook() -> ExecHook {
+/// Create a default exec hook with Continue-on-error and 30s timeout.
+pub fn default_exec_hook(container: &str, command: Vec<String>) -> ExecHook {
     ExecHook {
-        container: "app".into(),
-        command: vec!["sh".into(), "-c".into(), "echo done".into()],
+        container: container.to_string(),
+        command,
         on_error: HookErrorMode::Continue,
         timeout_seconds: 30,
     }
@@ -64,65 +34,70 @@ pub fn valid_exec_hook() -> ExecHook {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_valid_exec_hook_passes() {
-        let exec = valid_exec_hook();
-        assert!(validate_exec_hook("my-hook", &exec).is_ok());
+    fn make_hook(name: &str, pre_cmd: Option<Vec<String>>, post_cmd: Option<Vec<String>>) -> BackupHook {
+        let pre = pre_cmd
+            .map(|cmd| vec![default_exec_hook("app", cmd)])
+            .unwrap_or_default();
+        let post = post_cmd
+            .map(|cmd| vec![default_exec_hook("app", cmd)])
+            .unwrap_or_default();
+        BackupHook {
+            name: name.into(),
+            namespace_selector: None,
+            resource_selector: None,
+            pre,
+            post,
+        }
     }
 
     #[test]
-    fn test_empty_container_fails() {
-        let exec = ExecHook {
-            container: "".into(),
-            command: vec!["echo".into()],
-            on_error: HookErrorMode::Fail,
-            timeout_seconds: 10,
-        };
-        let err = validate_exec_hook("hook1", &exec).unwrap_err();
-        assert!(matches!(err, HookValidationError::EmptyContainer { .. }));
+    fn validate_hooks_valid() {
+        let hooks = vec![make_hook(
+            "freeze",
+            Some(vec!["fsfreeze".into(), "-f".into(), "/data".into()]),
+            Some(vec!["fsfreeze".into(), "-u".into(), "/data".into()]),
+        )];
+        assert!(validate_hooks(&hooks).is_empty());
     }
 
     #[test]
-    fn test_empty_command_fails() {
-        let exec = ExecHook {
-            container: "app".into(),
-            command: vec![],
-            on_error: HookErrorMode::Continue,
-            timeout_seconds: 10,
-        };
-        let err = validate_exec_hook("hook1", &exec).unwrap_err();
-        assert!(matches!(err, HookValidationError::EmptyCommand { .. }));
+    fn validate_hooks_catches_empty_pre_command() {
+        let hooks = vec![make_hook("bad-pre", Some(vec![]), None)];
+        let errors = validate_hooks(&hooks);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("bad-pre"));
+        assert!(errors[0].contains("pre-exec"));
     }
 
     #[test]
-    fn test_zero_timeout_fails() {
-        let exec = ExecHook {
-            container: "app".into(),
-            command: vec!["echo".into()],
-            on_error: HookErrorMode::Continue,
-            timeout_seconds: 0,
-        };
-        let err = validate_exec_hook("hook1", &exec).unwrap_err();
-        assert!(matches!(err, HookValidationError::ZeroTimeout { .. }));
+    fn validate_hooks_catches_empty_post_command() {
+        let hooks = vec![make_hook("bad-post", None, Some(vec![]))];
+        let errors = validate_hooks(&hooks);
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("bad-post"));
+        assert!(errors[0].contains("post-exec"));
     }
 
     #[test]
-    fn test_backup_hook_collects_all_errors() {
-        let bad_exec = ExecHook {
-            container: "".into(),
-            command: vec![],
-            on_error: HookErrorMode::Continue,
-            timeout_seconds: 0,
-        };
-        let hook = BackupHook {
-            name: "test-hook".into(),
-            pod_selector: "app=myapp".into(),
-            namespace: "default".into(),
-            pre_hooks: vec![bad_exec],
-            post_hooks: vec![],
-        };
-        let errors = validate_backup_hook(&hook);
-        // EmptyContainer fires first (container check before command check).
-        assert!(!errors.is_empty());
+    fn validate_hooks_multiple_errors() {
+        let hooks = vec![
+            make_hook("h1", Some(vec![]), None),
+            make_hook("h2", None, Some(vec![])),
+        ];
+        assert_eq!(validate_hooks(&hooks).len(), 2);
+    }
+
+    #[test]
+    fn default_exec_hook_defaults() {
+        let hook = default_exec_hook("mycontainer", vec!["echo".into(), "hello".into()]);
+        assert_eq!(hook.container, "mycontainer");
+        assert_eq!(hook.command, vec!["echo", "hello"]);
+        assert_eq!(hook.on_error, HookErrorMode::Continue);
+        assert_eq!(hook.timeout_seconds, 30);
+    }
+
+    #[test]
+    fn validate_hooks_empty_slice() {
+        assert!(validate_hooks(&[]).is_empty());
     }
 }

@@ -1,185 +1,235 @@
-//! Domain models for cave-runbook.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-
-// ── Trigger ───────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TriggerKind {
-    Manual,
-    Incident,
-    Alert,
-    Schedule,
-}
-
-/// What starts a runbook execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Trigger {
-    pub kind: TriggerKind,
-    /// For Incident: minimum severity that fires this runbook.
-    pub incident_severity: Option<String>,
-    /// For Alert: alert name pattern to match.
-    pub alert_name: Option<String>,
-    /// For Schedule: cron expression (e.g. "0 */6 * * *").
-    pub cron: Option<String>,
-}
-
-// ── RunbookStep ───────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ActionType {
-    ShellCommand,
-    ApiCall,
-    CaveModuleAction,
-    HumanApproval,
-    Condition,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum OnFailure {
-    /// Skip this step and continue to the next.
-    Skip,
-    /// Abort the entire runbook.
-    Abort,
-    /// Retry up to `retry_count` times with exponential back-off.
-    Retry,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunbookStep {
-    pub id: String,
-    pub name: String,
-    pub action: ActionType,
-    /// Arbitrary key/value params interpreted by the action type.
-    pub params: HashMap<String, serde_json::Value>,
-    pub timeout_secs: u64,
-    pub on_failure: OnFailure,
-    /// Used when `on_failure = retry`.
-    pub retry_count: Option<u32>,
-}
-
-// ── Runbook ───────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Runbook {
     pub id: Uuid,
     pub name: String,
     pub description: String,
-    pub trigger: Trigger,
-    pub steps: Vec<RunbookStep>,
-    pub owner: String,
+    pub version: String,
     pub tags: Vec<String>,
-    pub last_run: Option<DateTime<Utc>>,
+    pub parameters: Vec<ParameterDef>,
+    pub steps: Vec<Step>,
+    pub timeout_seconds: u64,
+    pub on_failure: FailureAction,
+    pub is_template: bool,
+    pub created_by: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-// ── RunbookExecution ──────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ExecutionStatus {
-    Running,
-    Completed,
-    Failed,
-    Aborted,
-    PendingApproval,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParameterDef {
+    pub name: String,
+    pub description: String,
+    pub param_type: ParamType,
+    pub required: bool,
+    pub default_value: Option<serde_json::Value>,
+    pub secret: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ParamType {
+    String,
+    Number,
+    Boolean,
+    Select,
+    MultiSelect,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Step {
+    pub id: String,
+    pub name: String,
+    pub step_type: StepType,
+    pub description: String,
+    pub condition: Option<String>,
+    pub depends_on: Vec<String>,
+    pub timeout_seconds: u64,
+    pub retry_count: u32,
+    pub continue_on_error: bool,
+    pub on_failure: FailureAction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StepType {
+    Shell {
+        command: String,
+        working_dir: Option<String>,
+        env: HashMap<String, String>,
+    },
+    Http {
+        url: String,
+        method: String,
+        headers: HashMap<String, String>,
+        body: Option<serde_json::Value>,
+        expected_status: Option<u16>,
+    },
+    KubernetesAction {
+        action: K8sAction,
+        resource_kind: String,
+        resource_name: String,
+        namespace: String,
+        manifest: Option<serde_json::Value>,
+    },
+    Notification {
+        channel: NotificationChannel,
+        message: String,
+        recipients: Vec<String>,
+    },
+    Wait {
+        duration_seconds: u64,
+        message: Option<String>,
+    },
+    ManualApproval {
+        message: String,
+        approvers: Vec<String>,
+        timeout_seconds: u64,
+    },
+    SetVariable {
+        name: String,
+        value: serde_json::Value,
+    },
+    Conditional {
+        condition: String,
+        true_steps: Vec<Step>,
+        false_steps: Vec<Step>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum K8sAction {
+    Apply,
+    Delete,
+    Restart,
+    Scale,
+    Patch,
+    Get,
+    ListPods,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotificationChannel {
+    Slack,
+    Email,
+    Webhook,
+    PagerDuty,
+    Teams,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureAction {
+    Stop,
+    Continue,
+    Rollback,
+    Notify,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionStatus {
+    Pending,
+    Running,
+    WaitingForApproval,
+    Completed,
+    Failed,
+    Cancelled,
+    TimedOut,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum StepStatus {
     Pending,
     Running,
-    Success,
+    Completed,
     Failed,
     Skipped,
-    PendingApproval,
+    WaitingForApproval,
+    TimedOut,
 }
 
-/// Result of a single step within an execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StepResult {
-    pub step_id: String,
-    pub status: StepStatus,
-    pub output: Option<String>,
-    pub error: Option<String>,
-    pub duration_ms: u64,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-}
-
-/// A single run of a runbook.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunbookExecution {
+pub struct Execution {
     pub id: Uuid,
     pub runbook_id: Uuid,
     pub runbook_name: String,
     pub status: ExecutionStatus,
-    pub started_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
-    /// Who or what initiated this run ("manual", "incident:<id>", "alert:<name>").
     pub triggered_by: String,
+    pub trigger_type: TriggerType,
+    pub parameters: HashMap<String, serde_json::Value>,
     pub step_results: Vec<StepResult>,
-    pub incident_id: Option<Uuid>,
-}
-
-// ── IncidentBinding ───────────────────────────────────────────────────────────
-
-/// Links a runbook to an incident pattern so it fires automatically.
-///
-/// Example: incident_pattern="high CPU" → runbook "scale-up-runbook".
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IncidentBinding {
-    pub id: Uuid,
-    pub name: String,
-    /// Substring/keyword to match in the incident title.
-    pub incident_pattern: String,
-    pub incident_severity: Option<String>,
-    pub runbook_id: Uuid,
-    /// If true, execute immediately on match; otherwise just surface the suggestion.
-    pub auto_execute: bool,
+    pub current_step: Option<String>,
+    pub variables: HashMap<String, serde_json::Value>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
 }
 
-// ── ApprovalRequest ───────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum ApprovalStatus {
-    Pending,
-    Approved,
-    Rejected,
+pub enum TriggerType {
+    Manual,
+    Scheduled,
+    Alert,
+    Api,
+    Webhook,
 }
 
-/// Human-in-the-loop gate: execution pauses until this is resolved.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepResult {
+    pub step_id: String,
+    pub step_name: String,
+    pub status: StepStatus,
+    pub output: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub logs: Vec<String>,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub retry_count: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApprovalRequest {
     pub id: Uuid,
     pub execution_id: Uuid,
     pub step_id: String,
     pub message: String,
+    pub approvers: Vec<String>,
+    pub approved_by: Option<String>,
+    pub rejected_by: Option<String>,
     pub status: ApprovalStatus,
-    pub requested_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub responded_at: Option<DateTime<Utc>>,
-    pub responder: Option<String>,
+    pub expires_at: DateTime<Utc>,
 }
 
-// ── RunbookTemplate ───────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ApprovalStatus {
+    Pending,
+    Approved,
+    Rejected,
+    Expired,
+}
 
-/// Reusable runbook skeleton that operators can instantiate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RunbookTemplate {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub tags: Vec<String>,
-    pub steps: Vec<RunbookStep>,
-    pub default_trigger: TriggerKind,
+pub struct RunbookTrigger {
+    pub id: Uuid,
+    pub runbook_id: Uuid,
+    pub trigger_type: TriggerType,
+    pub cron_expression: Option<String>,
+    pub alert_source: Option<String>,
+    pub alert_condition: Option<String>,
+    pub parameters: HashMap<String, serde_json::Value>,
+    pub enabled: bool,
+    pub last_triggered_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }

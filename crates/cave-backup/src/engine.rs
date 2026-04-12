@@ -1,147 +1,261 @@
-use crate::models::{BackupRecord, BackupSchedule, BackupStatus};
+//! Backup and restore creation logic.
+
+use crate::models::*;
 use chrono::Utc;
+use uuid::Uuid;
 
-/// Check if a backup has expired
-pub fn is_expired(record: &BackupRecord) -> bool {
-    Utc::now() > record.expires_at
+/// Create a new backup in the InProgress phase from a spec.
+pub fn create_backup(name: String, spec: BackupSpec) -> Backup {
+    let now = Utc::now();
+    let expires_at = if spec.ttl_hours > 0 {
+        Some(now + chrono::Duration::hours(spec.ttl_hours as i64))
+    } else {
+        None
+    };
+    Backup {
+        id: Uuid::new_v4(),
+        name,
+        phase: BackupPhase::InProgress,
+        storage_location: spec.storage_location.clone(),
+        included_namespaces: spec.included_namespaces.clone(),
+        excluded_namespaces: spec.excluded_namespaces.clone(),
+        included_resources: spec.included_resources.clone(),
+        excluded_resources: spec.excluded_resources.clone(),
+        label_selector: spec.label_selector.clone(),
+        include_cluster_resources: spec.include_cluster_resources,
+        ttl_hours: spec.ttl_hours,
+        hooks: spec.hooks.clone(),
+        volume_snapshot_locations: vec![],
+        default_volumes_to_fs_backup: spec.default_volumes_to_fs_backup,
+        snapshot_move_data: false,
+        expires_at,
+        started_at: Some(now),
+        completed_at: None,
+        items_backed_up: 0,
+        total_items: 0,
+        warnings: 0,
+        errors: 0,
+        size_bytes: 0,
+        logs: vec![format!("[{}] Backup started", now.to_rfc3339())],
+        created_at: now,
+    }
 }
 
-/// Check if a backup is healthy (completed without failures)
-pub fn is_healthy(record: &BackupRecord) -> bool {
-    record.status == BackupStatus::Completed && record.warnings.is_empty()
+/// Finalize a backup, setting phase, counts, and completion timestamp.
+pub fn complete_backup(backup: &mut Backup, items: u64, size_bytes: u64, errors: u64) {
+    let now = chrono::Utc::now();
+    backup.phase = if errors > 0 {
+        BackupPhase::PartiallyFailed
+    } else {
+        BackupPhase::Completed
+    };
+    backup.items_backed_up = items;
+    backup.total_items = items;
+    backup.size_bytes = size_bytes;
+    backup.errors = errors;
+    backup.completed_at = Some(now);
+    backup.logs.push(format!(
+        "[{}] Backup completed: {} items, {} bytes",
+        now.to_rfc3339(),
+        items,
+        size_bytes
+    ));
 }
 
-/// Calculate backup duration in seconds
-pub fn duration_secs(record: &BackupRecord) -> Option<i64> {
-    record.completed_at.map(|end| (end - record.started_at).num_seconds())
+/// Create a new restore in the InProgress phase.
+pub fn create_restore(
+    name: String,
+    backup_id: Uuid,
+    backup_name: String,
+    restore_pvs: bool,
+    namespace_mappings: std::collections::HashMap<String, String>,
+    included_namespaces: Vec<String>,
+    excluded_namespaces: Vec<String>,
+    included_resources: Vec<String>,
+    excluded_resources: Vec<String>,
+    existing_resource_policy: ExistingResourcePolicy,
+) -> Restore {
+    let now = chrono::Utc::now();
+    Restore {
+        id: Uuid::new_v4(),
+        name,
+        backup_name,
+        backup_id,
+        phase: RestorePhase::InProgress,
+        included_namespaces,
+        excluded_namespaces,
+        included_resources,
+        excluded_resources,
+        namespace_mappings,
+        restore_pvs,
+        preserve_node_ports: false,
+        hooks: vec![],
+        existing_resource_policy,
+        started_at: Some(now),
+        completed_at: None,
+        warnings: 0,
+        errors: 0,
+        logs: vec![format!("[{}] Restore started", now.to_rfc3339())],
+        created_at: now,
+    }
 }
 
-/// Filter enabled schedules
-pub fn active_schedules(schedules: &[BackupSchedule]) -> Vec<&BackupSchedule> {
-    schedules.iter().filter(|s| s.enabled).collect()
+/// Simulate running exec hooks and return log lines.
+pub fn run_exec_hooks(hooks: &[ExecHook], phase: &str) -> Vec<String> {
+    let now = chrono::Utc::now();
+    hooks
+        .iter()
+        .map(|h| {
+            format!(
+                "[{}] {} hook: container={} cmd={:?}",
+                now.to_rfc3339(),
+                phase,
+                h.container,
+                h.command
+            )
+        })
+        .collect()
 }
 
-/// Total size of all completed backups in bytes
-pub fn total_backup_size(records: &[BackupRecord]) -> u64 {
-    records.iter()
-        .filter(|r| r.status == BackupStatus::Completed)
-        .map(|r| r.size_bytes)
-        .sum()
-}
-
-/// Find the most recent successful backup
-pub fn latest_successful<'a>(records: &'a [BackupRecord]) -> Option<&'a BackupRecord> {
-    records.iter()
-        .filter(|r| r.status == BackupStatus::Completed)
-        .max_by_key(|r| r.started_at)
-}
-
-/// Validate a cron expression (simple: must have 5 space-separated fields)
-pub fn is_valid_cron(expr: &str) -> bool {
-    expr.split_whitespace().count() == 5
+/// Returns true if the backup has passed its TTL expiry time.
+pub fn check_expiration(backup: &Backup) -> bool {
+    if let Some(expires_at) = backup.expires_at {
+        chrono::Utc::now() > expires_at
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
-    use chrono::{Duration, Utc};
+    use std::collections::HashMap;
 
-    fn make_record(status: BackupStatus, size_bytes: u64, started_offset_secs: i64) -> BackupRecord {
-        let now = Utc::now();
-        let started_at = now + Duration::seconds(started_offset_secs);
-        BackupRecord {
-            id: Uuid::new_v4(),
-            schedule_id: None,
-            name: "backup-test".to_string(),
-            status,
-            size_bytes,
-            started_at,
-            completed_at: Some(started_at + Duration::minutes(5)),
-            expires_at: now + Duration::days(30),
-            warnings: vec![],
-        }
-    }
-
-    fn make_schedule(enabled: bool) -> BackupSchedule {
-        BackupSchedule {
-            id: Uuid::new_v4(),
-            name: "schedule-test".to_string(),
-            namespace: "default".to_string(),
-            cron_expression: "0 2 * * *".to_string(),
-            retention_days: 30,
-            storage_location: "s3://bucket/backups".to_string(),
-            enabled,
-            include_volumes: true,
+    fn default_spec() -> BackupSpec {
+        BackupSpec {
+            storage_location: "default".into(),
+            ttl_hours: 24,
+            ..Default::default()
         }
     }
 
     #[test]
-    fn test_is_expired_future() {
-        let record = make_record(BackupStatus::Completed, 1024, 0);
-        // expires_at is 30 days in the future
-        assert!(!is_expired(&record));
+    fn create_backup_starts_in_progress() {
+        let backup = create_backup("test-backup".into(), default_spec());
+        assert_eq!(backup.phase, BackupPhase::InProgress);
+        assert_eq!(backup.name, "test-backup");
+        assert!(backup.started_at.is_some());
+        assert!(backup.completed_at.is_none());
+        assert!(!backup.logs.is_empty());
     }
 
     #[test]
-    fn test_is_expired_past() {
-        let now = Utc::now();
-        let mut record = make_record(BackupStatus::Completed, 1024, 0);
-        record.expires_at = now - Duration::days(1);
-        assert!(is_expired(&record));
+    fn create_backup_sets_expiry_when_ttl_nonzero() {
+        let spec = BackupSpec {
+            ttl_hours: 72,
+            ..Default::default()
+        };
+        let backup = create_backup("ttl-test".into(), spec);
+        assert!(backup.expires_at.is_some());
     }
 
     #[test]
-    fn test_is_healthy_completed_no_warnings() {
-        let record = make_record(BackupStatus::Completed, 1024, 0);
-        assert!(is_healthy(&record));
+    fn create_backup_no_expiry_when_ttl_zero() {
+        let spec = BackupSpec {
+            ttl_hours: 0,
+            ..Default::default()
+        };
+        let backup = create_backup("no-ttl".into(), spec);
+        assert!(backup.expires_at.is_none());
     }
 
     #[test]
-    fn test_is_healthy_with_warnings() {
-        let mut record = make_record(BackupStatus::Completed, 1024, 0);
-        record.warnings = vec!["Volume pvc-xyz was skipped".to_string()];
-        assert!(!is_healthy(&record));
+    fn complete_backup_sets_completed_phase() {
+        let mut backup = create_backup("complete-test".into(), default_spec());
+        complete_backup(&mut backup, 42, 1024, 0);
+        assert_eq!(backup.phase, BackupPhase::Completed);
+        assert_eq!(backup.items_backed_up, 42);
+        assert_eq!(backup.size_bytes, 1024);
+        assert!(backup.completed_at.is_some());
+        assert_eq!(backup.logs.len(), 2);
     }
 
     #[test]
-    fn test_is_healthy_failed_status() {
-        let record = make_record(BackupStatus::Failed, 0, 0);
-        assert!(!is_healthy(&record));
+    fn complete_backup_with_errors_sets_partially_failed() {
+        let mut backup = create_backup("error-test".into(), default_spec());
+        complete_backup(&mut backup, 10, 512, 2);
+        assert_eq!(backup.phase, BackupPhase::PartiallyFailed);
+        assert_eq!(backup.errors, 2);
     }
 
     #[test]
-    fn test_active_schedules_filter() {
-        let schedules = vec![
-            make_schedule(true),
-            make_schedule(false),
-            make_schedule(true),
+    fn create_restore_starts_in_progress() {
+        let backup_id = Uuid::new_v4();
+        let restore = create_restore(
+            "my-restore".into(),
+            backup_id,
+            "my-backup".into(),
+            true,
+            HashMap::new(),
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            ExistingResourcePolicy::None,
+        );
+        assert_eq!(restore.phase, RestorePhase::InProgress);
+        assert_eq!(restore.backup_id, backup_id);
+        assert!(restore.started_at.is_some());
+        assert!(restore.completed_at.is_none());
+    }
+
+    #[test]
+    fn run_exec_hooks_returns_log_per_hook() {
+        let hooks = vec![
+            ExecHook {
+                container: "app".into(),
+                command: vec!["freeze".into()],
+                on_error: HookErrorMode::Continue,
+                timeout_seconds: 30,
+            },
+            ExecHook {
+                container: "sidecar".into(),
+                command: vec!["flush".into()],
+                on_error: HookErrorMode::Fail,
+                timeout_seconds: 10,
+            },
         ];
-        let active = active_schedules(&schedules);
-        assert_eq!(active.len(), 2);
-        for s in &active {
-            assert!(s.enabled);
-        }
+        let logs = run_exec_hooks(&hooks, "pre");
+        assert_eq!(logs.len(), 2);
+        assert!(logs[0].contains("pre"));
+        assert!(logs[0].contains("app"));
     }
 
     #[test]
-    fn test_total_backup_size() {
-        let records = vec![
-            make_record(BackupStatus::Completed, 100, 0),
-            make_record(BackupStatus::Completed, 200, 0),
-            make_record(BackupStatus::Failed, 50, 0),
-            make_record(BackupStatus::InProgress, 75, 0),
-        ];
-        // Only completed: 100 + 200 = 300
-        assert_eq!(total_backup_size(&records), 300);
+    fn check_expiration_not_expired_when_future() {
+        let spec = BackupSpec {
+            ttl_hours: 999,
+            ..Default::default()
+        };
+        let backup = create_backup("future".into(), spec);
+        assert!(!check_expiration(&backup));
     }
 
     #[test]
-    fn test_is_valid_cron() {
-        assert!(is_valid_cron("0 2 * * *"));
-        assert!(is_valid_cron("*/5 * * * *"));
-        assert!(!is_valid_cron("bad"));
-        assert!(!is_valid_cron("0 2 * *"));
-        assert!(!is_valid_cron("0 2 * * * *"));
+    fn check_expiration_false_when_no_expiry() {
+        let spec = BackupSpec {
+            ttl_hours: 0,
+            ..Default::default()
+        };
+        let backup = create_backup("no-expiry".into(), spec);
+        assert!(!check_expiration(&backup));
+    }
+
+    #[test]
+    fn check_expiration_true_when_expired() {
+        let mut backup = create_backup("expired".into(), default_spec());
+        // Force the expiry into the past
+        backup.expires_at = Some(chrono::Utc::now() - chrono::Duration::hours(1));
+        assert!(check_expiration(&backup));
     }
 }

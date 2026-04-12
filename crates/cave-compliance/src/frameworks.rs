@@ -1,386 +1,143 @@
-//! SOC2 Type II and ISO 27001 control catalogs with cross-framework mappings.
-
-use crate::models::{Control, ControlMapping, EvidenceType, Framework};
+use crate::models::*;
 use chrono::Utc;
+use uuid::Uuid;
 
-// ─── SOC2 Type II Controls ───────────────────────────────────────────────────
-
-pub fn soc2_controls() -> Vec<Control> {
-    let now = Utc::now();
-    vec![
-        Control {
-            id: "CC1.1".into(),
-            title: "COSO Principle 1: Commitment to Integrity and Ethical Values".into(),
-            description: "The entity demonstrates a commitment to integrity and ethical values.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Control Environment".into(),
-            implementation_guidance: "Establish a code of conduct, communicate it to all personnel, and monitor adherence.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.5.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC2.1".into(),
-            title: "COSO Principle 6: Board Oversight of Internal Control".into(),
-            description: "The board of directors demonstrates independence from management and exercises oversight of the development and performance of internal control.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Communication and Information".into(),
-            implementation_guidance: "Establish board oversight committees, conduct regular board reviews of security posture.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.6.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC3.1".into(),
-            title: "COSO Principle 7: Establish Organizational Structure".into(),
-            description: "Management establishes, with board oversight, structures, reporting lines, and appropriate authorities and responsibilities in pursuit of objectives.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Risk Assessment".into(),
-            implementation_guidance: "Define organizational chart, roles, and responsibilities for security functions.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.6.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC4.1".into(),
-            title: "COSO Principle 10: Select and Develop Control Activities".into(),
-            description: "The entity selects and develops control activities that contribute to the mitigation of risks to the achievement of objectives.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Monitoring Activities".into(),
-            implementation_guidance: "Identify and document controls, assign owners, and establish monitoring cadence.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::SecurityAssessment],
-            mappings: vec![],
-            created_at: now,
-        },
-        Control {
-            id: "CC5.1".into(),
-            title: "COSO Principle 11: Select and Develop Technology Controls".into(),
-            description: "The entity selects and develops general control activities over technology to support the achievement of objectives.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Control Activities".into(),
-            implementation_guidance: "Implement technology controls including automated monitoring, alerting, and access controls.".into(),
-            evidence_types: vec![EvidenceType::ConfigSnapshot, EvidenceType::ScanResult],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.12.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC6.1".into(),
-            title: "Logical and Physical Access Controls".into(),
-            description: "The entity implements logical access security software, infrastructure, and architectures over protected information assets.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Logical and Physical Access Controls".into(),
-            implementation_guidance: "Implement MFA, role-based access control, privileged access management, and physical security controls.".into(),
-            evidence_types: vec![EvidenceType::AccessLog, EvidenceType::ConfigSnapshot],
-            mappings: vec![
-                ControlMapping { framework: Framework::Iso27001, control_id: "A.9.1.1".into() },
-                ControlMapping { framework: Framework::Iso27001, control_id: "A.9.4.1".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "CC6.2".into(),
-            title: "Prior to Issuing System Credentials, Review Access".into(),
-            description: "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Logical and Physical Access Controls".into(),
-            implementation_guidance: "Implement an access request and approval workflow; verify identity before provisioning credentials.".into(),
-            evidence_types: vec![EvidenceType::AccessLog, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.9.2.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC6.3".into(),
-            title: "Role-Based Access Control".into(),
-            description: "The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on roles and responsibilities.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Logical and Physical Access Controls".into(),
-            implementation_guidance: "Define roles with least-privilege principles, implement RBAC, review access quarterly.".into(),
-            evidence_types: vec![EvidenceType::AccessLog, EvidenceType::ConfigSnapshot],
-            mappings: vec![
-                ControlMapping { framework: Framework::Iso27001, control_id: "A.9.2.1".into() },
-                ControlMapping { framework: Framework::Iso27001, control_id: "A.9.4.1".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "CC7.1".into(),
-            title: "Monitoring of System Components".into(),
-            description: "The entity uses detection and monitoring procedures to identify changes to configurations or new vulnerabilities.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "System Operations".into(),
-            implementation_guidance: "Deploy centralized logging, SIEM, and vulnerability scanning with alerting on anomalies.".into(),
-            evidence_types: vec![EvidenceType::ScanResult, EvidenceType::AuditLog, EvidenceType::ConfigSnapshot],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.12.6.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC7.2".into(),
-            title: "System Anomaly Detection".into(),
-            description: "The entity monitors system components and the operation of those components for anomalies that are indicative of malicious acts.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "System Operations".into(),
-            implementation_guidance: "Implement IDS/IPS, behavioral analytics, and automated threat detection.".into(),
-            evidence_types: vec![EvidenceType::ScanResult, EvidenceType::SecurityAssessment],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.16.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC8.1".into(),
-            title: "Change Management Process".into(),
-            description: "The entity authorizes, designs, develops or acquires, configures, documents, tests, approves, and implements changes to infrastructure, data, software, and procedures.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Change Management".into(),
-            implementation_guidance: "Implement formal change management process with approvals, testing, and rollback procedures.".into(),
-            evidence_types: vec![EvidenceType::AuditLog, EvidenceType::PolicyDocument],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.14.2.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "CC9.1".into(),
-            title: "Risk Assessment and Mitigation".into(),
-            description: "The entity identifies, selects, and develops risk mitigation activities for risks arising from potential business disruptions.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Risk Mitigation".into(),
-            implementation_guidance: "Conduct regular risk assessments, maintain risk register, and implement mitigation controls.".into(),
-            evidence_types: vec![EvidenceType::SecurityAssessment, EvidenceType::PolicyDocument],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.18.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A1.1".into(),
-            title: "Availability: Performance Monitoring".into(),
-            description: "The entity maintains, monitors, and evaluates current processing capacity and use to manage capacity demand.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Availability".into(),
-            implementation_guidance: "Implement capacity monitoring, alerting on thresholds, and auto-scaling policies.".into(),
-            evidence_types: vec![EvidenceType::ConfigSnapshot, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.17.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A1.2".into(),
-            title: "Availability: Recovery Testing".into(),
-            description: "The entity authorizes, designs, develops or acquires, implements, operates, approves, maintains, and monitors environmental protections, software, data backup processes, and recovery infrastructure.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Availability".into(),
-            implementation_guidance: "Conduct regular DR tests, document RTO/RPO objectives, test backup restoration.".into(),
-            evidence_types: vec![EvidenceType::AuditLog, EvidenceType::SecurityAssessment],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.17.1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "C1.1".into(),
-            title: "Confidentiality Controls".into(),
-            description: "The entity identifies and maintains confidential information to meet the entity's objectives related to confidentiality.".into(),
-            framework: Framework::Soc2TypeII,
-            category: "Confidentiality".into(),
-            implementation_guidance: "Classify data by sensitivity, implement encryption at rest and in transit, restrict access.".into(),
-            evidence_types: vec![EvidenceType::ConfigSnapshot, EvidenceType::PolicyDocument, EvidenceType::AccessLog],
-            mappings: vec![ControlMapping { framework: Framework::Iso27001, control_id: "A.10.1.1".into() }],
-            created_at: now,
-        },
-    ]
+pub fn builtin_frameworks() -> Vec<ComplianceFramework> {
+    vec![cis_kubernetes_framework(), soc2_framework(), pci_dss_framework(), hipaa_framework()]
 }
 
-// ─── ISO 27001 Controls ───────────────────────────────────────────────────────
-
-pub fn iso27001_controls() -> Vec<Control> {
-    let now = Utc::now();
-    vec![
-        Control {
-            id: "A.5.1.1".into(),
-            title: "Information Security Policies".into(),
-            description: "A set of policies for information security shall be defined, approved by management, published and communicated to employees and relevant external parties.".into(),
-            framework: Framework::Iso27001,
-            category: "Information Security Policies".into(),
-            implementation_guidance: "Define and document an information security policy; obtain management approval and communicate to all staff.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.6.1.1".into(),
-            title: "Information Security Roles and Responsibilities".into(),
-            description: "All information security responsibilities shall be defined and allocated.".into(),
-            framework: Framework::Iso27001,
-            category: "Organization of Information Security".into(),
-            implementation_guidance: "Document RACI matrix for security roles; assign a CISO or equivalent; define security responsibilities in job descriptions.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument],
-            mappings: vec![
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC2.1".into() },
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC3.1".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "A.8.1.1".into(),
-            title: "Inventory of Assets".into(),
-            description: "Assets associated with information and information processing facilities shall be identified and an inventory of these assets shall be drawn up and maintained.".into(),
-            framework: Framework::Iso27001,
-            category: "Asset Management".into(),
-            implementation_guidance: "Maintain an up-to-date asset inventory including hardware, software, data, and services.".into(),
-            evidence_types: vec![EvidenceType::ConfigSnapshot, EvidenceType::AuditLog],
-            mappings: vec![],
-            created_at: now,
-        },
-        Control {
-            id: "A.9.1.1".into(),
-            title: "Access Control Policy".into(),
-            description: "An access control policy shall be established, documented and reviewed based on business and information security requirements.".into(),
-            framework: Framework::Iso27001,
-            category: "Access Control".into(),
-            implementation_guidance: "Define and document an access control policy covering least privilege, need-to-know, and segregation of duties.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::AccessLog],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC6.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.9.2.1".into(),
-            title: "User Registration and De-registration".into(),
-            description: "A formal user registration and de-registration process shall be implemented to enable assignment of access rights.".into(),
-            framework: Framework::Iso27001,
-            category: "Access Control".into(),
-            implementation_guidance: "Implement onboarding/offboarding procedures; automate user provisioning and de-provisioning.".into(),
-            evidence_types: vec![EvidenceType::AccessLog, EvidenceType::AuditLog],
-            mappings: vec![
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC6.2".into() },
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC6.3".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "A.9.4.1".into(),
-            title: "Information Access Restriction".into(),
-            description: "Access to information and application system functions shall be restricted in accordance with the access control policy.".into(),
-            framework: Framework::Iso27001,
-            category: "Access Control".into(),
-            implementation_guidance: "Implement application-level access controls, enforce least privilege, review access rights regularly.".into(),
-            evidence_types: vec![EvidenceType::AccessLog, EvidenceType::ConfigSnapshot],
-            mappings: vec![
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC6.1".into() },
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC6.3".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "A.10.1.1".into(),
-            title: "Policy on Cryptographic Controls".into(),
-            description: "A policy on the use of cryptographic controls for protection of information shall be developed and implemented.".into(),
-            framework: Framework::Iso27001,
-            category: "Cryptography".into(),
-            implementation_guidance: "Document encryption standards, key management procedures, and approved algorithms.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::ConfigSnapshot],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "C1.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.11.1.1".into(),
-            title: "Physical Security Perimeter".into(),
-            description: "Security perimeters shall be defined and used to protect areas that contain either sensitive or critical information and information processing facilities.".into(),
-            framework: Framework::Iso27001,
-            category: "Physical and Environmental Security".into(),
-            implementation_guidance: "Define physical security zones, implement badge access, CCTV, and visitor management.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::AuditLog],
-            mappings: vec![],
-            created_at: now,
-        },
-        Control {
-            id: "A.12.1.1".into(),
-            title: "Documented Operating Procedures".into(),
-            description: "Operating procedures shall be documented and made available to all users who need them.".into(),
-            framework: Framework::Iso27001,
-            category: "Operations Security".into(),
-            implementation_guidance: "Document runbooks, playbooks, and operating procedures; make them accessible to relevant staff.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC5.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.12.6.1".into(),
-            title: "Management of Technical Vulnerabilities".into(),
-            description: "Information about technical vulnerabilities of information systems being used shall be obtained in a timely fashion.".into(),
-            framework: Framework::Iso27001,
-            category: "Operations Security".into(),
-            implementation_guidance: "Implement vulnerability scanning, patch management process, and track remediation SLAs.".into(),
-            evidence_types: vec![EvidenceType::ScanResult, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC7.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.13.1.1".into(),
-            title: "Network Controls".into(),
-            description: "Networks shall be managed and controlled to protect information in systems and applications.".into(),
-            framework: Framework::Iso27001,
-            category: "Communications Security".into(),
-            implementation_guidance: "Implement network segmentation, firewalls, IDS/IPS, and network monitoring.".into(),
-            evidence_types: vec![EvidenceType::ConfigSnapshot, EvidenceType::ScanResult],
-            mappings: vec![],
-            created_at: now,
-        },
-        Control {
-            id: "A.14.2.1".into(),
-            title: "Secure Development Policy".into(),
-            description: "Rules for the development of software and systems shall be established and applied to developments within the organization.".into(),
-            framework: Framework::Iso27001,
-            category: "System Acquisition, Development and Maintenance".into(),
-            implementation_guidance: "Define secure SDLC, code review requirements, security testing gates, and dependency scanning.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::ScanResult],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC8.1".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.16.1.1".into(),
-            title: "Responsibilities and Procedures for Incident Management".into(),
-            description: "Management responsibilities and procedures shall be established to ensure a quick, effective, and orderly response to information security incidents.".into(),
-            framework: Framework::Iso27001,
-            category: "Information Security Incident Management".into(),
-            implementation_guidance: "Define incident response plan, roles, escalation paths, and post-incident review procedures.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::IncidentReport],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC7.2".into() }],
-            created_at: now,
-        },
-        Control {
-            id: "A.17.1.1".into(),
-            title: "Planning Information Security Continuity".into(),
-            description: "The organization shall determine its requirements for information security and the continuity of information security management in adverse situations.".into(),
-            framework: Framework::Iso27001,
-            category: "Business Continuity Management".into(),
-            implementation_guidance: "Develop BCP/DR plans, conduct tabletop exercises, test recovery procedures annually.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::SecurityAssessment],
-            mappings: vec![
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "A1.1".into() },
-                ControlMapping { framework: Framework::Soc2TypeII, control_id: "A1.2".into() },
-            ],
-            created_at: now,
-        },
-        Control {
-            id: "A.18.1.1".into(),
-            title: "Identification of Applicable Legislation and Contractual Requirements".into(),
-            description: "All relevant legislative, statutory, regulatory, and contractual requirements and the organization's approach to meet these requirements shall be explicitly identified.".into(),
-            framework: Framework::Iso27001,
-            category: "Compliance".into(),
-            implementation_guidance: "Maintain a legal/regulatory register; assign compliance owners; conduct regular compliance reviews.".into(),
-            evidence_types: vec![EvidenceType::PolicyDocument, EvidenceType::AuditLog],
-            mappings: vec![ControlMapping { framework: Framework::Soc2TypeII, control_id: "CC9.1".into() }],
-            created_at: now,
-        },
-    ]
+pub fn cis_kubernetes_framework() -> ComplianceFramework {
+    let fw_id = Uuid::new_v4();
+    let controls = vec![
+        make_control(fw_id, "CIS-1.1.1", "Ensure API server config file permissions", "Master Node Security Configuration", ControlSeverity::Critical, true, "check_apiserver_file_perms", "Set permissions to 600 on kube-apiserver.yaml"),
+        make_control(fw_id, "CIS-1.2.1", "Ensure anonymous auth is disabled", "API Server", ControlSeverity::High, true, "check_anonymous_auth", "Set --anonymous-auth=false on kube-apiserver"),
+        make_control(fw_id, "CIS-1.2.2", "Ensure basic auth is not used", "API Server", ControlSeverity::High, true, "check_basic_auth", "Remove --basic-auth-file from kube-apiserver"),
+        make_control(fw_id, "CIS-1.2.6", "Ensure AlwaysAdmit admission plugin is not set", "API Server", ControlSeverity::High, true, "check_always_admit", "Remove AlwaysAdmit from --enable-admission-plugins"),
+        make_control(fw_id, "CIS-1.2.9", "Ensure EventRateLimit admission plugin is set", "API Server", ControlSeverity::Medium, true, "check_event_rate_limit", "Add EventRateLimit to --enable-admission-plugins"),
+        make_control(fw_id, "CIS-2.1", "Ensure etcd is configured with TLS", "etcd", ControlSeverity::Critical, true, "check_etcd_tls", "Configure --cert-file and --key-file for etcd"),
+        make_control(fw_id, "CIS-3.1.1", "Ensure client cert auth not used for users", "Authentication and Authorization", ControlSeverity::High, false, "", "Use OIDC or similar for user authentication"),
+        make_control(fw_id, "CIS-4.1.1", "Ensure worker service account permissions", "Worker Node Configuration", ControlSeverity::High, true, "check_worker_sa", "Ensure service accounts are not over-privileged"),
+        make_control(fw_id, "CIS-5.1.1", "Ensure RBAC is enabled", "RBAC and Service Accounts", ControlSeverity::Critical, true, "check_rbac_enabled", "Set --authorization-mode=RBAC on kube-apiserver"),
+        make_control(fw_id, "CIS-5.2.1", "Minimize privileged containers", "Pod Security Standards", ControlSeverity::High, true, "check_privileged_pods", "Use Pod Security Admission to restrict privileged pods"),
+        make_control(fw_id, "CIS-5.2.2", "Minimize hostPID containers", "Pod Security Standards", ControlSeverity::High, true, "check_host_pid", "Restrict hostPID via admission policy"),
+        make_control(fw_id, "CIS-5.3.1", "Ensure network policies are in place", "Network Policies and CNI", ControlSeverity::Medium, true, "check_network_policies", "Apply default-deny NetworkPolicy in all namespaces"),
+        make_control(fw_id, "CIS-5.4.1", "Prefer Secrets as files over env vars", "Secrets Management", ControlSeverity::Medium, false, "", "Mount secrets as volumes, not environment variables"),
+        make_control(fw_id, "CIS-5.7.1", "Create administrative boundaries with namespaces", "General Policies", ControlSeverity::Low, false, "", "Use namespaces to segment workloads by team/environment"),
+    ];
+    ComplianceFramework {
+        id: fw_id,
+        name: "CIS Kubernetes Benchmark".to_string(),
+        kind: FrameworkKind::CisKubernetes,
+        version: "1.8.0".to_string(),
+        description: "CIS Kubernetes Benchmark security configuration guide".to_string(),
+        controls,
+        created_at: Utc::now(),
+    }
 }
 
-// ─── Aggregation helpers ──────────────────────────────────────────────────────
-
-pub fn all_controls() -> Vec<Control> {
-    let mut controls = soc2_controls();
-    controls.extend(iso27001_controls());
-    controls
+pub fn soc2_framework() -> ComplianceFramework {
+    let fw_id = Uuid::new_v4();
+    let controls = vec![
+        make_control(fw_id, "SOC2-CC6.1", "Logical and Physical Access Controls", "Common Criteria", ControlSeverity::High, true, "check_access_controls", "Implement RBAC and MFA for all privileged access"),
+        make_control(fw_id, "SOC2-CC6.2", "Prior to issuing access credentials", "Common Criteria", ControlSeverity::High, false, "", "Document access request and approval process"),
+        make_control(fw_id, "SOC2-CC6.6", "Logical access security measures", "Common Criteria", ControlSeverity::High, true, "check_network_restrictions", "Restrict network access to authorized IPs"),
+        make_control(fw_id, "SOC2-CC7.1", "Vulnerability scanning", "System Operations", ControlSeverity::Medium, true, "check_vuln_scanning", "Run regular vulnerability scans on all containers"),
+        make_control(fw_id, "SOC2-CC8.1", "Change management process", "Change Management", ControlSeverity::Medium, false, "", "Document all infrastructure changes with approval"),
+        make_control(fw_id, "SOC2-A1.2", "Availability performance monitoring", "Availability", ControlSeverity::Medium, true, "check_monitoring", "Monitor system availability and set SLOs"),
+    ];
+    ComplianceFramework {
+        id: fw_id,
+        name: "SOC 2 Type II".to_string(),
+        kind: FrameworkKind::Soc2,
+        version: "2017".to_string(),
+        description: "SOC 2 Trust Services Criteria for security, availability, and confidentiality".to_string(),
+        controls,
+        created_at: Utc::now(),
+    }
 }
 
-pub fn get_control(id: &str) -> Option<Control> {
-    all_controls().into_iter().find(|c| c.id == id)
+pub fn pci_dss_framework() -> ComplianceFramework {
+    let fw_id = Uuid::new_v4();
+    let controls = vec![
+        make_control(fw_id, "PCI-1.1", "Network security controls", "Build and Maintain a Secure Network", ControlSeverity::Critical, true, "check_network_segmentation", "Implement network segmentation for cardholder data"),
+        make_control(fw_id, "PCI-2.1", "Change default passwords", "Secure Configurations", ControlSeverity::Critical, true, "check_default_credentials", "Change all vendor-supplied default credentials"),
+        make_control(fw_id, "PCI-6.3", "Security vulnerabilities identified", "Develop and Maintain Secure Systems", ControlSeverity::High, true, "check_vuln_management", "Maintain a vulnerability management program"),
+        make_control(fw_id, "PCI-7.1", "Limit access to cardholder data", "Restrict Access", ControlSeverity::Critical, false, "", "Implement need-to-know access policy for cardholder data"),
+        make_control(fw_id, "PCI-8.2", "User identification and authentication", "Identify and Authenticate", ControlSeverity::High, true, "check_user_auth", "Assign unique IDs to all users"),
+        make_control(fw_id, "PCI-10.1", "Audit logs for all system components", "Track and Monitor Access", ControlSeverity::High, true, "check_audit_logging", "Enable audit logging for all access to cardholder data"),
+        make_control(fw_id, "PCI-11.3", "Regular penetration testing", "Test Security Systems", ControlSeverity::High, false, "", "Perform penetration testing annually"),
+    ];
+    ComplianceFramework {
+        id: fw_id,
+        name: "PCI DSS".to_string(),
+        kind: FrameworkKind::PciDss,
+        version: "4.0".to_string(),
+        description: "Payment Card Industry Data Security Standard".to_string(),
+        controls,
+        created_at: Utc::now(),
+    }
 }
 
-pub fn get_mappings(control_id: &str) -> Vec<ControlMapping> {
-    get_control(control_id)
-        .map(|c| c.mappings)
-        .unwrap_or_default()
+pub fn hipaa_framework() -> ComplianceFramework {
+    let fw_id = Uuid::new_v4();
+    let controls = vec![
+        make_control(fw_id, "HIPAA-164.308(a)(1)", "Security Management Process", "Administrative Safeguards", ControlSeverity::Critical, false, "", "Implement policies and procedures to prevent security violations"),
+        make_control(fw_id, "HIPAA-164.308(a)(5)", "Security Awareness Training", "Administrative Safeguards", ControlSeverity::Medium, false, "", "Implement security awareness and training program"),
+        make_control(fw_id, "HIPAA-164.312(a)(1)", "Access Control", "Technical Safeguards", ControlSeverity::Critical, true, "check_access_control", "Implement technical policies for ePHI access"),
+        make_control(fw_id, "HIPAA-164.312(b)", "Audit Controls", "Technical Safeguards", ControlSeverity::High, true, "check_hipaa_audit", "Implement audit controls for ePHI access"),
+        make_control(fw_id, "HIPAA-164.312(e)(1)", "Transmission Security", "Technical Safeguards", ControlSeverity::High, true, "check_encryption_transit", "Encrypt all ePHI in transit using TLS 1.2+"),
+        make_control(fw_id, "HIPAA-164.312(a)(2)(iv)", "Encryption at Rest", "Technical Safeguards", ControlSeverity::High, true, "check_encryption_rest", "Encrypt ePHI at rest"),
+    ];
+    ComplianceFramework {
+        id: fw_id,
+        name: "HIPAA".to_string(),
+        kind: FrameworkKind::Hipaa,
+        version: "2013".to_string(),
+        description: "Health Insurance Portability and Accountability Act Security Rule".to_string(),
+        controls,
+        created_at: Utc::now(),
+    }
+}
+
+fn make_control(framework_id: Uuid, id: &str, title: &str, category: &str, severity: ControlSeverity, automated: bool, check_fn: &str, remediation: &str) -> Control {
+    Control {
+        id: Uuid::new_v4(),
+        framework_id,
+        control_id: id.to_string(),
+        title: title.to_string(),
+        description: format!("{}: {}", id, title),
+        category: category.to_string(),
+        severity,
+        automated,
+        check_fn: if check_fn.is_empty() { None } else { Some(check_fn.to_string()) },
+        remediation: remediation.to_string(),
+        references: vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_builtin_frameworks_loaded() {
+        let fws = builtin_frameworks();
+        assert_eq!(fws.len(), 4);
+    }
+
+    #[test]
+    fn test_cis_has_controls() {
+        let cis = cis_kubernetes_framework();
+        assert!(!cis.controls.is_empty());
+        assert!(cis.controls.iter().any(|c| c.control_id == "CIS-5.1.1"));
+    }
+
+    #[test]
+    fn test_all_controls_have_remediation() {
+        for fw in builtin_frameworks() {
+            for ctrl in &fw.controls {
+                assert!(!ctrl.remediation.is_empty(), "Control {} has no remediation", ctrl.control_id);
+            }
+        }
+    }
 }

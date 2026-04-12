@@ -1,57 +1,67 @@
-//! Issue tracking & project management — replaces Jira/Linear/Plane.
-//!
-//! Replaces: Jira, Linear, Plane
-//! Developer-first issue tracking: sprints, kanban, roadmaps, automation.
+//! CAVE Tracker — Issue & project tracking engine.
+//! Replaces: Jira
+//! Features: Projects, boards, sprints, issues, workflows, custom fields, JQL-like queries.
 
-pub mod automation;
-pub mod board;
 pub mod models;
-pub mod roadmap;
+pub mod workflow;
+pub mod query;
+pub mod sprint;
+pub mod board;
+pub mod fields;
 pub mod routes;
-pub mod tracker;
 
 use axum::Router;
-use models::{Activity, Automation, BacklogItem, Board, Comment, Issue, Label, Project, Roadmap, Sprint, Workflow};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use uuid::Uuid;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+use models::*;
 
-/// All in-memory state for the tracker module.
-/// Each collection is independently locked for fine-grained concurrency.
+pub struct TrackerStore {
+    pub projects: HashMap<uuid::Uuid, Project>,
+    pub issues: HashMap<uuid::Uuid, Issue>,
+    pub sprints: HashMap<uuid::Uuid, Sprint>,
+    pub boards: HashMap<uuid::Uuid, Board>,
+    pub workflows: HashMap<uuid::Uuid, Workflow>,
+    pub custom_field_defs: HashMap<uuid::Uuid, CustomFieldDef>,
+    pub comments: HashMap<uuid::Uuid, Comment>,
+    pub attachments: HashMap<uuid::Uuid, Attachment>,
+    pub issue_links: HashMap<uuid::Uuid, IssueLink>,
+    pub time_logs: HashMap<uuid::Uuid, TimeLog>,
+    pub activity_events: Vec<ActivityEvent>,
+    pub notifications: Vec<Notification>,
+}
+
+impl Default for TrackerStore {
+    fn default() -> Self {
+        let mut store = TrackerStore {
+            projects: HashMap::new(),
+            issues: HashMap::new(),
+            sprints: HashMap::new(),
+            boards: HashMap::new(),
+            workflows: HashMap::new(),
+            custom_field_defs: HashMap::new(),
+            comments: HashMap::new(),
+            attachments: HashMap::new(),
+            issue_links: HashMap::new(),
+            time_logs: HashMap::new(),
+            activity_events: Vec::new(),
+            notifications: Vec::new(),
+        };
+        // Seed default workflow
+        let wf = workflow::default_scrum_workflow();
+        store.workflows.insert(wf.id, wf);
+        let kanban_wf = workflow::default_kanban_workflow();
+        store.workflows.insert(kanban_wf.id, kanban_wf);
+        store
+    }
+}
+
 pub struct TrackerState {
-    pub projects: Mutex<HashMap<Uuid, Project>>,
-    pub issues: Mutex<HashMap<Uuid, Issue>>,
-    pub sprints: Mutex<HashMap<Uuid, Sprint>>,
-    pub boards: Mutex<HashMap<Uuid, Board>>,
-    pub workflows: Mutex<HashMap<Uuid, Workflow>>,
-    pub comments: Mutex<HashMap<Uuid, Vec<Comment>>>,
-    pub activities: Mutex<HashMap<Uuid, Vec<Activity>>>,
-    pub labels: Mutex<HashMap<Uuid, Label>>,
-    pub automations: Mutex<Vec<Automation>>,
-    /// project_id → prioritized backlog (sorted by rank ascending).
-    pub backlogs: Mutex<HashMap<Uuid, Vec<BacklogItem>>>,
-    pub roadmaps: Mutex<HashMap<Uuid, Roadmap>>,
-    /// project_id → next issue sequence number.
-    pub issue_counters: Mutex<HashMap<Uuid, u64>>,
+    pub store: Arc<RwLock<TrackerStore>>,
 }
 
 impl Default for TrackerState {
     fn default() -> Self {
-        Self {
-            projects: Mutex::new(HashMap::new()),
-            issues: Mutex::new(HashMap::new()),
-            sprints: Mutex::new(HashMap::new()),
-            boards: Mutex::new(HashMap::new()),
-            workflows: Mutex::new(HashMap::new()),
-            comments: Mutex::new(HashMap::new()),
-            activities: Mutex::new(HashMap::new()),
-            labels: Mutex::new(HashMap::new()),
-            automations: Mutex::new(Vec::new()),
-            backlogs: Mutex::new(HashMap::new()),
-            roadmaps: Mutex::new(HashMap::new()),
-            issue_counters: Mutex::new(HashMap::new()),
-        }
+        Self { store: Arc::new(RwLock::new(TrackerStore::default())) }
     }
 }
 
