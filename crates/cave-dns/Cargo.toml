@@ -1,18 +1,35 @@
 [package]
 name = "cave-dns"
+<<<<<<< HEAD
 description = "DNS record management — replaces external-dns"
+=======
+description = "DNS server — CoreDNS replacement with all record types, zones, service discovery"
+>>>>>>> claude/dazzling-tesla
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+<<<<<<< HEAD
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+=======
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+>>>>>>> claude/dazzling-tesla
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+<<<<<<< HEAD
 reqwest = { workspace = true }
+=======
+
+[dev-dependencies]
+tokio = { workspace = true }
+>>>>>>> claude/dazzling-tesla
