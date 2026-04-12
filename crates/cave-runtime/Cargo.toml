@@ -23,6 +23,7 @@ cave-docs = { path = "../cave-docs" }
 cave-status = { path = "../cave-status" }
 cave-changelog = { path = "../cave-changelog" }
 cave-certs = { path = "../cave-certs" }
+cave-pg = { path = "../cave-pg" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }
