@@ -1,47 +1,74 @@
-//! TSDB compaction: downsampling and merge/dedup.
+//! Block compaction, downsampling, and retention helpers.
 
-#![allow(dead_code)]
+use crate::model::Sample;
 
-use std::collections::BTreeMap;
-use crate::model::{Sample, Timestamp, Value};
-
-/// Compact a series BTreeMap if it exceeds max_samples_per_series.
-/// Downsamples by averaging every N consecutive samples.
-pub fn compact(
-    series_map: &mut BTreeMap<Timestamp, Value>,
-    max_samples_per_series: usize,
-) {
-    if series_map.len() <= max_samples_per_series {
-        return;
+/// Downsample a series to a fixed resolution by averaging samples in each bucket.
+pub fn downsample_series(samples: &[Sample], resolution_ms: i64) -> Vec<Sample> {
+    if samples.is_empty() || resolution_ms <= 0 {
+        return samples.to_vec();
     }
-    let samples: Vec<(Timestamp, Value)> = series_map.iter().map(|(&t, &v)| (t, v)).collect();
-    let n = samples.len();
-    let factor = (n + max_samples_per_series - 1) / max_samples_per_series;
-    series_map.clear();
-    for chunk in samples.chunks(factor) {
-        let avg_ts: i64 = chunk.iter().map(|(t, _)| t).sum::<i64>() / chunk.len() as i64;
-        let avg_v: f64 = chunk.iter().map(|(_, v)| v).sum::<f64>() / chunk.len() as f64;
-        series_map.insert(avg_ts, avg_v);
+
+    let mut buckets: std::collections::BTreeMap<i64, Vec<f64>> = std::collections::BTreeMap::new();
+
+    for s in samples {
+        let bucket_ts = (s.timestamp_ms / resolution_ms) * resolution_ms;
+        buckets.entry(bucket_ts).or_default().push(s.value);
     }
+
+    buckets.into_iter()
+        .map(|(ts, values)| {
+            let avg = values.iter().sum::<f64>() / values.len() as f64;
+            Sample::new(ts, avg)
+        })
+        .collect()
 }
 
-/// Merge two sorted sample vecs, deduplicating by timestamp (prefer a's value).
-pub fn merge_series(a: Vec<Sample>, b: Vec<Sample>) -> Vec<Sample> {
-    let mut map: BTreeMap<Timestamp, Value> = BTreeMap::new();
-    for s in b {
-        map.insert(s.timestamp, s.value);
+/// Merge two sorted sample slices, deduplicating by timestamp (last write wins).
+pub fn merge_samples(a: &[Sample], b: &[Sample]) -> Vec<Sample> {
+    let mut out = Vec::with_capacity(a.len() + b.len());
+    let (mut i, mut j) = (0, 0);
+    while i < a.len() && j < b.len() {
+        match a[i].timestamp_ms.cmp(&b[j].timestamp_ms) {
+            std::cmp::Ordering::Less    => { out.push(a[i]); i += 1; }
+            std::cmp::Ordering::Greater => { out.push(b[j]); j += 1; }
+            std::cmp::Ordering::Equal   => { out.push(b[j]); i += 1; j += 1; } // b wins
+        }
     }
-    // a overwrites b for same timestamps
-    for s in a {
-        map.insert(s.timestamp, s.value);
-    }
-    map.into_iter().map(|(t, v)| Sample { timestamp: t, value: v }).collect()
+    out.extend_from_slice(&a[i..]);
+    out.extend_from_slice(&b[j..]);
+    out
 }
 
-/// Drop all samples older than cutoff_ms.
-pub fn enforce_retention(
-    series_map: &mut BTreeMap<Timestamp, Value>,
-    cutoff_ms: Timestamp,
-) {
-    series_map.retain(|&ts, _| ts >= cutoff_ms);
+/// Remove samples older than `cutoff_ms` from a sorted slice.
+pub fn apply_retention(samples: &mut Vec<Sample>, cutoff_ms: i64) {
+    let pos = samples.partition_point(|s| s.timestamp_ms < cutoff_ms);
+    samples.drain(..pos);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_downsample() {
+        let samples = vec![
+            Sample::new(0,      1.0),
+            Sample::new(1_000,  3.0),
+            Sample::new(5_000,  2.0),
+            Sample::new(6_000,  4.0),
+        ];
+        let ds = downsample_series(&samples, 5_000);
+        assert_eq!(ds.len(), 2);
+        assert_eq!(ds[0].value, 2.0); // avg(1, 3)
+        assert_eq!(ds[1].value, 3.0); // avg(2, 4)
+    }
+
+    #[test]
+    fn test_merge() {
+        let a = vec![Sample::new(1, 1.0), Sample::new(3, 3.0), Sample::new(5, 5.0)];
+        let b = vec![Sample::new(2, 2.0), Sample::new(3, 3.5), Sample::new(4, 4.0)];
+        let m = merge_samples(&a, &b);
+        assert_eq!(m.len(), 5);
+        assert_eq!(m[2].value, 3.5); // b wins at ts=3
+    }
 }

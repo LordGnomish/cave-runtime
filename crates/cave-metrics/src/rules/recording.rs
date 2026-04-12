@@ -1,48 +1,84 @@
-//! Recording rules.
+//! Recording rules: evaluate a PromQL expression and write back to TSDB.
 
-#![allow(dead_code)]
-
-use crate::error::{MetricsError, MetricsResult};
-use crate::model::Labels;
-use crate::promql::{Engine, EvalContext, QueryValue};
-use crate::promql::parser::parse;
+use crate::error::Result;
+use crate::model::{Labels, QueryResult, Sample};
+use crate::promql::{parse, Engine};
 use crate::tsdb::Tsdb;
+use std::sync::Arc;
 
+/// A recording rule: `record: <name>` with `expr: <promql>` and optional labels.
 #[derive(Debug, Clone)]
 pub struct RecordingRule {
     pub name: String,
     pub expr: String,
     pub labels: Labels,
-    pub interval_ms: u64,
 }
 
 impl RecordingRule {
-    pub async fn evaluate(&self, engine: &Engine, tsdb: &Tsdb, now_ms: i64) -> MetricsResult<()> {
-        let expr = parse(&self.expr)?;
-        let ctx = EvalContext::instant(now_ms);
-        let result = engine.eval_instant(&expr, &ctx, tsdb)?;
+    pub fn new(name: impl Into<String>, expr: impl Into<String>) -> Self {
+        Self { name: name.into(), expr: expr.into(), labels: Labels::new() }
+    }
+
+    pub fn with_labels(mut self, labels: Labels) -> Self {
+        self.labels = labels;
+        self
+    }
+
+    /// Evaluate the expression and write the result back to the TSDB.
+    pub fn evaluate(&self, engine: &Engine, tsdb: &Arc<Tsdb>, ts_ms: i64) -> Result<()> {
+        let ast = parse(&self.expr)?;
+        let result = engine.eval_instant(&ast, ts_ms)?;
+
         match result {
-            QueryValue::InstantVector(samples) => {
-                for s in samples {
-                    // Build labels: start with rule labels, overlay with series labels, set __name__
-                    let mut combined = self.labels.0.clone();
-                    for (k, v) in &s.labels.0 {
-                        if k != "__name__" {
-                            combined.insert(k.clone(), v.clone());
-                        }
+            QueryResult::InstantVector(iv) => {
+                for (mut labels, value) in iv {
+                    // Set the __name__ to the recording rule name and merge extra labels.
+                    labels.insert("__name__", &self.name);
+                    for (k, v) in self.labels.iter() {
+                        labels.insert(k, v);
                     }
-                    combined.insert("__name__".to_string(), self.name.clone());
-                    let labels = Labels(combined);
-                    tsdb.append(labels, now_ms, s.value)?;
+                    tsdb.append(labels, Sample::new(ts_ms, value));
                 }
             }
-            QueryValue::Scalar(v) => {
-                let mut lbls = self.labels.0.clone();
-                lbls.insert("__name__".to_string(), self.name.clone());
-                tsdb.append(Labels(lbls), now_ms, v)?;
+            QueryResult::Scalar(v) => {
+                let mut labels = self.labels.clone();
+                labels.insert("__name__", &self.name);
+                tsdb.append(labels, Sample::new(ts_ms, v));
             }
-            _ => return Err(MetricsError::Eval("recording rule must return vector or scalar".to_string())),
+            _ => {}
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsdb::{Tsdb, TsdbConfig};
+    use crate::model::LabelMatcher;
+
+    #[test]
+    fn test_recording_rule() {
+        let tsdb = Arc::new(Tsdb::default());
+        // Seed data
+        tsdb.append(
+            Labels::from_pairs([("__name__", "http_requests"), ("job", "api")]),
+            Sample::new(1000, 10.0),
+        );
+        tsdb.append(
+            Labels::from_pairs([("__name__", "http_requests"), ("job", "api")]),
+            Sample::new(2000, 20.0),
+        );
+
+        let engine = Engine::new(Arc::clone(&tsdb));
+        let rule = RecordingRule::new("job:http_requests:sum", "sum(http_requests)");
+        rule.evaluate(&engine, &tsdb, 2000).unwrap();
+
+        // Check the recorded series
+        let series = tsdb.select(
+            &[LabelMatcher::equal("__name__", "job:http_requests:sum")],
+            0, 3000,
+        );
+        assert!(!series.is_empty());
     }
 }

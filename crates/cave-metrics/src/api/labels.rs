@@ -1,22 +1,33 @@
-//! Label names and values API handlers.
+//! /api/v1/labels and /api/v1/label/{name}/values
 
+use axum::{extract::{Path, Query, State}, Json};
+use serde::Deserialize;
 use std::sync::Arc;
-use axum::{
-    extract::{Path, State},
-    response::Json,
-};
-use serde_json::{json, Value};
+use crate::model::LabelMatcher;
 use crate::state::MetricsState;
 
-pub async fn label_names(State(state): State<Arc<MetricsState>>) -> Json<Value> {
-    let names = state.tsdb.label_names();
-    Json(json!({"status":"success","data":names}))
+#[derive(Debug, Deserialize)]
+pub struct LabelParams {
+    #[serde(rename = "match[]")]
+    pub matchers: Option<Vec<String>>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+    pub limit: Option<u64>,
+}
+
+pub async fn list_labels(
+    State(state): State<Arc<MetricsState>>,
+    Query(_params): Query<LabelParams>,
+) -> Json<serde_json::Value> {
+    let names = state.tsdb.label_names(&[]);
+    Json(serde_json::json!({ "status": "success", "data": names }))
 }
 
 pub async fn label_values(
     State(state): State<Arc<MetricsState>>,
     Path(name): Path<String>,
-) -> Json<Value> {
-    let values = state.tsdb.label_values(&name);
-    Json(json!({"status":"success","data":values}))
+    Query(_params): Query<LabelParams>,
+) -> Json<serde_json::Value> {
+    let values = state.tsdb.label_values(&name, &[]);
+    Json(serde_json::json!({ "status": "success", "data": values }))
 }

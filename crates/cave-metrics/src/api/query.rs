@@ -1,134 +1,239 @@
-//! Instant and range query API handlers.
+//! /api/v1/query and /api/v1/query_range handlers.
 
-use std::sync::Arc;
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
-    response::Json,
+    Json,
 };
-use serde::Deserialize;
-use serde_json::{json, Value};
-use crate::promql::{parser::parse, EvalContext, QueryValue};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
+use crate::model::QueryResult;
+use crate::promql::parse;
 use crate::state::MetricsState;
 
-#[derive(Deserialize)]
+// ─── Request / response types ────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
 pub struct InstantQueryParams {
     pub query: String,
-    pub time: Option<f64>,
+    pub time: Option<String>,
+    pub timeout: Option<String>,
+    pub limit: Option<u64>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct RangeQueryParams {
     pub query: String,
-    pub start: f64,
-    pub end: f64,
-    pub step: f64,
+    pub start: String,
+    pub end: String,
+    pub step: String,
+    pub timeout: Option<String>,
+    pub limit: Option<u64>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct ExemplarParams {
+    pub query: String,
+    pub start: Option<String>,
+    pub end: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApiResponse<T: Serialize> {
+    pub status: String,
+    pub data: T,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "errorType")]
+    pub error_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warnings: Option<Vec<String>>,
+}
+
+impl<T: Serialize> ApiResponse<T> {
+    pub fn success(data: T) -> Self {
+        Self { status: "success".into(), data, error: None, error_type: None, warnings: None }
+    }
+}
+
+fn api_error(err_type: &str, msg: &str) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "error",
+        "errorType": err_type,
+        "error": msg,
+    }))
+}
+
+// ─── Handlers ────────────────────────────────────────────────────────────────
 
 pub async fn instant_query(
     State(state): State<Arc<MetricsState>>,
     Query(params): Query<InstantQueryParams>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let ts_ms = params.time
-        .map(|t| (t * 1000.0) as i64)
-        .unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
+) -> Json<serde_json::Value> {
+    let ts_ms = parse_time_param(params.time.as_deref()).unwrap_or_else(now_ms);
 
-    let expr = parse(&params.query).map_err(|e| {
-        (StatusCode::BAD_REQUEST, Json(json!({"status":"error","error":e.to_string()})))
-    })?;
-
-    let ctx = EvalContext {
-        timestamp_ms: ts_ms,
-        lookback_ms: 5 * 60 * 1000,
-        step_ms: 0,
-        start_ms: ts_ms,
-        end_ms: ts_ms,
+    let ast = match parse(&params.query) {
+        Ok(a) => a,
+        Err(e) => return api_error("bad_data", &e.to_string()),
     };
 
-    let result = state.engine.eval_instant(&expr, &ctx, &state.tsdb).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","error":e.to_string()})))
-    })?;
-
-    let data = format_instant_result(result, ts_ms);
-    Ok(Json(json!({"status":"success","data":data})))
+    match state.engine.eval_instant(&ast, ts_ms) {
+        Ok(result) => Json(serde_json::json!({
+            "status": "success",
+            "data": query_result_to_json(result, ts_ms),
+        })),
+        Err(e) => api_error("execution", &e.to_string()),
+    }
 }
 
 pub async fn range_query(
     State(state): State<Arc<MetricsState>>,
     Query(params): Query<RangeQueryParams>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let start_ms = (params.start * 1000.0) as i64;
-    let end_ms = (params.end * 1000.0) as i64;
-    let step_ms = (params.step * 1000.0) as i64;
-
-    let expr = parse(&params.query).map_err(|e| {
-        (StatusCode::BAD_REQUEST, Json(json!({"status":"error","error":e.to_string()})))
-    })?;
-
-    let ctx = EvalContext {
-        timestamp_ms: start_ms,
-        lookback_ms: step_ms.max(5 * 60 * 1000),
-        step_ms,
-        start_ms,
-        end_ms,
+) -> Json<serde_json::Value> {
+    let start_ms = match parse_time_param(Some(&params.start)) {
+        Some(t) => t,
+        None => return api_error("bad_data", "invalid start"),
+    };
+    let end_ms = match parse_time_param(Some(&params.end)) {
+        Some(t) => t,
+        None => return api_error("bad_data", "invalid end"),
+    };
+    let step_ms = match parse_duration_param(&params.step) {
+        Some(d) => d,
+        None => return api_error("bad_data", "invalid step"),
     };
 
-    let steps = state.engine.eval_range(&expr, &ctx, &state.tsdb).map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"status":"error","error":e.to_string()})))
-    })?;
+    let ast = match parse(&params.query) {
+        Ok(a) => a,
+        Err(e) => return api_error("bad_data", &e.to_string()),
+    };
 
-    // Build matrix format
-    let mut series_map: std::collections::HashMap<u64, (serde_json::Map<String, Value>, Vec<Value>)> = std::collections::HashMap::new();
-    for (ts, val) in steps {
-        if let QueryValue::InstantVector(iv) = val {
-            for s in iv {
-                let fp = s.labels.fingerprint();
-                let entry = series_map.entry(fp).or_insert_with(|| {
-                    let metric: serde_json::Map<String, Value> = s.labels.0.iter()
-                        .map(|(k, v)| (k.clone(), Value::String(v.clone())))
-                        .collect();
-                    (metric, Vec::new())
-                });
-                entry.1.push(json!([ts as f64 / 1000.0, s.value.to_string()]));
+    match state.engine.eval_range(&ast, start_ms, end_ms, step_ms) {
+        Ok(steps) => {
+            // Group by series fingerprint across steps
+            let mut series_map: std::collections::HashMap<u64, (crate::model::Labels, Vec<[serde_json::Value; 2]>)> = HashMap::new();
+            for (ts_ms, result) in steps {
+                if let QueryResult::InstantVector(iv) = result {
+                    for (labels, val) in iv {
+                        let fp = labels.fingerprint();
+                        let entry = series_map.entry(fp).or_insert_with(|| (labels, Vec::new()));
+                        entry.1.push([
+                            serde_json::json!(ts_ms as f64 / 1000.0),
+                            serde_json::json!(val.to_string()),
+                        ]);
+                    }
+                }
             }
-        }
-    }
 
-    let result: Vec<Value> = series_map.into_values().map(|(metric, values)| {
-        json!({"metric": metric, "values": values})
-    }).collect();
-
-    Ok(Json(json!({
-        "status": "success",
-        "data": {
-            "resultType": "matrix",
-            "result": result
-        }
-    })))
-}
-
-fn format_instant_result(val: QueryValue, ts_ms: i64) -> Value {
-    match val {
-        QueryValue::InstantVector(iv) => {
-            let result: Vec<Value> = iv.into_iter().map(|s| {
-                let metric: serde_json::Map<String, Value> = s.labels.0.into_iter()
-                    .map(|(k, v)| (k, Value::String(v)))
-                    .collect();
-                json!({
-                    "metric": metric,
-                    "value": [s.timestamp as f64 / 1000.0, s.value.to_string()]
+            let result_vec: Vec<serde_json::Value> = series_map.into_values().map(|(labels, values)| {
+                serde_json::json!({
+                    "metric": labels.0,
+                    "values": values,
                 })
             }).collect();
-            json!({"resultType": "vector", "result": result})
+
+            Json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "resultType": "matrix",
+                    "result": result_vec,
+                }
+            }))
         }
-        QueryValue::Scalar(n) => {
-            json!({"resultType": "scalar", "result": [ts_ms as f64 / 1000.0, n.to_string()]})
+        Err(e) => api_error("execution", &e.to_string()),
+    }
+}
+
+pub async fn exemplars(Query(_params): Query<ExemplarParams>) -> Json<serde_json::Value> {
+    // Exemplars not yet stored; return empty result.
+    Json(serde_json::json!({ "status": "success", "data": [] }))
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+fn query_result_to_json(result: QueryResult, ts_ms: i64) -> serde_json::Value {
+    match result {
+        QueryResult::Scalar(v) => serde_json::json!({
+            "resultType": "scalar",
+            "result": [ts_ms as f64 / 1000.0, v.to_string()],
+        }),
+        QueryResult::String(s) => serde_json::json!({
+            "resultType": "string",
+            "result": [ts_ms as f64 / 1000.0, s],
+        }),
+        QueryResult::InstantVector(iv) => {
+            let result: Vec<serde_json::Value> = iv.into_iter().map(|(labels, val)| {
+                serde_json::json!({
+                    "metric": labels.0,
+                    "value": [ts_ms as f64 / 1000.0, val.to_string()],
+                })
+            }).collect();
+            serde_json::json!({ "resultType": "vector", "result": result })
         }
-        QueryValue::Str(s) => {
-            json!({"resultType": "string", "result": [ts_ms as f64 / 1000.0, s]})
-        }
-        QueryValue::RangeVector(_) => {
-            json!({"resultType": "matrix", "result": []})
+        QueryResult::RangeVector(rv) => {
+            let result: Vec<serde_json::Value> = rv.into_iter().map(|(labels, samps)| {
+                let values: Vec<serde_json::Value> = samps.iter().map(|s| {
+                    serde_json::json!([s.timestamp_ms as f64 / 1000.0, s.value.to_string()])
+                }).collect();
+                serde_json::json!({ "metric": labels.0, "values": values })
+            }).collect();
+            serde_json::json!({ "resultType": "matrix", "result": result })
         }
     }
+}
+
+/// Parse a time parameter: Unix seconds (float) or RFC3339.
+fn parse_time_param(s: Option<&str>) -> Option<i64> {
+    let s = s?;
+    if let Ok(f) = s.parse::<f64>() {
+        return Some((f * 1000.0) as i64);
+    }
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        return Some(dt.timestamp_millis());
+    }
+    None
+}
+
+/// Parse a duration parameter: seconds (float) or Prometheus duration string.
+fn parse_duration_param(s: &str) -> Option<i64> {
+    if let Ok(f) = s.parse::<f64>() {
+        return Some((f * 1000.0) as i64);
+    }
+    // Prometheus duration: 15s, 1m, 5m, 1h, 1d, etc.
+    parse_prometheus_duration(s)
+}
+
+fn parse_prometheus_duration(s: &str) -> Option<i64> {
+    let mut total_ms: i64 = 0;
+    let mut num_buf = String::new();
+    for c in s.chars() {
+        if c.is_ascii_digit() {
+            num_buf.push(c);
+        } else {
+            let n: i64 = num_buf.parse().ok()?;
+            num_buf.clear();
+            let ms = match c {
+                's' => n * 1_000,
+                'm' => n * 60_000,
+                'h' => n * 3_600_000,
+                'd' => n * 86_400_000,
+                'w' => n * 604_800_000,
+                'y' => n * 31_536_000_000,
+                _   => return None,
+            };
+            total_ms += ms;
+        }
+    }
+    if total_ms == 0 && !num_buf.is_empty() {
+        return num_buf.parse::<i64>().ok().map(|n| n * 1000);
+    }
+    if total_ms > 0 { Some(total_ms) } else { None }
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64
 }
