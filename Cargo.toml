@@ -43,6 +43,8 @@ members = [
     "crates/cave-pam",
     # === Runtime Binary ===
     "crates/cave-runtime",
+    # === CLI ===
+    "crates/cave-cli",
     # === Upstream Tracker ===
     "crates/cave-upstream",
 ]
