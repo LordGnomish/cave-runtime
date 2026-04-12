@@ -10,6 +10,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
-thiserror = { workspace = true }
-config = { workspace = true }
-tracing = { workspace = true }
+thiserror     = { workspace = true }
+anyhow        = { workspace = true }
+config        = { workspace = true }
+tracing       = { workspace = true }
+tokio-postgres = { workspace = true }
