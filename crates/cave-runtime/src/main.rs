@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let vault_state = cave_vault::VaultState::new();
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
@@ -58,6 +59,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+        // Vault engine
+        .merge(cave_vault::router(vault_state))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
