@@ -86,6 +86,7 @@ members = [
     # === Phase 5: Developer Experience ===
     # === Platform ===
     # === Infrastructure ===
+    # === Infrastructure-as-Code ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===

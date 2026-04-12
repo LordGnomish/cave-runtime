@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/interesting-khorana
 //! LLM-powered planner — generate, optimize, cost-estimate, risk-score plans.
 //!
 //! In production `generate_plan` sends the intent + state diff to a local LLM
@@ -240,6 +243,7 @@ fn monthly_cost(resource_type: &str) -> f64 {
         "virtual_machine" => 25.0,
         "object_storage" => 5.0,
         _ => 20.0,
+<<<<<<< HEAD
 =======
 //! LLM infrastructure planner — turns a parsed intent into an actionable plan.
 
@@ -502,5 +506,7 @@ mod tests {
         assert_eq!(plan.resource_count(), 2);
         assert!((plan.total_estimated_cost() - 20.0).abs() < f64::EPSILON);
 >>>>>>> claude/great-sanderson
+=======
+>>>>>>> claude/interesting-khorana
     }
 }
