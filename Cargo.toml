@@ -55,6 +55,7 @@ members = [
     "crates/cave-gateway",
     "crates/cave-artifacts",
     "crates/cave-tracker",
+    "crates/cave-streams",
     "crates/cave-registry",
     "crates/cave-workflows",
     "crates/cave-scan",
