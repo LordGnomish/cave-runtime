@@ -30,6 +30,9 @@ members = [
     "crates/cave-slo",
     "crates/cave-alerts",
     "crates/cave-profiler",
+    # === Data Services ===
+    "crates/cave-cache",
+    "crates/cave-store",
     # === Phase 4: Heavy Hitters ===
     "crates/cave-registry",
     "crates/cave-workflows",

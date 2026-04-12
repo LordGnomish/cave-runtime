@@ -45,8 +45,10 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let cache_state = Arc::new(cave_cache::CacheState::new());
+    let store_state = Arc::new(cave_store::StoreState::new());
 
-    // Build the unified router with all Phase 1 modules
+    // Build the unified router with all Phase 1 modules + data services
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
@@ -58,6 +60,9 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+        // Data services
+        .merge(cave_cache::router(cache_state))
+        .merge(cave_store::router(store_state))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
@@ -68,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!(port = port, "CAVE Runtime listening");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Data services: cache (Redis replacement), store (MinIO replacement)");
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -97,6 +103,8 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+            "cache": true,
+            "store": true,
         }
     }))
 }
