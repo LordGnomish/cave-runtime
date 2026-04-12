@@ -36,6 +36,24 @@ pub enum MeshError {
 
     #[error("invalid configuration: {0}")]
     InvalidConfig(String),
+
+    #[error("xDS error: {0}")]
+    Xds(String),
+
+    #[error("SPIFFE / certificate error: {0}")]
+    Spiffe(String),
+
+    #[error("telemetry configuration error: {0}")]
+    Telemetry(String),
+
+    #[error("multi-cluster error: {0}")]
+    MultiCluster(String),
+
+    #[error("EnvoyFilter patch error: {0}")]
+    EnvoyFilter(String),
+
+    #[error("timeout: {0}")]
+    Timeout(String),
 }
 
 pub type MeshResult<T> = Result<T, MeshError>;

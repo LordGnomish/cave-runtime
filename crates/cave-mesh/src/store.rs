@@ -1,23 +1,23 @@
 //! Mesh resource store — in-memory with optional cave-db persistence.
 //!
-//! All mesh resources (VS, DR, Gateway, ServiceEntry, PeerAuthentication,
-//! RequestAuthentication, AuthorizationPolicy, RateLimitPolicy) are stored
-//! in-memory for low-latency access and optionally persisted to PostgreSQL
-//! via cave-db so they survive restarts.
-//!
-//! The `MeshStorage` trait defines the persistence interface; `DbMeshStorage`
-//! implements it using cave-db's `CavePool`.
+//! Persists: VS, DR, Gateway, ServiceEntry, PeerAuthentication,
+//! RequestAuthentication, AuthorizationPolicy, RateLimitPolicy,
+//! Sidecar, EnvoyFilter, WorkloadGroup, WorkloadEntry, Telemetry.
 
 use crate::{
     auth::AuthEngine,
     error::{MeshError, MeshResult},
     models::{
-        AuthorizationPolicy, DestinationRule, Gateway, PeerAuthentication, RateLimitPolicy,
-        RequestAuthentication, ServiceEntry, VirtualService,
+        AuthorizationPolicy, DestinationRule, EnvoyFilter, Gateway, PeerAuthentication,
+        RateLimitPolicy, RequestAuthentication, ServiceEntry, Sidecar, Telemetry, VirtualService,
+        WorkloadEntry, WorkloadGroup,
     },
     mtls::MtlsManager,
     rate_limit::RateLimiter,
+    sidecar::{EnvoyFilterManager, SidecarManager, WorkloadGroupManager},
+    telemetry::TelemetryManager,
     traffic::TrafficManager,
+    MeshState,
 };
 use cave_db::{migrate::run_migrations, CavePool};
 use std::sync::Arc;
@@ -27,10 +27,6 @@ use tracing::{error, info};
 // MeshStorage trait
 // ─────────────────────────────────────────────────────────────
 
-/// Persistence interface for mesh resources.
-///
-/// Implemented by `DbMeshStorage` (backed by cave-db / PostgreSQL) and
-/// optionally by a no-op in-memory variant for testing.
 pub trait MeshStorage: Send + Sync {
     fn save_virtual_service(
         &self,
@@ -99,6 +95,46 @@ pub trait MeshStorage: Send + Sync {
     fn load_rate_limit_policies(
         &self,
     ) -> impl std::future::Future<Output = MeshResult<Vec<RateLimitPolicy>>> + Send;
+
+    fn save_sidecar(
+        &self,
+        sc: &Sidecar,
+    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
+    fn load_sidecars(
+        &self,
+    ) -> impl std::future::Future<Output = MeshResult<Vec<Sidecar>>> + Send;
+
+    fn save_envoy_filter(
+        &self,
+        ef: &EnvoyFilter,
+    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
+    fn load_envoy_filters(
+        &self,
+    ) -> impl std::future::Future<Output = MeshResult<Vec<EnvoyFilter>>> + Send;
+
+    fn save_workload_group(
+        &self,
+        wg: &WorkloadGroup,
+    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
+    fn load_workload_groups(
+        &self,
+    ) -> impl std::future::Future<Output = MeshResult<Vec<WorkloadGroup>>> + Send;
+
+    fn save_workload_entry(
+        &self,
+        we: &WorkloadEntry,
+    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
+    fn load_workload_entries(
+        &self,
+    ) -> impl std::future::Future<Output = MeshResult<Vec<WorkloadEntry>>> + Send;
+
+    fn save_telemetry(
+        &self,
+        t: &Telemetry,
+    ) -> impl std::future::Future<Output = MeshResult<()>> + Send;
+    fn load_telemetries(
+        &self,
+    ) -> impl std::future::Future<Output = MeshResult<Vec<Telemetry>>> + Send;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -107,54 +143,64 @@ pub trait MeshStorage: Send + Sync {
 
 const MODULE: &str = "mesh";
 
-/// SQL migrations for the cave_mesh schema.
 const MIGRATIONS: &[(i32, &str)] = &[(
     1,
     r#"
     CREATE TABLE IF NOT EXISTS virtual_services (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS destination_rules (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS gateways (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS service_entries (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS peer_authentications (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS request_authentications (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS authz_policies (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS rate_limit_policies (
-        key         TEXT PRIMARY KEY,
-        data        JSONB NOT NULL,
-        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS sidecars (
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS envoy_filters (
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS workload_groups (
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS workload_entries (
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS telemetries (
+        key TEXT PRIMARY KEY, data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     "#,
 )];
 
-/// cave-db backed implementation of `MeshStorage`.
 pub struct DbMeshStorage {
     pool: Arc<CavePool>,
 }
@@ -208,7 +254,7 @@ impl DbMeshStorage {
         Ok(results)
     }
 
-    async fn delete(&self, table: &str, key: &str) -> MeshResult<()> {
+    async fn delete_by_key(&self, table: &str, key: &str) -> MeshResult<()> {
         let client = self
             .pool
             .get()
@@ -225,17 +271,17 @@ impl DbMeshStorage {
 
 impl MeshStorage for DbMeshStorage {
     async fn save_virtual_service(&self, vs: &VirtualService) -> MeshResult<()> {
-        self.upsert("virtual_services", &vs.hosts[0], vs).await
+        self.upsert("virtual_services", &format!("{}/{}", vs.namespace, vs.name), vs).await
     }
     async fn load_virtual_services(&self) -> MeshResult<Vec<VirtualService>> {
         self.load_all("virtual_services").await
     }
     async fn delete_virtual_service(&self, host: &str) -> MeshResult<()> {
-        self.delete("virtual_services", host).await
+        self.delete_by_key("virtual_services", host).await
     }
 
     async fn save_destination_rule(&self, dr: &DestinationRule) -> MeshResult<()> {
-        self.upsert("destination_rules", &dr.host, dr).await
+        self.upsert("destination_rules", &format!("{}/{}", dr.namespace, dr.name), dr).await
     }
     async fn load_destination_rules(&self) -> MeshResult<Vec<DestinationRule>> {
         self.load_all("destination_rules").await
@@ -256,36 +302,22 @@ impl MeshStorage for DbMeshStorage {
     }
 
     async fn save_peer_authentication(&self, pa: &PeerAuthentication) -> MeshResult<()> {
-        self.upsert(
-            "peer_authentications",
-            &format!("{}/{}", pa.namespace, pa.name),
-            pa,
-        )
-        .await
+        self.upsert("peer_authentications", &format!("{}/{}", pa.namespace, pa.name), pa).await
     }
     async fn load_peer_authentications(&self) -> MeshResult<Vec<PeerAuthentication>> {
         self.load_all("peer_authentications").await
     }
 
     async fn save_request_authentication(&self, ra: &RequestAuthentication) -> MeshResult<()> {
-        self.upsert(
-            "request_authentications",
-            &format!("{}/{}", ra.namespace, ra.name),
-            ra,
-        )
-        .await
+        self.upsert("request_authentications", &format!("{}/{}", ra.namespace, ra.name), ra).await
     }
     async fn load_request_authentications(&self) -> MeshResult<Vec<RequestAuthentication>> {
         self.load_all("request_authentications").await
     }
 
     async fn save_authz_policy(&self, policy: &AuthorizationPolicy) -> MeshResult<()> {
-        self.upsert(
-            "authz_policies",
-            &format!("{}/{}", policy.namespace, policy.name),
-            policy,
-        )
-        .await
+        self.upsert("authz_policies", &format!("{}/{}", policy.namespace, policy.name), policy)
+            .await
     }
     async fn load_authz_policies(&self) -> MeshResult<Vec<AuthorizationPolicy>> {
         self.load_all("authz_policies").await
@@ -302,19 +334,55 @@ impl MeshStorage for DbMeshStorage {
     async fn load_rate_limit_policies(&self) -> MeshResult<Vec<RateLimitPolicy>> {
         self.load_all("rate_limit_policies").await
     }
+
+    async fn save_sidecar(&self, sc: &Sidecar) -> MeshResult<()> {
+        self.upsert("sidecars", &format!("{}/{}", sc.namespace, sc.name), sc).await
+    }
+    async fn load_sidecars(&self) -> MeshResult<Vec<Sidecar>> {
+        self.load_all("sidecars").await
+    }
+
+    async fn save_envoy_filter(&self, ef: &EnvoyFilter) -> MeshResult<()> {
+        self.upsert("envoy_filters", &format!("{}/{}", ef.namespace, ef.name), ef).await
+    }
+    async fn load_envoy_filters(&self) -> MeshResult<Vec<EnvoyFilter>> {
+        self.load_all("envoy_filters").await
+    }
+
+    async fn save_workload_group(&self, wg: &WorkloadGroup) -> MeshResult<()> {
+        self.upsert("workload_groups", &format!("{}/{}", wg.namespace, wg.name), wg).await
+    }
+    async fn load_workload_groups(&self) -> MeshResult<Vec<WorkloadGroup>> {
+        self.load_all("workload_groups").await
+    }
+
+    async fn save_workload_entry(&self, we: &WorkloadEntry) -> MeshResult<()> {
+        let key = format!(
+            "{}/{}",
+            we.namespace.as_deref().unwrap_or("default"),
+            we.name.as_deref().unwrap_or(&we.address)
+        );
+        self.upsert("workload_entries", &key, we).await
+    }
+    async fn load_workload_entries(&self) -> MeshResult<Vec<WorkloadEntry>> {
+        self.load_all("workload_entries").await
+    }
+
+    async fn save_telemetry(&self, t: &Telemetry) -> MeshResult<()> {
+        self.upsert("telemetries", &format!("{}/{}", t.namespace, t.name), t).await
+    }
+    async fn load_telemetries(&self) -> MeshResult<Vec<Telemetry>> {
+        self.load_all("telemetries").await
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
-// Boot loader — reload persisted state into in-memory engines
+// Boot loader
 // ─────────────────────────────────────────────────────────────
 
-/// Load all persisted mesh resources into the in-memory engines at startup.
 pub async fn load_persisted_state<S: MeshStorage>(
     storage: &S,
-    traffic: &TrafficManager,
-    mtls: &MtlsManager,
-    auth: &AuthEngine,
-    rate_limiter: &RateLimiter,
+    state: &MeshState,
 ) {
     macro_rules! load_or_warn {
         ($fut:expr, $label:expr) => {
@@ -329,22 +397,45 @@ pub async fn load_persisted_state<S: MeshStorage>(
     }
 
     for vs in load_or_warn!(storage.load_virtual_services(), "VirtualServices") {
-        traffic.upsert_virtual_service(vs);
+        state.traffic.upsert_virtual_service(vs);
     }
     for dr in load_or_warn!(storage.load_destination_rules(), "DestinationRules") {
-        traffic.upsert_destination_rule(dr);
+        state.traffic.upsert_destination_rule(dr);
     }
     for pa in load_or_warn!(storage.load_peer_authentications(), "PeerAuthentications") {
-        mtls.upsert_policy(pa);
+        state.mtls.upsert_policy(pa);
     }
     for ra in load_or_warn!(storage.load_request_authentications(), "RequestAuthentications") {
-        auth.upsert_request_auth(ra);
+        state.auth.upsert_request_auth(ra);
     }
     for ap in load_or_warn!(storage.load_authz_policies(), "AuthzPolicies") {
-        auth.upsert_authz_policy(ap);
+        state.auth.upsert_authz_policy(ap);
     }
     for rl in load_or_warn!(storage.load_rate_limit_policies(), "RateLimitPolicies") {
-        rate_limiter.upsert_policy(rl);
+        state.rate_limiter.upsert_policy(rl);
+    }
+    for sc in load_or_warn!(storage.load_sidecars(), "Sidecars") {
+        state.sidecar_mgr.upsert(sc);
+    }
+    for ef in load_or_warn!(storage.load_envoy_filters(), "EnvoyFilters") {
+        state.envoy_filter_mgr.upsert(ef);
+    }
+    for wg in load_or_warn!(storage.load_workload_groups(), "WorkloadGroups") {
+        state.workload_group_mgr.upsert_group(wg);
+    }
+    for we in load_or_warn!(storage.load_workload_entries(), "WorkloadEntries") {
+        state.workload_group_mgr.upsert_entry(we);
+    }
+    for t in load_or_warn!(storage.load_telemetries(), "Telemetries") {
+        state.telemetry_mgr.upsert(t);
+    }
+    for gw in load_or_warn!(storage.load_gateways(), "Gateways") {
+        let key = format!("{}/{}", gw.namespace, gw.name);
+        state.gateways.write().unwrap().insert(key, gw);
+    }
+    for se in load_or_warn!(storage.load_service_entries(), "ServiceEntries") {
+        let key = format!("{}/{}", se.namespace, se.name);
+        state.service_entries.write().unwrap().insert(key, se);
     }
 
     info!("Mesh state reloaded from persistent storage");
