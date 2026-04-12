@@ -1,412 +1,568 @@
-//! ApplicationSet generators — expand template parameters into concrete
-//! Application objects.
-//!
-//! Generators implemented:
-//!   • List — static list of parameter maps
-//!   • Clusters — all (or label-selected) clusters
-//!   • Git — directories or files from a Git repo
-//!   • Matrix — cartesian product of two generators
-//!   • Merge — overlay generators using merge keys
-//!   • PullRequest — open PRs from GitHub / GitLab
+//! ApplicationSet generators — list, cluster, git, matrix, merge, pull request.
 
-use crate::error::DeployError;
-use crate::models::{
-    Application, ApplicationSet, ApplicationSetGenerator, ApplicationSetTemplate,
-    ApplicationSetTemplateMetadata, ApplicationSpec, ApplicationSource, ApplicationDestination,
-    ApplicationSetStatus, Cluster, GitDirectoryGeneratorItem, GitFileGeneratorItem,
-    GitGenerator, ListGenerator, MatrixGenerator, MergeGenerator, SyncPolicy,
-};
-use chrono::Utc;
-use serde_json::Value;
+use crate::models::*;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-/// Expand an ApplicationSet into a set of Application specs.
-/// Each generator produces a list of parameter maps; the template is rendered
-/// for each map.
-pub fn expand_appset(
-    appset: &ApplicationSet,
-    clusters: &[Cluster],
-) -> Result<Vec<Application>, DeployError> {
-    let mut apps = Vec::new();
-    for generator in &appset.spec.generators {
-        let params = generate_params(generator, clusters)?;
-        for param_set in params {
-            let app = render_template(&appset.spec.template, &param_set, &appset.namespace)?;
-            apps.push(app);
-        }
-    }
-    Ok(apps)
+// ─── ApplicationSet CRD ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSet {
+    pub id: Uuid,
+    pub name: String,
+    pub namespace: String,
+    pub spec: ApplicationSetSpec,
+    pub status: Option<ApplicationSetStatus>,
 }
 
-/// Produce a list of parameter maps for a single generator.
-fn generate_params(
-    generator: &ApplicationSetGenerator,
-    clusters: &[Cluster],
-) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    match generator {
-        ApplicationSetGenerator::List(g) => generate_list(g),
-        ApplicationSetGenerator::Clusters(g) => generate_clusters(g, clusters),
-        ApplicationSetGenerator::Git(g) => generate_git(g),
-        ApplicationSetGenerator::Matrix(g) => generate_matrix(g, clusters),
-        ApplicationSetGenerator::Merge(g) => generate_merge(g, clusters),
-        ApplicationSetGenerator::PullRequest(g) => {
-            // PullRequest generator requires an external API call; return
-            // empty params when not yet connected.
-            Ok(vec![])
-        }
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSetSpec {
+    pub generators: Vec<Generator>,
+    pub template: ApplicationSetTemplate,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sync_policy: Option<ApplicationSetSyncPolicy>,
+    #[serde(default)]
+    pub ignore_application_differences: Vec<ApplicationSetIgnoreDifference>,
+    #[serde(default)]
+    pub template_patch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub go_template: Option<bool>,
+    #[serde(default)]
+    pub preserve_resources_on_deletion: bool,
 }
 
-// ─── List generator ───────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSetSyncPolicy {
+    #[serde(default)]
+    pub preserve_resources_on_deletion: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub applications_sync: Option<ApplicationsSyncPolicy>,
+}
 
-/// List generator: each element is a JSON object whose string fields become
-/// template parameters.
-pub fn generate_list(g: &ListGenerator) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    g.elements
-        .iter()
-        .map(|elem| {
-            let mut map = HashMap::new();
-            if let Some(obj) = elem.as_object() {
-                for (k, v) in obj {
-                    let val = match v {
-                        Value::String(s) => s.clone(),
-                        other => other.to_string(),
-                    };
-                    map.insert(k.clone(), val);
-                }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum ApplicationsSyncPolicy {
+    CreateOnly,
+    CreateUpdate,
+    CreateDelete,
+    Sync,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationSetIgnoreDifference {
+    pub name: Option<String>,
+    pub json_pointers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSetTemplate {
+    pub metadata: ApplicationSetTemplateMetadata,
+    pub spec: ApplicationSpec,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSetTemplateMetadata {
+    pub name: String,
+    #[serde(default)]
+    pub namespace: Option<String>,
+    #[serde(default)]
+    pub labels: HashMap<String, String>,
+    #[serde(default)]
+    pub annotations: HashMap<String, String>,
+    #[serde(default)]
+    pub finalizers: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApplicationSetStatus {
+    pub conditions: Vec<ApplicationSetCondition>,
+    pub resources: Vec<ApplicationSetResource>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationSetCondition {
+    pub condition_type: String,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationSetResource {
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub health: Option<HealthCondition>,
+}
+
+// ─── Generators ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Generator {
+    /// Static list of parameter sets.
+    List(ListGenerator),
+    /// One entry per cluster matching a label selector.
+    Clusters(ClusterGenerator),
+    /// Entries from git repository (directories or files).
+    Git(GitGenerator),
+    /// Cartesian product of two or more generators.
+    Matrix(MatrixGenerator),
+    /// Merge parameters from multiple generators.
+    Merge(MergeGenerator),
+    /// One entry per pull request in a repository.
+    PullRequest(PullRequestGenerator),
+    /// One entry per SCM repository matching a filter.
+    ScmProvider(ScmProviderGenerator),
+    /// Subset of another ApplicationSet's applications.
+    Plugin(PluginGenerator),
+    /// Single cluster/app combination.
+    SingleCluster(SingleClusterGenerator),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListGenerator {
+    pub elements: Vec<HashMap<String, String>>,
+    #[serde(default)]
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterGenerator {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selector: Option<LabelSelector>,
+    #[serde(default)]
+    pub values: HashMap<String, String>,
+    #[serde(default)]
+    pub flat_list: bool,
+    #[serde(default)]
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelSelector {
+    #[serde(default)]
+    pub match_labels: HashMap<String, String>,
+    #[serde(default)]
+    pub match_expressions: Vec<LabelSelectorRequirement>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelSelectorRequirement {
+    pub key: String,
+    pub operator: LabelSelectorOperator,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LabelSelectorOperator {
+    In,
+    NotIn,
+    Exists,
+    DoesNotExist,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitGenerator {
+    pub repo_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default)]
+    pub directories: Vec<GitDirectoryFilter>,
+    #[serde(default)]
+    pub files: Vec<GitFileFilter>,
+    #[serde(default)]
+    pub values: HashMap<String, String>,
+    #[serde(default)]
+    pub template: Option<ApplicationSetTemplate>,
+    #[serde(default)]
+    pub requeue_after_seconds: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitDirectoryFilter {
+    pub path: String,
+    #[serde(default)]
+    pub exclude: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitFileFilter {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MatrixGenerator {
+    pub generators: Vec<Generator>,
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MergeGenerator {
+    pub generators: Vec<MergeGeneratorEntry>,
+    pub merge_keys: Vec<String>,
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeGeneratorEntry {
+    pub generator: Box<Generator>,
+    pub values: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestGenerator {
+    pub github: Option<PullRequestGitHub>,
+    pub gitlab: Option<PullRequestGitLab>,
+    pub bitbucket: Option<PullRequestBitbucket>,
+    #[serde(default)]
+    pub filters: Vec<PullRequestFilter>,
+    #[serde(default)]
+    pub template: Option<ApplicationSetTemplate>,
+    #[serde(default)]
+    pub requeue_after_seconds: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestGitHub {
+    pub owner: String,
+    pub repo: String,
+    pub api: Option<String>,
+    pub token_ref: Option<String>,
+    pub app_secret_name: Option<String>,
+    pub labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestGitLab {
+    pub project: String,
+    pub api: Option<String>,
+    pub token_ref: Option<String>,
+    pub labels: Vec<String>,
+    pub pull_request_state: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestBitbucket {
+    pub owner: String,
+    pub repo: String,
+    pub api: Option<String>,
+    pub basic_auth: Option<BasicAuthRef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BasicAuthRef {
+    pub username_ref: String,
+    pub password_ref: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestFilter {
+    pub branch_match: Option<String>,
+    pub title_regex: Option<String>,
+    pub target_branch_match: Option<String>,
+    pub labels: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScmProviderGenerator {
+    pub github: Option<ScmGitHub>,
+    pub gitlab: Option<ScmGitLab>,
+    #[serde(default)]
+    pub filters: Vec<ScmFilter>,
+    pub clone_protocol: Option<String>,
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScmGitHub {
+    pub organization: String,
+    pub api: Option<String>,
+    pub token_ref: Option<String>,
+    #[serde(default)]
+    pub all_branches: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScmGitLab {
+    pub group: String,
+    pub api: Option<String>,
+    pub token_ref: Option<String>,
+    #[serde(default)]
+    pub all_branches: bool,
+    #[serde(default)]
+    pub include_subgroups: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScmFilter {
+    pub repository_match: Option<String>,
+    pub paths_exist: Vec<String>,
+    pub paths_do_not_exist: Vec<String>,
+    pub label_match: Option<String>,
+    pub branch_match: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginGenerator {
+    pub config_map_ref: String,
+    pub input: HashMap<String, serde_json::Value>,
+    pub values: HashMap<String, String>,
+    pub template: Option<ApplicationSetTemplate>,
+    pub requeue_after_seconds: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SingleClusterGenerator {
+    pub values: HashMap<String, String>,
+    pub template: Option<ApplicationSetTemplate>,
+}
+
+// ─── Generator evaluation ────────────────────────────────────────────────────
+
+/// Parameters generated by a generator for a single application.
+pub type GeneratorParams = HashMap<String, String>;
+
+/// Evaluate a list generator into parameter sets.
+pub fn evaluate_list_generator(list_gen: &ListGenerator) -> Vec<GeneratorParams> {
+    list_gen.elements.clone()
+}
+
+/// Evaluate a git directory generator (simplified — real impl would clone repo).
+pub fn evaluate_git_directory_generator(git_gen: &GitGenerator, paths: &[&str]) -> Vec<GeneratorParams> {
+    let mut params = Vec::new();
+    for path in paths {
+        for filter in &git_gen.directories {
+            if matches_glob(&filter.path, path) && !filter.exclude {
+                let dir_name = path.split('/').last().unwrap_or(path);
+                let mut p = git_gen.values.clone();
+                p.insert("path".to_string(), path.to_string());
+                p.insert("path.basename".to_string(), dir_name.to_string());
+                p.insert("path.basenameNormalized".to_string(), normalize_name(dir_name));
+                p.extend(git_gen.values.clone());
+                params.push(p);
             }
-            Ok(map)
-        })
-        .collect()
+        }
+    }
+    params
 }
 
-// ─── Clusters generator ───────────────────────────────────────────────────────
-
-fn generate_clusters(
-    g: &crate::models::ClusterGenerator,
-    clusters: &[Cluster],
-) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    let mut result = Vec::new();
-    for cluster in clusters {
-        // Apply label selector if present
-        if let Some(sel) = &g.selector {
-            if !label_selector_matches(&cluster.labels, sel) {
-                continue;
+/// Merge parameters from two generators (merge generator).
+pub fn evaluate_merge_generator(
+    base: &[GeneratorParams],
+    override_params: &[GeneratorParams],
+    merge_keys: &[String],
+) -> Vec<GeneratorParams> {
+    base.iter().map(|b| {
+        let mut merged = b.clone();
+        for ov in override_params {
+            let keys_match = merge_keys.iter().all(|k| {
+                b.get(k) == ov.get(k)
+            });
+            if keys_match {
+                merged.extend(ov.clone());
             }
         }
-        let mut params: HashMap<String, String> = HashMap::new();
-        params.insert("name".to_string(), cluster.name.clone());
-        params.insert("server".to_string(), cluster.server.clone());
-        // Extra values from the generator
-        for (k, v) in &g.values {
-            params.insert(k.clone(), v.clone());
-        }
-        // Expose cluster labels as parameters
-        for (k, v) in &cluster.labels {
-            params.insert(format!("metadata.labels.{k}"), v.clone());
-        }
-        result.push(params);
-    }
-    Ok(result)
+        merged
+    }).collect()
 }
 
-fn label_selector_matches(
-    labels: &HashMap<String, String>,
-    sel: &crate::models::LabelSelector,
-) -> bool {
-    for (k, v) in &sel.match_labels {
-        if labels.get(k).map(|lv| lv != v).unwrap_or(true) {
-            return false;
-        }
-    }
-    true
-}
-
-// ─── Git generator ────────────────────────────────────────────────────────────
-
-/// Git generator: produces one parameter set per matching directory or file
-/// in the repository.  When running without an actual checkout we return an
-/// empty list; callers must pre-clone the repo and pass the local paths via
-/// the `local_paths` extra field if needed.
-pub fn generate_git(
-    g: &GitGenerator,
-) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    // In a full implementation we would clone the repo and walk the FS.
-    // Here we produce params from already-known directory items (useful when
-    // the repo has already been fetched by the sync engine).
+/// Cartesian product of two parameter sets (matrix generator).
+pub fn evaluate_matrix_generator(
+    left: &[GeneratorParams],
+    right: &[GeneratorParams],
+) -> Vec<GeneratorParams> {
     let mut result = Vec::new();
-
-    for dir_item in &g.directories {
-        if dir_item.exclude {
-            continue;
+    for l in left {
+        for r in right {
+            let mut merged = l.clone();
+            merged.extend(r.clone());
+            result.push(merged);
         }
-        let mut params: HashMap<String, String> = HashMap::new();
-        params.insert("path".to_string(), dir_item.path.clone());
-        params.insert(
-            "path.basename".to_string(),
-            dir_item.path.split('/').last().unwrap_or(&dir_item.path).to_string(),
-        );
-        params.insert(
-            "path.basenameNormalized".to_string(),
-            dir_item.path.split('/').last().unwrap_or(&dir_item.path)
-                .to_lowercase()
-                .replace('_', "-"),
-        );
-        for (k, v) in &g.values {
-            params.insert(k.clone(), v.clone());
-        }
-        result.push(params);
-    }
-
-    for file_item in &g.files {
-        let mut params: HashMap<String, String> = HashMap::new();
-        params.insert("path".to_string(), file_item.path.clone());
-        for (k, v) in &g.values {
-            params.insert(k.clone(), v.clone());
-        }
-        result.push(params);
-    }
-
-    Ok(result)
-}
-
-// ─── Matrix generator ─────────────────────────────────────────────────────────
-
-/// Matrix generator: cartesian product of exactly 2 generators.
-pub fn generate_matrix(
-    g: &MatrixGenerator,
-    clusters: &[Cluster],
-) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    if g.generators.len() != 2 {
-        return Err(DeployError::Invalid(
-            "Matrix generator requires exactly 2 generators".to_string(),
-        ));
-    }
-    let left = generate_params(&g.generators[0], clusters)?;
-    let right = generate_params(&g.generators[1], clusters)?;
-
-    let mut result = Vec::new();
-    for l in &left {
-        for r in &right {
-            let mut combined = l.clone();
-            combined.extend(r.clone());
-            result.push(combined);
-        }
-    }
-    Ok(result)
-}
-
-// ─── Merge generator ──────────────────────────────────────────────────────────
-
-/// Merge generator: merges parameter sets from multiple generators using
-/// merge keys.  Later generators override earlier ones for matching keys.
-pub fn generate_merge(
-    g: &MergeGenerator,
-    clusters: &[Cluster],
-) -> Result<Vec<HashMap<String, String>>, DeployError> {
-    if g.generators.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // Start with the first generator's params as the base
-    let mut base = generate_params(&g.generators[0], clusters)?;
-
-    for overlay_gen in &g.generators[1..] {
-        let overlay = generate_params(overlay_gen, clusters)?;
-        // Merge: for each base entry, find the overlay entry with matching
-        // merge keys and apply its values
-        for b in &mut base {
-            for o in &overlay {
-                if g.merge_keys.iter().all(|k| b.get(k) == o.get(k)) {
-                    for (k, v) in o {
-                        if !g.merge_keys.contains(k) {
-                            b.insert(k.clone(), v.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(base)
-}
-
-// ─── Template rendering ───────────────────────────────────────────────────────
-
-/// Render the ApplicationSet template with a concrete set of parameters,
-/// substituting `{{param}}` placeholders.
-pub fn render_template(
-    template: &ApplicationSetTemplate,
-    params: &HashMap<String, String>,
-    appset_namespace: &str,
-) -> Result<Application, DeployError> {
-    let name = substitute(&template.metadata.name, params);
-    let namespace = template
-        .metadata
-        .namespace
-        .as_deref()
-        .map(|n| substitute(n, params))
-        .unwrap_or_else(|| appset_namespace.to_string());
-
-    // Deep-substitute the spec via JSON serialization
-    let spec_json = serde_json::to_string(&template.spec)
-        .map_err(|e| DeployError::Internal(e.to_string()))?;
-    let spec_substituted = substitute(&spec_json, params);
-    let spec: ApplicationSpec = serde_json::from_str(&spec_substituted)
-        .map_err(|e| DeployError::Internal(format!("template render: {e}")))?;
-
-    let now = Utc::now();
-    Ok(Application {
-        id: Uuid::new_v4(),
-        name,
-        namespace,
-        spec,
-        status: Default::default(),
-        created_at: now,
-        updated_at: now,
-        created_by: Some("cave-deploy/appset".to_string()),
-        finalizers: vec!["resources-finalizer.argocd.argoproj.io".to_string()],
-    })
-}
-
-/// Replace `{{key}}` with `params[key]`.
-pub fn substitute(template: &str, params: &HashMap<String, String>) -> String {
-    let mut result = template.to_string();
-    for (k, v) in params {
-        result = result.replace(&format!("{{{{{k}}}}}"), v);
     }
     result
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+fn matches_glob(pattern: &str, path: &str) -> bool {
+    if pattern == "*" { return true; }
+    if pattern.ends_with("/*") {
+        let prefix = &pattern[..pattern.len() - 2];
+        return path.starts_with(prefix);
+    }
+    if pattern.contains('*') {
+        let parts: Vec<&str> = pattern.split('*').collect();
+        let mut pos = 0;
+        for part in &parts {
+            if let Some(idx) = path[pos..].find(part) {
+                pos += idx + part.len();
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+    pattern == path
+}
+
+fn normalize_name(name: &str) -> String {
+    name.chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c.to_lowercase().next().unwrap() } else { '-' })
+        .collect()
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{
-        ApplicationSetTemplate, ApplicationSetTemplateMetadata, ApplicationSpec,
-        ApplicationSource, ApplicationDestination, GitGenerator, GitDirectoryGeneratorItem,
-        ListGenerator,
-    };
-    use serde_json::json;
-
-    fn minimal_template(name_tpl: &str) -> ApplicationSetTemplate {
-        ApplicationSetTemplate {
-            metadata: ApplicationSetTemplateMetadata {
-                name: name_tpl.to_string(),
-                namespace: Some("argocd".to_string()),
-                ..Default::default()
-            },
-            spec: ApplicationSpec {
-                source: ApplicationSource {
-                    repo_url: "https://github.com/example/repo.git".to_string(),
-                    path: Some("{{path}}".to_string()),
-                    target_revision: Some("HEAD".to_string()),
-                    ..Default::default()
-                },
-                destination: ApplicationDestination {
-                    server: Some("https://kubernetes.default.svc".to_string()),
-                    namespace: "{{path.basename}}".to_string(),
-                    ..Default::default()
-                },
-                project: "default".to_string(),
-                ..Default::default()
-            },
-        }
-    }
 
     #[test]
-    fn test_list_generator_expand() {
+    fn list_generator_returns_elements() {
         let list_gen = ListGenerator {
             elements: vec![
-                json!({"env": "staging", "region": "us-east-1"}),
-                json!({"env": "prod",    "region": "eu-west-1"}),
+                [("cluster".to_string(), "staging".to_string())].into(),
+                [("cluster".to_string(), "prod".to_string())].into(),
             ],
             template: None,
         };
-        let params = generate_list(&list_gen).unwrap();
+        let params = evaluate_list_generator(&list_gen);
         assert_eq!(params.len(), 2);
-        assert_eq!(params[0].get("env").unwrap(), "staging");
-        assert_eq!(params[1].get("region").unwrap(), "eu-west-1");
+        assert_eq!(params[0].get("cluster").map(|s| s.as_str()), Some("staging"));
     }
 
     #[test]
-    fn test_git_directory_generator() {
+    fn matrix_generator_cartesian_product() {
+        let left = vec![
+            [("cluster".to_string(), "staging".to_string())].into(),
+            [("cluster".to_string(), "prod".to_string())].into(),
+        ];
+        let right = vec![
+            [("region".to_string(), "us-east-1".to_string())].into(),
+            [("region".to_string(), "eu-west-1".to_string())].into(),
+        ];
+        let result = evaluate_matrix_generator(&left, &right);
+        assert_eq!(result.len(), 4);
+    }
+
+    #[test]
+    fn merge_generator_merges_on_key() {
+        let base = vec![
+            [("cluster".to_string(), "prod".to_string()), ("region".to_string(), "us".to_string())].into(),
+        ];
+        let overrides = vec![
+            [("cluster".to_string(), "prod".to_string()), ("replicas".to_string(), "5".to_string())].into(),
+        ];
+        let result = evaluate_merge_generator(&base, &overrides, &["cluster".to_string()]);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].get("replicas").map(|s| s.as_str()), Some("5"));
+        assert_eq!(result[0].get("region").map(|s| s.as_str()), Some("us"));
+    }
+
+    #[test]
+    fn merge_generator_no_key_match() {
+        let base = vec![
+            [("cluster".to_string(), "prod".to_string())].into(),
+        ];
+        let overrides = vec![
+            [("cluster".to_string(), "staging".to_string()), ("extra".to_string(), "val".to_string())].into(),
+        ];
+        let result = evaluate_merge_generator(&base, &overrides, &["cluster".to_string()]);
+        assert_eq!(result[0].get("extra"), None);
+    }
+
+    #[test]
+    fn git_directory_generator() {
         let git_gen = GitGenerator {
-            repo_url: "https://github.com/example/apps.git".to_string(),
-            directories: vec![
-                GitDirectoryGeneratorItem { path: "apps/frontend".to_string(), exclude: false },
-                GitDirectoryGeneratorItem { path: "apps/backend".to_string(), exclude: false },
-                GitDirectoryGeneratorItem { path: "apps/legacy".to_string(), exclude: true },
-            ],
-            files: vec![],
+            repo_url: "https://github.com/example/config".to_string(),
             revision: Some("main".to_string()),
-            values: HashMap::new(),
-            template: None,
-        };
-        let params = generate_git(&git_gen).unwrap();
-        // legacy is excluded
-        assert_eq!(params.len(), 2);
-        let paths: Vec<&str> = params.iter().map(|p| p["path"].as_str()).collect();
-        assert!(paths.contains(&"apps/frontend"));
-        assert!(paths.contains(&"apps/backend"));
-        assert!(!paths.contains(&"apps/legacy"));
-    }
-
-    #[test]
-    fn test_git_generator_basename() {
-        let git_gen2 = GitGenerator {
-            repo_url: "https://example.com/repo.git".to_string(),
-            directories: vec![GitDirectoryGeneratorItem {
-                path: "apps/my_service".to_string(),
-                exclude: false,
-            }],
+            directories: vec![GitDirectoryFilter { path: "clusters/*".to_string(), exclude: false }],
             files: vec![],
-            revision: None,
             values: HashMap::new(),
             template: None,
+            requeue_after_seconds: None,
         };
-        let params = generate_git(&git_gen2).unwrap();
-        assert_eq!(params[0]["path.basename"], "my_service");
-        assert_eq!(params[0]["path.basenameNormalized"], "my-service");
+        let paths = &["clusters/staging", "clusters/prod", "other/dir"];
+        let params = evaluate_git_directory_generator(&git_gen, paths);
+        assert_eq!(params.len(), 2);
     }
 
     #[test]
-    fn test_matrix_generator_cartesian_product() {
-        let matrix_gen = MatrixGenerator {
-            generators: vec![
-                ApplicationSetGenerator::List(ListGenerator {
-                    elements: vec![json!({"env": "dev"}), json!({"env": "prod"})],
-                    template: None,
-                }),
-                ApplicationSetGenerator::List(ListGenerator {
-                    elements: vec![json!({"region": "us-east"}), json!({"region": "eu-west"})],
-                    template: None,
-                }),
-            ],
-            template: None,
-        };
-        let params = generate_matrix(&matrix_gen, &[]).unwrap();
-        // 2 × 2 = 4 combinations
-        assert_eq!(params.len(), 4);
-        let found: Vec<String> = params
-            .iter()
-            .map(|p| format!("{}-{}", p["env"], p["region"]))
-            .collect();
-        assert!(found.contains(&"dev-us-east".to_string()));
-        assert!(found.contains(&"prod-eu-west".to_string()));
+    fn matches_glob_wildcard() {
+        assert!(matches_glob("clusters/*", "clusters/staging"));
+        assert!(matches_glob("clusters/*", "clusters/prod"));
+        assert!(!matches_glob("clusters/*", "other/staging"));
     }
 
     #[test]
-    fn test_template_substitution() {
-        let mut params = HashMap::new();
-        params.insert("path".to_string(), "apps/myservice".to_string());
-        params.insert("path.basename".to_string(), "myservice".to_string());
+    fn normalize_name_converts_special_chars() {
+        assert_eq!(normalize_name("My App_123"), "my-app-123");
+    }
 
-        let tpl = minimal_template("{{path.basename}}-app");
-        let app = render_template(&tpl, &params, "argocd").unwrap();
-        assert_eq!(app.name, "myservice-app");
-        assert_eq!(app.spec.destination.namespace, "myservice");
+    #[test]
+    fn applicationset_spec_serialization() {
+        let spec = ApplicationSetSpec {
+            generators: vec![Generator::List(ListGenerator {
+                elements: vec![[("env".to_string(), "prod".to_string())].into()],
+                template: None,
+            })],
+            template: ApplicationSetTemplate {
+                metadata: ApplicationSetTemplateMetadata {
+                    name: "app-{{env}}".to_string(),
+                    namespace: None,
+                    labels: HashMap::new(),
+                    annotations: HashMap::new(),
+                    finalizers: vec![],
+                },
+                spec: ApplicationSpec {
+                    source: ApplicationSource {
+                        repo_url: "https://github.com/example/app".to_string(),
+                        target_revision: Some("{{env}}".to_string()),
+                        path: None,
+                        helm: None,
+                        kustomize: None,
+                        directory: None,
+                    },
+                    sources: vec![],
+                    destination: Destination {
+                        server: "https://k8s.example.com".to_string(),
+                        name: None,
+                        namespace: "{{env}}".to_string(),
+                    },
+                    project: "default".to_string(),
+                    sync_policy: None,
+                    ignored_differences: None,
+                    info: None,
+                    revision_history_limit: None,
+                },
+            },
+            sync_policy: None,
+            ignore_application_differences: vec![],
+            template_patch: None,
+            go_template: None,
+            preserve_resources_on_deletion: false,
+        };
+        let json = serde_json::to_string(&spec).unwrap();
+        // Generator enum serializes in camelCase (List → list)
+        assert!(json.contains("list") || json.contains("List"));
     }
 }

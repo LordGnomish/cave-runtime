@@ -1,323 +1,302 @@
-//! Diff engine — compares desired state (from Git) to live state (from cluster).
-//!
-//! Produces `ResourceDiff` entries that show exactly what would change before
-//! a sync is applied, equivalent to `argocd app diff`.
+//! Diff engine — live vs desired state, structured merge diff.
 
-use crate::models::{DiffType, Manifest, ResourceDiff};
 use serde_json::Value;
 use std::collections::HashMap;
 
-/// A key that uniquely identifies a Kubernetes resource.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ResourceKey {
-    pub api_version: String,
-    pub kind: String,
-    pub namespace: Option<String>,
-    pub name: String,
+/// A single diff entry between desired and live state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiffEntry {
+    pub path: String,
+    pub diff_type: DiffType,
+    pub desired: Option<Value>,
+    pub live: Option<Value>,
 }
 
-impl ResourceKey {
-    pub fn from_manifest(m: &Manifest) -> Self {
-        Self {
-            api_version: m.api_version.clone(),
-            kind: m.kind.clone(),
-            namespace: m.namespace.clone(),
-            name: m.name.clone(),
-        }
-    }
-
-    pub fn from_live(live: &Value) -> Option<Self> {
-        Some(Self {
-            api_version: live["apiVersion"].as_str()?.to_string(),
-            kind: live["kind"].as_str()?.to_string(),
-            namespace: live["metadata"]["namespace"].as_str().map(String::from),
-            name: live["metadata"]["name"].as_str()?.to_string(),
-        })
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum DiffType {
+    Added,
+    Removed,
+    Modified,
 }
 
-/// Compute the diff between desired manifests (from Git) and live objects
-/// (from the cluster).  Returns one `ResourceDiff` per resource.
-pub fn compute_diff(
-    desired: &[Manifest],
-    live: &[Value],
-) -> Vec<ResourceDiff> {
-    let mut live_map: HashMap<ResourceKey, Value> = HashMap::new();
-    for obj in live {
-        if let Some(key) = ResourceKey::from_live(obj) {
-            live_map.insert(key, obj.clone());
-        }
-    }
+/// Result of a full resource diff.
+#[derive(Debug, Clone)]
+pub struct DiffResult {
+    pub resource_key: String,
+    pub in_sync: bool,
+    pub entries: Vec<DiffEntry>,
+    pub normalized_desired: Value,
+    pub normalized_live: Value,
+}
 
-    let mut diffs: Vec<ResourceDiff> = Vec::new();
-    let mut desired_keys: std::collections::HashSet<ResourceKey> =
-        std::collections::HashSet::new();
+/// Compute the diff between desired and live JSON values.
+pub fn compute_diff(desired: &Value, live: &Value) -> Vec<DiffEntry> {
+    let mut entries = Vec::new();
+    diff_recursive(desired, live, "", &mut entries);
+    entries
+}
 
-    for m in desired {
-        let key = ResourceKey::from_manifest(m);
-        desired_keys.insert(key.clone());
-
-        let (group, version) = split_api_version(&m.api_version);
-
-        match live_map.get(&key) {
-            None => {
-                diffs.push(ResourceDiff {
-                    group: group.clone(),
-                    version: version.clone(),
-                    kind: m.kind.clone(),
-                    namespace: m.namespace.clone(),
-                    name: m.name.clone(),
-                    diff_type: DiffType::Added,
-                    desired: Some(normalize_desired(&m.raw)),
-                    live: None,
-                    patch: Some(format!("+++ {}/{} added", m.kind, m.name)),
-                });
+fn diff_recursive(desired: &Value, live: &Value, path: &str, entries: &mut Vec<DiffEntry>) {
+    match (desired, live) {
+        (Value::Object(d_map), Value::Object(l_map)) => {
+            // Check all desired keys
+            for (k, d_val) in d_map {
+                let child_path = if path.is_empty() { k.clone() } else { format!("{}.{}", path, k) };
+                match l_map.get(k) {
+                    None => entries.push(DiffEntry {
+                        path: child_path,
+                        diff_type: DiffType::Added,
+                        desired: Some(d_val.clone()),
+                        live: None,
+                    }),
+                    Some(l_val) => diff_recursive(d_val, l_val, &child_path, entries),
+                }
             }
-            Some(live_obj) => {
-                let normalized_desired = normalize_desired(&m.raw);
-                let normalized_live = normalize_live(live_obj);
-                if objects_differ(&normalized_desired, &normalized_live) {
-                    let patch = build_patch(&normalized_live, &normalized_desired);
-                    diffs.push(ResourceDiff {
-                        group: group.clone(),
-                        version: version.clone(),
-                        kind: m.kind.clone(),
-                        namespace: m.namespace.clone(),
-                        name: m.name.clone(),
-                        diff_type: DiffType::Modified,
-                        desired: Some(normalized_desired),
-                        live: Some(normalized_live),
-                        patch: Some(patch),
-                    });
-                } else {
-                    diffs.push(ResourceDiff {
-                        group: group.clone(),
-                        version: version.clone(),
-                        kind: m.kind.clone(),
-                        namespace: m.namespace.clone(),
-                        name: m.name.clone(),
-                        diff_type: DiffType::Unchanged,
-                        desired: Some(normalized_desired),
-                        live: Some(normalized_live),
-                        patch: None,
+            // Keys in live but not in desired
+            for (k, l_val) in l_map {
+                if !d_map.contains_key(k) {
+                    let child_path = if path.is_empty() { k.clone() } else { format!("{}.{}", path, k) };
+                    entries.push(DiffEntry {
+                        path: child_path,
+                        diff_type: DiffType::Removed,
+                        desired: None,
+                        live: Some(l_val.clone()),
                     });
                 }
             }
         }
-    }
-
-    // Resources that are live but not in desired → Removed (would be pruned)
-    for (key, live_obj) in &live_map {
-        if !desired_keys.contains(key) {
-            let (group, version) = split_api_version(&key.api_version);
-            diffs.push(ResourceDiff {
-                group: group.clone(),
-                version: version.clone(),
-                kind: key.kind.clone(),
-                namespace: key.namespace.clone(),
-                name: key.name.clone(),
-                diff_type: DiffType::Removed,
-                desired: None,
-                live: Some(live_obj.clone()),
-                patch: Some(format!("--- {}/{} removed", key.kind, key.name)),
-            });
+        (Value::Array(d_arr), Value::Array(l_arr)) => {
+            let max_len = d_arr.len().max(l_arr.len());
+            for i in 0..max_len {
+                let child_path = format!("{}[{}]", path, i);
+                match (d_arr.get(i), l_arr.get(i)) {
+                    (Some(d), Some(l)) => diff_recursive(d, l, &child_path, entries),
+                    (Some(d), None) => entries.push(DiffEntry {
+                        path: child_path,
+                        diff_type: DiffType::Added,
+                        desired: Some(d.clone()),
+                        live: None,
+                    }),
+                    (None, Some(l)) => entries.push(DiffEntry {
+                        path: child_path,
+                        diff_type: DiffType::Removed,
+                        desired: None,
+                        live: Some(l.clone()),
+                    }),
+                    (None, None) => {}
+                }
+            }
+        }
+        _ => {
+            if desired != live {
+                entries.push(DiffEntry {
+                    path: path.to_string(),
+                    diff_type: DiffType::Modified,
+                    desired: Some(desired.clone()),
+                    live: Some(live.clone()),
+                });
+            }
         }
     }
-
-    diffs
 }
 
-/// Returns true when the app is out of sync (any resource is Added, Modified,
-/// or Removed).
-pub fn is_out_of_sync(diffs: &[ResourceDiff]) -> bool {
-    diffs.iter().any(|d| {
-        matches!(d.diff_type, DiffType::Added | DiffType::Modified | DiffType::Removed)
-    })
-}
-
-/// Strip server-managed fields that should not be considered during diff:
-/// `resourceVersion`, `uid`, `creationTimestamp`, `generation`,
-/// `managedFields`, `status`.
-fn normalize_live(obj: &Value) -> Value {
-    let mut v = obj.clone();
-    if let Some(meta) = v["metadata"].as_object_mut() {
-        meta.remove("resourceVersion");
-        meta.remove("uid");
-        meta.remove("creationTimestamp");
-        meta.remove("generation");
-        meta.remove("managedFields");
-        // Strip only the noisy kubectl last-applied annotation, not all annotations
-        if let Some(ann) = meta.get_mut("annotations").and_then(|a| a.as_object_mut()) {
-            ann.remove("kubectl.kubernetes.io/last-applied-configuration");
+/// Normalize a Kubernetes resource for diffing by removing server-side fields.
+pub fn normalize_resource(resource: &Value) -> Value {
+    let mut normalized = resource.clone();
+    if let Value::Object(map) = &mut normalized {
+        // Remove server-managed metadata fields
+        if let Some(Value::Object(meta)) = map.get_mut("metadata") {
+            meta.remove("creationTimestamp");
+            meta.remove("resourceVersion");
+            meta.remove("uid");
+            meta.remove("generation");
+            meta.remove("managedFields");
+            // Remove server-injected annotations
+            if let Some(Value::Object(annots)) = meta.get_mut("annotations") {
+                annots.remove("kubectl.kubernetes.io/last-applied-configuration");
+                annots.remove("deployment.kubernetes.io/revision");
+            }
         }
-    }
-    if let Some(map) = v.as_object_mut() {
+        // Remove server-populated status
         map.remove("status");
     }
-    v
+    normalized
 }
 
-/// Normalize the desired object similarly so comparison is fair.
-fn normalize_desired(obj: &Value) -> Value {
-    let mut v = obj.clone();
-    if let Some(meta) = v["metadata"].as_object_mut() {
-        meta.remove("creationTimestamp");
-        meta.remove("resourceVersion");
-        meta.remove("uid");
-        meta.remove("generation");
-        meta.remove("managedFields");
-    }
-    if let Some(map) = v.as_object_mut() {
-        map.remove("status");
-    }
-    v
+/// Apply ignored differences to filter out known acceptable diffs.
+pub fn apply_ignored_differences(
+    entries: Vec<DiffEntry>,
+    ignored: &[IgnoredDiff],
+) -> Vec<DiffEntry> {
+    entries.into_iter().filter(|e| {
+        !ignored.iter().any(|ig| ig.matches(&e.path))
+    }).collect()
 }
 
-fn objects_differ(a: &Value, b: &Value) -> bool {
-    a != b
+#[derive(Debug, Clone)]
+pub struct IgnoredDiff {
+    pub json_pointer: Option<String>,
+    pub jq_expression: Option<String>,
 }
 
-/// Build a naive line-diff patch string between two JSON objects.
-fn build_patch(old: &Value, new: &Value) -> String {
-    let old_str = serde_json::to_string_pretty(old).unwrap_or_default();
-    let new_str = serde_json::to_string_pretty(new).unwrap_or_default();
-
-    let old_lines: Vec<&str> = old_str.lines().collect();
-    let new_lines: Vec<&str> = new_str.lines().collect();
-
-    let mut patch = String::new();
-    // Simple unified diff: lines only in old are "−", only in new are "+".
-    // For production use a proper diff library; this is intentionally minimal.
-    for line in &old_lines {
-        if !new_lines.contains(line) {
-            patch.push('-');
-            patch.push_str(line);
-            patch.push('\n');
+impl IgnoredDiff {
+    pub fn matches(&self, path: &str) -> bool {
+        if let Some(ref ptr) = self.json_pointer {
+            // Simple prefix match for JSON pointer
+            let normalized_ptr = ptr.trim_start_matches('/').replace('/', ".");
+            return path.starts_with(&normalized_ptr) || &normalized_ptr == path;
         }
-    }
-    for line in &new_lines {
-        if !old_lines.contains(line) {
-            patch.push('+');
-            patch.push_str(line);
-            patch.push('\n');
-        }
-    }
-    patch
-}
-
-/// Split "apps/v1" → (Some("apps"), "v1"), "v1" → (None, "v1")
-pub fn split_api_version(api_version: &str) -> (Option<String>, String) {
-    if let Some((g, v)) = api_version.split_once('/') {
-        (Some(g.to_string()), v.to_string())
-    } else {
-        (None, api_version.to_string())
+        false
     }
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+/// Summary of diff state for an application.
+#[derive(Debug, Clone)]
+pub struct ApplicationDiff {
+    pub application_name: String,
+    pub total_resources: usize,
+    pub out_of_sync: usize,
+    pub missing: usize,
+    pub extra: usize,
+    pub resource_diffs: Vec<ResourceDiffSummary>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResourceDiffSummary {
+    pub kind: String,
+    pub namespace: String,
+    pub name: String,
+    pub in_sync: bool,
+    pub diff_count: usize,
+}
+
+impl ApplicationDiff {
+    pub fn is_in_sync(&self) -> bool {
+        self.out_of_sync == 0 && self.missing == 0 && self.extra == 0
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Manifest;
     use serde_json::json;
 
-    fn make_manifest(kind: &str, name: &str, ns: Option<&str>, raw: Value) -> Manifest {
-        Manifest {
-            api_version: "apps/v1".to_string(),
-            kind: kind.to_string(),
-            name: name.to_string(),
-            namespace: ns.map(String::from),
-            raw,
-            sync_wave: 0,
-            hook_type: None,
-            hook_delete_policy: None,
-        }
-    }
-
-    fn live_deploy(name: &str, image: &str) -> Value {
-        json!({
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "metadata": { "name": name, "namespace": "default", "resourceVersion": "99" },
-            "spec": { "replicas": 1, "template": { "spec": { "containers": [{"image": image}] } } }
-        })
+    #[test]
+    fn diff_identical_values() {
+        let a = json!({"key": "value"});
+        let diffs = compute_diff(&a, &a);
+        assert!(diffs.is_empty());
     }
 
     #[test]
-    fn test_diff_resource_added() {
-        let desired = vec![make_manifest(
-            "Deployment", "myapp", Some("default"),
-            json!({
-                "apiVersion": "apps/v1", "kind": "Deployment",
-                "metadata": {"name": "myapp", "namespace": "default"},
-                "spec": {"replicas": 1}
-            }),
-        )];
-        let live: Vec<Value> = vec![]; // nothing in cluster
+    fn diff_added_key() {
+        let desired = json!({"key": "value", "new": "field"});
+        let live = json!({"key": "value"});
         let diffs = compute_diff(&desired, &live);
         assert_eq!(diffs.len(), 1);
         assert_eq!(diffs[0].diff_type, DiffType::Added);
+        assert_eq!(diffs[0].path, "new");
     }
 
     #[test]
-    fn test_diff_resource_removed() {
-        let desired: Vec<Manifest> = vec![]; // git has nothing
-        let live = vec![live_deploy("orphan", "nginx:1")];
+    fn diff_removed_key() {
+        let desired = json!({"key": "value"});
+        let live = json!({"key": "value", "extra": "field"});
         let diffs = compute_diff(&desired, &live);
         assert_eq!(diffs.len(), 1);
         assert_eq!(diffs[0].diff_type, DiffType::Removed);
     }
 
     #[test]
-    fn test_diff_resource_modified() {
-        let desired = vec![make_manifest(
-            "Deployment", "myapp", Some("default"),
-            json!({
-                "apiVersion": "apps/v1", "kind": "Deployment",
-                "metadata": {"name": "myapp", "namespace": "default"},
-                "spec": {"replicas": 2}
-            }),
-        )];
-        let live = vec![live_deploy("myapp", "nginx:1")]; // replicas not set to 2
+    fn diff_modified_value() {
+        let desired = json!({"replicas": 3});
+        let live = json!({"replicas": 1});
         let diffs = compute_diff(&desired, &live);
         assert_eq!(diffs.len(), 1);
-        // Could be Modified or Unchanged depending on normalization; replicas differ
         assert_eq!(diffs[0].diff_type, DiffType::Modified);
+        assert_eq!(diffs[0].path, "replicas");
     }
 
     #[test]
-    fn test_diff_resource_unchanged() {
-        let raw = json!({
-            "apiVersion": "apps/v1", "kind": "Deployment",
-            "metadata": {"name": "myapp", "namespace": "default"},
-            "spec": {"replicas": 1, "template": {"spec": {"containers": [{"image": "nginx:1"}]}}}
-        });
-        let desired = vec![make_manifest("Deployment", "myapp", Some("default"), raw)];
-        // Live matches exactly (minus server-managed fields which normalize strips)
-        let live = vec![live_deploy("myapp", "nginx:1")];
+    fn diff_nested_path() {
+        let desired = json!({"spec": {"replicas": 3}});
+        let live = json!({"spec": {"replicas": 1}});
         let diffs = compute_diff(&desired, &live);
         assert_eq!(diffs.len(), 1);
-        assert_eq!(diffs[0].diff_type, DiffType::Unchanged);
+        assert_eq!(diffs[0].path, "spec.replicas");
     }
 
     #[test]
-    fn test_is_out_of_sync_true() {
-        let diffs = vec![ResourceDiff {
-            group: None, version: "v1".to_string(), kind: "ConfigMap".to_string(),
-            namespace: None, name: "cm".to_string(), diff_type: DiffType::Modified,
-            desired: None, live: None, patch: None,
-        }];
-        assert!(is_out_of_sync(&diffs));
+    fn diff_array_elements() {
+        let desired = json!({"containers": [{"image": "nginx:1.25"}]});
+        let live = json!({"containers": [{"image": "nginx:1.24"}]});
+        let diffs = compute_diff(&desired, &live);
+        assert_eq!(diffs.len(), 1);
+        assert!(diffs[0].path.contains("image"));
     }
 
     #[test]
-    fn test_is_out_of_sync_false() {
-        let diffs = vec![ResourceDiff {
-            group: None, version: "v1".to_string(), kind: "ConfigMap".to_string(),
-            namespace: None, name: "cm".to_string(), diff_type: DiffType::Unchanged,
-            desired: None, live: None, patch: None,
-        }];
-        assert!(!is_out_of_sync(&diffs));
+    fn normalize_removes_server_fields() {
+        let resource = json!({
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "my-app",
+                "resourceVersion": "12345",
+                "uid": "abc-def",
+                "creationTimestamp": "2024-01-01",
+                "managedFields": [],
+                "generation": 5
+            },
+            "spec": { "replicas": 2 },
+            "status": { "availableReplicas": 2 }
+        });
+        let normalized = normalize_resource(&resource);
+        let meta = normalized.get("metadata").unwrap();
+        assert!(meta.get("resourceVersion").is_none());
+        assert!(meta.get("uid").is_none());
+        assert!(meta.get("managedFields").is_none());
+        assert!(normalized.get("status").is_none());
+        assert_eq!(normalized["spec"]["replicas"], 2);
+    }
+
+    #[test]
+    fn apply_ignored_differences() {
+        let entries = vec![
+            DiffEntry { path: "metadata.annotations.kubectl.kubernetes.io/last-applied-configuration".to_string(), diff_type: DiffType::Modified, desired: None, live: None },
+            DiffEntry { path: "spec.replicas".to_string(), diff_type: DiffType::Modified, desired: Some(json!(3)), live: Some(json!(1)) },
+        ];
+        let ignored = vec![
+            IgnoredDiff { json_pointer: Some("/metadata/annotations".to_string()), jq_expression: None },
+        ];
+        let remaining = super::apply_ignored_differences(entries, &ignored);
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].path, "spec.replicas");
+    }
+
+    #[test]
+    fn application_diff_in_sync() {
+        let diff = ApplicationDiff {
+            application_name: "my-app".to_string(),
+            total_resources: 5,
+            out_of_sync: 0,
+            missing: 0,
+            extra: 0,
+            resource_diffs: vec![],
+        };
+        assert!(diff.is_in_sync());
+    }
+
+    #[test]
+    fn application_diff_out_of_sync() {
+        let diff = ApplicationDiff {
+            application_name: "my-app".to_string(),
+            total_resources: 5,
+            out_of_sync: 2,
+            missing: 0,
+            extra: 0,
+            resource_diffs: vec![],
+        };
+        assert!(!diff.is_in_sync());
     }
 }

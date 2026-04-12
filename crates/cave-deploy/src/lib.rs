@@ -1,32 +1,34 @@
-//! CAVE Deploy — GitOps continuous delivery engine.
+//! CAVE Deploy — GitOps deployment engine.
 //!
-//! Replaces: ArgoCD, Flux
-//! Native GitOps sync, canary/blue-green/rolling rollouts, drift detection.
+//! Replaces: ArgoCD + Flux
+//! Implements: Application CRD, ApplicationSet generators, sync engine,
+//! health assessment, diff engine, rollback, App of Apps, Helm/Kustomize/YAML,
+//! project-level RBAC, notifications, SSO patterns.
 
-pub mod gitops;
+pub mod appset;
+pub mod diff;
 pub mod health;
 pub mod models;
-pub mod rollout;
+pub mod rbac;
 pub mod routes;
+pub mod sync;
 
 use axum::Router;
-use models::DeployStore;
-use std::sync::{Arc, Mutex};
+use cave_db::CavePool;
+use std::sync::Arc;
 
-/// Shared state: a single in-memory store protected by a Mutex.
+pub use models::*;
+
 pub struct DeployState {
-    pub store: Arc<Mutex<DeployStore>>,
+    pub pool: Arc<CavePool>,
 }
 
-impl Default for DeployState {
-    fn default() -> Self {
-        Self {
-            store: Arc::new(Mutex::new(DeployStore::default())),
-        }
+impl DeployState {
+    pub fn new(pool: Arc<CavePool>) -> Arc<Self> {
+        Arc::new(Self { pool })
     }
 }
 
-/// Create the axum router for this module.
 pub fn router(state: Arc<DeployState>) -> Router {
     routes::create_router(state)
 }
