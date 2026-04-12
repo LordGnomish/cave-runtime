@@ -1,96 +1,143 @@
-//! Decision logging — record every policy evaluation with input, result, and metadata.
+//! Decision logging for OPA policy evaluation.
+//!
+//! Logs every policy decision with input, result, metrics, and provenance.
+//! Used for compliance, audit, debugging.
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use crate::models::DecisionLogEntry;
+use chrono::Utc;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-/// A single logged policy decision.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecisionEntry {
-    pub id: Uuid,
-    pub timestamp: DateTime<Utc>,
-    pub policy_id: String,
-    pub input: serde_json::Value,
-    pub result: serde_json::Value,
-    pub decision_id: String,
-    pub path: String,
-    pub metrics: DecisionMetrics,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DecisionMetrics {
-    /// Time to evaluate in microseconds.
-    pub timer_rego_query_eval_us: u64,
-}
-
-/// Thread-safe, bounded in-memory decision log.
-#[derive(Debug, Clone)]
+/// In-memory + DB decision log.
 pub struct DecisionLog {
-    inner: Arc<Mutex<LogInner>>,
-}
-
-#[derive(Debug)]
-struct LogInner {
-    entries: VecDeque<DecisionEntry>,
-    max_entries: usize,
+    /// Recent decisions (bounded ring buffer for in-memory access).
+    recent: Arc<Mutex<Vec<DecisionLogEntry>>>,
+    capacity: usize,
+    enabled: bool,
 }
 
 impl DecisionLog {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new(capacity: usize) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(LogInner {
-                entries: VecDeque::new(),
-                max_entries,
-            })),
+            recent: Arc::new(Mutex::new(Vec::with_capacity(capacity))),
+            capacity,
+            enabled: true,
         }
     }
 
-    /// Append a new decision entry, evicting the oldest if at capacity.
+    pub fn disabled() -> Self {
+        Self {
+            recent: Arc::new(Mutex::new(Vec::new())),
+            capacity: 0,
+            enabled: false,
+        }
+    }
+
+    /// Log a policy decision.
     pub fn record(
         &self,
-        policy_id: impl Into<String>,
-        path: impl Into<String>,
-        input: serde_json::Value,
-        result: serde_json::Value,
-        eval_us: u64,
-    ) {
-        let entry = DecisionEntry {
-            id: Uuid::new_v4(),
-            timestamp: Utc::now(),
-            policy_id: policy_id.into(),
-            input,
-            result,
+        path: &str,
+        input: Option<&serde_json::Value>,
+        result: Option<&serde_json::Value>,
+        error: Option<&str>,
+        requested_by: &str,
+    ) -> DecisionLogEntry {
+        let entry = DecisionLogEntry {
             decision_id: Uuid::new_v4().to_string(),
-            path: path.into(),
-            metrics: DecisionMetrics { timer_rego_query_eval_us: eval_us },
+            path: path.to_string(),
+            input: input.cloned(),
+            result: result.cloned(),
+            error: error.map(String::from),
+            requested_by: requested_by.to_string(),
+            timestamp: Utc::now(),
+            metrics: None,
+            bundle_name: None,
+            revision: None,
         };
-        let mut lock = self.inner.lock().expect("decision log lock poisoned");
-        if lock.entries.len() >= lock.max_entries {
-            lock.entries.pop_front();
+
+        if self.enabled {
+            if let Ok(mut guard) = self.recent.lock() {
+                if guard.len() >= self.capacity {
+                    guard.remove(0);
+                }
+                guard.push(entry.clone());
+            }
+
+            tracing::debug!(
+                target: "cave_policy.decision",
+                decision_id = entry.decision_id,
+                path = path,
+                allowed = result.and_then(|v| v.as_bool()).unwrap_or(false),
+                "policy decision recorded"
+            );
         }
-        lock.entries.push_back(entry);
+
+        entry
     }
 
-    /// Return all entries (oldest first), up to `limit`.
-    pub fn entries(&self, limit: usize) -> Vec<DecisionEntry> {
-        let lock = self.inner.lock().expect("decision log lock poisoned");
-        lock.entries.iter().rev().take(limit).cloned().collect::<Vec<_>>()
-            .into_iter().rev().collect()
+    /// Get recent decisions (most recent first).
+    pub fn recent_decisions(&self, limit: usize) -> Vec<DecisionLogEntry> {
+        if let Ok(guard) = self.recent.lock() {
+            guard.iter().rev().take(limit).cloned().collect()
+        } else {
+            vec![]
+        }
     }
 
-    pub fn len(&self) -> usize {
-        self.inner.lock().expect("lock poisoned").entries.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+    /// Check if logging is enabled.
+    pub fn is_enabled(&self) -> bool { self.enabled }
 }
 
 impl Default for DecisionLog {
-    fn default() -> Self {
-        Self::new(10_000)
+    fn default() -> Self { Self::new(1000) }
+}
+
+/// Mask sensitive fields in a decision log entry before storage.
+pub fn mask_sensitive(entry: &mut DecisionLogEntry, mask_fields: &[&str]) {
+    if let Some(input) = &mut entry.input {
+        mask_json(input, mask_fields);
+    }
+    if let Some(result) = &mut entry.result {
+        mask_json(result, mask_fields);
+    }
+}
+
+fn mask_json(v: &mut serde_json::Value, fields: &[&str]) {
+    match v {
+        serde_json::Value::Object(m) => {
+            for (k, val) in m.iter_mut() {
+                if fields.iter().any(|f| k.to_lowercase().contains(f)) {
+                    *val = serde_json::json!("***MASKED***");
+                } else {
+                    mask_json(val, fields);
+                }
+            }
+        }
+        serde_json::Value::Array(a) => {
+            for item in a { mask_json(item, fields); }
+        }
+        _ => {}
+    }
+}
+
+/// Metrics collected during policy evaluation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct EvalMetrics {
+    pub timer_rego_query_parse_ns: u64,
+    pub timer_rego_query_compile_ns: u64,
+    pub timer_rego_query_eval_ns: u64,
+    pub timer_server_handler_ns: u64,
+    pub counter_server_query_cache_hit: u64,
+}
+
+impl EvalMetrics {
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "timer_rego_query_parse_ns": self.timer_rego_query_parse_ns,
+            "timer_rego_query_compile_ns": self.timer_rego_query_compile_ns,
+            "timer_rego_query_eval_ns": self.timer_rego_query_eval_ns,
+            "timer_server_handler_ns": self.timer_server_handler_ns,
+            "counter_server_query_cache_hit": self.counter_server_query_cache_hit,
+        })
     }
 }
