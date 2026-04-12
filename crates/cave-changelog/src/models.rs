@@ -32,6 +32,7 @@ pub enum ChangeType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::{DateTime, Utc};
 
     fn make_change(ct: ChangeType) -> Change {
         Change {
