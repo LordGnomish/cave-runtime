@@ -41,6 +41,7 @@ members = [
     "crates/cave-dast",
     "crates/cave-backup",
     "crates/cave-pam",
+    "crates/cave-dashboard",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
