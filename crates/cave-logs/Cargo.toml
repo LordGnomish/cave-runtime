@@ -1,0 +1,30 @@
+[package]
+name = "cave-logs"
+description = "Log aggregation — Grafana Loki + ELK replacement with full LogQL support, push API, WebSocket tail"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+cave-db   = { path = "../cave-db" }
+
+axum        = { workspace = true, features = ["ws"] }
+tokio       = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+tracing     = { workspace = true }
+chrono      = { workspace = true }
+uuid        = { workspace = true }
+thiserror   = { workspace = true }
+regex       = { workspace = true }
+
+bytes        = "1"
+snap         = "1"
+prost        = "0.13"
+prost-types  = "0.13"
+dashmap      = "6"
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true }
