@@ -1,469 +1,370 @@
-//! Sync engine — git pull, manifest parsing, wave ordering, hook execution,
-//! drift detection, auto-sync loop, retry with backoff, and rollback.
-//!
-//! Annotation constants mirror ArgoCD so existing manifests work unchanged.
+//! Sync engine — manual, auto, self-heal, prune, dry-run, waves, hooks.
 
-use crate::diff::{compute_diff, is_out_of_sync};
-use crate::error::DeployError;
-use crate::health::assess_resource_health;
-use crate::models::{
-    Application, DiffType, HealthStatusDetail, Manifest, OperationPhase, OperationState,
-    ResourceDiff, ResourceResult, ResourceStatus, ResourceSyncStatus, RevisionHistory,
-    SyncHookType, SyncOperationResult, SyncRequest, SyncStatus, SyncStatusDetail,
-};
+use crate::models::*;
 use chrono::Utc;
-use serde::Deserialize;
-use serde_json::Value;
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use tokio::process::Command;
-use tracing::{debug, info, warn};
+use std::collections::HashMap;
 use uuid::Uuid;
 
-// ─── ArgoCD-compatible annotation keys ────────────────────────────────────────
+// ─── Sync request ────────────────────────────────────────────────────────────
 
-pub const ANNOTATION_SYNC_WAVE: &str = "argocd.argoproj.io/sync-wave";
-pub const ANNOTATION_HOOK: &str = "argocd.argoproj.io/hook";
-pub const ANNOTATION_HOOK_DELETE_POLICY: &str = "argocd.argoproj.io/hook-delete-policy";
-pub const LABEL_MANAGED_BY: &str = "app.kubernetes.io/managed-by";
-pub const LABEL_APP_NAME: &str = "argocd.argoproj.io/app-name";
-pub const CAVE_MANAGER: &str = "cave-deploy";
-
-// ─── Git operations ────────────────────────────────────────────────────────────
-
-/// Manages a local git clone for one repository.
-pub struct GitRepo {
-    pub repo_url: String,
-    pub work_dir: PathBuf,
+#[derive(Debug, Clone)]
+pub struct SyncRequest {
+    pub application_id: Uuid,
+    pub revision: Option<String>,
+    pub dry_run: bool,
+    pub prune: bool,
+    pub force: bool,
+    pub resource_filter: Option<Vec<SyncResourceFilter>>,
+    pub strategy: SyncStrategy,
+    pub initiated_by: String,
 }
 
-impl GitRepo {
-    pub fn new(repo_url: &str, base_dir: &Path) -> Self {
-        // Derive a safe dir name from the URL
-        let safe = repo_url
-            .replace("://", "_")
-            .replace('/', "_")
-            .replace(':', "_");
-        let work_dir = base_dir.join(&safe);
-        Self { repo_url: repo_url.to_string(), work_dir }
-    }
+#[derive(Debug, Clone, PartialEq)]
+pub enum SyncStrategy {
+    Apply,
+    Hook,
+}
 
-    /// Clone the repo if needed, then fetch and checkout the given revision.
-    /// Returns the resolved commit SHA.
-    pub async fn fetch(&self, revision: &str) -> Result<String, DeployError> {
-        if self.work_dir.exists() {
-            // Already cloned — fetch latest
-            let fetch = Command::new("git")
-                .args(["fetch", "--all", "--tags"])
-                .current_dir(&self.work_dir)
-                .output()
-                .await?;
-            if !fetch.status.success() {
-                warn!(
-                    url = %self.repo_url,
-                    stderr = %String::from_utf8_lossy(&fetch.stderr),
-                    "git fetch failed"
-                );
-            }
-        } else {
-            // Fresh clone
-            let clone = Command::new("git")
-                .args(["clone", "--", &self.repo_url, self.work_dir.to_str().unwrap_or(".")])
-                .output()
-                .await?;
-            if !clone.status.success() {
-                return Err(DeployError::Git(format!(
-                    "git clone failed: {}",
-                    String::from_utf8_lossy(&clone.stderr)
-                )));
-            }
-        }
-
-        // Checkout the target revision
-        let checkout = Command::new("git")
-            .args(["checkout", revision])
-            .current_dir(&self.work_dir)
-            .output()
-            .await?;
-        if !checkout.status.success() {
-            return Err(DeployError::Git(format!(
-                "git checkout {} failed: {}",
-                revision,
-                String::from_utf8_lossy(&checkout.stderr)
-            )));
-        }
-
-        self.current_revision().await
-    }
-
-    /// Return the current HEAD commit SHA.
-    pub async fn current_revision(&self) -> Result<String, DeployError> {
-        let out = Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(&self.work_dir)
-            .output()
-            .await?;
-        if !out.status.success() {
-            return Err(DeployError::Git("rev-parse HEAD failed".to_string()));
-        }
-        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-    }
-
-    /// Walk `path` (relative to repo root) and return all parsed manifests.
-    pub async fn load_manifests(&self, path: &str, recurse: bool) -> Result<Vec<Manifest>, DeployError> {
-        let target = self.work_dir.join(path);
-        if !target.exists() {
-            return Err(DeployError::Git(format!("path '{}' not found in repo", path)));
-        }
-        let mut manifests = Vec::new();
-        collect_manifests(&target, recurse, &mut manifests)?;
-        Ok(manifests)
+impl Default for SyncStrategy {
+    fn default() -> Self {
+        Self::Apply
     }
 }
 
-fn collect_manifests(
-    dir: &Path,
-    recurse: bool,
-    out: &mut Vec<Manifest>,
-) -> Result<(), DeployError> {
-    let entries = std::fs::read_dir(dir).map_err(|e| DeployError::Git(e.to_string()))?;
-    for entry in entries.flatten() {
-        let p = entry.path();
-        if p.is_dir() && recurse {
-            collect_manifests(&p, recurse, out)?;
-        } else if p.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
-            let content = std::fs::read_to_string(&p).map_err(|e| DeployError::Git(e.to_string()))?;
-            let parsed = parse_manifests(&content)?;
-            out.extend(parsed);
-        }
+/// Outcome of a single resource sync attempt.
+#[derive(Debug, Clone)]
+pub struct ResourceSyncResult {
+    pub group: String,
+    pub version: String,
+    pub kind: String,
+    pub namespace: String,
+    pub name: String,
+    pub action: SyncAction,
+    pub status: ResourceSyncStatus,
+    pub message: Option<String>,
+    pub hook_phase: Option<SyncPhase>,
+    pub wave: i32,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SyncAction {
+    Create,
+    Update,
+    Delete,
+    Skip,
+    Hook,
+    Replace,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ResourceSyncStatus {
+    Succeeded,
+    Failed,
+    Running,
+    Pruned,
+    Skipped,
+}
+
+// ─── Sync wave ordering ──────────────────────────────────────────────────────
+
+/// Group resources by their sync wave annotation.
+/// Resources with lower wave values are applied first.
+pub fn group_by_wave(resources: &[ManifestResource]) -> Vec<(i32, Vec<&ManifestResource>)> {
+    let mut wave_map: HashMap<i32, Vec<&ManifestResource>> = HashMap::new();
+    for res in resources {
+        let wave = res.wave;
+        wave_map.entry(wave).or_default().push(res);
     }
-    Ok(())
+    let mut waves: Vec<(i32, Vec<&ManifestResource>)> = wave_map.into_iter().collect();
+    waves.sort_by_key(|(w, _)| *w);
+    waves
 }
 
-// ─── Manifest parsing ─────────────────────────────────────────────────────────
+/// Resource from a rendered manifest.
+#[derive(Debug, Clone)]
+pub struct ManifestResource {
+    pub group: String,
+    pub version: String,
+    pub kind: String,
+    pub namespace: String,
+    pub name: String,
+    pub wave: i32,
+    pub hook_phases: Vec<SyncPhase>,
+    pub delete_on_success: bool,
+    pub manifest: serde_json::Value,
+}
 
-/// Parse a YAML string that may contain multiple `---` separated documents.
-pub fn parse_manifests(yaml: &str) -> Result<Vec<Manifest>, DeployError> {
-    let mut manifests = Vec::new();
-    for doc in serde_yaml::Deserializer::from_str(yaml) {
-        let value: Value = Value::deserialize(doc)?;
-        if value.is_null() {
-            continue;
-        }
-        if let Some(m) = value_to_manifest(value)? {
-            manifests.push(m);
-        }
+impl ManifestResource {
+    pub fn is_hook(&self) -> bool {
+        !self.hook_phases.is_empty()
     }
-    Ok(manifests)
+
+    pub fn is_in_phase(&self, phase: &SyncPhase) -> bool {
+        self.hook_phases.contains(phase)
+    }
 }
 
-fn value_to_manifest(raw: Value) -> Result<Option<Manifest>, DeployError> {
-    let api_version = match raw["apiVersion"].as_str() {
-        Some(v) => v.to_string(),
-        None => return Ok(None),
-    };
-    let kind = match raw["kind"].as_str() {
-        Some(k) => k.to_string(),
-        None => return Ok(None),
-    };
-    let name = match raw["metadata"]["name"].as_str() {
-        Some(n) => n.to_string(),
-        None => return Ok(None),
-    };
-    let namespace = raw["metadata"]["namespace"].as_str().map(String::from);
-    let sync_wave = extract_sync_wave(&raw);
-    let hook_type = extract_hook_type(&raw);
-    let hook_delete_policy =
-        raw["metadata"]["annotations"][ANNOTATION_HOOK_DELETE_POLICY].as_str().map(String::from);
-
-    Ok(Some(Manifest { api_version, kind, name, namespace, raw, sync_wave, hook_type, hook_delete_policy }))
-}
-
-/// Extract `argocd.argoproj.io/sync-wave` as an integer (default 0).
-pub fn extract_sync_wave(raw: &Value) -> i32 {
-    raw["metadata"]["annotations"][ANNOTATION_SYNC_WAVE]
-        .as_str()
+/// Parse sync wave from ArgoCD annotations.
+pub fn parse_wave(annotations: &HashMap<String, String>) -> i32 {
+    annotations
+        .get("argocd.argoproj.io/sync-wave")
         .and_then(|s| s.parse().ok())
         .unwrap_or(0)
 }
 
-/// Extract `argocd.argoproj.io/hook` as a `SyncHookType`.
-pub fn extract_hook_type(raw: &Value) -> Option<SyncHookType> {
-    let s = raw["metadata"]["annotations"][ANNOTATION_HOOK].as_str()?;
-    match s {
-        "PreSync" => Some(SyncHookType::PreSync),
-        "Sync" => Some(SyncHookType::Sync),
-        "PostSync" => Some(SyncHookType::PostSync),
-        "SyncFail" => Some(SyncHookType::SyncFail),
-        "Skip" => Some(SyncHookType::Skip),
-        _ => None,
-    }
+/// Parse hook phases from ArgoCD hook annotation.
+pub fn parse_hook_phases(annotations: &HashMap<String, String>) -> Vec<SyncPhase> {
+    annotations
+        .get("argocd.argoproj.io/hook")
+        .map(|s| {
+            s.split(',').filter_map(|p| match p.trim() {
+                "PreSync" => Some(SyncPhase::PreSync),
+                "Sync" => Some(SyncPhase::Sync),
+                "PostSync" => Some(SyncPhase::PostSync),
+                "SyncFail" => Some(SyncPhase::SyncFail),
+                "Skip" => Some(SyncPhase::Skip),
+                _ => None,
+            }).collect()
+        })
+        .unwrap_or_default()
 }
 
-// ─── Sync-wave ordering ───────────────────────────────────────────────────────
+/// Parse hook deletion policy.
+pub fn parse_delete_on_success(annotations: &HashMap<String, String>) -> bool {
+    annotations
+        .get("argocd.argoproj.io/hook-delete-policy")
+        .map(|s| s.contains("HookSucceeded") || s.contains("BeforeHookCreation"))
+        .unwrap_or(false)
+}
 
-/// Group manifests into waves ordered by wave number.  Each inner Vec contains
-/// all resources for one wave and must fully succeed before the next begins.
-pub fn order_by_waves(mut manifests: Vec<Manifest>) -> Vec<Vec<Manifest>> {
-    manifests.sort_by_key(|m| m.sync_wave);
-    let mut waves: Vec<Vec<Manifest>> = Vec::new();
-    let mut current_wave_num: Option<i32> = None;
+// ─── Rollback ────────────────────────────────────────────────────────────────
 
-    for m in manifests {
-        if Some(m.sync_wave) != current_wave_num {
-            current_wave_num = Some(m.sync_wave);
-            waves.push(Vec::new());
+/// Rollback request — target a specific revision history entry.
+#[derive(Debug, Clone)]
+pub struct RollbackRequest {
+    pub application_id: Uuid,
+    pub history_id: u64,
+    pub prune: bool,
+    pub dry_run: bool,
+    pub initiated_by: String,
+}
+
+/// Result of a rollback initiation.
+#[derive(Debug, Clone)]
+pub struct RollbackResult {
+    pub operation_id: Uuid,
+    pub application_id: Uuid,
+    pub target_revision: String,
+    pub target_history_id: u64,
+    pub started_at: chrono::DateTime<Utc>,
+}
+
+pub fn initiate_rollback(req: &RollbackRequest, history: &[RevisionHistory]) -> Option<RollbackResult> {
+    let entry = history.iter().find(|h| h.id == req.history_id)?;
+    Some(RollbackResult {
+        operation_id: Uuid::new_v4(),
+        application_id: req.application_id,
+        target_revision: entry.revision.clone(),
+        target_history_id: req.history_id,
+        started_at: Utc::now(),
+    })
+}
+
+// ─── Auto-sync evaluation ────────────────────────────────────────────────────
+
+/// Determine whether auto-sync should trigger based on policy and current status.
+pub fn should_auto_sync(
+    policy: &SyncPolicy,
+    current_sync: &SyncStatus,
+    health: &HealthStatus,
+) -> bool {
+    let automated = match &policy.automated {
+        Some(a) => a,
+        None => return false,
+    };
+
+    match current_sync {
+        SyncStatus::OutOfSync => true,
+        SyncStatus::Synced => {
+            // Self-heal: re-sync if app is synced but health has degraded
+            automated.self_heal && *health == HealthStatus::Degraded
         }
-        waves.last_mut().unwrap().push(m);
+        SyncStatus::Unknown => false,
     }
-    waves
 }
 
-/// Separate PreSync / PostSync / SyncFail hooks from regular resources.
-pub fn partition_by_phase(
-    manifests: Vec<Manifest>,
-) -> (Vec<Manifest>, Vec<Manifest>, Vec<Manifest>, Vec<Manifest>) {
-    let mut pre_sync = Vec::new();
-    let mut sync_phase = Vec::new();
-    let mut post_sync = Vec::new();
-    let mut sync_fail = Vec::new();
+/// Determine whether pruning should occur for a resource.
+pub fn should_prune(
+    policy: &SyncPolicy,
+    resource: &ResourceStatus,
+) -> bool {
+    let prune = policy.automated.as_ref().map(|a| a.prune).unwrap_or(false);
+    prune && resource.require_pruning
+}
 
-    for m in manifests {
-        match &m.hook_type {
-            Some(SyncHookType::PreSync) => pre_sync.push(m),
-            Some(SyncHookType::PostSync) => post_sync.push(m),
-            Some(SyncHookType::SyncFail) => sync_fail.push(m),
-            Some(SyncHookType::Skip) => {} // discard
-            _ => sync_phase.push(m),
+// ─── Sync options parsing ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default)]
+pub struct ParsedSyncOptions {
+    pub create_namespace: bool,
+    pub prune_last: bool,
+    pub replace: bool,
+    pub apply_out_of_sync_only: bool,
+    pub server_side_apply: bool,
+    pub fail_on_shared_resource: bool,
+    pub respect_ignore_differences: bool,
+    pub validate: bool,
+}
+
+pub fn parse_sync_options(options: &[String]) -> ParsedSyncOptions {
+    let mut parsed = ParsedSyncOptions { validate: true, ..Default::default() };
+    for opt in options {
+        match opt.as_str() {
+            "CreateNamespace=true" => parsed.create_namespace = true,
+            "PruneLast=true" => parsed.prune_last = true,
+            "Replace=true" => parsed.replace = true,
+            "ApplyOutOfSyncOnly=true" => parsed.apply_out_of_sync_only = true,
+            "ServerSideApply=true" => parsed.server_side_apply = true,
+            "FailOnSharedResource=true" => parsed.fail_on_shared_resource = true,
+            "RespectIgnoreDifferences=true" => parsed.respect_ignore_differences = true,
+            "Validate=false" => parsed.validate = false,
+            _ => {}
         }
     }
-    (pre_sync, sync_phase, post_sync, sync_fail)
+    parsed
 }
-
-// ─── Drift detection ──────────────────────────────────────────────────────────
-
-/// Detect drift between desired manifests (from git) and live objects.
-/// Returns all diffs; call `is_out_of_sync` to get a bool.
-pub fn detect_drift(
-    desired: &[Manifest],
-    live: &[Value],
-) -> (Vec<ResourceDiff>, SyncStatus) {
-    let diffs = compute_diff(desired, live);
-    let sync_status =
-        if is_out_of_sync(&diffs) { SyncStatus::OutOfSync } else { SyncStatus::Synced };
-    (diffs, sync_status)
-}
-
-// ─── Retry with backoff ───────────────────────────────────────────────────────
-
-/// Parse a duration string like "5s", "2m", "1h" into a `Duration`.
-pub fn parse_duration(s: &str) -> Duration {
-    if let Some(secs) = s.strip_suffix('s') {
-        Duration::from_secs(secs.parse().unwrap_or(5))
-    } else if let Some(mins) = s.strip_suffix('m') {
-        Duration::from_secs(mins.parse::<u64>().unwrap_or(1) * 60)
-    } else if let Some(hours) = s.strip_suffix('h') {
-        Duration::from_secs(hours.parse::<u64>().unwrap_or(1) * 3600)
-    } else {
-        Duration::from_secs(5)
-    }
-}
-
-/// Compute the backoff sleep for retry `n` given the policy.
-pub fn compute_backoff(base: Duration, factor: f64, max: Duration, n: u32) -> Duration {
-    let secs = base.as_secs_f64() * factor.powi(n as i32);
-    let result = Duration::from_secs_f64(secs);
-    result.min(max)
-}
-
-// ─── Resource tracking helpers ────────────────────────────────────────────────
-
-/// Return the label set that cave-deploy stamps on every managed resource.
-pub fn managed_labels(app_name: &str) -> HashMap<String, String> {
-    [
-        (LABEL_MANAGED_BY.to_string(), CAVE_MANAGER.to_string()),
-        (LABEL_APP_NAME.to_string(), app_name.to_string()),
-    ]
-    .into()
-}
-
-/// Return the annotation set used for annotation-based tracking.
-pub fn managed_annotations(app_name: &str, instance: &str) -> HashMap<String, String> {
-    [
-        ("argocd.argoproj.io/app-name".to_string(), app_name.to_string()),
-        ("argocd.argoproj.io/tracking-id".to_string(), format!("{app_name}:{instance}")),
-    ]
-    .into()
-}
-
-/// Inject tracking labels/annotations into a manifest's raw JSON.
-pub fn inject_tracking(raw: &mut Value, app_name: &str) {
-    if let Some(meta) = raw["metadata"].as_object_mut() {
-        let labels = meta.entry("labels").or_insert_with(|| Value::Object(Default::default()));
-        if let Some(lmap) = labels.as_object_mut() {
-            lmap.insert(LABEL_MANAGED_BY.to_string(), Value::String(CAVE_MANAGER.to_string()));
-            lmap.insert(LABEL_APP_NAME.to_string(), Value::String(app_name.to_string()));
-        }
-    }
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    const SIMPLE_DEPLOY: &str = r#"
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: myapp
-  namespace: default
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"
-spec:
-  replicas: 3
-"#;
-
-    const PRE_SYNC_JOB: &str = r#"
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: db-migrate
-  namespace: default
-  annotations:
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/sync-wave: "-5"
-spec:
-  template:
-    spec:
-      restartPolicy: Never
-"#;
-
-    const TWO_DOCS: &str = r#"
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: config
-  namespace: default
-data:
-  key: value
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: app
-  namespace: default
-  annotations:
-    argocd.argoproj.io/sync-wave: "1"
-spec:
-  replicas: 1
-"#;
+    use crate::models::{HealthStatus, SyncStatus, SyncPolicy, AutomatedSyncPolicy};
 
     #[test]
-    fn test_parse_single_manifest() {
-        let manifests = parse_manifests(SIMPLE_DEPLOY).unwrap();
-        assert_eq!(manifests.len(), 1);
-        assert_eq!(manifests[0].kind, "Deployment");
-        assert_eq!(manifests[0].name, "myapp");
-        assert_eq!(manifests[0].namespace, Some("default".to_string()));
-        assert_eq!(manifests[0].sync_wave, 2);
-        assert!(manifests[0].hook_type.is_none());
+    fn parse_wave_from_annotations() {
+        let mut annotations = HashMap::new();
+        annotations.insert("argocd.argoproj.io/sync-wave".to_string(), "5".to_string());
+        assert_eq!(parse_wave(&annotations), 5);
     }
 
     #[test]
-    fn test_parse_hook_manifest() {
-        let manifests = parse_manifests(PRE_SYNC_JOB).unwrap();
-        assert_eq!(manifests.len(), 1);
-        assert_eq!(manifests[0].hook_type, Some(SyncHookType::PreSync));
-        assert_eq!(manifests[0].sync_wave, -5);
+    fn parse_wave_default_zero() {
+        let annotations = HashMap::new();
+        assert_eq!(parse_wave(&annotations), 0);
     }
 
     #[test]
-    fn test_parse_multi_document() {
-        let manifests = parse_manifests(TWO_DOCS).unwrap();
-        assert_eq!(manifests.len(), 2);
-        let kinds: HashSet<&str> = manifests.iter().map(|m| m.kind.as_str()).collect();
-        assert!(kinds.contains("ConfigMap"));
-        assert!(kinds.contains("Deployment"));
+    fn parse_hook_phases_presync() {
+        let mut annotations = HashMap::new();
+        annotations.insert("argocd.argoproj.io/hook".to_string(), "PreSync".to_string());
+        let phases = parse_hook_phases(&annotations);
+        assert_eq!(phases, vec![SyncPhase::PreSync]);
     }
 
     #[test]
-    fn test_order_by_waves() {
-        let yaml = format!("{PRE_SYNC_JOB}\n---\n{SIMPLE_DEPLOY}");
-        let manifests = parse_manifests(&yaml).unwrap();
-        let waves = order_by_waves(manifests);
-        assert_eq!(waves.len(), 2);
-        // First wave is the pre-sync hook at wave -5
-        assert_eq!(waves[0][0].sync_wave, -5);
-        // Second wave is the deployment at wave 2
-        assert_eq!(waves[1][0].sync_wave, 2);
+    fn parse_hook_phases_multiple() {
+        let mut annotations = HashMap::new();
+        annotations.insert("argocd.argoproj.io/hook".to_string(), "PreSync,Sync".to_string());
+        let phases = parse_hook_phases(&annotations);
+        assert_eq!(phases.len(), 2);
     }
 
     #[test]
-    fn test_detect_drift_synced() {
-        let desired = parse_manifests(SIMPLE_DEPLOY).unwrap();
-        // Live has exactly the same content (minus server fields which normalize strips)
-        let live = vec![json!({
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "metadata": {
-                "name": "myapp",
-                "namespace": "default",
-                "resourceVersion": "123",
-                "annotations": { "argocd.argoproj.io/sync-wave": "2" }
+    fn group_by_wave_ordering() {
+        let resources = vec![
+            ManifestResource { group: "".to_string(), version: "v1".to_string(), kind: "ConfigMap".to_string(), namespace: "default".to_string(), name: "cm".to_string(), wave: 2, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
+            ManifestResource { group: "apps".to_string(), version: "v1".to_string(), kind: "Deployment".to_string(), namespace: "default".to_string(), name: "dep".to_string(), wave: 0, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
+            ManifestResource { group: "".to_string(), version: "v1".to_string(), kind: "Service".to_string(), namespace: "default".to_string(), name: "svc".to_string(), wave: 1, hook_phases: vec![], delete_on_success: false, manifest: serde_json::json!({}) },
+        ];
+        let waves = group_by_wave(&resources);
+        assert_eq!(waves[0].0, 0); // Deployment first
+        assert_eq!(waves[1].0, 1); // Service
+        assert_eq!(waves[2].0, 2); // ConfigMap last
+    }
+
+    #[test]
+    fn should_auto_sync_out_of_sync() {
+        let policy = SyncPolicy {
+            automated: Some(AutomatedSyncPolicy { prune: false, self_heal: false, allow_empty: false }),
+            sync_options: vec![],
+            retry: None,
+            managed_namespace_metadata: None,
+        };
+        assert!(should_auto_sync(&policy, &SyncStatus::OutOfSync, &HealthStatus::Healthy));
+    }
+
+    #[test]
+    fn should_auto_sync_self_heal_degraded() {
+        let policy = SyncPolicy {
+            automated: Some(AutomatedSyncPolicy { prune: false, self_heal: true, allow_empty: false }),
+            sync_options: vec![],
+            retry: None,
+            managed_namespace_metadata: None,
+        };
+        assert!(should_auto_sync(&policy, &SyncStatus::Synced, &HealthStatus::Degraded));
+        assert!(!should_auto_sync(&policy, &SyncStatus::Synced, &HealthStatus::Healthy));
+    }
+
+    #[test]
+    fn should_auto_sync_no_policy() {
+        let policy = SyncPolicy::default();
+        assert!(!should_auto_sync(&policy, &SyncStatus::OutOfSync, &HealthStatus::Healthy));
+    }
+
+    #[test]
+    fn parse_sync_options_create_namespace() {
+        let opts = vec!["CreateNamespace=true".to_string(), "ServerSideApply=true".to_string()];
+        let parsed = parse_sync_options(&opts);
+        assert!(parsed.create_namespace);
+        assert!(parsed.server_side_apply);
+        assert!(parsed.validate);
+    }
+
+    #[test]
+    fn parse_sync_options_validate_false() {
+        let opts = vec!["Validate=false".to_string()];
+        let parsed = parse_sync_options(&opts);
+        assert!(!parsed.validate);
+    }
+
+    #[test]
+    fn rollback_finds_history_entry() {
+        let app_id = Uuid::new_v4();
+        let history = vec![
+            RevisionHistory {
+                id: 1,
+                revision: "abc123".to_string(),
+                deployed_at: Utc::now(),
+                initiated_by: "user".to_string(),
+                source: ApplicationSource {
+                    repo_url: "https://github.com/example/app".to_string(),
+                    target_revision: Some("abc123".to_string()),
+                    path: None,
+                    helm: None,
+                    kustomize: None,
+                    directory: None,
+                },
             },
-            "spec": { "replicas": 3 }
-        })];
-        let (_diffs, status) = detect_drift(&desired, &live);
-        assert_eq!(status, SyncStatus::Synced);
+        ];
+        let req = RollbackRequest {
+            application_id: app_id,
+            history_id: 1,
+            prune: false,
+            dry_run: false,
+            initiated_by: "user".to_string(),
+        };
+        let result = initiate_rollback(&req, &history).unwrap();
+        assert_eq!(result.target_revision, "abc123");
     }
 
     #[test]
-    fn test_detect_drift_out_of_sync() {
-        let desired = parse_manifests(SIMPLE_DEPLOY).unwrap();
-        let live: Vec<Value> = vec![]; // nothing in cluster
-        let (_diffs, status) = detect_drift(&desired, &live);
-        assert_eq!(status, SyncStatus::OutOfSync);
-    }
-
-    #[test]
-    fn test_partition_by_phase() {
-        let yaml = format!("{PRE_SYNC_JOB}\n---\n{SIMPLE_DEPLOY}");
-        let manifests = parse_manifests(&yaml).unwrap();
-        let (pre, sync, post, fail) = partition_by_phase(manifests);
-        assert_eq!(pre.len(), 1);
-        assert_eq!(pre[0].name, "db-migrate");
-        assert_eq!(sync.len(), 1);
-        assert_eq!(sync[0].name, "myapp");
-        assert!(post.is_empty());
-        assert!(fail.is_empty());
-    }
-
-    #[test]
-    fn test_compute_backoff() {
-        let base = Duration::from_secs(5);
-        let max = Duration::from_secs(300);
-        // retry 0: 5 * 2^0 = 5
-        assert_eq!(compute_backoff(base, 2.0, max, 0), Duration::from_secs(5));
-        // retry 1: 5 * 2^1 = 10
-        assert_eq!(compute_backoff(base, 2.0, max, 1), Duration::from_secs(10));
-        // retry 10 would exceed max → capped
-        let capped = compute_backoff(base, 2.0, max, 10);
-        assert_eq!(capped, max);
-    }
-
-    #[test]
-    fn test_inject_tracking_labels() {
-        let mut raw = json!({
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "metadata": {"name": "app"}
-        });
-        inject_tracking(&mut raw, "my-app");
-        assert_eq!(raw["metadata"]["labels"]["app.kubernetes.io/managed-by"], "cave-deploy");
-        assert_eq!(raw["metadata"]["labels"]["argocd.argoproj.io/app-name"], "my-app");
+    fn rollback_not_found() {
+        let req = RollbackRequest {
+            application_id: Uuid::new_v4(),
+            history_id: 99,
+            prune: false,
+            dry_run: false,
+            initiated_by: "user".to_string(),
+        };
+        assert!(initiate_rollback(&req, &[]).is_none());
     }
 }

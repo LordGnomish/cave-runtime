@@ -1,225 +1,356 @@
-//! Pipeline triggers: webhook (GitHub, GitLab), cron schedule, manual.
+//! Pipeline triggers — webhook, cron, git push, CEL interceptors.
 
-use crate::models::ParameterValue;
+use crate::models::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum TriggerType {
-    Webhook,
-    GitHubWebhook,
-    GitLabWebhook,
-    Cron,
-    Manual,
-}
+// ─── Trigger definitions ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum TriggerConfig {
-    Webhook {
-        secret: Option<String>,
-        events: Vec<String>,
-    },
-    GitHubWebhook {
-        secret: String,
-        events: Vec<String>,
-        ref_filter: Option<String>,
-    },
-    GitLabWebhook {
-        token: String,
-        events: Vec<String>,
-    },
-    Cron {
-        schedule: String,
-    },
-    Manual,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Trigger {
+#[serde(rename_all = "camelCase")]
+pub struct TriggerTemplate {
     pub id: Uuid,
     pub name: String,
-    pub trigger_type: TriggerType,
-    pub pipeline_id: Uuid,
-    pub params: Vec<ParameterValue>,
-    pub config: TriggerConfig,
-    pub enabled: bool,
+    pub pipeline_ref: String,
+    #[serde(default)]
+    pub params: Vec<TriggerParam>,
+    #[serde(default)]
+    pub workspace_bindings: Vec<TriggerWorkspaceBinding>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerParam {
+    pub name: String,
+    /// CEL expression or literal value.
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerWorkspaceBinding {
+    pub name: String,
+    pub binding_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TriggerBinding {
+    pub id: Uuid,
+    pub name: String,
+    #[serde(default)]
+    pub params: Vec<TriggerBindingParam>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerBindingParam {
+    pub name: String,
+    /// JSONPath or CEL expression extracting value from event payload.
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventListener {
+    pub id: Uuid,
+    pub name: String,
+    pub triggers: Vec<ListenerTrigger>,
     pub created_at: DateTime<Utc>,
 }
 
-impl Trigger {
-    pub fn new(name: impl Into<String>, pipeline_id: Uuid, config: TriggerConfig) -> Self {
-        let trigger_type = match &config {
-            TriggerConfig::Webhook { .. } => TriggerType::Webhook,
-            TriggerConfig::GitHubWebhook { .. } => TriggerType::GitHubWebhook,
-            TriggerConfig::GitLabWebhook { .. } => TriggerType::GitLabWebhook,
-            TriggerConfig::Cron { .. } => TriggerType::Cron,
-            TriggerConfig::Manual => TriggerType::Manual,
-        };
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListenerTrigger {
+    pub name: String,
+    pub interceptors: Vec<Interceptor>,
+    pub bindings: Vec<String>,
+    pub template: String,
+}
+
+// ─── Interceptors (CEL-based filtering) ──────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum Interceptor {
+    /// CEL filter — event only passes if expression evaluates to true.
+    Cel { filter: String, overlays: Vec<CelOverlay> },
+    /// GitHub-specific interceptor (HMAC signature validation).
+    GitHub { secret_ref: String, event_types: Vec<String> },
+    /// Bitbucket interceptor.
+    Bitbucket { secret_ref: String, event_types: Vec<String> },
+    /// Webhook interceptor (URL-based forwarding).
+    Webhook { url: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CelOverlay {
+    pub key: String,
+    pub expression: String,
+}
+
+// ─── CEL evaluator (simplified) ──────────────────────────────────────────────
+
+/// Evaluate a simplified CEL expression against a JSON body.
+/// Supports: equality, &&, ||, body.field access, string literals.
+pub fn evaluate_cel(expr: &str, body: &serde_json::Value) -> bool {
+    let trimmed = expr.trim();
+
+    // AND
+    if let Some((left, right)) = split_logical(trimmed, "&&") {
+        return evaluate_cel(left, body) && evaluate_cel(right, body);
+    }
+
+    // OR
+    if let Some((left, right)) = split_logical(trimmed, "||") {
+        return evaluate_cel(left, body) || evaluate_cel(right, body);
+    }
+
+    // NOT
+    if trimmed.starts_with('!') {
+        return !evaluate_cel(&trimmed[1..], body);
+    }
+
+    // Equality: body.X.Y == 'value'
+    if let Some((lhs, rhs)) = split_at_op(trimmed, "==") {
+        let lhs_val = resolve_cel_path(lhs.trim(), body);
+        let rhs_val = strip_quotes(rhs.trim());
+        return lhs_val.as_deref() == Some(rhs_val);
+    }
+
+    // Not-equal
+    if let Some((lhs, rhs)) = split_at_op(trimmed, "!=") {
+        let lhs_val = resolve_cel_path(lhs.trim(), body);
+        let rhs_val = strip_quotes(rhs.trim());
+        return lhs_val.as_deref() != Some(rhs_val);
+    }
+
+    // .matches('regex') — simplified
+    if let Some(idx) = trimmed.find(".matches('") {
+        let path = &trimmed[..idx];
+        let rest = &trimmed[idx + ".matches('".len()..];
+        if let Some(end) = rest.find("')") {
+            let pattern = &rest[..end];
+            if let Some(val) = resolve_cel_path(path, body) {
+                return regex::Regex::new(pattern).map(|r| r.is_match(&val)).unwrap_or(false);
+            }
+        }
+    }
+
+    // Fallback: field existence check
+    resolve_cel_path(trimmed, body).is_some()
+}
+
+fn split_logical<'a>(expr: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
+    // Find op not inside parens or quotes
+    let bytes = expr.as_bytes();
+    let mut depth = 0i32;
+    let op_bytes = op.as_bytes();
+    let n = bytes.len();
+    let m = op_bytes.len();
+    if n < m { return None; }
+    for i in 0..=(n - m) {
+        match bytes[i] {
+            b'(' => depth += 1,
+            b')' => depth -= 1,
+            _ => {}
+        }
+        if depth == 0 && &bytes[i..i + m] == op_bytes {
+            return Some((&expr[..i], &expr[i + m..]));
+        }
+    }
+    None
+}
+
+fn split_at_op<'a>(expr: &'a str, op: &str) -> Option<(&'a str, &'a str)> {
+    expr.find(op).map(|i| (&expr[..i], &expr[i + op.len()..]))
+}
+
+fn strip_quotes(s: &str) -> &str {
+    if (s.starts_with('\'') && s.ends_with('\''))
+        || (s.starts_with('"') && s.ends_with('"'))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
+}
+
+fn resolve_cel_path(path: &str, body: &serde_json::Value) -> Option<String> {
+    let parts: Vec<&str> = path.split('.').collect();
+    let mut current = body;
+    for part in &parts {
+        if *part == "body" {
+            continue;
+        }
+        current = current.get(part)?;
+    }
+    match current {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
+        _ => None,
+    }
+}
+
+// ─── Cron trigger ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronTrigger {
+    pub id: Uuid,
+    pub name: String,
+    pub schedule: String,
+    pub pipeline_ref: String,
+    #[serde(default)]
+    pub params: Vec<Param>,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+    pub last_run: Option<DateTime<Utc>>,
+    pub next_run: Option<DateTime<Utc>>,
+}
+
+// ─── Git push trigger ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitPushTrigger {
+    pub id: Uuid,
+    pub name: String,
+    pub repo_url: String,
+    #[serde(default)]
+    pub branches: Vec<String>,
+    #[serde(default)]
+    pub paths: Vec<String>,
+    pub pipeline_ref: String,
+    #[serde(default)]
+    pub params: Vec<TriggerParam>,
+    pub webhook_secret: Option<String>,
+}
+
+// ─── Incoming webhook event ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebhookEvent {
+    pub event_type: String,
+    pub source: String,
+    pub headers: HashMap<String, String>,
+    pub body: serde_json::Value,
+    pub received_at: DateTime<Utc>,
+}
+
+impl WebhookEvent {
+    pub fn new(event_type: impl Into<String>, body: serde_json::Value) -> Self {
         Self {
-            id: Uuid::new_v4(),
-            name: name.into(),
-            trigger_type,
-            pipeline_id,
-            params: Vec::new(),
-            config,
-            enabled: true,
-            created_at: Utc::now(),
+            event_type: event_type.into(),
+            source: "unknown".to_string(),
+            headers: HashMap::new(),
+            body,
+            received_at: Utc::now(),
         }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Error)]
-pub enum TriggerError {
-    #[error("Invalid cron expression '{expr}': {reason}")]
-    InvalidCron { expr: String, reason: String },
-    #[error("Webhook signature verification failed")]
-    InvalidSignature,
-    #[error("Unsupported event: {0}")]
-    UnsupportedEvent(String),
-}
-
-// ---------------------------------------------------------------------------
-// Cron validation (basic 5-field standard cron)
-// ---------------------------------------------------------------------------
-
-/// Validate a standard 5-field cron expression (minute hour dom month dow).
-pub fn validate_cron(expr: &str) -> Result<(), TriggerError> {
-    let fields: Vec<&str> = expr.split_whitespace().collect();
-    if fields.len() != 5 {
-        return Err(TriggerError::InvalidCron {
-            expr: expr.to_string(),
-            reason: format!("expected 5 fields, got {}", fields.len()),
-        });
+/// Check if a webhook event passes all interceptors.
+pub fn passes_interceptors(event: &WebhookEvent, interceptors: &[Interceptor]) -> bool {
+    for interceptor in interceptors {
+        match interceptor {
+            Interceptor::Cel { filter, .. } => {
+                if !evaluate_cel(filter, &event.body) {
+                    return false;
+                }
+            }
+            Interceptor::GitHub { event_types, .. } => {
+                if !event_types.is_empty() {
+                    let header_event = event
+                        .headers
+                        .get("x-github-event")
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    if !event_types.iter().any(|et| et == header_event) {
+                        return false;
+                    }
+                }
+            }
+            Interceptor::Bitbucket { event_types, .. } => {
+                if !event_types.is_empty() {
+                    let header_event = event
+                        .headers
+                        .get("x-event-key")
+                        .map(|s| s.as_str())
+                        .unwrap_or("");
+                    if !event_types.iter().any(|et| et == header_event) {
+                        return false;
+                    }
+                }
+            }
+            Interceptor::Webhook { .. } => {}
+        }
     }
-    Ok(())
+    true
 }
-
-// ---------------------------------------------------------------------------
-// Webhook helpers
-// ---------------------------------------------------------------------------
-
-/// Verify a GitHub webhook HMAC-SHA256 signature header.
-/// `signature` format: `"sha256=<hex>"`.
-/// Real implementation would use ring::hmac; this validates the format contract.
-pub fn verify_github_signature(payload: &[u8], signature: &str, secret: &str) -> bool {
-    let Some(hex) = signature.strip_prefix("sha256=") else {
-        return false;
-    };
-    !hex.is_empty() && !secret.is_empty() && !payload.is_empty()
-}
-
-/// Check whether the incoming event name matches the trigger's allowed events.
-/// An empty allow-list or `"*"` entry accepts everything.
-pub fn event_matches(trigger_events: &[String], incoming: &str) -> bool {
-    trigger_events.is_empty()
-        || trigger_events.iter().any(|e| e == "*" || e == incoming)
-}
-
-/// Check whether a git ref matches an optional filter pattern.
-/// Patterns ending in `*` are prefix-matched; otherwise exact match.
-pub fn ref_matches(filter: Option<&str>, git_ref: &str) -> bool {
-    match filter {
-        None => true,
-        Some(f) if f.ends_with('*') => git_ref.starts_with(&f[..f.len() - 1]),
-        Some(f) => git_ref == f,
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // --- cron validation ---
+    use serde_json::json;
 
     #[test]
-    fn test_cron_valid_expressions() {
-        assert!(validate_cron("0 */6 * * *").is_ok());
-        assert!(validate_cron("30 2 * * 1").is_ok());
-        assert!(validate_cron("0 0 * * *").is_ok());
-        assert!(validate_cron("*/15 * * * *").is_ok());
+    fn cel_equality() {
+        let body = json!({"ref": "refs/heads/main"});
+        assert!(evaluate_cel("body.ref == 'refs/heads/main'", &body));
+        assert!(!evaluate_cel("body.ref == 'refs/heads/dev'", &body));
     }
 
     #[test]
-    fn test_cron_invalid_too_few_fields() {
-        assert!(validate_cron("0 * *").is_err());
-        assert!(validate_cron("").is_err());
+    fn cel_and_operator() {
+        let body = json!({"action": "push", "repository": {"private": "false"}});
+        let expr = "body.action == 'push' && body.repository.private == 'false'";
+        assert!(evaluate_cel(expr, &body));
     }
 
     #[test]
-    fn test_cron_invalid_too_many_fields() {
-        // 6-field (with seconds) is not standard 5-field cron
-        assert!(validate_cron("0 * * * * *").is_err());
-    }
-
-    // --- event matching ---
-
-    #[test]
-    fn test_event_matches_wildcard() {
-        let events = vec!["*".to_string()];
-        assert!(event_matches(&events, "push"));
-        assert!(event_matches(&events, "pull_request"));
-        assert!(event_matches(&events, "anything"));
+    fn cel_or_operator() {
+        let body = json!({"action": "opened"});
+        assert!(evaluate_cel("body.action == 'opened' || body.action == 'reopened'", &body));
     }
 
     #[test]
-    fn test_event_matches_specific_allowed() {
-        let events = vec!["push".to_string(), "pull_request".to_string()];
-        assert!(event_matches(&events, "push"));
-        assert!(event_matches(&events, "pull_request"));
-        assert!(!event_matches(&events, "delete"));
+    fn cel_not_equal() {
+        let body = json!({"status": "draft"});
+        assert!(evaluate_cel("body.status != 'open'", &body));
+        assert!(!evaluate_cel("body.status != 'draft'", &body));
     }
 
     #[test]
-    fn test_event_matches_empty_list_accepts_all() {
-        assert!(event_matches(&[], "push"));
-        assert!(event_matches(&[], "anything"));
-    }
-
-    // --- ref filter ---
-
-    #[test]
-    fn test_ref_filter_exact_match() {
-        assert!(ref_matches(Some("refs/heads/main"), "refs/heads/main"));
-        assert!(!ref_matches(Some("refs/heads/main"), "refs/heads/develop"));
+    fn passes_interceptors_github() {
+        let mut event = WebhookEvent::new("push", json!({}));
+        event.headers.insert("x-github-event".to_string(), "push".to_string());
+        let interceptors = vec![Interceptor::GitHub {
+            secret_ref: "my-secret".to_string(),
+            event_types: vec!["push".to_string()],
+        }];
+        assert!(passes_interceptors(&event, &interceptors));
     }
 
     #[test]
-    fn test_ref_filter_prefix_wildcard() {
-        assert!(ref_matches(Some("refs/heads/*"), "refs/heads/main"));
-        assert!(ref_matches(Some("refs/heads/*"), "refs/heads/feature-x"));
-        assert!(!ref_matches(Some("refs/tags/*"), "refs/heads/main"));
+    fn passes_interceptors_github_filtered() {
+        let mut event = WebhookEvent::new("pull_request", json!({}));
+        event.headers.insert("x-github-event".to_string(), "pull_request".to_string());
+        let interceptors = vec![Interceptor::GitHub {
+            secret_ref: "my-secret".to_string(),
+            event_types: vec!["push".to_string()],
+        }];
+        assert!(!passes_interceptors(&event, &interceptors));
     }
 
     #[test]
-    fn test_ref_filter_none_matches_all() {
-        assert!(ref_matches(None, "refs/heads/anything"));
-        assert!(ref_matches(None, "refs/tags/v1.0"));
-    }
-
-    // --- trigger construction ---
-
-    #[test]
-    fn test_trigger_type_inferred_from_config() {
-        let pid = Uuid::new_v4();
-        let t = Trigger::new("ci", pid, TriggerConfig::Cron { schedule: "0 * * * *".to_string() });
-        assert_eq!(t.trigger_type, TriggerType::Cron);
-        assert!(t.enabled);
-        assert_eq!(t.pipeline_id, pid);
+    fn passes_interceptors_cel() {
+        let event = WebhookEvent::new("push", json!({"ref": "refs/heads/main"}));
+        let interceptors = vec![Interceptor::Cel {
+            filter: "body.ref == 'refs/heads/main'".to_string(),
+            overlays: vec![],
+        }];
+        assert!(passes_interceptors(&event, &interceptors));
     }
 }
