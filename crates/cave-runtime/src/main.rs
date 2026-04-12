@@ -58,10 +58,15 @@ async fn main() -> anyhow::Result<()> {
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
 >>>>>>> claude/cranky-hellman
+=======
+    let docs_site_state = Arc::new(cave_docs_site::DocsSiteState::default());
+    let dns_state = Arc::new(cave_dns::DnsState::default());
+>>>>>>> claude/cranky-khorana
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -75,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
@@ -96,6 +102,10 @@ async fn main() -> anyhow::Result<()> {
 =======
         // GitOps
         .merge(cave_deploy::router(deploy_state))
+=======
+        .merge(cave_docs_site::router(docs_site_state))
+        .merge(cave_dns::router(dns_state))
+>>>>>>> claude/cranky-khorana
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -106,6 +116,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
+<<<<<<< HEAD
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
@@ -113,6 +124,10 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or(false),
         "Auth layer active"
     );
+=======
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Phase 5 modules: docs-site, dns");
+>>>>>>> claude/cranky-khorana
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -142,7 +157,12 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+<<<<<<< HEAD
             "pg": true,
+=======
+            "docs-site": true,
+            "dns": true,
+>>>>>>> claude/cranky-khorana
         }
     }))
 }
