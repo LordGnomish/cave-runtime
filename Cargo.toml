@@ -104,6 +104,7 @@ members = [
     "crates/cave-gitops-config",
     # === Service Mesh ===
     # === API Gateway ===
+    "crates/cave-runbook",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===
