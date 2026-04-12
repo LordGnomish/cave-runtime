@@ -2,7 +2,6 @@
 
 use crate::State;
 use axum::{
-    extract::State as AxumState,
     routing::get,
     Json, Router,
 };
