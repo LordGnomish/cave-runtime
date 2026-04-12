@@ -1,23 +1,45 @@
-//! Kubernetes backup/restore — replaces Velero
+//! CAVE Backup — Kubernetes backup/restore engine.
 //!
 //! Replaces: Velero
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Features: full/namespace/label-selector backup, S3/Azure/GCS/local targets,
+//! cron schedules with retention, CSI snapshots, restic/kopia file backup,
+//! pre/post hooks, cross-cluster restore, AES-256 encryption.
 
+pub mod engine;
+pub mod hooks;
 pub mod routes;
+<<<<<<< HEAD
 pub mod models;
 pub mod engine;
+=======
+pub mod schedule;
+pub mod storage;
+pub mod types;
+pub mod volume;
+>>>>>>> claude/gallant-meninsky
 
 use axum::Router;
-use cave_db::CavePool;
 use std::sync::Arc;
 
-/// Module state.
-pub struct State {
-    pub pool: Arc<CavePool>,
+pub struct BackupState {
+    pub store: Arc<storage::BackupStore>,
 }
 
-/// Create the axum router for this module.
-pub fn router(state: Arc<State>) -> Router {
+impl BackupState {
+    pub fn new() -> Self {
+        Self {
+            store: Arc::new(storage::BackupStore::new()),
+        }
+    }
+}
+
+impl Default for BackupState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub fn router(state: Arc<BackupState>) -> Router {
     routes::create_router(state)
 }
 
