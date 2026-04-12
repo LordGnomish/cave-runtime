@@ -1,24 +1,14 @@
 [package]
 name = "cave-cache"
-<<<<<<< HEAD
-<<<<<<< HEAD
 description = "Distributed cache — Redis/Valkey replacement with pub/sub"
-=======
 description = "In-memory cache — Redis replacement with all data types, pub/sub, transactions"
->>>>>>> claude/dazzling-tesla
-=======
 description = "Distributed cache — Redis/Valkey replacement with pub/sub"
->>>>>>> claude/jovial-faraday
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -26,8 +16,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-<<<<<<< HEAD
-=======
 tokio = { workspace = true }
 axum = { workspace = true }
 serde = { workspace = true }
@@ -37,9 +25,5 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 ring = { workspace = true }
-
 [dev-dependencies]
 tokio = { workspace = true }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday

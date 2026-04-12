@@ -1,35 +1,21 @@
 [package]
 name = "cave-docs-site"
-<<<<<<< HEAD
 description = "Developer documentation platform — replaces GitBook / Docusaurus"
-=======
 description = "Documentation site — GitBook replacement: markdown, spaces, pages, search, versioning"
->>>>>>> claude/dazzling-tesla
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-=======
-tokio = { workspace = true }
-axum = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
->>>>>>> claude/dazzling-tesla
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-<<<<<<< HEAD
-=======
 pulldown-cmark = { workspace = true }
-
 [dev-dependencies]
 tokio = { workspace = true }
->>>>>>> claude/dazzling-tesla

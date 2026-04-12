@@ -1,17 +1,13 @@
 [package]
 name = "cave-gitops-config"
-<<<<<<< HEAD
 description = "CAVE GitOps Config — Platform-as-a-product promise management"
-=======
 description = "Platform API — Kratix/Crossplane Compositions replacement for CAVE unified runtime"
->>>>>>> claude/modest-yonath
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
 axum = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -21,15 +17,5 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-=======
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
-axum = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
-thiserror = { workspace = true }
->>>>>>> claude/modest-yonath

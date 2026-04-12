@@ -70,7 +70,6 @@ pub struct Permission {
 }
 
 impl CaveIdentity {
-<<<<<<< HEAD
     /// Check if this identity has the required permission.
     /// Falls back to role-based evaluation when no explicit permissions are set.
     pub fn has_permission(&self, module: &str, action: &str) -> bool {
@@ -82,7 +81,6 @@ impl CaveIdentity {
             || self.permissions.contains(&"*".to_string())
         {
             return true;
-=======
     /// Check if this identity has the required permission
     pub fn has_permission(&self, _module: &str, action: &str) -> bool {
         match self.roles.first() {
@@ -99,7 +97,6 @@ impl CaveIdentity {
                 action.contains("read") || action.contains("list")
             }
             None => false,
->>>>>>> claude/heuristic-payne
         }
 
         // Fall back to coarse role evaluation

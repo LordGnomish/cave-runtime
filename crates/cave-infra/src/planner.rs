@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/interesting-khorana
 //! LLM-powered planner — generate, optimize, cost-estimate, risk-score plans.
 //!
 //! In production `generate_plan` sends the intent + state diff to a local LLM
@@ -244,18 +239,12 @@ fn monthly_cost(resource_type: &str) -> f64 {
         "virtual_machine" => 25.0,
         "object_storage" => 5.0,
         _ => 20.0,
-<<<<<<< HEAD
-=======
 //! LLM infrastructure planner — turns a parsed intent into an actionable plan.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
 use crate::providers::ResourceType;
-
 // ── PlannedResource ───────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlannedResource {
     /// Logical ID within this plan.
@@ -268,9 +257,7 @@ pub struct PlannedResource {
     pub depends_on: Vec<String>,
     pub estimated_cost_usd: Option<f64>,
 }
-
 // ── PlanStatus ────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PlanStatus {
     Draft,
@@ -281,9 +268,7 @@ pub enum PlanStatus {
     Applied,
     Failed(String),
 }
-
 // ── InfraPlan ─────────────────────────────────────────────────────────────────
-
 /// A complete infrastructure change-set derived from an intent.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfraPlan {
@@ -300,7 +285,6 @@ pub struct InfraPlan {
     pub approved_by: Option<Uuid>,
     pub approved_at: Option<DateTime<Utc>>,
 }
-
 impl InfraPlan {
     pub fn new(intent_id: Uuid, tenant_id: &str) -> Self {
         Self {
@@ -317,7 +301,6 @@ impl InfraPlan {
             approved_at: None,
         }
     }
-
     /// Sum the estimated costs of all resources in this plan.
     pub fn total_estimated_cost(&self) -> f64 {
         let create: f64 = self
@@ -332,7 +315,6 @@ impl InfraPlan {
             .sum();
         create + update
     }
-
     /// Total number of resource operations planned.
     pub fn resource_count(&self) -> usize {
         self.resources_to_create.len()
@@ -340,9 +322,7 @@ impl InfraPlan {
             + self.resources_to_destroy.len()
     }
 }
-
 // ── PlannerError ──────────────────────────────────────────────────────────────
-
 #[derive(Debug, thiserror::Error)]
 pub enum PlannerError {
     #[error("LLM unavailable: {0}")]
@@ -352,9 +332,7 @@ pub enum PlannerError {
     #[error("Rate limited")]
     RateLimited,
 }
-
 // ── InfraPlanner trait ────────────────────────────────────────────────────────
-
 /// Planners turn an intent into a concrete `InfraPlan`.
 #[async_trait::async_trait]
 pub trait InfraPlanner: Send + Sync {
@@ -363,16 +341,13 @@ pub trait InfraPlanner: Send + Sync {
         intent: &crate::intent::InfraIntent,
     ) -> Result<InfraPlan, PlannerError>;
 }
-
 // ── LlmPlanner ────────────────────────────────────────────────────────────────
-
 /// HTTP-based LLM planner (calls Claude API or compatible endpoint).
 pub struct LlmPlanner {
     pub api_endpoint: String,
     pub api_key: String,
     client: reqwest::Client,
 }
-
 impl LlmPlanner {
     pub fn new(api_endpoint: &str, api_key: &str) -> Self {
         Self {
@@ -382,7 +357,6 @@ impl LlmPlanner {
         }
     }
 }
-
 #[async_trait::async_trait]
 impl InfraPlanner for LlmPlanner {
     async fn generate_plan(
@@ -399,7 +373,6 @@ impl InfraPlanner for LlmPlanner {
                 )
             }]
         });
-
         let resp = self
             .client
             .post(&self.api_endpoint)
@@ -408,37 +381,30 @@ impl InfraPlanner for LlmPlanner {
             .send()
             .await
             .map_err(|e| PlannerError::LlmUnavailable(e.to_string()))?;
-
         if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
             return Err(PlannerError::RateLimited);
         }
-
         if !resp.status().is_success() {
             return Err(PlannerError::LlmUnavailable(format!(
                 "HTTP {}",
                 resp.status()
             )));
         }
-
         // A real implementation would parse the LLM response; here we return
         // an empty draft plan to keep the HTTP path compiling.
         Ok(InfraPlan::new(intent.id, &intent.tenant_id))
     }
 }
-
 // ── MockPlanner ───────────────────────────────────────────────────────────────
-
 /// Deterministic mock planner for tests.
 pub struct MockPlanner {
     pub resources: Vec<PlannedResource>,
 }
-
 impl MockPlanner {
     pub fn new(resources: Vec<PlannedResource>) -> Self {
         Self { resources }
     }
 }
-
 #[async_trait::async_trait]
 impl InfraPlanner for MockPlanner {
     async fn generate_plan(
@@ -455,14 +421,11 @@ impl InfraPlanner for MockPlanner {
         Ok(plan)
     }
 }
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::intent::InfraIntent;
-
     fn make_planned_resource(id: &str, cost: f64) -> PlannedResource {
         PlannedResource {
             id: id.to_string(),
@@ -474,7 +437,6 @@ mod tests {
             estimated_cost_usd: Some(cost),
         }
     }
-
     #[tokio::test]
     async fn test_mock_planner_generates_plan() {
         let resources = vec![
@@ -482,16 +444,13 @@ mod tests {
             make_planned_resource("r2", 20.0),
         ];
         let planner = MockPlanner::new(resources);
-
         let user = uuid::Uuid::new_v4();
         let intent = InfraIntent::new("deploy two vms", "t1", user);
-
         let plan = planner.generate_plan(&intent).await.unwrap();
         assert_eq!(plan.intent_id, intent.id);
         assert_eq!(plan.tenant_id, "t1");
         assert_eq!(plan.resources_to_create.len(), 2);
     }
-
     #[tokio::test]
     async fn test_plan_resource_count_and_cost() {
         let resources = vec![
@@ -499,20 +458,13 @@ mod tests {
             make_planned_resource("b", 15.0),
         ];
         let planner = MockPlanner::new(resources);
-
         let user = uuid::Uuid::new_v4();
         let intent = InfraIntent::new("two small vms", "t2", user);
         let plan = planner.generate_plan(&intent).await.unwrap();
-
         assert_eq!(plan.resource_count(), 2);
         assert!((plan.total_estimated_cost() - 20.0).abs() < f64::EPSILON);
->>>>>>> claude/great-sanderson
-=======
->>>>>>> claude/interesting-khorana
     }
-=======
 //! LLM-powered execution plan generation and optimization.
-
 use crate::intent::diff_state;
 use crate::models::{
     CostEstimate, ExecutionPlan, InfraIntent, InfraState, PlanStep, PolicyCheck, PolicySeverity,
@@ -521,16 +473,13 @@ use crate::models::{
 use anyhow::Result;
 use std::collections::HashMap;
 use uuid::Uuid;
-
 /// Generate an `ExecutionPlan` from an intent + current state.
 ///
 /// In production this would call an LLM via MCP or HTTP.  Here we implement
 /// the deterministic skeleton: diff → steps → rollback → cost → risk.
 pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<ExecutionPlan> {
     let mut plan = ExecutionPlan::new(intent.id);
-
     let (to_create, to_update, to_delete) = diff_state(state);
-
     // Build forward steps.
     for r in &to_create {
         let tool = format!("{}_create_{}", r.provider, r.resource_type);
@@ -550,7 +499,6 @@ pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<Executi
         // Map resource dep IDs → step IDs (best-effort; same name).
         plan.steps.push(step);
     }
-
     for r in &to_update {
         let tool = format!("{}_update_{}", r.provider, r.resource_type);
         let mut step = PlanStep::new(
@@ -568,7 +516,6 @@ pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<Executi
             .collect();
         plan.steps.push(step);
     }
-
     for r in &to_delete {
         let tool = format!("{}_delete_{}", r.provider, r.resource_type);
         let step = PlanStep::new(
@@ -581,14 +528,12 @@ pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<Executi
         );
         plan.steps.push(step);
     }
-
     // Wire step-level depends_on by matching resource dependency names to step IDs.
     let step_ids_by_resource: HashMap<String, Uuid> = plan
         .steps
         .iter()
         .map(|s| (s.resource_name.clone(), s.id))
         .collect();
-
     // For each desired resource, propagate its deps to the corresponding step.
     for desired in &state.desired {
         if let Some(&step_id) = step_ids_by_resource.get(&desired.name) {
@@ -604,13 +549,11 @@ pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<Executi
                         .copied()
                 })
                 .collect();
-
             if let Some(step) = plan.steps.iter_mut().find(|s| s.id == step_id) {
                 step.depends_on = dep_step_ids;
             }
         }
     }
-
     // Rollback = reverse delete-what-was-created, create-what-was-deleted.
     plan.rollback_steps = plan
         .steps
@@ -635,37 +578,29 @@ pub fn generate_plan(intent: &InfraIntent, state: &InfraState) -> Result<Executi
             rb
         })
         .collect();
-
     plan.cost_estimate = Some(estimate_cost(&plan));
     plan.risk_score = assess_risk(&plan, state);
     plan.explanation = explain_plan(&plan, intent);
-
     Ok(optimize_plan(plan))
 }
-
 /// Reorder / mark parallelizable steps that have no shared dependencies.
 pub fn optimize_plan(mut plan: ExecutionPlan) -> ExecutionPlan {
     // Group steps by depth level (topological layers).
     let mut depth: HashMap<Uuid, usize> = HashMap::new();
-
     for step in &plan.steps {
         compute_depth(step.id, &plan.steps, &mut depth);
     }
-
     // Steps at the same depth with no shared deps can run in parallel.
     let mut depth_counts: HashMap<usize, usize> = HashMap::new();
     for &d in depth.values() {
         *depth_counts.entry(d).or_default() += 1;
     }
-
     for step in &mut plan.steps {
         let d = depth.get(&step.id).copied().unwrap_or(0);
         step.parallelizable = depth_counts.get(&d).copied().unwrap_or(1) > 1;
     }
-
     plan
 }
-
 fn compute_depth(id: Uuid, steps: &[PlanStep], depth: &mut HashMap<Uuid, usize>) -> usize {
     if let Some(&d) = depth.get(&id) {
         return d;
@@ -686,12 +621,10 @@ fn compute_depth(id: Uuid, steps: &[PlanStep], depth: &mut HashMap<Uuid, usize>)
     depth.insert(id, d);
     d
 }
-
 /// Heuristic cost estimate — $10/month per resource, adjusted by type.
 pub fn estimate_cost(plan: &ExecutionPlan) -> CostEstimate {
     let mut breakdown = HashMap::new();
     let mut total = 0.0;
-
     for step in &plan.steps {
         if step.operation == StepOperation::Delete {
             continue;
@@ -706,7 +639,6 @@ pub fn estimate_cost(plan: &ExecutionPlan) -> CostEstimate {
         breakdown.insert(step.resource_name.clone(), base);
         total += base;
     }
-
     CostEstimate {
         monthly_usd: total,
         breakdown,
@@ -718,20 +650,17 @@ pub fn estimate_cost(plan: &ExecutionPlan) -> CostEstimate {
         ],
     }
 }
-
 /// Compute blast-radius risk score (0.0 = safe, 1.0 = very risky).
 pub fn assess_risk(plan: &ExecutionPlan, state: &InfraState) -> f64 {
     let total = plan.steps.len() as f64;
     if total == 0.0 {
         return 0.0;
     }
-
     let deletes = plan
         .steps
         .iter()
         .filter(|s| s.operation == StepOperation::Delete)
         .count() as f64;
-
     let prod_penalty = if state.desired.iter().any(|_| true) {
         // Simple heuristic: if any resource name contains "prod" bump risk.
         let prod_resources = state
@@ -743,24 +672,19 @@ pub fn assess_risk(plan: &ExecutionPlan, state: &InfraState) -> f64 {
     } else {
         0.0
     };
-
     let delete_ratio = (deletes / total) * 0.5;
     let size_penalty = (total / 50.0).min(0.2);
-
     (delete_ratio + size_penalty + prod_penalty).min(1.0)
 }
-
 /// Evaluate OPA-style policies against a plan.
 pub fn evaluate_policies(plan: &ExecutionPlan) -> Vec<PolicyCheck> {
     let mut checks = Vec::new();
-
     // Policy: no more than 10 deletes in a single plan.
     let delete_count = plan
         .steps
         .iter()
         .filter(|s| s.operation == StepOperation::Delete)
         .count();
-
     checks.push(PolicyCheck {
         policy_name: "max-deletes-per-plan".into(),
         passed: delete_count <= 10,
@@ -774,7 +698,6 @@ pub fn evaluate_policies(plan: &ExecutionPlan) -> Vec<PolicyCheck> {
         },
         severity: PolicySeverity::Error,
     });
-
     // Policy: high-risk plans require explicit approval.
     let risk = plan.risk_score;
     checks.push(PolicyCheck {
@@ -790,7 +713,6 @@ pub fn evaluate_policies(plan: &ExecutionPlan) -> Vec<PolicyCheck> {
         },
         severity: PolicySeverity::Critical,
     });
-
     // Policy: rollback steps must exist if there are creates.
     let has_creates = plan
         .steps
@@ -806,10 +728,8 @@ pub fn evaluate_policies(plan: &ExecutionPlan) -> Vec<PolicyCheck> {
         },
         severity: PolicySeverity::Warning,
     });
-
     checks
 }
-
 /// Generate a human-readable explanation of the plan.
 pub fn explain_plan(plan: &ExecutionPlan, intent: &InfraIntent) -> String {
     let creates = plan
@@ -827,18 +747,15 @@ pub fn explain_plan(plan: &ExecutionPlan, intent: &InfraIntent) -> String {
         .iter()
         .filter(|s| s.operation == StepOperation::Delete)
         .count();
-
     let cost_str = plan
         .cost_estimate
         .as_ref()
         .map(|c| format!("${:.2}/month", c.monthly_usd))
         .unwrap_or_else(|| "unknown".into());
-
     let intent_desc = intent
         .natural_language
         .as_deref()
         .unwrap_or(intent.name.as_str());
-
     format!(
         "Plan for intent '{}' (env: {}):\n\
          • {} resource(s) to create\n\
@@ -856,5 +773,4 @@ pub fn explain_plan(plan: &ExecutionPlan, intent: &InfraIntent) -> String {
         plan.risk_score,
         plan.rollback_steps.len(),
     )
->>>>>>> claude/silly-matsumoto
 }

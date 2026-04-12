@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! CAVE Cluster — Kubernetes cluster lifecycle management.
 //!
 //! Replaces Rancher, Gardener, and Cluster API with a Rust-native control
@@ -68,15 +67,12 @@ pub fn router(state: Arc<ClusterState>) -> Router {
 
 /// Module name constant (used for logging and DB schema namespacing).
 pub const MODULE_NAME: &str = "cluster";
-=======
 pub mod cluster;
-pub mod health;
 pub mod k8s_distro;
 pub mod multi_cluster;
 pub mod node;
 pub mod tenant_ns;
 pub mod upgrade;
-
 pub use cluster::{
     Cluster, ClusterError, ClusterManager, ClusterProvider, ClusterSpec, ClusterState,
     KubernetesDistro,
@@ -95,4 +91,3 @@ pub use tenant_ns::{
     LimitRange, NamespaceProvisioner, NamespaceStatus, ResourceQuota, TenantNamespace,
 };
 pub use upgrade::{UpgradeManager, UpgradePlan, UpgradeStatus, UpgradeStrategy};
->>>>>>> claude/great-sanderson

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Data models for cave-gitops-config.
 
 use chrono::{DateTime, Utc};
@@ -59,7 +58,6 @@ pub struct Promise {
     /// Names of other promises this one depends on.
     pub dependencies: Vec<String>,
     pub destination_selectors: Vec<DestinationSelector>,
-=======
 //! Domain models for the CAVE GitOps Config / Platform API.
 //!
 //! Core concepts mirror Kratix Promises + Crossplane Compositions:
@@ -68,38 +66,24 @@ pub struct Promise {
 //! - A `Composition` describes the ordered set of CAVE module calls needed
 //!   to fulfil a Promise.
 //! - A `ResourceClaim` tracks what was actually provisioned.
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-
 // ---------------------------------------------------------------------------
 // Promise
 // ---------------------------------------------------------------------------
-
 /// A platform capability that can be self-serviced by application teams.
 ///
 /// Analogous to a Kratix Promise or an AWS Service Catalog product.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Promise {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
     /// SemVer — bump when the input schema or pipeline changes.
-    pub version: String,
     /// Kubernetes-style API group (e.g. "platform.cave.io").
     pub api_group: String,
     /// JSON Schema that validates developer requests for this Promise.
     pub input_schema: serde_json::Value,
     /// Ordered fulfillment pipeline.
     pub pipeline: Vec<CompositionStep>,
->>>>>>> claude/modest-yonath
     pub status: PromiseStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-<<<<<<< HEAD
 // ─── Resource Request ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,9 +149,7 @@ pub struct ResourceRequest {
     pub pipeline_run: Option<PipelineRun>,
     /// Cluster names where the resource was deployed.
     pub destinations: Vec<String>,
-=======
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum PromiseStatus {
     /// Promise is registered and accepting requests.
     Active,
@@ -175,20 +157,14 @@ pub enum PromiseStatus {
     Deprecated,
     /// Promise is disabled — new requests are rejected.
     Inactive,
-}
-
 // ---------------------------------------------------------------------------
 // PromiseRequest
 // ---------------------------------------------------------------------------
-
 /// A developer's request for a platform capability.
 ///
 /// Analogous to a Kratix Resource Request or a Crossplane Claim.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromiseRequest {
-    pub id: Uuid,
     pub promise_id: Uuid,
-    pub promise_name: String,
     /// The environment this resource should be provisioned in.
     pub environment: String,
     /// Developer-supplied parameters — validated against `Promise.input_schema`.
@@ -200,12 +176,10 @@ pub struct PromiseRequest {
     pub message: Option<String>,
     /// IDs of `ResourceClaim`s produced by fulfilling this request.
     pub claim_ids: Vec<Uuid>,
->>>>>>> claude/modest-yonath
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-<<<<<<< HEAD
 // ─── State Store ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -279,44 +253,30 @@ pub struct RegisterClusterRequest {
     pub name: String,
     pub api_server: String,
     pub labels: Option<HashMap<String, String>>,
-=======
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum RequestStatus {
     Pending,
     Validating,
     Provisioning,
-    Ready,
     Failed,
     /// Pipeline was reversed after a failure.
     RolledBack,
     Deleting,
     Deleted,
-}
-
 // ---------------------------------------------------------------------------
 // Composition + CompositionStep
 // ---------------------------------------------------------------------------
-
 /// Describes how a set of CAVE modules are combined to fulfil a Promise.
 ///
 /// Analogous to a Crossplane Composition.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Composition {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
     pub promise_id: Uuid,
     pub steps: Vec<CompositionStep>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
 /// A single module invocation within a Composition pipeline.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompositionStep {
     /// Display name for this step (used in logs and status messages).
-    pub name: String,
     /// CAVE module to call (e.g. "cave-pg", "cave-vault", "cave-dns").
     pub module: String,
     /// Operation within the module (e.g. "create_database", "write_secret").
@@ -331,16 +291,11 @@ pub struct CompositionStep {
     pub required: bool,
     /// Timeout in seconds for this step (0 = no timeout).
     pub timeout_secs: u64,
-}
-
 // ---------------------------------------------------------------------------
 // PlatformConfig
 // ---------------------------------------------------------------------------
-
 /// Global platform configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlatformConfig {
-    pub id: Uuid,
     /// Human-readable name for this platform instance.
     pub platform_name: String,
     pub environments: Vec<Environment>,
@@ -350,33 +305,21 @@ pub struct PlatformConfig {
     /// Supports template variables: `{env}`, `{promise}`, `{request_id}`.
     pub naming_convention: String,
     pub updated_at: DateTime<Utc>,
-}
-
 // ---------------------------------------------------------------------------
 // Environment
 // ---------------------------------------------------------------------------
-
 /// A deployment environment (dev / staging / production, …).
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Environment {
-    pub name: String,
-    pub description: String,
     pub tier: EnvironmentTier,
     /// Constraints applied to every request in this environment.
     pub constraints: EnvironmentConstraints,
     /// Default parameter overrides for this environment.
     pub defaults: serde_json::Value,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum EnvironmentTier {
     Development,
     Staging,
     Production,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvironmentConstraints {
     /// Maximum hourly cost in USD cents allowed for a single request.
     pub max_cost_cents_per_hour: Option<u64>,
@@ -384,16 +327,11 @@ pub struct EnvironmentConstraints {
     pub blocked_promises: Vec<String>,
     /// If true, all requests require a second approval before provisioning.
     pub require_approval: bool,
-}
-
 // ---------------------------------------------------------------------------
 // ResourceClaim
 // ---------------------------------------------------------------------------
-
 /// Tracks a concrete resource provisioned as part of fulfilling a request.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceClaim {
-    pub id: Uuid,
     pub request_id: Uuid,
     pub promise_id: Uuid,
     /// The CAVE module that owns this resource (e.g. "cave-pg").
@@ -410,29 +348,18 @@ pub struct ResourceClaim {
     pub updated_at: DateTime<Utc>,
     /// Set when the resource is deleted.
     pub deleted_at: Option<DateTime<Utc>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum ClaimStatus {
     Provisioning,
-    Ready,
     Degraded,
     Deleting,
     Deleted,
     Failed,
-}
-
 // ---------------------------------------------------------------------------
 // ComplianceCheck
 // ---------------------------------------------------------------------------
-
 /// A validation rule that is evaluated before provisioning begins.
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComplianceCheck {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
     /// Promises this check applies to.  Empty = applies to all.
     pub applies_to_promises: Vec<String>,
     /// Environments this check applies to.  Empty = applies to all.
@@ -440,9 +367,6 @@ pub struct ComplianceCheck {
     pub rule: ComplianceRule,
     pub severity: ComplianceSeverity,
     pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ComplianceRule {
     /// The request parameter at `field` must be ≤ `max_value`.
@@ -460,53 +384,30 @@ pub enum ComplianceRule {
     CostLimit { max_cents_per_hour: u64 },
     /// Custom JSONPath expression that must evaluate to `true`.
     JsonPath { expression: String },
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum ComplianceSeverity {
     /// Log the violation but allow provisioning.
     Warning,
     /// Block provisioning.
-    Error,
-}
-
 // ---------------------------------------------------------------------------
 // API request/response helpers
 // ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize)]
-pub struct CreatePromiseRequest {
-    pub name: String,
-    pub description: String,
-    pub version: String,
     pub api_group: String,
     pub input_schema: serde_json::Value,
     pub pipeline: Vec<CompositionStep>,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct CreateCapabilityRequest {
-    pub promise_name: String,
     pub environment: String,
     pub parameters: serde_json::Value,
     pub requested_by: String,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct CreateCompositionRequest {
-    pub name: String,
-    pub description: String,
     pub promise_id: Uuid,
     pub steps: Vec<CompositionStep>,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct CreateEnvironmentRequest {
-    pub name: String,
-    pub description: String,
     pub tier: EnvironmentTier,
     pub constraints: EnvironmentConstraints,
     pub defaults: serde_json::Value,
->>>>>>> claude/modest-yonath
 }

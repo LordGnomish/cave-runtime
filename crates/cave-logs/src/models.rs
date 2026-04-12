@@ -1,23 +1,12 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 //! Domain models for cave-logs.
-=======
 //! Data model: streams (label sets + entries), push/query API types, alerting.
->>>>>>> claude/inspiring-pascal
-=======
 //! Domain models for cave-logs.
->>>>>>> claude/sharp-wiles
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
 // ── Log Level ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,114 +65,10 @@ impl Default for RetentionPolicy {
         Self {
             max_entries: 100_000,
             max_age_hours: 168, // 7 days
-<<<<<<< HEAD
-=======
-//! Loki-compatible data models.
-//!
-//! Mirrors Loki's push and query API shapes so that any
-//! Loki-aware client (Alloy, Promtail, Grafana) works unchanged.
-
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-// ---------------------------------------------------------------------------
-// Push API — POST /loki/api/v1/push
-// ---------------------------------------------------------------------------
-
-/// Top-level push request body.
-/// {"streams": [{...}, ...]}
-#[derive(Debug, Deserialize)]
-pub struct PushRequest {
-    pub streams: Vec<StreamEntry>,
-}
-
-/// A single log stream with its labels and log lines.
-/// {"stream": {"app": "foo"}, "values": [["<ns_ts>", "line"], ...]}
-#[derive(Debug, Deserialize)]
-pub struct StreamEntry {
-    /// Label set for this stream, e.g. {"app": "myapp", "level": "error"}
-    pub stream: HashMap<String, String>,
-    /// Log lines: each is [nanosecond_unix_timestamp_string, log_line_string]
-    pub values: Vec<(String, String)>,
-}
-
-// ---------------------------------------------------------------------------
-// Query result types
-// ---------------------------------------------------------------------------
-
-/// Loki response envelope: {"status":"success","data":{...}}
-=======
-// ─── Label set ───────────────────────────────────────────────────────────────
-
-/// A set of key/value labels that uniquely identify a log stream.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Labels(pub HashMap<String, String>);
-
-impl Labels {
-    pub fn new(map: HashMap<String, String>) -> Self {
-        Self(map)
-    }
-
-    /// Deterministic fingerprint (sorted keys).
-    pub fn fingerprint(&self) -> u64 {
-        self.fingerprint_with_tenant(None)
-    }
-
-    /// Fingerprint scoped to a tenant so identical labels in different tenants
-    /// are stored as distinct streams.
-    pub fn fingerprint_with_tenant(&self, tenant: Option<&str>) -> u64 {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-        let mut pairs: Vec<_> = self.0.iter().collect();
-        pairs.sort_by_key(|(k, _)| k.as_str());
-        let mut h = DefaultHasher::new();
-        tenant.hash(&mut h);
-        for (k, v) in &pairs {
-            k.hash(&mut h);
-            v.hash(&mut h);
-        }
-        h.finish()
-    }
-
-    /// Loki-style selector string: `{app="foo", env="prod"}`.
-    pub fn to_selector(&self) -> String {
-        let mut pairs: Vec<_> = self.0.iter().collect();
-        pairs.sort_by_key(|(k, _)| k.as_str());
-        let inner = pairs
-            .iter()
-            .map(|(k, v)| format!("{}=\"{}\"", k, v))
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!("{{{}}}", inner)
-    }
-
-    /// Check if this label set satisfies all matchers.
-    pub fn matches(&self, matchers: &[LabelMatcher]) -> bool {
-        matchers.iter().all(|m| m.matches_opt(self.0.get(&m.name).map(|s| s.as_str())))
-    }
-
-    /// Merge extracted labels (from parser stages) into a cloned label set.
-    pub fn merged(&self, extra: &HashMap<String, String>) -> Labels {
-        let mut m = self.0.clone();
-        m.extend(extra.iter().map(|(k, v)| (k.clone(), v.clone())));
-        Labels(m)
-    }
-}
-
-impl std::hash::Hash for Labels {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        let mut pairs: Vec<_> = self.0.iter().collect();
-        pairs.sort_by_key(|(k, _)| k.as_str());
-        for (k, v) in pairs {
-            k.hash(state);
-            v.hash(state);
-=======
->>>>>>> claude/sharp-wiles
         }
     }
 }
 
-<<<<<<< HEAD
 // ─── Label matcher ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -260,20 +145,6 @@ pub struct StreamPush {
 
 // ─── Query API ────────────────────────────────────────────────────────────────
 
->>>>>>> claude/inspiring-pascal
-#[derive(Debug, Serialize)]
-pub struct LokiResponse<T: Serialize> {
-    pub status: &'static str,
-    pub data: T,
-}
-
-impl<T: Serialize> LokiResponse<T> {
-    pub fn success(data: T) -> Self {
-        Self { status: "success", data }
-    }
-}
-
-<<<<<<< HEAD
 /// Data portion of a streams query result.
 /// {"resultType":"streams","result":[...]}
 #[derive(Debug, Serialize)]
@@ -322,9 +193,54 @@ impl Default for QueryStats {
                 total_lines_processed: 0,
                 exec_time: 0.0,
             },
->>>>>>> claude/gallant-cartwright
-=======
+/// Data portion of a streams query result.
+/// {"resultType":"streams","result":[...]}
 #[derive(Debug, Serialize)]
+pub struct StreamsData {
+    #[serde(rename = "resultType")]
+    pub result_type: &'static str,
+    pub result: Vec<StreamResult>,
+    pub stats: QueryStats,
+}
+
+/// A single stream result entry.
+/// {"stream": {labels}, "values": [[ts, line], ...]}
+#[derive(Debug, Serialize)]
+pub struct StreamResult {
+    pub stream: HashMap<String, String>,
+    pub values: Vec<(String, String)>,
+}
+
+/// Minimal query stats block (Loki includes this in every response).
+#[derive(Debug, Serialize)]
+pub struct QueryStats {
+    pub summary: StatsSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatsSummary {
+    #[serde(rename = "bytesProcessedPerSecond")]
+    pub bytes_processed_per_second: u64,
+    #[serde(rename = "linesProcessedPerSecond")]
+    pub lines_processed_per_second: u64,
+    #[serde(rename = "totalBytesProcessed")]
+    pub total_bytes_processed: u64,
+    #[serde(rename = "totalLinesProcessed")]
+    pub total_lines_processed: u64,
+    #[serde(rename = "execTime")]
+    pub exec_time: f64,
+}
+
+impl Default for QueryStats {
+    fn default() -> Self {
+        Self {
+            summary: StatsSummary {
+                bytes_processed_per_second: 0,
+                lines_processed_per_second: 0,
+                total_bytes_processed: 0,
+                total_lines_processed: 0,
+                exec_time: 0.0,
+            },
 #[serde(tag = "resultType", rename_all = "camelCase")]
 pub enum QueryData {
     #[serde(rename = "streams")]
@@ -333,44 +249,26 @@ pub enum QueryData {
     Matrix { result: Vec<MatrixResult> },
     #[serde(rename = "vector")]
     Vector { result: Vec<VectorResult> },
-}
-
 #[derive(Debug, Clone, Serialize)]
-pub struct StreamResult {
-    pub stream: HashMap<String, String>,
     /// Each value: `[timestamp_ns_string, log_line]`.
     pub values: Vec<[String; 2]>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct MatrixResult {
     pub metric: HashMap<String, String>,
     /// Each sample: `[unix_timestamp_float, value_string]`.
     pub values: Vec<(f64, String)>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct VectorResult {
     pub metric: HashMap<String, String>,
     pub value: (f64, String),
-}
-
 // ─── Tail API ─────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize)]
 pub struct TailResponse {
     pub streams: Vec<StreamResult>,
     pub dropped_entries: Option<Vec<DroppedEntry>>,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct DroppedEntry {
     pub timestamp: String,
     pub labels: String,
-}
-
 // ─── Alerting ─────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertRule {
     pub id: Uuid,
@@ -382,14 +280,10 @@ pub struct AlertRule {
     pub severity: AlertSeverity,
     pub annotations: HashMap<String, String>,
     pub tenant: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertCondition {
     pub op: CompareOp,
     pub threshold: f64,
-}
-
 impl AlertCondition {
     pub fn eval(&self, value: f64) -> bool {
         match self.op {
@@ -399,15 +293,10 @@ impl AlertCondition {
             CompareOp::Lte => value <= self.threshold,
             CompareOp::Eq => (value - self.threshold).abs() < f64::EPSILON,
             CompareOp::Ne => (value - self.threshold).abs() >= f64::EPSILON,
->>>>>>> claude/inspiring-pascal
         }
     }
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
 // ── Log Query ───────────────────────────────────────────────────────────────
 
 /// Aggregation / operation type for a query (LogQL-like).
@@ -460,8 +349,6 @@ pub enum AlertCondition {
     PatternMatch,
     /// Detect anomalous error rate vs recent baseline.
     AnomalyDetected,
-<<<<<<< HEAD
-=======
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CompareOp {
     Gt,
@@ -470,18 +357,11 @@ pub enum CompareOp {
     Lte,
     Eq,
     Ne,
->>>>>>> claude/inspiring-pascal
-=======
->>>>>>> claude/sharp-wiles
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlertSeverity {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
     Info,
     Warning,
     Critical,
@@ -567,12 +447,9 @@ pub struct LogDashboard {
     pub description: String,
     pub panels: Vec<DashboardPanel>,
     pub created_at: DateTime<Utc>,
-<<<<<<< HEAD
-=======
 // ---------------------------------------------------------------------------
 // Query parameters
 // ---------------------------------------------------------------------------
-
 /// GET /loki/api/v1/query
 #[derive(Debug, Deserialize)]
 pub struct InstantQueryParams {
@@ -585,7 +462,6 @@ pub struct InstantQueryParams {
     /// Log direction: "forward" | "backward" (default "backward")
     pub direction: Option<String>,
 }
-
 /// GET /loki/api/v1/query_range
 #[derive(Debug, Deserialize)]
 pub struct RangeQueryParams {
@@ -602,20 +478,16 @@ pub struct RangeQueryParams {
     /// Log direction: "forward" | "backward"
     pub direction: Option<String>,
 }
-
 /// GET /loki/api/v1/labels  and  GET /loki/api/v1/label/:name/values
 #[derive(Debug, Deserialize)]
 pub struct LabelParams {
     pub start: Option<String>,
     pub end: Option<String>,
     pub query: Option<String>,
->>>>>>> claude/gallant-cartwright
-=======
     Critical,
     Warning,
     Info,
 }
-
 #[derive(Debug, Clone, Serialize)]
 pub struct FiredAlert {
     pub rule_id: Uuid,
@@ -625,9 +497,7 @@ pub struct FiredAlert {
     pub severity: AlertSeverity,
     pub annotations: HashMap<String, String>,
 }
-
 // ─── Protobuf types (Loki wire format) ───────────────────────────────────────
-
 pub mod proto {
     /// `/loki/api/v1/push` protobuf body (Snappy-compressed).
     #[derive(Clone, PartialEq, prost::Message)]
@@ -635,7 +505,6 @@ pub mod proto {
         #[prost(message, repeated, tag = "1")]
         pub streams: Vec<StreamAdapter>,
     }
-
     #[derive(Clone, PartialEq, prost::Message)]
     pub struct StreamAdapter {
         #[prost(string, tag = "1")]
@@ -645,7 +514,6 @@ pub mod proto {
         #[prost(string, tag = "3")]
         pub hash: String,
     }
-
     #[derive(Clone, PartialEq, prost::Message)]
     pub struct EntryAdapter {
         #[prost(message, optional, tag = "1")]
@@ -655,7 +523,6 @@ pub mod proto {
         #[prost(message, repeated, tag = "3")]
         pub structured_metadata: Vec<LabelPairAdapter>,
     }
-
     #[derive(Clone, PartialEq, prost::Message)]
     pub struct LabelPairAdapter {
         #[prost(string, tag = "1")]
@@ -663,7 +530,4 @@ pub mod proto {
         #[prost(string, tag = "2")]
         pub value: String,
     }
->>>>>>> claude/inspiring-pascal
-=======
->>>>>>> claude/sharp-wiles
 }

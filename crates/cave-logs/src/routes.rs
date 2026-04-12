@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
 //! HTTP routes for cave-logs.
-<<<<<<< HEAD
-=======
-//! HTTP routes for cave-logs.
->>>>>>> claude/sharp-wiles
 
 use crate::alerting::{evaluate_all_alerts, AlertFiring};
 use crate::ingestion::{ingest_batch, ingest_log, IngestRequest};
@@ -14,27 +8,17 @@ use crate::models::{
 };
 use crate::query::{execute_query, QueryResult};
 use crate::LogsState;
-<<<<<<< HEAD
-=======
 //!
 //! Exposes two route groups:
 //!   /api/logs/*          — cave-native management API
 //!   /loki/api/v1/*       — Loki-compatible API (drop-in replacement)
-
 use crate::{models::*, LogsState};
->>>>>>> claude/gallant-cartwright
-=======
->>>>>>> claude/sharp-wiles
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -563,10 +547,7 @@ async fn delete_dashboard(
 }
 
 // ── Health ─────────────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-=======
 use std::sync::Arc;
-
 pub fn create_router(state: Arc<LogsState>) -> Router {
     Router::new()
         // ── cave-native ────────────────────────────────────────────────────
@@ -586,32 +567,23 @@ pub fn create_router(state: Arc<LogsState>) -> Router {
         .route("/loki/api/v1/label/:name/values", get(label_values))
         .with_state(state)
 }
-
 // ---------------------------------------------------------------------------
 // cave-native
 // ---------------------------------------------------------------------------
->>>>>>> claude/gallant-cartwright
-=======
->>>>>>> claude/sharp-wiles
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-logs",
         "status": "ok",
-<<<<<<< HEAD
-<<<<<<< HEAD
         "upstream": "ELK Stack / Grafana Loki"
-=======
         "upstream": "loki",
         "upstream_tracked_version": "3.x",
         "compat": ["loki_push_v1", "logql_api_v1"]
     }))
 }
-
 // ---------------------------------------------------------------------------
 // Loki push — POST /loki/api/v1/push
 // ---------------------------------------------------------------------------
-
 /// Accept a Loki-format push payload and ingest log streams.
 ///
 /// Clients send either JSON (Content-Type: application/json) or
@@ -630,11 +602,9 @@ async fn push(
     // TODO: persist to log store (PostgreSQL / object storage)
     StatusCode::NO_CONTENT
 }
-
 // ---------------------------------------------------------------------------
 // Loki instant query — GET /loki/api/v1/query
 // ---------------------------------------------------------------------------
-
 async fn instant_query(
     State(_state): State<Arc<LogsState>>,
     Query(params): Query<InstantQueryParams>,
@@ -658,11 +628,9 @@ async fn instant_query(
         }
     }))
 }
-
 // ---------------------------------------------------------------------------
 // Loki range query — GET /loki/api/v1/query_range
 // ---------------------------------------------------------------------------
-
 async fn range_query(
     State(_state): State<Arc<LogsState>>,
     Query(params): Query<RangeQueryParams>,
@@ -691,11 +659,9 @@ async fn range_query(
         }
     }))
 }
-
 // ---------------------------------------------------------------------------
 // Loki labels — GET /loki/api/v1/labels
 // ---------------------------------------------------------------------------
-
 async fn labels(
     State(_state): State<Arc<LogsState>>,
     Query(_params): Query<LabelParams>,
@@ -707,11 +673,9 @@ async fn labels(
         "data": data
     }))
 }
-
 // ---------------------------------------------------------------------------
 // Loki label values — GET /loki/api/v1/label/:name/values
 // ---------------------------------------------------------------------------
-
 async fn label_values(
     State(_state): State<Arc<LogsState>>,
     Path(name): Path<String>,
@@ -723,9 +687,8 @@ async fn label_values(
     Json(serde_json::json!({
         "status": "success",
         "data": data
->>>>>>> claude/gallant-cartwright
     }))
-=======
+        "upstream": "ELK Stack / Grafana Loki"
 //! Loki-compatible HTTP routes.
 //!
 //! POST /loki/api/v1/push
@@ -735,7 +698,6 @@ async fn label_values(
 //! GET  /loki/api/v1/label/:name/values
 //! GET  /loki/api/v1/series
 //! GET  /loki/api/v1/tail       (WebSocket)
-
 use crate::logql::{eval::Evaluator, parser::parse};
 use crate::models::{LokiResponse, PushRequest, QueryData};
 use crate::push::{ingest_json, ingest_proto};
@@ -753,7 +715,6 @@ use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::warn;
-
 pub fn create_router(state: Arc<LogsState>) -> Router {
     Router::new()
         .route("/loki/api/v1/push", post(push_handler))
@@ -765,9 +726,7 @@ pub fn create_router(state: Arc<LogsState>) -> Router {
         .route("/loki/api/v1/tail", get(tail_handler))
         .with_state(state)
 }
-
 // ─── Tenant extraction ────────────────────────────────────────────────────────
-
 fn extract_tenant(headers: &HeaderMap) -> Option<String> {
     headers
         .get("X-Scope-OrgID")
@@ -775,9 +734,7 @@ fn extract_tenant(headers: &HeaderMap) -> Option<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
 }
-
 // ─── Push ─────────────────────────────────────────────────────────────────────
-
 async fn push_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -788,7 +745,6 @@ async fn push_handler(
         .get("Content-Type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json");
-
     if content_type.contains("application/x-protobuf") {
         match ingest_proto(&state.store, body, tenant) {
             Ok(()) => StatusCode::NO_CONTENT.into_response(),
@@ -810,9 +766,7 @@ async fn push_handler(
         }
     }
 }
-
 // ─── Instant query ────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct QueryParams {
     query: String,
@@ -823,7 +777,6 @@ struct QueryParams {
     #[serde(default)]
     direction: Option<String>,
 }
-
 async fn query_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -834,7 +787,6 @@ async fn query_handler(
     let start = time - Duration::hours(1);
     let limit = params.limit.unwrap_or(state.default_limit);
     let forward = params.direction.as_deref() != Some("backward");
-
     match parse(&params.query) {
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
         Ok(expr) => {
@@ -853,9 +805,7 @@ async fn query_handler(
         }
     }
 }
-
 // ─── Range query ──────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct QueryRangeParams {
     query: String,
@@ -870,7 +820,6 @@ struct QueryRangeParams {
     #[serde(default)]
     direction: Option<String>,
 }
-
 async fn query_range_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -886,7 +835,6 @@ async fn query_range_handler(
         .and_then(parse_step_secs)
         .unwrap_or(60);
     let limit = params.limit.unwrap_or(state.default_limit);
-
     match parse(&params.query) {
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
         Ok(expr) => {
@@ -905,9 +853,7 @@ async fn query_range_handler(
         }
     }
 }
-
 // ─── Labels ───────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct TimeRangeParams {
     #[serde(default)]
@@ -917,7 +863,6 @@ struct TimeRangeParams {
     #[serde(default)]
     query: Option<String>,
 }
-
 async fn labels_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -928,7 +873,6 @@ async fn labels_handler(
     let names = state.store.label_names(start, end, tenant.as_deref());
     Json(LokiResponse::success(names))
 }
-
 async fn label_values_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -940,9 +884,7 @@ async fn label_values_handler(
     let values = state.store.label_values(&name, start, end, tenant.as_deref());
     Json(LokiResponse::success(values))
 }
-
 // ─── Series ───────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct SeriesParams {
     #[serde(rename = "match[]", default)]
@@ -952,7 +894,6 @@ struct SeriesParams {
     #[serde(default)]
     end: Option<String>,
 }
-
 async fn series_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -962,7 +903,6 @@ async fn series_handler(
     let now = Utc::now();
     let start = params.start.as_deref().and_then(parse_time).unwrap_or(now - Duration::hours(1));
     let end = params.end.as_deref().and_then(parse_time).unwrap_or(now);
-
     // Parse all matchers from `match[]` parameters
     let mut all_matchers = vec![];
     for m in &params.matches {
@@ -972,21 +912,17 @@ async fn series_handler(
             Err(e) => return (StatusCode::BAD_REQUEST, e).into_response(),
         }
     }
-
     let series = state.store.series(&all_matchers, start, end, tenant.as_deref());
     let result: Vec<_> = series.into_iter().map(|l| l.0).collect();
     Json(LokiResponse::success(result)).into_response()
 }
-
 // ─── WebSocket tail ───────────────────────────────────────────────────────────
-
 #[derive(Debug, Deserialize)]
 struct TailParams {
     query: String,
     #[serde(default)]
     limit: Option<usize>,
 }
-
 async fn tail_handler(
     State(state): State<Arc<LogsState>>,
     headers: HeaderMap,
@@ -998,9 +934,7 @@ async fn tail_handler(
     let query = params.query.clone();
     ws.on_upgrade(move |socket| handle_tail(socket, Arc::clone(&state.store), query, limit, tenant))
 }
-
 // ─── Time parsing helpers ─────────────────────────────────────────────────────
-
 /// Parse a time value — Unix epoch seconds (float), nanoseconds, or RFC3339.
 fn parse_time(s: &str) -> Option<DateTime<Utc>> {
     // Unix nanoseconds (> 1e15)
@@ -1019,7 +953,6 @@ fn parse_time(s: &str) -> Option<DateTime<Utc>> {
     // RFC3339
     s.parse::<DateTime<Utc>>().ok()
 }
-
 fn parse_step_secs(s: &str) -> Option<i64> {
     // Accept "30s", "1m", "1h", plain integer seconds
     if let Ok(n) = s.parse::<i64>() {
@@ -1035,16 +968,12 @@ fn parse_step_secs(s: &str) -> Option<i64> {
         _ => None,
     }
 }
-
 fn time_range(params: &TimeRangeParams) -> (DateTime<Utc>, DateTime<Utc>) {
     let now = Utc::now();
     let start = params.start.as_deref().and_then(parse_time).unwrap_or(now - Duration::hours(1));
     let end = params.end.as_deref().and_then(parse_time).unwrap_or(now);
     (start, end)
->>>>>>> claude/inspiring-pascal
 }
-=======
         "upstream": "ELK Stack / Grafana Loki"
     }))
 }
->>>>>>> claude/sharp-wiles

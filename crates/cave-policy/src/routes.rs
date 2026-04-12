@@ -17,13 +17,10 @@ use crate::{
     State,
 };
 use axum::{
-<<<<<<< HEAD
     routing::get,
-=======
     extract::{Path, State as AxumState},
     http::StatusCode,
     routing::{delete, get, post, put},
->>>>>>> claude/wizardly-goldstine
     Json, Router,
 };
 use serde::Deserialize;

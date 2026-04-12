@@ -1,14 +1,7 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/elastic-ellis
 use crate::models::{IngestResponse, IngestSpanRequest, SearchResponse, Span, TraceQuery};
 use crate::{analyzer, collector, TraceState};
 use axum::{
     extract::{Path, Query, State as AxumState},
-<<<<<<< HEAD
-=======
 use crate::comparison::TraceComparer;
 use crate::dependency::DependencyComputer;
 use crate::otlp::OtlpReceiver;
@@ -18,18 +11,11 @@ use crate::storage::TraceStore;
 use crate::types::TraceQuery;
 use axum::{
     extract::{Path, Query, State},
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/elastic-ellis
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/elastic-ellis
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -220,17 +206,13 @@ async fn latency_handler(
 struct LatencyQuery {
     service: Option<String>,
 }
-<<<<<<< HEAD
-=======
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
-
 pub struct TraceState {
     pub store: Arc<TraceStore>,
     pub query_engine: QueryEngine,
     pub sampler: Mutex<Sampler>,
 }
-
 impl TraceState {
     pub fn new() -> Self {
         let store = Arc::new(TraceStore::new(10_000));
@@ -244,13 +226,11 @@ impl TraceState {
         }
     }
 }
-
 impl Default for TraceState {
     fn default() -> Self {
         Self::new()
     }
 }
-
 pub fn router(state: Arc<TraceState>) -> Router {
     Router::new()
         .route("/api/trace/health", get(health))
@@ -277,15 +257,12 @@ pub fn router(state: Arc<TraceState>) -> Router {
         .route("/api/trace/stats", get(get_stats))
         .with_state(state)
 }
-
 // -------------------------------------------------------------------------
 // Handlers
 // -------------------------------------------------------------------------
-
 async fn health() -> impl IntoResponse {
     Json(serde_json::json!({"status": "ok", "module": crate::MODULE_NAME}))
 }
-
 async fn ingest_otlp(
     State(state): State<Arc<TraceState>>,
     body: String,
@@ -307,12 +284,10 @@ async fn ingest_otlp(
         ),
     }
 }
-
 async fn list_services(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
     let services = state.store.list_services();
     Json(serde_json::json!({"services": services}))
 }
-
 async fn list_operations(
     State(state): State<Arc<TraceState>>,
     Path(service): Path<String>,
@@ -320,7 +295,6 @@ async fn list_operations(
     let ops = state.store.list_operations(&service);
     Json(serde_json::json!({"service": service, "operations": ops}))
 }
-
 #[derive(Deserialize)]
 struct FindTracesQuery {
     service: Option<String>,
@@ -329,7 +303,6 @@ struct FindTracesQuery {
     min_duration: Option<i64>,
     max_duration: Option<i64>,
 }
-
 async fn find_traces(
     State(state): State<Arc<TraceState>>,
     Query(q): Query<FindTracesQuery>,
@@ -345,7 +318,6 @@ async fn find_traces(
     let traces = state.query_engine.find_traces(&query);
     Json(serde_json::to_value(traces).unwrap())
 }
-
 async fn get_trace(
     State(state): State<Arc<TraceState>>,
     Path(trace_id): Path<String>,
@@ -358,7 +330,6 @@ async fn get_trace(
         ),
     }
 }
-
 async fn get_span(
     State(state): State<Arc<TraceState>>,
     Path((_trace_id, span_id)): Path<(String, String)>,
@@ -371,7 +342,6 @@ async fn get_span(
         ),
     }
 }
-
 async fn delete_trace(
     State(state): State<Arc<TraceState>>,
     Path(trace_id): Path<String>,
@@ -387,19 +357,16 @@ async fn delete_trace(
         ),
     }
 }
-
 async fn get_dependencies(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
     let traces = state.store.all_traces();
     let graph = DependencyComputer::compute(&traces);
     Json(serde_json::to_value(graph).unwrap())
 }
-
 #[derive(Deserialize)]
 struct CompareQuery {
     a: String,
     b: String,
 }
-
 async fn compare_traces(
     State(state): State<Arc<TraceState>>,
     Query(q): Query<CompareQuery>,
@@ -425,13 +392,11 @@ async fn compare_traces(
     let cmp = TraceComparer::compare(&trace_a, &trace_b);
     (StatusCode::OK, Json(serde_json::to_value(cmp).unwrap()))
 }
-
 #[derive(Deserialize)]
 struct SlowestQuery {
     service: Option<String>,
     limit: Option<usize>,
 }
-
 async fn slowest_traces(
     State(state): State<Arc<TraceState>>,
     Query(q): Query<SlowestQuery>,
@@ -441,13 +406,11 @@ async fn slowest_traces(
         .slowest_traces(q.service.as_deref(), q.limit.unwrap_or(10));
     Json(serde_json::to_value(traces).unwrap())
 }
-
 #[derive(Deserialize)]
 struct ErrorQuery {
     service: Option<String>,
     limit: Option<usize>,
 }
-
 async fn error_traces(
     State(state): State<Arc<TraceState>>,
     Query(q): Query<ErrorQuery>,
@@ -457,12 +420,10 @@ async fn error_traces(
         .error_traces(q.service.as_deref(), q.limit.unwrap_or(10));
     Json(serde_json::to_value(traces).unwrap())
 }
-
 async fn get_sampling_strategy(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
     let rate = state.sampler.lock().unwrap().sampling_rate();
     Json(serde_json::json!({"sampling_rate": rate}))
 }
-
 async fn get_stats(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
     let count = state.store.trace_count();
     let services = state.store.list_services();
@@ -472,10 +433,6 @@ async fn get_stats(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
         "services": services,
     }))
 }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/elastic-ellis
-=======
 //! HTTP routes for cave-trace.
 //!
 //! Exposes two route groups:
@@ -485,7 +442,6 @@ async fn get_stats(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
 //! The OTLP endpoint accepts both JSON and binary-protobuf bodies:
 //!   Content-Type: application/json            → decoded via serde_json
 //!   Content-Type: application/x-protobuf      → raw bytes queued for proto decode
-
 use crate::{models::ExportTraceServiceResponse, TraceState};
 use axum::{
     extract::{Request, State},
@@ -494,7 +450,6 @@ use axum::{
     Json, Router,
 };
 use std::sync::Arc;
-
 pub fn create_router(state: Arc<TraceState>) -> Router {
     Router::new()
         // ── cave-native ────────────────────────────────────────────────────
@@ -505,11 +460,9 @@ pub fn create_router(state: Arc<TraceState>) -> Router {
         .route("/v1/traces", post(export_traces))
         .with_state(state)
 }
-
 // ---------------------------------------------------------------------------
 // cave-native
 // ---------------------------------------------------------------------------
-
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-trace",
@@ -519,11 +472,9 @@ async fn health() -> Json<serde_json::Value> {
         "compat": ["otlp_http_v1"]
     }))
 }
-
 // ---------------------------------------------------------------------------
 // OTLP trace receiver — POST /v1/traces
 // ---------------------------------------------------------------------------
-
 /// Accept an OTLP ExportTraceServiceRequest.
 ///
 /// Per the OTLP/HTTP spec:
@@ -545,7 +496,6 @@ async fn export_traces(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json")
         .to_string();
-
     // Collect the body bytes regardless of content-type
     let body_bytes = match axum::body::to_bytes(request.into_body(), usize::MAX).await {
         Ok(b) => b,
@@ -556,7 +506,6 @@ async fn export_traces(
             );
         }
     };
-
     if content_type.contains("application/x-protobuf") {
         // TODO: decode prost ExportTraceServiceRequest from body_bytes
         tracing::debug!(bytes = body_bytes.len(), "otlp protobuf traces received");
@@ -582,11 +531,9 @@ async fn export_traces(
             }
         }
     }
-
     // Full success response — empty ExportTraceServiceResponse per OTLP spec
     (
         StatusCode::OK,
         Json(ExportTraceServiceResponse { partial_success: None }),
     )
 }
->>>>>>> claude/gallant-cartwright

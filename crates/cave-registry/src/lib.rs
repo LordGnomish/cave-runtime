@@ -1,33 +1,12 @@
-<<<<<<< HEAD
-//! Container registry — Harbor replacement.
-//!
-//! Implements Docker Registry V2 + OCI Distribution Spec:
-//!   - Complete HTTP V2 API (manifests, blobs, catalog, tags, uploads)
-//!   - OCI Image Manifest, Docker Manifest V2 Schema 2, Manifest List
-//!   - Content-addressable blob storage with SHA256 digest verification
-//!   - Chunked and monolithic blob uploads with session tracking
-//!   - Garbage collection for unreferenced blobs
-//!   - Vulnerability scanning integration hooks
-//!   - Repository-level access control
-//!   - Webhook notifications on push/pull/delete events
-//!   - Replication to upstream registries
-//!   - Tag immutability policies
-//!   - cave-db integration via CavePool migrations
-//!
-//! Replaces: Harbor
-
-<<<<<<< HEAD
-<<<<<<< HEAD
 pub mod engine;
 pub mod models;
-=======
 pub mod error;
 pub mod gc;
 pub mod migrations;
 pub mod policy;
 pub mod replication;
->>>>>>> claude/brave-raman
-=======
+pub mod engine;
+pub mod models;
 //! CAVE Registry — container image registry and package proxy/cache.
 //!
 //! Replaces Pulp / Harbor with a Rust-native implementation.
@@ -46,13 +25,9 @@ pub mod replication;
 //! ## Upstream Tracking
 //! - OCI Distribution Spec: https://github.com/opencontainers/distribution-spec
 //! - Docker Registry API:   https://docs.docker.com/registry/spec/api/
-
 pub mod docker_v2;
->>>>>>> claude/gallant-cartwright
-=======
 pub mod engine;
 pub mod models;
->>>>>>> claude/thirsty-lederberg
 pub mod routes;
 pub mod scan;
 pub mod store;
@@ -60,27 +35,22 @@ pub mod types;
 pub mod webhook;
 
 use axum::Router;
-<<<<<<< HEAD
 use cave_db::Storage;
-=======
 use cave_db::CavePool;
 use policy::PolicyManager;
 use replication::ReplicationManager;
 use scan::ScanManager;
->>>>>>> claude/brave-raman
 use std::sync::Arc;
 use store::RegistryStore;
 use webhook::WebhookManager;
 
-<<<<<<< HEAD
-/// Module state.
-pub struct State {
-    pub storage: Arc<dyn Storage>,
-=======
+// ── Owned state that also holds the DB pool (used at startup) ─────────────────
+
+pub struct Registry {
+    pub state: Arc<AppState>,
+    pub pool: Arc<CavePool>,
 pub const MODULE_NAME: &str = "registry";
-
 // ── Application state ─────────────────────────────────────────────────────────
-
 /// Shared state injected into every request handler.
 pub struct AppState {
     pub store: Arc<RegistryStore>,
@@ -89,14 +59,11 @@ pub struct AppState {
     pub scanner: Arc<ScanManager>,
     pub policy: Arc<PolicyManager>,
 }
-
-<<<<<<< HEAD
 // ── Owned state that also holds the DB pool (used at startup) ─────────────────
 
 pub struct Registry {
     pub state: Arc<AppState>,
     pub pool: Arc<CavePool>,
->>>>>>> claude/brave-raman
 }
 
 impl Registry {
@@ -139,7 +106,6 @@ pub fn router(_pool: Arc<CavePool>) -> Router {
         policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
     });
     routes::create_router(state)
-=======
 /// Create the axum router for this module.
 ///
 /// Merges cave-native management routes with the Docker Registry V2
@@ -147,5 +113,4 @@ pub fn router(_pool: Arc<CavePool>) -> Router {
 pub fn router(state: Arc<State>) -> Router {
     routes::create_router(Arc::clone(&state))
         .merge(docker_v2::docker_v2_router(state))
->>>>>>> claude/gallant-cartwright
 }

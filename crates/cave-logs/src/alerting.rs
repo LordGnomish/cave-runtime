@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/sharp-wiles
 //! Log-based alerting: rule evaluation, pattern detection, anomaly detection.
 
 use crate::models::{AlertCondition, AlertSeverity, LogAlert, LogLevel};
@@ -153,25 +149,20 @@ pub fn detect_anomaly(state: &Arc<LogsState>, alert: &LogAlert) -> f64 {
         recent_rate * 100.0
     } else {
         recent_rate / baseline_rate
-<<<<<<< HEAD
-=======
 //! Log-based alerting rules.
 //!
 //! Rules are stored in-process (Arc<RwLock<Vec<AlertRule>>>).  The evaluator
 //! runs periodically and fires alerts when the LogQL metric expression crosses
 //! the configured threshold.
-
 use crate::models::{AlertRule, FiredAlert};
 use crate::store::LogStore;
 use chrono::Utc;
 use std::sync::{Arc, RwLock};
 use tracing::{debug, info, warn};
-
 pub struct AlertManager {
     rules: Arc<RwLock<Vec<AlertRule>>>,
     store: Arc<LogStore>,
 }
-
 impl AlertManager {
     pub fn new(store: Arc<LogStore>) -> Self {
         Self {
@@ -179,26 +170,21 @@ impl AlertManager {
             store,
         }
     }
-
     pub fn add_rule(&self, rule: AlertRule) {
         self.rules.write().unwrap().push(rule);
     }
-
     pub fn remove_rule(&self, id: uuid::Uuid) {
         self.rules.write().unwrap().retain(|r| r.id != id);
     }
-
     pub fn list_rules(&self) -> Vec<AlertRule> {
         self.rules.read().unwrap().clone()
     }
-
     /// Evaluate all rules against the current store state.
     /// Returns any fired alerts.
     pub fn evaluate(&self) -> Vec<FiredAlert> {
         let rules = self.rules.read().unwrap().clone();
         let now = Utc::now();
         let mut fired = vec![];
-
         for rule in &rules {
             debug!(rule = %rule.name, "evaluating alert rule");
             match self.store.eval_alert(rule, now) {
@@ -214,10 +200,8 @@ impl AlertManager {
                 None => {}
             }
         }
-
         fired
     }
-
     /// Background task: evaluate rules every `interval_secs` seconds.
     pub async fn run_loop(self: Arc<Self>, interval_secs: u64) {
         let mut ticker = tokio::time::interval(std::time::Duration::from_secs(interval_secs));
@@ -230,18 +214,15 @@ impl AlertManager {
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::{AlertCondition, AlertSeverity, CompareOp, Labels, LogEntry};
     use chrono::{Duration, Utc};
     use std::collections::HashMap;
-
     fn make_store() -> Arc<LogStore> {
         Arc::new(LogStore::new(Duration::days(1)))
     }
-
     #[test]
     fn alert_fires_when_count_exceeds_threshold() {
         let store = make_store();
@@ -257,7 +238,6 @@ mod tests {
                 None,
             );
         }
-
         let manager = AlertManager::new(Arc::clone(&store));
         manager.add_rule(AlertRule {
             id: uuid::Uuid::new_v4(),
@@ -269,12 +249,10 @@ mod tests {
             annotations: HashMap::new(),
             tenant: None,
         });
-
         let fired = manager.evaluate();
         assert!(!fired.is_empty(), "alert should have fired");
         assert!(fired[0].value > 5.0);
     }
-
     #[test]
     fn alert_does_not_fire_below_threshold() {
         let store = make_store();
@@ -288,7 +266,6 @@ mod tests {
             }],
             None,
         );
-
         let manager = AlertManager::new(Arc::clone(&store));
         manager.add_rule(AlertRule {
             id: uuid::Uuid::new_v4(),
@@ -300,11 +277,7 @@ mod tests {
             annotations: HashMap::new(),
             tenant: None,
         });
-
         let fired = manager.evaluate();
         assert!(fired.is_empty(), "alert should not have fired");
->>>>>>> claude/inspiring-pascal
-=======
->>>>>>> claude/sharp-wiles
     }
 }

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! HTTP routes for cave-deploy.
 
 use crate::{
@@ -12,7 +11,6 @@ use crate::{
 };
 use axum::{
     extract::{Path, State as AxumState},
-=======
 //! Admin API — full ArgoCD v1 REST surface.
 //!
 //! Endpoints:
@@ -41,20 +39,16 @@ use axum::{
 //!   POST   /api/v1/applicationsets
 //!
 //!   GET    /api/v1/deploy/health
-
 use crate::error::DeployError;
 use crate::models::{
     Application, ApplicationSet, AppProject, Cluster, Repository,
     CreateApplicationRequest, UpdateApplicationRequest, SyncRequest, RollbackRequest,
     OperationState, OperationPhase, SyncOperationResult, ApplicationStatus, HealthStatusDetail,
     SyncStatusDetail,
-};
 use crate::store::DeployStore;
 use crate::sync::{detect_drift, parse_manifests};
-use axum::{
     extract::{Path, State},
     http::StatusCode,
->>>>>>> claude/thirsty-snyder
     routing::{delete, get, post, put},
     Json, Router,
 };
@@ -62,7 +56,6 @@ use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
-<<<<<<< HEAD
 pub fn create_router(state: Arc<DeployState>) -> Router {
     Router::new()
         // Applications — CRUD
@@ -94,23 +87,15 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         .route("/api/v1/deploy/rollouts/:id/promote", post(promote_rollout))
         .route("/api/v1/deploy/rollouts/:id/abort", post(abort_rollout))
         // Module health
-=======
 // ─── Module state ─────────────────────────────────────────────────────────────
-
 pub struct DeployState {
     pub store: Arc<DeployStore>,
 }
-
 // ─── Router ───────────────────────────────────────────────────────────────────
-
-pub fn create_router(state: Arc<DeployState>) -> Router {
-    Router::new()
         // Applications
         .route("/api/v1/applications", get(list_applications).post(create_application))
-        .route(
             "/api/v1/applications/:name",
             get(get_application).put(update_application).delete(delete_application),
-        )
         .route("/api/v1/applications/:name/sync", post(sync_application))
         .route("/api/v1/applications/:name/rollback", post(rollback_application))
         .route("/api/v1/applications/:name/diff", get(diff_application))
@@ -126,7 +111,6 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         // ApplicationSets
         .route("/api/v1/applicationsets", get(list_appsets).post(create_appset))
         // Health
->>>>>>> claude/thirsty-snyder
         .route("/api/v1/deploy/health", get(health))
         .with_state(state)
 }
@@ -134,7 +118,6 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
 // ─── Applications ─────────────────────────────────────────────────────────────
 
 async fn list_applications(
-<<<<<<< HEAD
     AxumState(state): AxumState<Arc<DeployState>>,
 ) -> Json<Vec<Application>> {
     let store = state.store.lock().unwrap();
@@ -395,14 +378,10 @@ async fn health() -> Json<serde_json::Value> {
         "module": "cave-deploy",
         "status": "ok",
         "upstream": "ArgoCD + Flux",
-=======
     State(state): State<Arc<DeployState>>,
 ) -> Result<Json<Vec<Application>>, DeployError> {
     let apps = state.store.list_applications().await?;
     Ok(Json(apps))
-}
-
-async fn get_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
 ) -> Result<Json<Application>, DeployError> {
@@ -412,21 +391,12 @@ async fn get_application(
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
     Ok(Json(app))
-}
-
-async fn create_application(
     State(state): State<Arc<DeployState>>,
-    Json(req): Json<CreateApplicationRequest>,
 ) -> Result<(StatusCode, Json<Application>), DeployError> {
     // Check for duplicates
     if state.store.get_application(&req.name).await?.is_some() {
         return Err(DeployError::AlreadyExists(req.name));
-    }
-
     let now = Utc::now();
-    let app = Application {
-        id: Uuid::new_v4(),
-        name: req.name,
         namespace: req.namespace.unwrap_or_else(|| "argocd".to_string()),
         spec: req.spec,
         status: ApplicationStatus {
@@ -436,7 +406,6 @@ async fn create_application(
             },
             health: HealthStatusDetail {
                 status: crate::models::HealthStatus::Unknown.to_string(),
-                message: None,
             },
             ..Default::default()
         },
@@ -444,48 +413,33 @@ async fn create_application(
         updated_at: now,
         created_by: None,
         finalizers: vec!["resources-finalizer.argocd.argoproj.io".to_string()],
-    };
-
     state.store.create_application(&app).await?;
     Ok((StatusCode::CREATED, Json(app)))
-}
-
-async fn update_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
-    Json(req): Json<UpdateApplicationRequest>,
 ) -> Result<Json<Application>, DeployError> {
     let mut app = state
         .store
         .get_application(&name)
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
-
     state.store.update_application_spec(&name, &req.spec).await?;
     app.spec = req.spec;
-    app.updated_at = Utc::now();
     Ok(Json(app))
-}
-
-async fn delete_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, DeployError> {
     state.store.delete_application(&name).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
 async fn sync_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
-    Json(req): Json<SyncRequest>,
 ) -> Result<Json<OperationState>, DeployError> {
     let app = state
         .store
         .get_application(&name)
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
-
     let now = Utc::now();
     // Record the operation start
     let op = OperationState {
@@ -495,8 +449,6 @@ async fn sync_application(
         started_at: now,
         finished_at: None,
         retry_count: 0,
-    };
-
     // In a full implementation the sync engine would be invoked here.
     // For now we record a Succeeded operation.
     let result = OperationState {
@@ -509,39 +461,29 @@ async fn sync_application(
         started_at: now,
         finished_at: Some(Utc::now()),
         retry_count: 0,
-    };
-
     // Update the application status to reflect the sync
     if !req.dry_run {
         let mut status = app.status.clone();
         status.operation_state = Some(result.clone());
         status.sync.status = crate::models::SyncStatus::Synced.to_string();
         state.store.update_application_status(&name, &status).await?;
-    }
-
     Ok(Json(result))
-}
-
 async fn rollback_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
-    Json(req): Json<RollbackRequest>,
 ) -> Result<Json<OperationState>, DeployError> {
     let app = state
         .store
         .get_application(&name)
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
-
     // Locate the target revision history entry
     let history_entry = app
         .status
-        .history
         .iter()
         .find(|h| h.id == req.id)
         .ok_or_else(|| DeployError::NotFound(format!("history entry {}", req.id)))?
         .clone();
-
     let now = Utc::now();
     let result = OperationState {
         phase: OperationPhase::Succeeded,
@@ -554,17 +496,11 @@ async fn rollback_application(
         started_at: now,
         finished_at: Some(Utc::now()),
         retry_count: 0,
-    };
-
     if !req.dry_run {
         let mut status = app.status.clone();
         status.operation_state = Some(result.clone());
         state.store.update_application_status(&name, &status).await?;
-    }
-
     Ok(Json(result))
-}
-
 async fn diff_application(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
@@ -574,12 +510,9 @@ async fn diff_application(
         .get_application(&name)
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
-
     // In a full implementation: fetch desired from git, live from cluster.
     // Return empty diff (synced) for now; real logic lives in sync engine.
     Ok(Json(vec![]))
-}
-
 async fn app_history(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
@@ -589,66 +522,47 @@ async fn app_history(
         .get_application(&name)
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
-
     let history = state
         .store
         .get_revision_history(app.id, 20)
         .await?;
-
     Ok(Json(history))
-}
-
 // ─── Repositories ─────────────────────────────────────────────────────────────
-
 async fn list_repositories(
     State(state): State<Arc<DeployState>>,
 ) -> Result<Json<Vec<Repository>>, DeployError> {
     let repos = state.store.list_repositories().await?;
     Ok(Json(repos))
-}
-
 async fn upsert_repository(
     State(state): State<Arc<DeployState>>,
     Json(repo): Json<Repository>,
 ) -> Result<(StatusCode, Json<Repository>), DeployError> {
     state.store.upsert_repository(&repo).await?;
     Ok((StatusCode::OK, Json(repo)))
-}
-
 // ─── Clusters ─────────────────────────────────────────────────────────────────
-
 async fn list_clusters(
     State(state): State<Arc<DeployState>>,
 ) -> Result<Json<Vec<Cluster>>, DeployError> {
     let clusters = state.store.list_clusters().await?;
     Ok(Json(clusters))
-}
-
 async fn upsert_cluster(
     State(state): State<Arc<DeployState>>,
     Json(cluster): Json<Cluster>,
 ) -> Result<(StatusCode, Json<Cluster>), DeployError> {
     state.store.upsert_cluster(&cluster).await?;
     Ok((StatusCode::OK, Json(cluster)))
-}
-
 async fn delete_cluster(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, DeployError> {
     state.store.delete_cluster(&name).await?;
     Ok(StatusCode::NO_CONTENT)
-}
-
 // ─── Projects ─────────────────────────────────────────────────────────────────
-
 async fn list_projects(
     State(state): State<Arc<DeployState>>,
 ) -> Result<Json<Vec<AppProject>>, DeployError> {
     let projects = state.store.list_projects().await?;
     Ok(Json(projects))
-}
-
 async fn get_project(
     State(state): State<Arc<DeployState>>,
     Path(name): Path<String>,
@@ -659,37 +573,25 @@ async fn get_project(
         .await?
         .ok_or_else(|| DeployError::NotFound(name.clone()))?;
     Ok(Json(project))
-}
-
 async fn upsert_project(
     State(state): State<Arc<DeployState>>,
     Json(project): Json<AppProject>,
 ) -> Result<(StatusCode, Json<AppProject>), DeployError> {
     state.store.upsert_project(&project).await?;
     Ok((StatusCode::OK, Json(project)))
-}
-
 // ─── ApplicationSets ──────────────────────────────────────────────────────────
-
 async fn list_appsets(
     State(_state): State<Arc<DeployState>>,
 ) -> Json<Vec<ApplicationSet>> {
     // TODO: persist ApplicationSets in DB
     Json(vec![])
-}
-
 async fn create_appset(
     State(_state): State<Arc<DeployState>>,
     Json(appset): Json<ApplicationSet>,
 ) -> Result<(StatusCode, Json<ApplicationSet>), DeployError> {
     // TODO: persist and trigger reconciliation
     Ok((StatusCode::CREATED, Json(appset)))
-}
-
 // ─── Health ───────────────────────────────────────────────────────────────────
-
-async fn health() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
         "module":   "cave-deploy",
         "status":   "ok",
         "upstream": "argocd",
@@ -700,6 +602,5 @@ async fn health() -> Json<serde_json::Value> {
             "applicationsets", "multi-cluster", "rbac",
             "notifications", "rollback", "diff-engine"
         ]
->>>>>>> claude/thirsty-snyder
     }))
 }

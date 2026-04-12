@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! CAVE Service Mesh — full Istio-parity control plane.
 //!
 //! Provides:
@@ -81,30 +80,16 @@ impl MeshState {
             service_entries: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-=======
 //! CAVE Mesh — Service mesh replacing Istio + Linkerd.
-//!
 //! Replaces: Istio, Linkerd
 //! Features: mTLS, traffic splitting, canary routing, circuit breaking,
 //!           fault injection, traffic mirroring, golden-signal observability.
-
-pub mod models;
-pub mod mtls;
 pub mod observability;
 pub mod proxy;
-pub mod routes;
-pub mod traffic;
-
-use axum::Router;
-use std::{
-    collections::HashMap,
     sync::{Arc, Mutex},
-};
 use uuid::Uuid;
-
 /// Shared in-memory state for the mesh module.
 /// Each collection is independently locked to reduce contention.
-pub struct MeshState {
     pub services: Mutex<HashMap<Uuid, models::Service>>,
     pub instances: Mutex<HashMap<Uuid, models::ServiceInstance>>,
     pub virtual_services: Mutex<HashMap<Uuid, models::VirtualService>>,
@@ -115,18 +100,15 @@ pub struct MeshState {
     pub circuit_breakers: Mutex<HashMap<Uuid, proxy::CircuitBreakerState>>,
     pub metrics: Mutex<HashMap<Uuid, observability::ServiceMetrics>>,
     pub certs: Mutex<HashMap<Uuid, mtls::CertRecord>>,
->>>>>>> claude/peaceful-lederberg
 }
 
 impl Default for MeshState {
     fn default() -> Self {
-<<<<<<< HEAD
         Self::new()
     }
 }
 
 /// Build the axum router for the mesh admin API.
-=======
         Self {
             services: Mutex::new(HashMap::new()),
             instances: Mutex::new(HashMap::new()),
@@ -138,17 +120,11 @@ impl Default for MeshState {
             circuit_breakers: Mutex::new(HashMap::new()),
             metrics: Mutex::new(HashMap::new()),
             certs: Mutex::new(HashMap::new()),
-        }
-    }
-}
-
 /// Create the axum router for the mesh module.
->>>>>>> claude/peaceful-lederberg
 pub fn router(state: Arc<MeshState>) -> Router {
     routes::create_router(state)
 }
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────────────────────
 // Tests (≥ 20 covering every major feature)
 // ─────────────────────────────────────────────────────────────
@@ -1048,6 +1024,4 @@ mod tests {
         assert_eq!(idx3, 0);
     }
 }
-=======
 pub const MODULE_NAME: &str = "mesh";
->>>>>>> claude/peaceful-lederberg

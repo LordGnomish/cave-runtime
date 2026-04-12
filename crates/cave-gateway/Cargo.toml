@@ -1,17 +1,13 @@
 [package]
 name = "cave-gateway"
-<<<<<<< HEAD
 description = "API gateway & traffic management — replaces Kong"
-=======
 description = "API Gateway — full Kong + Gravitee replacement. Reverse proxy, plugin system, developer portal, monetization."
->>>>>>> claude/silly-wescoff
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 axum = { workspace = true }
@@ -25,9 +21,7 @@ thiserror = { workspace = true }
 jsonwebtoken = { workspace = true }
 reqwest = { workspace = true }
 regex = { workspace = true }
-=======
 cave-db   = { path = "../cave-db" }
-
 axum          = { workspace = true }
 tower         = { workspace = true }
 tower-http    = { workspace = true }
@@ -46,4 +40,3 @@ ring          = { workspace = true }
 async-trait   = "0.1"
 base64        = "0.22"
 bytes         = "1"
->>>>>>> claude/silly-wescoff

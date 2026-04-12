@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
 //! HTTP routes for cave-cache.
 
 use crate::cache::PipelineOp;
@@ -44,8 +40,6 @@ struct SetKeyRequest {
     value: serde_json::Value,
     ttl: Option<u64>,
     tags: Option<Vec<String>>,
-<<<<<<< HEAD
-=======
 use std::sync::Arc;
 use axum::{
     Router,
@@ -57,9 +51,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use crate::engine::CacheEngine;
-
 pub type CacheState = Arc<CacheEngine>;
-
 pub fn cache_router(state: CacheState) -> Router {
     Router::new()
         .route("/api/cache/health", get(health))
@@ -79,11 +71,9 @@ pub fn cache_router(state: CacheState) -> Router {
         .route("/api/cache/publish", post(publish_msg))
         .with_state(state)
 }
-
 async fn health() -> impl IntoResponse {
     Json(serde_json::json!({"status": "ok", "service": "cave-cache"}))
 }
-
 async fn info(State(engine): State<CacheState>) -> impl IntoResponse {
     let count = {
         let store = engine.store.lock().unwrap();
@@ -94,7 +84,6 @@ async fn info(State(engine): State<CacheState>) -> impl IntoResponse {
         "service": "cave-cache",
     }))
 }
-
 async fn get_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -108,14 +97,12 @@ async fn get_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct SetRequest {
     key: String,
     value: String,
     ttl_secs: Option<u64>,
 }
-
 async fn set_key(
     State(engine): State<CacheState>,
     Json(req): Json<SetRequest>,
@@ -126,7 +113,6 @@ async fn set_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn del_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -134,7 +120,6 @@ async fn del_key(
     let n = engine.del(&[key.as_str()]);
     Json(serde_json::json!({"deleted": n}))
 }
-
 async fn type_of_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -144,7 +129,6 @@ async fn type_of_key(
         None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"type": "none"}))).into_response(),
     }
 }
-
 async fn ttl_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -153,17 +137,10 @@ async fn ttl_key(
         Ok(t) => Json(serde_json::json!({"ttl": t})).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
 struct ExpireRequest {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> claude/jovial-faraday
     ttl: u64,
 }
 
@@ -336,12 +313,9 @@ async fn subscribe(
         }),
     }
 }
-<<<<<<< HEAD
-=======
     key: String,
     secs: u64,
 }
-
 async fn expire_key(
     State(engine): State<CacheState>,
     Json(req): Json<ExpireRequest>,
@@ -351,13 +325,11 @@ async fn expire_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct LpushRequest {
     key: String,
     values: Vec<String>,
 }
-
 async fn lpush_key(
     State(engine): State<CacheState>,
     Json(req): Json<LpushRequest>,
@@ -368,13 +340,11 @@ async fn lpush_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct LrangeQuery {
     start: Option<i64>,
     stop: Option<i64>,
 }
-
 async fn lrange_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -392,13 +362,11 @@ async fn lrange_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct HsetRequest {
     key: String,
     fields: std::collections::HashMap<String, String>,
 }
-
 async fn hset_key(
     State(engine): State<CacheState>,
     Json(req): Json<HsetRequest>,
@@ -413,7 +381,6 @@ async fn hset_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 async fn hgetall_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -432,19 +399,16 @@ async fn hgetall_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct ZaddMember {
     score: f64,
     member: String,
 }
-
 #[derive(Deserialize)]
 struct ZaddRequest {
     key: String,
     members: Vec<ZaddMember>,
 }
-
 async fn zadd_key(
     State(engine): State<CacheState>,
     Json(req): Json<ZaddRequest>,
@@ -458,13 +422,11 @@ async fn zadd_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize)]
 struct ZrangeQuery {
     start: Option<i64>,
     stop: Option<i64>,
 }
-
 async fn zrange_key(
     State(engine): State<CacheState>,
     Path(key): Path<String>,
@@ -482,13 +444,11 @@ async fn zrange_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 }
-
 #[derive(Deserialize, Serialize)]
 struct PublishRequest {
     channel: String,
     message: String,
 }
-
 async fn publish_msg(
     State(engine): State<CacheState>,
     Json(req): Json<PublishRequest>,
@@ -496,6 +456,3 @@ async fn publish_msg(
     let n = engine.publish(&req.channel, req.message.into_bytes());
     Json(serde_json::json!({"receivers": n}))
 }
->>>>>>> claude/dazzling-tesla
-=======
->>>>>>> claude/jovial-faraday

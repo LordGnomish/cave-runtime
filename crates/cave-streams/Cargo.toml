@@ -1,17 +1,13 @@
 [package]
 name = "cave-streams"
-<<<<<<< HEAD
 description = "CAVE Streams — cloud-native event streaming platform, Kafka-compatible without JVM or ZooKeeper"
-=======
 description = "Cloud-native event streaming platform — replaces Kafka + Confluent Platform"
->>>>>>> claude/youthful-babbage
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-<<<<<<< HEAD
 
 # Async
 tokio      = { workspace = true, features = ["full"] }
@@ -32,13 +28,10 @@ bytes      = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
-=======
 axum = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
->>>>>>> claude/youthful-babbage

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! HTTP routes for cave-dns.
 
 use crate::{
@@ -52,47 +51,31 @@ pub struct CreateZoneRequest {
     pub name: String,
     pub provider: DnsProvider,
     pub ttl_default: u32,
-=======
-use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
     response::IntoResponse,
     routing::{delete, get, post},
-    Json, Router,
-};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
-
 use crate::cache::DnsCache;
 use crate::discovery::{ServiceEndpoint, ServiceRegistry};
 use crate::resolver::Resolver;
 use crate::types::*;
 use crate::zone::{Zone, ZoneStore};
-
 // ── State ────────────────────────────────────────────────────────────────────
-
 #[allow(dead_code)]
 pub struct DnsState {
     pub zones: Arc<ZoneStore>,
     pub registry: Arc<ServiceRegistry>,
     pub resolver: Arc<Resolver>,
-}
-
 // ── Request/Response types ───────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-pub struct CreateZoneRequest {
     pub origin: String,
     pub ttl: Option<u32>,
->>>>>>> claude/dazzling-tesla
 }
 
 #[derive(Deserialize)]
 pub struct CreateRecordRequest {
     pub name: String,
-<<<<<<< HEAD
     pub record_type: crate::models::RecordType,
     pub ttl: u32,
     pub data: crate::models::RecordData,
@@ -115,7 +98,6 @@ pub struct SyncResponse {
 pub struct ProviderInfo {
     pub name: &'static str,
     pub slug: &'static str,
-=======
     #[serde(rename = "type")]
     pub rtype: String,
     pub ttl: Option<u32>,
@@ -125,38 +107,20 @@ pub struct ProviderInfo {
     pub port: Option<u16>,
     pub weight: Option<u16>,
     pub text: Option<String>,
-}
-
-#[derive(Serialize)]
 pub struct ZoneListResponse {
     pub zones: Vec<String>,
-}
-
-#[derive(Serialize)]
 pub struct RecordListResponse {
     pub records: Vec<ResourceRecord>,
-}
-
-#[derive(Deserialize)]
 pub struct LookupQuery {
     pub name: String,
     #[serde(rename = "type")]
     pub rtype: Option<String>,
-}
-
-#[derive(Deserialize)]
 pub struct NamespaceParams {
     pub namespace: String,
-}
-
-#[derive(Serialize)]
 pub struct HealthResponse {
     pub status: &'static str,
     pub module: &'static str,
-}
-
 // ── Router ───────────────────────────────────────────────────────────────────
-
 pub fn router(state: Arc<DnsState>) -> Router {
     Router::new()
         .route("/api/dns/zones", get(list_zones).post(create_zone))
@@ -175,25 +139,20 @@ pub fn router(state: Arc<DnsState>) -> Router {
         .route("/api/dns/discovery/ns/:namespace", get(list_services))
         .route("/api/dns/health", get(health))
         .with_state(state)
->>>>>>> claude/dazzling-tesla
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
-<<<<<<< HEAD
 async fn list_zones(State(state): State<Arc<DnsState>>) -> Json<Vec<DnsZone>> {
     Json(state.zones.lock().unwrap().clone())
-=======
 async fn list_zones(State(state): State<Arc<DnsState>>) -> impl IntoResponse {
     let zones = state.zones.list_zones();
     Json(ZoneListResponse { zones })
->>>>>>> claude/dazzling-tesla
 }
 
 async fn create_zone(
     State(state): State<Arc<DnsState>>,
     Json(req): Json<CreateZoneRequest>,
-<<<<<<< HEAD
 ) -> (StatusCode, Json<DnsZone>) {
     let zone = DnsZone::new(req.name, req.provider, req.ttl_default);
     state.zones.lock().unwrap().push(zone.clone());
@@ -227,7 +186,6 @@ async fn update_zone(
     zone.ttl_default = req.ttl_default;
     zone.updated_at = Utc::now();
     Ok(Json(zone.clone()))
-=======
 ) -> impl IntoResponse {
     let ttl = req.ttl.unwrap_or(3600);
     let origin = if req.origin.ends_with('.') {
@@ -235,7 +193,6 @@ async fn update_zone(
     } else {
         format!("{}.", req.origin)
     };
-
     let soa = ResourceRecord {
         name: origin.clone(),
         rtype: RecordType::SOA,
@@ -251,13 +208,11 @@ async fn update_zone(
             minimum: 300,
         },
     };
-
     let zone = Zone {
         origin: origin.clone(),
         soa,
         records: HashMap::new(),
     };
-
     match state.zones.add_zone(zone) {
         Ok(_) => (StatusCode::CREATED, Json(serde_json::json!({"origin": origin}))).into_response(),
         Err(e) => (
@@ -265,20 +220,16 @@ async fn update_zone(
             Json(serde_json::json!({"error": e.to_string()})),
         )
             .into_response(),
-    }
->>>>>>> claude/dazzling-tesla
 }
 
 async fn delete_zone(
     State(state): State<Arc<DnsState>>,
-<<<<<<< HEAD
     Path(id): Path<Uuid>,
 ) -> StatusCode {
     let mut zones = state.zones.lock().unwrap();
     let before = zones.len();
     zones.retain(|z| z.id != id);
     if zones.len() < before { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND }
-=======
     Path(zone): Path<String>,
 ) -> impl IntoResponse {
     match state.zones.remove_zone(&zone) {
@@ -289,17 +240,14 @@ async fn delete_zone(
         )
             .into_response(),
     }
->>>>>>> claude/dazzling-tesla
 }
 
 async fn list_records(
     State(state): State<Arc<DnsState>>,
-<<<<<<< HEAD
     Path(id): Path<Uuid>,
 ) -> Json<Vec<DnsRecord>> {
     let records = state.records.lock().unwrap();
     Json(records.iter().filter(|r| r.zone_id == id).cloned().collect())
-=======
     Path(zone): Path<String>,
 ) -> impl IntoResponse {
     match state.zones.get_zone(&zone) {
@@ -314,12 +262,10 @@ async fn list_records(
         )
             .into_response(),
     }
->>>>>>> claude/dazzling-tesla
 }
 
 async fn create_record(
     State(state): State<Arc<DnsState>>,
-<<<<<<< HEAD
     Path(id): Path<Uuid>,
     Json(req): Json<CreateRecordRequest>,
 ) -> (StatusCode, Json<DnsRecord>) {
@@ -359,13 +305,10 @@ async fn update_record(
     record.data = req.data;
     record.updated_at = Utc::now();
     Ok(Json(record.clone()))
-=======
     Path(zone): Path<String>,
-    Json(req): Json<CreateRecordRequest>,
 ) -> impl IntoResponse {
     let ttl = req.ttl.unwrap_or(3600);
     let rtype = RecordType::from_str(&req.rtype);
-
     let zone_obj = match state.zones.get_zone(&zone) {
         Some(z) => z,
         None => {
@@ -374,15 +317,12 @@ async fn update_record(
                 Json(serde_json::json!({"error": "zone not found"})),
             )
                 .into_response();
-        }
     };
-
     let name = if req.name.ends_with('.') {
         req.name.clone()
     } else {
         format!("{}.{}", req.name, zone_obj.origin)
     };
-
     let rdata = match &rtype {
         RecordType::A => {
             let addr = req.address.as_deref().unwrap_or("0.0.0.0");
@@ -394,9 +334,6 @@ async fn update_record(
                         Json(serde_json::json!({"error": "invalid IPv4 address"})),
                     )
                         .into_response();
-                }
-            }
-        }
         RecordType::CNAME => RData::CNAME(req.target.clone().unwrap_or_default()),
         RecordType::MX => RData::MX {
             priority: req.priority.unwrap_or(10),
@@ -405,7 +342,6 @@ async fn update_record(
         RecordType::TXT => RData::TXT(vec![req.text.clone().unwrap_or_default().into_bytes()]),
         _ => RData::Raw(vec![]),
     };
-
     let record = ResourceRecord {
         name: name.clone(),
         rtype,
@@ -413,7 +349,6 @@ async fn update_record(
         ttl,
         rdata,
     };
-
     match state.zones.add_record(&zone, record) {
         Ok(_) => (StatusCode::CREATED, Json(serde_json::json!({"name": name}))).into_response(),
         Err(e) => (
@@ -421,13 +356,10 @@ async fn update_record(
             Json(serde_json::json!({"error": e.to_string()})),
         )
             .into_response(),
-    }
->>>>>>> claude/dazzling-tesla
 }
 
 async fn delete_record(
     State(state): State<Arc<DnsState>>,
-<<<<<<< HEAD
     Path((zone_id, record_id)): Path<(Uuid, Uuid)>,
 ) -> StatusCode {
     let mut records = state.records.lock().unwrap();
@@ -484,7 +416,6 @@ async fn health() -> Json<serde_json::Value> {
         "upstream": "external-dns",
     }))
 }
-=======
     Path((zone, name, rtype)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let rtype = RecordType::from_str(&rtype);
@@ -495,20 +426,13 @@ async fn health() -> Json<serde_json::Value> {
             Json(serde_json::json!({"error": e.to_string()})),
         )
             .into_response(),
-    }
-}
-
 async fn lookup(
-    State(state): State<Arc<DnsState>>,
     Query(params): Query<LookupQuery>,
 ) -> impl IntoResponse {
     let rtype = RecordType::from_str(params.rtype.as_deref().unwrap_or("A"));
     let records = state.zones.lookup(&params.name, &rtype);
     Json(serde_json::json!({ "name": params.name, "records": records }))
-}
-
 async fn register_service(
-    State(state): State<Arc<DnsState>>,
     Json(endpoint): Json<ServiceEndpointJson>,
 ) -> impl IntoResponse {
     let ep = ServiceEndpoint {
@@ -519,21 +443,14 @@ async fn register_service(
         port: endpoint.port,
         protocol: endpoint.protocol,
         ttl: endpoint.ttl.unwrap_or(30),
-    };
     state.registry.register(ep);
     StatusCode::CREATED
-}
-
 async fn deregister_service(
-    State(state): State<Arc<DnsState>>,
     Path(fqdn): Path<String>,
 ) -> impl IntoResponse {
     state.registry.deregister(&fqdn);
     StatusCode::NO_CONTENT
-}
-
 async fn list_services(
-    State(state): State<Arc<DnsState>>,
     Path(namespace): Path<String>,
 ) -> impl IntoResponse {
     let services = state.registry.lookup_all_in_namespace(&namespace);
@@ -547,18 +464,12 @@ async fn list_services(
             port: ep.port,
             protocol: ep.protocol,
             ttl: Some(ep.ttl),
-        })
         .collect();
     Json(serde_json::json!({ "services": items }))
-}
-
 async fn health() -> impl IntoResponse {
     Json(HealthResponse {
         status: "ok",
         module: crate::MODULE_NAME,
-    })
-}
-
 // JSON-friendly service endpoint (ip as string)
 #[derive(Serialize, Deserialize)]
 pub struct ServiceEndpointJson {
@@ -569,9 +480,6 @@ pub struct ServiceEndpointJson {
     pub port: u16,
     pub protocol: String,
     pub ttl: Option<u32>,
-}
-
 // Make DnsCache accessible (though not used in routes directly here)
 #[allow(dead_code)]
 fn _use_cache(_: &DnsCache) {}
->>>>>>> claude/dazzling-tesla
