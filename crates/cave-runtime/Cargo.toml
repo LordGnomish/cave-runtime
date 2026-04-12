@@ -30,6 +30,8 @@ cave-store = { path = "../cave-store" }
 cave-gitops-config = { path = "../cave-gitops-config" }
 # Phase 4 modules
 cave-tracker = { path = "../cave-tracker" }
+# Service mesh
+cave-mesh = { path = "../cave-mesh" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }
