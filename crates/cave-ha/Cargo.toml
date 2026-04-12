@@ -1,0 +1,19 @@
+[package]
+name = "cave-ha"
+description = "HA/DR with Raft consensus — leader election, log replication, snapshots, failover"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }
