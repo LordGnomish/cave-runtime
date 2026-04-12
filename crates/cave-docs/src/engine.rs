@@ -1,4 +1,4 @@
-use crate::models::{ApiSpec, SpecFormat};
+use crate::models::ApiSpec;
 
 /// Check if a version string looks like a valid semver
 pub fn is_valid_version(version: &str) -> bool {

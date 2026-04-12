@@ -15,15 +15,15 @@ use std::sync::Arc;
 pub fn create_router(state: Arc<CacheState>) -> Router {
     Router::new()
         .route("/api/v1/cache/keys", get(list_keys).post(set_key))
-        .route("/api/v1/cache/keys/:key", get(get_key).delete(delete_key))
-        .route("/api/v1/cache/keys/:key/expire", post(expire_key))
-        .route("/api/v1/cache/keys/:key/incr", post(incr_key))
-        .route("/api/v1/cache/keys/:key/decr", post(decr_key))
+        .route("/api/v1/cache/keys/{key}", get(get_key).delete(delete_key))
+        .route("/api/v1/cache/keys/{key}/expire", post(expire_key))
+        .route("/api/v1/cache/keys/{key}/incr", post(incr_key))
+        .route("/api/v1/cache/keys/{key}/decr", post(decr_key))
         .route("/api/v1/cache/pipeline", post(pipeline))
         .route("/api/v1/cache/stats", get(get_stats))
         .route("/api/v1/cache/pubsub", get(list_channels))
         .route("/api/v1/cache/pubsub/publish", post(publish))
-        .route("/api/v1/cache/pubsub/:channel", get(subscribe))
+        .route("/api/v1/cache/pubsub/{channel}", get(subscribe))
         .with_state(state)
 }
 

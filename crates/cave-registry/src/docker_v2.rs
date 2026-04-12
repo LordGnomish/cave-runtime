@@ -117,17 +117,17 @@ pub fn docker_v2_router(state: Arc<RegistryState>) -> Router {
         // Manifests — note: :name is a single path segment here.
         // Multi-segment names (org/image) require middleware-level rewriting
         // or a wildcard route; see CAVE-REGISTRY-MULTI-SEGMENT-TODO.
-        .route("/v2/:name/manifests/:reference", get(pull_manifest)
+        .route("/v2/{name}/manifests/{reference}", get(pull_manifest)
             .head(head_manifest)
             .put(push_manifest))
         // Blobs
-        .route("/v2/:name/blobs/:digest", get(pull_blob).head(head_blob))
+        .route("/v2/{name}/blobs/{digest}", get(pull_blob).head(head_blob))
         // Blob upload (chunked)
-        .route("/v2/:name/blobs/uploads/", post(initiate_upload))
-        .route("/v2/:name/blobs/uploads/:upload_uuid",
+        .route("/v2/{name}/blobs/uploads/", post(initiate_upload))
+        .route("/v2/{name}/blobs/uploads/{upload_uuid}",
             patch(upload_chunk).put(complete_upload))
         // Tag list (bonus — used by many tools)
-        .route("/v2/:name/tags/list", get(list_tags))
+        .route("/v2/{name}/tags/list", get(list_tags))
         .with_state(state)
 }
 

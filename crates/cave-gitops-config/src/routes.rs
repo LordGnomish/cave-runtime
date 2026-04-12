@@ -46,7 +46,7 @@ pub fn create_router(state: Arc<GitOpsAppState>) -> Router {
         .route("/api/gitops/state", get(list_state))
         .route("/api/gitops/state/*path", get(get_state_entry))
         .route("/api/gitops/clusters", get(list_clusters).post(register_cluster))
-        .route("/api/gitops/pipelines/:request_id", get(get_pipeline))
+        .route("/api/gitops/pipelines/{request_id}", get(get_pipeline))
         .with_state(state)
 }
 

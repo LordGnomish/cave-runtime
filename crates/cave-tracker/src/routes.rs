@@ -60,10 +60,10 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
             post(complete_sprint),
         )
         // Board / backlog / roadmap / metrics
-        .route("/api/v1/tracker/projects/:project_id/board", get(kanban_board))
-        .route("/api/v1/tracker/projects/:project_id/backlog", get(project_backlog))
-        .route("/api/v1/tracker/projects/:project_id/roadmap", get(project_roadmap))
-        .route("/api/v1/tracker/projects/:project_id/metrics", get(project_metrics))
+        .route("/api/v1/tracker/projects/{project_id}/board", get(kanban_board))
+        .route("/api/v1/tracker/projects/{project_id}/backlog", get(project_backlog))
+        .route("/api/v1/tracker/projects/{project_id}/roadmap", get(project_roadmap))
+        .route("/api/v1/tracker/projects/{project_id}/metrics", get(project_metrics))
         // Labels
         .route(
             "/api/v1/tracker/projects/:project_id/labels",
@@ -79,8 +79,8 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
             "/api/v1/tracker/issues/:issue_id",
             get(get_issue).put(update_issue_handler).delete(delete_issue),
         )
-        .route("/api/v1/tracker/issues/:issue_id/activity", get(get_issue_activity))
-        .route("/api/v1/tracker/issues/:issue_id/transition", post(transition_issue_handler))
+        .route("/api/v1/tracker/issues/{issue_id}/activity", get(get_issue_activity))
+        .route("/api/v1/tracker/issues/{issue_id}/transition", post(transition_issue_handler))
         .route(
             "/api/v1/tracker/issues/:issue_id/comments",
             get(list_comments).post(add_comment),

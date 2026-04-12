@@ -177,9 +177,9 @@ pub fn routes() -> Router<Arc<GatewayState>> {
     Router::new()
         .route("/api/v1/gateway/billing/plans", get(list_billing_plans).post(create_billing_plan))
         .route("/api/v1/gateway/billing/usage", post(record_usage))
-        .route("/api/v1/gateway/billing/usage/:consumer_id/:api_id", get(get_usage))
+        .route("/api/v1/gateway/billing/usage/{consumer_id}/{api_id}", get(get_usage))
         .route("/api/v1/gateway/billing/invoices", post(generate_invoice))
-        .route("/api/v1/gateway/billing/invoices/:id", get(get_invoice))
+        .route("/api/v1/gateway/billing/invoices/{id}", get(get_invoice))
         .route("/api/v1/gateway/billing/invoices", get(list_invoices))
 }
 

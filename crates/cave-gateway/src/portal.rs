@@ -34,14 +34,14 @@ pub fn portal_router(state: AppState) -> Router {
     Router::new()
         // API catalog
         .route("/apis", get(list_apis))
-        .route("/apis/:id", get(get_api))
-        .route("/apis/:id/documentation", get(list_docs).post(create_doc))
+        .route("/apis/{id}", get(get_api))
+        .route("/apis/{id}/documentation", get(list_docs).post(create_doc))
         // Subscriptions
         .route("/subscriptions", get(list_subscriptions).post(create_subscription))
-        .route("/subscriptions/:id", get(get_subscription).delete(cancel_subscription))
-        .route("/consumers/:id/subscriptions", get(consumer_subscriptions))
+        .route("/subscriptions/{id}", get(get_subscription).delete(cancel_subscription))
+        .route("/consumers/{id}/subscriptions", get(consumer_subscriptions))
         // Usage / monetization
-        .route("/consumers/:id/usage", get(consumer_usage))
+        .route("/consumers/{id}/usage", get(consumer_usage))
         .route("/usage", get(global_usage))
         .with_state(state)
 }
@@ -49,10 +49,10 @@ pub fn portal_router(state: AppState) -> Router {
 /// API lifecycle routes (admin-facing, nested under /admin/services)
 pub fn lifecycle_router(state: AppState) -> Router {
     Router::new()
-        .route("/services/:id/versions", get(list_versions).post(create_version))
-        .route("/services/:id/versions/:vid", put(update_version))
-        .route("/services/:id/versions/:vid/deprecate", post(deprecate_version))
-        .route("/services/:id/versions/:vid/retire", post(retire_version))
+        .route("/services/{id}/versions", get(list_versions).post(create_version))
+        .route("/services/{id}/versions/{vid}", put(update_version))
+        .route("/services/{id}/versions/{vid}/deprecate", post(deprecate_version))
+        .route("/services/{id}/versions/{vid}/retire", post(retire_version))
         .with_state(state)
 }
 

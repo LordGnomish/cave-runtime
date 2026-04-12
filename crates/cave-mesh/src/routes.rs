@@ -130,7 +130,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             "/api/mesh/ratelimits",
             get(list_rate_limits).post(upsert_rate_limit),
         )
-        .route("/api/mesh/ratelimits/:name", delete(delete_rate_limit))
+        .route("/api/mesh/ratelimits/{name}", delete(delete_rate_limit))
         // ── Circuit Breakers ─────────────────────────────────
         .route("/api/mesh/circuitbreakers", get(list_circuit_breakers))
         .with_state(state)

@@ -37,7 +37,7 @@ pub fn create_router(state: Arc<MetricsState>) -> Router {
         // Label names:    GET /api/v1/labels
         .route("/api/v1/labels", get(labels))
         // Label values:   GET /api/v1/label/:name/values
-        .route("/api/v1/label/:name/values", get(label_values))
+        .route("/api/v1/label/{name}/values", get(label_values))
         // ── Self-metrics (Prometheus exposition format) ────────────────────
         .route("/metrics", get(self_metrics))
         .with_state(state)
@@ -215,19 +215,19 @@ use uuid::Uuid;
         // Alert rules CRUD
         .route("/api/v1/metrics/alerts", get(list_alert_rules))
         .route("/api/v1/metrics/alerts", post(create_alert_rule))
-        .route("/api/v1/metrics/alerts/:id", get(get_alert_rule))
-        .route("/api/v1/metrics/alerts/:id", put(update_alert_rule))
-        .route("/api/v1/metrics/alerts/:id", delete(delete_alert_rule))
+        .route("/api/v1/metrics/alerts/{id}", get(get_alert_rule))
+        .route("/api/v1/metrics/alerts/{id}", put(update_alert_rule))
+        .route("/api/v1/metrics/alerts/{id}", delete(delete_alert_rule))
         .route("/api/v1/metrics/alerts/evaluate", post(trigger_alert_evaluation))
         .route("/api/v1/metrics/alerts/firing", get(list_firing_alerts))
         // Recording rules CRUD
         .route("/api/v1/metrics/rules", get(list_recording_rules))
         .route("/api/v1/metrics/rules", post(create_recording_rule))
-        .route("/api/v1/metrics/rules/:id", delete(delete_recording_rule))
+        .route("/api/v1/metrics/rules/{id}", delete(delete_recording_rule))
         // Scrape targets CRUD
         .route("/api/v1/metrics/targets", get(list_targets))
         .route("/api/v1/metrics/targets", post(create_target))
-        .route("/api/v1/metrics/targets/:id", delete(delete_target))
+        .route("/api/v1/metrics/targets/{id}", delete(delete_target))
         .route("/api/v1/metrics/targets/discover", post(discover_targets))
     Json(json!({
         "upstream": "Prometheus + Thanos"

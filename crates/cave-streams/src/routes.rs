@@ -85,17 +85,17 @@ pub fn router(state: AppState) -> Router {
         .route("/health", get(health))
         // Topics
         .route("/topics", post(create_topic).get(list_topics))
-        .route("/topics/:name", get(get_topic).delete(delete_topic))
-        .route("/topics/:name/config", put(alter_topic_config))
-        .route("/topics/:name/partitions", put(add_partitions))
-        .route("/topics/:name/watermarks", get(get_watermarks))
+        .route("/topics/{name}", get(get_topic).delete(delete_topic))
+        .route("/topics/{name}/config", put(alter_topic_config))
+        .route("/topics/{name}/partitions", put(add_partitions))
+        .route("/topics/{name}/watermarks", get(get_watermarks))
         // Produce / Consume (REST proxy)
-        .route("/topics/:name/records", post(produce_record))
-        .route("/topics/:name/records/:partition", get(fetch_records))
+        .route("/topics/{name}/records", post(produce_record))
+        .route("/topics/{name}/records/{partition}", get(fetch_records))
         // Consumer groups
         .route("/groups", get(list_groups))
-        .route("/groups/:group", get(describe_group).delete(delete_group))
-        .route("/groups/:group/offsets/:topic", put(reset_offsets))
+        .route("/groups/{group}", get(describe_group).delete(delete_group))
+        .route("/groups/{group}/offsets/{topic}", put(reset_offsets))
         .route(
             "/groups/:group/offsets/:topic/:partition",
             get(get_offset).post(commit_offset),
@@ -103,7 +103,7 @@ pub fn router(state: AppState) -> Router {
         // Schema registry
         .route("/schemas", post(register_schema).get(list_subjects))
         .route("/schemas/check", post(check_schema_compat))
-        .route("/schemas/id/:id", get(get_schema_by_id))
+        .route("/schemas/id/{id}", get(get_schema_by_id))
         .route(
             "/schemas/:subject",
             get(get_latest_schema).delete(delete_subject),
@@ -116,24 +116,24 @@ pub fn router(state: AppState) -> Router {
             "/schemas/:subject/versions/:version",
             get(get_schema_version),
         )
-        .route("/schemas/:subject/compat", put(set_compat).get(get_compat))
+        .route("/schemas/{subject}/compat", put(set_compat).get(get_compat))
         // Connectors
         .route("/connectors", post(create_connector).get(list_connectors))
         .route(
             "/connectors/:name",
             get(get_connector).delete(delete_connector),
         )
-        .route("/connectors/:name/pause", put(pause_connector))
-        .route("/connectors/:name/resume", put(resume_connector))
+        .route("/connectors/{name}/pause", put(pause_connector))
+        .route("/connectors/{name}/resume", put(resume_connector))
         // Pipelines (Streams API)
         .route("/pipelines", post(create_pipeline).get(list_pipelines))
         .route(
             "/pipelines/:id",
             get(get_pipeline).delete(delete_pipeline),
         )
-        .route("/pipelines/:id/start", put(start_pipeline))
-        .route("/pipelines/:id/pause", put(pause_pipeline))
-        .route("/pipelines/:id/stop", put(stop_pipeline))
+        .route("/pipelines/{id}/start", put(start_pipeline))
+        .route("/pipelines/{id}/pause", put(pause_pipeline))
+        .route("/pipelines/{id}/stop", put(stop_pipeline))
         // Admin
         .route("/admin/cluster", get(cluster_info))
         .route("/admin/compact", post(run_compaction))

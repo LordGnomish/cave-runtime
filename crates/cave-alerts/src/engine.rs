@@ -1,4 +1,4 @@
-use crate::models::{Alert, AlertState, Matcher, Route, Silence};
+use crate::models::{Alert, Matcher, Route, Silence};
 use chrono::Utc;
 
 /// Compute a stable fingerprint for an alert based on its name + sorted labels

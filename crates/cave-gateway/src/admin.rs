@@ -63,7 +63,7 @@ pub fn admin_router(state: AppState) -> Router {
             "/upstreams/:id/targets/:tid",
             get(get_target).delete(delete_target),
         )
-        .route("/upstreams/:id/health", get(upstream_health))
+        .route("/upstreams/{id}/health", get(upstream_health))
         // Consumers
         .route("/consumers", get(list_consumers).post(create_consumer))
         .route(

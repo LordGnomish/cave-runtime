@@ -1,6 +1,6 @@
 //! Metric analysis — evaluate PromQL/webhook results against thresholds.
 
-use crate::types::{AnalysisPhase, AnalysisRun, AnalysisTemplate, MetricCondition, MetricResult};
+use crate::types::{AnalysisPhase, AnalysisRun, MetricCondition, MetricResult};
 use chrono::Utc;
 
 /// Evaluate a single metric value against its condition.

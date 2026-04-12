@@ -248,13 +248,13 @@ impl Default for LifecycleStore {
 pub fn routes() -> Router<Arc<GatewayState>> {
     Router::new()
         .route("/api/v1/gateway/lifecycle/apis", get(list_api_versions).post(create_api_version))
-        .route("/api/v1/gateway/lifecycle/apis/:id", get(get_api_version))
-        .route("/api/v1/gateway/lifecycle/apis/:id/transition", post(transition))
-        .route("/api/v1/gateway/lifecycle/apis/:id/review", post(submit_review))
-        .route("/api/v1/gateway/lifecycle/apis/:id/changelog", post(add_changelog))
+        .route("/api/v1/gateway/lifecycle/apis/{id}", get(get_api_version))
+        .route("/api/v1/gateway/lifecycle/apis/{id}/transition", post(transition))
+        .route("/api/v1/gateway/lifecycle/apis/{id}/review", post(submit_review))
+        .route("/api/v1/gateway/lifecycle/apis/{id}/changelog", post(add_changelog))
         .route("/api/v1/gateway/lifecycle/reviews", get(list_reviews))
-        .route("/api/v1/gateway/lifecycle/reviews/:id/approve", post(approve_review))
-        .route("/api/v1/gateway/lifecycle/reviews/:id/reject", post(reject_review))
+        .route("/api/v1/gateway/lifecycle/reviews/{id}/approve", post(approve_review))
+        .route("/api/v1/gateway/lifecycle/reviews/{id}/reject", post(reject_review))
         .route("/api/v1/gateway/lifecycle/audit", get(get_audit_trail))
 }
 
