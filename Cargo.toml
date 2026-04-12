@@ -45,6 +45,8 @@ members = [
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === DNS Server ===
+    "crates/cave-dns",
 ]
 
 [workspace.package]
