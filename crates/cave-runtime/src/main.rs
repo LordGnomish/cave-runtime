@@ -61,6 +61,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -80,6 +81,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let vault_store = Arc::new(std::sync::Mutex::new(cave_vault::VaultStore::default()));
 >>>>>>> claude/ecstatic-chebyshev
+=======
+    let trace_state = Arc::new(cave_trace::TraceState::default());
+>>>>>>> claude/elastic-ellis
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
@@ -92,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
+        .merge(cave_trace::router(trace_state))
         .merge(cave_docs::router())
         .merge(cave_status::router())
         .merge(cave_changelog::router())
@@ -139,6 +144,7 @@ async fn main() -> anyhow::Result<()> {
     info!(port = port, "CAVE Runtime listening");
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
@@ -153,6 +159,9 @@ async fn main() -> anyhow::Result<()> {
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
+=======
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, trace");
+>>>>>>> claude/elastic-ellis
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()

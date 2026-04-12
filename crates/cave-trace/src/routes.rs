@@ -1,8 +1,12 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/elastic-ellis
 use crate::models::{IngestResponse, IngestSpanRequest, SearchResponse, Span, TraceQuery};
 use crate::{analyzer, collector, TraceState};
 use axum::{
     extract::{Path, Query, State as AxumState},
+<<<<<<< HEAD
 =======
 use crate::comparison::TraceComparer;
 use crate::dependency::DependencyComputer;
@@ -14,12 +18,17 @@ use crate::types::TraceQuery;
 use axum::{
     extract::{Path, Query, State},
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/elastic-ellis
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/elastic-ellis
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -210,6 +219,7 @@ async fn latency_handler(
 struct LatencyQuery {
     service: Option<String>,
 }
+<<<<<<< HEAD
 =======
 use serde::Deserialize;
 use std::sync::{Arc, Mutex};
@@ -462,3 +472,5 @@ async fn get_stats(State(state): State<Arc<TraceState>>) -> impl IntoResponse {
     }))
 }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/elastic-ellis
