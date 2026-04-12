@@ -21,6 +21,8 @@ members = [
     # === Vault / Secrets Management ===
     "crates/cave-vault",
     # === Phase 2: Security Core ===
+    "crates/cave-security",
+    "crates/cave-admission",
     "crates/cave-vulns",
     "crates/cave-sbom",
     "crates/cave-uptime",
