@@ -1,37 +1,21 @@
-//! cave-cache — Redis/Valkey replacement for distributed caching.
+//! cave-cache — Full Redis parity cache server.
 //!
-//! Replaces: Redis, Valkey
-//! Features: get/set/delete/expire, glob pattern matching, atomic incr/decr,
-//!           pipeline operations, pub/sub channels, in-memory TTL eviction.
+//! Implements the RESP2/RESP3 wire protocol, all Redis data types, pub/sub,
+//! Lua scripting, transactions, key expiry, persistence, and more.
 
-pub mod cache;
-pub mod models;
-pub mod routes;
+pub mod acl;
+pub mod cluster;
+pub mod commands;
+pub mod config;
+pub mod db;
+pub mod error;
+pub mod eviction;
+pub mod keyspace;
+pub mod persistence;
+pub mod resp;
+pub mod server;
+pub mod types;
 
-use axum::Router;
-use std::sync::{Arc, Mutex};
-
-/// Shared state for the cache module.
-pub struct CacheState {
-    pub store: Mutex<cache::CacheStore>,
-}
-
-impl CacheState {
-    pub fn new() -> Self {
-        Self {
-            store: Mutex::new(cache::CacheStore::new()),
-        }
-    }
-}
-
-impl Default for CacheState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn router(state: Arc<CacheState>) -> Router {
-    routes::create_router(state)
-}
-
-pub const MODULE_NAME: &str = "cache";
+pub use server::run;
+pub use config::Config;
+pub use db::ServerState;
