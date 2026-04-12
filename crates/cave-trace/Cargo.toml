@@ -1,18 +1,34 @@
 [package]
 name = "cave-trace"
+<<<<<<< HEAD
 description = "Distributed tracing — Jaeger/Tempo replacement"
+=======
+description = "Distributed tracing — Jaeger replacement: OTLP, spans, indexing, query, dependency graph"
+>>>>>>> claude/dazzling-tesla
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+<<<<<<< HEAD
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 axum = { workspace = true }
 tokio = { workspace = true }
+=======
+tokio = { workspace = true }
+axum = { workspace = true }
+>>>>>>> claude/dazzling-tesla
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+<<<<<<< HEAD
+=======
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+>>>>>>> claude/dazzling-tesla

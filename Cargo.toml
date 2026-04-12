@@ -85,6 +85,15 @@ members = [
     "crates/cave-gitops-config",
     "crates/cave-compliance",
     "crates/cave-cost-alloc",
+    # === Storage & Cache ===
+    "crates/cave-cache",
+    "crates/cave-store",
+    # === Infrastructure ===
+    "crates/cave-dns",
+    "crates/cave-pg",
+    # === Docs & Tracing ===
+    "crates/cave-docs-site",
+    "crates/cave-trace",
 ]
 
 [workspace.package]
@@ -140,6 +149,8 @@ reqwest-middleware = "0.4"
 # Persistence
 rusqlite = { version = "0.32", features = ["bundled"] }
 async-trait = "0.1"
+# Markdown rendering
+pulldown-cmark = "0.12"
 
 [profile.release]
 opt-level = 3

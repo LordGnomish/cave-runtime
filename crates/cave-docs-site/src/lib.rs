@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 //! CAVE Docs Site — Developer documentation platform.
 //!
 //! Replaces: GitBook / Docusaurus
@@ -29,4 +30,20 @@ pub fn router(state: Arc<DocsSiteState>) -> Router {
     routes::create_router(state)
 }
 
+=======
+//! CAVE Docs Site — GitBook replacement.
+
+pub mod error;
+pub mod types;
+pub mod renderer;
+pub mod store;
+pub mod toc;
+pub mod search;
+pub mod versioning;
+pub mod openapi;
+pub mod routes;
+
+pub use store::DocsStore;
+pub use error::{DocsError, DocsResult};
+>>>>>>> claude/dazzling-tesla
 pub const MODULE_NAME: &str = "docs-site";
