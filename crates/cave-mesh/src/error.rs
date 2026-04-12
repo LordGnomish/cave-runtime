@@ -1,0 +1,41 @@
+//! Unified error type for cave-mesh.
+
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum MeshError {
+    #[error("service not found: {0}")]
+    ServiceNotFound(String),
+
+    #[error("resource not found: {0}")]
+    NotFound(String),
+
+    #[error("circuit breaker open for: {0}")]
+    CircuitOpen(String),
+
+    #[error("mTLS rejected: {0}")]
+    MtlsRejected(String),
+
+    #[error("authorization denied: {0}")]
+    AuthzDenied(String),
+
+    #[error("JWT error: {0}")]
+    Jwt(String),
+
+    #[error("rate limit exceeded for: {0}")]
+    RateLimited(String),
+
+    #[error("fault injection abort: HTTP {0}")]
+    FaultAbort(u16),
+
+    #[error("storage error: {0}")]
+    Storage(String),
+
+    #[error("serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error("invalid configuration: {0}")]
+    InvalidConfig(String),
+}
+
+pub type MeshResult<T> = Result<T, MeshError>;
