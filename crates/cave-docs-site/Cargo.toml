@@ -1,0 +1,21 @@
+[package]
+name = "cave-docs-site"
+description = "Documentation site — GitBook replacement: markdown, spaces, pages, search, versioning"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+pulldown-cmark = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
