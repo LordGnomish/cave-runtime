@@ -1,6 +1,6 @@
 [package]
 name = "cave-compliance"
-description = "CAVE Compliance — SOC2/ISO27001 compliance management"
+description = "Compliance & audit — CIS Kubernetes Benchmark, SOC2, PCI-DSS, HIPAA"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,11 +8,14 @@ license.workspace = true
 [dependencies]
 cave-core = { path = "../cave-core" }
 axum = { workspace = true }
-tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }

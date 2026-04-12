@@ -1,46 +1,54 @@
-//! Automated runbook execution and incident remediation.
-//!
-//! Replaces: PagerDuty Runbooks / Rundeck / StackStorm
-//!
-//! Core concepts:
-//! - Runbook: ordered set of steps triggered manually, by incidents, alerts, or schedule.
-//! - RunbookExecution: a live or completed run with per-step results.
-//! - IncidentBinding: auto-attach a runbook when an incident matches a pattern.
-//! - ApprovalRequest: human-in-the-loop gate; execution pauses until approved/rejected.
-//! - RunbookTemplate: predefined runbook skeletons (restart, scale, failover, etc.).
+//! CAVE Runbook — Runbook automation engine.
+//! Replaces: manual runbooks, PagerDuty runbooks.
+//! Features: YAML-defined runbooks, multi-step execution, approvals, scheduling.
 
-pub mod executor;
+pub mod engine;
+pub mod library;
 pub mod models;
 pub mod routes;
-pub mod templates;
-pub mod triggers;
+pub mod schedule;
+pub mod steps;
 
 use axum::Router;
-use models::{ApprovalRequest, IncidentBinding, Runbook, RunbookExecution};
+use models::*;
 use std::{collections::HashMap, sync::Arc};
-use tokio::sync::Mutex;
-use uuid::Uuid;
+use tokio::sync::RwLock;
 
-/// Shared module state — all fields behind `Arc<Mutex<_>>` for concurrent access.
+pub struct RunbookStore {
+    pub runbooks: HashMap<uuid::Uuid, Runbook>,
+    pub executions: HashMap<uuid::Uuid, Execution>,
+    pub approval_requests: HashMap<uuid::Uuid, ApprovalRequest>,
+    pub triggers: HashMap<uuid::Uuid, RunbookTrigger>,
+}
+
+impl Default for RunbookStore {
+    fn default() -> Self {
+        let mut store = RunbookStore {
+            runbooks: HashMap::new(),
+            executions: HashMap::new(),
+            approval_requests: HashMap::new(),
+            triggers: HashMap::new(),
+        };
+        // Seed built-in templates
+        for template in library::builtin_templates() {
+            store.runbooks.insert(template.id, template);
+        }
+        store
+    }
+}
+
 pub struct RunbookState {
-    pub runbooks: Mutex<HashMap<Uuid, Runbook>>,
-    pub executions: Mutex<HashMap<Uuid, RunbookExecution>>,
-    pub bindings: Mutex<HashMap<Uuid, IncidentBinding>>,
-    pub approvals: Mutex<HashMap<Uuid, ApprovalRequest>>,
+    pub store: Arc<RwLock<RunbookStore>>,
 }
 
 impl Default for RunbookState {
     fn default() -> Self {
         Self {
-            runbooks: Mutex::new(HashMap::new()),
-            executions: Mutex::new(HashMap::new()),
-            bindings: Mutex::new(HashMap::new()),
-            approvals: Mutex::new(HashMap::new()),
+            store: Arc::new(RwLock::new(RunbookStore::default())),
         }
     }
 }
 
-/// Create the axum router for this module.
 pub fn router(state: Arc<RunbookState>) -> Router {
     routes::create_router(state)
 }

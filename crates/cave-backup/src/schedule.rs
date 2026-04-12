@@ -1,55 +1,15 @@
-//! Cron-based schedule management and expression validation.
+//! Schedule validation and cron utilities.
 
-/// Validate a standard 5-field cron expression.
-/// Fields: minute hour day-of-month month day-of-week
-pub fn validate_cron_expression(expr: &str) -> bool {
+use crate::models::Schedule;
+
+/// Validate a cron expression (basic: check field count = 5).
+pub fn validate_cron(expr: &str) -> bool {
     let parts: Vec<&str> = expr.split_whitespace().collect();
-    if parts.len() != 5 {
-        return false;
-    }
-    let ranges = [(0, 59), (0, 23), (1, 31), (1, 12), (0, 7)];
-    parts.iter().zip(ranges.iter()).all(|(field, &(min, max))| {
-        validate_cron_field(field, min, max)
-    })
+    parts.len() == 5
 }
 
-/// Validate a single cron field against [min, max].
-pub fn validate_cron_field(field: &str, min: u32, max: u32) -> bool {
-    if field == "*" {
-        return true;
-    }
-    // Step: */n
-    if let Some(step_str) = field.strip_prefix("*/") {
-        return step_str
-            .parse::<u32>()
-            .map(|n| n > 0 && n <= max)
-            .unwrap_or(false);
-    }
-    // Range: n-m
-    if field.contains('-') {
-        let parts: Vec<&str> = field.splitn(2, '-').collect();
-        if parts.len() == 2 {
-            if let (Ok(lo), Ok(hi)) = (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
-                return lo >= min && hi <= max && lo <= hi;
-            }
-        }
-        return false;
-    }
-    // List: n,m,...
-    if field.contains(',') {
-        return field
-            .split(',')
-            .all(|v| v.parse::<u32>().map(|n| n >= min && n <= max).unwrap_or(false));
-    }
-    // Single value
-    field
-        .parse::<u32>()
-        .map(|n| n >= min && n <= max)
-        .unwrap_or(false)
-}
-
-/// Describe when a cron expression next fires (human-readable stub).
-pub fn describe_schedule(expr: &str) -> String {
+/// Compute a human-readable description of a cron expression.
+pub fn describe_cron(expr: &str) -> String {
     match expr {
         "0 * * * *" => "every hour".into(),
         "0 0 * * *" => "daily at midnight".into(),
@@ -59,66 +19,89 @@ pub fn describe_schedule(expr: &str) -> String {
     }
 }
 
+/// Return IDs of all schedules that are not paused (eligible to fire).
+pub fn due_schedules(schedules: &[&Schedule]) -> Vec<uuid::Uuid> {
+    schedules
+        .iter()
+        .filter(|s| !s.paused)
+        .map(|s| s.id)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{BackupSpec, Schedule};
+    use chrono::Utc;
+    use uuid::Uuid;
 
-    #[test]
-    fn test_validate_cron_standard_expressions() {
-        assert!(validate_cron_expression("0 * * * *"));   // every hour
-        assert!(validate_cron_expression("0 0 * * *"));   // daily midnight
-        assert!(validate_cron_expression("*/15 * * * *")); // every 15 min
-        assert!(validate_cron_expression("0 0 1 1 *"));   // Jan 1st
+    fn make_schedule(paused: bool) -> Schedule {
+        Schedule {
+            id: Uuid::new_v4(),
+            name: "test".into(),
+            cron_expression: "0 0 * * *".into(),
+            template: BackupSpec::default(),
+            paused,
+            last_backup_at: None,
+            last_backup_phase: None,
+            created_at: Utc::now(),
+        }
     }
 
     #[test]
-    fn test_validate_cron_invalid_field_count() {
-        assert!(!validate_cron_expression("* * * *"));      // 4 fields
-        assert!(!validate_cron_expression("* * * * * *")); // 6 fields
-        assert!(!validate_cron_expression(""));
+    fn validate_cron_accepts_five_fields() {
+        assert!(validate_cron("0 * * * *"));
+        assert!(validate_cron("*/15 * * * *"));
+        assert!(validate_cron("0 0 * * 0"));
+        assert!(validate_cron("30 2 1 * *"));
     }
 
     #[test]
-    fn test_validate_cron_field_star() {
-        assert!(validate_cron_field("*", 0, 59));
+    fn validate_cron_rejects_wrong_field_count() {
+        assert!(!validate_cron("* * * *"));         // 4 fields
+        assert!(!validate_cron("* * * * * *"));     // 6 fields
+        assert!(!validate_cron(""));                // 0 fields
+        assert!(!validate_cron("0 0 * * * extra")); // 6 fields
     }
 
     #[test]
-    fn test_validate_cron_field_step() {
-        assert!(validate_cron_field("*/5", 0, 59));
-        assert!(validate_cron_field("*/0", 0, 59) == false); // step=0 invalid
-        assert!(validate_cron_field("*/60", 0, 59) == false); // > max
+    fn describe_cron_known_expressions() {
+        assert_eq!(describe_cron("0 * * * *"), "every hour");
+        assert_eq!(describe_cron("0 0 * * *"), "daily at midnight");
+        assert_eq!(describe_cron("0 0 * * 0"), "weekly on Sunday");
+        assert_eq!(describe_cron("0 0 1 * *"), "monthly on the 1st");
     }
 
     #[test]
-    fn test_validate_cron_field_range() {
-        assert!(validate_cron_field("1-5", 0, 59));
-        assert!(!validate_cron_field("5-1", 0, 59)); // reversed
-        assert!(!validate_cron_field("0-60", 0, 59)); // exceeds max
+    fn describe_cron_unknown_falls_through() {
+        let desc = describe_cron("15 3 * * 2");
+        assert!(desc.contains("15 3 * * 2"));
     }
 
     #[test]
-    fn test_validate_cron_field_list() {
-        assert!(validate_cron_field("1,15,30", 0, 59));
-        assert!(!validate_cron_field("1,60,30", 0, 59)); // 60 out of range
+    fn due_schedules_excludes_paused() {
+        let active = make_schedule(false);
+        let paused = make_schedule(true);
+        let active_id = active.id;
+
+        let refs: Vec<&Schedule> = vec![&active, &paused];
+        let due = due_schedules(&refs);
+        assert_eq!(due, vec![active_id]);
     }
 
     #[test]
-    fn test_validate_cron_field_single() {
-        assert!(validate_cron_field("0", 0, 59));
-        assert!(validate_cron_field("59", 0, 59));
-        assert!(!validate_cron_field("60", 0, 59));
+    fn due_schedules_empty_when_all_paused() {
+        let s1 = make_schedule(true);
+        let s2 = make_schedule(true);
+        let refs: Vec<&Schedule> = vec![&s1, &s2];
+        assert!(due_schedules(&refs).is_empty());
     }
 
     #[test]
-    fn test_describe_schedule_known() {
-        assert_eq!(describe_schedule("0 0 * * *"), "daily at midnight");
-        assert_eq!(describe_schedule("0 * * * *"), "every hour");
-    }
-
-    #[test]
-    fn test_describe_schedule_unknown() {
-        let desc = describe_schedule("5 4 * * 1");
-        assert!(desc.contains("cron:"));
+    fn due_schedules_all_when_none_paused() {
+        let s1 = make_schedule(false);
+        let s2 = make_schedule(false);
+        let refs: Vec<&Schedule> = vec![&s1, &s2];
+        assert_eq!(due_schedules(&refs).len(), 2);
     }
 }

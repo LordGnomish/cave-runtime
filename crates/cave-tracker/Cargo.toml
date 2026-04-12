@@ -1,14 +1,12 @@
 [package]
 name = "cave-tracker"
-description = "Issue tracking & project management — replaces Jira/Linear/Plane"
+description = "Issue & project tracking — replaces Jira"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-cave-auth = { path = "../cave-auth" }
-cave-db = { path = "../cave-db" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -17,3 +15,6 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }

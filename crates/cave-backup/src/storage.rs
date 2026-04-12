@@ -1,115 +1,85 @@
-//! In-memory backup store (production would persist to PostgreSQL / object storage).
+//! Backup storage location validation and lifecycle.
 
-use crate::types::{Backup, BackupId, BackupSchedule, DownloadRequest, RestoreJob};
-use tokio::sync::RwLock;
-use uuid::Uuid;
+use crate::models::{BackupStorageLocation, BslPhase};
 
-#[derive(Default)]
-pub struct BackupStore {
-    pub backups: RwLock<Vec<Backup>>,
-    pub restores: RwLock<Vec<RestoreJob>>,
-    pub schedules: RwLock<Vec<BackupSchedule>>,
-    pub downloads: RwLock<Vec<DownloadRequest>>,
+/// Validate a storage location, returning a list of error strings.
+pub fn validate_bsl(bsl: &BackupStorageLocation) -> Vec<String> {
+    let mut errors = Vec::new();
+    if bsl.bucket.is_empty() {
+        errors.push("bucket is required".into());
+    }
+    if bsl.name.is_empty() {
+        errors.push("name is required".into());
+    }
+    errors
 }
 
-impl BackupStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
+/// Mark a BSL as available after successful validation.
+pub fn mark_available(bsl: &mut BackupStorageLocation) {
+    bsl.phase = BslPhase::Available;
+    bsl.last_validated_at = Some(chrono::Utc::now());
+}
 
-    // ── Backups ───────────────────────────────────────────────────────────────
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{BslAccessMode, StorageProvider};
+    use uuid::Uuid;
 
-    pub async fn insert_backup(&self, backup: Backup) {
-        self.backups.write().await.push(backup);
-    }
-
-    pub async fn list_backups(&self) -> Vec<Backup> {
-        self.backups.read().await.clone()
-    }
-
-    pub async fn get_backup(&self, id: BackupId) -> Option<Backup> {
-        self.backups
-            .read()
-            .await
-            .iter()
-            .find(|b| b.id == id)
-            .cloned()
-    }
-
-    pub async fn delete_backup(&self, id: BackupId) -> bool {
-        let mut backups = self.backups.write().await;
-        let before = backups.len();
-        backups.retain(|b| b.id != id);
-        backups.len() < before
-    }
-
-    // ── Restores ──────────────────────────────────────────────────────────────
-
-    pub async fn insert_restore(&self, restore: RestoreJob) {
-        self.restores.write().await.push(restore);
-    }
-
-    pub async fn list_restores(&self) -> Vec<RestoreJob> {
-        self.restores.read().await.clone()
-    }
-
-    pub async fn get_restore(&self, id: Uuid) -> Option<RestoreJob> {
-        self.restores
-            .read()
-            .await
-            .iter()
-            .find(|r| r.id == id)
-            .cloned()
-    }
-
-    // ── Schedules ─────────────────────────────────────────────────────────────
-
-    pub async fn insert_schedule(&self, schedule: BackupSchedule) {
-        self.schedules.write().await.push(schedule);
-    }
-
-    pub async fn list_schedules(&self) -> Vec<BackupSchedule> {
-        self.schedules.read().await.clone()
-    }
-
-    pub async fn get_schedule(&self, id: Uuid) -> Option<BackupSchedule> {
-        self.schedules
-            .read()
-            .await
-            .iter()
-            .find(|s| s.id == id)
-            .cloned()
-    }
-
-    pub async fn update_schedule(&self, updated: BackupSchedule) -> bool {
-        let mut schedules = self.schedules.write().await;
-        if let Some(s) = schedules.iter_mut().find(|s| s.id == updated.id) {
-            *s = updated;
-            true
-        } else {
-            false
+    fn make_bsl(name: &str, bucket: &str) -> BackupStorageLocation {
+        BackupStorageLocation {
+            id: Uuid::new_v4(),
+            name: name.into(),
+            provider: StorageProvider::S3,
+            bucket: bucket.into(),
+            prefix: None,
+            region: None,
+            endpoint: None,
+            access_mode: BslAccessMode::ReadWrite,
+            credential_secret: None,
+            ca_bundle: None,
+            insecure_skip_tls_verify: false,
+            is_default: false,
+            phase: BslPhase::Unavailable,
+            last_validated_at: None,
+            created_at: chrono::Utc::now(),
         }
     }
 
-    pub async fn delete_schedule(&self, id: Uuid) -> bool {
-        let mut schedules = self.schedules.write().await;
-        let before = schedules.len();
-        schedules.retain(|s| s.id != id);
-        schedules.len() < before
+    #[test]
+    fn validate_bsl_valid() {
+        let bsl = make_bsl("default", "cave-backups");
+        assert!(validate_bsl(&bsl).is_empty());
     }
 
-    // ── Download Requests ─────────────────────────────────────────────────────
-
-    pub async fn insert_download(&self, req: DownloadRequest) {
-        self.downloads.write().await.push(req);
+    #[test]
+    fn validate_bsl_missing_bucket() {
+        let bsl = make_bsl("default", "");
+        let errors = validate_bsl(&bsl);
+        assert!(errors.iter().any(|e| e.contains("bucket")));
     }
 
-    pub async fn get_download(&self, id: Uuid) -> Option<DownloadRequest> {
-        self.downloads
-            .read()
-            .await
-            .iter()
-            .find(|d| d.id == id)
-            .cloned()
+    #[test]
+    fn validate_bsl_missing_name() {
+        let bsl = make_bsl("", "my-bucket");
+        let errors = validate_bsl(&bsl);
+        assert!(errors.iter().any(|e| e.contains("name")));
+    }
+
+    #[test]
+    fn validate_bsl_both_missing() {
+        let bsl = make_bsl("", "");
+        assert_eq!(validate_bsl(&bsl).len(), 2);
+    }
+
+    #[test]
+    fn mark_available_sets_phase_and_timestamp() {
+        let mut bsl = make_bsl("default", "bucket");
+        assert_eq!(bsl.phase, BslPhase::Unavailable);
+        assert!(bsl.last_validated_at.is_none());
+
+        mark_available(&mut bsl);
+        assert_eq!(bsl.phase, BslPhase::Available);
+        assert!(bsl.last_validated_at.is_some());
     }
 }
