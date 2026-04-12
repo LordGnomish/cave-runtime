@@ -105,6 +105,7 @@ members = [
     # === Service Mesh ===
     # === API Gateway ===
     "crates/cave-runbook",
+    # === GitOps Deploy ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===
