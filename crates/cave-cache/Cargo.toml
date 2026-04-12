@@ -1,0 +1,21 @@
+[package]
+name = "cave-cache"
+description = "In-memory cache — Redis replacement with all data types, pub/sub, transactions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+ring = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
