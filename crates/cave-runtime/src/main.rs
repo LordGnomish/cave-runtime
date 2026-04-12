@@ -76,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -114,6 +115,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let streams_state = Arc::new(cave_streams::StreamsState::default());
 >>>>>>> claude/youthful-babbage
+=======
+    let compliance_state = Arc::new(cave_compliance::ComplianceState::default());
+>>>>>>> claude/zen-poincare
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -184,6 +188,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -290,6 +295,9 @@ async fn main() -> anyhow::Result<()> {
         // Phase 4 module routers
         .merge(cave_streams::router(streams_state))
 >>>>>>> claude/youthful-babbage
+=======
+        .merge(cave_compliance::router(compliance_state))
+>>>>>>> claude/zen-poincare
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -300,6 +308,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -373,6 +382,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Phase 4 modules: streams");
 >>>>>>> claude/youthful-babbage
+=======
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, compliance");
+>>>>>>> claude/zen-poincare
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -402,6 +414,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -449,6 +462,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "streams": true,
 >>>>>>> claude/youthful-babbage
+=======
+            "compliance": true,
+>>>>>>> claude/zen-poincare
         }
     }))
 }
