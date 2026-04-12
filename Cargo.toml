@@ -41,10 +41,48 @@ members = [
     "crates/cave-dast",
     "crates/cave-backup",
     "crates/cave-pam",
+    # === LLM Gateway ===
+    "crates/cave-llm-gateway",
+    # === Infrastructure & Networking ===
+    "crates/cave-gateway",
+    "crates/cave-dns",
+    "crates/cave-mesh",
+    "crates/cave-cluster",
+    "crates/cave-ha",
+    "crates/cave-infra",
+    # === Data & Storage ===
+    "crates/cave-pg",
+    "crates/cave-cache",
+    "crates/cave-store",
+    "crates/cave-streams",
+    # === Observability ===
+    "crates/cave-metrics",
+    "crates/cave-logs",
+    "crates/cave-trace",
+    # === Security & Admission ===
+    "crates/cave-admission",
+    "crates/cave-security",
+    "crates/cave-vault",
+    # === Developer Experience ===
+    "crates/cave-cli",
+    "crates/cave-dashboard",
+    "crates/cave-docs-site",
+    "crates/cave-deploy",
+    "crates/cave-pipelines",
+    "crates/cave-rollouts",
+    # === Asset & Artifact Management ===
+    "crates/cave-artifacts",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === Issue Tracking ===
+    "crates/cave-tracker",
+    # === Platform Governance ===
+    "crates/cave-runbook",
+    "crates/cave-gitops-config",
+    "crates/cave-compliance",
+    "crates/cave-cost-alloc",
 ]
 
 [workspace.package]
