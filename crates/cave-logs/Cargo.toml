@@ -1,0 +1,55 @@
+[package]
+name = "cave-logs"
+description = "Log aggregation with full Loki parity — LogQL engine, multi-tenant storage, Loki push API, syslog, OTLP, Fluentd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+
+# Async
+tokio = { workspace = true }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+
+# Web
+axum = { workspace = true, features = ["ws"] }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Protobuf + compression
+prost = "0.13"
+snap = "1"
+flate2 = "1"
+lz4_flex = "0.11"
+zstd = "0.13"
+
+# Storage
+bloomfilter = "1"
+byteorder = "1"
+
+# Logging / tracing
+tracing = { workspace = true }
+prometheus-client = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+regex = { workspace = true }
+dashmap = "6"
+bytes = "1"
+base64 = "0.22"
+parking_lot = "0.12"
+smallvec = "1"
+indexmap = { version = "2", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }
