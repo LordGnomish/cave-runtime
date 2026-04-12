@@ -48,91 +48,46 @@ async fn main() -> anyhow::Result<()> {
         "Starting CAVE Unified Runtime"
     );
 
-<<<<<<< HEAD
-    // ── Auth layer ────────────────────────────────────────────────────────────
-    //
-    // Reads OKTA_DOMAIN, OKTA_AUTH_SERVER_ID, OKTA_AUDIENCE from the environment.
-    // Falls back to dev-bypass when CAVE_AUTH_DISABLED=true.
-    let auth_layer = cave_auth::auth_layer_from_env();
-
-    // ── Module states ─────────────────────────────────────────────────────────
-    let secrets_state = Arc::new(cave_secrets::SecretsState::default());
-    let lint_state = Arc::new(cave_lint::LintState::default());
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
-=======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
->>>>>>> claude/cranky-hellman
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let docs_site_state = Arc::new(cave_docs_site::DocsSiteState::default());
     let dns_state = Arc::new(cave_dns::DnsState::default());
->>>>>>> claude/cranky-khorana
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let gateway_state = Arc::new(cave_gateway::GatewayState::default());
->>>>>>> claude/heuristic-wing
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let infra_state = Arc::new(cave_infra::InfraModuleState::default());
->>>>>>> claude/interesting-khorana
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let gitops_config_state = Arc::new(cave_gitops_config::AppState::default());
->>>>>>> claude/modest-yonath
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let tracker_state = Arc::new(cave_tracker::TrackerState::default());
->>>>>>> claude/peaceful-bell
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let mesh_state = Arc::new(cave_mesh::MeshState::default());
->>>>>>> claude/peaceful-lederberg
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let metrics_state = Arc::new(cave_metrics::MetricsState::new());
->>>>>>> claude/relaxed-nash
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
->>>>>>> claude/romantic-kapitsa
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let infra_state = Arc::new(cave_infra::InfraState::default());
->>>>>>> claude/silly-matsumoto
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let runbook_state = Arc::new(cave_runbook::RunbookState::default());
->>>>>>> claude/thirsty-nobel
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let streams_state = Arc::new(cave_streams::StreamsState::default());
->>>>>>> claude/youthful-babbage
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let compliance_state = Arc::new(cave_compliance::ComplianceState::default());
->>>>>>> claude/zen-poincare
+    let pg_state = Arc::new(cave_pg::PgState::default());
+    let ha_state = Arc::new(cave_ha::HaState::default());
 
     // ── Protected module router ───────────────────────────────────────────────
     //
     // All module routes are wrapped with AuthLayer.  Every handler can use
     // `cave_auth::AuthCtx` extractor or `require_permission!` macro.
     let protected = Router::new()
-=======
-    let cluster_state = Arc::new(cave_cluster::ClusterState::default());
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let vault_store = Arc::new(std::sync::Mutex::new(cave_vault::VaultStore::default()));
->>>>>>> claude/ecstatic-chebyshev
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let trace_state = Arc::new(cave_trace::TraceState::default());
->>>>>>> claude/elastic-ellis
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     // Build shared database pool (all DB-backed modules share one pool).
     // DATABASE_URL env var overrides the config file.
     let db_url = std::env::var("DATABASE_URL")
@@ -145,7 +100,6 @@ async fn main() -> anyhow::Result<()> {
         cave_db::CavePool::new(&db_config)
             .expect("Failed to create database connection pool"),
     );
->>>>>>> claude/gallant-cartwright
 
     // Initialize module states
     let secrets_state  = Arc::new(cave_secrets::SecretsState::default());
@@ -157,29 +111,25 @@ async fn main() -> anyhow::Result<()> {
     let trace_state    = Arc::new(cave_trace::TraceState { pool: Arc::clone(&pool) });
 
     // Build the unified router with all modules
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let cache_state = Arc::new(cave_cache::CacheState::new());
     let store_state = Arc::new(cave_store::StoreState::new());
-
     // Build the unified router with all Phase 1 modules + data services
->>>>>>> claude/jovial-faraday
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let logs_state = Arc::new(cave_logs::LogsState::default());
-
     // Build the unified router with all Phase 1 + Phase 3 modules
->>>>>>> claude/sharp-wiles
-=======
+    let pg_state = Arc::new(cave_pg::PgState::default());
     let llm_gateway_state = Arc::new(cave_llm_gateway::GatewayState::default());
-
     // Build the unified router with all Phase 1 + Phase 3 modules
->>>>>>> claude/vigilant-torvalds
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
         .route("/ready", axum::routing::get(ready))
         // Platform modules
         .merge(cave_cluster::router(cluster_state))
->>>>>>> claude/cranky-wozniak
+    let pg_state = Arc::new(cave_pg::PgState::default());
+    let llm_gateway_state = Arc::new(cave_llm_gateway::GatewayState::default());
+    // Build the unified router with all Phase 1 + Phase 3 modules
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
@@ -188,24 +138,6 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -223,18 +155,44 @@ async fn main() -> anyhow::Result<()> {
         .route("/ready", axum::routing::get(ready))
         .merge(protected)
         // Observability / transport middleware (outermost = last applied)
-=======
-        // GitOps
-        .merge(cave_deploy::router(deploy_state))
-=======
         .merge(cave_docs_site::router(docs_site_state))
         .merge(cave_dns::router(dns_state))
->>>>>>> claude/cranky-khorana
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Vault / Secrets Management
         .merge(cave_vault::router(vault_store))
->>>>>>> claude/ecstatic-chebyshev
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Feature flags (cave-native + Unleash compat)
         .merge(cave_flags::router(flags_state))
         // Container registry (cave-native + Docker V2 compat)
@@ -243,63 +201,309 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_metrics::router(metrics_state))
         .merge(cave_logs::router(logs_state))
         .merge(cave_trace::router(trace_state))
->>>>>>> claude/gallant-cartwright
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Gateway module
         .merge(cave_gateway::router(gateway_state))
->>>>>>> claude/heuristic-wing
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         .merge(cave_infra::router(infra_state))
->>>>>>> claude/interesting-khorana
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Data services
         .merge(cave_cache::router(cache_state))
         .merge(cave_store::router(store_state))
->>>>>>> claude/jovial-faraday
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Platform API
         .merge(cave_gitops_config::router(gitops_config_state))
->>>>>>> claude/modest-yonath
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Phase 4 module routers
         .merge(cave_tracker::router(tracker_state))
->>>>>>> claude/peaceful-bell
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Service mesh
         .merge(cave_mesh::router(mesh_state))
->>>>>>> claude/peaceful-lederberg
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Metrics
         .merge(cave_metrics::router(metrics_state))
->>>>>>> claude/relaxed-nash
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // FinOps
         .merge(cave_cost_alloc::router(cost_alloc_state))
->>>>>>> claude/romantic-kapitsa
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Phase 3 module routers
         .merge(cave_logs::router(logs_state))
->>>>>>> claude/sharp-wiles
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         .merge(cave_infra::router(infra_state))
->>>>>>> claude/silly-matsumoto
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Phase 4: runbook automation
         .merge(cave_runbook::router(runbook_state))
->>>>>>> claude/thirsty-nobel
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Phase 3 module routers
         .merge(cave_llm_gateway::router(llm_gateway_state))
->>>>>>> claude/vigilant-torvalds
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         // Phase 4 module routers
         .merge(cave_streams::router(streams_state))
->>>>>>> claude/youthful-babbage
-=======
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         .merge(cave_compliance::router(compliance_state))
->>>>>>> claude/zen-poincare
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
+        // HA & DR
+        .merge(cave_ha::router(ha_state))
         // Middleware
->>>>>>> claude/cranky-hellman
+        .merge(cave_pg::router(pg_state))
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
+        // HA & DR
+        .merge(cave_ha::router(ha_state))
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive()); // TODO: restrict origins in production
@@ -308,11 +512,6 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
@@ -320,71 +519,43 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or(false),
         "Auth layer active"
     );
-=======
-=======
     info!("Platform modules: cluster");
->>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
->>>>>>> claude/cranky-khorana
-=======
+    info!("Platform modules: cluster");
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, trace");
->>>>>>> claude/elastic-ellis
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, flags, registry");
     info!("Observability: metrics (Prometheus compat), logs (Loki compat), trace (OTLP compat)");
->>>>>>> claude/gallant-cartwright
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Gateway module: routes, upstreams, rate-limiting, auth, circuit-breaker");
->>>>>>> claude/heuristic-wing
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Infrastructure module: infra (replaces Terraform + Crossplane)");
->>>>>>> claude/interesting-khorana
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Data services: cache (Redis replacement), store (MinIO replacement)");
->>>>>>> claude/jovial-faraday
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Platform API: gitops-config (Promises, Compositions, Environments, Claims)");
->>>>>>> claude/modest-yonath
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 4 modules: tracker");
->>>>>>> claude/peaceful-bell
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Metrics: Prometheus/Thanos replacement active");
->>>>>>> claude/relaxed-nash
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("FinOps modules: cost-alloc (showback/chargeback, replaces Kubecost/CloudHealth)");
->>>>>>> claude/romantic-kapitsa
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 3 modules: logs");
->>>>>>> claude/sharp-wiles
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 5 modules: infra (LLM+MCP IaC)");
->>>>>>> claude/silly-matsumoto
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 4 modules: runbook");
->>>>>>> claude/thirsty-nobel
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 3 modules: llm-gateway");
->>>>>>> claude/vigilant-torvalds
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 4 modules: streams");
->>>>>>> claude/youthful-babbage
-=======
+    info!("Phase 5 modules: docs-site, dns");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, compliance");
->>>>>>> claude/zen-poincare
+    info!("Phase 5 modules: docs-site, dns");
+    info!("HA/DR: Raft consensus, failover, cross-site replication enabled");
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -414,57 +585,34 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
             "pg": true,
-=======
             "docs-site": true,
             "dns": true,
->>>>>>> claude/cranky-khorana
-=======
+            "pg": true,
             "gateway": true,
->>>>>>> claude/heuristic-wing
-=======
+            "pg": true,
             "infra": true,
->>>>>>> claude/interesting-khorana
-=======
+            "pg": true,
             "cache": true,
             "store": true,
->>>>>>> claude/jovial-faraday
-=======
+            "pg": true,
             "gitops-config": true,
->>>>>>> claude/modest-yonath
-=======
+            "pg": true,
             "tracker": true,
->>>>>>> claude/peaceful-bell
-=======
+            "pg": true,
             "metrics": true,
->>>>>>> claude/relaxed-nash
-=======
+            "pg": true,
             "cost-alloc": true,
->>>>>>> claude/romantic-kapitsa
-=======
+            "pg": true,
             "logs": true,
->>>>>>> claude/sharp-wiles
-=======
+            "pg": true,
             "llm-gateway": true,
->>>>>>> claude/vigilant-torvalds
-=======
+            "pg": true,
             "streams": true,
->>>>>>> claude/youthful-babbage
-=======
+            "pg": true,
             "compliance": true,
->>>>>>> claude/zen-poincare
+            "pg": true,
+            "ha": true,
         }
     }))
 }

@@ -110,6 +110,7 @@ members = [
     # === GitOps Deploy ===
     # === Observability / Visualization ===
     "crates/cave-compliance",
+    # === High Availability & DR ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! cave-ha — High Availability and Disaster Recovery for the CAVE runtime.
 //!
 //! Multiple bare-metal CAVE runtime instances form a cluster. One is elected
@@ -8,7 +7,6 @@
 //!
 //! Cross-datacenter DR is supported via active-passive or active-active
 //! site pairs with configurable RPO/RTO targets.
-=======
 //! cave-ha — High Availability and Disaster Recovery using Raft consensus.
 //!
 //! Provides:
@@ -17,12 +15,10 @@
 //! - Automatic and manual failover with split-brain protection
 //! - Cluster health monitoring
 //! - Disaster recovery: backup/restore, PITR, geo-redundant snapshots
->>>>>>> claude/great-sanderson
 
 pub mod dr;
 pub mod failover;
 pub mod health;
-<<<<<<< HEAD
 pub mod models;
 pub mod raft;
 pub mod replication;
@@ -131,15 +127,12 @@ impl Default for HaState {
 pub fn router(state: Arc<HaState>) -> Router {
     routes::create_router(state)
 }
-=======
 pub mod raft;
 pub mod replication;
 pub mod snapshot;
-
 pub use raft::{LogEntry, NodeId, RaftMessage, RaftNode, RaftRole};
 pub use snapshot::{Snapshot, SnapshotManager};
 pub use replication::{ConsistencyLevel, CrossDcReplicator, ReplicationConfig, ReplicationStatus};
 pub use failover::{FailoverEvent, FailoverManager, FailoverReason};
 pub use health::{ClusterHealth, ClusterHealthMonitor, NodeHealth, NodeHealthStatus, ResourceUsage};
 pub use dr::{BackupMetadata, DisasterRecovery};
->>>>>>> claude/great-sanderson
