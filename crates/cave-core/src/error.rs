@@ -19,7 +19,7 @@ pub enum CaveError {
     Validation(String),
 
     #[error("Database error: {0}")]
-    Database(#[from] tokio_postgres::Error),
+    Database(String),
 
     #[error("Configuration error: {0}")]
     Config(String),
@@ -31,7 +31,7 @@ pub enum CaveError {
     UpstreamSync { project: String, message: String },
 
     #[error("Internal error: {0}")]
-    Internal(#[from] anyhow::Error),
+    Internal(String),
 }
 
 impl CaveError {
