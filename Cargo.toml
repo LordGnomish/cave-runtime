@@ -41,10 +41,19 @@ members = [
     "crates/cave-dast",
     "crates/cave-backup",
     "crates/cave-pam",
+    # === LLM Gateway ===
+    "crates/cave-llm-gateway",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === Issue Tracking ===
+    "crates/cave-tracker",
+    # === Platform Governance ===
+    "crates/cave-runbook",
+    "crates/cave-gitops-config",
+    "crates/cave-compliance",
+    "crates/cave-cost-alloc",
 ]
 
 [workspace.package]
