@@ -1,6 +1,10 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 //! HTTP routes for cave-logs.
 <<<<<<< HEAD
+=======
+//! HTTP routes for cave-logs.
+>>>>>>> claude/sharp-wiles
 
 use crate::alerting::{evaluate_all_alerts, AlertFiring};
 use crate::ingestion::{ingest_batch, ingest_log, IngestRequest};
@@ -10,6 +14,7 @@ use crate::models::{
 };
 use crate::query::{execute_query, QueryResult};
 use crate::LogsState;
+<<<<<<< HEAD
 =======
 //!
 //! Exposes two route groups:
@@ -18,6 +23,8 @@ use crate::LogsState;
 
 use crate::{models::*, LogsState};
 >>>>>>> claude/gallant-cartwright
+=======
+>>>>>>> claude/sharp-wiles
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -25,6 +32,9 @@ use axum::{
     Json, Router,
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -553,6 +563,7 @@ async fn delete_dashboard(
 }
 
 // ── Health ─────────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 =======
 use std::sync::Arc;
 
@@ -580,11 +591,14 @@ pub fn create_router(state: Arc<LogsState>) -> Router {
 // cave-native
 // ---------------------------------------------------------------------------
 >>>>>>> claude/gallant-cartwright
+=======
+>>>>>>> claude/sharp-wiles
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-logs",
         "status": "ok",
+<<<<<<< HEAD
 <<<<<<< HEAD
         "upstream": "ELK Stack / Grafana Loki"
 =======
@@ -1029,3 +1043,8 @@ fn time_range(params: &TimeRangeParams) -> (DateTime<Utc>, DateTime<Utc>) {
     (start, end)
 >>>>>>> claude/inspiring-pascal
 }
+=======
+        "upstream": "ELK Stack / Grafana Loki"
+    }))
+}
+>>>>>>> claude/sharp-wiles

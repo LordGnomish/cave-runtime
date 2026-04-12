@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 //! Log-based alerting: rule evaluation, pattern detection, anomaly detection.
 
 use crate::models::{AlertCondition, AlertSeverity, LogAlert, LogLevel};
@@ -150,6 +153,7 @@ pub fn detect_anomaly(state: &Arc<LogsState>, alert: &LogAlert) -> f64 {
         recent_rate * 100.0
     } else {
         recent_rate / baseline_rate
+<<<<<<< HEAD
 =======
 //! Log-based alerting rules.
 //!
@@ -300,5 +304,7 @@ mod tests {
         let fired = manager.evaluate();
         assert!(fired.is_empty(), "alert should not have fired");
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
     }
 }

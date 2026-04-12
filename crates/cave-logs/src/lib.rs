@@ -1,5 +1,8 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 //! Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki.
 //!
 //! Replaces: Elasticsearch + Logstash + Kibana / Grafana Loki
@@ -40,6 +43,7 @@ impl Default for LogsState {
 }
 
 /// Create the axum router for this module.
+<<<<<<< HEAD
 =======
 //! CAVE Logs — structured log ingestion and query engine.
 //!
@@ -132,11 +136,14 @@ impl LogsState {
 ///
 /// Mount at the root or under a prefix — Loki clients use `/loki/api/v1/*`.
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
 pub fn router(state: Arc<LogsState>) -> Router {
     routes::create_router(state)
 }
 
 pub const MODULE_NAME: &str = "logs";
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 
@@ -424,3 +431,5 @@ mod tests {
     }
 }
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
