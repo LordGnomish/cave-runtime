@@ -31,6 +31,12 @@ pub struct RegistryState {
     pub storage: Arc<RegistryStorage>,
 }
 
+impl Default for RegistryState {
+    fn default() -> Self {
+        todo!("RegistryState requires a database pool and storage backend")
+    }
+}
+
 /// Build the combined axum router (Docker V2 + Harbor Admin API).
 pub fn router(state: Arc<RegistryState>) -> Router {
     routes::v2::router(Arc::clone(&state))

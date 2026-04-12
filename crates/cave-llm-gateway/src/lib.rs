@@ -51,6 +51,12 @@ impl GatewayState {
     }
 }
 
+impl Default for GatewayState {
+    fn default() -> Self {
+        todo!("GatewayState requires provider configuration — use GatewayState::new(router)")
+    }
+}
+
 /// Build Axum router exposing the OpenAI-compatible API + admin endpoints.
 pub fn router(state: Arc<GatewayState>) -> Router {
     routes::create_router(state)

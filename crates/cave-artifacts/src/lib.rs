@@ -37,6 +37,12 @@ impl ArtifactsState {
     }
 }
 
+impl Default for ArtifactsState {
+    fn default() -> Self {
+        todo!("ArtifactsState requires a database pool — use ArtifactsState::new(pool)")
+    }
+}
+
 pub fn router(state: Arc<ArtifactsState>) -> Router {
     routes::create_router(state)
 }

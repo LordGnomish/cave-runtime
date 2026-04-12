@@ -6,7 +6,6 @@ members = [
     "crates/cave-auth",
     "crates/cave-db",
     "crates/cave-ebpf-common",
-    "crates/cave-store",
     # === Phase 1: Quick Wins ===
     "crates/cave-flags",
     "crates/cave-secrets",
@@ -16,7 +15,6 @@ members = [
     "crates/cave-changelog",
     "crates/cave-certs",
     # === Phase 2: Security Core ===
-    "crates/cave-security",
     "crates/cave-vulns",
     "crates/cave-sbom",
     "crates/cave-uptime",
@@ -33,19 +31,12 @@ members = [
     "crates/cave-alerts",
     "crates/cave-profiler",
     # === Phase 4: Heavy Hitters ===
-    "crates/cave-pipelines",
-    "crates/cave-deploy",
-    "crates/cave-artifacts",
-    "crates/cave-registry",
-    "crates/cave-rollouts",
     "crates/cave-workflows",
     "crates/cave-scan",
     "crates/cave-portal",
     "crates/cave-scaffold",
     "crates/cave-chaos",
-    "crates/cave-policy",
     "crates/cave-dast",
-    "crates/cave-backup",
     "crates/cave-pam",
     # === LLM Gateway ===
     "crates/cave-llm-gateway",
@@ -78,19 +69,22 @@ members = [
     "crates/cave-rollouts",
     # === Asset & Artifact Management ===
     "crates/cave-artifacts",
+    # === Registry & Feature Flags ===
+    "crates/cave-registry",
     # === Platform Governance ===
     "crates/cave-runbook",
     "crates/cave-gitops-config",
     "crates/cave-compliance",
     "crates/cave-cost-alloc",
+    "crates/cave-backup",
     # === Issue Tracking ===
     "crates/cave-tracker",
+    # === Policy ===
+    "crates/cave-policy",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
-    # === HA/DR ===
-    "crates/cave-ha",
 ]
 
 [workspace.package]
@@ -152,6 +146,17 @@ pulldown-cmark = "0.12"
 base64 = "0.22"
 # Random number generation
 rand = { version = "0.8", features = ["std"] }
+# Additional deps used by platform modules
+bytes = "1"
+parking_lot = "0.12"
+dashmap = "6"
+flate2 = "1"
+futures = "0.3"
+lz4_flex = "0.11"
+petgraph = "0.6"
+snap = "1"
+tokio-util = { version = "0.7", features = ["full"] }
+zstd = "0.13"
 
 [profile.release]
 opt-level = 3
