@@ -1,6 +1,6 @@
 //! Notification payload construction for rollout events.
 
-use crate::types::{NotificationChannel, NotificationEvent, Rollout, RolloutPhase};
+use crate::types::{NotificationEvent, Rollout};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]

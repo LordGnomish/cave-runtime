@@ -21,7 +21,7 @@ pub fn create_router(state: Arc<TraceState>) -> Router {
         // Ingest
         .route("/api/v1/traces/ingest", post(ingest_handler))
         // Parameterized last
-        .route("/api/v1/traces/:id", get(get_trace_handler))
+        .route("/api/v1/traces/{id}", get(get_trace_handler))
         .with_state(state)
 }
 

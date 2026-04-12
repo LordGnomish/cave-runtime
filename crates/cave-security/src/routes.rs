@@ -29,7 +29,7 @@ pub fn create_router(state: Arc<SecurityState>) -> Router {
         )
         // Alerts: ingest events and query alerts
         .route("/api/v1/alerts", get(list_alerts).post(ingest_event))
-        .route("/api/v1/alerts/:id/acknowledge", post(acknowledge_alert))
+        .route("/api/v1/alerts/{id}/acknowledge", post(acknowledge_alert))
         // Scans
         .route("/api/v1/scans", get(list_scans).post(trigger_scan))
         // Vulnerabilities (aggregated from all scans)

@@ -67,7 +67,7 @@ impl MetricsState {
             .route("/api/v1/query_range", get(query::range_query))
             .route("/api/v1/series", get(series::series))
             .route("/api/v1/labels", get(labels::label_names))
-            .route("/api/v1/label/:name/values", get(labels::label_values))
+            .route("/api/v1/label/{name}/values", get(labels::label_values))
             .route("/api/v1/write", post(remote_write::remote_write))
             .with_state(self)
     }

@@ -56,16 +56,16 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
         .route("/api/dashboard/health", get(health))
         // ── Dashboards ──────────────────────────────────────────────────────
         .route("/api/dashboards/db", post(upsert_dashboard))
-        .route("/api/dashboards/uid/:uid", get(get_dashboard).delete(delete_dashboard))
+        .route("/api/dashboards/uid/{uid}", get(get_dashboard).delete(delete_dashboard))
         .route("/api/dashboards/home", get(home_dashboard))
         .route("/api/dashboards/import", post(import_dashboard))
         // ── Stars ───────────────────────────────────────────────────────────
-        .route("/api/user/stars/dashboard/:uid", post(star_dashboard).delete(unstar_dashboard))
+        .route("/api/user/stars/dashboard/{uid}", post(star_dashboard).delete(unstar_dashboard))
         // ── Search ──────────────────────────────────────────────────────────
         .route("/api/search", get(search))
         // ── Folders ─────────────────────────────────────────────────────────
         .route("/api/folders", get(list_folders).post(create_folder))
-        .route("/api/folders/:uid", get(get_folder).put(update_folder).delete(delete_folder))
+        .route("/api/folders/{uid}", get(get_folder).put(update_folder).delete(delete_folder))
         // ── DataSources ─────────────────────────────────────────────────────
         .route("/api/datasources", get(list_datasources).post(create_datasource))
         .route(
@@ -85,10 +85,10 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
         .route("/api/alerts", get(list_alerts))
         // ── Snapshots ───────────────────────────────────────────────────────
         .route("/api/snapshots", post(create_snapshot))
-        .route("/api/snapshots/:key", get(get_snapshot).delete(delete_snapshot))
+        .route("/api/snapshots/{key}", get(get_snapshot).delete(delete_snapshot))
         // ── Annotations ─────────────────────────────────────────────────────
         .route("/api/annotations", get(list_annotations).post(create_annotation))
-        .route("/api/annotations/:id", delete(delete_annotation))
+        .route("/api/annotations/{id}", delete(delete_annotation))
         // ── Playlists ───────────────────────────────────────────────────────
         .route("/api/playlists", get(list_playlists).post(create_playlist))
         .route(
@@ -96,7 +96,7 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
             get(get_playlist).put(update_playlist).delete(delete_playlist),
         )
         // ── Renderer ────────────────────────────────────────────────────────
-        .route("/api/dashboard/render/:uid", get(render_dashboard))
+        .route("/api/dashboard/render/{uid}", get(render_dashboard))
         .with_state(state)
 }
 

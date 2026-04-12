@@ -27,29 +27,29 @@ pub fn create_router(state: Arc<PgState>) -> Router {
             "/api/pg/databases/:id",
             get(get_database).delete(delete_database),
         )
-        .route("/api/pg/databases/:id/healthcheck", post(healthcheck_database))
+        .route("/api/pg/databases/{id}/healthcheck", post(healthcheck_database))
         // Schema migrations
         .route(
             "/api/pg/migrations",
             get(list_migrations).post(record_migration),
         )
-        .route("/api/pg/migrations/:id", get(get_migration))
+        .route("/api/pg/migrations/{id}", get(get_migration))
         // Connection pools
         .route("/api/pg/pools", get(list_pools).post(create_pool))
-        .route("/api/pg/pools/:id", get(get_pool).put(update_pool))
+        .route("/api/pg/pools/{id}", get(get_pool).put(update_pool))
         // Query analytics — literal /slow before /:id to ensure priority
         .route("/api/pg/queries/slow", get(slow_queries))
         .route("/api/pg/queries", get(list_queries).post(record_query))
         // Backup / restore
         .route("/api/pg/backups", get(list_backups).post(create_backup))
-        .route("/api/pg/backups/:id", get(get_backup))
-        .route("/api/pg/backups/:id/restore", post(restore_backup))
+        .route("/api/pg/backups/{id}", get(get_backup))
+        .route("/api/pg/backups/{id}/restore", post(restore_backup))
         // Replication monitoring
         .route(
             "/api/pg/replication",
             get(list_replication).post(register_replication),
         )
-        .route("/api/pg/replication/:id", put(update_replication))
+        .route("/api/pg/replication/{id}", put(update_replication))
         // Table / index statistics
         .route("/api/pg/tables/bloat", get(bloated_tables))
         .route(
@@ -58,7 +58,7 @@ pub fn create_router(state: Arc<PgState>) -> Router {
         )
         // User / role management
         .route("/api/pg/users", get(list_users).post(create_user))
-        .route("/api/pg/users/:id", delete(delete_user))
+        .route("/api/pg/users/{id}", delete(delete_user))
         // Size monitoring & alerts
         .route("/api/pg/sizes", get(list_sizes).post(record_size))
         .route("/api/pg/alerts", get(size_alerts))

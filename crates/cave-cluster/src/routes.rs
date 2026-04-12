@@ -26,9 +26,9 @@ pub fn create_router(state: Arc<ClusterState>) -> Router {
             get(get_cluster).put(update_cluster).delete(delete_cluster),
         )
         // Cluster actions
-        .route("/api/v1/clusters/:id/upgrade", post(trigger_upgrade))
-        .route("/api/v1/clusters/:id/health", get(get_cluster_health))
-        .route("/api/v1/clusters/:id/kubeconfig", get(get_kubeconfig))
+        .route("/api/v1/clusters/{id}/upgrade", post(trigger_upgrade))
+        .route("/api/v1/clusters/{id}/health", get(get_cluster_health))
+        .route("/api/v1/clusters/{id}/kubeconfig", get(get_kubeconfig))
         // Node pools
         .route(
             "/api/v1/clusters/:id/nodepools",
@@ -55,8 +55,8 @@ pub fn create_router(state: Arc<ClusterState>) -> Router {
             get(get_tenant).delete(delete_tenant),
         )
         // Tenant views
-        .route("/api/v1/tenants/:id/clusters", get(list_tenant_clusters))
-        .route("/api/v1/tenants/:id/quota", get(get_tenant_quota))
+        .route("/api/v1/tenants/{id}/clusters", get(list_tenant_clusters))
+        .route("/api/v1/tenants/{id}/quota", get(get_tenant_quota))
         // Module health
         .route("/api/cluster/health", get(module_health))
         .with_state(state)

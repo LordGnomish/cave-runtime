@@ -1,5 +1,4 @@
 use crate::models::{LlmStats, LlmTrace};
-use std::collections::HashMap;
 
 pub fn calculate_stats(model: &str, traces: &[LlmTrace]) -> LlmStats {
     let model_traces: Vec<&LlmTrace> = traces.iter().filter(|t| t.model == model).collect();

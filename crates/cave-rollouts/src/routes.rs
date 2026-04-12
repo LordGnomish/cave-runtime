@@ -20,7 +20,6 @@
 
 use crate::{
     engine,
-    store::RolloutsStore,
     types::{
         AnalysisRun, AnalysisTemplate, Experiment, ExperimentVariant, MetricTemplate,
         Rollout, RolloutStrategy,
@@ -30,7 +29,7 @@ use crate::{
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use serde::Deserialize;
@@ -51,23 +50,23 @@ pub fn create_router(state: Arc<RolloutsState>) -> Router {
             "/api/v1/rollouts/:id",
             get(get_rollout).put(update_rollout).delete(delete_rollout),
         )
-        .route("/api/v1/rollouts/:id/promote", post(promote_rollout))
-        .route("/api/v1/rollouts/:id/rollback", post(rollback_rollout))
+        .route("/api/v1/rollouts/{id}/promote", post(promote_rollout))
+        .route("/api/v1/rollouts/{id}/rollback", post(rollback_rollout))
         // Experiments
         .route(
             "/api/v1/experiments",
             get(list_experiments).post(create_experiment),
         )
-        .route("/api/v1/experiments/:id", get(get_experiment))
+        .route("/api/v1/experiments/{id}", get(get_experiment))
         // Analysis Templates
         .route(
             "/api/v1/analysistemplates",
             get(list_templates).post(create_template),
         )
-        .route("/api/v1/analysistemplates/:id", get(get_template))
+        .route("/api/v1/analysistemplates/{id}", get(get_template))
         // Analysis Runs
         .route("/api/v1/analysisruns", get(list_runs))
-        .route("/api/v1/analysisruns/:id", get(get_run))
+        .route("/api/v1/analysisruns/{id}", get(get_run))
         // Health
         .route("/api/rollouts/health", get(health))
         .with_state(state)

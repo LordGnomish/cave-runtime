@@ -128,8 +128,8 @@ fn evaluate_step(step: &PolicyStep, req: &EvaluateFlowRequest) -> (bool, String)
 pub fn routes() -> Router<Arc<GatewayState>> {
     Router::new()
         .route("/api/v1/gateway/flows", get(list_flows).post(create_flow))
-        .route("/api/v1/gateway/flows/:id", get(get_flow).delete(delete_flow))
-        .route("/api/v1/gateway/flows/:id/evaluate", post(evaluate_flow))
+        .route("/api/v1/gateway/flows/{id}", get(get_flow).delete(delete_flow))
+        .route("/api/v1/gateway/flows/{id}/evaluate", post(evaluate_flow))
 }
 
 async fn list_flows(State(state): State<Arc<GatewayState>>) -> Json<Vec<PolicyFlow>> {

@@ -251,9 +251,9 @@ fn generate_mock(path: &str, method: &str) -> serde_json::Value {
 pub fn routes() -> Router<Arc<GatewayState>> {
     Router::new()
         .route("/api/v1/gateway/specs", get(list_specs).post(create_spec))
-        .route("/api/v1/gateway/specs/:id", get(get_spec).put(update_spec).delete(delete_spec))
-        .route("/api/v1/gateway/specs/:id/quality", get(quality_score))
-        .route("/api/v1/gateway/specs/:id/mock", post(mock_response))
+        .route("/api/v1/gateway/specs/{id}", get(get_spec).put(update_spec).delete(delete_spec))
+        .route("/api/v1/gateway/specs/{id}/quality", get(quality_score))
+        .route("/api/v1/gateway/specs/{id}/mock", post(mock_response))
 }
 
 async fn list_specs(State(state): State<Arc<GatewayState>>) -> Json<Vec<ApiSpec>> {

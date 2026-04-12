@@ -1,5 +1,4 @@
-use crate::models::{ChaosExperiment, ExperimentParams, ExperimentStatus, ExperimentType};
-use chrono::Utc;
+use crate::models::{ChaosExperiment, ExperimentStatus, ExperimentType};
 
 /// Validate experiment parameters based on type
 pub fn validate_experiment(experiment: &ChaosExperiment) -> Vec<String> {

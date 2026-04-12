@@ -80,7 +80,7 @@ pub fn create_router(state: Arc<RunbookState>) -> Router {
             "/api/v1/runbooks/bindings",
             get(list_bindings).post(create_binding),
         )
-        .route("/api/v1/runbooks/bindings/:id", delete(delete_binding))
+        .route("/api/v1/runbooks/bindings/{id}", delete(delete_binding))
         // Execution detail — "executions" static, must come before /:id
         .route(
             "/api/v1/runbooks/executions/:id",
@@ -100,8 +100,8 @@ pub fn create_router(state: Arc<RunbookState>) -> Router {
             get(get_runbook).put(update_runbook).delete(delete_runbook),
         )
         // Runbook actions
-        .route("/api/v1/runbooks/:id/execute", post(execute_runbook_handler))
-        .route("/api/v1/runbooks/:id/executions", get(list_executions))
+        .route("/api/v1/runbooks/{id}/execute", post(execute_runbook_handler))
+        .route("/api/v1/runbooks/{id}/executions", get(list_executions))
         .with_state(state)
 }
 

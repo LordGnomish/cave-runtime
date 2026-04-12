@@ -440,10 +440,10 @@ fn extract_bearer_token(req: &axum::extract::Request) -> Option<String> {
 
 /// Axum extractor for `AuthContext`.
 ///
-/// ```rust
-/// async fn handler(AuthCtx(ctx): AuthCtx) -> impl IntoResponse {
-///     require_permission!(ctx, "cave-flags:write");
-///     // ...
+/// ```rust,no_run
+/// # use cave_auth::auth_middleware::{AuthCtx};
+/// async fn handler(AuthCtx(ctx): AuthCtx) -> impl axum::response::IntoResponse {
+///     // require_permission!(ctx, "cave-flags:write");
 /// }
 /// ```
 pub struct AuthCtx(pub AuthContext);
@@ -479,11 +479,12 @@ where
 /// Returns HTTP 403 immediately if the `AuthContext` does not grant the
 /// permission.  The handler function must return `impl IntoResponse`.
 ///
-/// ```rust
-/// async fn create_flag(AuthCtx(ctx): AuthCtx) -> impl IntoResponse {
-///     require_permission!(ctx, "cave-flags:write");
+/// ```rust,no_run
+/// # use cave_auth::auth_middleware::{AuthCtx};
+/// async fn create_flag(AuthCtx(ctx): AuthCtx) -> impl axum::response::IntoResponse {
+///     // require_permission!(ctx, "cave-flags:write");
 ///     // only reached if ctx has the permission
-///     StatusCode::CREATED
+///     axum::http::StatusCode::CREATED
 /// }
 /// ```
 #[macro_export]

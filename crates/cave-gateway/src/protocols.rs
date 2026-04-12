@@ -141,7 +141,7 @@ pub fn routes() -> Router<Arc<GatewayState>> {
     Router::new()
         .route("/api/v1/gateway/protocols", get(list_endpoints).post(register_endpoint))
         .route("/api/v1/gateway/protocols/summary", get(protocol_summary))
-        .route("/api/v1/gateway/protocols/:id", get(get_endpoint).delete(deregister_endpoint))
+        .route("/api/v1/gateway/protocols/{id}", get(get_endpoint).delete(deregister_endpoint))
         .route("/api/v1/gateway/protocols/route", post(route_message))
         .route("/api/v1/gateway/protocols/messages", get(message_log))
 }

@@ -167,7 +167,7 @@ pub fn unleash_router(state: Arc<FlagsState>) -> Router {
         .route("/api/client/features", get(client_features))
         // Admin API (create, list, get)
         .route("/api/admin/features", get(admin_list_features).post(admin_create_feature))
-        .route("/api/admin/features/:name", get(admin_get_feature))
+        .route("/api/admin/features/{name}", get(admin_get_feature))
         .with_state(state)
 }
 

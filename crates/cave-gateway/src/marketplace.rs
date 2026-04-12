@@ -168,11 +168,11 @@ pub fn routes() -> Router<Arc<GatewayState>> {
         .route("/api/v1/gateway/marketplace/plans", get(list_plans).post(create_plan))
         // Consumer management
         .route("/api/v1/gateway/marketplace/consumers", get(list_consumers).post(create_consumer))
-        .route("/api/v1/gateway/marketplace/consumers/:id", get(get_consumer))
-        .route("/api/v1/gateway/marketplace/consumers/:id/dashboard", get(get_dashboard))
-        .route("/api/v1/gateway/marketplace/consumers/:id/keys", post(provision_key))
-        .route("/api/v1/gateway/marketplace/consumers/:id/keys/:key", delete(revoke_key))
-        .route("/api/v1/gateway/marketplace/consumers/:id/subscribe", post(subscribe))
+        .route("/api/v1/gateway/marketplace/consumers/{id}", get(get_consumer))
+        .route("/api/v1/gateway/marketplace/consumers/{id}/dashboard", get(get_dashboard))
+        .route("/api/v1/gateway/marketplace/consumers/{id}/keys", post(provision_key))
+        .route("/api/v1/gateway/marketplace/consumers/{id}/keys/{key}", delete(revoke_key))
+        .route("/api/v1/gateway/marketplace/consumers/{id}/subscribe", post(subscribe))
 }
 
 async fn list_catalog(State(state): State<Arc<GatewayState>>) -> Json<serde_json::Value> {

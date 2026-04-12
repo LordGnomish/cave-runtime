@@ -40,11 +40,11 @@ pub fn create_router(state: Arc<State>) -> Router {
             "/api/v1/pipelines/:id",
             get(get_pipeline).put(update_pipeline).delete(delete_pipeline),
         )
-        .route("/api/v1/pipelines/:id/run", post(run_pipeline))
+        .route("/api/v1/pipelines/{id}/run", post(run_pipeline))
         // Pipeline runs
         .route("/api/v1/pipelineruns", get(list_pipeline_runs))
-        .route("/api/v1/pipelineruns/:id", get(get_pipeline_run))
-        .route("/api/v1/pipelineruns/:id/cancel", post(cancel_pipeline_run))
+        .route("/api/v1/pipelineruns/{id}", get(get_pipeline_run))
+        .route("/api/v1/pipelineruns/{id}/cancel", post(cancel_pipeline_run))
         // Tasks
         .route("/api/v1/tasks", get(list_tasks).post(create_task))
         .route(
@@ -53,15 +53,15 @@ pub fn create_router(state: Arc<State>) -> Router {
         )
         // Task runs
         .route("/api/v1/taskruns", get(list_task_runs))
-        .route("/api/v1/taskruns/:id", get(get_task_run))
+        .route("/api/v1/taskruns/{id}", get(get_task_run))
         // Triggers
         .route("/api/v1/triggers", get(list_triggers).post(create_trigger))
-        .route("/api/v1/triggers/:id", get(get_trigger).delete(delete_trigger))
+        .route("/api/v1/triggers/{id}", get(get_trigger).delete(delete_trigger))
         // Catalog
         .route("/api/v1/catalog", get(list_catalog))
         // Approvals
-        .route("/api/v1/approvals/:id/approve", post(approve_gate))
-        .route("/api/v1/approvals/:id/reject", post(reject_gate))
+        .route("/api/v1/approvals/{id}/approve", post(approve_gate))
+        .route("/api/v1/approvals/{id}/reject", post(reject_gate))
         .with_state(state)
 }
 

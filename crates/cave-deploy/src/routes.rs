@@ -23,11 +23,11 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         // Applications — CRUD
         .route("/api/v1/deploy/applications", get(list_applications))
         .route("/api/v1/deploy/applications", post(create_application))
-        .route("/api/v1/deploy/applications/:id", get(get_application))
-        .route("/api/v1/deploy/applications/:id", put(update_application))
-        .route("/api/v1/deploy/applications/:id", delete(delete_application))
+        .route("/api/v1/deploy/applications/{id}", get(get_application))
+        .route("/api/v1/deploy/applications/{id}", put(update_application))
+        .route("/api/v1/deploy/applications/{id}", delete(delete_application))
         // Sync / Rollback
-        .route("/api/v1/deploy/applications/:id/sync", post(sync_app))
+        .route("/api/v1/deploy/applications/{id}/sync", post(sync_app))
         .route(
             "/api/v1/deploy/applications/:id/rollback",
             post(rollback_app),
@@ -42,12 +42,12 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
             get(get_app_history),
         )
         // Diff
-        .route("/api/v1/deploy/diff/:id", get(get_diff))
+        .route("/api/v1/deploy/diff/{id}", get(get_diff))
         // Rollouts
         .route("/api/v1/deploy/rollouts", post(create_rollout))
-        .route("/api/v1/deploy/rollouts/:id", get(get_rollout))
-        .route("/api/v1/deploy/rollouts/:id/promote", post(promote_rollout))
-        .route("/api/v1/deploy/rollouts/:id/abort", post(abort_rollout))
+        .route("/api/v1/deploy/rollouts/{id}", get(get_rollout))
+        .route("/api/v1/deploy/rollouts/{id}/promote", post(promote_rollout))
+        .route("/api/v1/deploy/rollouts/{id}/abort", post(abort_rollout))
         // Module health
         .route("/api/v1/deploy/health", get(health))
         .with_state(state)

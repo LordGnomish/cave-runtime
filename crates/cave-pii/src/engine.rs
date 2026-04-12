@@ -1,4 +1,4 @@
-use crate::models::{PiiFinding, PiiType};
+use crate::models::PiiFinding;
 use std::collections::HashMap;
 
 /// Redact a matched string (replace middle chars with asterisks)
