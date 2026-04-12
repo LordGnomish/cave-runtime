@@ -17,3 +17,7 @@ config = { workspace = true }
 tracing = { workspace = true }
 tokio-postgres = { workspace = true }
 anyhow = { workspace = true }
+thiserror     = { workspace = true }
+anyhow        = { workspace = true }
+config        = { workspace = true }
+tracing       = { workspace = true }
