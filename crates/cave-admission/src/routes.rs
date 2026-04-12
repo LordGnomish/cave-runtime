@@ -21,7 +21,7 @@ pub fn create_router(state: Arc<AdmissionState>) -> Router {
         // Policies CRUD
         .route("/api/v1/policies", get(list_policies).post(create_policy))
         .route(
-            "/api/v1/policies/:id",
+            "/api/v1/policies/{id}",
             get(get_policy).put(update_policy).delete(delete_policy),
         )
         // Admission review

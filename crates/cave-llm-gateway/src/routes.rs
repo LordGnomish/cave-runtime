@@ -31,7 +31,7 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
             get(list_providers).post(create_provider),
         )
         .route(
-            "/api/v1/llm/providers/:id",
+            "/api/v1/llm/providers/{id}",
             get(get_provider).put(update_provider).delete(delete_provider),
         )
         // ── Routing policies ─────────────────────────────────────────────────
@@ -40,7 +40,7 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
             get(list_policies).post(create_policy),
         )
         .route(
-            "/api/v1/llm/policies/:id",
+            "/api/v1/llm/policies/{id}",
             get(get_policy).put(update_policy).delete(delete_policy),
         )
         // ── Token budgets ────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
             get(list_budgets).post(create_budget),
         )
         .route(
-            "/api/v1/llm/budgets/:id",
+            "/api/v1/llm/budgets/{id}",
             get(get_budget).put(update_budget).delete(delete_budget),
         )
         // ── Observability ────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ pub fn create_router(state: Arc<GatewayState>) -> Router {
             get(list_guardrails).post(create_guardrail),
         )
         .route(
-            "/api/v1/llm/guardrails/:id",
+            "/api/v1/llm/guardrails/{id}",
             get(get_guardrail).put(update_guardrail).delete(delete_guardrail),
         )
         // ── Health ───────────────────────────────────────────────────────────

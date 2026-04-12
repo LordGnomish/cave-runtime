@@ -82,7 +82,7 @@ fn wrap<T: Serialize>(r: StreamResult<T>) -> ApiResult<T> {
 pub fn router(state: AppState) -> Router {
     Router::new()
         // Health
-        .route("/health", get(health))
+        .route("/api/v1/streams/health", get(health))
         // Topics
         .route("/topics", post(create_topic).get(list_topics))
         .route("/topics/{name}", get(get_topic).delete(delete_topic))
@@ -97,7 +97,7 @@ pub fn router(state: AppState) -> Router {
         .route("/groups/{group}", get(describe_group).delete(delete_group))
         .route("/groups/{group}/offsets/{topic}", put(reset_offsets))
         .route(
-            "/groups/:group/offsets/:topic/:partition",
+            "/groups/{group}/offsets/{topic}/{partition}",
             get(get_offset).post(commit_offset),
         )
         // Schema registry
@@ -105,22 +105,22 @@ pub fn router(state: AppState) -> Router {
         .route("/schemas/check", post(check_schema_compat))
         .route("/schemas/id/{id}", get(get_schema_by_id))
         .route(
-            "/schemas/:subject",
+            "/schemas/{subject}",
             get(get_latest_schema).delete(delete_subject),
         )
         .route(
-            "/schemas/:subject/versions",
+            "/schemas/{subject}/versions",
             get(list_schema_versions).post(register_schema_for_subject),
         )
         .route(
-            "/schemas/:subject/versions/:version",
+            "/schemas/{subject}/versions/{version}",
             get(get_schema_version),
         )
         .route("/schemas/{subject}/compat", put(set_compat).get(get_compat))
         // Connectors
         .route("/connectors", post(create_connector).get(list_connectors))
         .route(
-            "/connectors/:name",
+            "/connectors/{name}",
             get(get_connector).delete(delete_connector),
         )
         .route("/connectors/{name}/pause", put(pause_connector))
@@ -128,7 +128,7 @@ pub fn router(state: AppState) -> Router {
         // Pipelines (Streams API)
         .route("/pipelines", post(create_pipeline).get(list_pipelines))
         .route(
-            "/pipelines/:id",
+            "/pipelines/{id}",
             get(get_pipeline).delete(delete_pipeline),
         )
         .route("/pipelines/{id}/start", put(start_pipeline))

@@ -387,7 +387,7 @@ async fn handle_delete_blob(
 
 // ── Upload handlers ───────────────────────────────────────────────────────────
 
-/// POST /v2/:name/blobs/uploads/
+/// POST /v2/{name}/blobs/uploads/
 /// Supports monolithic upload (body + digest query) or initiates a session.
 async fn handle_start_upload(
     state: Arc<AppState>,
@@ -435,7 +435,7 @@ async fn handle_start_upload(
         .into_response()
 }
 
-/// PATCH /v2/:name/blobs/uploads/:session_id
+/// PATCH /v2/{name}/blobs/uploads/{session_id}
 async fn handle_patch_upload(
     state: Arc<AppState>,
     name: String,
@@ -461,7 +461,7 @@ async fn handle_patch_upload(
     }
 }
 
-/// PUT /v2/:name/blobs/uploads/:session_id?digest=sha256:...
+/// PUT /v2/{name}/blobs/uploads/{session_id}?digest=sha256:...
 async fn handle_complete_upload(
     state: Arc<AppState>,
     name: String,
@@ -508,7 +508,7 @@ async fn handle_complete_upload(
     }
 }
 
-/// DELETE /v2/:name/blobs/uploads/:session_id  — cancel an in-progress upload.
+/// DELETE /v2/{name}/blobs/uploads/{session_id}  — cancel an in-progress upload.
 async fn handle_cancel_upload(
     state: Arc<AppState>,
     _name: String,

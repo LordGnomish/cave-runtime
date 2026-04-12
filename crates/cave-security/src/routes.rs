@@ -24,7 +24,7 @@ pub fn create_router(state: Arc<SecurityState>) -> Router {
         // Rules CRUD
         .route("/api/v1/rules", get(list_rules).post(create_rule))
         .route(
-            "/api/v1/rules/:id",
+            "/api/v1/rules/{id}",
             get(get_rule).put(update_rule).delete(delete_rule),
         )
         // Alerts: ingest events and query alerts

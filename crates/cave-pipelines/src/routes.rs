@@ -2,20 +2,20 @@
 //!
 //! Endpoints:
 //!   GET/POST   /api/v1/pipelines
-//!   GET/PUT/DELETE /api/v1/pipelines/:id
-//!   POST       /api/v1/pipelines/:id/run
+//!   GET/PUT/DELETE /api/v1/pipelines/{id}
+//!   POST       /api/v1/pipelines/{id}/run
 //!   GET        /api/v1/pipelineruns
-//!   GET        /api/v1/pipelineruns/:id
-//!   POST       /api/v1/pipelineruns/:id/cancel
+//!   GET        /api/v1/pipelineruns/{id}
+//!   POST       /api/v1/pipelineruns/{id}/cancel
 //!   GET/POST   /api/v1/tasks
-//!   GET/PUT/DELETE /api/v1/tasks/:id
+//!   GET/PUT/DELETE /api/v1/tasks/{id}
 //!   GET        /api/v1/taskruns
-//!   GET        /api/v1/taskruns/:id
+//!   GET        /api/v1/taskruns/{id}
 //!   GET/POST   /api/v1/triggers
-//!   GET/DELETE /api/v1/triggers/:id
+//!   GET/DELETE /api/v1/triggers/{id}
 //!   GET        /api/v1/catalog
-//!   POST       /api/v1/approvals/:id/approve
-//!   POST       /api/v1/approvals/:id/reject
+//!   POST       /api/v1/approvals/{id}/approve
+//!   POST       /api/v1/approvals/{id}/reject
 
 use crate::models::{ApprovalStatus, Pipeline, PipelineRun, RunStatus, Task, TaskRun};
 use crate::triggers::Trigger;
@@ -37,7 +37,7 @@ pub fn create_router(state: Arc<State>) -> Router {
         // Pipelines
         .route("/api/v1/pipelines", get(list_pipelines).post(create_pipeline))
         .route(
-            "/api/v1/pipelines/:id",
+            "/api/v1/pipelines/{id}",
             get(get_pipeline).put(update_pipeline).delete(delete_pipeline),
         )
         .route("/api/v1/pipelines/{id}/run", post(run_pipeline))
@@ -48,7 +48,7 @@ pub fn create_router(state: Arc<State>) -> Router {
         // Tasks
         .route("/api/v1/tasks", get(list_tasks).post(create_task))
         .route(
-            "/api/v1/tasks/:id",
+            "/api/v1/tasks/{id}",
             get(get_task).put(update_task).delete(delete_task),
         )
         // Task runs

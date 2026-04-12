@@ -73,21 +73,21 @@ pub fn create_router(state: Arc<RunbookState>) -> Router {
     Router::new()
         // Health
         .route("/api/v1/runbooks/health", get(health))
-        // Templates — static segment, must come before /:id
+        // Templates — static segment, must come before /{id}
         .route("/api/v1/runbooks/templates", get(list_templates))
-        // Bindings — static segment, must come before /:id
+        // Bindings — static segment, must come before /{id}
         .route(
             "/api/v1/runbooks/bindings",
             get(list_bindings).post(create_binding),
         )
         .route("/api/v1/runbooks/bindings/{id}", delete(delete_binding))
-        // Execution detail — "executions" static, must come before /:id
+        // Execution detail — "executions" static, must come before /{id}
         .route(
-            "/api/v1/runbooks/executions/:id",
+            "/api/v1/runbooks/executions/{id}",
             get(get_execution),
         )
         .route(
-            "/api/v1/runbooks/executions/:id/approve/:step_id",
+            "/api/v1/runbooks/executions/{id}/approve/{step_id}",
             post(approve_step),
         )
         // Runbooks CRUD
@@ -96,7 +96,7 @@ pub fn create_router(state: Arc<RunbookState>) -> Router {
             get(list_runbooks).post(create_runbook),
         )
         .route(
-            "/api/v1/runbooks/:id",
+            "/api/v1/runbooks/{id}",
             get(get_runbook).put(update_runbook).delete(delete_runbook),
         )
         // Runbook actions
@@ -251,7 +251,7 @@ async fn execute_runbook_handler(
         execs.insert(exec_id, stub);
     }
 
-    // Run in background — caller polls GET /executions/:id for status.
+    // Run in background — caller polls GET /executions/{id} for status.
     let state_bg = Arc::clone(&state);
     let incident_id = req.incident_id;
     tokio::spawn(async move {

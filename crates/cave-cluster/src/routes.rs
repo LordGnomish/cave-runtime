@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 pub fn create_router(state: Arc<ClusterState>) -> Router {
     Router::new()
-        // Templates must be registered before /:id to avoid shadowing.
+        // Templates must be registered before /{id} to avoid shadowing.
         .route("/api/v1/clusters/templates", get(list_templates))
         // Cluster CRUD
         .route(
@@ -22,7 +22,7 @@ pub fn create_router(state: Arc<ClusterState>) -> Router {
             get(list_clusters).post(create_cluster),
         )
         .route(
-            "/api/v1/clusters/:id",
+            "/api/v1/clusters/{id}",
             get(get_cluster).put(update_cluster).delete(delete_cluster),
         )
         // Cluster actions
@@ -31,18 +31,18 @@ pub fn create_router(state: Arc<ClusterState>) -> Router {
         .route("/api/v1/clusters/{id}/kubeconfig", get(get_kubeconfig))
         // Node pools
         .route(
-            "/api/v1/clusters/:id/nodepools",
+            "/api/v1/clusters/{id}/nodepools",
             get(list_node_pools).post(create_node_pool),
         )
         .route(
-            "/api/v1/clusters/:id/nodepools/:pool_id",
+            "/api/v1/clusters/{id}/nodepools/{pool_id}",
             get(get_node_pool)
                 .put(scale_node_pool)
                 .delete(delete_node_pool),
         )
         // Add-ons
         .route(
-            "/api/v1/clusters/:id/addons",
+            "/api/v1/clusters/{id}/addons",
             get(list_cluster_addons).post(install_addon),
         )
         // Tenant CRUD
@@ -51,7 +51,7 @@ pub fn create_router(state: Arc<ClusterState>) -> Router {
             get(list_tenants).post(create_tenant),
         )
         .route(
-            "/api/v1/tenants/:id",
+            "/api/v1/tenants/{id}",
             get(get_tenant).delete(delete_tenant),
         )
         // Tenant views
@@ -88,7 +88,7 @@ async fn create_cluster(
     (StatusCode::CREATED, Json(cluster))
 }
 
-/// GET /api/v1/clusters/:id
+/// GET /api/v1/clusters/{id}
 async fn get_cluster(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -102,7 +102,7 @@ async fn get_cluster(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-/// PUT /api/v1/clusters/:id — update cluster metadata
+/// PUT /api/v1/clusters/{id} — update cluster metadata
 async fn update_cluster(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -120,7 +120,7 @@ async fn update_cluster(
     Ok(Json(cluster.clone()))
 }
 
-/// DELETE /api/v1/clusters/:id — begin graceful teardown
+/// DELETE /api/v1/clusters/{id} — begin graceful teardown
 async fn delete_cluster(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -137,7 +137,7 @@ async fn delete_cluster(
 
 // ── Cluster Actions ───────────────────────────────────────────────────────────
 
-/// POST /api/v1/clusters/:id/upgrade — trigger a rolling upgrade
+/// POST /api/v1/clusters/{id}/upgrade — trigger a rolling upgrade
 async fn trigger_upgrade(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -157,7 +157,7 @@ async fn trigger_upgrade(
     Ok(Json(upgraded))
 }
 
-/// GET /api/v1/clusters/:id/health — live health check
+/// GET /api/v1/clusters/{id}/health — live health check
 async fn get_cluster_health(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -169,7 +169,7 @@ async fn get_cluster_health(
     Ok(Json(h))
 }
 
-/// GET /api/v1/clusters/:id/kubeconfig — return kubeconfig reference (fetch from cave-vault)
+/// GET /api/v1/clusters/{id}/kubeconfig — return kubeconfig reference (fetch from cave-vault)
 async fn get_kubeconfig(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -185,7 +185,7 @@ async fn get_kubeconfig(
 
 // ── Node Pools ────────────────────────────────────────────────────────────────
 
-/// GET /api/v1/clusters/:id/nodepools
+/// GET /api/v1/clusters/{id}/nodepools
 async fn list_node_pools(
     State(state): State<Arc<ClusterState>>,
     Path(cluster_id): Path<Uuid>,
@@ -200,7 +200,7 @@ async fn list_node_pools(
     Json(pools)
 }
 
-/// POST /api/v1/clusters/:id/nodepools
+/// POST /api/v1/clusters/{id}/nodepools
 async fn create_node_pool(
     State(state): State<Arc<ClusterState>>,
     Path(cluster_id): Path<Uuid>,
@@ -223,7 +223,7 @@ async fn create_node_pool(
     (StatusCode::CREATED, Json(pool))
 }
 
-/// GET /api/v1/clusters/:id/nodepools/:pool_id
+/// GET /api/v1/clusters/{id}/nodepools/{pool_id}
 async fn get_node_pool(
     State(state): State<Arc<ClusterState>>,
     Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
@@ -237,7 +237,7 @@ async fn get_node_pool(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-/// PUT /api/v1/clusters/:id/nodepools/:pool_id — scale a node pool
+/// PUT /api/v1/clusters/{id}/nodepools/{pool_id} — scale a node pool
 async fn scale_node_pool(
     State(state): State<Arc<ClusterState>>,
     Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
@@ -254,7 +254,7 @@ async fn scale_node_pool(
     Ok(Json(scaled))
 }
 
-/// DELETE /api/v1/clusters/:id/nodepools/:pool_id
+/// DELETE /api/v1/clusters/{id}/nodepools/{pool_id}
 async fn delete_node_pool(
     State(state): State<Arc<ClusterState>>,
     Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
@@ -269,7 +269,7 @@ async fn delete_node_pool(
 
 // ── Add-ons ───────────────────────────────────────────────────────────────────
 
-/// GET /api/v1/clusters/:id/addons
+/// GET /api/v1/clusters/{id}/addons
 async fn list_cluster_addons(
     State(state): State<Arc<ClusterState>>,
     Path(cluster_id): Path<Uuid>,
@@ -283,7 +283,7 @@ async fn list_cluster_addons(
     Json(addons)
 }
 
-/// POST /api/v1/clusters/:id/addons — install an add-on
+/// POST /api/v1/clusters/{id}/addons — install an add-on
 async fn install_addon(
     State(state): State<Arc<ClusterState>>,
     Path(cluster_id): Path<Uuid>,
@@ -333,7 +333,7 @@ async fn create_tenant(
     (StatusCode::CREATED, Json(t))
 }
 
-/// GET /api/v1/tenants/:id
+/// GET /api/v1/tenants/{id}
 async fn get_tenant(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -347,7 +347,7 @@ async fn get_tenant(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-/// DELETE /api/v1/tenants/:id
+/// DELETE /api/v1/tenants/{id}
 async fn delete_tenant(
     State(state): State<Arc<ClusterState>>,
     Path(id): Path<Uuid>,
@@ -361,7 +361,7 @@ async fn delete_tenant(
     }
 }
 
-/// GET /api/v1/tenants/:id/clusters — all clusters owned by a tenant
+/// GET /api/v1/tenants/{id}/clusters — all clusters owned by a tenant
 async fn list_tenant_clusters(
     State(state): State<Arc<ClusterState>>,
     Path(tenant_id): Path<Uuid>,
@@ -379,7 +379,7 @@ async fn list_tenant_clusters(
     Ok(Json(clusters))
 }
 
-/// GET /api/v1/tenants/:id/quota — quota usage snapshot
+/// GET /api/v1/tenants/{id}/quota — quota usage snapshot
 async fn get_tenant_quota(
     State(state): State<Arc<ClusterState>>,
     Path(tenant_id): Path<Uuid>,

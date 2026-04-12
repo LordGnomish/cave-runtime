@@ -514,7 +514,7 @@ pub fn scim_router(token_store: Arc<TokenStore>) -> Router {
             get(scim_list_users).post(scim_create_user),
         )
         .route(
-            "/scim/v2/Users/:id",
+            "/scim/v2/Users/{id}",
             get(scim_get_user)
                 .put(scim_replace_user)
                 .patch(scim_patch_user)

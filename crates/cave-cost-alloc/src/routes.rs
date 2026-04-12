@@ -36,13 +36,13 @@ pub fn create_router(state: Arc<CostAllocState>) -> Router {
             get(list_cost_centers).post(create_cost_center),
         )
         .route(
-            "/api/v1/finops/cost-centers/:id",
+            "/api/v1/finops/cost-centers/{id}",
             get(get_cost_center).put(update_cost_center).delete(delete_cost_center),
         )
         // Budgets
         .route("/api/v1/finops/budgets", get(list_budgets).post(create_budget))
         .route(
-            "/api/v1/finops/budgets/:id",
+            "/api/v1/finops/budgets/{id}",
             get(get_budget).delete(delete_budget),
         )
         // Allocation / chargeback rules
@@ -51,7 +51,7 @@ pub fn create_router(state: Arc<CostAllocState>) -> Router {
             get(list_allocation_rules).post(create_allocation_rule),
         )
         .route(
-            "/api/v1/finops/allocation-rules/:id",
+            "/api/v1/finops/allocation-rules/{id}",
             get(get_allocation_rule).delete(delete_allocation_rule),
         )
         // Reports & analytics

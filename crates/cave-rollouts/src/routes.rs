@@ -3,19 +3,19 @@
 //! Endpoints:
 //!   GET  /api/v1/rollouts
 //!   POST /api/v1/rollouts
-//!   GET  /api/v1/rollouts/:id
-//!   PUT  /api/v1/rollouts/:id
-//!   DELETE /api/v1/rollouts/:id
-//!   POST /api/v1/rollouts/:id/promote
-//!   POST /api/v1/rollouts/:id/rollback
+//!   GET  /api/v1/rollouts/{id}
+//!   PUT  /api/v1/rollouts/{id}
+//!   DELETE /api/v1/rollouts/{id}
+//!   POST /api/v1/rollouts/{id}/promote
+//!   POST /api/v1/rollouts/{id}/rollback
 //!   GET  /api/v1/experiments
 //!   POST /api/v1/experiments
-//!   GET  /api/v1/experiments/:id
+//!   GET  /api/v1/experiments/{id}
 //!   GET  /api/v1/analysistemplates
 //!   POST /api/v1/analysistemplates
-//!   GET  /api/v1/analysistemplates/:id
+//!   GET  /api/v1/analysistemplates/{id}
 //!   GET  /api/v1/analysisruns
-//!   GET  /api/v1/analysisruns/:id
+//!   GET  /api/v1/analysisruns/{id}
 //!   GET  /api/rollouts/health
 
 use crate::{
@@ -47,7 +47,7 @@ pub fn create_router(state: Arc<RolloutsState>) -> Router {
         // Rollouts CRUD
         .route("/api/v1/rollouts", get(list_rollouts).post(create_rollout))
         .route(
-            "/api/v1/rollouts/:id",
+            "/api/v1/rollouts/{id}",
             get(get_rollout).put(update_rollout).delete(delete_rollout),
         )
         .route("/api/v1/rollouts/{id}/promote", post(promote_rollout))

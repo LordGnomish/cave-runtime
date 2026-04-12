@@ -19,56 +19,56 @@ pub fn create_router(state: Arc<StoreState>) -> Router {
         // Bucket CRUD
         .route("/api/v1/store/buckets", get(list_buckets).post(create_bucket))
         .route(
-            "/api/v1/store/buckets/:bucket",
+            "/api/v1/store/buckets/{bucket}",
             get(get_bucket).delete(delete_bucket),
         )
         // Bucket configuration
         .route(
-            "/api/v1/store/buckets/:bucket/versioning",
+            "/api/v1/store/buckets/{bucket}/versioning",
             put(set_versioning),
         )
         .route(
-            "/api/v1/store/buckets/:bucket/lifecycle",
+            "/api/v1/store/buckets/{bucket}/lifecycle",
             get(get_lifecycle).put(put_lifecycle),
         )
         .route(
-            "/api/v1/store/buckets/:bucket/policy",
+            "/api/v1/store/buckets/{bucket}/policy",
             get(get_policy).put(put_policy),
         )
         .route(
-            "/api/v1/store/buckets/:bucket/replication",
+            "/api/v1/store/buckets/{bucket}/replication",
             get(get_replication).put(put_replication),
         )
         // Object CRUD
         .route(
-            "/api/v1/store/buckets/:bucket/objects",
+            "/api/v1/store/buckets/{bucket}/objects",
             get(list_objects),
         )
         .route("/api/v1/store/objects", post(put_object))
         .route(
-            "/api/v1/store/objects/:bucket/:key",
+            "/api/v1/store/objects/{bucket}/{key}",
             get(get_object).delete(delete_object),
         )
         .route(
-            "/api/v1/store/objects/:bucket/:key/versions",
+            "/api/v1/store/objects/{bucket}/{key}/versions",
             get(list_versions),
         )
         // Multipart upload
         .route("/api/v1/store/multipart/initiate", post(initiate_multipart))
         .route(
-            "/api/v1/store/multipart/:upload_id/parts",
+            "/api/v1/store/multipart/{upload_id}/parts",
             put(upload_part),
         )
         .route(
-            "/api/v1/store/multipart/:upload_id/complete",
+            "/api/v1/store/multipart/{upload_id}/complete",
             post(complete_multipart),
         )
         .route(
-            "/api/v1/store/multipart/:upload_id",
+            "/api/v1/store/multipart/{upload_id}",
             delete(abort_multipart),
         )
         .route(
-            "/api/v1/store/buckets/:bucket/multipart",
+            "/api/v1/store/buckets/{bucket}/multipart",
             get(list_multipart),
         )
         .with_state(state)

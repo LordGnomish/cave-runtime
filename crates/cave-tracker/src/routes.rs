@@ -38,25 +38,25 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
         // Projects
         .route("/api/v1/tracker/projects", get(list_projects).post(create_project))
         .route(
-            "/api/v1/tracker/projects/:project_id",
+            "/api/v1/tracker/projects/{project_id}",
             get(get_project).put(update_project).delete(delete_project),
         )
         // Issues under project
         .route(
-            "/api/v1/tracker/projects/:project_id/issues",
+            "/api/v1/tracker/projects/{project_id}/issues",
             get(list_project_issues).post(create_project_issue),
         )
         // Sprints
         .route(
-            "/api/v1/tracker/projects/:project_id/sprints",
+            "/api/v1/tracker/projects/{project_id}/sprints",
             get(list_sprints).post(create_sprint),
         )
         .route(
-            "/api/v1/tracker/projects/:project_id/sprints/:sprint_id/start",
+            "/api/v1/tracker/projects/{project_id}/sprints/{sprint_id}/start",
             post(start_sprint),
         )
         .route(
-            "/api/v1/tracker/projects/:project_id/sprints/:sprint_id/complete",
+            "/api/v1/tracker/projects/{project_id}/sprints/{sprint_id}/complete",
             post(complete_sprint),
         )
         // Board / backlog / roadmap / metrics
@@ -66,23 +66,23 @@ pub fn create_router(state: Arc<TrackerState>) -> Router {
         .route("/api/v1/tracker/projects/{project_id}/metrics", get(project_metrics))
         // Labels
         .route(
-            "/api/v1/tracker/projects/:project_id/labels",
+            "/api/v1/tracker/projects/{project_id}/labels",
             get(list_labels).post(create_label),
         )
         // Automations
         .route(
-            "/api/v1/tracker/projects/:project_id/automations",
+            "/api/v1/tracker/projects/{project_id}/automations",
             get(list_automations).post(create_automation),
         )
         // Individual issues
         .route(
-            "/api/v1/tracker/issues/:issue_id",
+            "/api/v1/tracker/issues/{issue_id}",
             get(get_issue).put(update_issue_handler).delete(delete_issue),
         )
         .route("/api/v1/tracker/issues/{issue_id}/activity", get(get_issue_activity))
         .route("/api/v1/tracker/issues/{issue_id}/transition", post(transition_issue_handler))
         .route(
-            "/api/v1/tracker/issues/:issue_id/comments",
+            "/api/v1/tracker/issues/{issue_id}/comments",
             get(list_comments).post(add_comment),
         )
         .with_state(state)
