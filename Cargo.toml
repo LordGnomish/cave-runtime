@@ -6,10 +6,6 @@ members = [
     "crates/cave-auth",
     "crates/cave-db",
     "crates/cave-ebpf-common",
-    # === Observability Stack ===
-    "crates/cave-metrics",
-    "crates/cave-logs",
-    "crates/cave-trace",
     # === Phase 1: Quick Wins ===
     "crates/cave-flags",
     "crates/cave-secrets",
@@ -18,44 +14,23 @@ members = [
     "crates/cave-status",
     "crates/cave-changelog",
     "crates/cave-certs",
-    # === Vault / Secrets Management ===
-    "crates/cave-vault",
-    # === Metrics ===
-    "crates/cave-metrics",
     # === Phase 2: Security Core ===
-    "crates/cave-security",
-    "crates/cave-admission",
     "crates/cave-vulns",
     "crates/cave-sbom",
     "crates/cave-uptime",
     "crates/cave-cost",
-    "crates/cave-cost-alloc",
     "crates/cave-sign",
     "crates/cave-forensics",
     # === Phase 3: Platform Intelligence ===
-    "crates/cave-logs",
     "crates/cave-devlake",
     "crates/cave-ai-obs",
-    "crates/cave-llm-gateway",
     "crates/cave-pii",
     "crates/cave-incidents",
     "crates/cave-chat",
     "crates/cave-slo",
     "crates/cave-alerts",
     "crates/cave-profiler",
-    "crates/cave-trace",
-    # === CI/CD ===
-    "crates/cave-pipelines",
-    # === Data Services ===
-    "crates/cave-cache",
-    "crates/cave-store",
-    # === Phase 5: Next-Gen IaC ===
-    "crates/cave-infra",
     # === Phase 4: Heavy Hitters ===
-    "crates/cave-gateway",
-    "crates/cave-artifacts",
-    "crates/cave-tracker",
-    "crates/cave-streams",
     "crates/cave-registry",
     "crates/cave-workflows",
     "crates/cave-scan",
@@ -65,7 +40,6 @@ members = [
     "crates/cave-policy",
     "crates/cave-dast",
     "crates/cave-backup",
-    "crates/cave-rollouts",
     "crates/cave-pam",
     # === LLM Gateway ===
     "crates/cave-llm-gateway",
@@ -98,45 +72,17 @@ members = [
     "crates/cave-rollouts",
     # === Asset & Artifact Management ===
     "crates/cave-artifacts",
-    # === Phase 5: Developer Experience ===
-    # === Platform ===
-    # === Infrastructure ===
-    # === Infrastructure-as-Code ===
-    # === Platform API ===
-    "crates/cave-gitops-config",
-    # === Service Mesh ===
-    # === API Gateway ===
-    "crates/cave-runbook",
-    # === GitOps Deploy ===
-    # === Observability / Visualization ===
-    "crates/cave-compliance",
-    # === High Availability & DR ===
-    # === Runtime Binary ===
-    "crates/cave-runtime",
-    # === CLI ===
-    "crates/cave-cli",
-    # === Upstream Tracker ===
-    "crates/cave-upstream",
-    # === Issue Tracking ===
-    "crates/cave-tracker",
     # === Platform Governance ===
     "crates/cave-runbook",
     "crates/cave-gitops-config",
     "crates/cave-compliance",
     "crates/cave-cost-alloc",
-    # === Storage & Cache ===
-    "crates/cave-cache",
-    "crates/cave-store",
-    # === Infrastructure ===
-    "crates/cave-dns",
-    "crates/cave-pg",
-    # === Docs & Tracing ===
-    "crates/cave-docs-site",
-    "crates/cave-trace",
-    # === Observability ===
-    "crates/cave-logs",
-    # === Event Streaming ===
-    "crates/cave-streams",
+    # === Issue Tracking ===
+    "crates/cave-tracker",
+    # === Runtime Binary ===
+    "crates/cave-runtime",
+    # === Upstream Tracker ===
+    "crates/cave-upstream",
 ]
 
 [workspace.package]
@@ -198,7 +144,6 @@ pulldown-cmark = "0.12"
 base64 = "0.22"
 # Random number generation
 rand = { version = "0.8", features = ["std"] }
-# async traits
 
 [profile.release]
 opt-level = 3
