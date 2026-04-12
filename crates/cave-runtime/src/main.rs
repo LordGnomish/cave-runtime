@@ -75,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -110,6 +111,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let runbook_state = Arc::new(cave_runbook::RunbookState::default());
 >>>>>>> claude/thirsty-nobel
+=======
+    let streams_state = Arc::new(cave_streams::StreamsState::default());
+>>>>>>> claude/youthful-babbage
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -180,6 +184,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -281,6 +286,10 @@ async fn main() -> anyhow::Result<()> {
         // Phase 3 module routers
         .merge(cave_llm_gateway::router(llm_gateway_state))
 >>>>>>> claude/vigilant-torvalds
+=======
+        // Phase 4 module routers
+        .merge(cave_streams::router(streams_state))
+>>>>>>> claude/youthful-babbage
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -307,6 +316,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Platform modules: cluster");
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -360,6 +370,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Phase 3 modules: llm-gateway");
 >>>>>>> claude/vigilant-torvalds
+=======
+    info!("Phase 4 modules: streams");
+>>>>>>> claude/youthful-babbage
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -389,6 +402,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -432,6 +446,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "llm-gateway": true,
 >>>>>>> claude/vigilant-torvalds
+=======
+            "streams": true,
+>>>>>>> claude/youthful-babbage
         }
     }))
 }
