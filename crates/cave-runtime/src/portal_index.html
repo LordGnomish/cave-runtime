@@ -1,83 +1,558 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CAVE Platform</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
-    header { background: #1a1f2e; border-bottom: 1px solid #2d3748; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-    header h1 { font-size: 1.4rem; font-weight: 700; color: #7c3aed; }
-    header span { color: #718096; font-size: 0.875rem; }
-    main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
-    h2 { font-size: 1rem; font-weight: 600; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.05em; margin: 2rem 0 1rem; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
-    .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 8px; padding: 1.25rem; transition: border-color 0.15s; }
-    .card:hover { border-color: #7c3aed; }
-    .card a { text-decoration: none; color: inherit; }
-    .card .name { font-weight: 600; color: #e2e8f0; margin-bottom: 0.25rem; }
-    .card .desc { font-size: 0.8rem; color: #718096; }
-    .card .path { font-size: 0.75rem; color: #4a5568; margin-top: 0.5rem; font-family: monospace; }
-    .badge { display: inline-block; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px; margin-bottom: 0.5rem; }
-    .p1 { background: #1a3a2a; color: #48bb78; }
-    .p2 { background: #1a2a3a; color: #63b3ed; }
-    .p3 { background: #2a1a3a; color: #b794f4; }
-    .p4 { background: #3a2a1a; color: #f6ad55; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CAVE Platform</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-sidebar:#161b22;--bg-card:#21262d;--bg-hover:#30363d;
+  --border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
+  --accent:#58a6ff;--accent-dim:#1f6feb;
+  --green:#3fb950;--yellow:#d29922;--red:#f85149;
+  --radius:6px;--sidebar-w:240px;--transition:0.18s ease;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+#app{display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform var(--transition);z-index:100}
+.sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo{width:28px;height:28px;background:linear-gradient(135deg,var(--accent-dim),var(--accent));border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;flex-shrink:0;letter-spacing:-0.5px}
+.logo-text{font-weight:700;font-size:15px}
+.sidebar-search{padding:9px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-btn{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-muted);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color var(--transition),color var(--transition)}
+.search-btn:hover{border-color:var(--accent);color:var(--text)}
+.search-btn-kbd{margin-left:auto;font-size:10px;background:var(--bg-card);padding:2px 5px;border-radius:3px;border:1px solid var(--border)}
+.sidebar-nav{flex:1;overflow-y:auto;padding:6px 0}
+.sidebar-nav::-webkit-scrollbar{width:3px}
+.sidebar-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 16px;color:var(--text-muted);cursor:pointer;transition:background var(--transition),color var(--transition);user-select:none}
+.nav-item:hover{background:var(--bg-hover);color:var(--text)}
+.nav-item.active{background:rgba(31,111,235,0.25);color:var(--accent);font-weight:500}
+.nav-item .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.nav-sec{display:flex;align-items:center;gap:6px;padding:7px 16px 4px;color:var(--text-muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;cursor:pointer;user-select:none;margin-top:2px}
+.nav-sec:hover{color:var(--text)}
+.nav-sec .chev{margin-left:auto;font-size:9px;transition:transform var(--transition);display:inline-block}
+.nav-sec.closed .chev{transform:rotate(-90deg)}
+.nav-sub{overflow:hidden}
+.nav-sub .nav-item{padding-left:30px;font-size:13px}
+.sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);flex-shrink:0}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;background:var(--bg)}
+#hamburger{display:none;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:4px;line-height:1}
+#breadcrumb{color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:6px;min-width:0}
+#breadcrumb .bc-active{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hbadge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap}
+#content{flex:1;overflow-y:auto;padding:24px}
+#content::-webkit-scrollbar{width:5px}
+#content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── Cards & Stats ── */
+.page-hdr{margin-bottom:24px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{color:var(--text-muted);font-size:13px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:28px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.stat-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px}
+.stat-val{font-size:24px;font-weight:700;line-height:1}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:3px}
+.c-green{color:var(--green)}.c-yellow{color:var(--yellow)}.c-red{color:var(--red)}.c-accent{color:var(--accent)}
+.sec-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.module-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:28px}
+.mcard{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:13px;cursor:pointer;transition:border-color var(--transition),box-shadow var(--transition),transform var(--transition)}
+.mcard:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,0.4);transform:translateY(-1px)}
+.mcard-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.mcard-name{font-weight:600;font-size:13px}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mcard-desc{font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mcard-foot{margin-top:9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pbadge{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;white-space:nowrap}
+.p1{background:#1f6feb22;color:var(--accent);border:1px solid #1f6feb55}
+.p2{background:#3fb95022;color:var(--green);border:1px solid #3fb95055}
+.p3{background:#d2992222;color:var(--yellow);border:1px solid #d2992255}
+.p4{background:#f8514922;color:var(--red);border:1px solid #f8514955}
+.utag{font-size:10px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:2px 6px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+
+/* ── Status dots ── */
+.dg{background:var(--green);box-shadow:0 0 5px var(--green)}
+.dy{background:var(--yellow);box-shadow:0 0 5px var(--yellow)}
+.dr{background:var(--red);box-shadow:0 0 5px var(--red)}
+.dm{background:var(--text-muted)}
+
+/* ── Module detail ── */
+.mod-hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.mod-icon{width:50px;height:50px;border-radius:10px;background:linear-gradient(135deg,var(--accent-dim),var(--accent));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.mod-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.mod-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.spill{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600}
+.sp-healthy{background:#3fb95018;color:var(--green);border:1px solid #3fb95044}
+.sp-warning{background:#d2992218;color:var(--yellow);border:1px solid #d2992244}
+.sp-error{background:#f8514918;color:var(--red);border:1px solid #f8514944}
+.sp-pending{background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+.dcrd{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.dcrd-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:12px}
+.feat-list{list-style:none;display:flex;flex-direction:column;gap:7px}
+.feat-list li{display:flex;align-items:center;gap:8px;font-size:13px}
+.feat-list li::before{content:'✓';color:var(--green);font-weight:700;font-size:11px;flex-shrink:0}
+.qactions{display:flex;flex-wrap:wrap;gap:7px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all var(--transition);background:none;font-family:inherit}
+.btn-p{background:var(--accent-dim);color:#fff;border-color:var(--accent-dim)}
+.btn-p:hover{background:var(--accent)}
+.btn-s{background:var(--bg-card);color:var(--text);border-color:var(--border)}
+.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+.cfg-ph{background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);padding:18px;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.6}
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-k{font-size:12px;color:var(--text-muted)}
+.info-v{font-size:12px;font-weight:500}
+
+/* ── Search palette ── */
+#soverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px)}
+#soverlay.open{display:flex;align-items:flex-start;justify-content:center;padding-top:14vh}
+#spalette{background:var(--bg-sidebar);border:1px solid var(--border);border-radius:10px;width:540px;max-width:92vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+#sinput{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);padding:13px 16px;color:var(--text);font-size:15px;outline:none;font-family:inherit}
+#sinput::placeholder{color:var(--text-muted)}
+#sresults{max-height:340px;overflow-y:auto}
+#sresults::-webkit-scrollbar{width:3px}
+#sresults::-webkit-scrollbar-thumb{background:var(--border)}
+.sresult{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background var(--transition)}
+.sresult:hover,.sresult.focused{background:var(--bg-hover)}
+.sr-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.sr-name{font-weight:600;font-size:13px}
+.sr-desc{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.sr-cat{font-size:10px;color:var(--text-muted);margin-left:auto;background:var(--bg-card);padding:2px 7px;border-radius:10px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0}
+.sempty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px}
+
+/* ── Mobile overlay ── */
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:90}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  #sidebar{position:fixed;top:0;left:0;bottom:0;transform:translateX(-100%);box-shadow:none}
+  #sidebar.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,0.5)}
+  #sidebar-overlay.show{display:block}
+  #hamburger{display:flex}
+  #content{padding:14px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .module-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .detail-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .module-grid{grid-template-columns:1fr 1fr}
+}
+
+/* ── Animations ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.pulse{animation:pulse 2s infinite}
+</style>
 </head>
 <body>
-  <header>
-    <h1>CAVE Platform</h1>
-    <span>Unified Runtime — all modules active</span>
-  </header>
-  <main>
-    <h2>Phase 1 — Core</h2>
-    <div class="grid">
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Secrets</div><div class="desc">Vault replacement</div><div class="path">GET /api/secrets/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Lint</div><div class="desc">Policy-as-code linter</div><div class="path">GET /api/lint/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Docs</div><div class="desc">Documentation hub</div><div class="path">GET /api/docs/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Status</div><div class="desc">Service status page</div><div class="path">GET /api/status/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Changelog</div><div class="desc">Release notes</div><div class="path">GET /api/changelog/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Certs</div><div class="desc">Certificate manager</div><div class="path">GET /api/certs/health</div></div>
-      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Flags</div><div class="desc">Feature flags (Unleash)</div><div class="path">GET /api/flags/health</div></div>
+<div id="app">
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">CV</div>
+      <span class="logo-text">CAVE Platform</span>
     </div>
+    <div class="sidebar-search">
+      <button class="search-btn" onclick="openSearch()">
+        <span>⌕</span><span>Search modules…</span>
+        <span class="search-btn-kbd">⌘K</span>
+      </button>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav"></div>
+    <div class="sidebar-footer">
+      v<span id="rv">…</span> · <span id="ru">—</span>
+    </div>
+  </nav>
 
-    <h2>Phase 2 — Security &amp; Reliability</h2>
-    <div class="grid">
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Vulns</div><div class="desc">Vulnerability hub (DefectDojo)</div><div class="path">GET /api/vulns/health</div></div>
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">SBOM</div><div class="desc">Dependency intelligence</div><div class="path">GET /api/sbom/health</div></div>
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Uptime</div><div class="desc">Synthetic monitoring</div><div class="path">GET /api/uptime/health</div></div>
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Cost</div><div class="desc">FinOps (OpenCost)</div><div class="path">GET /api/cost/health</div></div>
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Sign</div><div class="desc">Image signing (Sigstore)</div><div class="path">GET /api/sign/health</div></div>
-      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Forensics</div><div class="desc">Runtime forensics (Tetragon)</div><div class="path">GET /api/forensics/health</div></div>
+  <div id="main">
+    <div id="topbar">
+      <button id="hamburger" onclick="toggleSidebar()">☰</button>
+      <div id="breadcrumb">
+        <span style="color:var(--text-muted)">CAVE</span>
+        <span style="color:var(--border)">›</span>
+        <span class="bc-active" id="bc">Overview</span>
+      </div>
+      <div class="topbar-right">
+        <div class="hbadge">
+          <span class="sdot dm" id="gsdot"></span>
+          <span id="gstext">Connecting…</span>
+        </div>
+      </div>
     </div>
+    <div id="content"></div>
+  </div>
+</div>
 
-    <h2>Phase 3 — Platform Intelligence</h2>
-    <div class="grid">
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">DevLake</div><div class="desc">DevOps analytics</div><div class="path">GET /api/devlake/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">AI Obs</div><div class="desc">LLM observability (Langfuse)</div><div class="path">GET /api/ai-obs/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">PII</div><div class="desc">PII detection (Presidio)</div><div class="path">GET /api/pii/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Incidents</div><div class="desc">Incident management</div><div class="path">GET /api/incidents/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Chat</div><div class="desc">LLM chat (LibreChat)</div><div class="path">GET /api/chat/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">SLO</div><div class="desc">Error budgets &amp; burn rates</div><div class="path">GET /api/slo/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Alerts</div><div class="desc">Alert routing (Alertmanager)</div><div class="path">GET /api/alerts/health</div></div>
-      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Profiler</div><div class="desc">Continuous profiling (Pyroscope)</div><div class="path">GET /api/profiler/health</div></div>
-    </div>
+<!-- Search Palette -->
+<div id="soverlay" onclick="handleSOverlay(event)">
+  <div id="spalette">
+    <input id="sinput" type="text" placeholder="Jump to module…"
+      oninput="onSInput()" onkeydown="onSKey(event)" autocomplete="off" spellcheck="false">
+    <div id="sresults"></div>
+  </div>
+</div>
 
-    <h2>Phase 4 — Heavy Hitters</h2>
-    <div class="grid">
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Registry</div><div class="desc">Package proxy (Pulp)</div><div class="path">GET /api/registry/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Workflows</div><div class="desc">Event automation (n8n)</div><div class="path">GET /api/workflows/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Scan</div><div class="desc">SAST (SonarQube)</div><div class="path">GET /api/scan/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Portal</div><div class="desc">Developer portal (Backstage)</div><div class="path">GET /api/portal/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Scaffold</div><div class="desc">Template engine</div><div class="path">GET /api/scaffold/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Chaos</div><div class="desc">Chaos engineering (Chaos Mesh)</div><div class="path">GET /api/chaos/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Policy</div><div class="desc">Policy engine (OPA)</div><div class="path">GET /api/policy/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">DAST</div><div class="desc">Dynamic security testing (ZAP)</div><div class="path">GET /api/dast/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Backup</div><div class="desc">K8s backup (Velero)</div><div class="path">GET /api/backup/health</div></div>
-      <div class="card"><span class="badge p4">Phase 4</span><div class="name">PAM</div><div class="desc">Privileged access (Teleport)</div><div class="path">GET /api/pam/health</div></div>
+<script>
+// ── Module Registry ──────────────────────────────────────────────────────────
+
+const MODS = {
+  // Core
+  db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null},
+  auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null},
+  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 26 OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null},
+  // Security
+  secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health'},
+  certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health'},
+  sign:{id:'sign',name:'Code Signing',cat:'security',desc:'Container and artifact signing via Sigstore / Cosign',up:'Sigstore',phase:2,status:'pending',icon:'✍️',features:['Container signing','SLSA attestations','Keyless signing','Rekor transparency log'],ep:null},
+  policy:{id:'policy',name:'Policy',cat:'security',desc:'OPA-based admission control and audit policies for Kubernetes',up:'OPA Gatekeeper',phase:2,status:'pending',icon:'📋',features:['Rego policies','Admission webhooks','Audit mode','Constraint templates'],ep:null},
+  vulns:{id:'vulns',name:'Vulnerabilities',cat:'security',desc:'Vulnerability management and tracking across all findings',up:'DefectDojo',phase:2,status:'pending',icon:'🐛',features:['Importer formats','JIRA integration','Deduplication','SLA tracking'],ep:null},
+  sbom:{id:'sbom',name:'SBOM',cat:'security',desc:'Software Bill of Materials — CycloneDX, SPDX, dependency analysis',up:'DependencyTrack',phase:2,status:'pending',icon:'📦',features:['CycloneDX support','NVD/OSV integration','Policy engine','Component analysis'],ep:null},
+  scan:{id:'scan',name:'Code Scan',cat:'security',desc:'Static analysis with quality gates across all languages',up:'SonarQube',phase:3,status:'pending',icon:'🔬',features:['Multi-language rules','Quality profiles','Coverage gates','PR decoration'],ep:null},
+  pii:{id:'pii',name:'PII Detection',cat:'security',desc:'PII and sensitive data detection with anonymization',up:'Microsoft Presidio',phase:3,status:'pending',icon:'🕵️',features:['Named entity recognition','Custom recognizers','Anonymization','Multi-language'],ep:null},
+  dast:{id:'dast',name:'DAST',cat:'security',desc:'Dynamic application security testing — API and web scanning',up:'OWASP ZAP',phase:3,status:'pending',icon:'⚡',features:['API scanning','Auth testing','Passive scanning','Active attack rules'],ep:null},
+  pam:{id:'pam',name:'PAM',cat:'security',desc:'Privileged access management — session recording, zero-trust',up:'Teleport',phase:3,status:'pending',icon:'🚪',features:['Session recording','RBAC','Kubernetes access','Audit trail'],ep:null},
+  // Observability
+  status:{id:'status',name:'Status',cat:'observability',desc:'Platform status page and component health dashboard',up:null,phase:1,status:'healthy',icon:'📊',features:['Component status','Incident history','Uptime metrics','Subscriber notifications'],ep:'/api/status/health'},
+  uptime:{id:'uptime',name:'Uptime',cat:'observability',desc:'HTTP, TCP, DNS uptime monitoring with alerting',up:'Uptime Kuma',phase:2,status:'pending',icon:'💓',features:['HTTP monitoring','TCP checks','DNS checks','Notification channels'],ep:null},
+  incidents:{id:'incidents',name:'Incidents',cat:'observability',desc:'On-call scheduling and incident management',up:'Grafana OnCall',phase:2,status:'pending',icon:'🚨',features:['On-call schedules','Escalation policies','Alert routing','Postmortem tracking'],ep:null},
+  'ai-obs':{id:'ai-obs',name:'AI Observability',cat:'observability',desc:'LLM trace and evaluation framework for AI workloads',up:'Langfuse',phase:2,status:'pending',icon:'🤖',features:['Trace capture','Prompt versioning','Evaluation scoring','Cost tracking'],ep:null},
+  profiler:{id:'profiler',name:'Profiler',cat:'observability',desc:'Continuous profiling with eBPF and language-native integrations',up:'Pyroscope',phase:3,status:'pending',icon:'📈',features:['eBPF profiling','CPU / memory profiles','Multi-language SDK','Flame graphs'],ep:null},
+  forensics:{id:'forensics',name:'Forensics',cat:'observability',desc:'eBPF-based runtime security monitoring and forensics',up:'Tetragon',phase:3,status:'pending',icon:'🔭',features:['eBPF hooks','Process tracking','Network events','Policy enforcement'],ep:null},
+  // CI/CD
+  lint:{id:'lint',name:'Lint',cat:'cicd',desc:'Dockerfile and IaC linting with best-practice enforcement',up:'Hadolint',phase:1,status:'healthy',icon:'✅',features:['Dockerfile rules','Shell linting','Custom ignore rules','CI integration'],ep:'/api/lint/health'},
+  changelog:{id:'changelog',name:'Changelog',cat:'cicd',desc:'Automated changelog generation and release notes management',up:null,phase:1,status:'healthy',icon:'📝',features:['Conventional commits','Auto-generation','Version bumping','Release notes'],ep:'/api/changelog/health'},
+  docs:{id:'docs',name:'Docs / Schemas',cat:'cicd',desc:'Schema registry and API documentation — replaces Apicurio',up:'Apicurio Registry',phase:1,status:'healthy',icon:'📚',features:['OpenAPI / AsyncAPI','Schema versioning','Compatibility rules','JSON Schema'],ep:'/api/docs/health'},
+  registry:{id:'registry',name:'Artifact Registry',cat:'cicd',desc:'Container image and package registry with remote sync',up:'Pulp',phase:2,status:'pending',icon:'🏗️',features:['OCI registry','Helm charts','PyPI / npm mirrors','Remote sync'],ep:null},
+  chaos:{id:'chaos',name:'Chaos',cat:'cicd',desc:'Fault injection for resilience and chaos engineering',up:'Chaos Mesh',phase:3,status:'pending',icon:'🌪️',features:['Pod failures','Network partitions','I/O chaos','Schedule model'],ep:null},
+  // Platform
+  flags:{id:'flags',name:'Feature Flags',cat:'platform',desc:'Feature flag management with strategies, targeting and metrics',up:'Unleash',phase:2,status:'pending',icon:'🚩',features:['Toggle strategies','Client SDKs','A/B testing','Kill switch'],ep:null},
+  portal:{id:'portal',name:'Dev Portal',cat:'platform',desc:'Developer portal — service catalog, scaffolding, tech radar',up:'Backstage',phase:1,status:'healthy',icon:'🏠',features:['Service catalog','Scaffolding templates','Plugin system','Tech radar'],ep:'/api/portal/health'},
+  chat:{id:'chat',name:'AI Chat',cat:'platform',desc:'Multi-provider AI chat interface with conversation history',up:'LibreChat',phase:3,status:'pending',icon:'💬',features:['Multi-provider','Conversation history','Plugin system','Role-based access'],ep:null},
+  workflows:{id:'workflows',name:'Workflows',cat:'platform',desc:'Visual workflow automation with 300+ integrations',up:'n8n',phase:3,status:'pending',icon:'🔄',features:['Visual editor','300+ integrations','Code nodes','Schedule triggers'],ep:null},
+  devlake:{id:'devlake',name:'DevLake',cat:'platform',desc:'DORA metrics and engineering analytics across all tools',up:'Apache DevLake',phase:3,status:'pending',icon:'📉',features:['DORA metrics','PR analytics','Issue tracking','Custom dashboards'],ep:null},
+  // Operations
+  backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null},
+  cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null},
+};
+
+const NAV=[
+  {type:'link',id:'overview',label:'Overview',icon:'⊞'},
+  {type:'sec',id:'core',label:'Core Infrastructure',mods:['db','auth','upstream']},
+  {type:'sec',id:'security',label:'Security',mods:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
+  {type:'sec',id:'observability',label:'Observability',mods:['status','uptime','incidents','ai-obs','profiler','forensics']},
+  {type:'sec',id:'cicd',label:'CI / CD',mods:['lint','changelog','docs','registry','chaos']},
+  {type:'sec',id:'platform',label:'Platform',mods:['flags','portal','chat','workflows','devlake']},
+  {type:'sec',id:'operations',label:'Operations',mods:['backup','cost']},
+];
+
+const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const S={
+  page:'overview',
+  expanded:new Set(['security','cicd','observability']),
+  health:null,
+  ver:'…',
+  searchOpen:false,
+  sfocus:-1,
+  sresults:[],
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function dot(status){
+  return {healthy:'dg',warning:'dy',error:'dr',pending:'dm'}[status]||'dm';
+}
+function statusLabel(s){
+  return {healthy:'Healthy',warning:'Degraded',error:'Error',pending:'Planned'}[s]||s;
+}
+function pillClass(s){
+  return {healthy:'sp-healthy',warning:'sp-warning',error:'sp-error',pending:'sp-pending'}[s]||'sp-pending';
+}
+
+// ── Health Polling ────────────────────────────────────────────────────────────
+
+async function fetchHealth(){
+  try{
+    const r=await fetch('/health');
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    S.health=d;
+    S.ver=d.version||'?';
+    document.getElementById('rv').textContent=d.version||'?';
+    const gsd=document.getElementById('gsdot');
+    const gst=document.getElementById('gstext');
+    gsd.className='sdot dg';
+    gst.textContent='Runtime OK';
+    // Phase 1 are live
+    ['secrets','lint','docs','status','changelog','certs','portal','upstream'].forEach(id=>{
+      if(MODS[id])MODS[id].status='healthy';
+    });
+    if(S.page==='overview')renderPage();
+    renderNav();
+  }catch{
+    document.getElementById('gsdot').className='sdot dr';
+    document.getElementById('gstext').textContent='Unreachable';
+  }
+}
+fetchHealth();
+setInterval(fetchHealth,30000);
+
+// ── Router ───────────────────────────────────────────────────────────────────
+
+function go(page){
+  S.page=page;
+  window.location.hash=page==='overview'?'#/':'#/m/'+page;
+  renderPage();
+  renderNav();
+  if(window.innerWidth<=768)closeSidebar();
+}
+
+window.addEventListener('hashchange',()=>{
+  const h=window.location.hash;
+  if(!h||h==='#/'||h==='#'){S.page='overview';}
+  else{const m=h.match(/^#\/m\/(.+)$/);S.page=(m&&MODS[m[1]])?m[1]:'overview';}
+  renderPage();renderNav();
+});
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+
+function toggleSec(id){
+  S.expanded.has(id)?S.expanded.delete(id):S.expanded.add(id);
+  renderNav();
+}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+function renderNav(){
+  let h='';
+  for(const item of NAV){
+    if(item.type==='link'){
+      const a=S.page===item.id;
+      h+=`<div class="nav-item${a?' active':''}" onclick="go('${item.id}')">${item.icon} ${item.label}</div>`;
+    } else {
+      const exp=S.expanded.has(item.id);
+      h+=`<div class="nav-sec${exp?'':' closed'}" onclick="toggleSec('${item.id}')">
+        <span>${item.label}</span><span class="chev">▾</span>
+      </div>`;
+      if(exp){
+        h+=`<div class="nav-sub">`;
+        for(const mid of item.mods){
+          const m=MODS[mid];if(!m)continue;
+          const a=S.page===mid;
+          h+=`<div class="nav-item${a?' active':''}" onclick="go('${mid}')">
+            <span class="sdot ${dot(m.status)}"></span><span style="flex:1">${m.name}</span>
+          </div>`;
+        }
+        h+=`</div>`;
+      }
+    }
+  }
+  document.getElementById('sidebar-nav').innerHTML=h;
+  document.getElementById('bc').textContent=S.page==='overview'?'Overview':(MODS[S.page]?.name||S.page);
+}
+
+// ── Page Renderers ────────────────────────────────────────────────────────────
+
+function renderPage(){
+  document.getElementById('content').innerHTML=
+    S.page==='overview'?renderOverview():renderMod(MODS[S.page]);
+}
+
+function renderOverview(){
+  const all=Object.values(MODS);
+  const healthy=all.filter(m=>m.status==='healthy').length;
+  const sections=[
+    {label:'Core Infrastructure',ids:['db','auth','upstream']},
+    {label:'Security',ids:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
+    {label:'Observability',ids:['status','uptime','incidents','ai-obs','profiler','forensics']},
+    {label:'CI / CD',ids:['lint','changelog','docs','registry','chaos']},
+    {label:'Platform',ids:['flags','portal','chat','workflows','devlake']},
+    {label:'Operations',ids:['backup','cost']},
+  ];
+  let grids='';
+  for(const sec of sections){
+    grids+=`<div class="sec-title">${sec.label}</div><div class="module-grid">`;
+    for(const id of sec.ids){
+      const m=MODS[id];if(!m)continue;
+      grids+=`<div class="mcard" onclick="go('${m.id}')">
+        <div class="mcard-hdr">
+          <span class="mcard-name">${m.icon} ${m.name}</span>
+          <span class="sdot ${dot(m.status)}" title="${statusLabel(m.status)}"></span>
+        </div>
+        <div class="mcard-desc">${m.desc}</div>
+        <div class="mcard-foot">
+          <span class="pbadge p${m.phase}">Phase ${m.phase}</span>
+          ${m.up?`<span class="utag">${m.up}</span>`:''}
+        </div>
+      </div>`;
+    }
+    grids+=`</div>`;
+  }
+
+  const hstate=S.health?'<span class="c-green">OK</span>':'<span class="c-red">ERR</span>';
+  return `
+    <div class="page-hdr">
+      <div class="page-title">Platform Overview</div>
+      <div class="page-sub">CAVE Unified Runtime — all modules in a single binary</div>
     </div>
-  </main>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-lbl">Total Modules</div><div class="stat-val c-accent">${all.length}</div><div class="stat-sub">across all phases</div></div>
+      <div class="stat-card"><div class="stat-lbl">Healthy</div><div class="stat-val c-green">${healthy}</div><div class="stat-sub">Phase 1 live</div></div>
+      <div class="stat-card"><div class="stat-lbl">Phase 1</div><div class="stat-val">${all.filter(m=>m.phase===1).length}</div><div class="stat-sub">implemented</div></div>
+      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">26</div><div class="stat-sub">projects tracked</div></div>
+      <div class="stat-card"><div class="stat-lbl">Runtime</div><div class="stat-val" style="font-size:18px">${hstate}</div><div class="stat-sub">v${S.ver}</div></div>
+    </div>
+    ${grids}`;
+}
+
+function renderMod(m){
+  if(!m)return`<div style="padding:40px;text-align:center;color:var(--text-muted)">Module not found</div>`;
+  const feats=m.features.map(f=>`<li>${f}</li>`).join('');
+  let actions=``;
+  if(m.ep)actions+=`<button class="btn btn-p" onclick="chkHealth('${m.ep}')">⟳ Check Health</button>`;
+  actions+=`<button class="btn btn-s" onclick="showCfg('${m.id}')">⚙ Configure</button>`;
+  if(m.up)actions+=`<button class="btn btn-s">↗ ${m.up}</button>`;
+
+  return `
+    <div class="mod-hdr">
+      <div class="mod-icon">${m.icon}</div>
+      <div>
+        <div class="mod-title">${m.name}</div>
+        <div class="mod-meta">
+          <span class="spill ${pillClass(m.status)}">
+            <span class="sdot ${dot(m.status)}" style="width:6px;height:6px"></span>
+            ${statusLabel(m.status)}
+          </span>
+          <span class="pbadge p${m.phase}">Phase ${m.phase}</span>
+          ${m.up?`<span class="utag">↳ ${m.up}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--text-muted);margin-bottom:22px;font-size:13px;max-width:580px;line-height:1.6">${m.desc}</p>
+    <div class="detail-grid">
+      <div class="dcrd">
+        <div class="dcrd-title">Features</div>
+        <ul class="feat-list">${feats}</ul>
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Quick Actions</div>
+        <div class="qactions">${actions}</div>
+        ${m.ep?`<div style="margin-top:14px">
+          <div class="dcrd-title">Health Endpoint</div>
+          <code style="font-size:11px;color:var(--text-muted);background:var(--bg);padding:3px 8px;border-radius:4px;border:1px solid var(--border)">${m.ep}</code>
+        </div>`:''}
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Configuration</div>
+        <div class="cfg-ph">Configuration panel coming in Phase ${m.phase}<br><span style="font-size:11px">Edit <code>cave-runtime.yaml</code> for now</span></div>
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Module Info</div>
+        <div class="info-row"><span class="info-k">Status</span><span class="info-v" style="color:${m.status==='healthy'?'var(--green)':m.status==='pending'?'var(--text-muted)':'var(--red)'}">${statusLabel(m.status)}</span></div>
+        <div class="info-row"><span class="info-k">Phase</span><span class="info-v">${m.phase}</span></div>
+        <div class="info-row"><span class="info-k">Crate</span><span class="info-v" style="font-family:monospace;font-size:12px">cave-${m.id}</span></div>
+        ${m.up?`<div class="info-row"><span class="info-k">Upstream</span><span class="info-v">${m.up}</span></div>`:''}
+        <div class="info-row"><span class="info-k">Category</span><span class="info-v" style="text-transform:capitalize">${CAT_LABELS[m.cat]||m.cat}</span></div>
+      </div>
+    </div>`;
+}
+
+async function chkHealth(ep){
+  try{
+    const r=await fetch(ep);
+    const d=await r.json();
+    alert(JSON.stringify(d,null,2));
+  }catch(e){alert('Health check failed: '+e.message);}
+}
+function showCfg(id){
+  alert(`Configure ${id}:\n\nEdit cave-runtime.yaml and restart.\nFull UI config coming in Phase 2.`);
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+function openSearch(){
+  S.searchOpen=true;S.sfocus=-1;
+  document.getElementById('soverlay').classList.add('open');
+  const inp=document.getElementById('sinput');
+  inp.value='';
+  setTimeout(()=>inp.focus(),30);
+  renderSearch('');
+}
+function closeSearch(){
+  S.searchOpen=false;
+  document.getElementById('soverlay').classList.remove('open');
+}
+function handleSOverlay(e){if(e.target===document.getElementById('soverlay'))closeSearch();}
+function onSInput(){S.sfocus=-1;renderSearch(document.getElementById('sinput').value);}
+function onSKey(e){
+  const res=document.querySelectorAll('.sresult');
+  if(e.key==='Escape'){closeSearch();return;}
+  if(e.key==='ArrowDown'){e.preventDefault();S.sfocus=Math.min(S.sfocus+1,res.length-1);updSFocus();return;}
+  if(e.key==='ArrowUp'){e.preventDefault();S.sfocus=Math.max(S.sfocus-1,-1);updSFocus();return;}
+  if(e.key==='Enter'){
+    if(S.sfocus>=0&&S.sresults[S.sfocus]){go(S.sresults[S.sfocus].id);closeSearch();}
+    return;
+  }
+}
+function updSFocus(){
+  document.querySelectorAll('.sresult').forEach((el,i)=>el.classList.toggle('focused',i===S.sfocus));
+}
+function renderSearch(q){
+  const lq=q.toLowerCase().trim();
+  const all=Object.values(MODS);
+  S.sresults=lq?all.filter(m=>m.name.toLowerCase().includes(lq)||m.desc.toLowerCase().includes(lq)||m.id.includes(lq)||(m.up&&m.up.toLowerCase().includes(lq))):all;
+  const el=document.getElementById('sresults');
+  if(!S.sresults.length){el.innerHTML=`<div class="sempty">No results for "${q}"</div>`;return;}
+  el.innerHTML=S.sresults.map(m=>`
+    <div class="sresult" onclick="go('${m.id}');closeSearch()">
+      <span class="sr-icon">${m.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div class="sr-name">${m.name}</div>
+        <div class="sr-desc">${m.desc}</div>
+      </div>
+      <span class="sr-cat">${CAT_LABELS[m.cat]||m.cat}</span>
+    </div>`).join('');
+}
+
+// ── Keyboard Shortcuts ────────────────────────────────────────────────────────
+
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){
+    e.preventDefault();
+    S.searchOpen?closeSearch():openSearch();
+  }
+  if(e.key==='Escape'&&S.searchOpen)closeSearch();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+(()=>{
+  const h=window.location.hash;
+  if(h&&h!=='#/'&&h!=='#'){
+    const m=h.match(/^#\/m\/(.+)$/);
+    if(m&&MODS[m[1]])S.page=m[1];
+  }
+  renderNav();
+  renderPage();
+})();
+</script>
 </body>
 </html>
