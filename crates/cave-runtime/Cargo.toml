@@ -36,6 +36,7 @@ cave-mesh = { path = "../cave-mesh" }
 cave-metrics = { path = "../cave-metrics" }
 # FinOps
 cave-cost-alloc = { path = "../cave-cost-alloc" }
+# Phase 5 modules
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }
