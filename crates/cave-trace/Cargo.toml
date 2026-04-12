@@ -2,6 +2,7 @@
 name = "cave-trace"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 description = "Distributed tracing — Jaeger/Tempo replacement"
 =======
 description = "Distributed tracing — Jaeger replacement: OTLP, spans, indexing, query, dependency graph"
@@ -9,12 +10,16 @@ description = "Distributed tracing — Jaeger replacement: OTLP, spans, indexing
 =======
 description = "Distributed tracing — Jaeger/Tempo replacement"
 >>>>>>> claude/elastic-ellis
+=======
+description = "Distributed tracing backend — replaces Jaeger/Tempo. OTLP HTTP receiver compatible."
+>>>>>>> claude/gallant-cartwright
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
@@ -45,3 +50,15 @@ tokio = { workspace = true }
 >>>>>>> claude/dazzling-tesla
 =======
 >>>>>>> claude/elastic-ellis
+=======
+cave-auth = { path = "../cave-auth" }
+cave-db   = { path = "../cave-db" }
+axum       = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+tokio      = { workspace = true }
+tracing    = { workspace = true }
+uuid       = { workspace = true }
+chrono     = { workspace = true }
+thiserror  = { workspace = true }
+>>>>>>> claude/gallant-cartwright

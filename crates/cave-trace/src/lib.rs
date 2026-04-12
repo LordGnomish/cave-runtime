@@ -1,5 +1,6 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> claude/elastic-ellis
 //! cave-trace — distributed tracing, Jaeger/Tempo replacement.
@@ -9,10 +10,29 @@
 
 pub mod analyzer;
 pub mod collector;
+=======
+//! CAVE Trace — distributed tracing backend.
+//!
+//! Replaces Jaeger / Grafana Tempo with a Rust-native implementation.
+//! Accepts traces via the OpenTelemetry Protocol (OTLP) over HTTP.
+//!
+//! ## Upstream Compatibility: OpenTelemetry (OTLP)
+//! - Trace receiver: POST /v1/traces
+//!   Accepts application/x-protobuf (binary protobuf) OR
+//!          application/json  (OTLP JSON encoding)
+//!   Response: ExportTraceServiceResponse (empty JSON `{}` on success)
+//!
+//! ## Upstream Tracking: OpenTelemetry Collector
+//! - GitHub: https://github.com/open-telemetry/opentelemetry-collector
+//! - Spec:   https://opentelemetry.io/docs/specs/otlp/
+//! - Tracked: OTLP/HTTP receiver protocol
+
+>>>>>>> claude/gallant-cartwright
 pub mod models;
 pub mod routes;
 
 use axum::Router;
+<<<<<<< HEAD
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -41,10 +61,22 @@ impl Default for TraceState {
 }
 
 /// Return the axum sub-router for all tracing endpoints.
+=======
+use cave_db::CavePool;
+use std::sync::Arc;
+
+/// Module state shared across request handlers.
+pub struct TraceState {
+    pub pool: Arc<CavePool>,
+}
+
+/// Create the axum router for the trace module.
+>>>>>>> claude/gallant-cartwright
 pub fn router(state: Arc<TraceState>) -> Router {
     routes::create_router(state)
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 //! CAVE Trace — Jaeger replacement.
@@ -64,4 +96,6 @@ pub use error::{TraceError, TraceResult};
 >>>>>>> claude/dazzling-tesla
 =======
 >>>>>>> claude/elastic-ellis
+=======
+>>>>>>> claude/gallant-cartwright
 pub const MODULE_NAME: &str = "trace";
