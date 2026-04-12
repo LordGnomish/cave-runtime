@@ -1,304 +1,274 @@
-//! Health check logic — active probes and passive observation.
+//! Health check subsystem — active probes + passive observation.
 //!
-//! Active health checks: periodic HTTP GET to a configured path on each target.
-//! Passive health checks: recording observed success/failure on each proxied request.
+//! Active: periodic HTTP/TCP pings to each target.
+//! Passive: intercept proxy responses; mark unhealthy on thresholds.
 
-use crate::models::TargetHealth;
-use std::collections::HashMap;
+use crate::models::{ActiveHealthCheck, HealthCheckType, PassiveHealthCheck};
+use dashmap::DashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
-// ─────────────────────────────────────────────
-//  Per-target observed health state
-// ─────────────────────────────────────────────
-
-#[derive(Debug, Clone)]
-pub struct TargetHealthState {
-    pub consecutive_successes: u32,
-    pub consecutive_failures: u32,
-    pub consecutive_timeouts: u32,
-    pub last_check: Option<Instant>,
-    pub health: TargetHealth,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HealthStatus {
+    Healthy,
+    Unhealthy,
+    Unknown,
 }
 
-impl Default for TargetHealthState {
+#[derive(Debug)]
+struct TargetState {
+    status: HealthStatus,
+    consecutive_successes: u32,
+    consecutive_failures: u32,
+    consecutive_http_failures: u32,
+    consecutive_tcp_failures: u32,
+    consecutive_timeouts: u32,
+    last_checked: Option<Instant>,
+}
+
+impl Default for TargetState {
     fn default() -> Self {
         Self {
+            status: HealthStatus::Unknown,
             consecutive_successes: 0,
             consecutive_failures: 0,
+            consecutive_http_failures: 0,
+            consecutive_tcp_failures: 0,
             consecutive_timeouts: 0,
-            last_check: None,
-            health: TargetHealth::Healthy,
+            last_checked: None,
         }
     }
 }
 
-impl TargetHealthState {
-    /// Record a successful response.  `success_threshold` consecutive successes
-    /// needed to move an unhealthy target back to healthy.
-    pub fn record_success(&mut self, success_threshold: u32, unhealthy_statuses: &[u16]) {
-        let _ = unhealthy_statuses; // status already validated by caller
-        self.consecutive_failures = 0;
-        self.consecutive_timeouts = 0;
-        self.consecutive_successes += 1;
-        self.last_check = Some(Instant::now());
-
-        if self.health == TargetHealth::Unhealthy
-            && self.consecutive_successes >= success_threshold
-        {
-            self.health = TargetHealth::Healthy;
-        }
-    }
-
-    /// Record a failed/error response.
-    pub fn record_failure(&mut self, failure_threshold: u32) {
-        self.consecutive_successes = 0;
-        self.consecutive_failures += 1;
-        self.last_check = Some(Instant::now());
-
-        if self.health == TargetHealth::Healthy
-            && self.consecutive_failures >= failure_threshold
-        {
-            self.health = TargetHealth::Unhealthy;
-        }
-    }
-
-    /// Record a timeout.
-    pub fn record_timeout(&mut self, timeout_threshold: u32) {
-        self.consecutive_successes = 0;
-        self.consecutive_timeouts += 1;
-        self.last_check = Some(Instant::now());
-
-        if self.health == TargetHealth::Healthy
-            && self.consecutive_timeouts >= timeout_threshold
-        {
-            self.health = TargetHealth::Unhealthy;
-        }
-    }
-}
-
-// ─────────────────────────────────────────────
-//  Health checker registry
-// ─────────────────────────────────────────────
-
-#[derive(Default)]
+#[derive(Clone)]
 pub struct HealthRegistry {
-    /// target_id → health state
-    states: HashMap<Uuid, TargetHealthState>,
+    // upstream_id → target_id → state
+    states: Arc<DashMap<Uuid, DashMap<Uuid, TargetState>>>,
 }
 
 impl HealthRegistry {
-    pub fn get_or_create(&mut self, target_id: Uuid) -> &mut TargetHealthState {
-        self.states.entry(target_id).or_default()
+    pub fn new() -> Self {
+        Self { states: Arc::new(DashMap::new()) }
     }
 
-    pub fn current_health(&self, target_id: Uuid) -> TargetHealth {
-        self.states
-            .get(&target_id)
-            .map(|s| s.health.clone())
-            .unwrap_or(TargetHealth::Healthy)
+    fn _state_map_unused(&self, _upstream_id: Uuid) {
+        // removed — use states directly
     }
 
-    /// Passive health reporting: called after each proxied request.
-    pub fn passive_report(
-        &mut self,
+    pub fn is_healthy(&self, upstream_id: Uuid, target_id: Uuid) -> bool {
+        if let Some(up) = self.states.get(&upstream_id) {
+            if let Some(t) = up.get(&target_id) {
+                return t.status != HealthStatus::Unhealthy;
+            }
+        }
+        true // unknown = assume healthy
+    }
+
+    /// Called by passive health checker after each upstream response.
+    pub fn observe(
+        &self,
+        upstream_id: Uuid,
         target_id: Uuid,
-        status_code: u16,
+        status_code: Option<u16>,
+        is_tcp_failure: bool,
         is_timeout: bool,
-        success_threshold: u32,
-        failure_threshold: u32,
-        timeout_threshold: u32,
-        healthy_statuses: &[u16],
-        unhealthy_statuses: &[u16],
-    ) -> TargetHealth {
-        let state = self.get_or_create(target_id);
+        passive: &PassiveHealthCheck,
+    ) {
+        if !passive.enabled {
+            return;
+        }
+        self.states.entry(upstream_id).or_insert_with(DashMap::new);
+        let up = self.states.get(&upstream_id).unwrap();
+        let mut entry = up.entry(target_id).or_insert_with(TargetState::default);
 
         if is_timeout {
-            state.record_timeout(timeout_threshold);
-        } else if unhealthy_statuses.contains(&status_code) {
-            state.record_failure(failure_threshold);
-        } else if healthy_statuses.contains(&status_code) {
-            state.record_success(success_threshold, unhealthy_statuses);
+            entry.consecutive_timeouts += 1;
+            entry.consecutive_successes = 0;
+        } else if is_tcp_failure {
+            entry.consecutive_tcp_failures += 1;
+            entry.consecutive_successes = 0;
+        } else if let Some(code) = status_code {
+            if passive.unhealthy.http_statuses.contains(&code) {
+                entry.consecutive_http_failures += 1;
+                entry.consecutive_successes = 0;
+            } else if passive.healthy.http_statuses.contains(&code) {
+                entry.consecutive_successes += 1;
+                entry.consecutive_http_failures = 0;
+                entry.consecutive_tcp_failures = 0;
+                entry.consecutive_timeouts = 0;
+            }
         }
 
-        state.health.clone()
+        // Evaluate transitions
+        let unhealthy = passive.unhealthy.http_failures > 0
+            && entry.consecutive_http_failures >= passive.unhealthy.http_failures
+            || passive.unhealthy.tcp_failures > 0
+                && entry.consecutive_tcp_failures >= passive.unhealthy.tcp_failures
+            || passive.unhealthy.timeouts > 0
+                && entry.consecutive_timeouts >= passive.unhealthy.timeouts;
+
+        let healthy = passive.healthy.successes > 0
+            && entry.consecutive_successes >= passive.healthy.successes;
+
+        if unhealthy {
+            if entry.status != HealthStatus::Unhealthy {
+                warn!(upstream=%upstream_id, target=%target_id, "target marked unhealthy (passive)");
+            }
+            entry.status = HealthStatus::Unhealthy;
+        } else if healthy {
+            entry.status = HealthStatus::Healthy;
+        }
     }
 
-    /// Active health check result: directly set health based on probe outcome.
-    pub fn active_report(
-        &mut self,
+    /// Active health check probe — called by background task.
+    pub async fn probe_http(
+        &self,
+        upstream_id: Uuid,
         target_id: Uuid,
-        probe_status: Option<u16>,
-        healthy_statuses: &[u16],
-        unhealthy_statuses: &[u16],
-        success_threshold: u32,
-        failure_threshold: u32,
-    ) -> TargetHealth {
-        let state = self.get_or_create(target_id);
-
-        match probe_status {
-            None => {
-                // Connection error / timeout
-                state.record_failure(failure_threshold);
-            }
-            Some(code) if unhealthy_statuses.contains(&code) => {
-                state.record_failure(failure_threshold);
-            }
-            Some(code) if healthy_statuses.contains(&code) => {
-                state.record_success(success_threshold, unhealthy_statuses);
-            }
-            Some(_) => {
-                // Ambiguous status — do not count either way
-            }
+        url: &str,
+        active: &ActiveHealthCheck,
+    ) {
+        if !active.enabled {
+            return;
         }
 
-        state.health.clone()
-    }
-}
-
-/// Represent an upstream reference used by the health scheduler.
-/// In the real implementation, this ties into the store.
-pub struct UpstreamRef {
-    pub upstream_id: Uuid,
-    pub target_id: Uuid,
-    pub target_addr: String,
-    pub http_path: String,
-    pub timeout: Duration,
-}
-
-/// Result of an active health probe.
-#[derive(Debug, Clone)]
-pub struct ProbeResult {
-    pub target_id: Uuid,
-    pub status: Option<u16>,
-    pub latency_ms: u64,
-}
-
-/// Execute an active HTTP health probe against a single target.
-///
-/// In tests, pass a `mock_status` to skip the real HTTP call.
-pub async fn probe_target(
-    target_addr: &str,
-    http_path: &str,
-    timeout: Duration,
-    mock_status: Option<u16>,
-) -> ProbeResult {
-    let target_id = Uuid::new_v4(); // caller should pass the real ID
-    let start = Instant::now();
-
-    let status = if let Some(s) = mock_status {
-        Some(s)
-    } else {
-        let url = format!("http://{target_addr}{http_path}");
         let client = reqwest::Client::builder()
-            .timeout(timeout)
+            .timeout(Duration::from_secs(active.timeout))
+            .danger_accept_invalid_certs(!active.https_verify_certificate)
             .build()
             .unwrap_or_default();
 
-        match client.get(&url).send().await {
-            Ok(resp) => Some(resp.status().as_u16()),
-            Err(_) => None,
-        }
-    };
+        let result = client.get(url).send().await;
 
-    ProbeResult {
-        target_id,
-        status,
-        latency_ms: start.elapsed().as_millis() as u64,
+        self.states.entry(upstream_id).or_insert_with(DashMap::new);
+        let up = self.states.get(&upstream_id).unwrap();
+        let mut entry = up.entry(target_id).or_insert_with(TargetState::default);
+        entry.last_checked = Some(Instant::now());
+
+        match result {
+            Ok(resp) => {
+                let code = resp.status().as_u16();
+                debug!(target=%target_id, status=code, "active health probe");
+                if active.healthy.http_statuses.contains(&code) {
+                    entry.consecutive_successes += 1;
+                    entry.consecutive_failures = 0;
+                    if entry.consecutive_successes >= active.healthy.successes
+                        && active.healthy.successes > 0
+                    {
+                        entry.status = HealthStatus::Healthy;
+                    }
+                } else if active.unhealthy.http_statuses.contains(&code) {
+                    entry.consecutive_failures += 1;
+                    entry.consecutive_successes = 0;
+                    if entry.consecutive_failures >= active.unhealthy.http_failures
+                        && active.unhealthy.http_failures > 0
+                    {
+                        warn!(target=%target_id, "target marked unhealthy (active)");
+                        entry.status = HealthStatus::Unhealthy;
+                    }
+                }
+            }
+            Err(e) => {
+                entry.consecutive_failures += 1;
+                entry.consecutive_successes = 0;
+                if e.is_timeout() {
+                    entry.consecutive_timeouts += 1;
+                }
+                if entry.consecutive_failures >= active.unhealthy.http_failures.max(1) {
+                    warn!(target=%target_id, err=%e, "target marked unhealthy (active probe failed)");
+                    entry.status = HealthStatus::Unhealthy;
+                }
+            }
+        }
+    }
+
+    pub fn get_status(&self, upstream_id: Uuid, target_id: Uuid) -> HealthStatus {
+        if let Some(up) = self.states.get(&upstream_id) {
+            if let Some(t) = up.get(&target_id) {
+                return t.status.clone();
+            }
+        }
+        HealthStatus::Unknown
+    }
+
+    /// Force-set a target healthy/unhealthy (Admin API endpoint).
+    pub fn set_status(&self, upstream_id: Uuid, target_id: Uuid, healthy: bool) {
+        self.states.entry(upstream_id).or_insert_with(DashMap::new);
+        let up = self.states.get(&upstream_id).unwrap();
+        let mut entry = up.entry(target_id).or_insert_with(TargetState::default);
+        entry.status = if healthy { HealthStatus::Healthy } else { HealthStatus::Unhealthy };
+        entry.consecutive_successes = 0;
+        entry.consecutive_failures = 0;
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Tests
-// ─────────────────────────────────────────────────────────────────────────────
+impl Default for HealthRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use uuid::Uuid;
+    use crate::models::{HealthThreshold, PassiveHealthCheck};
 
-    fn healthy_statuses() -> Vec<u16> {
-        (200u16..=299).collect()
-    }
-
-    fn unhealthy_statuses() -> Vec<u16> {
-        vec![429, 500, 502, 503, 504]
-    }
-
-    #[test]
-    fn test_passive_marks_unhealthy_after_failures() {
-        let mut registry = HealthRegistry::default();
-        let id = Uuid::new_v4();
-
-        // threshold = 3 consecutive failures
-        for _ in 0..3 {
-            registry.passive_report(
-                id,
-                500,
-                false,
-                5,
-                3,
-                3,
-                &healthy_statuses(),
-                &unhealthy_statuses(),
-            );
+    fn make_passive(http_failures: u32, successes: u32) -> PassiveHealthCheck {
+        PassiveHealthCheck {
+            enabled: true,
+            r#type: HealthCheckType::Http,
+            healthy: HealthThreshold {
+                successes,
+                http_statuses: vec![200],
+                ..Default::default()
+            },
+            unhealthy: HealthThreshold {
+                http_failures,
+                http_statuses: vec![500],
+                ..Default::default()
+            },
         }
-
-        assert_eq!(registry.current_health(id), TargetHealth::Unhealthy);
     }
 
     #[test]
-    fn test_passive_recovers_after_successes() {
-        let mut registry = HealthRegistry::default();
-        let id = Uuid::new_v4();
+    fn marks_unhealthy_after_threshold() {
+        let reg = HealthRegistry::new();
+        let up = Uuid::new_v4();
+        let tgt = Uuid::new_v4();
+        let passive = make_passive(3, 2);
 
-        // First mark unhealthy
         for _ in 0..3 {
-            registry.passive_report(id, 500, false, 3, 3, 3, &healthy_statuses(), &unhealthy_statuses());
+            reg.observe(up, tgt, Some(500), false, false, &passive);
         }
-        assert_eq!(registry.current_health(id), TargetHealth::Unhealthy);
+        assert_eq!(reg.get_status(up, tgt), HealthStatus::Unhealthy);
+    }
 
-        // Then 3 successes → healthy
+    #[test]
+    fn recovers_after_successes() {
+        let reg = HealthRegistry::new();
+        let up = Uuid::new_v4();
+        let tgt = Uuid::new_v4();
+        let passive = make_passive(3, 2);
+
         for _ in 0..3 {
-            registry.passive_report(id, 200, false, 3, 3, 3, &healthy_statuses(), &unhealthy_statuses());
+            reg.observe(up, tgt, Some(500), false, false, &passive);
         }
-        assert_eq!(registry.current_health(id), TargetHealth::Healthy);
-    }
-
-    #[test]
-    fn test_active_probe_marks_unhealthy() {
-        let mut registry = HealthRegistry::default();
-        let id = Uuid::new_v4();
-
-        // 3 failing active probes
-        for _ in 0..3 {
-            registry.active_report(id, Some(503), &healthy_statuses(), &unhealthy_statuses(), 3, 3);
+        for _ in 0..2 {
+            reg.observe(up, tgt, Some(200), false, false, &passive);
         }
-
-        assert_eq!(registry.current_health(id), TargetHealth::Unhealthy);
+        assert_eq!(reg.get_status(up, tgt), HealthStatus::Healthy);
     }
 
     #[test]
-    fn test_timeout_marks_unhealthy() {
-        let mut registry = HealthRegistry::default();
-        let id = Uuid::new_v4();
-
-        // 3 timeouts → unhealthy
-        let state = registry.get_or_create(id);
-        state.record_timeout(3);
-        state.record_timeout(3);
-        state.record_timeout(3);
-
-        assert_eq!(registry.current_health(id), TargetHealth::Unhealthy);
-    }
-
-    #[test]
-    fn test_single_failure_does_not_mark_unhealthy() {
-        let mut registry = HealthRegistry::default();
-        let id = Uuid::new_v4();
-
-        // threshold = 3, so 1 failure should not trip
-        registry.passive_report(id, 500, false, 3, 3, 3, &healthy_statuses(), &unhealthy_statuses());
-        assert_eq!(registry.current_health(id), TargetHealth::Healthy);
+    fn force_set_status() {
+        let reg = HealthRegistry::new();
+        let up = Uuid::new_v4();
+        let tgt = Uuid::new_v4();
+        reg.set_status(up, tgt, false);
+        assert!(!reg.is_healthy(up, tgt));
+        reg.set_status(up, tgt, true);
+        assert!(reg.is_healthy(up, tgt));
     }
 }

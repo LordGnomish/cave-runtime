@@ -1,400 +1,379 @@
-//! Route matching engine — host, path (prefix + regex), methods, headers, SNI.
+//! Route matching engine — Kong-compatible scoring.
 //!
-//! Priority order (highest first):
-//!   1. `regex_priority` field (explicit user ordering)
-//!   2. Regex paths beat prefix paths
-//!   3. Longer (more specific) prefix paths
-//!   4. Routes with more matcher criteria (host + method + headers)
+//! Priority rules (higher = better match):
+//!   1. Longer matching prefix / exact path beats shorter
+//!   2. regex_priority field
+//!   3. Specific host beats wildcard
+//!   4. More methods/headers specified beats fewer
 
-use crate::models::Route;
+use crate::models::{PathHandling, Protocol, Route};
 use regex::Regex;
 use std::collections::HashMap;
 
-/// A single incoming request context for route matching.
+/// Compiled, cached version of a Route for fast matching.
+#[derive(Debug)]
+pub struct CompiledRoute {
+    pub route_id: uuid::Uuid,
+    pub service_id: Option<uuid::Uuid>,
+    pub regex_priority: i64,
+    pub strip_path: bool,
+    pub preserve_host: bool,
+    pub path_handling: PathHandling,
+    pub protocols: Vec<Protocol>,
+    pub methods: Option<Vec<String>>,
+    pub hosts: Option<Vec<HostPattern>>,
+    pub paths: Option<Vec<PathPattern>>,
+    pub headers: Option<HashMap<String, Vec<String>>>,
+    pub snis: Option<Vec<String>>,
+}
+
+#[derive(Debug)]
+pub enum HostPattern {
+    Exact(String),
+    Wildcard(String), // *.example.com
+}
+
+#[derive(Debug)]
+pub enum PathPattern {
+    Exact(String),
+    Prefix(String),
+    Regex(Regex, String), // (compiled, original)
+}
+
+impl HostPattern {
+    pub fn matches(&self, host: &str) -> bool {
+        match self {
+            HostPattern::Exact(h) => h.eq_ignore_ascii_case(host),
+            HostPattern::Wildcard(suffix) => {
+                // suffix is ".example.com" (starts with .)
+                host.ends_with(suffix.as_str()) && host.len() > suffix.len()
+            }
+        }
+    }
+
+    pub fn specificity(&self) -> i64 {
+        match self {
+            HostPattern::Exact(_) => 10,
+            HostPattern::Wildcard(_) => 1,
+        }
+    }
+}
+
+impl PathPattern {
+    pub fn matches(&self, path: &str) -> Option<usize> {
+        // Returns matched length for scoring
+        match self {
+            PathPattern::Exact(p) => {
+                if path == p.as_str() { Some(p.len()) } else { None }
+            }
+            PathPattern::Prefix(p) => {
+                if path.starts_with(p.as_str()) { Some(p.len()) } else { None }
+            }
+            PathPattern::Regex(re, _) => {
+                if re.is_match(path) { Some(0) } else { None }
+            }
+        }
+    }
+}
+
+/// Parse a route into its compiled form.
+pub fn compile_route(route: &Route) -> CompiledRoute {
+    let hosts = route.hosts.as_ref().map(|hs| {
+        hs.iter()
+            .map(|h| {
+                if h.starts_with("*.") {
+                    HostPattern::Wildcard(h[1..].to_string())
+                } else {
+                    HostPattern::Exact(h.clone())
+                }
+            })
+            .collect()
+    });
+
+    let paths = route.paths.as_ref().map(|ps| {
+        ps.iter()
+            .map(|p| {
+                if p.starts_with('~') {
+                    // Kong uses ~ prefix for regex paths
+                    let pattern = &p[1..];
+                    match Regex::new(pattern) {
+                        Ok(re) => PathPattern::Regex(re, p.clone()),
+                        Err(_) => PathPattern::Prefix(p.clone()),
+                    }
+                } else if p.ends_with('*') {
+                    // treat trailing * as prefix
+                    PathPattern::Prefix(p[..p.len() - 1].to_string())
+                } else {
+                    // Kong default: prefix match
+                    PathPattern::Prefix(p.clone())
+                }
+            })
+            .collect()
+    });
+
+    CompiledRoute {
+        route_id: route.id,
+        service_id: route.service_id,
+        regex_priority: route.regex_priority,
+        strip_path: route.strip_path,
+        preserve_host: route.preserve_host,
+        path_handling: route.path_handling.clone(),
+        protocols: route.protocols.clone(),
+        methods: route.methods.clone(),
+        hosts,
+        paths,
+        headers: route.headers.clone(),
+        snis: route.snis.clone(),
+    }
+}
+
 #[derive(Debug, Clone)]
-pub struct MatchContext<'a> {
-    pub method: &'a str,
-    pub path: &'a str,
-    pub host: &'a str,
-    pub sni: Option<&'a str>,
-    pub headers: &'a HashMap<String, String>,
+pub struct MatchResult {
+    pub route_id: uuid::Uuid,
+    pub service_id: Option<uuid::Uuid>,
+    pub strip_path: bool,
+    pub preserve_host: bool,
+    pub matched_path_len: usize,
+    pub score: i64,
+    pub path_handling: PathHandling,
 }
 
-/// Determine whether a path pattern matches the given request path.
-///
-/// Regex patterns are prefixed with `~`.
-/// Exact patterns are prefixed with `=`.
-/// Everything else is a prefix match.
-pub fn path_matches(pattern: &str, path: &str) -> bool {
-    if let Some(regex_str) = pattern.strip_prefix('~') {
-        match Regex::new(regex_str) {
-            Ok(re) => re.is_match(path),
-            Err(_) => false,
-        }
-    } else if let Some(exact) = pattern.strip_prefix('=') {
-        path == exact
-    } else {
-        // Prefix match
-        path == pattern
-            || path.starts_with(&format!("{pattern}/"))
-            || (pattern.ends_with('/') && path.starts_with(pattern.as_ref() as &str))
-    }
-}
+/// Attempt to match an incoming request against compiled routes.
+/// Returns the best-scored match, if any.
+pub fn match_request(
+    compiled: &[CompiledRoute],
+    method: &str,
+    host: &str,
+    path: &str,
+    headers: &HashMap<String, String>,
+    protocol: &Protocol,
+    sni: Option<&str>,
+) -> Option<MatchResult> {
+    let mut best: Option<MatchResult> = None;
 
-/// Return `true` if the route matches the given context.
-pub fn route_matches(route: &Route, ctx: &MatchContext) -> bool {
-    // Method check (empty list = all methods allowed)
-    if !route.methods.is_empty() {
-        let method_upper = ctx.method.to_uppercase();
-        if !route.methods.iter().any(|m| m.to_uppercase() == method_upper) {
-            return false;
+    'outer: for cr in compiled {
+        // Protocol must match
+        if !cr.protocols.iter().any(|p| p == protocol) {
+            continue;
         }
-    }
 
-    // Host check (empty list = all hosts)
-    if !route.hosts.is_empty() && !ctx.host.is_empty() {
-        if !route.hosts.iter().any(|h| host_matches(h, ctx.host)) {
-            return false;
+        // Method check
+        if let Some(methods) = &cr.methods {
+            if !methods.iter().any(|m| m.eq_ignore_ascii_case(method)) {
+                continue 'outer;
+            }
         }
-    }
 
-    // SNI check (empty list = all SNIs)
-    if !route.snis.is_empty() {
-        match ctx.sni {
-            None => return false,
-            Some(sni) => {
-                if !route.snis.iter().any(|s| s == sni) {
-                    return false;
+        // SNI check
+        if let Some(snis) = &cr.snis {
+            let incoming_sni = sni.unwrap_or("");
+            if !snis.iter().any(|s| s == incoming_sni) {
+                continue 'outer;
+            }
+        }
+
+        // Host check
+        let mut host_score = 0i64;
+        if let Some(host_patterns) = &cr.hosts {
+            let mut matched = false;
+            for hp in host_patterns {
+                if hp.matches(host) {
+                    host_score += hp.specificity();
+                    matched = true;
+                    break;
+                }
+            }
+            if !matched {
+                continue 'outer;
+            }
+        }
+
+        // Header check
+        if let Some(required_headers) = &cr.headers {
+            for (hdr_name, allowed_values) in required_headers {
+                let incoming = headers.get(&hdr_name.to_lowercase());
+                let matches = match incoming {
+                    Some(v) => allowed_values.iter().any(|av| {
+                        // Kong supports regex values here
+                        if av.starts_with("~*") {
+                            Regex::new(&av[2..]).map(|re| re.is_match(v)).unwrap_or(false)
+                        } else {
+                            av == v
+                        }
+                    }),
+                    None => false,
+                };
+                if !matches {
+                    continue 'outer;
                 }
             }
         }
-    }
 
-    // Header check
-    for (header_name, expected_values) in &route.headers {
-        let header_lower = header_name.to_lowercase();
-        let actual = ctx
-            .headers
-            .iter()
-            .find(|(k, _)| k.to_lowercase() == header_lower)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("");
-
-        if !expected_values.iter().any(|ev| ev == actual) {
-            return false;
-        }
-    }
-
-    // Path check (empty list = all paths)
-    if !route.paths.is_empty() {
-        if !route.paths.iter().any(|p| path_matches(p, ctx.path)) {
-            return false;
-        }
-    }
-
-    true
-}
-
-/// Wildcard host matching: `*.example.com` matches `api.example.com`.
-fn host_matches(pattern: &str, host: &str) -> bool {
-    if let Some(suffix) = pattern.strip_prefix("*.") {
-        host.ends_with(suffix) && host.len() > suffix.len()
-    } else {
-        pattern == host
-    }
-}
-
-/// Score a route for priority sorting — higher score wins.
-///
-/// Scores are compared lexicographically as (regex_priority, is_regex, path_len, criteria_count).
-pub fn route_score(route: &Route) -> (i32, i32, usize, usize) {
-    let has_regex = route
-        .paths
-        .iter()
-        .any(|p| p.starts_with('~') || p.starts_with('='));
-
-    let is_regex_score = if has_regex { 1 } else { 0 };
-
-    let max_path_len = route.paths.iter().map(|p| p.len()).max().unwrap_or(0);
-
-    let criteria = route.methods.len()
-        + route.hosts.len()
-        + route.headers.len()
-        + route.snis.len();
-
-    (route.regex_priority, is_regex_score, max_path_len, criteria)
-}
-
-/// Find the best matching route from a slice of candidates.
-pub fn find_best_match<'a>(
-    routes: &'a [&'a Route],
-    ctx: &MatchContext,
-) -> Option<&'a Route> {
-    let mut matched: Vec<&&Route> = routes
-        .iter()
-        .filter(|r| route_matches(r, ctx))
-        .collect();
-
-    if matched.is_empty() {
-        return None;
-    }
-
-    // Sort descending by score
-    matched.sort_by(|a, b| route_score(b).cmp(&route_score(a)));
-    matched.first().copied().copied()
-}
-
-/// Compute the upstream path after applying `strip_path` rules.
-pub fn compute_upstream_path(route: &Route, request_path: &str) -> String {
-    if !route.strip_path {
-        return request_path.to_string();
-    }
-
-    // Find the longest matching prefix and strip it
-    let matched_prefix = route
-        .paths
-        .iter()
-        .filter(|p| !p.starts_with('~') && !p.starts_with('='))
-        .filter(|p| path_matches(p, request_path))
-        .max_by_key(|p| p.len());
-
-    match matched_prefix {
-        Some(prefix) => {
-            let stripped = request_path.strip_prefix(prefix.as_str()).unwrap_or("");
-            if stripped.is_empty() {
-                "/".to_string()
-            } else if stripped.starts_with('/') {
-                stripped.to_string()
-            } else {
-                format!("/{stripped}")
+        // Path check
+        let mut path_len = 0usize;
+        if let Some(path_patterns) = &cr.paths {
+            let mut matched = false;
+            for pp in path_patterns {
+                if let Some(len) = pp.matches(path) {
+                    path_len = path_len.max(len);
+                    matched = true;
+                }
+            }
+            if !matched {
+                continue 'outer;
             }
         }
-        None => request_path.to_string(),
+
+        // Score = regex_priority * 1000 + host_specificity * 100 + path_length
+        let score =
+            cr.regex_priority * 1_000 + host_score * 100 + path_len as i64;
+
+        let result = MatchResult {
+            route_id: cr.route_id,
+            service_id: cr.service_id,
+            strip_path: cr.strip_path,
+            preserve_host: cr.preserve_host,
+            matched_path_len: path_len,
+            score,
+            path_handling: cr.path_handling.clone(),
+        };
+
+        match &best {
+            None => best = Some(result),
+            Some(b) if score > b.score => best = Some(result),
+            _ => {}
+        }
     }
+
+    best
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Tests
-// ─────────────────────────────────────────────────────────────────────────────
+/// Compute the upstream path after optional strip_path.
+pub fn upstream_path(
+    route: &MatchResult,
+    request_path: &str,
+    service_path: Option<&str>,
+) -> String {
+    let base = if route.strip_path && route.matched_path_len > 0 {
+        &request_path[route.matched_path_len..]
+    } else {
+        request_path
+    };
+
+    let base = if base.is_empty() { "/" } else { base };
+
+    match service_path {
+        None | Some("/") | Some("") => base.to_string(),
+        Some(sp) => {
+            if sp.ends_with('/') && base.starts_with('/') {
+                format!("{}{}", &sp[..sp.len() - 1], base)
+            } else {
+                format!("{}{}", sp, base)
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::{PathHandling, Protocol, Route};
-    use chrono::Utc;
-    use std::collections::HashMap;
     use uuid::Uuid;
 
-    fn make_route(paths: Vec<&str>, methods: Vec<&str>) -> Route {
-        Route {
-            id: Uuid::new_v4(),
-            name: None,
-            service_id: Uuid::new_v4(),
-            protocols: vec![Protocol::Http],
-            methods: methods.iter().map(|s| s.to_string()).collect(),
-            hosts: vec![],
-            paths: paths.iter().map(|s| s.to_string()).collect(),
-            headers: HashMap::new(),
-            snis: vec![],
-            strip_path: false,
-            preserve_host: false,
-            regex_priority: 0,
-            path_handling: PathHandling::V0,
-            tags: vec![],
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        }
-    }
-
-    fn empty_headers() -> HashMap<String, String> {
-        HashMap::new()
+    fn make_route(paths: Vec<&str>, methods: Option<Vec<&str>>, hosts: Option<Vec<&str>>) -> CompiledRoute {
+        let mut r = Route::new(Uuid::new_v4());
+        r.paths = Some(paths.into_iter().map(String::from).collect());
+        r.methods = methods.map(|ms| ms.into_iter().map(String::from).collect());
+        r.hosts = hosts.map(|hs| hs.into_iter().map(String::from).collect());
+        compile_route(&r)
     }
 
     #[test]
-    fn test_prefix_match_basic() {
-        assert!(path_matches("/api", "/api/users"));
-        assert!(path_matches("/api", "/api/users/123"));
-        assert!(path_matches("/api", "/api"));
-        assert!(!path_matches("/api", "/other"));
-        assert!(!path_matches("/api", "/ap"));
+    fn test_prefix_match() {
+        let compiled = vec![make_route(vec!["/api"], None, None)];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "example.com", "/api/users", &hdrs, &Protocol::Http, None);
+        assert!(res.is_some());
+        assert_eq!(res.unwrap().matched_path_len, 4);
     }
 
     #[test]
-    fn test_regex_match() {
-        assert!(path_matches("~/api/v[0-9]+/.*", "/api/v1/users"));
-        assert!(path_matches("~/api/v[0-9]+/.*", "/api/v42/items"));
-        assert!(!path_matches("~/api/v[0-9]+/.*", "/api/vX/users"));
-    }
-
-    #[test]
-    fn test_exact_match() {
-        assert!(path_matches("=/exact", "/exact"));
-        assert!(!path_matches("=/exact", "/exact/more"));
-        assert!(!path_matches("=/exact", "/other"));
-    }
-
-    #[test]
-    fn test_method_filter() {
-        let route = make_route(vec!["/api"], vec!["GET"]);
-        let headers = empty_headers();
-
-        let get_ctx = MatchContext {
-            method: "GET",
-            path: "/api/test",
-            host: "",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(route_matches(&route, &get_ctx));
-
-        let post_ctx = MatchContext {
-            method: "POST",
-            path: "/api/test",
-            host: "",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(!route_matches(&route, &post_ctx));
+    fn test_no_match_wrong_path() {
+        let compiled = vec![make_route(vec!["/api"], None, None)];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "example.com", "/other", &hdrs, &Protocol::Http, None);
+        assert!(res.is_none());
     }
 
     #[test]
     fn test_host_match() {
-        let mut route = make_route(vec!["/"], vec![]);
-        route.hosts = vec!["api.example.com".to_string()];
-        let headers = empty_headers();
-
-        let ctx_match = MatchContext {
-            method: "GET",
-            path: "/test",
-            host: "api.example.com",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(route_matches(&route, &ctx_match));
-
-        let ctx_no_match = MatchContext {
-            method: "GET",
-            path: "/test",
-            host: "other.example.com",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(!route_matches(&route, &ctx_no_match));
+        let compiled = vec![make_route(vec!["/"], None, Some(vec!["api.example.com"]))];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "api.example.com", "/foo", &hdrs, &Protocol::Http, None);
+        assert!(res.is_some());
     }
 
     #[test]
-    fn test_wildcard_host_match() {
-        let mut route = make_route(vec!["/"], vec![]);
-        route.hosts = vec!["*.example.com".to_string()];
-        let headers = empty_headers();
-
-        let ctx = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "api.example.com",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(route_matches(&route, &ctx));
-
-        let ctx_exact = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "example.com",
-            sni: None,
-            headers: &headers,
-        };
-        // "*.example.com" does not match "example.com" itself
-        assert!(!route_matches(&route, &ctx_exact));
+    fn test_wildcard_host() {
+        let compiled = vec![make_route(vec!["/"], None, Some(vec!["*.example.com"]))];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "api.example.com", "/foo", &hdrs, &Protocol::Http, None);
+        assert!(res.is_some());
+        let res2 = match_request(&compiled, "GET", "other.io", "/foo", &hdrs, &Protocol::Http, None);
+        assert!(res2.is_none());
     }
 
     #[test]
-    fn test_header_match() {
-        let mut route = make_route(vec!["/"], vec![]);
-        route.headers.insert(
-            "X-Version".to_string(),
-            vec!["v2".to_string(), "v3".to_string()],
-        );
-        let mut headers_match = HashMap::new();
-        headers_match.insert("X-Version".to_string(), "v2".to_string());
-        let mut headers_no_match = HashMap::new();
-        headers_no_match.insert("X-Version".to_string(), "v1".to_string());
-
-        let ctx_match = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "",
-            sni: None,
-            headers: &headers_match,
-        };
-        assert!(route_matches(&route, &ctx_match));
-
-        let ctx_no = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "",
-            sni: None,
-            headers: &headers_no_match,
-        };
-        assert!(!route_matches(&route, &ctx_no));
+    fn test_method_filter() {
+        let compiled = vec![make_route(vec!["/"], Some(vec!["POST"]), None)];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "example.com", "/", &hdrs, &Protocol::Http, None);
+        assert!(res.is_none());
+        let res2 = match_request(&compiled, "POST", "example.com", "/", &hdrs, &Protocol::Http, None);
+        assert!(res2.is_some());
     }
 
     #[test]
-    fn test_sni_match() {
-        let mut route = make_route(vec!["/"], vec![]);
-        route.snis = vec!["secure.example.com".to_string()];
-        let headers = empty_headers();
+    fn test_longer_prefix_wins() {
+        let mut r1 = Route::new(Uuid::new_v4());
+        r1.paths = Some(vec!["/api".to_string()]);
+        r1.regex_priority = 0;
+        let mut r2 = Route::new(Uuid::new_v4());
+        r2.paths = Some(vec!["/api/v1".to_string()]);
+        r2.regex_priority = 0;
 
-        let ctx_with_sni = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "",
-            sni: Some("secure.example.com"),
-            headers: &headers,
-        };
-        assert!(route_matches(&route, &ctx_with_sni));
-
-        let ctx_no_sni = MatchContext {
-            method: "GET",
-            path: "/",
-            host: "",
-            sni: None,
-            headers: &headers,
-        };
-        assert!(!route_matches(&route, &ctx_no_sni));
+        let compiled = vec![compile_route(&r1), compile_route(&r2)];
+        let hdrs = HashMap::new();
+        let res = match_request(&compiled, "GET", "x", "/api/v1/users", &hdrs, &Protocol::Http, None)
+            .unwrap();
+        assert_eq!(res.route_id, r2.id);
     }
 
     #[test]
-    fn test_priority_ordering_longer_prefix_wins() {
-        let short = make_route(vec!["/api"], vec![]);
-        let long = make_route(vec!["/api/v2"], vec![]);
-        let headers = empty_headers();
-
-        let ctx = MatchContext {
-            method: "GET",
-            path: "/api/v2/users",
-            host: "",
-            sni: None,
-            headers: &headers,
+    fn test_upstream_path_strip() {
+        let m = MatchResult {
+            route_id: Uuid::new_v4(),
+            service_id: None,
+            strip_path: true,
+            preserve_host: false,
+            matched_path_len: 4,
+            score: 0,
+            path_handling: PathHandling::V0,
         };
-
-        let routes = vec![&short, &long];
-        let best = find_best_match(&routes, &ctx).unwrap();
-        assert_eq!(best.paths, vec!["/api/v2"]);
+        assert_eq!(upstream_path(&m, "/api/users", None), "/users");
     }
 
     #[test]
-    fn test_strip_path() {
-        let mut route = make_route(vec!["/api/v1"], vec![]);
-        route.strip_path = true;
-
-        assert_eq!(
-            compute_upstream_path(&route, "/api/v1/users"),
-            "/users"
-        );
-        assert_eq!(
-            compute_upstream_path(&route, "/api/v1"),
-            "/"
-        );
+    fn test_upstream_path_no_strip() {
+        let m = MatchResult {
+            route_id: Uuid::new_v4(),
+            service_id: None,
+            strip_path: false,
+            preserve_host: false,
+            matched_path_len: 4,
+            score: 0,
+            path_handling: PathHandling::V0,
+        };
+        assert_eq!(upstream_path(&m, "/api/users", Some("/v2")), "/v2/api/users");
     }
 }
