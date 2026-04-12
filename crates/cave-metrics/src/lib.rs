@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/nostalgic-leavitt
 //! cave-metrics: Prometheus + Thanos replacement.
 //! Provides TSDB, PromQL evaluation, remote_write, scraping, rules, and Alertmanager integration.
 
@@ -505,6 +508,7 @@ http_latency_sum 45.3
         assert_eq!(alerts[0].name, "HighErrorRate");
     }
 }
+<<<<<<< HEAD
 =======
 //! CAVE Metrics — time-series metrics ingestion and query engine.
 //!
@@ -542,3 +546,5 @@ pub fn router(state: Arc<MetricsState>) -> Router {
 
 pub const MODULE_NAME: &str = "metrics";
 >>>>>>> claude/gallant-cartwright
+=======
+>>>>>>> claude/nostalgic-leavitt
