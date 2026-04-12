@@ -41,6 +41,9 @@ members = [
     "crates/cave-dast",
     "crates/cave-backup",
     "crates/cave-pam",
+    # === Phase 5: Developer Experience ===
+    "crates/cave-docs-site",
+    "crates/cave-dns",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===

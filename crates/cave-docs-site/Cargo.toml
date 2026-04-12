@@ -1,17 +1,17 @@
 [package]
-name = "cave-core"
-description = "CAVE Unified Runtime — shared types, config, and utilities"
+name = "cave-docs-site"
+description = "Developer documentation platform — replaces GitBook / Docusaurus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+cave-core = { path = "../cave-core" }
+axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = { workspace = true }
+tokio = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 thiserror = { workspace = true }
-anyhow = { workspace = true }
-config = { workspace = true }
 tracing = { workspace = true }
-tokio-postgres = { workspace = true }
