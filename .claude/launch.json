@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "CAVE Unified Runtime",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "--bin", "cave-runtime"],
+      "port": 8080
+    },
+    {
+      "name": "CAVE Unified Runtime (release)",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "--release", "--bin", "cave-runtime"],
+      "port": 8080
+    },
+    {
+      "name": "CAVE Metrics Server",
+      "runtimeExecutable": "cargo",
+      "runtimeArgs": ["run", "--bin", "cave-runtime", "--", "--port", "8080"],
+      "port": 9090
+    }
+  ]
+}
