@@ -1,0 +1,23 @@
+[package]
+name = "cave-llm-gateway"
+description = "CAVE LLM Gateway — Unified LLM API gateway with multi-provider routing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }
