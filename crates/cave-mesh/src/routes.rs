@@ -2,24 +2,24 @@
 //!
 //! Endpoint map:
 //!   Services            GET/POST /api/mesh/services
-//!                       GET/DELETE /api/mesh/services/:ns/:name
-//!                       PUT /api/mesh/services/:ns/:name/health/:addr/:port
+//!                       GET/DELETE /api/mesh/services/{ns}/{name}
+//!                       PUT /api/mesh/services/{ns}/{name}/health/{addr}/{port}
 //!   VirtualServices     GET/POST /api/mesh/virtualservices
-//!                       GET/DELETE /api/mesh/virtualservices/:host
+//!                       GET/DELETE /api/mesh/virtualservices/{host}
 //!   DestinationRules    GET/POST /api/mesh/destinationrules
-//!                       GET/DELETE /api/mesh/destinationrules/:host
+//!                       GET/DELETE /api/mesh/destinationrules/{host}
 //!   Gateways            GET/POST /api/mesh/gateways
-//!                       GET/DELETE /api/mesh/gateways/:ns/:name
+//!                       GET/DELETE /api/mesh/gateways/{ns}/{name}
 //!   ServiceEntries      GET/POST /api/mesh/serviceentries
-//!                       GET/DELETE /api/mesh/serviceentries/:ns/:name
+//!                       GET/DELETE /api/mesh/serviceentries/{ns}/{name}
 //!   PeerAuth            GET/POST /api/mesh/peerauthentications
-//!                       DELETE /api/mesh/peerauthentications/:ns/:name
+//!                       DELETE /api/mesh/peerauthentications/{ns}/{name}
 //!   RequestAuth         GET/POST /api/mesh/requestauthentications
-//!                       DELETE /api/mesh/requestauthentications/:ns/:name
+//!                       DELETE /api/mesh/requestauthentications/{ns}/{name}
 //!   AuthzPolicy         GET/POST /api/mesh/authorizationpolicies
-//!                       DELETE /api/mesh/authorizationpolicies/:ns/:name
+//!                       DELETE /api/mesh/authorizationpolicies/{ns}/{name}
 //!   RateLimit           GET/POST /api/mesh/ratelimits
-//!                       DELETE /api/mesh/ratelimits/:name
+//!                       DELETE /api/mesh/ratelimits/{name}
 //!   CircuitBreakers     GET /api/mesh/circuitbreakers
 //!   Metrics             GET /api/mesh/metrics
 //!   Health              GET /api/mesh/health
@@ -55,11 +55,11 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
         // ── Service Registry ─────────────────────────────────
         .route("/api/mesh/services", get(list_services).post(register_service))
         .route(
-            "/api/mesh/services/:ns/:name",
+            "/api/mesh/services/{ns}/{name}",
             get(get_service).delete(deregister_service),
         )
         .route(
-            "/api/mesh/services/:ns/:name/health/:addr/:port",
+            "/api/mesh/services/{ns}/{name}/health/{addr}/{port}",
             put(update_health),
         )
         // ── VirtualServices ──────────────────────────────────
@@ -68,7 +68,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_virtual_services).post(upsert_virtual_service),
         )
         .route(
-            "/api/mesh/virtualservices/:host",
+            "/api/mesh/virtualservices/{host}",
             get(get_virtual_service).delete(delete_virtual_service),
         )
         // ── DestinationRules ─────────────────────────────────
@@ -77,7 +77,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_destination_rules).post(upsert_destination_rule),
         )
         .route(
-            "/api/mesh/destinationrules/:host",
+            "/api/mesh/destinationrules/{host}",
             get(get_destination_rule).delete(delete_destination_rule),
         )
         // ── Gateways ─────────────────────────────────────────
@@ -86,7 +86,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_gateways).post(upsert_gateway),
         )
         .route(
-            "/api/mesh/gateways/:ns/:name",
+            "/api/mesh/gateways/{ns}/{name}",
             get(get_gateway).delete(delete_gateway),
         )
         // ── ServiceEntries ───────────────────────────────────
@@ -95,7 +95,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_service_entries).post(upsert_service_entry),
         )
         .route(
-            "/api/mesh/serviceentries/:ns/:name",
+            "/api/mesh/serviceentries/{ns}/{name}",
             get(get_service_entry).delete(delete_service_entry),
         )
         // ── PeerAuthentication ───────────────────────────────
@@ -104,7 +104,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_peer_authentications).post(upsert_peer_authentication),
         )
         .route(
-            "/api/mesh/peerauthentications/:ns/:name",
+            "/api/mesh/peerauthentications/{ns}/{name}",
             delete(delete_peer_authentication),
         )
         // ── RequestAuthentication ────────────────────────────
@@ -113,7 +113,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_request_authentications).post(upsert_request_authentication),
         )
         .route(
-            "/api/mesh/requestauthentications/:ns/:name",
+            "/api/mesh/requestauthentications/{ns}/{name}",
             delete(delete_request_authentication),
         )
         // ── AuthorizationPolicy ──────────────────────────────
@@ -122,7 +122,7 @@ pub fn create_router(state: Arc<MeshState>) -> Router {
             get(list_authz_policies).post(upsert_authz_policy),
         )
         .route(
-            "/api/mesh/authorizationpolicies/:ns/:name",
+            "/api/mesh/authorizationpolicies/{ns}/{name}",
             delete(delete_authz_policy),
         )
         // ── Rate Limiting ────────────────────────────────────

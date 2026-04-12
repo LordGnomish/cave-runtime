@@ -38,12 +38,12 @@ fn internal(msg: impl std::fmt::Display) -> (StatusCode, Json<Value>) {
 pub fn create_router(store: SharedVaultStore) -> Router {
     Router::new()
         // ── KV secrets engine ──────────────────────────────────────────────
-        .route("/api/v1/vault/secret/data/*path", get(kv_get).post(kv_put).delete(kv_delete))
-        .route("/api/v1/vault/secret/metadata/*path", get(kv_metadata).post(kv_update_metadata))
-        .route("/api/v1/vault/secret/delete/*path", post(kv_soft_delete_versions))
-        .route("/api/v1/vault/secret/undelete/*path", post(kv_undelete))
-        .route("/api/v1/vault/secret/destroy/*path", post(kv_destroy))
-        .route("/api/v1/vault/secret/list/*path", get(kv_list))
+        .route("/api/v1/vault/secret/data/{*path}", get(kv_get).post(kv_put).delete(kv_delete))
+        .route("/api/v1/vault/secret/metadata/{*path}", get(kv_metadata).post(kv_update_metadata))
+        .route("/api/v1/vault/secret/delete/{*path}", post(kv_soft_delete_versions))
+        .route("/api/v1/vault/secret/undelete/{*path}", post(kv_undelete))
+        .route("/api/v1/vault/secret/destroy/{*path}", post(kv_destroy))
+        .route("/api/v1/vault/secret/list/{*path}", get(kv_list))
         // ── PKI engine ─────────────────────────────────────────────────────
         .route("/api/v1/vault/pki/root/generate", post(pki_generate_root))
         .route("/api/v1/vault/pki/issue", post(pki_issue))
@@ -73,7 +73,7 @@ pub fn create_router(store: SharedVaultStore) -> Router {
         // ── Policies ───────────────────────────────────────────────────────
         .route("/api/v1/vault/sys/policy", get(policy_list))
         .route(
-            "/api/v1/vault/sys/policy/:name",
+            "/api/v1/vault/sys/policy/{name}",
             get(policy_read).post(policy_create).delete(policy_delete),
         )
         // ── Audit log ──────────────────────────────────────────────────────

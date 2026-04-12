@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 pub fn create_router(state: Arc<TraceState>) -> Router {
     Router::new()
-        // Static routes first so they take priority over /:id
+        // Static routes first so they take priority over /{id}
         .route("/api/v1/traces/search", get(search_handler))
         .route("/api/v1/traces/services", get(services_handler))
         .route("/api/v1/traces/service-map", get(service_map_handler))
@@ -58,7 +58,7 @@ async fn ingest_handler(
     })
 }
 
-// ── GET /api/v1/traces/:id ────────────────────────────────────────────────────
+// ── GET /api/v1/traces/{id} ────────────────────────────────────────────────────
 
 async fn get_trace_handler(
     AxumState(state): AxumState<Arc<TraceState>>,

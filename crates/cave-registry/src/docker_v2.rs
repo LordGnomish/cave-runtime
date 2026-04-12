@@ -7,14 +7,14 @@
 //! ## Endpoints
 //! - GET  /v2/                               — API version check
 //! - GET  /v2/_catalog                       — list repositories
-//! - GET  /v2/:name/manifests/:reference     — pull manifest
-//! - HEAD /v2/:name/manifests/:reference     — manifest existence check
-//! - PUT  /v2/:name/manifests/:reference     — push manifest
-//! - GET  /v2/:name/blobs/:digest            — pull blob
-//! - HEAD /v2/:name/blobs/:digest            — blob existence check
-//! - POST /v2/:name/blobs/uploads/           — initiate blob upload
-//! - PATCH /v2/:name/blobs/uploads/:uuid     — chunked blob upload
-//! - PUT  /v2/:name/blobs/uploads/:uuid      — complete blob upload
+//! - GET  /v2/{name}/manifests/{reference}     — pull manifest
+//! - HEAD /v2/{name}/manifests/{reference}     — manifest existence check
+//! - PUT  /v2/{name}/manifests/{reference}     — push manifest
+//! - GET  /v2/{name}/blobs/{digest}            — pull blob
+//! - HEAD /v2/{name}/blobs/{digest}            — blob existence check
+//! - POST /v2/{name}/blobs/uploads/           — initiate blob upload
+//! - PATCH /v2/{name}/blobs/uploads/{uuid}     — chunked blob upload
+//! - PUT  /v2/{name}/blobs/uploads/{uuid}      — complete blob upload
 //!
 //! ## Required headers (Docker spec)
 //! - Docker-Distribution-API-Version: registry/2.0   (all responses)
@@ -50,7 +50,7 @@ pub struct CatalogResponse {
     pub repositories: Vec<String>,
 }
 
-/// GET /v2/:name/tags/list response.
+/// GET /v2/{name}/tags/list response.
 #[derive(Debug, Serialize)]
 pub struct TagsResponse {
     pub name: String,
@@ -155,7 +155,7 @@ async fn catalog(
 }
 
 // ---------------------------------------------------------------------------
-// GET /v2/:name/manifests/:reference — pull manifest
+// GET /v2/{name}/manifests/{reference} — pull manifest
 // ---------------------------------------------------------------------------
 
 async fn pull_manifest(
@@ -174,7 +174,7 @@ async fn pull_manifest(
 }
 
 // ---------------------------------------------------------------------------
-// HEAD /v2/:name/manifests/:reference — manifest existence check
+// HEAD /v2/{name}/manifests/{reference} — manifest existence check
 // ---------------------------------------------------------------------------
 
 async fn head_manifest(
@@ -187,7 +187,7 @@ async fn head_manifest(
 }
 
 // ---------------------------------------------------------------------------
-// PUT /v2/:name/manifests/:reference — push manifest
+// PUT /v2/{name}/manifests/{reference} — push manifest
 // ---------------------------------------------------------------------------
 
 async fn push_manifest(
@@ -209,7 +209,7 @@ async fn push_manifest(
 }
 
 // ---------------------------------------------------------------------------
-// GET /v2/:name/blobs/:digest — pull blob
+// GET /v2/{name}/blobs/{digest} — pull blob
 // ---------------------------------------------------------------------------
 
 async fn pull_blob(
@@ -226,7 +226,7 @@ async fn pull_blob(
 }
 
 // ---------------------------------------------------------------------------
-// HEAD /v2/:name/blobs/:digest — blob existence check
+// HEAD /v2/{name}/blobs/{digest} — blob existence check
 // ---------------------------------------------------------------------------
 
 async fn head_blob(
@@ -239,7 +239,7 @@ async fn head_blob(
 }
 
 // ---------------------------------------------------------------------------
-// POST /v2/:name/blobs/uploads/ — initiate blob upload
+// POST /v2/{name}/blobs/uploads/ — initiate blob upload
 // ---------------------------------------------------------------------------
 
 async fn initiate_upload(
@@ -263,7 +263,7 @@ async fn initiate_upload(
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /v2/:name/blobs/uploads/:uuid — chunked blob upload
+// PATCH /v2/{name}/blobs/uploads/{uuid} — chunked blob upload
 // ---------------------------------------------------------------------------
 
 async fn upload_chunk(
@@ -286,7 +286,7 @@ async fn upload_chunk(
 }
 
 // ---------------------------------------------------------------------------
-// PUT /v2/:name/blobs/uploads/:uuid — complete blob upload
+// PUT /v2/{name}/blobs/uploads/{uuid} — complete blob upload
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
@@ -317,7 +317,7 @@ async fn complete_upload(
 }
 
 // ---------------------------------------------------------------------------
-// GET /v2/:name/tags/list
+// GET /v2/{name}/tags/list
 // ---------------------------------------------------------------------------
 
 async fn list_tags(

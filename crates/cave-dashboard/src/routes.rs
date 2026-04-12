@@ -69,7 +69,7 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
         // ── DataSources ─────────────────────────────────────────────────────
         .route("/api/datasources", get(list_datasources).post(create_datasource))
         .route(
-            "/api/datasources/:id",
+            "/api/datasources/{id}",
             get(get_datasource).put(update_datasource).delete(delete_datasource),
         )
         // ── Alert Notifications ─────────────────────────────────────────────
@@ -78,7 +78,7 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
             get(list_alert_channels).post(create_alert_channel),
         )
         .route(
-            "/api/alert-notifications/:id",
+            "/api/alert-notifications/{id}",
             get(get_alert_channel).put(update_alert_channel).delete(delete_alert_channel),
         )
         // ── Alerts (panel-level rules) ───────────────────────────────────────
@@ -92,7 +92,7 @@ pub fn create_router(state: Arc<DashboardState>) -> Router {
         // ── Playlists ───────────────────────────────────────────────────────
         .route("/api/playlists", get(list_playlists).post(create_playlist))
         .route(
-            "/api/playlists/:id",
+            "/api/playlists/{id}",
             get(get_playlist).put(update_playlist).delete(delete_playlist),
         )
         // ── Renderer ────────────────────────────────────────────────────────

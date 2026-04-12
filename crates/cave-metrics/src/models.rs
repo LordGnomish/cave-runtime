@@ -95,7 +95,7 @@ pub struct LabelsData {
     pub data: Vec<String>,
 }
 
-/// Response for /api/v1/label/:name/values — list of label values.
+/// Response for /api/v1/label/{name}/values — list of label values.
 #[derive(Debug, Serialize)]
 pub struct LabelValuesData {
     pub data: Vec<String>,
@@ -150,7 +150,7 @@ pub struct LabelsParams {
     pub end: Option<String>,
 }
 
-/// Query parameters for GET /api/v1/label/:name/values
+/// Query parameters for GET /api/v1/label/{name}/values
 #[derive(Debug, Deserialize)]
 pub struct LabelValuesParams {
     #[serde(rename = "match[]")]

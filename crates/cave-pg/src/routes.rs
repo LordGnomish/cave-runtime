@@ -24,7 +24,7 @@ pub fn create_router(state: Arc<PgState>) -> Router {
             get(list_databases).post(register_database),
         )
         .route(
-            "/api/pg/databases/:id",
+            "/api/pg/databases/{id}",
             get(get_database).delete(delete_database),
         )
         .route("/api/pg/databases/{id}/healthcheck", post(healthcheck_database))
@@ -37,7 +37,7 @@ pub fn create_router(state: Arc<PgState>) -> Router {
         // Connection pools
         .route("/api/pg/pools", get(list_pools).post(create_pool))
         .route("/api/pg/pools/{id}", get(get_pool).put(update_pool))
-        // Query analytics — literal /slow before /:id to ensure priority
+        // Query analytics — literal /slow before /{id} to ensure priority
         .route("/api/pg/queries/slow", get(slow_queries))
         .route("/api/pg/queries", get(list_queries).post(record_query))
         // Backup / restore

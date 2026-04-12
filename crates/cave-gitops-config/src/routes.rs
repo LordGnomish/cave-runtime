@@ -35,16 +35,16 @@ pub fn create_router(state: Arc<GitOpsAppState>) -> Router {
         .route("/api/gitops/health", get(health))
         .route("/api/gitops/promises", get(list_promises).post(create_promise))
         .route(
-            "/api/gitops/promises/:name",
+            "/api/gitops/promises/{name}",
             get(get_promise).put(update_promise).delete(delete_promise),
         )
         .route("/api/gitops/requests", get(list_requests).post(create_request))
         .route(
-            "/api/gitops/requests/:id",
+            "/api/gitops/requests/{id}",
             get(get_request).delete(delete_request),
         )
         .route("/api/gitops/state", get(list_state))
-        .route("/api/gitops/state/*path", get(get_state_entry))
+        .route("/api/gitops/state/{*path}", get(get_state_entry))
         .route("/api/gitops/clusters", get(list_clusters).post(register_cluster))
         .route("/api/gitops/pipelines/{request_id}", get(get_pipeline))
         .with_state(state)

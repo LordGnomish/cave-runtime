@@ -383,7 +383,7 @@ pub struct CreateToggleRequest {
     pub impression_data: bool,
 }
 
-/// Update an existing feature toggle (PUT /api/admin/features/:name).
+/// Update an existing feature toggle (PUT /api/admin/features/{name}).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateToggleRequest {

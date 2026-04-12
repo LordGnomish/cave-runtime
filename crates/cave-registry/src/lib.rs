@@ -82,8 +82,9 @@ impl Registry {
 
 /// Create the axum router from an `AppState` reference.
 pub fn router(state: Arc<AppState>) -> Router {
-    routes::create_router(Arc::clone(&state))
-        .merge(docker_v2::docker_v2_router(state))
+    // docker_v2_router is not merged here because routes/mod.rs already handles
+    // all /v2/{*path} traffic via a single wildcard dispatch handler.
+    routes::create_router(state)
 }
 
 pub const MODULE_NAME: &str = "registry";

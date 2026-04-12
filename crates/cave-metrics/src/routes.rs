@@ -36,7 +36,7 @@ pub fn create_router(state: Arc<MetricsState>) -> Router {
         .route("/api/v1/series", get(series))
         // Label names:    GET /api/v1/labels
         .route("/api/v1/labels", get(labels))
-        // Label values:   GET /api/v1/label/:name/values
+        // Label values:   GET /api/v1/label/{name}/values
         .route("/api/v1/label/{name}/values", get(label_values))
         // ── Self-metrics (Prometheus exposition format) ────────────────────
         .route("/metrics", get(self_metrics))
@@ -152,7 +152,7 @@ async fn labels(
 }
 
 // ---------------------------------------------------------------------------
-// Label values — GET /api/v1/label/:name/values
+// Label values — GET /api/v1/label/{name}/values
 // ---------------------------------------------------------------------------
 
 async fn label_values(

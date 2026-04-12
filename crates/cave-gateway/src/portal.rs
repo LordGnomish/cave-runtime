@@ -2,18 +2,18 @@
 //!
 //! Routes:
 //!   /portal/apis                          GET — API catalog
-//!   /portal/apis/:id                      GET — API details
-//!   /portal/apis/:id/documentation        GET, POST
+//!   /portal/apis/{id}                      GET — API details
+//!   /portal/apis/{id}/documentation        GET, POST
 //!   /portal/subscriptions                 GET, POST
-//!   /portal/subscriptions/:id             GET, DELETE
-//!   /portal/consumers/:id/subscriptions   GET
-//!   /portal/consumers/:id/usage           GET
+//!   /portal/subscriptions/{id}             GET, DELETE
+//!   /portal/consumers/{id}/subscriptions   GET
+//!   /portal/consumers/{id}/usage           GET
 //!   /portal/usage                         GET — global usage summary
 //!
-//!   /admin/services/:id/versions          GET, POST
-//!   /admin/services/:id/versions/:vid     PUT
-//!   /admin/services/:id/versions/:vid/deprecate  POST
-//!   /admin/services/:id/versions/:vid/retire     POST
+//!   /admin/services/{id}/versions          GET, POST
+//!   /admin/services/{id}/versions/{vid}     PUT
+//!   /admin/services/{id}/versions/{vid}/deprecate  POST
+//!   /admin/services/{id}/versions/{vid}/retire     POST
 
 use crate::models::*;
 use crate::GatewayState;

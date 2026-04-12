@@ -4,21 +4,21 @@
 //!
 //! Endpoints:
 //!   /admin/services               GET (list), POST (create)
-//!   /admin/services/:id           GET, PUT, DELETE
+//!   /admin/services/{id}           GET, PUT, DELETE
 //!   /admin/routes                 GET, POST
-//!   /admin/routes/:id             GET, PUT, DELETE
+//!   /admin/routes/{id}             GET, PUT, DELETE
 //!   /admin/upstreams              GET, POST
-//!   /admin/upstreams/:id          GET, PUT, DELETE
-//!   /admin/upstreams/:id/targets  GET, POST
-//!   /admin/upstreams/:id/targets/:tid  GET, DELETE
+//!   /admin/upstreams/{id}          GET, PUT, DELETE
+//!   /admin/upstreams/{id}/targets  GET, POST
+//!   /admin/upstreams/{id}/targets/{tid}  GET, DELETE
 //!   /admin/consumers              GET, POST
-//!   /admin/consumers/:id          GET, PUT, DELETE
-//!   /admin/consumers/:id/key-auth    GET, POST
-//!   /admin/consumers/:id/jwt         GET, POST
-//!   /admin/consumers/:id/basic-auth  GET, POST
-//!   /admin/consumers/:id/hmac-auth   GET, POST
+//!   /admin/consumers/{id}          GET, PUT, DELETE
+//!   /admin/consumers/{id}/key-auth    GET, POST
+//!   /admin/consumers/{id}/jwt         GET, POST
+//!   /admin/consumers/{id}/basic-auth  GET, POST
+//!   /admin/consumers/{id}/hmac-auth   GET, POST
 //!   /admin/plugins                GET, POST
-//!   /admin/plugins/:id            GET, PUT, DELETE
+//!   /admin/plugins/{id}            GET, PUT, DELETE
 
 use crate::models::*;
 use crate::GatewayState;
@@ -39,58 +39,58 @@ pub fn admin_router(state: AppState) -> Router {
         // Services
         .route("/services", get(list_services).post(create_service))
         .route(
-            "/services/:id",
+            "/services/{id}",
             get(get_service).put(update_service).delete(delete_service),
         )
         // Routes
         .route("/routes", get(list_routes).post(create_route))
         .route(
-            "/routes/:id",
+            "/routes/{id}",
             get(get_route).put(update_route).delete(delete_route),
         )
         // Upstreams
         .route("/upstreams", get(list_upstreams).post(create_upstream))
         .route(
-            "/upstreams/:id",
+            "/upstreams/{id}",
             get(get_upstream).put(update_upstream).delete(delete_upstream),
         )
         // Targets
         .route(
-            "/upstreams/:id/targets",
+            "/upstreams/{id}/targets",
             get(list_targets).post(create_target),
         )
         .route(
-            "/upstreams/:id/targets/:tid",
+            "/upstreams/{id}/targets/{tid}",
             get(get_target).delete(delete_target),
         )
         .route("/upstreams/{id}/health", get(upstream_health))
         // Consumers
         .route("/consumers", get(list_consumers).post(create_consumer))
         .route(
-            "/consumers/:id",
+            "/consumers/{id}",
             get(get_consumer).put(update_consumer).delete(delete_consumer),
         )
         // Credentials
         .route(
-            "/consumers/:id/key-auth",
+            "/consumers/{id}/key-auth",
             get(list_key_auth).post(create_key_auth),
         )
         .route(
-            "/consumers/:id/jwt",
+            "/consumers/{id}/jwt",
             get(list_jwt).post(create_jwt),
         )
         .route(
-            "/consumers/:id/basic-auth",
+            "/consumers/{id}/basic-auth",
             get(list_basic_auth).post(create_basic_auth),
         )
         .route(
-            "/consumers/:id/hmac-auth",
+            "/consumers/{id}/hmac-auth",
             get(list_hmac_auth).post(create_hmac_auth),
         )
         // Plugins
         .route("/plugins", get(list_plugins).post(create_plugin))
         .route(
-            "/plugins/:id",
+            "/plugins/{id}",
             get(get_plugin).put(update_plugin).delete(delete_plugin),
         )
         .with_state(state)

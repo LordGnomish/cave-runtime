@@ -29,16 +29,16 @@ pub fn create_router(state: Arc<DeployState>) -> Router {
         // Sync / Rollback
         .route("/api/v1/deploy/applications/{id}/sync", post(sync_app))
         .route(
-            "/api/v1/deploy/applications/:id/rollback",
+            "/api/v1/deploy/applications/{id}/rollback",
             post(rollback_app),
         )
         // Status / History
         .route(
-            "/api/v1/deploy/applications/:id/status",
+            "/api/v1/deploy/applications/{id}/status",
             get(get_app_status),
         )
         .route(
-            "/api/v1/deploy/applications/:id/history",
+            "/api/v1/deploy/applications/{id}/history",
             get(get_app_history),
         )
         // Diff

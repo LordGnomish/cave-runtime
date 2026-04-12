@@ -8,7 +8,7 @@
 //! - GET  /api/client/features   — client SDK polling endpoint
 //! - GET  /api/admin/features    — admin UI / API list
 //! - POST /api/admin/features    — create a toggle via Unleash format
-//! - GET  /api/admin/features/:name — get single toggle
+//! - GET  /api/admin/features/{name} — get single toggle
 //!
 //! ## Response format (Unleash v2 wire protocol)
 //! {
@@ -225,7 +225,7 @@ async fn admin_create_feature(
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/admin/features/:name — Unleash admin get single toggle
+// GET /api/admin/features/{name} — Unleash admin get single toggle
 // ---------------------------------------------------------------------------
 
 async fn admin_get_feature(
