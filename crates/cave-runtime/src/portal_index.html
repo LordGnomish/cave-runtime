@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAVE Platform</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+    header { background: #1a1f2e; border-bottom: 1px solid #2d3748; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: #7c3aed; }
+    header span { color: #718096; font-size: 0.875rem; }
+    main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+    h2 { font-size: 1rem; font-weight: 600; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.05em; margin: 2rem 0 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+    .card { background: #1a1f2e; border: 1px solid #2d3748; border-radius: 8px; padding: 1.25rem; transition: border-color 0.15s; }
+    .card:hover { border-color: #7c3aed; }
+    .card a { text-decoration: none; color: inherit; }
+    .card .name { font-weight: 600; color: #e2e8f0; margin-bottom: 0.25rem; }
+    .card .desc { font-size: 0.8rem; color: #718096; }
+    .card .path { font-size: 0.75rem; color: #4a5568; margin-top: 0.5rem; font-family: monospace; }
+    .badge { display: inline-block; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 4px; margin-bottom: 0.5rem; }
+    .p1 { background: #1a3a2a; color: #48bb78; }
+    .p2 { background: #1a2a3a; color: #63b3ed; }
+    .p3 { background: #2a1a3a; color: #b794f4; }
+    .p4 { background: #3a2a1a; color: #f6ad55; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CAVE Platform</h1>
+    <span>Unified Runtime — all modules active</span>
+  </header>
+  <main>
+    <h2>Phase 1 — Core</h2>
+    <div class="grid">
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Secrets</div><div class="desc">Vault replacement</div><div class="path">GET /api/secrets/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Lint</div><div class="desc">Policy-as-code linter</div><div class="path">GET /api/lint/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Docs</div><div class="desc">Documentation hub</div><div class="path">GET /api/docs/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Status</div><div class="desc">Service status page</div><div class="path">GET /api/status/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Changelog</div><div class="desc">Release notes</div><div class="path">GET /api/changelog/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Certs</div><div class="desc">Certificate manager</div><div class="path">GET /api/certs/health</div></div>
+      <div class="card"><span class="badge p1">Phase 1</span><div class="name">Flags</div><div class="desc">Feature flags (Unleash)</div><div class="path">GET /api/flags/health</div></div>
+    </div>
+
+    <h2>Phase 2 — Security &amp; Reliability</h2>
+    <div class="grid">
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Vulns</div><div class="desc">Vulnerability hub (DefectDojo)</div><div class="path">GET /api/vulns/health</div></div>
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">SBOM</div><div class="desc">Dependency intelligence</div><div class="path">GET /api/sbom/health</div></div>
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Uptime</div><div class="desc">Synthetic monitoring</div><div class="path">GET /api/uptime/health</div></div>
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Cost</div><div class="desc">FinOps (OpenCost)</div><div class="path">GET /api/cost/health</div></div>
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Sign</div><div class="desc">Image signing (Sigstore)</div><div class="path">GET /api/sign/health</div></div>
+      <div class="card"><span class="badge p2">Phase 2</span><div class="name">Forensics</div><div class="desc">Runtime forensics (Tetragon)</div><div class="path">GET /api/forensics/health</div></div>
+    </div>
+
+    <h2>Phase 3 — Platform Intelligence</h2>
+    <div class="grid">
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">DevLake</div><div class="desc">DevOps analytics</div><div class="path">GET /api/devlake/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">AI Obs</div><div class="desc">LLM observability (Langfuse)</div><div class="path">GET /api/ai-obs/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">PII</div><div class="desc">PII detection (Presidio)</div><div class="path">GET /api/pii/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Incidents</div><div class="desc">Incident management</div><div class="path">GET /api/incidents/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Chat</div><div class="desc">LLM chat (LibreChat)</div><div class="path">GET /api/chat/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">SLO</div><div class="desc">Error budgets &amp; burn rates</div><div class="path">GET /api/slo/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Alerts</div><div class="desc">Alert routing (Alertmanager)</div><div class="path">GET /api/alerts/health</div></div>
+      <div class="card"><span class="badge p3">Phase 3</span><div class="name">Profiler</div><div class="desc">Continuous profiling (Pyroscope)</div><div class="path">GET /api/profiler/health</div></div>
+    </div>
+
+    <h2>Phase 4 — Heavy Hitters</h2>
+    <div class="grid">
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Registry</div><div class="desc">Package proxy (Pulp)</div><div class="path">GET /api/registry/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Workflows</div><div class="desc">Event automation (n8n)</div><div class="path">GET /api/workflows/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Scan</div><div class="desc">SAST (SonarQube)</div><div class="path">GET /api/scan/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Portal</div><div class="desc">Developer portal (Backstage)</div><div class="path">GET /api/portal/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Scaffold</div><div class="desc">Template engine</div><div class="path">GET /api/scaffold/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Chaos</div><div class="desc">Chaos engineering (Chaos Mesh)</div><div class="path">GET /api/chaos/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Policy</div><div class="desc">Policy engine (OPA)</div><div class="path">GET /api/policy/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">DAST</div><div class="desc">Dynamic security testing (ZAP)</div><div class="path">GET /api/dast/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">Backup</div><div class="desc">K8s backup (Velero)</div><div class="path">GET /api/backup/health</div></div>
+      <div class="card"><span class="badge p4">Phase 4</span><div class="name">PAM</div><div class="desc">Privileged access (Teleport)</div><div class="path">GET /api/pam/health</div></div>
+    </div>
+  </main>
+</body>
+</html>

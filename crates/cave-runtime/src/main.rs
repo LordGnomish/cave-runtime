@@ -3,7 +3,7 @@
 //! Single binary that hosts all enabled platform modules.
 //! Native Okta/Keycloak auth, shared PostgreSQL, eBPF hooks.
 
-use axum::Router;
+use axum::{Router, routing::get};
 use clap::Parser;
 use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
@@ -116,6 +116,8 @@ async fn main() -> anyhow::Result<()> {
     metrics_state.clone().start().await;
 
     let app = Router::new()
+        // Portal dashboard UI served at "/"
+        .route("/", axum::routing::get(portal_index))
         .route("/health", axum::routing::get(health))
         .route("/ready", axum::routing::get(ready))
         // Phase 1
@@ -153,6 +155,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_dast::router(dast_state))
         .merge(cave_backup::router(backup_state))
         .merge(cave_pam::router(pam_state))
+<<<<<<< HEAD
         // LLM Gateway
         .merge(cave_llm_gateway::router(llm_gateway_state))
         // Infrastructure & Networking
@@ -203,6 +206,11 @@ async fn main() -> anyhow::Result<()> {
     info!(port = port, "CAVE Runtime listening");
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// Serves the portal dashboard HTML at "/".
+async fn portal_index() -> axum::response::Html<&'static str> {
+    axum::response::Html(include_str!("portal_index.html"))
 }
 
 async fn health() -> axum::Json<serde_json::Value> {
