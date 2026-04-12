@@ -1,5 +1,15 @@
-//! Automatic request metrics: request count, error count, and active
+//! Automatic request metrics: request count, error count, latency, and active
 //! connections per service pair.  Exports Prometheus text format.
+//!
+//! Automatic metrics (Istio parity):
+//!   cave_mesh_requests_total{source,destination,method,response_code}
+//!   cave_mesh_errors_total{...}
+//!   cave_mesh_request_duration_ms_total{...}
+//!   cave_mesh_bytes_total{...}
+//!   cave_mesh_active_connections{service}
+//!   cave_mesh_circuit_trips_total{service}
+//!   cave_mesh_rate_limited_total{service}
+//!   cave_mesh_faults_injected_total{service}
 
 use prometheus_client::{
     encoding::{text::encode, EncodeLabelSet},
@@ -7,10 +17,6 @@ use prometheus_client::{
     registry::Registry,
 };
 use std::sync::{Arc, Mutex};
-
-// ─────────────────────────────────────────────────────────────
-// Label Sets
-// ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 pub struct RequestLabels {
@@ -25,26 +31,15 @@ pub struct ServiceLabels {
     pub service: String,
 }
 
-// ─────────────────────────────────────────────────────────────
-// MeshMetrics
-// ─────────────────────────────────────────────────────────────
-
-/// Prometheus metrics for the CAVE service mesh.
 #[derive(Clone)]
 pub struct MeshMetrics {
-    /// Total requests routed through the mesh.
     pub request_total: Family<RequestLabels, Counter>,
-    /// Total requests that resulted in a 5xx response.
     pub error_total: Family<RequestLabels, Counter>,
-    /// Total bytes transferred per service pair (approximated).
+    pub request_duration_ms_total: Family<RequestLabels, Counter>,
     pub bytes_total: Family<RequestLabels, Counter>,
-    /// Active (in-flight) connections per service.
     pub active_connections: Family<ServiceLabels, Gauge>,
-    /// Total circuit-breaker trips.
     pub circuit_trips_total: Family<ServiceLabels, Counter>,
-    /// Total requests rate-limited.
     pub rate_limited_total: Family<ServiceLabels, Counter>,
-    /// Total fault injections applied.
     pub faults_injected_total: Family<ServiceLabels, Counter>,
 
     registry: Arc<Mutex<Registry>>,
@@ -56,6 +51,7 @@ impl MeshMetrics {
 
         let request_total = Family::<RequestLabels, Counter>::default();
         let error_total = Family::<RequestLabels, Counter>::default();
+        let request_duration_ms_total = Family::<RequestLabels, Counter>::default();
         let bytes_total = Family::<RequestLabels, Counter>::default();
         let active_connections = Family::<ServiceLabels, Gauge>::default();
         let circuit_trips_total = Family::<ServiceLabels, Counter>::default();
@@ -71,6 +67,11 @@ impl MeshMetrics {
             "cave_mesh_errors_total",
             "Total 5xx errors in the CAVE mesh",
             error_total.clone(),
+        );
+        registry.register(
+            "cave_mesh_request_duration_ms_total",
+            "Cumulative request duration in milliseconds",
+            request_duration_ms_total.clone(),
         );
         registry.register(
             "cave_mesh_bytes_total",
@@ -101,6 +102,7 @@ impl MeshMetrics {
         Self {
             request_total,
             error_total,
+            request_duration_ms_total,
             bytes_total,
             active_connections,
             circuit_trips_total,
@@ -110,7 +112,6 @@ impl MeshMetrics {
         }
     }
 
-    /// Record a routed request.
     pub fn record_request(
         &self,
         source: &str,
@@ -118,6 +119,7 @@ impl MeshMetrics {
         method: &str,
         status: u16,
         bytes: u64,
+        duration_ms: u64,
     ) {
         let labels = RequestLabels {
             source: source.to_string(),
@@ -132,9 +134,11 @@ impl MeshMetrics {
         if bytes > 0 {
             self.bytes_total.get_or_create(&labels).inc_by(bytes);
         }
+        if duration_ms > 0 {
+            self.request_duration_ms_total.get_or_create(&labels).inc_by(duration_ms);
+        }
     }
 
-    /// Update active connection count for a service.
     pub fn inc_connections(&self, service: &str) {
         let lbl = ServiceLabels { service: service.to_string() };
         self.active_connections.get_or_create(&lbl).inc();
@@ -145,25 +149,21 @@ impl MeshMetrics {
         self.active_connections.get_or_create(&lbl).dec();
     }
 
-    /// Record a circuit-breaker trip.
     pub fn record_circuit_trip(&self, service: &str) {
         let lbl = ServiceLabels { service: service.to_string() };
         self.circuit_trips_total.get_or_create(&lbl).inc();
     }
 
-    /// Record a rate-limited request.
     pub fn record_rate_limited(&self, service: &str) {
         let lbl = ServiceLabels { service: service.to_string() };
         self.rate_limited_total.get_or_create(&lbl).inc();
     }
 
-    /// Record a fault injection.
     pub fn record_fault_injected(&self, service: &str) {
         let lbl = ServiceLabels { service: service.to_string() };
         self.faults_injected_total.get_or_create(&lbl).inc();
     }
 
-    /// Export all metrics in Prometheus text exposition format.
     pub fn export(&self) -> String {
         let registry = self.registry.lock().unwrap();
         let mut output = String::new();

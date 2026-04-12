@@ -1,11 +1,12 @@
 //! JWT validation (RequestAuthentication) and authorization policy engine
 //! (AuthorizationPolicy).
 //!
-//! AuthorizationPolicy logic follows Istio semantics:
-//!   1. If any DENY policy matches → DENY.
-//!   2. If no ALLOW policy exists for the workload → ALLOW (default-allow mesh).
-//!   3. If at least one ALLOW policy exists, the request must match one → ALLOW.
-//!   4. Otherwise → DENY.
+//! Istio semantics:
+//!   1. DENY policies evaluated first — any match → DENY.
+//!   2. No ALLOW policies for the workload → default-allow.
+//!   3. At least one ALLOW policy exists → request must match one.
+//!   4. CUSTOM action → delegated to external provider (recorded but not blocked here).
+//!   5. AUDIT action → always allowed, decision logged.
 
 use crate::{
     error::{MeshError, MeshResult},
@@ -20,7 +21,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
 };
-use tracing::debug;
+use tracing::{debug, info};
 
 // ─────────────────────────────────────────────────────────────
 // AuthEngine
@@ -30,8 +31,7 @@ use tracing::debug;
 pub struct AuthEngine {
     request_auth: Arc<RwLock<HashMap<String, RequestAuthentication>>>,
     authz_policies: Arc<RwLock<HashMap<String, AuthorizationPolicy>>>,
-    /// Shared HMAC secret for HS256 JWT validation (test / dev only).
-    /// Production deployments inject RSA public keys per issuer.
+    /// HMAC secret for HS256 JWT validation (dev/test; prod uses per-issuer RSA keys).
     pub hmac_secret: Arc<RwLock<String>>,
 }
 
@@ -79,18 +79,12 @@ impl AuthEngine {
     }
 
     pub fn list_authz_policies(&self) -> Vec<AuthorizationPolicy> {
-        self.authz_policies
-            .read()
-            .unwrap()
-            .values()
-            .cloned()
-            .collect()
+        self.authz_policies.read().unwrap().values().cloned().collect()
     }
 
     // ─── JWT Validation ──────────────────────────────────────
 
-    /// Validate a JWT token using the configured HMAC secret.
-    /// Returns the decoded claims on success.
+    /// Validate a JWT using the configured HMAC secret (HS256).
     pub fn validate_jwt(&self, token: &str) -> MeshResult<HashMap<String, Value>> {
         let secret = self.hmac_secret.read().unwrap();
         let key = DecodingKey::from_secret(secret.as_bytes());
@@ -111,7 +105,6 @@ impl AuthEngine {
         token: Option<&str>,
         ctx: &mut RequestContext,
     ) -> MeshResult<()> {
-        // Find applicable RequestAuthentication policies
         let policies: Vec<RequestAuthentication> = {
             let map = self.request_auth.read().unwrap();
             map.values()
@@ -131,19 +124,17 @@ impl AuthEngine {
         };
 
         if policies.is_empty() {
-            // No JWT policy → pass-through
             return Ok(());
         }
 
-        // If a token was provided, validate it
         if let Some(raw_token) = token {
-            match self.validate_jwt(raw_token) {
-                Ok(claims) => {
-                    ctx.jwt_claims = Some(claims);
-                    return Ok(());
-                }
-                Err(e) => return Err(e),
+            let claims = self.validate_jwt(raw_token)?;
+            // Populate request_principal from sub claim
+            if let Some(Value::String(sub)) = claims.get("sub") {
+                ctx.request_principal = Some(sub.clone());
             }
+            ctx.jwt_claims = Some(claims);
+            return Ok(());
         }
 
         // Token required but absent
@@ -152,7 +143,7 @@ impl AuthEngine {
 
     // ─── Authorization ───────────────────────────────────────
 
-    /// Check whether the request is authorized to reach the workload.
+    /// Check authorization against all applicable policies.
     pub fn check_authz(
         &self,
         namespace: &str,
@@ -181,11 +172,11 @@ impl AuthEngine {
             namespace = %namespace,
             path = %ctx.path,
             method = %ctx.method,
-            policies = %policies.len(),
+            policies = policies.len(),
             "AuthzPolicy check"
         );
 
-        // ── Step 1: check DENY policies ──────────────────────
+        // ── 1. DENY ──────────────────────────────────────────
         for policy in policies.iter().filter(|p| p.action == AuthzAction::Deny) {
             if policy.rules.is_empty() || self.rules_match(&policy.rules, ctx) {
                 return Err(MeshError::AuthzDenied(format!(
@@ -195,66 +186,71 @@ impl AuthEngine {
             }
         }
 
-        // ── Step 2: collect ALLOW policies ───────────────────
-        let allow_policies: Vec<&AuthorizationPolicy> = policies
-            .iter()
-            .filter(|p| p.action == AuthzAction::Allow)
-            .collect();
-
-        if allow_policies.is_empty() {
-            // No ALLOW policies → default-allow
-            return Ok(());
+        // ── 2. AUDIT (allow, log) ────────────────────────────
+        for policy in policies.iter().filter(|p| p.action == AuthzAction::Audit) {
+            if policy.rules.is_empty() || self.rules_match(&policy.rules, ctx) {
+                info!(policy = %policy.name, path = %ctx.path, "AUDIT policy matched");
+                // Audit does not block
+            }
         }
 
-        // ── Step 3: at least one ALLOW rule must match ───────
+        // ── 3. CUSTOM (delegate to external authz) ───────────
+        for policy in policies.iter().filter(|p| p.action == AuthzAction::Custom) {
+            if policy.rules.is_empty() || self.rules_match(&policy.rules, ctx) {
+                // In a real implementation this would call the external provider.
+                // Here we allow but record the delegation.
+                if let Some(provider) = &policy.provider {
+                    debug!(provider = %provider.name, "CUSTOM authz delegation (pass-through in control plane)");
+                }
+            }
+        }
+
+        // ── 4. ALLOW ─────────────────────────────────────────
+        let allow_policies: Vec<&AuthorizationPolicy> =
+            policies.iter().filter(|p| p.action == AuthzAction::Allow).collect();
+
+        if allow_policies.is_empty() {
+            return Ok(()); // default-allow
+        }
+
         for policy in &allow_policies {
             if policy.rules.is_empty() || self.rules_match(&policy.rules, ctx) {
                 return Ok(());
             }
         }
 
-        Err(MeshError::AuthzDenied(
-            "No ALLOW policy matched".to_string(),
-        ))
+        Err(MeshError::AuthzDenied("No ALLOW policy matched".to_string()))
     }
 
-    // ─── Internal match helpers ──────────────────────────────
+    // ─── Internal helpers ────────────────────────────────────
 
-    /// Returns true if ANY rule in the slice matches the request (OR semantics).
     fn rules_match(&self, rules: &[AuthzRule], ctx: &RequestContext) -> bool {
         rules.iter().any(|rule| self.single_rule_matches(rule, ctx))
     }
 
     fn single_rule_matches(&self, rule: &AuthzRule, ctx: &RequestContext) -> bool {
-        // FROM: all specified sources must match (AND)
-        if !rule.from.is_empty()
-            && !rule
-                .from
-                .iter()
-                .all(|src| self.source_matches(src, ctx))
-        {
+        if !rule.from.is_empty() && !rule.from.iter().all(|src| self.source_matches(src, ctx)) {
             return false;
         }
-        // TO: all specified operations must match (AND)
-        if !rule.to.is_empty()
-            && !rule.to.iter().all(|op| self.op_matches(op, ctx))
-        {
+        if !rule.to.is_empty() && !rule.to.iter().all(|op| self.op_matches(op, ctx)) {
             return false;
         }
-        // WHEN: all conditions must match (AND)
-        if !rule.when.is_empty()
-            && !rule.when.iter().all(|cond| self.cond_matches(cond, ctx))
-        {
+        if !rule.when.is_empty() && !rule.when.iter().all(|cond| self.cond_matches(cond, ctx)) {
             return false;
         }
         true
     }
 
     fn source_matches(&self, src: &Source, ctx: &RequestContext) -> bool {
-        // Positive matches
         if !src.principals.is_empty() {
             let principal = ctx.source_principal.as_deref().unwrap_or("");
             if !src.principals.iter().any(|p| glob_match(p, principal)) {
+                return false;
+            }
+        }
+        if !src.request_principals.is_empty() {
+            let rp = ctx.request_principal.as_deref().unwrap_or("");
+            if !src.request_principals.iter().any(|p| glob_match(p, rp)) {
                 return false;
             }
         }
@@ -270,10 +266,22 @@ impl AuthEngine {
                 return false;
             }
         }
+        if !src.remote_ip_blocks.is_empty() {
+            let ip = ctx.remote_ip.as_deref().unwrap_or("");
+            if !src.remote_ip_blocks.iter().any(|b| ip_in_block(ip, b)) {
+                return false;
+            }
+        }
         // Negative matches
         if !src.not_principals.is_empty() {
             let principal = ctx.source_principal.as_deref().unwrap_or("");
             if src.not_principals.iter().any(|p| glob_match(p, principal)) {
+                return false;
+            }
+        }
+        if !src.not_request_principals.is_empty() {
+            let rp = ctx.request_principal.as_deref().unwrap_or("");
+            if src.not_request_principals.iter().any(|p| glob_match(p, rp)) {
                 return false;
             }
         }
@@ -283,23 +291,23 @@ impl AuthEngine {
                 return false;
             }
         }
+        if !src.not_ip_blocks.is_empty() {
+            let ip = ctx.source_ip.as_deref().unwrap_or("");
+            if src.not_ip_blocks.iter().any(|b| ip_in_block(ip, b)) {
+                return false;
+            }
+        }
         true
     }
 
     fn op_matches(&self, op: &Operation, ctx: &RequestContext) -> bool {
-        if !op.methods.is_empty()
-            && !op.methods.iter().any(|m| m == &ctx.method || m == "*")
-        {
+        if !op.methods.is_empty() && !op.methods.iter().any(|m| m == &ctx.method || m == "*") {
             return false;
         }
-        if !op.paths.is_empty()
-            && !op.paths.iter().any(|p| glob_match(p, &ctx.path))
-        {
+        if !op.paths.is_empty() && !op.paths.iter().any(|p| glob_match(p, &ctx.path)) {
             return false;
         }
-        if !op.hosts.is_empty()
-            && !op.hosts.iter().any(|h| h == &ctx.host || h == "*")
-        {
+        if !op.hosts.is_empty() && !op.hosts.iter().any(|h| h == &ctx.host || h == "*") {
             return false;
         }
         if !op.ports.is_empty() {
@@ -308,16 +316,22 @@ impl AuthEngine {
                 return false;
             }
         }
-        // Negative
         if !op.not_methods.is_empty()
             && op.not_methods.iter().any(|m| m == &ctx.method || m == "*")
         {
             return false;
         }
-        if !op.not_paths.is_empty()
-            && op.not_paths.iter().any(|p| glob_match(p, &ctx.path))
-        {
+        if !op.not_paths.is_empty() && op.not_paths.iter().any(|p| glob_match(p, &ctx.path)) {
             return false;
+        }
+        if !op.not_hosts.is_empty() && op.not_hosts.iter().any(|h| h == &ctx.host || h == "*") {
+            return false;
+        }
+        if !op.not_ports.is_empty() {
+            let port_str = ctx.port.map(|p| p.to_string()).unwrap_or_default();
+            if op.not_ports.iter().any(|p| p == &port_str || p == "*") {
+                return false;
+            }
         }
         true
     }
@@ -326,11 +340,9 @@ impl AuthEngine {
         let value = self.resolve_condition_value(&cond.key, ctx);
         let val_str = value.as_deref().unwrap_or("");
 
-        // Positive: value must be in cond.values (OR)
         if !cond.values.is_empty() && !cond.values.iter().any(|v| v == val_str || v == "*") {
             return false;
         }
-        // Negative: value must NOT be in cond.not_values
         if !cond.not_values.is_empty()
             && cond.not_values.iter().any(|v| v == val_str || v == "*")
         {
@@ -339,26 +351,22 @@ impl AuthEngine {
         true
     }
 
-    /// Resolve a condition key to a value from the request context.
     fn resolve_condition_value(&self, key: &str, ctx: &RequestContext) -> Option<String> {
         match key {
             "source.ip" => ctx.source_ip.clone(),
             "source.namespace" => ctx.source_namespace.clone(),
             "source.principal" => ctx.source_principal.clone(),
+            "request.auth.principal" => ctx.request_principal.clone(),
             "request.method" => Some(ctx.method.clone()),
             "request.path" => Some(ctx.path.clone()),
             _ if key.starts_with("request.auth.claims[") => {
-                // e.g. "request.auth.claims[group]"
                 let claim_name = key
                     .trim_start_matches("request.auth.claims[")
                     .trim_end_matches(']');
-                ctx.jwt_claims
-                    .as_ref()
-                    .and_then(|c| c.get(claim_name))
-                    .and_then(|v| match v {
-                        Value::String(s) => Some(s.clone()),
-                        other => Some(other.to_string()),
-                    })
+                ctx.jwt_claims.as_ref().and_then(|c| c.get(claim_name)).and_then(|v| match v {
+                    Value::String(s) => Some(s.clone()),
+                    other => Some(other.to_string()),
+                })
             }
             _ => None,
         }
@@ -369,15 +377,10 @@ impl AuthEngine {
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-/// Simple glob matching: `*` matches anything, `?` matches one char.
 fn glob_match(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
+    if pattern == "*" || pattern == value {
         return true;
     }
-    if pattern == value {
-        return true;
-    }
-    // Wildcard prefix/suffix: "cluster.local/*/sa/*"
     if pattern.contains('*') {
         let parts: Vec<&str> = pattern.split('*').collect();
         let mut pos = 0usize;
@@ -391,9 +394,7 @@ fn glob_match(pattern: &str, value: &str) -> bool {
                 }
                 pos = part.len();
             } else if i == parts.len() - 1 {
-                if !value[pos..].ends_with(part) {
-                    return false;
-                }
+                return value[pos..].ends_with(part);
             } else if let Some(idx) = value[pos..].find(part) {
                 pos += idx + part.len();
             } else {
@@ -405,12 +406,10 @@ fn glob_match(pattern: &str, value: &str) -> bool {
     false
 }
 
-/// Minimal IP block check — handles exact match and /prefix notation.
 fn ip_in_block(ip: &str, block: &str) -> bool {
     if block == "*" || block == ip {
         return true;
     }
-    // Very basic CIDR: if block has no /, treat as prefix string match
     if let Some(prefix) = block.strip_suffix("/32") {
         return ip == prefix;
     }

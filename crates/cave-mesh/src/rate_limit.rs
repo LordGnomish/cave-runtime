@@ -1,7 +1,4 @@
 //! Token-bucket rate limiter per service.
-//!
-//! Each service gets an independent bucket whose refill rate is derived from
-//! the configured `RateLimitPolicy` (requests per second/minute/hour).
 
 use crate::models::{RateLimitPolicy, RateLimitUnit};
 use std::{
@@ -11,28 +8,18 @@ use std::{
 };
 use tracing::debug;
 
-// ─────────────────────────────────────────────────────────────
-// Token Bucket
-// ─────────────────────────────────────────────────────────────
-
 struct TokenBucket {
     capacity: f64,
     tokens: f64,
-    refill_rate: f64, // tokens per second
+    refill_rate: f64,
     last_refill: Instant,
 }
 
 impl TokenBucket {
     fn new(capacity: f64, refill_rate: f64) -> Self {
-        Self {
-            capacity,
-            tokens: capacity, // start full
-            refill_rate,
-            last_refill: Instant::now(),
-        }
+        Self { capacity, tokens: capacity, refill_rate, last_refill: Instant::now() }
     }
 
-    /// Returns `true` if a token was consumed (request allowed).
     fn try_consume(&mut self) -> bool {
         self.refill();
         if self.tokens >= 1.0 {
@@ -54,17 +41,12 @@ impl TokenBucket {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// RateLimiter
-// ─────────────────────────────────────────────────────────────
-
 #[derive(Debug)]
 pub enum RateLimitDecision {
     Allowed,
     Denied { service: String },
 }
 
-/// Thread-safe rate limiter keyed by service name.
 #[derive(Clone)]
 pub struct RateLimiter {
     policies: Arc<RwLock<HashMap<String, RateLimitPolicy>>>,
@@ -85,18 +67,14 @@ impl RateLimiter {
         }
     }
 
-    // ─── Policy CRUD ─────────────────────────────────────────
-
     pub fn upsert_policy(&self, policy: RateLimitPolicy) {
         let name = policy.name.clone();
         {
             let mut map = self.policies.write().unwrap();
             map.insert(name.clone(), policy.clone());
         }
-        // Rebuild bucket with new limits
         if let Some(rule) = policy.rules.first() {
             let rps = rule.unit.to_rps(rule.requests_per_unit);
-            // capacity = burst: allow up to 2× the per-second rate
             let capacity = (rps * 2.0).max(1.0);
             let mut buckets = self.buckets.lock().unwrap();
             buckets.insert(name, TokenBucket::new(capacity, rps));
@@ -112,36 +90,24 @@ impl RateLimiter {
         self.policies.read().unwrap().values().cloned().collect()
     }
 
-    // ─── Enforcement ─────────────────────────────────────────
-
-    /// Try to consume a token for `service`.  Returns `Allowed` if a matching
-    /// policy exists AND a token is available, or if no policy is configured.
     pub fn check_and_consume(&self, service: &str) -> RateLimitDecision {
-        let has_policy = {
-            let map = self.policies.read().unwrap();
-            map.contains_key(service)
-        };
-
+        let has_policy = { self.policies.read().unwrap().contains_key(service) };
         if !has_policy {
             return RateLimitDecision::Allowed;
         }
 
         let mut buckets = self.buckets.lock().unwrap();
-
-        // Ensure bucket exists (in case it was removed or never created)
         let bucket = buckets.entry(service.to_string()).or_insert_with(|| {
             let rps = self.default_rps_for(service);
             TokenBucket::new((rps * 2.0).max(1.0), rps)
         });
 
         if bucket.try_consume() {
-            debug!(service = %service, tokens = %bucket.available_tokens(), "Rate limit: allowed");
+            debug!(service = %service, tokens = bucket.available_tokens(), "Rate limit: allowed");
             RateLimitDecision::Allowed
         } else {
             debug!(service = %service, "Rate limit: denied");
-            RateLimitDecision::Denied {
-                service: service.to_string(),
-            }
+            RateLimitDecision::Denied { service: service.to_string() }
         }
     }
 
@@ -153,7 +119,6 @@ impl RateLimiter {
             .unwrap_or(100.0)
     }
 
-    /// Snapshot of all bucket states.
     pub fn snapshot(&self) -> Vec<RateLimiterSnapshot> {
         let buckets = self.buckets.lock().unwrap();
         buckets
@@ -166,26 +131,9 @@ impl RateLimiter {
             })
             .collect()
     }
-}
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RateLimiterSnapshot {
-    pub service: String,
-    pub available_tokens: f64,
-    pub capacity: f64,
-    pub refill_rate_rps: f64,
-}
-
-// ─────────────────────────────────────────────────────────────
-// Direct constructor for tests
-// ─────────────────────────────────────────────────────────────
-
-impl RateLimiter {
-    /// Create a rate-limited policy directly (helper for tests).
-    pub fn with_policy(
-        service: impl Into<String>,
-        requests_per_second: u64,
-    ) -> Self {
+    /// Helper for tests — create a pre-configured rate limiter.
+    pub fn with_policy(service: impl Into<String>, requests_per_second: u64) -> Self {
         let rl = Self::new();
         let name = service.into();
         rl.upsert_policy(RateLimitPolicy {
@@ -201,4 +149,12 @@ impl RateLimiter {
         });
         rl
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RateLimiterSnapshot {
+    pub service: String,
+    pub available_tokens: f64,
+    pub capacity: f64,
+    pub refill_rate_rps: f64,
 }

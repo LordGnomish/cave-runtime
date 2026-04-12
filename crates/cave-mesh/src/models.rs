@@ -1,7 +1,11 @@
 //! Istio-equivalent resource types for the CAVE service mesh.
 //!
-//! Covers VirtualService, DestinationRule, Gateway, ServiceEntry,
-//! PeerAuthentication, RequestAuthentication, and AuthorizationPolicy.
+//! Full parity with Istio v1.20+:
+//!   Traffic:     VirtualService, DestinationRule, Gateway, ServiceEntry, Sidecar
+//!   Workload:    WorkloadEntry, WorkloadGroup, EnvoyFilter
+//!   Security:    PeerAuthentication, RequestAuthentication, AuthorizationPolicy
+//!   Observability: Telemetry (metrics/logs/tracing per workload)
+//!   Rate Limit:  RateLimitPolicy (CAVE extension)
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,14 +32,14 @@ pub enum HealthStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Endpoint {
-    /// host:port or bare IP
     pub address: String,
     pub port: u16,
     pub health: HealthStatus,
-    /// Relative routing weight (default 100)
     pub weight: u32,
     pub labels: HashMap<String, String>,
     pub last_checked: DateTime<Utc>,
+    pub locality: Option<Locality>,
+    pub network: Option<String>,
 }
 
 impl Endpoint {
@@ -47,6 +51,8 @@ impl Endpoint {
             weight: 100,
             labels: HashMap::new(),
             last_checked: Utc::now(),
+            locality: None,
+            network: None,
         }
     }
 
@@ -56,20 +62,39 @@ impl Endpoint {
     }
 }
 
+/// Locality descriptor (region/zone/subzone) matching Istio's Locality proto.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct Locality {
+    pub region: String,
+    pub zone: Option<String>,
+    pub sub_zone: Option<String>,
+}
+
+impl Locality {
+    pub fn new(region: impl Into<String>) -> Self {
+        Self { region: region.into(), zone: None, sub_zone: None }
+    }
+
+    pub fn with_zone(mut self, zone: impl Into<String>) -> Self {
+        self.zone = Some(zone.into());
+        self
+    }
+}
+
 // ─────────────────────────────────────────────────────────────
 // VirtualService
 // ─────────────────────────────────────────────────────────────
 
-/// Maps to Istio VirtualService: host-based HTTP routing rules.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VirtualService {
     pub name: String,
     pub namespace: String,
-    /// Hosts this VS applies to (e.g. "reviews.prod.svc.cluster.local")
     pub hosts: Vec<String>,
-    /// Gateway names this VS is attached to (empty = mesh-internal)
     pub gateways: Vec<String>,
     pub http: Vec<HttpRoute>,
+    pub tcp: Vec<TcpRoute>,
+    pub tls: Vec<TlsRoute>,
+    pub export_to: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -83,6 +108,9 @@ impl VirtualService {
             hosts,
             gateways: vec![],
             http: vec![],
+            tcp: vec![],
+            tls: vec![],
+            export_to: vec![".".to_string()],
             created_at: now,
             updated_at: now,
         }
@@ -92,19 +120,58 @@ impl VirtualService {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpRoute {
     pub name: Option<String>,
-    /// All match rules must pass (AND logic).  Empty = match everything.
     pub match_rules: Vec<HttpMatchRequest>,
-    /// Weighted destinations
     pub route: Vec<HttpRouteDestination>,
+    pub redirect: Option<HttpRedirect>,
+    pub direct_response: Option<HttpDirectResponse>,
+    pub rewrite: Option<HttpRewrite>,
     pub fault: Option<HttpFaultInjection>,
     pub retries: Option<HttpRetry>,
-    /// Route-level timeout in milliseconds
     pub timeout_ms: Option<u64>,
     pub mirror: Option<Destination>,
+    pub mirror_percentage: Option<f64>,
     pub headers: Option<HeaderOperations>,
+    pub cors_policy: Option<CorsPolicy>,
 }
 
-/// A single match predicate for an HTTP request.
+/// HTTP redirect (307/301/302).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpRedirect {
+    pub uri: Option<String>,
+    pub authority: Option<String>,
+    pub port: Option<u16>,
+    pub scheme: Option<String>,
+    /// HTTP status code (301, 302, 303, 307, 308).  Default 301.
+    pub redirect_code: u32,
+}
+
+impl Default for HttpRedirect {
+    fn default() -> Self {
+        Self { uri: None, authority: None, port: None, scheme: None, redirect_code: 301 }
+    }
+}
+
+/// URI / authority rewrite before forwarding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpRewrite {
+    pub uri: Option<String>,
+    pub authority: Option<String>,
+}
+
+/// Return a fixed response without forwarding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpDirectResponse {
+    pub status: u32,
+    pub body: Option<HttpBody>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpBody {
+    pub string: Option<String>,
+    pub bytes: Option<String>, // base64-encoded
+}
+
+/// Match predicate for an HTTP request.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HttpMatchRequest {
     pub name: Option<String>,
@@ -113,11 +180,14 @@ pub struct HttpMatchRequest {
     pub authority: Option<StringMatch>,
     pub method: Option<StringMatch>,
     pub query_params: HashMap<String, StringMatch>,
-    /// Source labels the request pod must carry
     pub source_labels: HashMap<String, String>,
+    pub gateways: Vec<String>,
+    pub source_namespace: Option<String>,
+    pub without_headers: HashMap<String, StringMatch>,
+    pub port: Option<u32>,
+    pub ignore_uri_case: bool,
 }
 
-/// Istio StringMatch: exact, prefix, or regex.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum StringMatch {
     Exact(String),
@@ -130,11 +200,9 @@ impl StringMatch {
         match self {
             StringMatch::Exact(s) => s == value,
             StringMatch::Prefix(s) => value.starts_with(s.as_str()),
-            StringMatch::Regex(pattern) => {
-                regex::Regex::new(pattern)
-                    .map(|re| re.is_match(value))
-                    .unwrap_or(false)
-            }
+            StringMatch::Regex(pattern) => regex::Regex::new(pattern)
+                .map(|re| re.is_match(value))
+                .unwrap_or(false),
         }
     }
 }
@@ -142,7 +210,6 @@ impl StringMatch {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpRouteDestination {
     pub destination: Destination,
-    /// 0-100 weight; all destinations in a route must sum to 100
     pub weight: Option<u32>,
     pub headers: Option<HeaderOperations>,
 }
@@ -172,6 +239,16 @@ pub struct HeaderManipulation {
     pub remove: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsPolicy {
+    pub allow_origins: Vec<StringMatch>,
+    pub allow_methods: Vec<String>,
+    pub allow_headers: Vec<String>,
+    pub expose_headers: Vec<String>,
+    pub max_age_seconds: Option<u64>,
+    pub allow_credentials: bool,
+}
+
 // ─── Fault Injection ──────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -182,17 +259,15 @@ pub struct HttpFaultInjection {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FixedDelay {
-    /// 0.0-100.0 — percentage of requests to delay
     pub percent: f64,
     pub fixed_delay_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpAbort {
-    /// 0.0-100.0 — percentage of requests to abort
     pub percent: f64,
-    /// HTTP status code to return on abort
     pub http_status: u16,
+    pub grpc_status: Option<String>,
 }
 
 // ─── Retry ────────────────────────────────────────────────────
@@ -201,8 +276,46 @@ pub struct HttpAbort {
 pub struct HttpRetry {
     pub attempts: u32,
     pub per_try_timeout_ms: Option<u64>,
-    /// Comma-separated retry conditions: "5xx", "gateway-error", "retriable-4xx"
     pub retry_on: Vec<String>,
+    pub retry_remote_localities: bool,
+}
+
+// ─── TCP / TLS routes ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcpRoute {
+    pub match_rules: Vec<L4MatchAttributes>,
+    pub route: Vec<RouteDestination>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct L4MatchAttributes {
+    pub destination_subnets: Vec<String>,
+    pub port: Option<u32>,
+    pub source_labels: HashMap<String, String>,
+    pub gateways: Vec<String>,
+    pub source_namespace: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteDestination {
+    pub destination: Destination,
+    pub weight: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsRoute {
+    pub match_rules: Vec<TlsMatchAttributes>,
+    pub route: Vec<RouteDestination>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsMatchAttributes {
+    pub sni_hosts: Vec<String>,
+    pub destination_subnets: Vec<String>,
+    pub port: Option<u32>,
+    pub source_labels: HashMap<String, String>,
+    pub gateways: Vec<String>,
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -213,16 +326,20 @@ pub struct HttpRetry {
 pub struct DestinationRule {
     pub name: String,
     pub namespace: String,
-    /// Host this rule applies to
     pub host: String,
     pub traffic_policy: Option<TrafficPolicy>,
     pub subsets: Vec<SubsetDefinition>,
+    pub export_to: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl DestinationRule {
-    pub fn new(name: impl Into<String>, namespace: impl Into<String>, host: impl Into<String>) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        namespace: impl Into<String>,
+        host: impl Into<String>,
+    ) -> Self {
         let now = Utc::now();
         Self {
             name: name.into(),
@@ -230,6 +347,7 @@ impl DestinationRule {
             host: host.into(),
             traffic_policy: None,
             subsets: vec![],
+            export_to: vec![".".to_string()],
             created_at: now,
             updated_at: now,
         }
@@ -241,6 +359,8 @@ pub struct TrafficPolicy {
     pub load_balancer: Option<LoadBalancerSettings>,
     pub connection_pool: Option<ConnectionPoolSettings>,
     pub outlier_detection: Option<OutlierDetection>,
+    pub tls: Option<ClientTlsSettings>,
+    pub port_level_settings: Vec<PortTrafficPolicy>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -249,12 +369,67 @@ pub enum LoadBalancerMode {
     LeastConn,
     Random,
     Passthrough,
+    ConsistentHash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadBalancerSettings {
     pub mode: LoadBalancerMode,
-    pub consistent_hash_header: Option<String>,
+    pub consistent_hash: Option<ConsistentHashLb>,
+    pub locality_lb_setting: Option<LocalityLbSetting>,
+    pub warmup_duration_secs: Option<u64>,
+}
+
+/// Consistent-hash load balancing — multiple key types (Istio parity).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsistentHashLb {
+    pub key_type: ConsistentHashKey,
+    pub minimum_ring_size: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ConsistentHashKey {
+    /// Hash on an HTTP header value.
+    HttpHeaderName(String),
+    /// Hash on a cookie (name, path, TTL).
+    HttpCookie { name: String, path: Option<String>, ttl_seconds: u64 },
+    /// Hash on the source IP.
+    UseSourceIp,
+    /// Hash on a query parameter.
+    HttpQueryParameterName(String),
+}
+
+/// Locality-aware load balancing distribution and failover.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalityLbSetting {
+    pub enabled: Option<bool>,
+    pub distribute: Vec<LocalityWeightSetting>,
+    pub failover: Vec<LocalityFailover>,
+    pub failover_priority: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalityWeightSetting {
+    /// Origin locality (e.g. "us-east1/*").
+    pub from: String,
+    /// Distribution map: locality → weight (0-100).
+    pub to: HashMap<String, u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalityFailover {
+    pub from: String,
+    pub to: String,
+}
+
+/// Per-port traffic policy (overrides top-level for a specific port).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortTrafficPolicy {
+    pub port: PortSelector,
+    pub load_balancer: Option<LoadBalancerSettings>,
+    pub connection_pool: Option<ConnectionPoolSettings>,
+    pub outlier_detection: Option<OutlierDetection>,
+    pub tls: Option<ClientTlsSettings>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -267,6 +442,14 @@ pub struct ConnectionPoolSettings {
 pub struct TcpSettings {
     pub max_connections: u32,
     pub connect_timeout_ms: u64,
+    pub tcp_keepalive: Option<TcpKeepalive>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcpKeepalive {
+    pub probes: u32,
+    pub time_seconds: u32,
+    pub interval_seconds: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,21 +457,52 @@ pub struct HttpPoolSettings {
     pub max_requests_per_connection: u32,
     pub max_retries: u32,
     pub max_pending_requests: u32,
+    pub idle_timeout_ms: Option<u64>,
+    pub h2_upgrade_policy: H2UpgradePolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum H2UpgradePolicy {
+    Default,
+    DoNotUpgrade,
+    Upgrade,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutlierDetection {
     pub consecutive_errors: u32,
+    pub consecutive_gateway_errors: Option<u32>,
+    pub consecutive_local_origin_errors: Option<u32>,
     pub interval_ms: u64,
     pub base_ejection_time_ms: u64,
     pub max_ejection_percent: u8,
     pub min_health_percent: u8,
+    pub split_external_local_origin_errors: bool,
+}
+
+/// Client-side TLS settings for outbound connections (DestinationRule).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientTlsSettings {
+    pub mode: ClientTlsMode,
+    pub client_certificate: Option<String>,
+    pub private_key: Option<String>,
+    pub ca_certificates: Option<String>,
+    pub credential_name: Option<String>,
+    pub subject_alt_names: Vec<String>,
+    pub sni: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ClientTlsMode {
+    Disable,
+    Simple,
+    Mutual,
+    IstioMutual,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubsetDefinition {
     pub name: String,
-    /// Pod labels that select this subset
     pub labels: HashMap<String, String>,
     pub traffic_policy: Option<TrafficPolicy>,
 }
@@ -301,7 +515,6 @@ pub struct SubsetDefinition {
 pub struct Gateway {
     pub name: String,
     pub namespace: String,
-    /// Selects the gateway pod by label
     pub selector: HashMap<String, String>,
     pub servers: Vec<Server>,
     pub created_at: DateTime<Utc>,
@@ -311,17 +524,18 @@ pub struct Gateway {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Server {
     pub port: ServerPort,
-    /// Virtual hosts served through this server block
     pub hosts: Vec<String>,
     pub tls: Option<ServerTlsSettings>,
+    pub default_endpoint: Option<String>,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerPort {
     pub number: u16,
     pub name: String,
-    /// HTTP | HTTPS | GRPC | HTTP2 | MONGO | TCP | TLS
     pub protocol: String,
+    pub target_port: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -331,6 +545,12 @@ pub struct ServerTlsSettings {
     pub private_key: Option<String>,
     pub ca_certificates: Option<String>,
     pub credential_name: Option<String>,
+    pub subject_alt_names: Vec<String>,
+    pub verify_certificate_spki: Vec<String>,
+    pub verify_certificate_hash: Vec<String>,
+    pub min_protocol_version: Option<TlsProtocol>,
+    pub max_protocol_version: Option<TlsProtocol>,
+    pub cipher_suites: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -342,11 +562,19 @@ pub enum TlsMode {
     IstioMutual,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TlsProtocol {
+    TlsAuto,
+    Tlsv10,
+    Tlsv11,
+    Tlsv12,
+    Tlsv13,
+}
+
 // ─────────────────────────────────────────────────────────────
 // ServiceEntry
 // ─────────────────────────────────────────────────────────────
 
-/// Registers an external (off-mesh) service so it can be referenced in VS/DR.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEntry {
     pub name: String,
@@ -358,6 +586,7 @@ pub struct ServiceEntry {
     pub resolution: ServiceResolution,
     pub endpoints: Vec<WorkloadEntry>,
     pub export_to: Vec<String>,
+    pub subject_alt_names: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -381,16 +610,346 @@ pub enum ServiceResolution {
     None,
     Static,
     Dns,
+    DnsRoundRobin,
 }
 
+// ─────────────────────────────────────────────────────────────
+// WorkloadEntry + WorkloadGroup
+// ─────────────────────────────────────────────────────────────
+
+/// Represents a single VM/bare-metal workload endpoint.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkloadEntry {
+    pub name: Option<String>,
+    pub namespace: Option<String>,
     pub address: String,
     pub ports: HashMap<String, u16>,
     pub labels: HashMap<String, String>,
     pub weight: u32,
     pub network: Option<String>,
     pub locality: Option<String>,
+    pub service_account: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+impl WorkloadEntry {
+    pub fn new(address: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            name: None,
+            namespace: None,
+            address: address.into(),
+            ports: HashMap::new(),
+            labels: HashMap::new(),
+            weight: 100,
+            network: None,
+            locality: None,
+            service_account: None,
+            created_at: Some(now),
+            updated_at: Some(now),
+        }
+    }
+}
+
+/// Groups WorkloadEntries with shared metadata and a bootstrap template.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkloadGroup {
+    pub name: String,
+    pub namespace: String,
+    pub selector: Option<HashMap<String, String>>,
+    pub metadata: WorkloadGroupMetadata,
+    pub template: WorkloadEntryTemplate,
+    pub probe: Option<ReadinessProbe>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WorkloadGroupMetadata {
+    pub labels: HashMap<String, String>,
+    pub annotations: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WorkloadEntryTemplate {
+    pub address: Option<String>,
+    pub ports: HashMap<String, u16>,
+    pub labels: HashMap<String, String>,
+    pub weight: u32,
+    pub service_account: Option<String>,
+    pub network: Option<String>,
+    pub locality: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessProbe {
+    pub initial_delay_seconds: u32,
+    pub timeout_seconds: u32,
+    pub period_seconds: u32,
+    pub success_threshold: u32,
+    pub failure_threshold: u32,
+    pub probe_type: ReadinessProbeType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ReadinessProbeType {
+    HttpGet(HttpProbe),
+    TcpSocket(TcpProbe),
+    Exec(ExecProbe),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpProbe {
+    pub path: String,
+    pub port: u32,
+    pub scheme: Option<String>,
+    pub http_headers: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcpProbe {
+    pub port: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecProbe {
+    pub command: Vec<String>,
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sidecar
+// ─────────────────────────────────────────────────────────────
+
+/// Configures sidecar proxy behaviour per workload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Sidecar {
+    pub name: String,
+    pub namespace: String,
+    pub selector: Option<HashMap<String, String>>,
+    pub ingress: Vec<IstioIngressListener>,
+    pub egress: Vec<IstioEgressListener>,
+    pub outbound_traffic_policy: OutboundTrafficPolicy,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Sidecar {
+    pub fn new(name: impl Into<String>, namespace: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            name: name.into(),
+            namespace: namespace.into(),
+            selector: None,
+            ingress: vec![],
+            egress: vec![],
+            outbound_traffic_policy: OutboundTrafficPolicy::AllowAny,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IstioIngressListener {
+    pub port: ServicePort,
+    pub bind: Option<String>,
+    pub capture_mode: CaptureMode,
+    pub default_endpoint: String,
+    pub tls: Option<ServerTlsSettings>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IstioEgressListener {
+    pub port: Option<ServicePort>,
+    pub bind: Option<String>,
+    pub capture_mode: CaptureMode,
+    /// Host patterns accessible from this listener (e.g. "prod/*", "*/reviews.prod.svc.cluster.local").
+    pub hosts: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum CaptureMode {
+    #[default]
+    Default,
+    Iptables,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum OutboundTrafficPolicy {
+    /// Only allow traffic to services in the service registry.
+    RegistryOnly,
+    /// Allow traffic to any destination.
+    AllowAny,
+}
+
+// ─────────────────────────────────────────────────────────────
+// EnvoyFilter
+// ─────────────────────────────────────────────────────────────
+
+/// Direct Envoy configuration patches — Istio EnvoyFilter parity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvoyFilter {
+    pub name: String,
+    pub namespace: String,
+    pub selector: Option<HashMap<String, String>>,
+    pub config_patches: Vec<EnvoyConfigObjectPatch>,
+    /// Processing priority; lower numbers applied first.
+    pub priority: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl EnvoyFilter {
+    pub fn new(name: impl Into<String>, namespace: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            name: name.into(),
+            namespace: namespace.into(),
+            selector: None,
+            config_patches: vec![],
+            priority: 0,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvoyConfigObjectPatch {
+    pub apply_to: ApplyTo,
+    pub match_rule: Option<EnvoyFilterMatch>,
+    pub patch: PatchOperation,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ApplyTo {
+    Invalid,
+    ListenerFilter,
+    NetworkFilter,
+    HttpFilter,
+    RouteConfiguration,
+    VirtualHost,
+    HttpRoute,
+    Cluster,
+    FilterChain,
+    Extension,
+    Bootstrap,
+    Listener,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnvoyFilterMatch {
+    pub context: PatchContext,
+    pub listener: Option<ListenerMatch>,
+    pub route_configuration: Option<RouteConfigurationMatch>,
+    pub cluster: Option<ClusterMatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum PatchContext {
+    #[default]
+    Any,
+    Inbound,
+    Outbound,
+    Gateway,
+    SidecarInbound,
+    SidecarOutbound,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListenerMatch {
+    pub port_number: Option<u32>,
+    pub filter_chain: Option<FilterChainMatch>,
+    pub name: Option<String>,
+    pub listener_filter: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterChainMatch {
+    pub name: Option<String>,
+    pub sni: Option<String>,
+    pub transport_protocol: Option<String>,
+    pub application_protocols: Vec<String>,
+    pub filter: Option<FilterMatch>,
+    pub destination_port: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterMatch {
+    pub name: String,
+    pub sub_filter: Option<SubFilterMatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubFilterMatch {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteConfigurationMatch {
+    pub name: Option<String>,
+    pub port_number: Option<u32>,
+    pub port_name: Option<String>,
+    pub gateway: Option<String>,
+    pub vhost: Option<VirtualHostMatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VirtualHostMatch {
+    pub name: String,
+    pub route: Option<RouteMatch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteMatch {
+    pub name: String,
+    pub action: RouteAction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RouteAction {
+    Any,
+    Route,
+    Redirect,
+    DirectResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterMatch {
+    pub port_number: Option<u32>,
+    pub service: Option<String>,
+    pub subset: Option<String>,
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatchOperation {
+    pub operation: PatchOp,
+    /// Typed JSON value to merge/add/insert.
+    pub value: Option<serde_json::Value>,
+    pub filter_class: FilterClass,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum PatchOp {
+    #[default]
+    Invalid,
+    Merge,
+    Add,
+    Remove,
+    Insert,
+    Replace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum FilterClass {
+    #[default]
+    Unspecified,
+    Authn,
+    Authz,
+    Stats,
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -401,10 +960,8 @@ pub struct WorkloadEntry {
 pub struct PeerAuthentication {
     pub name: String,
     pub namespace: String,
-    /// Workload selector (None = namespace-wide policy)
     pub selector: Option<HashMap<String, String>>,
     pub mtls: MtlsConfig,
-    /// Per-port overrides
     pub port_level_mtls: HashMap<u16, MtlsConfig>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -417,16 +974,15 @@ pub struct MtlsConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum MtlsMode {
-    /// Only mTLS connections accepted
     Strict,
-    /// Both plaintext and mTLS accepted
     Permissive,
-    /// mTLS disabled
     Disable,
+    /// Unset — inherits from parent scope.
+    Unset,
 }
 
 // ─────────────────────────────────────────────────────────────
-// RequestAuthentication (JWT)
+// RequestAuthentication (JWT / OIDC)
 // ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -444,20 +1000,25 @@ pub struct JwtRule {
     pub issuer: String,
     pub audiences: Vec<String>,
     pub jwks_uri: Option<String>,
-    /// Inline JWKS JSON (alternative to jwks_uri)
     pub jwks: Option<String>,
-    /// Header names to extract the JWT from (default: Authorization: Bearer)
     pub from_headers: Vec<JwtHeader>,
-    /// Query parameter names to extract the JWT from
     pub from_params: Vec<String>,
-    /// If true, token validation errors are forwarded to the application
+    pub from_cookies: Vec<String>,
     pub forward_original_token: bool,
+    pub output_claim_to_headers: Vec<ClaimToHeader>,
+    pub timeout_seconds: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtHeader {
     pub name: String,
     pub prefix: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimToHeader {
+    pub header: String,
+    pub claim: String,
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -471,6 +1032,8 @@ pub struct AuthorizationPolicy {
     pub selector: Option<HashMap<String, String>>,
     pub action: AuthzAction,
     pub rules: Vec<AuthzRule>,
+    /// Provider name for CUSTOM action (external authz).
+    pub provider: Option<ExtensionProvider>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -479,26 +1042,36 @@ pub struct AuthorizationPolicy {
 pub enum AuthzAction {
     Allow,
     Deny,
+    /// Delegate to an external authorization provider.
+    Custom,
+    /// Log the request but do not enforce.
+    Audit,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtensionProvider {
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AuthzRule {
-    /// Source constraints
     pub from: Vec<Source>,
-    /// Operation constraints
     pub to: Vec<Operation>,
-    /// Condition constraints (custom key/value from JWT claims or headers)
     pub when: Vec<Condition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Source {
     pub principals: Vec<String>,
+    pub request_principals: Vec<String>,
     pub namespaces: Vec<String>,
     pub ip_blocks: Vec<String>,
+    pub remote_ip_blocks: Vec<String>,
     pub not_principals: Vec<String>,
+    pub not_request_principals: Vec<String>,
     pub not_namespaces: Vec<String>,
     pub not_ip_blocks: Vec<String>,
+    pub not_remote_ip_blocks: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -515,14 +1088,133 @@ pub struct Operation {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Condition {
-    /// Attribute key, e.g. "request.auth.claims[group]"
     pub key: String,
     pub values: Vec<String>,
     pub not_values: Vec<String>,
 }
 
 // ─────────────────────────────────────────────────────────────
-// Rate Limit Policy
+// Telemetry API (Istio Telemetry resource)
+// ─────────────────────────────────────────────────────────────
+
+/// Controls metrics/logs/tracing per workload (Istio Telemetry API).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Telemetry {
+    pub name: String,
+    pub namespace: String,
+    pub selector: Option<HashMap<String, String>>,
+    pub tracing: Vec<Tracing>,
+    pub metrics: Vec<Metrics>,
+    pub access_logging: Vec<AccessLogging>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Telemetry {
+    pub fn new(name: impl Into<String>, namespace: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            name: name.into(),
+            namespace: namespace.into(),
+            selector: None,
+            tracing: vec![],
+            metrics: vec![],
+            access_logging: vec![],
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tracing {
+    pub providers: Vec<ProviderRef>,
+    pub random_sampling_percentage: Option<f64>,
+    pub disable_span_reporting: Option<bool>,
+    pub custom_tags: HashMap<String, TraceTag>,
+    pub use_request_id_for_trace_sampling: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderRef {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TraceTag {
+    Literal(String),
+    Environment { name: String, default_value: Option<String> },
+    Header { name: String, default_value: Option<String> },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metrics {
+    pub providers: Vec<ProviderRef>,
+    pub overrides: Vec<MetricsOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricsOverride {
+    pub match_rule: MetricSelector,
+    pub disabled: Option<bool>,
+    pub tag_overrides: HashMap<String, MetricTagOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricSelector {
+    pub metric: Option<MetricType>,
+    pub mode: Option<WorkloadMode>,
+    pub custom_metric: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetricType {
+    AllMetrics,
+    RequestCount,
+    RequestDuration,
+    RequestSize,
+    ResponseSize,
+    TcpSentBytes,
+    TcpReceivedBytes,
+    TcpConnections,
+    GrpcRequestMessages,
+    GrpcResponseMessages,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum WorkloadMode {
+    ClientAndServer,
+    Client,
+    Server,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MetricTagOverride {
+    pub operation: MetricTagOperation,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetricTagOperation {
+    Upsert,
+    Remove,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccessLogging {
+    pub providers: Vec<ProviderRef>,
+    pub disabled: Option<bool>,
+    pub filter: Option<AccessLogFilter>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccessLogFilter {
+    /// CEL expression for conditional logging (e.g. "response.code >= 400").
+    pub expression: String,
+}
+
+// ─────────────────────────────────────────────────────────────
+// Rate Limit Policy (CAVE extension)
 // ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -549,7 +1241,6 @@ pub enum RateLimitUnit {
 }
 
 impl RateLimitUnit {
-    /// Convert to requests-per-second rate.
     pub fn to_rps(&self, requests_per_unit: u64) -> f64 {
         match self {
             RateLimitUnit::Second => requests_per_unit as f64,
@@ -560,10 +1251,64 @@ impl RateLimitUnit {
 }
 
 // ─────────────────────────────────────────────────────────────
+// SPIFFE / certificate types
+// ─────────────────────────────────────────────────────────────
+
+/// A parsed SPIFFE ID (spiffe://<trust-domain>/<path>).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct SpiffeId {
+    pub trust_domain: String,
+    pub path: String,
+}
+
+impl SpiffeId {
+    /// Parse from a SPIFFE URI string.
+    pub fn parse(uri: &str) -> Option<Self> {
+        let stripped = uri.strip_prefix("spiffe://")?;
+        let (trust_domain, path) = stripped.split_once('/')?;
+        Some(Self {
+            trust_domain: trust_domain.to_string(),
+            path: format!("/{path}"),
+        })
+    }
+
+    /// Format as a SPIFFE URI.
+    pub fn to_uri(&self) -> String {
+        format!("spiffe://{}{}", self.trust_domain, self.path)
+    }
+
+    /// Build the canonical Istio SPIFFE ID for a workload.
+    pub fn for_workload(trust_domain: &str, namespace: &str, service_account: &str) -> Self {
+        Self {
+            trust_domain: trust_domain.to_string(),
+            path: format!("/ns/{namespace}/sa/{service_account}"),
+        }
+    }
+}
+
+impl std::fmt::Display for SpiffeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_uri())
+    }
+}
+
+/// DER-encoded X.509 certificate bundle.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CertBundle {
+    pub spiffe_id: SpiffeId,
+    /// PEM-encoded certificate chain.
+    pub cert_pem: String,
+    /// PEM-encoded private key (stored only in the issuing CA's memory).
+    pub key_pem: Option<String>,
+    pub not_before: DateTime<Utc>,
+    pub not_after: DateTime<Utc>,
+    pub serial: String,
+}
+
+// ─────────────────────────────────────────────────────────────
 // Traffic Decision (output of TrafficManager)
 // ─────────────────────────────────────────────────────────────
 
-/// Resolved routing decision returned by the traffic manager.
 #[derive(Debug, Clone)]
 pub struct RouteDecision {
     pub destination_host: String,
@@ -574,18 +1319,31 @@ pub struct RouteDecision {
     pub retry: Option<HttpRetry>,
     pub timeout_ms: Option<u64>,
     pub request_headers_add: HashMap<String, String>,
+    pub request_headers_remove: Vec<String>,
     pub response_headers_add: HashMap<String, String>,
-    /// W3C traceparent propagated / generated for this hop
+    pub response_headers_remove: Vec<String>,
     pub traceparent: Option<String>,
+    pub redirect: Option<HttpRedirect>,
+    pub rewrite: Option<HttpRewrite>,
+    pub mirror: Option<MirrorDecision>,
+    pub cors_policy: Option<CorsPolicy>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MirrorDecision {
+    pub host: String,
+    pub subset: Option<String>,
+    pub port: Option<u16>,
+    pub percentage: f64,
 }
 
 #[derive(Debug, Clone)]
 pub enum FaultEffect {
-    Delay(u64),     // milliseconds
-    Abort(u16),     // HTTP status code
+    Delay(u64),
+    Abort(u16),
 }
 
-/// Minimal inbound request descriptor used by the traffic engine.
+/// Inbound request descriptor consumed by the traffic engine.
 #[derive(Debug, Clone, Default)]
 pub struct IncomingRequest {
     pub uri: String,
@@ -594,28 +1352,31 @@ pub struct IncomingRequest {
     pub headers: HashMap<String, String>,
     pub query_params: HashMap<String, String>,
     pub source_labels: HashMap<String, String>,
-    /// W3C Trace Context — carried in for propagation
+    pub source_namespace: Option<String>,
     pub traceparent: Option<String>,
     pub tracestate: Option<String>,
+    pub gateway: Option<String>,
 }
 
-/// Authz check input.
+/// Authorization check context.
 #[derive(Debug, Clone, Default)]
 pub struct RequestContext {
     pub source_principal: Option<String>,
     pub source_namespace: Option<String>,
     pub source_ip: Option<String>,
+    pub remote_ip: Option<String>,
     pub method: String,
     pub path: String,
     pub host: String,
     pub port: Option<u16>,
     pub jwt_claims: Option<HashMap<String, serde_json::Value>>,
+    pub request_principal: Option<String>,
 }
 
-/// mTLS connection descriptor.
+/// mTLS peer connection descriptor.
 #[derive(Debug, Clone, Default)]
 pub struct TlsContext {
-    /// SPIFFE ID of the peer (e.g. "spiffe://cluster.local/ns/default/sa/reviews")
     pub peer_principal: Option<String>,
     pub is_mtls: bool,
+    pub peer_cert_san: Vec<String>,
 }
