@@ -57,7 +57,11 @@ async fn main() -> anyhow::Result<()> {
     // ── Module states ─────────────────────────────────────────────────────────
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
+=======
+    let deploy_state = Arc::new(cave_deploy::DeployState::default());
+>>>>>>> claude/cranky-hellman
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -71,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -88,6 +93,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/ready", axum::routing::get(ready))
         .merge(protected)
         // Observability / transport middleware (outermost = last applied)
+=======
+        // GitOps
+        .merge(cave_deploy::router(deploy_state))
+        // Middleware
+>>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive()); // TODO: restrict origins in production
