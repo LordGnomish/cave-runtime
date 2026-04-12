@@ -76,6 +76,8 @@ members = [
     # === Platform ===
     # === Runtime Binary ===
     "crates/cave-runtime",
+    # === CLI ===
+    "crates/cave-cli",
     # === Upstream Tracker ===
     "crates/cave-upstream",
     # === Issue Tracking ===
