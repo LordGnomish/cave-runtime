@@ -49,6 +49,7 @@ members = [
     "crates/cave-policy",
     "crates/cave-dast",
     "crates/cave-backup",
+    "crates/cave-rollouts",
     "crates/cave-pam",
     # === LLM Gateway ===
     "crates/cave-llm-gateway",
