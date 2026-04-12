@@ -1,13 +1,19 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 //! Data models for cave-portal.
 
 >>>>>>> claude/determined-visvesvaraya
+=======
+>>>>>>> claude/thirsty-lederberg
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/thirsty-lederberg
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Service {
     pub id: Uuid,
@@ -45,6 +51,7 @@ pub enum LinkType {
     Docs,
     Repo,
     Chat,
+<<<<<<< HEAD
 =======
 /// Overall health of a module.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,4 +176,6 @@ pub struct DashboardData {
     pub unknown_count: usize,
     pub generated_at: DateTime<Utc>,
 >>>>>>> claude/determined-visvesvaraya
+=======
+>>>>>>> claude/thirsty-lederberg
 }

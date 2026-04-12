@@ -88,6 +88,7 @@ impl RawClaims {
     }
 }
 
+<<<<<<< HEAD
 /// Map an Okta group / Keycloak role name to a CaveRole.
 fn map_group_to_role(name: &str) -> Option<CaveRole> {
     match name {
@@ -197,6 +198,8 @@ const ALL_MODULES: &[&str] = &[
     "cave-auth",
 ];
 
+=======
+>>>>>>> claude/thirsty-lederberg
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,8 +216,11 @@ mod tests {
             exp: 9999999999,
             aud: serde_json::Value::String("cave-runtime".to_string()),
             iss: "https://auth.example.com".to_string(),
+<<<<<<< HEAD
             email: None,
             scp: None,
+=======
+>>>>>>> claude/thirsty-lederberg
         }
     }
 

@@ -17,6 +17,7 @@
 //! Replaces: Harbor
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 pub mod engine;
 pub mod models;
 =======
@@ -48,6 +49,10 @@ pub mod replication;
 
 pub mod docker_v2;
 >>>>>>> claude/gallant-cartwright
+=======
+pub mod engine;
+pub mod models;
+>>>>>>> claude/thirsty-lederberg
 pub mod routes;
 pub mod scan;
 pub mod store;

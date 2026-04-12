@@ -7,10 +7,14 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 pub mod engine;
 =======
 pub mod dashboard;
 >>>>>>> claude/determined-visvesvaraya
+=======
+pub mod engine;
+>>>>>>> claude/thirsty-lederberg
 pub mod models;
 pub mod routes;
 pub mod ui;
