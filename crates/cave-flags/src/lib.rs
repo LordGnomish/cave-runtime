@@ -33,12 +33,17 @@ pub mod routes;
 pub mod store;
 
 use axum::Router;
+<<<<<<< HEAD
 use models::{Event, FeatureToggle, Project, Segment};
 use pool::FlagsPool;
 use std::collections::HashMap;
+=======
+use cave_db::Storage;
+>>>>>>> claude/bold-mahavira
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+<<<<<<< HEAD
 /// Module name used for the PostgreSQL schema (`cave_flags`).
 pub const MODULE_NAME: &str = "flags";
 
@@ -53,6 +58,11 @@ pub struct MetricEntry {
     pub yes: u64,
     pub no: u64,
     pub variants: HashMap<String, u64>,
+=======
+/// Module state shared across request handlers.
+pub struct FlagsState {
+    pub storage: Arc<dyn Storage>,
+>>>>>>> claude/bold-mahavira
 }
 
 // ================================================================
@@ -123,3 +133,9 @@ impl FlagsState {
 pub fn router(state: Arc<FlagsState>) -> Router {
     routes::create_router(state)
 }
+<<<<<<< HEAD
+=======
+
+/// Module name for DB schema / collection prefix.
+pub const MODULE_NAME: &str = "flags";
+>>>>>>> claude/bold-mahavira

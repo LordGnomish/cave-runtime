@@ -31,11 +31,16 @@
 use crate::models::*;
 use crate::{FlagsState, MetricEntry};
 use axum::{
+<<<<<<< HEAD
     extract::{Path, State},
+=======
+    extract::State,
+>>>>>>> claude/bold-mahavira
     http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+<<<<<<< HEAD
 use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -43,6 +48,13 @@ use uuid::Uuid;
 // ================================================================
 // Router factory
 // ================================================================
+=======
+use cave_db::StorageExt;
+use std::sync::Arc;
+use uuid::Uuid;
+
+const COLLECTION: &str = "flags";
+>>>>>>> claude/bold-mahavira
 
 pub fn create_router(state: Arc<FlagsState>) -> Router {
     Router::new()
@@ -88,6 +100,7 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
         .with_state(state)
 }
 
+<<<<<<< HEAD
 // ================================================================
 // Client API handlers
 // ================================================================
@@ -546,15 +559,33 @@ async fn admin_metrics(State(state): State<Arc<FlagsState>>) -> Json<serde_json:
 /// GET /api/flags — list all legacy flags
 async fn list_flags(State(_state): State<Arc<FlagsState>>) -> Json<Vec<FeatureFlag>> {
     Json(vec![])
+=======
+/// GET /api/flags — list all flags
+async fn list_flags(
+    State(state): State<Arc<FlagsState>>,
+) -> Result<Json<Vec<FeatureFlag>>, StatusCode> {
+    let flags = state
+        .storage
+        .list::<FeatureFlag>(COLLECTION)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(flags))
+>>>>>>> claude/bold-mahavira
 }
 
 /// POST /api/flags — create a new legacy flag
 async fn create_flag(
-    State(_state): State<Arc<FlagsState>>,
+    State(state): State<Arc<FlagsState>>,
     Json(req): Json<CreateFlagRequest>,
+<<<<<<< HEAD
 ) -> Json<FeatureFlag> {
     let now = Utc::now();
     Json(FeatureFlag {
+=======
+) -> Result<Json<FeatureFlag>, StatusCode> {
+    let now = chrono::Utc::now();
+    let flag = FeatureFlag {
+>>>>>>> claude/bold-mahavira
         id: Uuid::new_v4(),
         name: req.name,
         description: req.description,
@@ -566,18 +597,41 @@ async fn create_flag(
         kill_switch: false,
         created_at: now,
         updated_at: now,
+<<<<<<< HEAD
         created_by: Uuid::new_v4(),
     })
+=======
+        created_by: Uuid::new_v4(), // TODO: extract from CaveIdentity
+    };
+
+    state
+        .storage
+        .put::<FeatureFlag>(COLLECTION, &flag.id.to_string(), &flag)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(flag))
+>>>>>>> claude/bold-mahavira
 }
 
 /// POST /api/flags/evaluate — evaluate all flags for a context
 async fn evaluate(
-    State(_state): State<Arc<FlagsState>>,
+    State(state): State<Arc<FlagsState>>,
     Json(req): Json<EvaluateRequest>,
+<<<<<<< HEAD
 ) -> Json<EvaluateResponse> {
     let flags: Vec<FeatureFlag> = vec![];
+=======
+) -> Result<Json<EvaluateResponse>, StatusCode> {
+    let flags = state
+        .storage
+        .list::<FeatureFlag>(COLLECTION)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+>>>>>>> claude/bold-mahavira
     let evaluations = crate::engine::evaluate_flags(&flags, &req.context);
-    Json(EvaluateResponse { flags: evaluations })
+    Ok(Json(EvaluateResponse { flags: evaluations }))
 }
 
 /// GET /api/flags/health
