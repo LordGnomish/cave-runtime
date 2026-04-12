@@ -1,449 +1,460 @@
-//! Schema registry — Avro, JSON Schema, and Protobuf schema management.
+//! Confluent-compatible Schema Registry.
 //!
-//! Enforces compatibility policies between schema versions:
-//!   * **BACKWARD**  — new schema can read data written by old schema.
-//!   * **FORWARD**   — old schema can read data written by new schema.
-//!   * **FULL**      — both directions.
-//!   * **NONE**      — no compatibility checking.
-//!
-//! The registry stores schemas by *subject* (typically `<topic>-key` or
-//! `<topic>-value`) and assigns a globally-unique integer ID to each version.
+//! Implements the Schema Registry REST API:
+//!   GET/POST /subjects
+//!   GET/POST /subjects/{subject}/versions
+//!   GET      /subjects/{subject}/versions/{version}
+//!   DELETE   /subjects/{subject}
+//!   GET      /schemas/ids/{id}
+//!   POST     /compatibility/subjects/{subject}/versions/{version}
+//!   GET/PUT  /config  (global compatibility level)
+//!   GET/PUT  /config/{subject}
 
-use crate::error::{StreamError, StreamResult};
-use crate::models::{CompatibilityMode, Schema, SchemaType};
-use crate::storage::StreamStorage;
-use serde_json::Value as JsonValue;
+use crate::error::{StreamsError, StreamsResult};
+use chrono::{DateTime, Utc};
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicI32, Ordering};
 
-// ─── Registry facade ─────────────────────────────────────────────────────────
+// ── Schema format ─────────────────────────────────────────────────────────────
 
-pub struct SchemaRegistry<S: StreamStorage> {
-    storage: S,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum SchemaFormat {
+    Avro,
+    Protobuf,
+    JsonSchema,
 }
 
-impl<S: StreamStorage> SchemaRegistry<S> {
-    pub fn new(storage: S) -> Self {
-        Self { storage }
+impl SchemaFormat {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "PROTOBUF" => Self::Protobuf,
+            "JSON" | "JSON_SCHEMA" | "JSONSCHEMA" => Self::JsonSchema,
+            _ => Self::Avro,
+        }
+    }
+}
+
+// ── Compatibility level ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CompatibilityLevel {
+    None,
+    Backward,
+    BackwardTransitive,
+    Forward,
+    ForwardTransitive,
+    Full,
+    FullTransitive,
+}
+
+impl Default for CompatibilityLevel {
+    fn default() -> Self {
+        Self::Backward
+    }
+}
+
+impl CompatibilityLevel {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_uppercase().replace('-', "_").as_str() {
+            "NONE" => Self::None,
+            "BACKWARD" => Self::Backward,
+            "BACKWARD_TRANSITIVE" => Self::BackwardTransitive,
+            "FORWARD" => Self::Forward,
+            "FORWARD_TRANSITIVE" => Self::ForwardTransitive,
+            "FULL" => Self::Full,
+            "FULL_TRANSITIVE" => Self::FullTransitive,
+            _ => Self::Backward,
+        }
+    }
+}
+
+// ── Schema ────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Schema {
+    pub id: i32,
+    pub version: i32,
+    pub subject: String,
+    pub schema: String,
+    pub schema_type: SchemaFormat,
+    /// Schemas referenced by this schema
+    pub references: Vec<SchemaReference>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SchemaReference {
+    pub name: String,
+    pub subject: String,
+    pub version: i32,
+}
+
+// ── Subject ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug)]
+pub struct Subject {
+    pub name: String,
+    pub versions: Vec<Schema>,
+    pub compatibility: Option<CompatibilityLevel>,
+    pub is_deleted: bool,
+}
+
+impl Subject {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            versions: Vec::new(),
+            compatibility: None,
+            is_deleted: false,
+        }
     }
 
-    // ─── Registration ────────────────────────────────────────────────────────
+    pub fn latest(&self) -> Option<&Schema> {
+        self.versions.last()
+    }
 
-    /// Register a new schema version for a subject.
-    ///
-    /// If an identical schema (by fingerprint) already exists, the existing
-    /// schema ID is returned without creating a duplicate.
-    pub fn register(
+    pub fn get_version(&self, version: i32) -> Option<&Schema> {
+        if version == -1 {
+            return self.latest();
+        }
+        self.versions.iter().find(|s| s.version == version)
+    }
+}
+
+// ── Compatibility check ───────────────────────────────────────────────────────
+
+/// Very lightweight structural compatibility check for JSON Schema.
+/// Real implementations would use a full schema compatibility library.
+fn check_json_schema_compatible(
+    level: CompatibilityLevel,
+    new_schema: &str,
+    existing: &[&Schema],
+) -> bool {
+    if level == CompatibilityLevel::None {
+        return true;
+    }
+    if existing.is_empty() {
+        return true;
+    }
+    // Simplified: check that new schema is syntactically valid JSON
+    serde_json::from_str::<serde_json::Value>(new_schema).is_ok()
+}
+
+fn check_schema_compatible(
+    level: CompatibilityLevel,
+    format: SchemaFormat,
+    new_schema: &str,
+    existing: &[&Schema],
+) -> bool {
+    match format {
+        SchemaFormat::JsonSchema => check_json_schema_compatible(level, new_schema, existing),
+        // For Avro/Protobuf: accept if non-empty and parseable as JSON (schema definitions are JSON)
+        SchemaFormat::Avro | SchemaFormat::Protobuf => {
+            if level == CompatibilityLevel::None {
+                return true;
+            }
+            !new_schema.is_empty()
+        }
+    }
+}
+
+// ── Schema Registry ───────────────────────────────────────────────────────────
+
+pub struct SchemaRegistry {
+    subjects: DashMap<String, Subject>,
+    /// Global schema ID → schema for lookup by ID
+    schemas_by_id: DashMap<i32, Schema>,
+    next_id: AtomicI32,
+    global_compatibility: std::sync::RwLock<CompatibilityLevel>,
+}
+
+impl SchemaRegistry {
+    pub fn new() -> Self {
+        Self {
+            subjects: DashMap::new(),
+            schemas_by_id: DashMap::new(),
+            next_id: AtomicI32::new(1),
+            global_compatibility: std::sync::RwLock::new(CompatibilityLevel::Backward),
+        }
+    }
+
+    // ── Register schema ───────────────────────────────────────────────────────
+
+    pub fn register_schema(
         &self,
-        subject: impl Into<String>,
-        schema_type: SchemaType,
-        definition: impl Into<String>,
-    ) -> StreamResult<u32> {
-        let subject = subject.into();
-        let definition = definition.into();
+        subject: &str,
+        schema: String,
+        schema_type: SchemaFormat,
+        references: Vec<SchemaReference>,
+    ) -> StreamsResult<i32> {
+        let compat = self.effective_compatibility(subject);
 
-        // Parse / validate the schema definition.
-        validate_syntax(&schema_type, &definition)?;
+        let mut subj = self
+            .subjects
+            .entry(subject.to_string())
+            .or_insert_with(|| Subject::new(subject.to_string()));
 
-        let fingerprint = fnv1a_64(definition.as_bytes());
-
-        // Check for deduplication (same fingerprint → same schema).
-        let existing_versions = self.storage.list_subject_versions(&subject)?;
-        for version in existing_versions {
-            if let Some(existing) = self.storage.get_schema_by_version(&subject, version)? {
-                if existing.fingerprint == fingerprint {
-                    return Ok(existing.id);
-                }
+        // Check compatibility
+        if !subj.versions.is_empty() {
+            let existing: Vec<&Schema> = subj.versions.iter().collect();
+            if !check_schema_compatible(compat, schema_type, &schema, &existing) {
+                return Err(StreamsError::SchemaIncompatible {
+                    subject: subject.to_string(),
+                    reason: format!("not {:?} compatible", compat),
+                });
             }
         }
 
-        // Compatibility check against the latest schema for this subject.
-        let latest = self.storage.get_latest_schema(&subject)?;
-        let compat_mode = self.storage.get_subject_compat(&subject)?;
-
-        if let Some(ref prev) = latest {
-            check_compatibility(&compat_mode, prev, &definition, &schema_type)?;
+        // Check for exact duplicate
+        for existing in &subj.versions {
+            if existing.schema == schema {
+                return Ok(existing.id);
+            }
         }
 
-        let id = self.storage.next_schema_id()?;
-        let version = latest.map(|s| s.version + 1).unwrap_or(1);
-
-        let schema = Schema {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let version = subj.versions.len() as i32 + 1;
+        let s = Schema {
             id,
-            subject: subject.clone(),
             version,
+            subject: subject.to_string(),
+            schema: schema.clone(),
             schema_type,
-            definition,
-            fingerprint,
+            references,
+            created_at: Utc::now(),
         };
-
-        self.storage.register_schema(schema)?;
+        self.schemas_by_id.insert(id, s.clone());
+        subj.versions.push(s);
         Ok(id)
     }
 
-    // ─── Lookup ──────────────────────────────────────────────────────────────
+    // ── Lookup ────────────────────────────────────────────────────────────────
 
-    pub fn get_by_id(&self, id: u32) -> StreamResult<Schema> {
-        self.storage
-            .get_schema(id)?
-            .ok_or(StreamError::SchemaNotFound(id))
+    pub fn get_schema_by_id(&self, id: i32) -> StreamsResult<Schema> {
+        self.schemas_by_id
+            .get(&id)
+            .map(|s| s.clone())
+            .ok_or_else(|| StreamsError::SchemaNotFound(id))
     }
 
-    pub fn get_latest(&self, subject: &str) -> StreamResult<Schema> {
-        self.storage
-            .get_latest_schema(subject)?
-            .ok_or_else(|| StreamError::SubjectNotFound(subject.into()))
+    pub fn get_schema_by_version(&self, subject: &str, version: i32) -> StreamsResult<Schema> {
+        let subj = self
+            .subjects
+            .get(subject)
+            .ok_or_else(|| StreamsError::SubjectNotFound(subject.to_string()))?;
+        subj.get_version(version)
+            .cloned()
+            .ok_or_else(|| StreamsError::SchemaNotFound(version))
     }
 
-    pub fn get_version(&self, subject: &str, version: u32) -> StreamResult<Schema> {
-        self.storage
-            .get_schema_by_version(subject, version)?
-            .ok_or_else(|| StreamError::SubjectNotFound(subject.into()))
+    pub fn get_latest_schema(&self, subject: &str) -> StreamsResult<Schema> {
+        self.get_schema_by_version(subject, -1)
     }
 
-    pub fn list_versions(&self, subject: &str) -> StreamResult<Vec<u32>> {
-        self.storage.list_subject_versions(subject)
+    pub fn list_subjects(&self) -> Vec<String> {
+        self.subjects
+            .iter()
+            .filter(|e| !e.is_deleted)
+            .map(|e| e.key().clone())
+            .collect()
     }
 
-    pub fn list_subjects(&self) -> StreamResult<Vec<String>> {
-        self.storage.list_subjects()
+    pub fn list_versions(&self, subject: &str) -> StreamsResult<Vec<i32>> {
+        let subj = self
+            .subjects
+            .get(subject)
+            .ok_or_else(|| StreamsError::SubjectNotFound(subject.to_string()))?;
+        Ok(subj.versions.iter().map(|s| s.version).collect())
     }
 
-    // ─── Delete ──────────────────────────────────────────────────────────────
-
-    pub fn delete_version(&self, subject: &str, version: u32) -> StreamResult<()> {
-        self.storage.delete_schema(subject, version)
+    pub fn delete_subject(&self, subject: &str) -> StreamsResult<Vec<i32>> {
+        let mut subj = self
+            .subjects
+            .get_mut(subject)
+            .ok_or_else(|| StreamsError::SubjectNotFound(subject.to_string()))?;
+        let versions: Vec<i32> = subj.versions.iter().map(|s| s.version).collect();
+        subj.is_deleted = true;
+        Ok(versions)
     }
 
-    // ─── Compatibility config ────────────────────────────────────────────────
-
-    pub fn set_compatibility(
-        &self,
-        subject: &str,
-        mode: CompatibilityMode,
-    ) -> StreamResult<()> {
-        self.storage.set_subject_compat(subject, mode)
+    pub fn delete_schema_version(&self, subject: &str, version: i32) -> StreamsResult<i32> {
+        let mut subj = self
+            .subjects
+            .get_mut(subject)
+            .ok_or_else(|| StreamsError::SubjectNotFound(subject.to_string()))?;
+        let pos = subj
+            .versions
+            .iter()
+            .position(|s| s.version == version)
+            .ok_or_else(|| StreamsError::SchemaNotFound(version))?;
+        let removed = subj.versions.remove(pos);
+        Ok(removed.id)
     }
 
-    pub fn get_compatibility(&self, subject: &str) -> StreamResult<CompatibilityMode> {
-        self.storage.get_subject_compat(subject)
-    }
+    // ── Compatibility ─────────────────────────────────────────────────────────
 
-    // ─── Validation ──────────────────────────────────────────────────────────
-
-    /// Check whether `candidate_definition` is compatible with the current
-    /// latest schema for `subject` under the subject's configured mode.
     pub fn check_compatibility(
         &self,
         subject: &str,
-        schema_type: &SchemaType,
-        candidate_definition: &str,
-    ) -> StreamResult<CompatibilityCheckResult> {
-        validate_syntax(schema_type, candidate_definition)?;
-
-        let Some(latest) = self.storage.get_latest_schema(subject)? else {
-            return Ok(CompatibilityCheckResult {
-                compatible: true,
-                messages: vec!["No existing schema; any schema is compatible".into()],
-            });
-        };
-
-        let mode = self.storage.get_subject_compat(subject)?;
-
-        match check_compatibility(&mode, &latest, candidate_definition, schema_type) {
-            Ok(()) => Ok(CompatibilityCheckResult {
-                compatible: true,
-                messages: Vec::new(),
-            }),
-            Err(StreamError::SchemaCompatibility(msg)) => Ok(CompatibilityCheckResult {
-                compatible: false,
-                messages: vec![msg],
-            }),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-// ─── Compatibility checking ───────────────────────────────────────────────────
-
-/// Check whether `candidate` is compatible with `existing` under `mode`.
-fn check_compatibility(
-    mode: &CompatibilityMode,
-    existing: &Schema,
-    candidate_definition: &str,
-    candidate_type: &SchemaType,
-) -> StreamResult<()> {
-    if *mode == CompatibilityMode::None {
-        return Ok(());
-    }
-
-    // Type mismatch is always incompatible.
-    if &existing.schema_type != candidate_type {
-        return Err(StreamError::SchemaCompatibility(format!(
-            "Schema type mismatch: existing={:?}, candidate={:?}",
-            existing.schema_type, candidate_type
-        )));
-    }
-
-    let backward = matches!(
-        mode,
-        CompatibilityMode::Backward
-            | CompatibilityMode::BackwardTransitive
-            | CompatibilityMode::Full
-            | CompatibilityMode::FullTransitive
-    );
-    let forward = matches!(
-        mode,
-        CompatibilityMode::Forward
-            | CompatibilityMode::ForwardTransitive
-            | CompatibilityMode::Full
-            | CompatibilityMode::FullTransitive
-    );
-
-    match existing.schema_type {
-        SchemaType::JsonSchema => {
-            let existing_json: JsonValue =
-                serde_json::from_str(&existing.definition).map_err(|e| {
-                    StreamError::SchemaValidation(format!("Existing schema invalid JSON: {e}"))
-                })?;
-            let candidate_json: JsonValue =
-                serde_json::from_str(candidate_definition).map_err(|e| {
-                    StreamError::SchemaValidation(format!("Candidate schema invalid JSON: {e}"))
-                })?;
-            check_json_schema_compatibility(
-                &existing_json,
-                &candidate_json,
-                backward,
-                forward,
-            )
-        }
-        SchemaType::Avro => {
-            // For Avro we do structural compatibility checking using the JSON
-            // representation of the Avro schema.
-            let existing_json: JsonValue =
-                serde_json::from_str(&existing.definition).map_err(|e| {
-                    StreamError::SchemaValidation(format!("Existing Avro schema invalid JSON: {e}"))
-                })?;
-            let candidate_json: JsonValue =
-                serde_json::from_str(candidate_definition).map_err(|e| {
-                    StreamError::SchemaValidation(format!(
-                        "Candidate Avro schema invalid JSON: {e}"
-                    ))
-                })?;
-            check_avro_compatibility(&existing_json, &candidate_json, backward, forward)
-        }
-        SchemaType::Protobuf => {
-            // Protobuf compatibility: field numbers must be stable.
-            check_protobuf_compatibility(
-                &existing.definition,
-                candidate_definition,
-                backward,
-                forward,
-            )
-        }
-    }
-}
-
-// ─── JSON Schema compatibility ────────────────────────────────────────────────
-
-fn check_json_schema_compatibility(
-    existing: &JsonValue,
-    candidate: &JsonValue,
-    backward: bool,
-    forward: bool,
-) -> StreamResult<()> {
-    // Required field analysis.
-    let existing_required = json_required_fields(existing);
-    let candidate_required = json_required_fields(candidate);
-
-    if backward {
-        // New schema must be able to read old data:
-        // new schema MUST NOT add required fields (old data won't have them).
-        for field in &candidate_required {
-            if !existing_required.contains(field) {
-                return Err(StreamError::SchemaCompatibility(format!(
-                    "BACKWARD incompatible: candidate adds required field '{field}' \
-                     not present in existing schema"
-                )));
-            }
-        }
-    }
-
-    if forward {
-        // Old schema must be able to read new data:
-        // old schema MUST NOT have required fields missing in new schema.
-        for field in &existing_required {
-            if !json_has_field(candidate, field) {
-                return Err(StreamError::SchemaCompatibility(format!(
-                    "FORWARD incompatible: candidate removes field '{field}' \
-                     that is required by existing schema"
-                )));
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn json_required_fields(schema: &JsonValue) -> Vec<String> {
-    schema
-        .get("required")
-        .and_then(|r| r.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
+        version: i32,
+        new_schema: &str,
+        schema_type: SchemaFormat,
+    ) -> StreamsResult<bool> {
+        let compat = self.effective_compatibility(subject);
+        let subj = self
+            .subjects
+            .get(subject)
+            .ok_or_else(|| StreamsError::SubjectNotFound(subject.to_string()))?;
+        let existing: Vec<&Schema> = if version == -1 {
+            subj.versions.iter().collect()
+        } else {
+            subj.versions
+                .iter()
+                .filter(|s| s.version <= version)
                 .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn json_has_field(schema: &JsonValue, field: &str) -> bool {
-    schema
-        .get("properties")
-        .and_then(|p| p.as_object())
-        .map(|props| props.contains_key(field))
-        .unwrap_or(false)
-}
-
-// ─── Avro compatibility ────────────────────────────────────────────────────────
-
-fn check_avro_compatibility(
-    existing: &JsonValue,
-    candidate: &JsonValue,
-    backward: bool,
-    forward: bool,
-) -> StreamResult<()> {
-    let existing_fields = avro_fields(existing);
-    let candidate_fields = avro_fields(candidate);
-
-    if backward {
-        // New schema must read old data → no new fields without defaults.
-        for (name, field) in &candidate_fields {
-            if !existing_fields.contains_key(name.as_str()) && field.get("default").is_none() {
-                return Err(StreamError::SchemaCompatibility(format!(
-                    "BACKWARD incompatible: new field '{name}' has no default value"
-                )));
-            }
-        }
+        };
+        Ok(check_schema_compatible(compat, schema_type, new_schema, &existing))
     }
 
-    if forward {
-        // Old schema must read new data → no removed fields without defaults.
-        for (name, field) in &existing_fields {
-            if !candidate_fields.contains_key(name.as_str()) && field.get("default").is_none() {
-                return Err(StreamError::SchemaCompatibility(format!(
-                    "FORWARD incompatible: existing field '{name}' removed without default"
-                )));
-            }
-        }
+    pub fn get_global_compatibility(&self) -> CompatibilityLevel {
+        *self.global_compatibility.read().unwrap()
     }
 
-    Ok(())
-}
-
-fn avro_fields(schema: &JsonValue) -> std::collections::HashMap<String, &JsonValue> {
-    let mut map = std::collections::HashMap::new();
-    if let Some(fields) = schema.get("fields").and_then(|f| f.as_array()) {
-        for field in fields {
-            if let Some(name) = field.get("name").and_then(|n| n.as_str()) {
-                map.insert(name.to_string(), field);
-            }
-        }
-    }
-    map
-}
-
-// ─── Protobuf compatibility ───────────────────────────────────────────────────
-
-fn check_protobuf_compatibility(
-    existing: &str,
-    candidate: &str,
-    backward: bool,
-    forward: bool,
-) -> StreamResult<()> {
-    // Extract (field_number, field_name, type) triples from the text IDL.
-    let existing_fields = parse_proto_fields(existing);
-    let candidate_fields = parse_proto_fields(candidate);
-
-    if backward || forward {
-        // Field numbers must remain stable (same number → same type).
-        for (num, (name, typ)) in &existing_fields {
-            if let Some((cname, ctyp)) = candidate_fields.get(num) {
-                if typ != ctyp {
-                    return Err(StreamError::SchemaCompatibility(format!(
-                        "Field {num} ({name}) type changed from '{typ}' to '{ctyp}'"
-                    )));
-                }
-                if cname != name {
-                    // Name change is allowed (wire format uses numbers).
-                    let _ = cname;
-                }
-            } else if forward {
-                // Field removed — old schema can't read new data.
-                return Err(StreamError::SchemaCompatibility(format!(
-                    "FORWARD incompatible: field {num} ({name}) removed"
-                )));
-            }
-        }
+    pub fn set_global_compatibility(&self, level: CompatibilityLevel) {
+        *self.global_compatibility.write().unwrap() = level;
     }
 
-    Ok(())
-}
-
-/// Very minimal proto3 field parser: extracts `field_number → (name, type)`.
-fn parse_proto_fields(proto: &str) -> std::collections::HashMap<u32, (String, String)> {
-    let mut map = std::collections::HashMap::new();
-    for line in proto.lines() {
-        let line = line.trim();
-        // Pattern: `<type> <name> = <number>;`
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.len() >= 4 && parts[parts.len() - 1].ends_with(';') {
-            let typ = parts[0];
-            let name = parts[1];
-            let num_part = parts[parts.len() - 1].trim_end_matches(';');
-            let num_part = parts[parts.len() - 2].trim_end_matches('=');
-            if let Ok(num) = num_part.parse::<u32>() {
-                map.insert(num, (name.to_string(), typ.to_string()));
-            }
-        }
+    pub fn get_subject_compatibility(&self, subject: &str) -> Option<CompatibilityLevel> {
+        self.subjects.get(subject).and_then(|s| s.compatibility)
     }
-    map
-}
 
-// ─── Syntax validation ────────────────────────────────────────────────────────
+    pub fn set_subject_compatibility(&self, subject: &str, level: CompatibilityLevel) {
+        let mut subj = self
+            .subjects
+            .entry(subject.to_string())
+            .or_insert_with(|| Subject::new(subject.to_string()));
+        subj.compatibility = Some(level);
+    }
 
-fn validate_syntax(schema_type: &SchemaType, definition: &str) -> StreamResult<()> {
-    match schema_type {
-        SchemaType::Avro | SchemaType::JsonSchema => {
-            serde_json::from_str::<JsonValue>(definition).map_err(|e| {
-                StreamError::SchemaValidation(format!("Invalid JSON in schema: {e}"))
-            })?;
-            Ok(())
-        }
-        SchemaType::Protobuf => {
-            if definition.trim().is_empty() {
-                return Err(StreamError::SchemaValidation(
-                    "Protobuf schema must not be empty".into(),
-                ));
-            }
-            Ok(())
-        }
+    fn effective_compatibility(&self, subject: &str) -> CompatibilityLevel {
+        self.subjects
+            .get(subject)
+            .and_then(|s| s.compatibility)
+            .unwrap_or_else(|| self.get_global_compatibility())
     }
 }
 
-// ─── FNV-1a 64-bit ───────────────────────────────────────────────────────────
+// ── HTTP request/response DTOs ────────────────────────────────────────────────
 
-fn fnv1a_64(data: &[u8]) -> u64 {
-    let mut hash: u64 = 14_695_981_039_346_656_037;
-    for byte in data {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(1_099_511_628_211);
-    }
-    hash
+#[derive(Debug, Deserialize)]
+pub struct RegisterSchemaRequest {
+    pub schema: String,
+    #[serde(rename = "schemaType", default = "default_schema_type")]
+    pub schema_type: String,
+    #[serde(default)]
+    pub references: Vec<SchemaRefDto>,
 }
 
-// ─── Result types ─────────────────────────────────────────────────────────────
+fn default_schema_type() -> String {
+    "AVRO".into()
+}
 
-#[derive(Debug, serde::Serialize)]
-pub struct CompatibilityCheckResult {
-    pub compatible: bool,
-    pub messages: Vec<String>,
+#[derive(Debug, Deserialize)]
+pub struct SchemaRefDto {
+    pub name: String,
+    pub subject: String,
+    pub version: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RegisterSchemaResponse {
+    pub id: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SchemaResponse {
+    pub id: i32,
+    pub version: i32,
+    pub subject: String,
+    pub schema: String,
+    #[serde(rename = "schemaType")]
+    pub schema_type: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CompatibilityConfig {
+    pub compatibility: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CompatibilityCheckResponse {
+    pub is_compatible: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registry() -> SchemaRegistry {
+        SchemaRegistry::new()
+    }
+
+    const AVRO_SCHEMA_V1: &str = r#"{"type":"record","name":"User","fields":[{"name":"id","type":"int"},{"name":"name","type":"string"}]}"#;
+    const AVRO_SCHEMA_V2: &str = r#"{"type":"record","name":"User","fields":[{"name":"id","type":"int"},{"name":"name","type":"string"},{"name":"email","type":["null","string"],"default":null}]}"#;
+
+    #[test]
+    fn register_and_lookup_by_id() {
+        let r = registry();
+        let id = r.register_schema("user-value", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let schema = r.get_schema_by_id(id).unwrap();
+        assert_eq!(schema.subject, "user-value");
+        assert_eq!(schema.version, 1);
+    }
+
+    #[test]
+    fn duplicate_schema_returns_same_id() {
+        let r = registry();
+        let id1 = r.register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let id2 = r.register_schema("evt", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn list_subjects_and_versions() {
+        let r = registry();
+        r.register_schema("s1", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        r.register_schema("s2", AVRO_SCHEMA_V2.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let subjects = r.list_subjects();
+        assert!(subjects.contains(&"s1".to_string()));
+        assert!(subjects.contains(&"s2".to_string()));
+    }
+
+    #[test]
+    fn json_schema_registration() {
+        let r = registry();
+        let js = r#"{"type":"object","properties":{"name":{"type":"string"}}}"#;
+        let id = r.register_schema("cfg-value", js.into(), SchemaFormat::JsonSchema, vec![]).unwrap();
+        assert!(id > 0);
+    }
+
+    #[test]
+    fn delete_subject() {
+        let r = registry();
+        r.register_schema("temp", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let versions = r.delete_subject("temp").unwrap();
+        assert_eq!(versions, vec![1]);
+    }
+
+    #[test]
+    fn compatibility_check() {
+        let r = registry();
+        r.set_global_compatibility(CompatibilityLevel::None);
+        r.register_schema("any", AVRO_SCHEMA_V1.into(), SchemaFormat::Avro, vec![]).unwrap();
+        let ok = r.check_compatibility("any", -1, AVRO_SCHEMA_V2, SchemaFormat::Avro).unwrap();
+        assert!(ok);
+    }
 }

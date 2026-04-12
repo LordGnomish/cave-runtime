@@ -1,87 +1,57 @@
-//! CAVE LLM Gateway — LiteLLM / AI Gateway replacement.
+//! CAVE LLM Gateway — Multi-provider LLM router and proxy.
 //!
-//! Replaces: LiteLLM, AI Gateway
-//! Unified LLM routing proxy with provider failover, semantic caching,
-//! guardrails (PII, content policy, budget, rate limiting), and token budget tracking.
+//! Replaces: LiteLLM, custom AI gateway, OpenAI proxy
+//!
+//! Features:
+//! - Multi-provider routing (OpenAI, Anthropic, local models)
+//! - OpenAI chat completions API compatibility
+//! - Load balancing across providers
+//! - Fallback chains (provider A → B → C)
+//! - Rate limiting per consumer
+//! - Token counting and cost tracking
+//! - Prompt caching
+//! - Streaming support (SSE)
+//! - Model aliasing
+//! - Request/response logging
+//! - Guardrails (input/output filtering)
+//! - API key management
 
-pub mod budget;
+pub mod alias;
+pub mod api_keys;
 pub mod cache;
+pub mod cost;
+pub mod error;
 pub mod guardrails;
-pub mod models;
+pub mod logging;
+pub mod openai;
+pub mod provider;
+pub mod rate_limit;
 pub mod router;
 pub mod routes;
+pub mod streaming;
 
 use axum::Router;
-use models::{ModelMapping, ProviderType, RoutingPolicy, SemanticCacheEntry};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-/// Shared mutable state for the LLM gateway.
-///
-/// All fields are wrapped in `Mutex` so they can be updated at runtime via the
-/// management API without a service restart. Use `Arc<GatewayState>` in handlers.
+pub use error::{GatewayError, GatewayResult};
+pub use router::GatewayRouter;
+
+pub const MODULE_NAME: &str = "llm-gateway";
+
+/// Shared state for the LLM gateway.
 pub struct GatewayState {
-    pub providers: Mutex<Vec<models::LlmProvider>>,
-    pub policies: Mutex<Vec<RoutingPolicy>>,
-    pub budgets: Mutex<Vec<models::TokenBudget>>,
-    /// Prompt-hash → cached response.
-    pub cache: Mutex<HashMap<String, SemanticCacheEntry>>,
-    pub guardrails: Mutex<Vec<models::Guardrail>>,
-    /// Model alias → per-provider model names.
-    pub model_mappings: Mutex<HashMap<String, ModelMapping>>,
+    pub router: Arc<GatewayRouter>,
 }
 
-impl Default for GatewayState {
-    fn default() -> Self {
+impl GatewayState {
+    pub fn new(router: GatewayRouter) -> Self {
         Self {
-            providers: Mutex::new(Vec::new()),
-            policies: Mutex::new(vec![RoutingPolicy::default()]),
-            budgets: Mutex::new(Vec::new()),
-            cache: Mutex::new(HashMap::new()),
-            guardrails: Mutex::new(Vec::new()),
-            model_mappings: Mutex::new(builtin_model_mappings()),
+            router: Arc::new(router),
         }
     }
 }
 
-/// Well-known model aliases pre-populated for common cross-provider mappings.
-fn builtin_model_mappings() -> HashMap<String, ModelMapping> {
-    let mut m = HashMap::new();
-
-    let mut gpt4_providers = HashMap::new();
-    gpt4_providers.insert(ProviderType::OpenAI, "gpt-4-turbo".to_string());
-    gpt4_providers.insert(
-        ProviderType::Anthropic,
-        "claude-sonnet-4-20250514".to_string(),
-    );
-    m.insert(
-        "gpt-4".to_string(),
-        ModelMapping {
-            alias: "gpt-4".to_string(),
-            provider_models: gpt4_providers,
-        },
-    );
-
-    let mut claude_providers = HashMap::new();
-    claude_providers.insert(
-        ProviderType::Anthropic,
-        "claude-sonnet-4-20250514".to_string(),
-    );
-    claude_providers.insert(ProviderType::OpenAI, "gpt-4o".to_string());
-    m.insert(
-        "claude-sonnet".to_string(),
-        ModelMapping {
-            alias: "claude-sonnet".to_string(),
-            provider_models: claude_providers,
-        },
-    );
-
-    m
-}
-
-/// Create the axum router for the LLM gateway.
+/// Build Axum router exposing the OpenAI-compatible API + admin endpoints.
 pub fn router(state: Arc<GatewayState>) -> Router {
     routes::create_router(state)
 }
-
-pub const MODULE_NAME: &str = "llm-gateway";

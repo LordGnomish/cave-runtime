@@ -1,88 +1,61 @@
-//! # CAVE Streams
+//! CAVE Streams — Kafka-compatible streaming platform.
 //!
-//! Cloud-native event streaming platform — a production-grade Kafka replacement
-//! without JVM or ZooKeeper dependencies.
+//! Replaces: Apache Kafka + Confluent Schema Registry + Kafka Connect
 //!
-//! ## Architecture
-//!
-//! ```text
-//! ┌─────────────────────────────────────────────────────────┐
-//! │                     cave-streams                         │
-//! │                                                         │
-//! │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐    │
-//! │  │ Producer │  │ Consumer │  │  Schema Registry   │    │
-//! │  └──────────┘  └──────────┘  └────────────────────┘    │
-//! │  ┌──────────┐  ┌──────────┐  ┌────────────────────┐    │
-//! │  │  Topics  │  │ Connect  │  │   Streams API      │    │
-//! │  └──────────┘  └──────────┘  └────────────────────┘    │
-//! │  ┌──────────────────────────────────────────────────┐   │
-//! │  │       Kafka Wire Protocol (TCP :9092)            │   │
-//! │  └──────────────────────────────────────────────────┘   │
-//! │  ┌──────────────────────────────────────────────────┐   │
-//! │  │         REST Proxy + Admin API (HTTP :8080)      │   │
-//! │  └──────────────────────────────────────────────────┘   │
-//! │  ┌──────────────────────────────────────────────────┐   │
-//! │  │   StreamStorage trait  (Memory / PostgreSQL)     │   │
-//! │  └──────────────────────────────────────────────────┘   │
-//! └─────────────────────────────────────────────────────────┘
-//! ```
-//!
-//! ## Key Features
-//!
-//! - **Topics & Partitions** — Kafka-compatible topic/partition model.
-//! - **Producer API** — key-hash, round-robin, and manual partitioning.
-//! - **Consumer API** — consumer groups with eager and cooperative-sticky rebalancing.
-//! - **Exactly-Once** — idempotent producers (PID + sequence) and transactional API.
-//! - **Log Compaction** — keep latest value per key per partition.
-//! - **Schema Registry** — Avro, JSON Schema, Protobuf; BACKWARD/FORWARD/FULL compatibility.
-//! - **Kafka Protocol** — binary wire protocol so existing Kafka clients connect directly.
-//! - **Connect API** — source/sink connector framework.
-//! - **Streams API** — stateless (map/filter/flatMap) and stateful (aggregate/count/join) transforms.
-//! - **Tiered Storage** — hot/warm/cold archival with S3-compatible object storage.
-//! - **REST Proxy** — produce/consume via HTTP for clients without a Kafka SDK.
-//! - **Admin API** — topic, group, compaction, and tier management over HTTP.
-//! - **cave-db integration** — [`StreamStorage`] trait implemented by both in-memory and PostgreSQL backends.
+//! Features:
+//! - Full Kafka wire protocol (API keys 0-67)
+//! - Topic management (create, delete, describe, alter configs)
+//! - Partition management (rebalance, reassignment)
+//! - Consumer groups (range, roundrobin, sticky, cooperative-sticky)
+//! - Exactly-once semantics (idempotent producer, transactions)
+//! - Schema Registry (Avro, Protobuf, JSON Schema)
+//! - Kafka Connect API (connectors, tasks, transforms)
+//! - Message compression (gzip, snappy, lz4, zstd)
+//! - Log compaction and retention policies
+//! - ACLs (per topic, group, cluster)
+//! - Quotas (produce/fetch byte rate, request rate)
+//! - MirrorMaker pattern (cross-cluster replication)
 
-pub mod admin;
-pub mod compaction;
+pub mod acl;
+pub mod broker;
+pub mod compression;
 pub mod connect;
-pub mod consumer;
+pub mod consumer_group;
 pub mod error;
-pub mod kafka_protocol;
-pub mod models;
-pub mod producer;
+pub mod mirror;
+pub mod protocol;
+pub mod quota;
 pub mod routes;
 pub mod schema_registry;
-pub mod storage;
-pub mod streams_api;
-pub mod topic;
+pub mod server;
+pub mod transactions;
 
-#[cfg(test)]
-mod tests;
+use axum::Router;
+use std::sync::Arc;
 
-// ─── Re-exports ───────────────────────────────────────────────────────────────
-
-pub use error::{StreamError, StreamResult};
-pub use models::{
-    CompatibilityMode, ConnectorConfig, ConnectorDirection, ConnectorStatus,
-    ConsumerGroup, GroupMember, GroupState,
-    Header, PartitionLog, PartitionerStrategy, ProducerRecord, ProducerState,
-    RebalanceProtocol, RecordMetadata, Record,
-    Schema, SchemaType,
-    StorageTierConfig, StreamPipelineConfig, StreamOperation,
-    TopicConfig, TopicInfo, TopicPartition, Transaction, TransactionState,
-};
-pub use storage::{MemoryStorage, PostgresStorage, StreamStorage};
-pub use producer::{Producer, ProducerRecordBuilder};
-pub use consumer::{Consumer, GroupAdmin};
-pub use topic::{TopicManager, TopicConfigPatch};
-pub use compaction::CompactionEngine;
-pub use schema_registry::SchemaRegistry;
-pub use kafka_protocol::KafkaServer;
-pub use connect::{ConnectorRegistry, SourceConnector, SinkConnector};
-pub use streams_api::{PipelineRegistry, StreamPipelineBuilder};
-pub use admin::AdminClient;
-pub use routes::{StreamsState, router};
+pub use broker::Broker;
+pub use error::{StreamsError, StreamsResult};
 
 pub const MODULE_NAME: &str = "streams";
-pub const KAFKA_DEFAULT_PORT: u16 = 9092;
+/// Default Kafka wire protocol port
+pub const KAFKA_PORT: u16 = 9092;
+/// Default Schema Registry port
+pub const SCHEMA_REGISTRY_PORT: u16 = 8081;
+
+/// Shared application state for the streams module.
+pub struct StreamsState {
+    pub broker: Arc<Broker>,
+}
+
+impl Default for StreamsState {
+    fn default() -> Self {
+        Self {
+            broker: Arc::new(Broker::new(broker::BrokerConfig::default())),
+        }
+    }
+}
+
+/// Build Axum management/REST router (Schema Registry + Connect + admin endpoints).
+pub fn router(state: Arc<StreamsState>) -> Router {
+    routes::create_router(state)
+}

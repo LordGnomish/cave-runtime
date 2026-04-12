@@ -1,211 +1,249 @@
-//! Pre-request guardrails: PII filtering, content policy, budget and rate limits.
+//! Guardrails — input/output content filtering.
 
-use crate::models::{Guardrail, GuardrailAction, GuardrailType, LlmRequest};
-use crate::GatewayState;
-use tracing::{info, warn};
+use crate::error::{GatewayError, GatewayResult};
+use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, MessageContent};
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
-pub enum GuardrailResult {
-    Pass,
-    Warn(String),
-    Block(String),
-    /// Request was modified (e.g. PII redacted). Carry the clean version forward.
-    Redact(LlmRequest),
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuardrailRule {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub rule_type: RuleType,
+    pub action: GuardrailAction,
 }
 
-/// Run all enabled guardrails against `request` in order.
-/// Returns the first `Block`, accumulates `Redact` modifications, collects `Warn`s.
-pub fn evaluate_guardrails(state: &GatewayState, request: &LlmRequest) -> GuardrailResult {
-    let enabled: Vec<Guardrail> = {
-        let g = state.guardrails.lock().unwrap();
-        g.iter().filter(|g| g.enabled).cloned().collect()
-    };
-
-    let mut current = request.clone();
-
-    for guardrail in &enabled {
-        let result = match guardrail.guardrail_type {
-            GuardrailType::PiiFilter => pii_filter(&current, guardrail),
-            GuardrailType::ContentPolicy => content_policy(&current, guardrail),
-            GuardrailType::TokenLimit => token_limit_check(&current, guardrail),
-            GuardrailType::CostLimit => cost_limit_check(&current, guardrail),
-            GuardrailType::RateLimit => rate_limit_check(&current, state, guardrail),
-        };
-
-        match result {
-            GuardrailResult::Block(reason) => {
-                warn!(guardrail = %guardrail.name, %reason, "Request blocked");
-                return GuardrailResult::Block(reason);
-            }
-            GuardrailResult::Redact(modified) => {
-                current = modified;
-            }
-            GuardrailResult::Warn(msg) => {
-                warn!(guardrail = %guardrail.name, %msg, "Guardrail warning");
-            }
-            GuardrailResult::Pass => {}
-        }
-    }
-
-    if current != *request {
-        GuardrailResult::Redact(current)
-    } else {
-        GuardrailResult::Pass
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleType {
+    /// Block if input contains any of these substrings (case-insensitive)
+    BlockedKeywords { keywords: Vec<String> },
+    /// Block if input matches a regex pattern
+    RegexBlock { pattern: String },
+    /// Block if prompt length exceeds max_chars
+    MaxPromptLength { max_chars: usize },
+    /// Block if response contains any of these substrings
+    OutputFilter { keywords: Vec<String> },
+    /// Require output to not be empty
+    NonEmptyOutput,
 }
 
-/// Detect and optionally redact PII in prompt messages.
-/// Integrates conceptually with cave-pii; inline heuristics for now.
-pub fn pii_filter(request: &LlmRequest, guardrail: &Guardrail) -> GuardrailResult {
-    let mut modified_messages = request.messages.clone();
-    let mut found_pii = false;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GuardrailAction {
+    Block,
+    Warn,
+    Redact,
+}
 
-    for msg in &mut modified_messages {
-        // Email heuristic: word containing '@' followed by a '.'
-        let words: Vec<&str> = msg.content.split_whitespace().collect();
-        let redacted: Vec<&str> = words
-            .iter()
-            .map(|w| {
-                if w.contains('@') && w.contains('.') {
-                    found_pii = true;
-                    "[EMAIL]"
-                } else {
-                    w
+pub struct GuardrailEngine {
+    rules: DashMap<String, GuardrailRule>,
+}
+
+impl GuardrailEngine {
+    pub fn new() -> Self {
+        let e = Self { rules: DashMap::new() };
+        e.load_defaults();
+        e
+    }
+
+    fn load_defaults(&self) {
+        self.add_rule(GuardrailRule {
+            id: "max-prompt-length".into(),
+            name: "Max prompt length 32k chars".into(),
+            enabled: true,
+            rule_type: RuleType::MaxPromptLength { max_chars: 32_768 },
+            action: GuardrailAction::Block,
+        });
+        self.add_rule(GuardrailRule {
+            id: "non-empty-output".into(),
+            name: "Response must not be empty".into(),
+            enabled: true,
+            rule_type: RuleType::NonEmptyOutput,
+            action: GuardrailAction::Warn,
+        });
+    }
+
+    pub fn add_rule(&self, rule: GuardrailRule) {
+        self.rules.insert(rule.id.clone(), rule);
+    }
+
+    pub fn remove_rule(&self, id: &str) -> bool {
+        self.rules.remove(id).is_some()
+    }
+
+    pub fn list_rules(&self) -> Vec<GuardrailRule> {
+        self.rules.iter().map(|e| e.value().clone()).collect()
+    }
+
+    /// Check the input request. Returns Err if a blocking rule fires.
+    pub fn check_input(&self, req: &ChatCompletionRequest) -> GatewayResult<Vec<String>> {
+        let mut warnings = Vec::new();
+
+        // Gather all message text
+        let full_text: String = req.messages.iter()
+            .filter_map(|m| m.content.as_text())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        for entry in self.rules.iter() {
+            let rule = entry.value();
+            if !rule.enabled {
+                continue;
+            }
+
+            let fired = match &rule.rule_type {
+                RuleType::MaxPromptLength { max_chars } => full_text.len() > *max_chars,
+                RuleType::BlockedKeywords { keywords } => {
+                    let lower = full_text.to_lowercase();
+                    keywords.iter().any(|kw| lower.contains(kw.as_str()))
                 }
-            })
-            .collect();
-
-        if found_pii {
-            msg.content = redacted.join(" ");
-        }
-
-        // SSN heuristic: NNN-NN-NNNN
-        if msg.content.len() >= 11 {
-            let bytes = msg.content.as_bytes();
-            let mut i = 0;
-            while i + 10 < bytes.len() {
-                if bytes[i..i + 3].iter().all(|b| b.is_ascii_digit())
-                    && bytes[i + 3] == b'-'
-                    && bytes[i + 4..i + 6].iter().all(|b| b.is_ascii_digit())
-                    && bytes[i + 6] == b'-'
-                    && bytes[i + 7..i + 11].iter().all(|b| b.is_ascii_digit())
-                {
-                    msg.content = msg.content[..i].to_string()
-                        + "[SSN]"
-                        + &msg.content[i + 11..];
-                    found_pii = true;
-                    break;
+                RuleType::RegexBlock { .. } => {
+                    // Regex support would need the `regex` crate; skip for now
+                    false
                 }
-                i += 1;
+                // Output rules checked separately
+                RuleType::OutputFilter { .. } | RuleType::NonEmptyOutput => false,
+            };
+
+            if fired {
+                match rule.action {
+                    GuardrailAction::Block => {
+                        return Err(GatewayError::GuardrailBlocked {
+                            rule: rule.name.clone(),
+                            reason: "input violated guardrail".into(),
+                        });
+                    }
+                    GuardrailAction::Warn | GuardrailAction::Redact => {
+                        warnings.push(format!("guardrail warning: {}", rule.name));
+                    }
+                }
             }
         }
+
+        Ok(warnings)
     }
 
-    if !found_pii {
-        return GuardrailResult::Pass;
-    }
+    /// Check the output response. Returns Err if a blocking rule fires.
+    pub fn check_output(&self, resp: &ChatCompletionResponse) -> GatewayResult<Vec<String>> {
+        let mut warnings = Vec::new();
 
-    match guardrail.action {
-        GuardrailAction::Block => {
-            GuardrailResult::Block("PII detected in request".to_string())
-        }
-        GuardrailAction::Warn => {
-            GuardrailResult::Warn("PII detected in request".to_string())
-        }
-        GuardrailAction::Redact => {
-            let mut modified = request.clone();
-            modified.messages = modified_messages;
-            GuardrailResult::Redact(modified)
-        }
-    }
-}
+        let output_text: String = resp.choices.iter()
+            .filter_map(|c| c.message.as_ref())
+            .filter_map(|m| m.content.as_text())
+            .collect::<Vec<_>>()
+            .join("\n");
 
-/// Block requests containing policy-violating terms.
-pub fn content_policy(request: &LlmRequest, guardrail: &Guardrail) -> GuardrailResult {
-    let default_blocked = ["<script>", "DROP TABLE", "rm -rf /"];
-    let blocked: Vec<String> = guardrail.config["blocked_terms"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_else(|| default_blocked.iter().map(|s| s.to_string()).collect());
+        for entry in self.rules.iter() {
+            let rule = entry.value();
+            if !rule.enabled {
+                continue;
+            }
 
-    for msg in &request.messages {
-        for term in &blocked {
-            if msg.content.contains(term.as_str()) {
-                return GuardrailResult::Block(
-                    "Content policy violation: blocked term detected".to_string(),
-                );
+            let fired = match &rule.rule_type {
+                RuleType::OutputFilter { keywords } => {
+                    let lower = output_text.to_lowercase();
+                    keywords.iter().any(|kw| lower.contains(kw.as_str()))
+                }
+                RuleType::NonEmptyOutput => output_text.trim().is_empty(),
+                _ => false,
+            };
+
+            if fired {
+                match rule.action {
+                    GuardrailAction::Block => {
+                        return Err(GatewayError::GuardrailBlocked {
+                            rule: rule.name.clone(),
+                            reason: "output violated guardrail".into(),
+                        });
+                    }
+                    GuardrailAction::Warn | GuardrailAction::Redact => {
+                        warnings.push(format!("guardrail warning: {}", rule.name));
+                    }
+                }
             }
         }
-    }
 
-    GuardrailResult::Pass
+        Ok(warnings)
+    }
 }
 
-/// Reject requests whose estimated input token count exceeds the configured limit.
-pub fn token_limit_check(request: &LlmRequest, guardrail: &Guardrail) -> GuardrailResult {
-    let max_tokens = guardrail.config["max_input_tokens"].as_u64().unwrap_or(32_000);
-
-    // ~4 characters per token is a common approximation.
-    let estimated: u64 = request
-        .messages
-        .iter()
-        .map(|m| m.content.len() as u64 / 4)
-        .sum();
-
-    if estimated > max_tokens {
-        return GuardrailResult::Block(format!(
-            "Estimated input tokens ({estimated}) exceeds limit ({max_tokens})"
-        ));
+impl Default for GuardrailEngine {
+    fn default() -> Self {
+        Self::new()
     }
-
-    GuardrailResult::Pass
 }
 
-/// Reject requests whose estimated cost exceeds the per-request threshold.
-pub fn cost_limit_check(request: &LlmRequest, guardrail: &Guardrail) -> GuardrailResult {
-    let max_cost_usd = guardrail.config["max_cost_usd"].as_f64().unwrap_or(1.0);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::openai::{ChatMessage, Usage};
 
-    let input_tokens: f64 = request
-        .messages
-        .iter()
-        .map(|m| m.content.len() as f64 / 4.0)
-        .sum();
-    let output_tokens = request.max_tokens.unwrap_or(1024) as f64;
-    // Conservative estimate: $0.01 / 1k tokens
-    let estimated_cost = (input_tokens + output_tokens) / 1_000.0 * 0.01;
-
-    if estimated_cost > max_cost_usd {
-        return GuardrailResult::Block(format!(
-            "Estimated cost (${estimated_cost:.4}) exceeds limit (${max_cost_usd:.2})"
-        ));
+    fn make_req(text: &str) -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            model: "gpt-4o".into(),
+            messages: vec![ChatMessage::user(text)],
+            temperature: None, top_p: None, max_tokens: None, stream: None,
+            stop: None, presence_penalty: None, frequency_penalty: None,
+            n: None, user: None, tools: None, tool_choice: None,
+            response_format: None, seed: None, logprobs: None,
+        }
     }
 
-    GuardrailResult::Pass
-}
+    #[test]
+    fn normal_request_passes() {
+        let engine = GuardrailEngine::new();
+        assert!(engine.check_input(&make_req("Hello, world!")).is_ok());
+    }
 
-/// Per-user/team rate limiting check.
-///
-/// Full sliding-window counters require persistent state (Redis / in-memory map with
-/// timestamps). This stub validates the configuration path and logs intent.
-/// Wire in cave-db or a tokio::sync::Mutex<HashMap<String, VecDeque<Instant>>> for
-/// the real implementation.
-pub fn rate_limit_check(
-    request: &LlmRequest,
-    _state: &GatewayState,
-    guardrail: &Guardrail,
-) -> GuardrailResult {
-    let max_rpm = guardrail.config["max_requests_per_minute"].as_u64().unwrap_or(60);
-    let scope = request
-        .metadata
-        .as_ref()
-        .and_then(|m| m.user_id.as_deref())
-        .unwrap_or("anonymous");
+    #[test]
+    fn max_length_blocks() {
+        let engine = GuardrailEngine::new();
+        let long_text = "a".repeat(40_000);
+        let result = engine.check_input(&make_req(&long_text));
+        assert!(result.is_err());
+    }
 
-    info!(scope, max_rpm, "Rate limit check (sliding-window not yet implemented)");
+    #[test]
+    fn keyword_block_fires() {
+        let engine = GuardrailEngine::new();
+        engine.add_rule(GuardrailRule {
+            id: "no-badword".into(),
+            name: "Block badword".into(),
+            enabled: true,
+            rule_type: RuleType::BlockedKeywords { keywords: vec!["badword".into()] },
+            action: GuardrailAction::Block,
+        });
+        let result = engine.check_input(&make_req("this contains badword here"));
+        assert!(result.is_err());
+    }
 
-    GuardrailResult::Pass
+    #[test]
+    fn output_filter_fires() {
+        let engine = GuardrailEngine::new();
+        engine.add_rule(GuardrailRule {
+            id: "no-secret".into(),
+            name: "No secrets in output".into(),
+            enabled: true,
+            rule_type: RuleType::OutputFilter { keywords: vec!["secret".into()] },
+            action: GuardrailAction::Block,
+        });
+        let resp = ChatCompletionResponse::simple("gpt-4o", "Here is the secret key".into(), Usage::new(5, 5));
+        let result = engine.check_output(&resp);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn disabled_rule_not_checked() {
+        let engine = GuardrailEngine::new();
+        engine.add_rule(GuardrailRule {
+            id: "disabled-kw".into(),
+            name: "Disabled".into(),
+            enabled: false,
+            rule_type: RuleType::BlockedKeywords { keywords: vec!["anything".into()] },
+            action: GuardrailAction::Block,
+        });
+        assert!(engine.check_input(&make_req("this contains anything")).is_ok());
+    }
 }

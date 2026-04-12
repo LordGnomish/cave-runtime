@@ -1,340 +1,256 @@
-//! Provider selection, fallback, load balancing, and format transformation.
+//! GatewayRouter — multi-provider routing with load balancing and fallback chains.
 
-use crate::models::{
-    HealthStatus, LlmProvider, LlmRequest, LlmResponse, Message, ModelMapping, ProviderType,
-    RoutingStrategy, Usage, Choice,
-};
-use crate::GatewayState;
-use std::collections::HashMap;
-use tracing::warn;
-use uuid::Uuid;
+use crate::alias::AliasRegistry;
+use crate::cache::{CacheConfig, PromptCache};
+use crate::cost::CostTracker;
+use crate::error::{GatewayError, GatewayResult};
+use crate::guardrails::GuardrailEngine;
+use crate::logging::{LogStatus, RequestLogger};
+use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
+use crate::provider::{LlmProvider, ProviderRegistry};
+use crate::rate_limit::{RateLimit, RateLimiter};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::Instant;
 
-pub struct RouteResult {
-    pub provider: LlmProvider,
-    pub resolved_model: String,
+// ── Routing policy ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoutingStrategy {
+    /// Always use a specific provider
+    Fixed { provider: String },
+    /// Round-robin across providers
+    RoundRobin { providers: Vec<String> },
+    /// Weighted random selection
+    Weighted { providers: Vec<(String, u32)> },
+    /// Try providers in order until one succeeds
+    Fallback { providers: Vec<String> },
 }
 
-/// Select the best provider for a request based on the active routing policy.
-pub fn route_request(state: &GatewayState, request: &LlmRequest) -> Option<RouteResult> {
-    let providers = state.providers.lock().unwrap();
-    let policies = state.policies.lock().unwrap();
-    let mappings = state.model_mappings.lock().unwrap();
+// ── Gateway router ────────────────────────────────────────────────────────────
 
-    let healthy: Vec<&LlmProvider> = providers
-        .iter()
-        .filter(|p| {
-            p.health_status == HealthStatus::Healthy
-                || p.health_status == HealthStatus::Unknown
-        })
-        .collect();
+pub struct GatewayRouter {
+    pub providers: Arc<ProviderRegistry>,
+    pub aliases: Arc<AliasRegistry>,
+    pub rate_limiter: Arc<RateLimiter>,
+    pub cache: Arc<PromptCache>,
+    pub cost_tracker: Arc<CostTracker>,
+    pub logger: Arc<RequestLogger>,
+    pub guardrails: Arc<GuardrailEngine>,
+    strategy: RoutingStrategy,
+    /// Rotating counter for round-robin
+    rr_counter: std::sync::atomic::AtomicUsize,
+}
 
-    if healthy.is_empty() {
-        warn!("No healthy providers available");
-        return None;
+impl GatewayRouter {
+    pub fn new(
+        providers: Arc<ProviderRegistry>,
+        aliases: Arc<AliasRegistry>,
+        strategy: RoutingStrategy,
+    ) -> Self {
+        Self {
+            providers,
+            aliases,
+            strategy,
+            rate_limiter: Arc::new(RateLimiter::new(RateLimit::default())),
+            cache: Arc::new(PromptCache::new(CacheConfig::default())),
+            cost_tracker: Arc::new(CostTracker::new()),
+            logger: Arc::new(RequestLogger::new(10_000)),
+            guardrails: Arc::new(GuardrailEngine::new()),
+            rr_counter: std::sync::atomic::AtomicUsize::new(0),
+        }
     }
 
-    let policy = policies.first().cloned().unwrap_or_default();
+    /// Route a request through the full pipeline:
+    /// rate-limit → guardrail input check → cache → provider → guardrail output → log
+    pub async fn complete(
+        &self,
+        consumer: &str,
+        mut req: ChatCompletionRequest,
+    ) -> GatewayResult<ChatCompletionResponse> {
+        let start = Instant::now();
 
-    let provider = match policy.strategy {
-        RoutingStrategy::PriorityFallback => {
-            let mut sorted = healthy.clone();
-            sorted.sort_by_key(|p| p.priority);
-            sorted.into_iter().next()
+        // Resolve alias
+        let (provider_name, model) = self.resolve_model(&req.model);
+        req.model = model;
+
+        // Rate limit (estimate token cost from messages length)
+        let estimated_tokens: u32 = req.messages.iter()
+            .filter_map(|m| m.content.as_text())
+            .map(|t| crate::cost::estimate_tokens(t))
+            .sum();
+
+        if let Err(e) = self.rate_limiter.check(consumer, estimated_tokens) {
+            self.logger.log_error(consumer, &provider_name, &req.model, 0, LogStatus::RateLimited, &e.to_string());
+            return Err(e);
         }
-        RoutingStrategy::RoundRobin => load_balance(&healthy),
-        RoutingStrategy::LeastLatency => healthy.iter().min_by_key(|p| p.priority).copied(),
-        RoutingStrategy::CostOptimized => cost_optimize(&healthy),
-        RoutingStrategy::Custom => {
-            let mut sorted = healthy.clone();
-            sorted.sort_by_key(|p| p.priority);
-            sorted.into_iter().next()
+
+        // Guardrail input check
+        if let Err(e) = self.guardrails.check_input(&req) {
+            self.logger.log_error(consumer, &provider_name, &req.model, 0, LogStatus::GuardrailBlocked, &e.to_string());
+            return Err(e);
         }
-    }?;
 
-    let resolved_model = resolve_model(&request.model, &provider.provider_type, &mappings);
-    Some(RouteResult {
-        provider: provider.clone(),
-        resolved_model,
-    })
-}
-
-/// Try providers in fallback order when the primary fails.
-pub fn fallback_chain(
-    state: &GatewayState,
-    request: &LlmRequest,
-    failed_provider_id: Uuid,
-) -> Option<RouteResult> {
-    let providers = state.providers.lock().unwrap();
-    let policies = state.policies.lock().unwrap();
-    let mappings = state.model_mappings.lock().unwrap();
-
-    let policy = policies.first().cloned().unwrap_or_default();
-
-    // Try explicit fallback chain first.
-    for provider_id in &policy.fallback_chain {
-        if *provider_id == failed_provider_id {
-            continue;
+        // Cache check
+        if let Some(cached) = self.cache.get(&req) {
+            let latency = start.elapsed().as_millis() as u64;
+            self.logger.log_success(consumer, &provider_name, &req, &cached, latency, true);
+            return Ok(cached);
         }
-        if let Some(provider) = providers.iter().find(|p| p.id == *provider_id) {
-            if provider.health_status != HealthStatus::Unhealthy {
-                let resolved_model =
-                    resolve_model(&request.model, &provider.provider_type, &mappings);
-                return Some(RouteResult {
-                    provider: provider.clone(),
-                    resolved_model,
-                });
+
+        // Route to provider(s)
+        let resp = self.dispatch(consumer, &provider_name, &req).await?;
+
+        // Guardrail output check
+        if let Err(e) = self.guardrails.check_output(&resp) {
+            let latency = start.elapsed().as_millis() as u64;
+            self.logger.log_error(consumer, &provider_name, &req.model, latency, LogStatus::GuardrailBlocked, &e.to_string());
+            return Err(e);
+        }
+
+        // Record cost
+        self.cost_tracker.record(consumer, &req.model, &provider_name, resp.usage.prompt_tokens, resp.usage.completion_tokens);
+
+        // Cache store
+        self.cache.insert(&req, resp.clone());
+
+        // Log
+        let latency = start.elapsed().as_millis() as u64;
+        self.logger.log_success(consumer, &provider_name, &req, &resp, latency, false);
+
+        Ok(resp)
+    }
+
+    fn resolve_model(&self, model: &str) -> (String, String) {
+        if let Some(alias) = self.aliases.resolve(model) {
+            (alias.provider, alias.model)
+        } else {
+            // Try to infer provider from model name
+            let provider = if model.starts_with("claude") {
+                "anthropic"
+            } else if model.starts_with("gpt") || model.starts_with("o1") || model.starts_with("o3") {
+                "openai"
+            } else {
+                "local"
+            };
+            (provider.to_string(), model.to_string())
+        }
+    }
+
+    async fn dispatch(&self, consumer: &str, preferred_provider: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
+        match &self.strategy {
+            RoutingStrategy::Fixed { provider } => {
+                let name = if preferred_provider == "local" || preferred_provider == "openai" || preferred_provider == "anthropic" {
+                    preferred_provider
+                } else {
+                    provider.as_str()
+                };
+                self.call_provider(name, req).await
+            }
+            RoutingStrategy::Fallback { providers } => {
+                let mut last_err = GatewayError::NoProvidersAvailable;
+                for name in providers {
+                    match self.call_provider(name, req).await {
+                        Ok(resp) => return Ok(resp),
+                        Err(e) => {
+                            tracing::warn!("provider {} failed: {}", name, e);
+                            last_err = e;
+                        }
+                    }
+                }
+                Err(last_err)
+            }
+            RoutingStrategy::RoundRobin { providers } => {
+                if providers.is_empty() {
+                    return Err(GatewayError::NoProvidersAvailable);
+                }
+                let idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % providers.len();
+                self.call_provider(&providers[idx], req).await
+            }
+            RoutingStrategy::Weighted { providers } => {
+                if providers.is_empty() {
+                    return Err(GatewayError::NoProvidersAvailable);
+                }
+                // Simple weighted selection using modulo on counter
+                let total: u32 = providers.iter().map(|(_, w)| w).sum();
+                let idx = self.rr_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u32 % total;
+                let mut cumulative = 0u32;
+                let selected = providers.iter().find(|(_, w)| {
+                    cumulative += w;
+                    cumulative > idx
+                }).map(|(name, _)| name.as_str()).unwrap_or(&providers[0].0);
+                self.call_provider(selected, req).await
             }
         }
     }
 
-    // Fall back to any remaining healthy provider.
-    providers
-        .iter()
-        .filter(|p| p.id != failed_provider_id && p.health_status != HealthStatus::Unhealthy)
-        .next()
-        .map(|provider| {
-            let resolved_model =
-                resolve_model(&request.model, &provider.provider_type, &mappings);
-            RouteResult {
-                provider: provider.clone(),
-                resolved_model,
-            }
-        })
+    async fn call_provider(&self, name: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
+        let provider = self.providers.get(name)
+            .ok_or_else(|| GatewayError::ProviderUnavailable { provider: name.to_string(), reason: "not registered".into() })?;
+        provider.complete(req).await
+    }
+
+    pub fn provider_names(&self) -> Vec<String> {
+        self.providers.list()
+    }
 }
 
-/// Weighted random selection across healthy providers.
-pub fn load_balance<'a>(providers: &[&'a LlmProvider]) -> Option<&'a LlmProvider> {
-    if providers.is_empty() {
-        return None;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::provider::{MockProvider, ProviderRegistry};
+    use crate::openai::ChatMessage;
+
+    fn make_router() -> GatewayRouter {
+        let registry = Arc::new(ProviderRegistry::new());
+        registry.register(Arc::new(MockProvider::new("mock")));
+        let aliases = Arc::new(AliasRegistry::new());
+        GatewayRouter::new(registry, aliases, RoutingStrategy::Fixed { provider: "mock".into() })
     }
-    let total_weight: f64 = providers.iter().map(|p| p.weight).sum();
-    if total_weight == 0.0 {
-        return providers.first().copied();
-    }
-    let mut target = pseudo_random_f64() * total_weight;
-    for provider in providers {
-        target -= provider.weight;
-        if target <= 0.0 {
-            return Some(provider);
+
+    fn make_req() -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            model: "mock-model".into(),
+            messages: vec![ChatMessage::user("hello")],
+            temperature: None, top_p: None, max_tokens: None, stream: None,
+            stop: None, presence_penalty: None, frequency_penalty: None,
+            n: None, user: None, tools: None, tool_choice: None,
+            response_format: None, seed: None, logprobs: None,
         }
     }
-    providers.last().copied()
-}
 
-/// Pick the cheapest equivalent provider using a static cost heuristic.
-pub fn cost_optimize<'a>(providers: &[&'a LlmProvider]) -> Option<&'a LlmProvider> {
-    let cost_rank = |pt: &ProviderType| match pt {
-        ProviderType::Local => 0u8,
-        ProviderType::Ollama => 1,
-        ProviderType::Mistral => 2,
-        ProviderType::OpenAI => 3,
-        ProviderType::Anthropic => 4,
-        ProviderType::Bedrock => 5,
-        ProviderType::Google => 6,
-        ProviderType::AzureOpenAI => 7,
-    };
-    providers
-        .iter()
-        .min_by_key(|p| cost_rank(&p.provider_type))
-        .copied()
-}
-
-/// Resolve a model alias to the provider-specific model name.
-pub fn resolve_model(
-    alias: &str,
-    provider_type: &ProviderType,
-    mappings: &HashMap<String, ModelMapping>,
-) -> String {
-    if let Some(mapping) = mappings.get(alias) {
-        if let Some(model) = mapping.provider_models.get(provider_type) {
-            return model.clone();
-        }
+    #[tokio::test]
+    async fn basic_routing_success() {
+        let router = make_router();
+        let resp = router.complete("user-1", make_req()).await.unwrap();
+        assert!(!resp.choices.is_empty());
     }
-    alias.to_string()
-}
 
-/// Transform a unified LlmRequest into the provider's wire format.
-pub fn transform_request(
-    request: &LlmRequest,
-    provider_type: &ProviderType,
-    resolved_model: &str,
-) -> serde_json::Value {
-    match provider_type {
-        ProviderType::Anthropic => to_anthropic(request, resolved_model),
-        ProviderType::Bedrock => to_bedrock(request, resolved_model),
-        _ => to_openai(request, resolved_model),
+    #[tokio::test]
+    async fn cache_hit_on_second_request() {
+        let router = make_router();
+        // First call
+        router.complete("user-1", make_req()).await.unwrap();
+        // Second identical call should be a cache hit
+        router.complete("user-1", make_req()).await.unwrap();
+        let stats = router.cache.stats();
+        // At least one hit
+        assert!(stats.hits >= 1);
     }
-}
 
-/// Normalize a provider-specific response back to the unified LlmResponse.
-pub fn transform_response(
-    raw: &serde_json::Value,
-    provider: &LlmProvider,
-    latency_ms: u64,
-) -> LlmResponse {
-    match provider.provider_type {
-        ProviderType::Anthropic => from_anthropic(raw, provider, latency_ms),
-        _ => from_openai(raw, provider, latency_ms),
+    #[tokio::test]
+    async fn fallback_strategy_tries_next_on_failure() {
+        let registry = Arc::new(ProviderRegistry::new());
+        // Register only "mock", not "broken"
+        registry.register(Arc::new(MockProvider::new("mock")));
+        let aliases = Arc::new(AliasRegistry::new());
+        let router = GatewayRouter::new(
+            registry,
+            aliases,
+            RoutingStrategy::Fallback { providers: vec!["broken".into(), "mock".into()] },
+        );
+        let resp = router.complete("user-1", make_req()).await.unwrap();
+        assert!(!resp.choices.is_empty());
     }
-}
-
-// ─── Wire format helpers ──────────────────────────────────────────────────────
-
-fn to_openai(request: &LlmRequest, model: &str) -> serde_json::Value {
-    let mut body = serde_json::json!({
-        "model": model,
-        "messages": request.messages,
-        "stream": request.stream,
-    });
-    if let Some(t) = request.temperature {
-        body["temperature"] = serde_json::json!(t);
-    }
-    if let Some(m) = request.max_tokens {
-        body["max_tokens"] = serde_json::json!(m);
-    }
-    if let Some(tools) = &request.tools {
-        body["tools"] = tools.clone();
-    }
-    body
-}
-
-fn to_anthropic(request: &LlmRequest, model: &str) -> serde_json::Value {
-    // Anthropic separates the system prompt from the message list.
-    let system = request
-        .messages
-        .iter()
-        .find(|m| m.role == "system")
-        .map(|m| m.content.clone());
-
-    let messages: Vec<serde_json::Value> = request
-        .messages
-        .iter()
-        .filter(|m| m.role != "system")
-        .map(|m| serde_json::json!({"role": m.role, "content": m.content}))
-        .collect();
-
-    let mut body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-        "max_tokens": request.max_tokens.unwrap_or(1024),
-    });
-    if let Some(sys) = system {
-        body["system"] = serde_json::json!(sys);
-    }
-    if let Some(t) = request.temperature {
-        body["temperature"] = serde_json::json!(t);
-    }
-    body
-}
-
-fn to_bedrock(request: &LlmRequest, model: &str) -> serde_json::Value {
-    // Bedrock Converse API format.
-    let messages: Vec<serde_json::Value> = request
-        .messages
-        .iter()
-        .filter(|m| m.role != "system")
-        .map(|m| {
-            serde_json::json!({
-                "role": m.role,
-                "content": [{"text": m.content}],
-            })
-        })
-        .collect();
-
-    serde_json::json!({
-        "modelId": model,
-        "messages": messages,
-        "inferenceConfig": {
-            "maxTokens": request.max_tokens.unwrap_or(1024),
-            "temperature": request.temperature.unwrap_or(1.0),
-        },
-    })
-}
-
-fn from_openai(raw: &serde_json::Value, provider: &LlmProvider, latency_ms: u64) -> LlmResponse {
-    let choices: Vec<Choice> = raw["choices"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .enumerate()
-                .map(|(i, c)| Choice {
-                    index: i as u32,
-                    message: Message {
-                        role: c["message"]["role"]
-                            .as_str()
-                            .unwrap_or("assistant")
-                            .to_string(),
-                        content: c["message"]["content"].as_str().unwrap_or("").to_string(),
-                    },
-                    finish_reason: c["finish_reason"].as_str().map(str::to_string),
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let prompt_tokens = raw["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32;
-    let completion_tokens = raw["usage"]["completion_tokens"].as_u64().unwrap_or(0) as u32;
-
-    LlmResponse {
-        id: Uuid::new_v4(),
-        model: raw["model"].as_str().unwrap_or("unknown").to_string(),
-        provider_used: provider.name.clone(),
-        choices,
-        usage: Usage {
-            prompt_tokens,
-            completion_tokens,
-            total_tokens: raw["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32,
-        },
-        latency_ms,
-        cost: None,
-        cached: false,
-    }
-}
-
-fn from_anthropic(
-    raw: &serde_json::Value,
-    provider: &LlmProvider,
-    latency_ms: u64,
-) -> LlmResponse {
-    let content = raw["content"]
-        .as_array()
-        .and_then(|arr| arr.first())
-        .and_then(|c| c["text"].as_str())
-        .unwrap_or("")
-        .to_string();
-
-    let prompt_tokens = raw["usage"]["input_tokens"].as_u64().unwrap_or(0) as u32;
-    let completion_tokens = raw["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
-
-    LlmResponse {
-        id: Uuid::new_v4(),
-        model: raw["model"].as_str().unwrap_or("unknown").to_string(),
-        provider_used: provider.name.clone(),
-        choices: vec![Choice {
-            index: 0,
-            message: Message {
-                role: "assistant".to_string(),
-                content,
-            },
-            finish_reason: raw["stop_reason"].as_str().map(str::to_string),
-        }],
-        usage: Usage {
-            prompt_tokens,
-            completion_tokens,
-            total_tokens: prompt_tokens + completion_tokens,
-        },
-        latency_ms,
-        cost: None,
-        cached: false,
-    }
-}
-
-/// Cheap pseudo-random float in [0, 1) derived from sub-microsecond system time.
-/// Good enough for weighted load balancing without pulling in a rand crate.
-fn pseudo_random_f64() -> f64 {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
-    (nanos % 1_000_000) as f64 / 1_000_000.0
 }
