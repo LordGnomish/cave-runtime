@@ -68,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -88,6 +89,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let tracker_state = Arc::new(cave_tracker::TrackerState::default());
 >>>>>>> claude/peaceful-bell
+=======
+    let mesh_state = Arc::new(cave_mesh::MeshState::default());
+>>>>>>> claude/peaceful-lederberg
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -157,6 +161,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -215,6 +220,10 @@ async fn main() -> anyhow::Result<()> {
         // Phase 4 module routers
         .merge(cave_tracker::router(tracker_state))
 >>>>>>> claude/peaceful-bell
+=======
+        // Service mesh
+        .merge(cave_mesh::router(mesh_state))
+>>>>>>> claude/peaceful-lederberg
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
