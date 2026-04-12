@@ -93,6 +93,8 @@ members = [
     # === Platform ===
     # === Infrastructure ===
     # === Infrastructure-as-Code ===
+    # === Platform API ===
+    "crates/cave-gitops-config",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===

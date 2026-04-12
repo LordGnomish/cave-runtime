@@ -26,6 +26,8 @@ cave-infra = { path = "../cave-infra" }
 # Data services
 cave-cache = { path = "../cave-cache" }
 cave-store = { path = "../cave-store" }
+# Platform API
+cave-gitops-config = { path = "../cave-gitops-config" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }

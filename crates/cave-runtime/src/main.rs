@@ -66,6 +66,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -80,6 +81,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let infra_state = Arc::new(cave_infra::InfraModuleState::default());
 >>>>>>> claude/interesting-khorana
+=======
+    let gitops_config_state = Arc::new(cave_gitops_config::AppState::default());
+>>>>>>> claude/modest-yonath
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -147,6 +151,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -197,6 +202,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_cache::router(cache_state))
         .merge(cave_store::router(store_state))
 >>>>>>> claude/jovial-faraday
+=======
+        // Platform API
+        .merge(cave_gitops_config::router(gitops_config_state))
+>>>>>>> claude/modest-yonath
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -226,6 +235,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -244,6 +254,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Data services: cache (Redis replacement), store (MinIO replacement)");
 >>>>>>> claude/jovial-faraday
+=======
+    info!("Platform API: gitops-config (Promises, Compositions, Environments, Claims)");
+>>>>>>> claude/modest-yonath
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -277,6 +290,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -292,6 +306,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "cache": true,
             "store": true,
 >>>>>>> claude/jovial-faraday
+=======
+            "gitops-config": true,
+>>>>>>> claude/modest-yonath
         }
     }))
 }
