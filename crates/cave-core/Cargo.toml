@@ -15,5 +15,3 @@ anyhow = { workspace = true }
 tokio-postgres = { workspace = true }
 config = { workspace = true }
 tracing = { workspace = true }
-tokio-postgres = { workspace = true }
-anyhow = { workspace = true }
