@@ -2,6 +2,12 @@
 //!
 //! Single binary that hosts all enabled platform modules.
 //! Native Okta/Keycloak auth, shared PostgreSQL, eBPF hooks.
+//!
+//! ## Auth wiring
+//!
+//! All module routers are wrapped with `cave_auth::AuthLayer`.
+//! Set `CAVE_AUTH_DISABLED=true` to bypass auth in local development.
+//! Health / readiness probes (`/health`, `/ready`) are always unauthenticated.
 
 use axum::Router;
 use clap::Parser;
@@ -42,15 +48,21 @@ async fn main() -> anyhow::Result<()> {
         "Starting CAVE Unified Runtime"
     );
 
-    // Initialize module states
+    // ── Auth layer ────────────────────────────────────────────────────────────
+    //
+    // Reads OKTA_DOMAIN, OKTA_AUTH_SERVER_ID, OKTA_AUDIENCE from the environment.
+    // Falls back to dev-bypass when CAVE_AUTH_DISABLED=true.
+    let auth_layer = cave_auth::auth_layer_from_env();
+
+    // ── Module states ─────────────────────────────────────────────────────────
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
 
-    // Build the unified router with all Phase 1 modules
-    let app = Router::new()
-        // Core health endpoints
-        .route("/health", axum::routing::get(health))
-        .route("/ready", axum::routing::get(ready))
+    // ── Protected module router ───────────────────────────────────────────────
+    //
+    // All module routes are wrapped with AuthLayer.  Every handler can use
+    // `cave_auth::AuthCtx` extractor or `require_permission!` macro.
+    let protected = Router::new()
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
@@ -58,16 +70,37 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
-        // Middleware
+        // SCIM 2.0 provisioning (Okta user lifecycle)
+        .merge(cave_auth::okta::scim_router(
+            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+        ))
+        // Apply the auth layer to all module routes
+        .layer(auth_layer);
+
+    // ── Full app router ───────────────────────────────────────────────────────
+    //
+    // Health / readiness probes sit outside the auth layer so monitoring
+    // systems can reach them without credentials.
+    let app = Router::new()
+        .route("/health", axum::routing::get(health))
+        .route("/ready", axum::routing::get(ready))
+        .merge(protected)
+        // Observability / transport middleware (outermost = last applied)
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
-        .layer(CorsLayer::permissive()); // TODO: restrict in production
+        .layer(CorsLayer::permissive()); // TODO: restrict origins in production
 
     let port = cli.port.unwrap_or(8080);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!(
+        auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false),
+        "Auth layer active"
+    );
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
