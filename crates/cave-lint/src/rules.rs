@@ -121,3 +121,104 @@ pub fn builtin_rules() -> Vec<LintRule> {
 pub fn lint(content: &str, rules: &[LintRule]) -> Vec<Violation> {
     rules.iter().flat_map(|r| (r.check)(content)).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dockerfile_root_detected() {
+        let violations = check_dockerfile_root("USER root\n");
+        assert!(!violations.is_empty(), "Expected violation for USER root");
+    }
+
+    #[test]
+    fn test_dockerfile_root_not_detected() {
+        let violations = check_dockerfile_root("USER appuser\n");
+        assert!(violations.is_empty(), "Expected no violation for USER appuser");
+    }
+
+    #[test]
+    fn test_dockerfile_latest_detected() {
+        let violations = check_dockerfile_latest("FROM nginx:latest\n");
+        assert!(!violations.is_empty(), "Expected violation for FROM nginx:latest");
+    }
+
+    #[test]
+    fn test_dockerfile_latest_no_tag_detected() {
+        let violations = check_dockerfile_latest("FROM nginx\n");
+        assert!(!violations.is_empty(), "Expected violation for FROM nginx (no tag)");
+    }
+
+    #[test]
+    fn test_dockerfile_latest_specific_version_ok() {
+        let violations = check_dockerfile_latest("FROM nginx:1.21\n");
+        assert!(violations.is_empty(), "Expected no violation for pinned version");
+    }
+
+    #[test]
+    fn test_k8s_no_limits_detected() {
+        let content = "kind: Deployment\nspec:\n  containers:\n  - name: app\n    image: nginx\n";
+        let violations = check_k8s_no_limits(content);
+        assert!(!violations.is_empty(), "Expected violation for missing resource limits");
+    }
+
+    #[test]
+    fn test_k8s_no_limits_ok() {
+        let content = "kind: Deployment\nspec:\n  containers:\n  - resources:\n      limits:\n        cpu: \"500m\"\n";
+        let violations = check_k8s_no_limits(content);
+        assert!(violations.is_empty(), "Expected no violation when limits are defined");
+    }
+
+    #[test]
+    fn test_k8s_privileged_detected() {
+        let violations = check_k8s_privileged("privileged: true\n");
+        assert!(!violations.is_empty(), "Expected violation for privileged: true");
+    }
+
+    #[test]
+    fn test_k8s_privileged_false_ok() {
+        let violations = check_k8s_privileged("privileged: false\n");
+        assert!(violations.is_empty(), "Expected no violation for privileged: false");
+    }
+
+    #[test]
+    fn test_deprecated_api_detected() {
+        let violations = check_deprecated_apis("apiVersion: extensions/v1beta1\n");
+        assert!(!violations.is_empty(), "Expected violation for deprecated extensions/v1beta1");
+    }
+
+    #[test]
+    fn test_deprecated_api_new_version_ok() {
+        let violations = check_deprecated_apis("apiVersion: apps/v1\n");
+        assert!(violations.is_empty(), "Expected no violation for apps/v1");
+    }
+
+    #[test]
+    fn test_lint_applies_all_rules() {
+        // Content that triggers all 5 builtin rules
+        let content = "FROM nginx:latest\nUSER root\napiVersion: extensions/v1beta1\nkind: Deployment\nprivileged: true\n";
+        let rules = builtin_rules();
+        let violations = lint(content, &rules);
+        // Should have violations from multiple rules
+        assert!(!violations.is_empty(), "Expected violations from lint");
+        // Check we got violations from at least 3 different rules
+        let unique_rule_ids: std::collections::HashSet<&str> = violations.iter().map(|v| v.rule_id.as_str()).collect();
+        assert!(unique_rule_ids.len() >= 3, "Expected violations from at least 3 rules");
+    }
+
+    #[test]
+    fn test_builtin_rules_count() {
+        let rules = builtin_rules();
+        assert!(rules.len() >= 5, "Expected at least 5 builtin rules, got {}", rules.len());
+    }
+
+    #[test]
+    fn test_violation_has_rule_id() {
+        let violations = check_dockerfile_root("USER root\n");
+        assert!(!violations.is_empty());
+        for v in &violations {
+            assert!(!v.rule_id.is_empty(), "Violation rule_id should not be empty");
+        }
+    }
+}

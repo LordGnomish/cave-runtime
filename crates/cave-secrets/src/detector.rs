@@ -170,4 +170,114 @@ mod tests {
         let findings = scan(content, "id_rsa", &detectors);
         assert!(!findings.is_empty());
     }
+
+    #[test]
+    fn test_entropy_low() {
+        // "aaaa" has only one unique character, entropy should be near 0
+        assert!(shannon_entropy("aaaa") < 0.01);
+    }
+
+    #[test]
+    fn test_entropy_high() {
+        // random-looking string with many unique chars should have high entropy
+        assert!(shannon_entropy("aB3$xY9!kLmN2@pQrS") > 3.0);
+    }
+
+    #[test]
+    fn test_entropy_binary_string() {
+        // "0101010101" has only 2 unique characters, entropy should be ~1.0
+        let e = shannon_entropy("0101010101");
+        assert!((e - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_scan_aws_key_detected() {
+        let detectors = builtin_detectors();
+        let content = "AWS_KEY=AKIAIOSFODNN7EXAMPLE\n";
+        let findings = scan(content, "test.env", &detectors);
+        assert!(!findings.is_empty());
+        let aws_finding = findings.iter().find(|f| f.detector == "aws-access-key");
+        assert!(aws_finding.is_some(), "Expected aws-access-key finding");
+    }
+
+    #[test]
+    fn test_scan_github_token() {
+        let detectors = builtin_detectors();
+        let content = "TOKEN=ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\n";
+        let findings = scan(content, "config.env", &detectors);
+        assert!(!findings.is_empty());
+        let gh_finding = findings.iter().find(|f| f.detector == "github-token");
+        assert!(gh_finding.is_some(), "Expected github-token finding");
+    }
+
+    #[test]
+    fn test_scan_private_key() {
+        let detectors = builtin_detectors();
+        let content = "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n";
+        let findings = scan(content, "id_rsa", &detectors);
+        assert!(!findings.is_empty());
+        let pk_finding = findings.iter().find(|f| f.detector == "private-key");
+        assert!(pk_finding.is_some(), "Expected private-key finding");
+    }
+
+    #[test]
+    fn test_scan_jwt_token() {
+        let detectors = builtin_detectors();
+        let content = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c\n";
+        let findings = scan(content, "request.txt", &detectors);
+        assert!(!findings.is_empty());
+        let jwt_finding = findings.iter().find(|f| f.detector == "jwt-token");
+        assert!(jwt_finding.is_some(), "Expected jwt-token finding");
+    }
+
+    #[test]
+    fn test_scan_empty_content() {
+        let detectors = builtin_detectors();
+        let findings = scan("", "empty.txt", &detectors);
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_scan_clean_content() {
+        let detectors = builtin_detectors();
+        let content = "# This is a normal config file\nHOST=localhost\nPORT=8080\n";
+        let findings = scan(content, "config.txt", &detectors);
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_builtin_detectors_count() {
+        let detectors = builtin_detectors();
+        assert!(detectors.len() >= 5, "Expected at least 5 builtin detectors, got {}", detectors.len());
+    }
+
+    #[test]
+    fn test_builtin_detector_names() {
+        let detectors = builtin_detectors();
+        for det in &detectors {
+            assert!(!det.name.is_empty(), "Detector name should not be empty");
+        }
+    }
+
+    #[test]
+    fn test_scan_multiple_findings() {
+        let detectors = builtin_detectors();
+        let content = "AWS_KEY=AKIAIOSFODNN7EXAMPLE\n-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----\n";
+        let findings = scan(content, "secrets.txt", &detectors);
+        assert!(findings.len() >= 2, "Expected at least 2 findings, got {}", findings.len());
+        let has_aws = findings.iter().any(|f| f.detector == "aws-access-key");
+        let has_pk = findings.iter().any(|f| f.detector == "private-key");
+        assert!(has_aws, "Expected aws-access-key finding");
+        assert!(has_pk, "Expected private-key finding");
+    }
+
+    #[test]
+    fn test_finding_line_number() {
+        let detectors = builtin_detectors();
+        let content = "# line 1: nothing\n# line 2: nothing\nAWS_KEY=AKIAIOSFODNN7EXAMPLE\n";
+        let findings = scan(content, "test.env", &detectors);
+        let aws_finding = findings.iter().find(|f| f.detector == "aws-access-key");
+        assert!(aws_finding.is_some(), "Expected aws-access-key finding");
+        assert_eq!(aws_finding.unwrap().line, 3, "AWS key should be found on line 3");
+    }
 }

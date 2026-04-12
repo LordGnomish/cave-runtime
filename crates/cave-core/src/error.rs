@@ -47,3 +47,38 @@ impl CaveError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_auth_error_is_401() {
+        let err = CaveError::Auth("bad token".to_string());
+        assert_eq!(err.status_code(), 401);
+    }
+
+    #[test]
+    fn test_forbidden_is_403() {
+        let err = CaveError::Forbidden("access denied".to_string());
+        assert_eq!(err.status_code(), 403);
+    }
+
+    #[test]
+    fn test_not_found_is_404() {
+        let err = CaveError::NotFound("resource missing".to_string());
+        assert_eq!(err.status_code(), 404);
+    }
+
+    #[test]
+    fn test_validation_is_422() {
+        let err = CaveError::Validation("invalid input".to_string());
+        assert_eq!(err.status_code(), 422);
+    }
+
+    #[test]
+    fn test_module_disabled_is_503() {
+        let err = CaveError::ModuleDisabled { module: "cave-flags".to_string() };
+        assert_eq!(err.status_code(), 503);
+    }
+}
