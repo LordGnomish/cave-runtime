@@ -39,6 +39,9 @@ members = [
     "crates/cave-trace",
     # === CI/CD ===
     "crates/cave-pipelines",
+    # === Data Services ===
+    "crates/cave-cache",
+    "crates/cave-store",
     # === Phase 4: Heavy Hitters ===
     "crates/cave-gateway",
     "crates/cave-registry",

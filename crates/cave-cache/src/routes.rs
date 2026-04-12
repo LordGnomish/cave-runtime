@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
 //! HTTP routes for cave-cache.
 
 use crate::cache::PipelineOp;
@@ -41,6 +44,7 @@ struct SetKeyRequest {
     value: serde_json::Value,
     ttl: Option<u64>,
     tags: Option<Vec<String>>,
+<<<<<<< HEAD
 =======
 use std::sync::Arc;
 use axum::{
@@ -150,11 +154,16 @@ async fn ttl_key(
         Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
     }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
 }
 
 #[derive(Deserialize)]
 struct ExpireRequest {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
     ttl: u64,
 }
 
@@ -327,6 +336,7 @@ async fn subscribe(
         }),
     }
 }
+<<<<<<< HEAD
 =======
     key: String,
     secs: u64,
@@ -487,3 +497,5 @@ async fn publish_msg(
     Json(serde_json::json!({"receivers": n}))
 }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday

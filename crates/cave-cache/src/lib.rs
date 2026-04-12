@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/jovial-faraday
 //! cave-cache — Redis/Valkey replacement for distributed caching.
 //!
 //! Replaces: Redis, Valkey
@@ -36,6 +39,7 @@ pub fn router(state: Arc<CacheState>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "cache";
+<<<<<<< HEAD
 =======
 //! cave-cache — In-memory cache, Redis replacement.
 
@@ -386,3 +390,5 @@ mod tests {
     }
 }
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/jovial-faraday
