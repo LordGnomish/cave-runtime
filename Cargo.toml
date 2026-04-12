@@ -15,6 +15,7 @@ members = [
     "crates/cave-changelog",
     "crates/cave-certs",
     # === Phase 2: Security Core ===
+    "crates/cave-security",
     "crates/cave-vulns",
     "crates/cave-sbom",
     "crates/cave-uptime",
