@@ -1,37 +1,48 @@
-//! cave-store — MinIO replacement for object storage management.
+//! **cave-store** — embedded etcd-compatible KV store + S3-compatible object storage.
 //!
-//! Replaces: MinIO, AWS S3 (dev/platform use)
-//! Features: bucket CRUD, put/get/delete objects, multipart upload,
-//!           versioning, lifecycle rules, access policies, replication rules.
+//! ## Architecture
+//!
+//! ```text
+//!   ┌─────────────────────────────────────────────────────────┐
+//!   │                    CaveStoreServer                      │
+//!   │   ┌─────────────────────┐  ┌───────────────────────┐   │
+//!   │   │  etcd v3 gRPC       │  │  S3-compatible HTTP   │   │
+//!   │   │  (port 2379)        │  │  (port 9000)          │   │
+//!   │   │  KV, Watch, Lease   │  │  Buckets, Objects     │   │
+//!   │   │  Auth, Cluster      │  │  Multipart, Versions  │   │
+//!   │   └────────┬────────────┘  └──────────┬────────────┘   │
+//!   │            │  StorageEngine            │ S3Store        │
+//!   │   ┌────────▼────────────┐  ┌──────────▼────────────┐   │
+//!   │   │  MVCC + WAL         │  │  File-backed objects  │   │
+//!   │   │  (crash-safe)       │  │  + in-memory index    │   │
+//!   │   └─────────────────────┘  └───────────────────────┘   │
+//!   └─────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! ## etcd API (gRPC)
+//! - KV: Put, Range, DeleteRange, Txn, Compact
+//! - Watch: streaming watch with filters
+//! - Lease: Grant, Revoke, KeepAlive, TimeToLive, Leases
+//! - Auth: users, roles, permissions
+//! - Cluster: member management
+//! - Maintenance: status, defragment, hash
+//!
+//! ## S3 API (HTTP)
+//! - Bucket: Create, Delete, List, Head, Versioning, Lifecycle, Policy, Notifications, ACL
+//! - Object: Put, Get, Delete, Head, Copy, List (prefix/delimiter/pagination)
+//! - Multipart: Create, UploadPart, Complete, Abort
+//! - Presigned URLs
+//! - SSE-S3 and SSE-C encryption
 
-pub mod models;
-pub mod routes;
-pub mod storage;
+pub mod config;
+pub mod engine;
+pub mod error;
+pub mod etcd;
+pub mod s3;
+pub mod server;
 
-use axum::Router;
-use std::sync::{Arc, Mutex};
-
-/// Shared state for the object store module.
-pub struct StoreState {
-    pub inner: Mutex<storage::ObjectStore>,
-}
-
-impl StoreState {
-    pub fn new() -> Self {
-        Self {
-            inner: Mutex::new(storage::ObjectStore::new()),
-        }
-    }
-}
-
-impl Default for StoreState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub fn router(state: Arc<StoreState>) -> Router {
-    routes::create_router(state)
-}
-
-pub const MODULE_NAME: &str = "store";
+pub use config::StoreConfig;
+pub use engine::StorageEngine;
+pub use error::{Result, StoreError};
+pub use s3::S3Store;
+pub use server::CaveStoreServer;
