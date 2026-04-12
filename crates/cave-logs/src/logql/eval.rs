@@ -1,735 +1,678 @@
-//! LogQL evaluator — runs an AST against the LogStore.
+//! LogQL evaluator — takes a parsed `Query` and executes it against the store.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use regex::Regex;
 
 use super::ast::*;
-use crate::models::{LabelMatcher, Labels, LogEntry, MatrixResult, StreamResult};
+use crate::models::{
+    Direction, Labels, LogEntry, MatrixResult, QueryData, StreamResult,
+    TimestampNs, VectorResult,
+};
 use crate::store::LogStore;
-use chrono::{DateTime, Duration, Utc};
-use std::collections::HashMap;
 
-/// An entry after passing through the log pipeline.
+/// An evaluated log entry with extracted labels from pipeline parsers.
 #[derive(Debug, Clone)]
 pub struct ProcessedEntry {
-    pub timestamp: DateTime<Utc>,
+    pub ts: TimestampNs,
     pub line: String,
-    /// Labels extracted by parser stages, merged with stream labels.
-    pub extracted: HashMap<String, String>,
+    pub labels: HashMap<String, String>,
 }
 
-pub struct Evaluator<'a> {
-    store: &'a LogStore,
-}
+// ── Label matcher evaluation ─────────────────────────────────────────────────
 
-impl<'a> Evaluator<'a> {
-    pub fn new(store: &'a LogStore) -> Self {
-        Self { store }
+/// Check if a `Labels` set satisfies a stream selector.
+pub fn labels_match(labels: &Labels, selector: &StreamSelector) -> bool {
+    for m in &selector.matchers {
+        let actual = labels.get(&m.name);
+        match (&m.op, actual) {
+            (MatchOp::Eq, Some(v)) => {
+                if v != m.value.as_str() { return false; }
+            }
+            (MatchOp::Eq, None) => return false,
+            (MatchOp::Neq, Some(v)) => {
+                if v == m.value.as_str() { return false; }
+            }
+            (MatchOp::Neq, None) => {} // absence satisfies !=
+            (MatchOp::Re, actual_opt) => {
+                let v = actual_opt.unwrap_or("");
+                let re = match Regex::new(&m.value) { Ok(r) => r, Err(_) => return false };
+                if !re.is_match(v) { return false; }
+            }
+            (MatchOp::NotRe, actual_opt) => {
+                let v = actual_opt.unwrap_or("");
+                let re = match Regex::new(&m.value) { Ok(r) => r, Err(_) => return false };
+                if re.is_match(v) { return false; }
+            }
+        }
     }
+    true
+}
 
-    // ─── Public entry points ──────────────────────────────────────────────────
+// ── Pipeline stage execution ─────────────────────────────────────────────────
 
-    /// Evaluate a log stream expression, returning matching stream results.
-    pub fn eval_log(
-        &self,
-        expr: &LogStreamExpr,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        limit: usize,
-        tenant: Option<&str>,
-    ) -> Vec<StreamResult> {
-        let raw = self
-            .store
-            .query_streams(&expr.matchers, start, end, limit, true, tenant);
+/// Apply the log pipeline to a single entry, returning `None` if it is filtered out.
+pub fn apply_pipeline(
+    entry: &LogEntry,
+    base_labels: &Labels,
+    pipeline: &[PipelineStage],
+) -> Option<ProcessedEntry> {
+    let mut line = entry.line.clone();
+    let mut extra: HashMap<String, String> = base_labels.0.clone();
+    extra.extend(entry.metadata.clone());
 
-        raw.into_iter()
-            .filter_map(|(labels, entries)| {
-                let processed = self.apply_pipeline(entries, &expr.pipeline, &labels);
-                if processed.is_empty() {
+    for stage in pipeline {
+        match stage {
+            PipelineStage::LineFilter(lf) => {
+                if !apply_line_filter(&line, lf) {
                     return None;
                 }
-                let values = processed
-                    .into_iter()
-                    .map(|e| {
-                        let ts_ns = e.timestamp.timestamp_nanos_opt().unwrap_or(0).to_string();
-                        [ts_ns, e.line]
-                    })
-                    .collect();
-                Some(StreamResult {
-                    stream: labels.0.into_iter().collect(),
-                    values,
-                })
-            })
-            .collect()
-    }
-
-    /// Evaluate a metric expression over a range, returning matrix results.
-    pub fn eval_metric(
-        &self,
-        expr: &MetricExpr,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        step_secs: i64,
-        tenant: Option<&str>,
-    ) -> Vec<MatrixResult> {
-        match expr {
-            MetricExpr::RangeAgg(ra) => self.eval_range_agg(ra, start, end, step_secs, tenant),
-            MetricExpr::VectorAgg(va) => self.eval_vector_agg(va, start, end, step_secs, tenant),
-        }
-    }
-
-    /// Evaluate an expression down to a single scalar (for alerting).
-    pub fn eval_scalar(
-        &self,
-        expr: &Expr,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        tenant: Option<&str>,
-    ) -> Option<f64> {
-        match expr {
-            Expr::Log(ls) => {
-                let results = self.eval_log(ls, start, end, usize::MAX, tenant);
-                let count: usize = results.iter().map(|r| r.values.len()).sum();
-                Some(count as f64)
             }
-            Expr::Metric(m) => {
-                let results = self.eval_metric(m, start, end, (end - start).num_seconds().max(1), tenant);
-                let last_val = results
-                    .iter()
-                    .flat_map(|r| r.values.iter())
-                    .last()
-                    .and_then(|(_, v)| v.parse::<f64>().ok());
-                last_val
+            PipelineStage::Parser(p) => {
+                apply_parser(&line, p, &mut extra);
+            }
+            PipelineStage::LabelFilter(lf) => {
+                if !apply_label_filter(&extra, lf) {
+                    return None;
+                }
+            }
+            PipelineStage::LineFormat(lf) => {
+                line = apply_line_format(&lf.template, &extra);
+            }
+            PipelineStage::LabelFormat(lf) => {
+                apply_label_format(&lf.mappings, &mut extra);
+            }
+            PipelineStage::Decolorize(_) => {
+                line = strip_ansi(&line);
+            }
+            PipelineStage::Unwrap(_) => {
+                // Unwrap is used in range aggregations; skip in log queries.
             }
         }
     }
 
-    // ─── Range aggregations ───────────────────────────────────────────────────
+    Some(ProcessedEntry { ts: entry.ts, line, labels: extra })
+}
 
-    fn eval_range_agg(
-        &self,
-        ra: &RangeAggExpr,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        step_secs: i64,
-        tenant: Option<&str>,
-    ) -> Vec<MatrixResult> {
-        let range_secs = ra.range.as_secs() as i64;
-        let buckets = match &ra.op {
-            RangeAggOp::Rate => self.store.rate_over_buckets(
-                &ra.stream.matchers,
-                start, end, range_secs, step_secs, tenant,
-            ),
-            RangeAggOp::CountOverTime => self.store.count_over_buckets(
-                &ra.stream.matchers,
-                start, end, range_secs, step_secs, tenant,
-            ),
-            RangeAggOp::BytesOverTime => self.store.bytes_over_buckets(
-                &ra.stream.matchers,
-                start, end, range_secs, step_secs, tenant,
-            ),
-            RangeAggOp::BytesRate => {
-                self.store.bytes_over_buckets(
-                    &ra.stream.matchers,
-                    start, end, range_secs, step_secs, tenant,
-                )
-                .into_iter()
-                .map(|(t, b)| (t, b / range_secs as f64))
-                .collect()
-            }
-            // For label-based agg ops we treat them as count for now
-            _ => self.store.count_over_buckets(
-                &ra.stream.matchers,
-                start, end, range_secs, step_secs, tenant,
-            ),
-        };
-
-        if buckets.is_empty() {
-            return vec![];
-        }
-
-        // Collect the label set of matching streams for the metric labels
-        let series = self.store.series(&ra.stream.matchers, start, end, tenant);
-        let metric_labels = if series.is_empty() {
-            HashMap::new()
-        } else {
-            apply_grouping(&series[0].0, ra.grouping.as_ref())
-        };
-
-        let values = buckets
-            .into_iter()
-            .map(|(t, v)| (t.timestamp() as f64, format!("{v:.6}")))
-            .collect();
-
-        vec![MatrixResult { metric: metric_labels, values }]
-    }
-
-    // ─── Vector aggregations ──────────────────────────────────────────────────
-
-    fn eval_vector_agg(
-        &self,
-        va: &VectorAggExpr,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        step_secs: i64,
-        tenant: Option<&str>,
-    ) -> Vec<MatrixResult> {
-        let inner = self.eval_metric(&va.expr, start, end, step_secs, tenant);
-
-        // Collect all sample values grouped by step bucket
-        let mut buckets: HashMap<i64, Vec<f64>> = HashMap::new();
-        for mr in &inner {
-            for (ts, v) in &mr.values {
-                if let Ok(f) = v.parse::<f64>() {
-                    buckets.entry(*ts as i64).or_default().push(f);
-                }
-            }
-        }
-
-        let k = va.param.unwrap_or(5) as usize;
-        let mut step_times: Vec<i64> = buckets.keys().copied().collect();
-        step_times.sort();
-
-        let values: Vec<(f64, String)> = step_times
-            .into_iter()
-            .map(|ts| {
-                let samples = buckets.get(&ts).cloned().unwrap_or_default();
-                let agg = match va.op {
-                    VectorAggOp::Sum => samples.iter().sum(),
-                    VectorAggOp::Avg => {
-                        if samples.is_empty() { 0.0 } else { samples.iter().sum::<f64>() / samples.len() as f64 }
-                    }
-                    VectorAggOp::Max => samples.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
-                    VectorAggOp::Min => samples.iter().cloned().fold(f64::INFINITY, f64::min),
-                    VectorAggOp::Count => samples.len() as f64,
-                    VectorAggOp::Topk => {
-                        let mut s = samples.clone();
-                        s.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-                        s.into_iter().take(k).sum()
-                    }
-                    VectorAggOp::Bottomk => {
-                        let mut s = samples.clone();
-                        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-                        s.into_iter().take(k).sum()
-                    }
-                };
-                (ts as f64, format!("{agg:.6}"))
-            })
-            .collect();
-
-        let metric = HashMap::new();
-        vec![MatrixResult { metric, values }]
-    }
-
-    // ─── Pipeline execution ───────────────────────────────────────────────────
-
-    fn apply_pipeline(
-        &self,
-        entries: Vec<LogEntry>,
-        pipeline: &[PipelineStage],
-        stream_labels: &Labels,
-    ) -> Vec<ProcessedEntry> {
-        let mut result: Vec<ProcessedEntry> = entries
-            .into_iter()
-            .map(|e| ProcessedEntry {
-                timestamp: e.timestamp,
-                line: e.line,
-                extracted: e.structured_metadata,
-            })
-            .collect();
-
-        for stage in pipeline {
-            result = match stage {
-                PipelineStage::Filter(f) => {
-                    result.into_iter().filter(|e| self.apply_filter(e, f)).collect()
-                }
-                PipelineStage::Parser(p) => result
-                    .into_iter()
-                    .map(|mut e| { self.apply_parser(&mut e, p); e })
-                    .collect(),
-                PipelineStage::LabelFilter(lf) => result
-                    .into_iter()
-                    .filter(|e| self.apply_label_filter(e, lf, stream_labels))
-                    .collect(),
-                PipelineStage::LineFormat(tmpl) => result
-                    .into_iter()
-                    .map(|mut e| { self.apply_line_format(&mut e, tmpl, stream_labels); e })
-                    .collect(),
-                PipelineStage::LabelFmt(pairs) => result
-                    .into_iter()
-                    .map(|mut e| {
-                        for (from, to) in pairs {
-                            if let Some(v) = e.extracted.remove(from) {
-                                e.extracted.insert(to.clone(), v);
-                            }
-                        }
-                        e
-                    })
-                    .collect(),
-                PipelineStage::Decolorize => result
-                    .into_iter()
-                    .map(|mut e| {
-                        e.line = strip_ansi(&e.line);
-                        e
-                    })
-                    .collect(),
-            };
-        }
-        result
-    }
-
-    // ── Filter stage ──────────────────────────────────────────────────────────
-
-    fn apply_filter(&self, entry: &ProcessedEntry, stage: &FilterStage) -> bool {
-        match stage.op {
-            FilterOp::Contains => entry.line.contains(&stage.value),
-            FilterOp::NotContains => !entry.line.contains(&stage.value),
-            FilterOp::Re => regex::Regex::new(&stage.value)
-                .map(|re| re.is_match(&entry.line))
-                .unwrap_or(false),
-            FilterOp::NotRe => !regex::Regex::new(&stage.value)
-                .map(|re| re.is_match(&entry.line))
-                .unwrap_or(false),
-        }
-    }
-
-    // ── Parser stage ──────────────────────────────────────────────────────────
-
-    fn apply_parser(&self, entry: &mut ProcessedEntry, stage: &ParserStage) {
-        match stage {
-            ParserStage::Json => parse_json(entry),
-            ParserStage::Logfmt => parse_logfmt(entry),
-            ParserStage::Regexp(re) => parse_regexp(entry, re),
-            ParserStage::Pattern(pat) => parse_pattern(entry, pat),
-            ParserStage::Unpack => parse_unpack(entry),
-        }
-    }
-
-    // ── Label filter stage ────────────────────────────────────────────────────
-
-    fn apply_label_filter(
-        &self,
-        entry: &ProcessedEntry,
-        stage: &LabelFilterStage,
-        stream_labels: &Labels,
-    ) -> bool {
-        // Look up in extracted fields first, then stream labels
-        let val = entry
-            .extracted
-            .get(&stage.label)
-            .or_else(|| stream_labels.0.get(&stage.label))
-            .map(|s| s.as_str());
-
-        match &stage.op {
-            LabelFilterOp::Re => {
-                let s = val.unwrap_or("");
-                if let LabelFilterValue::String(pat) = &stage.value {
-                    regex::Regex::new(pat).map(|re| re.is_match(s)).unwrap_or(false)
-                } else {
-                    false
-                }
-            }
-            LabelFilterOp::NRe => {
-                let s = val.unwrap_or("");
-                if let LabelFilterValue::String(pat) = &stage.value {
-                    !regex::Regex::new(pat).map(|re| re.is_match(s)).unwrap_or(false)
-                } else {
-                    true
-                }
-            }
-            LabelFilterOp::Eq => match &stage.value {
-                LabelFilterValue::String(s) => val == Some(s.as_str()),
-                LabelFilterValue::Float(f) => {
-                    val.and_then(|v| v.parse::<f64>().ok()).map(|n| (n - f).abs() < f64::EPSILON).unwrap_or(false)
-                }
-                _ => false,
-            },
-            LabelFilterOp::Ne => match &stage.value {
-                LabelFilterValue::String(s) => val != Some(s.as_str()),
-                LabelFilterValue::Float(f) => {
-                    val.and_then(|v| v.parse::<f64>().ok()).map(|n| (n - f).abs() >= f64::EPSILON).unwrap_or(true)
-                }
-                _ => true,
-            },
-            op => {
-                // Numeric comparison
-                let num = val.and_then(|v| v.parse::<f64>().ok());
-                let threshold = match &stage.value {
-                    LabelFilterValue::Float(f) => Some(*f),
-                    LabelFilterValue::Duration(d) => Some(d.as_secs_f64()),
-                    _ => None,
-                };
-                match (num, threshold) {
-                    (Some(n), Some(t)) => match op {
-                        LabelFilterOp::Gt => n > t,
-                        LabelFilterOp::Gte => n >= t,
-                        LabelFilterOp::Lt => n < t,
-                        LabelFilterOp::Lte => n <= t,
-                        _ => false,
-                    },
-                    _ => false,
-                }
-            }
-        }
-    }
-
-    // ── Line format stage ─────────────────────────────────────────────────────
-
-    fn apply_line_format(
-        &self,
-        entry: &mut ProcessedEntry,
-        template: &str,
-        stream_labels: &Labels,
-    ) {
-        // Simple Go-template-style replacement: {{.field}} → field value
-        let mut result = template.to_string();
-        // Merge stream labels + extracted for lookup
-        let mut all: HashMap<&str, &str> = HashMap::new();
-        for (k, v) in &stream_labels.0 {
-            all.insert(k.as_str(), v.as_str());
-        }
-        for (k, v) in &entry.extracted {
-            all.insert(k.as_str(), v.as_str());
-        }
-        for (k, v) in &all {
-            result = result.replace(&format!("{{{{.{k}}}}}"), v);
-        }
-        entry.line = result;
+fn apply_line_filter(line: &str, lf: &LineFilter) -> bool {
+    match lf {
+        LineFilter::Contains(s) => line.contains(s.as_str()),
+        LineFilter::NotContains(s) => !line.contains(s.as_str()),
+        LineFilter::Matches(pat) => Regex::new(pat).map(|r| r.is_match(line)).unwrap_or(false),
+        LineFilter::NotMatches(pat) => Regex::new(pat).map(|r| !r.is_match(line)).unwrap_or(true),
     }
 }
 
-// ─── Parser implementations ───────────────────────────────────────────────────
-
-fn parse_json(entry: &mut ProcessedEntry) {
-    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(&entry.line) {
-        for (k, v) in map {
-            let s = match v {
-                serde_json::Value::String(s) => s,
-                other => other.to_string(),
-            };
-            entry.extracted.insert(k, s);
-        }
+fn apply_parser(line: &str, parser: &Parser, extra: &mut HashMap<String, String>) {
+    match parser {
+        Parser::Json => parse_json(line, extra),
+        Parser::Logfmt => parse_logfmt(line, extra),
+        Parser::Regexp(pat) => parse_regexp(line, pat, extra),
+        Parser::Pattern(pat) => parse_pattern(line, pat, extra),
+        Parser::Unpack => parse_unpack(line, extra),
     }
 }
 
-/// Public re-export for integration tests.
-pub fn parse_logfmt_pub(entry: &mut ProcessedEntry) {
-    parse_logfmt(entry);
-}
-
-fn parse_logfmt(entry: &mut ProcessedEntry) {
-    // key=value or key="quoted value" or bare_key
-    let mut rest = entry.line.as_str();
-    while !rest.is_empty() {
-        rest = rest.trim_start();
-        if rest.is_empty() {
-            break;
-        }
-        // Find key
-        let eq_pos = rest.find('=');
-        let sp_pos = rest.find(' ');
-        match (eq_pos, sp_pos) {
-            (Some(e), sp) if sp.map(|s| e < s).unwrap_or(true) => {
-                let key = &rest[..e];
-                rest = &rest[e + 1..];
-                let (val, remaining) = if rest.starts_with('"') {
-                    let end = rest[1..].find('"').map(|i| i + 1).unwrap_or(rest.len() - 1);
-                    (&rest[1..end], &rest[end + 1..])
-                } else {
-                    match rest.find(' ') {
-                        Some(sp2) => (&rest[..sp2], &rest[sp2..]),
-                        None => (rest, ""),
-                    }
-                };
-                entry.extracted.insert(key.to_string(), val.to_string());
-                rest = remaining;
-            }
-            (_, Some(sp)) => {
-                // bare key (boolean)
-                let key = &rest[..sp];
-                entry.extracted.insert(key.to_string(), "true".into());
-                rest = &rest[sp..];
-            }
-            _ => {
-                // last bare key
-                entry.extracted.insert(rest.trim().to_string(), "true".into());
-                break;
-            }
-        }
-    }
-}
-
-fn parse_regexp(entry: &mut ProcessedEntry, pattern: &str) {
-    if let Ok(re) = regex::Regex::new(pattern) {
-        if let Some(caps) = re.captures(&entry.line) {
-            for name in re.capture_names().flatten() {
-                if let Some(m) = caps.name(name) {
-                    entry.extracted.insert(name.to_string(), m.as_str().to_string());
-                }
-            }
-        }
-    }
-}
-
-fn parse_pattern(entry: &mut ProcessedEntry, pattern: &str) {
-    // Pattern syntax: `<ip> - <user> [<_>]` where <name> captures and <_> discards.
-    // Build a regex from the pattern.
-    let mut regex_str = String::from("^");
-    let mut in_bracket = false;
-    let mut capture_name = String::new();
-
-    for ch in pattern.chars() {
-        match ch {
-            '<' => {
-                in_bracket = true;
-                capture_name.clear();
-            }
-            '>' if in_bracket => {
-                in_bracket = false;
-                if capture_name == "_" {
-                    regex_str.push_str(r"[^\s]+");
-                } else {
-                    regex_str.push_str(&format!(r"(?P<{}>[\S]+)", capture_name));
-                }
-            }
-            c if in_bracket => capture_name.push(c),
-            c => {
-                // Escape regex special chars
-                for rc in regex::escape(&c.to_string()).chars() {
-                    regex_str.push(rc);
-                }
-            }
-        }
-    }
-    regex_str.push('$');
-    parse_regexp_with_pattern(entry, &regex_str);
-}
-
-fn parse_regexp_with_pattern(entry: &mut ProcessedEntry, pattern: &str) {
-    parse_regexp(entry, pattern);
-}
-
-fn parse_unpack(entry: &mut ProcessedEntry) {
-    // Loki's unpack: expects JSON with a "_entry" field for the original log line
-    // and other fields as labels.
-    if let Ok(serde_json::Value::Object(map)) = serde_json::from_str(&entry.line) {
-        for (k, v) in &map {
-            if k == "_entry" {
-                if let serde_json::Value::String(s) = v {
-                    entry.line = s.clone();
-                }
-            } else {
+fn parse_json(line: &str, extra: &mut HashMap<String, String>) {
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Some(obj) = val.as_object() {
+            for (k, v) in obj {
                 let s = match v {
                     serde_json::Value::String(s) => s.clone(),
                     other => other.to_string(),
                 };
-                entry.extracted.insert(k.clone(), s);
+                extra.insert(k.clone(), s);
             }
         }
     }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+fn parse_logfmt(line: &str, extra: &mut HashMap<String, String>) {
+    // logfmt: key=value key="quoted value" key=value ...
+    let mut rest = line;
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if rest.is_empty() { break; }
+        let eq = match rest.find('=') {
+            Some(i) => i,
+            None => break,
+        };
+        let key = rest[..eq].trim();
+        rest = &rest[eq + 1..];
+        let (value, consumed) = if rest.starts_with('"') {
+            let end = rest[1..].find('"').map(|i| i + 2).unwrap_or(rest.len());
+            (&rest[1..end - 1], end)
+        } else {
+            let end = rest.find(' ').unwrap_or(rest.len());
+            (&rest[..end], end)
+        };
+        if !key.is_empty() {
+            extra.insert(key.to_owned(), value.to_owned());
+        }
+        rest = &rest[consumed..];
+    }
+}
+
+fn parse_regexp(line: &str, pat: &str, extra: &mut HashMap<String, String>) {
+    if let Ok(re) = Regex::new(pat) {
+        if let Some(caps) = re.captures(line) {
+            for name in re.capture_names().flatten() {
+                if let Some(m) = caps.name(name) {
+                    extra.insert(name.to_owned(), m.as_str().to_owned());
+                }
+            }
+        }
+    }
+}
+
+fn parse_pattern(line: &str, pat: &str, extra: &mut HashMap<String, String>) {
+    // Loki pattern: `<label>text<label2>...` where `<_>` discards.
+    // Convert to regex: replace <label> with named capture groups.
+    let mut regex_str = String::new();
+    let mut remaining = pat;
+    while !remaining.is_empty() {
+        if remaining.starts_with('<') {
+            let close = remaining.find('>').unwrap_or(remaining.len());
+            let label = &remaining[1..close];
+            remaining = &remaining[close + 1..];
+            if label == "_" {
+                regex_str.push_str("(?:.*)");
+            } else {
+                regex_str.push_str(&format!("(?P<{}>[^<]*)", regex::escape(label)));
+            }
+        } else {
+            let next_lt = remaining.find('<').unwrap_or(remaining.len());
+            regex_str.push_str(&regex::escape(&remaining[..next_lt]));
+            remaining = &remaining[next_lt..];
+        }
+    }
+    parse_regexp(line, &regex_str, extra);
+}
+
+fn parse_unpack(line: &str, extra: &mut HashMap<String, String>) {
+    // Unpack expects a JSON object with a "_entry" field for the real log line
+    // and all other fields as labels.
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Some(obj) = val.as_object() {
+            for (k, v) in obj {
+                if k == "_entry" { continue; }
+                let s = match v {
+                    serde_json::Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                extra.insert(k.clone(), s);
+            }
+        }
+    }
+}
+
+fn apply_label_filter(labels: &HashMap<String, String>, lf: &LabelFilter) -> bool {
+    let actual = labels.get(&lf.label);
+    match &lf.value {
+        LabelFilterValue::String(expected) => {
+            let v = actual.map(|s| s.as_str()).unwrap_or("");
+            match &lf.op {
+                CompareOp::Eq => v == expected.as_str(),
+                CompareOp::Neq => v != expected.as_str(),
+                CompareOp::Re => Regex::new(expected).map(|r| r.is_match(v)).unwrap_or(false),
+                CompareOp::NotRe => Regex::new(expected).map(|r| !r.is_match(v)).unwrap_or(true),
+                _ => false,
+            }
+        }
+        LabelFilterValue::Float(expected) => {
+            let v: f64 = actual.and_then(|s| s.parse().ok()).unwrap_or(f64::NAN);
+            match &lf.op {
+                CompareOp::Eq => (v - expected).abs() < f64::EPSILON,
+                CompareOp::Neq => (v - expected).abs() >= f64::EPSILON,
+                CompareOp::Gt => v > *expected,
+                CompareOp::Gte => v >= *expected,
+                CompareOp::Lt => v < *expected,
+                CompareOp::Lte => v <= *expected,
+                _ => false,
+            }
+        }
+        LabelFilterValue::Duration(expected) => {
+            // Compare as nanoseconds.
+            let v_ns: u64 = actual.and_then(|s| parse_duration_str(s)).unwrap_or(0);
+            let exp_ns = expected.as_nanos() as u64;
+            match &lf.op {
+                CompareOp::Eq => v_ns == exp_ns,
+                CompareOp::Neq => v_ns != exp_ns,
+                CompareOp::Gt => v_ns > exp_ns,
+                CompareOp::Gte => v_ns >= exp_ns,
+                CompareOp::Lt => v_ns < exp_ns,
+                CompareOp::Lte => v_ns <= exp_ns,
+                _ => false,
+            }
+        }
+        LabelFilterValue::Bytes(expected) => {
+            let v: u64 = actual.and_then(|s| s.parse().ok()).unwrap_or(0);
+            match &lf.op {
+                CompareOp::Eq => v == *expected,
+                CompareOp::Neq => v != *expected,
+                CompareOp::Gt => v > *expected,
+                CompareOp::Gte => v >= *expected,
+                CompareOp::Lt => v < *expected,
+                CompareOp::Lte => v <= *expected,
+                _ => false,
+            }
+        }
+    }
+}
+
+fn parse_duration_str(s: &str) -> Option<u64> {
+    if let Some(rest) = s.strip_suffix("ms") {
+        rest.parse::<f64>().ok().map(|n| (n * 1_000_000.0) as u64)
+    } else if let Some(rest) = s.strip_suffix('s') {
+        rest.parse::<f64>().ok().map(|n| (n * 1_000_000_000.0) as u64)
+    } else if let Some(rest) = s.strip_suffix('m') {
+        rest.parse::<f64>().ok().map(|n| (n * 60_000_000_000.0) as u64)
+    } else if let Some(rest) = s.strip_suffix('h') {
+        rest.parse::<f64>().ok().map(|n| (n * 3_600_000_000_000.0) as u64)
+    } else {
+        s.parse::<u64>().ok() // raw nanoseconds
+    }
+}
+
+fn apply_line_format(template: &str, labels: &HashMap<String, String>) -> String {
+    // Simple `{{.label}}` substitution.
+    let mut out = template.to_owned();
+    for (k, v) in labels {
+        out = out.replace(&format!("{{{{.{}}}}}", k), v);
+    }
+    out
+}
+
+fn apply_label_format(mappings: &[(String, String)], labels: &mut HashMap<String, String>) {
+    for (new_name, old_name) in mappings {
+        if let Some(v) = labels.remove(old_name.as_str()) {
+            labels.insert(new_name.clone(), v);
+        }
+    }
+}
 
 fn strip_ansi(s: &str) -> String {
-    // Remove ANSI escape sequences: ESC [ ... m
-    let re = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
+    // Remove ESC[...m sequences.
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"\x1b\[[0-9;]*m").unwrap());
     re.replace_all(s, "").into_owned()
 }
 
-fn apply_grouping(labels: &HashMap<String, String>, grouping: Option<&Grouping>) -> HashMap<String, String> {
-    match grouping {
-        None => labels.clone(),
-        Some(g) if g.by => labels
-            .iter()
-            .filter(|(k, _)| g.labels.contains(k))
-            .map(|(k, v)| (k.clone(), v.clone()))
+// ── Main evaluator ────────────────────────────────────────────────────────────
+
+pub struct Evaluator {
+    store: Arc<LogStore>,
+}
+
+impl Evaluator {
+    pub fn new(store: Arc<LogStore>) -> Self {
+        Self { store }
+    }
+
+    /// Execute a log query and return `QueryData::Streams`.
+    pub fn eval_log_query(
+        &self,
+        tenant: &str,
+        query: &LogQuery,
+        start_ns: TimestampNs,
+        end_ns: TimestampNs,
+        limit: usize,
+        direction: Direction,
+    ) -> QueryData {
+        let fps = self.store.matching_fps(tenant, |labels| labels_match(labels, &query.selector));
+
+        let raw = self.store.query_entries(tenant, &fps, start_ns, end_ns, limit, direction);
+
+        let mut streams: Vec<StreamResult> = Vec::new();
+        let mut total = 0usize;
+
+        'outer: for (_, labels, entries) in raw {
+            let mut values = Vec::new();
+            for entry in &entries {
+                if total >= limit { break 'outer; }
+                if let Some(processed) = apply_pipeline(entry, &labels, &query.pipeline) {
+                    values.push((processed.ts.to_string(), processed.line));
+                    total += 1;
+                }
+            }
+            if !values.is_empty() {
+                streams.push(StreamResult {
+                    stream: labels.0,
+                    values,
+                });
+            }
+        }
+
+        QueryData::Streams(streams)
+    }
+
+    /// Execute a metric (range aggregation or vector aggregation) query.
+    pub fn eval_metric_query(
+        &self,
+        tenant: &str,
+        query: &MetricQuery,
+        start_ns: TimestampNs,
+        end_ns: TimestampNs,
+        step_ns: i64,
+    ) -> QueryData {
+        match query {
+            MetricQuery::RangeAgg(ra) => self.eval_range_agg(tenant, ra, start_ns, end_ns, step_ns),
+            MetricQuery::VectorAgg(va) => self.eval_vector_agg(tenant, va, start_ns, end_ns, step_ns),
+            MetricQuery::BinaryExpr(be) => self.eval_binary(tenant, be, start_ns, end_ns, step_ns),
+            MetricQuery::Literal(n) => QueryData::Vector(vec![VectorResult {
+                metric: HashMap::new(),
+                value: (start_ns as f64 / 1e9, n.to_string()),
+            }]),
+        }
+    }
+
+    fn eval_range_agg(
+        &self,
+        tenant: &str,
+        ra: &LogRangeAggregation,
+        start_ns: TimestampNs,
+        end_ns: TimestampNs,
+        step_ns: i64,
+    ) -> QueryData {
+        let fps = self.store.matching_fps(tenant, |labels| labels_match(labels, &ra.query.selector));
+
+        // Compute buckets across all matching streams.
+        let buckets = match ra.agg {
+            RangeAgg::Rate => {
+                let range_ns = ra.range.as_nanos() as i64;
+                let counts = self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
+                counts.into_iter().map(|(ts, c)| (ts, c / (range_ns as f64 / 1e9))).collect::<Vec<_>>()
+            }
+            RangeAgg::CountOverTime => {
+                self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
+            }
+            RangeAgg::BytesOverTime => {
+                self.store.bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
+            }
+            RangeAgg::BytesRate => {
+                let range_ns = ra.range.as_nanos() as i64;
+                self.store.bytes_over_buckets(tenant, &fps, start_ns, end_ns, step_ns)
+                    .into_iter()
+                    .map(|(ts, b)| (ts, b / (range_ns as f64 / 1e9)))
+                    .collect()
+            }
+            RangeAgg::AbsentOverTime => {
+                // Returns 1 if there are NO entries in the range, else no result.
+                let counts = self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns);
+                counts.into_iter().map(|(ts, c)| (ts, if c == 0.0 { 1.0 } else { 0.0 })).collect()
+            }
+            // For unwrap-based range aggs we default to count_over_time as a stub;
+            // full implementation requires extracting numeric values from log lines.
+            _ => self.store.count_over_buckets(tenant, &fps, start_ns, end_ns, step_ns),
+        };
+
+        // Aggregate per stream into a matrix result.
+        let metric: HashMap<String, String> = HashMap::new();
+        let values: Vec<(f64, String)> = buckets
+            .into_iter()
+            .filter(|(_, v)| *v != 0.0)
+            .map(|(ts, v)| (ts as f64 / 1e9, format!("{:.6}", v)))
+            .collect();
+
+        QueryData::Matrix(vec![MatrixResult { metric, values }])
+    }
+
+    fn eval_vector_agg(
+        &self,
+        tenant: &str,
+        va: &VectorAggregation,
+        start_ns: TimestampNs,
+        end_ns: TimestampNs,
+        step_ns: i64,
+    ) -> QueryData {
+        // Evaluate inner query as matrix, then aggregate vectors.
+        let inner_data = self.eval_metric_query(tenant, &va.inner, start_ns, end_ns, step_ns);
+
+        let matrix = match inner_data {
+            QueryData::Matrix(m) => m,
+            other => return other,
+        };
+
+        // Group by labels according to grouping spec.
+        let mut groups: HashMap<Vec<(String, String)>, Vec<f64>> = HashMap::new();
+
+        for series in &matrix {
+            let group_key: Vec<(String, String)> = match &va.grouping {
+                None => vec![],
+                Some(g) if g.without => {
+                    let mut pairs: Vec<(String, String)> = series
+                        .metric.iter()
+                        .filter(|(k, _)| !g.labels.contains(k))
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect();
+                    pairs.sort();
+                    pairs
+                }
+                Some(g) => {
+                    let mut pairs: Vec<(String, String)> = g.labels.iter()
+                        .filter_map(|l| series.metric.get(l).map(|v| (l.clone(), v.clone())))
+                        .collect();
+                    pairs.sort();
+                    pairs
+                }
+            };
+
+            let vals: Vec<f64> = series.values.iter()
+                .map(|(_, v)| v.parse::<f64>().unwrap_or(0.0))
+                .collect();
+
+            groups.entry(group_key).or_default().extend(vals);
+        }
+
+        // Apply aggregation function.
+        let results: Vec<MatrixResult> = groups.into_iter().map(|(key, vals)| {
+            let metric: HashMap<String, String> = key.into_iter().collect();
+            let agg_val = match &va.agg {
+                VectorAgg::Sum => vals.iter().sum(),
+                VectorAgg::Avg => vals.iter().sum::<f64>() / vals.len() as f64,
+                VectorAgg::Max => vals.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+                VectorAgg::Min => vals.iter().cloned().fold(f64::INFINITY, f64::min),
+                VectorAgg::Count => vals.len() as f64,
+                VectorAgg::Stddev => {
+                    let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+                    (vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64).sqrt()
+                }
+                VectorAgg::Stdvar => {
+                    let mean = vals.iter().sum::<f64>() / vals.len() as f64;
+                    vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / vals.len() as f64
+                }
+                VectorAgg::Topk(_) | VectorAgg::Bottomk(_) | VectorAgg::Quantile(_) => {
+                    vals.iter().sum::<f64>() // simplified; real impl needs per-series tracking
+                }
+            };
+            MatrixResult {
+                metric,
+                values: vec![(start_ns as f64 / 1e9, format!("{:.6}", agg_val))],
+            }
+        }).collect();
+
+        QueryData::Matrix(results)
+    }
+
+    fn eval_binary(
+        &self,
+        tenant: &str,
+        be: &BinaryExpr,
+        start_ns: TimestampNs,
+        end_ns: TimestampNs,
+        step_ns: i64,
+    ) -> QueryData {
+        let lhs = self.eval_metric_query(tenant, &be.lhs, start_ns, end_ns, step_ns);
+        let rhs = self.eval_metric_query(tenant, &be.rhs, start_ns, end_ns, step_ns);
+
+        let lhs_vals: Vec<f64> = extract_values(&lhs);
+        let rhs_vals: Vec<f64> = extract_values(&rhs);
+
+        let result_vals: Vec<f64> = lhs_vals.iter().zip(rhs_vals.iter()).map(|(l, r)| {
+            match &be.op {
+                BinOp::Add => l + r,
+                BinOp::Sub => l - r,
+                BinOp::Mul => l * r,
+                BinOp::Div => if *r == 0.0 { f64::NAN } else { l / r },
+                BinOp::Mod => l % r,
+                BinOp::Pow => l.powf(*r),
+                BinOp::CmpEq(b) => if (l - r).abs() < f64::EPSILON { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpNeq(b) => if (l - r).abs() >= f64::EPSILON { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpGt(b) => if l > r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpGte(b) => if l >= r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpLt(b) => if l < r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                BinOp::CmpLte(b) => if l <= r { if *b { 1.0 } else { *l } } else { if *b { 0.0 } else { f64::NAN } },
+                _ => l + r,
+            }
+        }).collect();
+
+        let values: Vec<(f64, String)> = result_vals.into_iter()
+            .enumerate()
+            .map(|(i, v)| ((start_ns + i as i64 * step_ns) as f64 / 1e9, format!("{:.6}", v)))
+            .collect();
+
+        QueryData::Matrix(vec![MatrixResult { metric: HashMap::new(), values }])
+    }
+}
+
+fn extract_values(data: &QueryData) -> Vec<f64> {
+    match data {
+        QueryData::Matrix(m) => m.iter()
+            .flat_map(|r| r.values.iter().map(|(_, v)| v.parse::<f64>().unwrap_or(0.0)))
             .collect(),
-        Some(g) => labels
-            .iter()
-            .filter(|(k, _)| !g.labels.contains(k))
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
+        QueryData::Vector(v) => v.iter().map(|r| r.value.1.parse::<f64>().unwrap_or(0.0)).collect(),
+        _ => vec![],
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logql::parser::parse;
-    use crate::models::LogEntry;
-    use crate::store::LogStore;
-    use chrono::{Duration, Utc};
+    use crate::models::{Labels, LogEntry};
     use std::collections::HashMap;
 
-    fn make_store() -> LogStore {
-        LogStore::new(Duration::days(7))
+    fn make_labels(pairs: &[(&str, &str)]) -> Labels {
+        Labels::new(pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect())
     }
 
-    fn push_entry(store: &LogStore, labels: &[(&str, &str)], line: &str, offset_secs: i64) {
-        let label_map = labels.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
+    #[test]
+    fn labels_match_eq() {
+        let labels = make_labels(&[("app", "nginx"), ("env", "prod")]);
+        let sel = StreamSelector {
+            matchers: vec![
+                LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "nginx".into() },
+                LabelMatcher { name: "env".into(), op: MatchOp::Eq, value: "prod".into() },
+            ],
+        };
+        assert!(labels_match(&labels, &sel));
+    }
+
+    #[test]
+    fn labels_match_neq() {
+        let labels = make_labels(&[("app", "nginx")]);
+        let sel = StreamSelector {
+            matchers: vec![
+                LabelMatcher { name: "app".into(), op: MatchOp::Neq, value: "apache".into() },
+            ],
+        };
+        assert!(labels_match(&labels, &sel));
+    }
+
+    #[test]
+    fn labels_match_regex() {
+        let labels = make_labels(&[("env", "production")]);
+        let sel = StreamSelector {
+            matchers: vec![
+                LabelMatcher { name: "env".into(), op: MatchOp::Re, value: "prod.*".into() },
+            ],
+        };
+        assert!(labels_match(&labels, &sel));
+    }
+
+    #[test]
+    fn pipeline_line_filter_contains() {
+        let entry = LogEntry::new(0, "error: something went wrong");
+        let labels = make_labels(&[]);
+        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains("error".into()))];
+        assert!(apply_pipeline(&entry, &labels, &pipeline).is_some());
+
+        let pipeline_neg = vec![PipelineStage::LineFilter(LineFilter::Contains("debug".into()))];
+        assert!(apply_pipeline(&entry, &labels, &pipeline_neg).is_none());
+    }
+
+    #[test]
+    fn pipeline_json_parser() {
+        let entry = LogEntry::new(0, r#"{"status":200,"method":"GET","path":"/api"}"#);
+        let labels = make_labels(&[]);
+        let pipeline = vec![
+            PipelineStage::Parser(Parser::Json),
+            PipelineStage::LabelFilter(LabelFilter {
+                label: "status".into(),
+                op: CompareOp::Gte,
+                value: LabelFilterValue::Float(200.0),
+            }),
+        ];
+        let result = apply_pipeline(&entry, &labels, &pipeline);
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(r.labels.get("method").map(|s| s.as_str()), Some("GET"));
+    }
+
+    #[test]
+    fn pipeline_logfmt_parser() {
+        let entry = LogEntry::new(0, r#"level=info msg="request done" status=200"#);
+        let labels = make_labels(&[]);
+        let pipeline = vec![PipelineStage::Parser(Parser::Logfmt)];
+        let result = apply_pipeline(&entry, &labels, &pipeline).unwrap();
+        assert_eq!(result.labels.get("level").map(|s| s.as_str()), Some("info"));
+        assert_eq!(result.labels.get("status").map(|s| s.as_str()), Some("200"));
+    }
+
+    #[test]
+    fn pipeline_line_format() {
+        let entry = LogEntry::new(0, "ignored");
+        let labels = make_labels(&[("method", "GET"), ("status", "200")]);
+        let pipeline = vec![PipelineStage::LineFormat(LineFormat {
+            template: "{{.method}} {{.status}}".into(),
+        })];
+        let result = apply_pipeline(&entry, &labels, &pipeline).unwrap();
+        assert_eq!(result.line, "GET 200");
+    }
+
+    #[test]
+    fn pipeline_decolorize() {
+        let entry = LogEntry::new(0, "\x1b[31mERROR\x1b[0m: something bad");
+        let labels = make_labels(&[]);
+        let pipeline = vec![PipelineStage::Decolorize(Decolorize)];
+        let result = apply_pipeline(&entry, &labels, &pipeline).unwrap();
+        assert_eq!(result.line, "ERROR: something bad");
+    }
+
+    #[test]
+    fn evaluator_log_query() {
+        let store = LogStore::new();
+        let t = 1_000_000_000i64;
         store.push(
-            Labels::new(label_map),
-            vec![LogEntry {
-                timestamp: Utc::now() - Duration::seconds(60 - offset_secs),
-                line: line.to_string(),
-                structured_metadata: HashMap::new(),
-            }],
-            None,
-        );
-    }
-
-    #[test]
-    fn eval_stream_filter_contains() {
-        let store = make_store();
-        push_entry(&store, &[("app", "web")], "ERROR: connection refused", 0);
-        push_entry(&store, &[("app", "web")], "INFO: started successfully", 1);
-
-        let expr = parse(r#"{app="web"} |= "ERROR""#).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].values.len(), 1);
-        assert!(results[0].values[0][1].contains("ERROR"));
-    }
-
-    #[test]
-    fn eval_stream_filter_not_contains() {
-        let store = make_store();
-        push_entry(&store, &[("app", "api")], "ERROR timeout", 0);
-        push_entry(&store, &[("app", "api")], "INFO ok", 1);
-
-        let expr = parse(r#"{app="api"} != "ERROR""#).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert_eq!(results[0].values.len(), 1);
-        assert!(results[0].values[0][1].contains("INFO"));
-    }
-
-    #[test]
-    fn eval_json_parser() {
-        let store = make_store();
-        let labels = Labels::new([("app".into(), "svc".into())].into());
-        store.push(
-            labels,
-            vec![LogEntry {
-                timestamp: Utc::now() - Duration::seconds(10),
-                line: r#"{"level":"error","msg":"oops","status":500}"#.to_string(),
-                structured_metadata: HashMap::new(),
-            }],
-            None,
-        );
-
-        let expr = parse(r#"{app="svc"} | json | status >= 400"#).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].values.len(), 1);
-    }
-
-    #[test]
-    fn eval_logfmt_parser() {
-        let store = make_store();
-        let labels = Labels::new([("app".into(), "svc".into())].into());
-        store.push(
-            labels,
-            vec![LogEntry {
-                timestamp: Utc::now() - Duration::seconds(5),
-                line: r#"level=error method=GET status=500 path="/api""#.to_string(),
-                structured_metadata: HashMap::new(),
-            }],
-            None,
-        );
-
-        let expr = parse(r#"{app="svc"} | logfmt | level = "error""#).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert_eq!(results.len(), 1);
-    }
-
-    #[test]
-    fn eval_regexp_parser() {
-        let store = make_store();
-        let labels = Labels::new([("app".into(), "nginx".into())].into());
-        store.push(
-            labels,
-            vec![LogEntry {
-                timestamp: Utc::now() - Duration::seconds(5),
-                line: "GET /api/users 200 1234".to_string(),
-                structured_metadata: HashMap::new(),
-            }],
-            None,
-        );
-
-        let expr = parse(
-            r#"{app="nginx"} | regexp "(?P<method>[A-Z]+) (?P<path>/[^ ]*) (?P<status>[0-9]+)""#,
+            "tenant",
+            make_labels(&[("app", "test")]),
+            vec![
+                LogEntry::new(t, "error: disk full"),
+                LogEntry::new(t + 1_000_000, "info: started"),
+            ],
         ).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert_eq!(results.len(), 1);
-    }
 
-    #[test]
-    fn eval_line_format() {
-        let store = make_store();
-        let labels = Labels::new([("app".into(), "x".into())].into());
-        store.push(
-            labels,
-            vec![LogEntry {
-                timestamp: Utc::now() - Duration::seconds(5),
-                line: r#"{"status":"200","method":"GET"}"#.to_string(),
-                structured_metadata: HashMap::new(),
-            }],
-            None,
-        );
+        let eval = Evaluator::new(store);
+        let selector = StreamSelector {
+            matchers: vec![LabelMatcher { name: "app".into(), op: MatchOp::Eq, value: "test".into() }],
+        };
+        let pipeline = vec![PipelineStage::LineFilter(LineFilter::Contains("error".into()))];
+        let query = LogQuery { selector, pipeline };
 
-        let expr = parse(r#"{app="x"} | json | line_format "{{.method}} {{.status}}""#).unwrap();
-        let crate::logql::ast::Expr::Log(ls) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_log(&ls, now - Duration::hours(1), now, 100, None);
-        assert!(!results.is_empty());
-        assert!(results[0].values[0][1].contains("GET"));
-    }
-
-    #[test]
-    fn eval_count_over_time() {
-        let store = make_store();
-        for i in 0..5 {
-            push_entry(&store, &[("job", "app")], &format!("log {i}"), i * 10);
-        }
-        let expr = parse(r#"count_over_time({job="app"}[1h])"#).unwrap();
-        let crate::logql::ast::Expr::Metric(m) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_metric(&m, now - Duration::hours(1), now, 3600, None);
-        assert!(!results.is_empty());
-        let total: f64 = results[0]
-            .values
-            .iter()
-            .flat_map(|(_, v)| v.parse::<f64>())
-            .sum();
-        assert!(total >= 5.0);
-    }
-
-    #[test]
-    fn eval_rate() {
-        let store = make_store();
-        for i in 0..10 {
-            push_entry(&store, &[("job", "rate-test")], "msg", i * 5);
-        }
-        let expr = parse(r#"rate({job="rate-test"}[5m])"#).unwrap();
-        let crate::logql::ast::Expr::Metric(m) = expr else { panic!() };
-        let eval = Evaluator::new(&store);
-        let now = Utc::now();
-        let results = eval.eval_metric(&m, now - Duration::minutes(5), now, 300, None);
-        assert!(!results.is_empty());
+        let data = eval.eval_log_query("tenant", &query, 0, t + 2_000_000, 100, Direction::Forward);
+        if let QueryData::Streams(streams) = data {
+            assert_eq!(streams.len(), 1);
+            assert_eq!(streams[0].values.len(), 1);
+            assert!(streams[0].values[0].1.contains("error"));
+        } else { panic!("expected streams"); }
     }
 }
