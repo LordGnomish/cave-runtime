@@ -1,0 +1,69 @@
+[package]
+name = "cave-dns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "CoreDNS-compatible DNS server with full plugin ecosystem"
+
+[dependencies]
+# Workspace shared (cave-core excluded: pre-existing upstream compile errors)
+axum         = { workspace = true }
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+tracing      = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+uuid         = { workspace = true }
+chrono       = { workspace = true }
+reqwest      = { workspace = true }
+tower        = { workspace = true }
+tower-http   = { workspace = true }
+kube         = { workspace = true }
+k8s-openapi  = { workspace = true }
+prometheus-client = { workspace = true }
+regex        = { workspace = true }
+
+# DNS protocol — hickory-dns (formerly trust-dns)
+hickory-proto    = { version = "0.24", features = ["dnssec-ring"] }
+hickory-resolver = { version = "0.24", features = ["tokio-runtime", "dnssec-ring"] }
+
+# Async trait objects
+async-trait = "0.1"
+
+# Byte buffers
+bytes = "1"
+
+# Concurrent hash map (cache, metrics)
+dashmap = "6"
+
+# Atomic arc swap for hot reload
+arc-swap = "1"
+
+# File watching (zone reload)
+notify = "6"
+
+# TCP codec (length-delimited DNS framing)
+tokio-util = { version = "0.7", features = ["codec"] }
+
+# TLS stack
+rustls        = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pemfile = "2"
+tokio-rustls  = "0.26"
+
+# IP CIDR matching for ACL
+ipnet = "2"
+
+# Base64 for DNS-over-HTTPS GET requests
+base64 = "0.22"
+
+# etcd backend
+etcd-client = "0.13"
+
+# futures utilities (join_all for spawned listeners)
+futures = "0.3"
+
+[dev-dependencies]
+tokio    = { workspace = true }
