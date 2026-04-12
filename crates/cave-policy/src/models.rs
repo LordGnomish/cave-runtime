@@ -1,181 +1,271 @@
+//! OPA REST API data models (v1 API).
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Policy {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
-    pub rules: Vec<PolicyRule>,
-    pub enforcement: EnforcementMode,
-    pub created_at: DateTime<Utc>,
-    pub enabled: bool,
+// ─── OPA Data API ─────────────────────────────────────────────────────────────
+
+/// POST /v1/data/{path} request body.
+#[derive(Debug, Default, Deserialize)]
+pub struct DataQueryRequest {
+    pub input: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PolicyRule {
-    pub id: Uuid,
+/// Query parameters for data endpoints.
+#[derive(Debug, Default, Deserialize)]
+pub struct DataQueryParams {
+    pub pretty: Option<bool>,
+    pub provenance: Option<bool>,
+    pub explain: Option<String>, // "notes" | "fails" | "full" | "debug"
+    pub metrics: Option<bool>,
+    pub instrument: Option<bool>,
+    pub strict_builtin_errors: Option<bool>,
+}
+
+/// GET|POST /v1/data/{path} response.
+#[derive(Debug, Serialize)]
+pub struct DataResponse {
+    pub result: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<ProvenanceInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<Vec<TraceEvent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<ApiWarning>,
+}
+
+/// PUT /v1/data/{path} request.
+#[derive(Debug, Deserialize)]
+pub struct PutDataRequest {
+    #[serde(flatten)]
+    pub value: serde_json::Value,
+}
+
+/// PATCH /v1/data/{path} request (JSON Patch, RFC 6902).
+pub type PatchDataRequest = Vec<JsonPatchOp>;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JsonPatchOp {
+    pub op: String, // "add" | "remove" | "replace" | "move" | "copy" | "test"
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+}
+
+// ─── OPA Policy API ───────────────────────────────────────────────────────────
+
+/// A stored Rego policy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredPolicy {
+    pub id: String,
+    pub raw: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ast: Option<serde_json::Value>,
+}
+
+/// GET /v1/policies response.
+#[derive(Debug, Serialize)]
+pub struct ListPoliciesResponse {
+    pub result: Vec<StoredPolicy>,
+}
+
+/// GET /v1/policies/{id} response.
+#[derive(Debug, Serialize)]
+pub struct GetPolicyResponse {
+    pub result: StoredPolicy,
+}
+
+/// PUT /v1/policies/{id} request body (raw Rego text).
+pub type PutPolicyRequest = String;
+
+/// Response after creating/updating a policy.
+#[derive(Debug, Serialize)]
+pub struct PutPolicyResponse {
+    pub result: StoredPolicy,
+}
+
+// ─── OPA Query API ────────────────────────────────────────────────────────────
+
+/// GET /v1/query?q=... query parameters.
+#[derive(Debug, Deserialize)]
+pub struct AdHocQueryParams {
+    pub q: String,
+    pub pretty: Option<bool>,
+    pub explain: Option<String>,
+    pub metrics: Option<bool>,
+}
+
+/// POST /v1/query request body.
+#[derive(Debug, Deserialize)]
+pub struct AdHocQueryRequest {
+    pub query: String,
+    pub input: Option<serde_json::Value>,
+    pub pretty: Option<bool>,
+    pub explain: Option<String>,
+    pub metrics: Option<bool>,
+}
+
+/// GET|POST /v1/query response.
+#[derive(Debug, Serialize)]
+pub struct QueryResponse {
+    /// List of variable bindings, one per successful evaluation.
+    pub result: Vec<HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub explanation: Option<Vec<TraceEvent>>,
+}
+
+// ─── OPA Compile (Partial Evaluation) API ─────────────────────────────────────
+
+/// POST /v1/compile request.
+#[derive(Debug, Deserialize)]
+pub struct CompileRequest {
+    pub query: String,
+    pub input: Option<serde_json::Value>,
+    /// Unknowns to treat as opaque during partial evaluation.
+    pub unknowns: Option<Vec<String>>,
+    pub options: Option<CompileOptions>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CompileOptions {
+    pub disallow_unknown_functions: Option<bool>,
+}
+
+/// POST /v1/compile response.
+#[derive(Debug, Serialize)]
+pub struct CompileResponse {
+    /// Remaining partial queries after evaluation.
+    pub result: CompileResult,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metrics: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CompileResult {
+    pub queries: Vec<Vec<serde_json::Value>>,
+    pub support: Vec<serde_json::Value>,
+}
+
+// ─── OPA Status & Health API ──────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct HealthResponse {
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundles: Option<HashMap<String, BundleStatus>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugins: Option<HashMap<String, PluginStatus>>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct BundleStatus {
     pub name: String,
-    pub condition: RuleCondition,
-    pub severity: ViolationSeverity,
+    pub active_revision: Option<String>,
+    pub last_successful_activation: Option<DateTime<Utc>>,
+    pub last_successful_download: Option<DateTime<Utc>>,
+    pub last_successful_request: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct PluginStatus {
+    pub state: String, // "OK" | "WARN" | "ERR" | "NOT_READY"
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct StatusResponse {
+    pub result: OpaStatus,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OpaStatus {
+    pub labels: HashMap<String, String>,
+    pub bundles: HashMap<String, BundleStatus>,
+    pub plugins: HashMap<String, PluginStatus>,
+    pub metrics: Option<serde_json::Value>,
+}
+
+// ─── Provenance & Trace ───────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct ProvenanceInfo {
+    pub version: String,
+    pub build_commit: String,
+    pub build_timestamp: String,
+    pub build_hostname: String,
+    pub bundles: HashMap<String, BundleProvenance>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BundleProvenance {
+    pub revision: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TraceEvent {
+    pub op: String, // "enter" | "redo" | "eval" | "fail" | "exit" | "unify" | "save" | "note"
+    pub query_id: u64,
+    pub parent_id: u64,
+    pub type_: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub locals: Option<Vec<Local>>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Local {
+    pub name: String,
+    pub value: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApiWarning {
+    pub code: String,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum RuleCondition {
-    FieldEquals { field: String, value: serde_json::Value },
-    FieldExists { field: String },
-    FieldNotExists { field: String },
-    FieldGreaterThan { field: String, threshold: f64 },
-    FieldLessThan { field: String, threshold: f64 },
-    AllOf { conditions: Vec<RuleCondition> },
-    AnyOf { conditions: Vec<RuleCondition> },
-    Not { condition: Box<RuleCondition> },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum EnforcementMode {
-    Audit,
-    Enforce,
-    Disabled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ViolationSeverity {
-    Critical,
-    High,
-    Medium,
-    Low,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Violation {
-    pub rule_id: Uuid,
-    pub rule_name: String,
-    pub severity: ViolationSeverity,
-    pub message: String,
-    pub resource_path: Option<String>,
-}
+// ─── Decision Log ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PolicyDecision {
-    pub allowed: bool,
-    pub violations: Vec<Violation>,
-    pub enforcement: EnforcementMode,
+pub struct DecisionLogEntry {
+    pub decision_id: String,
+    pub path: String,
+    pub input: Option<serde_json::Value>,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub requested_by: String,
+    pub timestamp: DateTime<Utc>,
+    pub metrics: Option<serde_json::Value>,
+    pub bundle_name: Option<String>,
+    pub revision: Option<String>,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Utc;
+// ─── Error response ───────────────────────────────────────────────────────────
 
-    #[test]
-    fn test_rule_condition_field_equals_serde() {
-        let cond = RuleCondition::FieldEquals {
-            field: "status".to_string(),
-            value: serde_json::json!("active"),
-        };
-        let json = serde_json::to_string(&cond).unwrap();
-        let back: RuleCondition = serde_json::from_str(&json).unwrap();
-        assert_eq!(cond, back);
-    }
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse {
+    pub code: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub errors: Option<Vec<PolicyViolation>>,
+}
 
-    #[test]
-    fn test_rule_condition_not_serde() {
-        let inner = RuleCondition::FieldExists { field: "owner".to_string() };
-        let cond = RuleCondition::Not { condition: Box::new(inner) };
-        let json = serde_json::to_string(&cond).unwrap();
-        let back: RuleCondition = serde_json::from_str(&json).unwrap();
-        assert_eq!(cond, back);
-    }
-
-    #[test]
-    fn test_rule_condition_all_of_serde() {
-        let cond = RuleCondition::AllOf {
-            conditions: vec![
-                RuleCondition::FieldExists { field: "name".to_string() },
-                RuleCondition::FieldExists { field: "version".to_string() },
-            ],
-        };
-        let json = serde_json::to_string(&cond).unwrap();
-        let back: RuleCondition = serde_json::from_str(&json).unwrap();
-        assert_eq!(cond, back);
-    }
-
-    #[test]
-    fn test_enforcement_mode_serde() {
-        assert_eq!(serde_json::to_string(&EnforcementMode::Audit).unwrap(), "\"audit\"");
-        assert_eq!(serde_json::to_string(&EnforcementMode::Enforce).unwrap(), "\"enforce\"");
-        assert_eq!(serde_json::to_string(&EnforcementMode::Disabled).unwrap(), "\"disabled\"");
-    }
-
-    #[test]
-    fn test_violation_severity_serde() {
-        assert_eq!(serde_json::to_string(&ViolationSeverity::Critical).unwrap(), "\"critical\"");
-        assert_eq!(serde_json::to_string(&ViolationSeverity::High).unwrap(), "\"high\"");
-        assert_eq!(serde_json::to_string(&ViolationSeverity::Medium).unwrap(), "\"medium\"");
-        assert_eq!(serde_json::to_string(&ViolationSeverity::Low).unwrap(), "\"low\"");
-    }
-
-    #[test]
-    fn test_policy_rule_serde() {
-        let rule = PolicyRule {
-            id: Uuid::new_v4(),
-            name: "no-root".to_string(),
-            condition: RuleCondition::FieldEquals {
-                field: "user".to_string(),
-                value: serde_json::json!("root"),
-            },
-            severity: ViolationSeverity::Critical,
-            message: "Root user not allowed".to_string(),
-        };
-        let json = serde_json::to_string(&rule).unwrap();
-        let back: PolicyRule = serde_json::from_str(&json).unwrap();
-        assert_eq!(rule, back);
-    }
-
-    #[test]
-    fn test_policy_serde_roundtrip() {
-        let policy = Policy {
-            id: Uuid::new_v4(),
-            name: "test-policy".to_string(),
-            description: "A test".to_string(),
-            rules: vec![],
-            enforcement: EnforcementMode::Audit,
-            created_at: Utc::now(),
-            enabled: true,
-        };
-        let json = serde_json::to_string(&policy).unwrap();
-        let back: Policy = serde_json::from_str(&json).unwrap();
-        assert_eq!(policy, back);
-    }
-
-    #[test]
-    fn test_violation_serde() {
-        let v = Violation {
-            rule_id: Uuid::new_v4(),
-            rule_name: "rule-1".to_string(),
-            severity: ViolationSeverity::High,
-            message: "Field missing".to_string(),
-            resource_path: Some("spec.containers[0]".to_string()),
-        };
-        let json = serde_json::to_string(&v).unwrap();
-        let back: Violation = serde_json::from_str(&json).unwrap();
-        assert_eq!(v, back);
-    }
-
-    #[test]
-    fn test_condition_greater_than_serde() {
-        let cond = RuleCondition::FieldGreaterThan {
-            field: "replicas".to_string(),
-            threshold: 10.0,
-        };
-        let json = serde_json::to_string(&cond).unwrap();
-        let back: RuleCondition = serde_json::from_str(&json).unwrap();
-        assert_eq!(cond, back);
-    }
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PolicyViolation {
+    pub policy: String,
+    pub rule: String,
+    pub message: String,
+    pub resource: Option<String>,
+    pub severity: Option<String>,
 }
