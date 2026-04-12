@@ -29,6 +29,7 @@ members = [
     "crates/cave-sbom",
     "crates/cave-uptime",
     "crates/cave-cost",
+    "crates/cave-cost-alloc",
     "crates/cave-sign",
     "crates/cave-forensics",
     # === Phase 3: Platform Intelligence ===
