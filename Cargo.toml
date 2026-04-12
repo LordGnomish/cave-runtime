@@ -24,6 +24,7 @@ members = [
     # === Phase 3: Platform Intelligence ===
     "crates/cave-devlake",
     "crates/cave-ai-obs",
+    "crates/cave-llm-gateway",
     "crates/cave-pii",
     "crates/cave-incidents",
     "crates/cave-chat",
