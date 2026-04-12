@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let infra_state = Arc::new(cave_infra::InfraState::default());
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
@@ -58,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+        .merge(cave_infra::router(infra_state))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
@@ -68,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!(port = port, "CAVE Runtime listening");
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Phase 5 modules: infra (LLM+MCP IaC)");
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()

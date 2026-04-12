@@ -30,6 +30,8 @@ members = [
     "crates/cave-slo",
     "crates/cave-alerts",
     "crates/cave-profiler",
+    # === Phase 5: Next-Gen IaC ===
+    "crates/cave-infra",
     # === Phase 4: Heavy Hitters ===
     "crates/cave-registry",
     "crates/cave-workflows",
