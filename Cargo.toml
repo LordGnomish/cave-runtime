@@ -30,6 +30,8 @@ members = [
     "crates/cave-slo",
     "crates/cave-alerts",
     "crates/cave-profiler",
+    # === CI/CD ===
+    "crates/cave-pipelines",
     # === Phase 4: Heavy Hitters ===
     "crates/cave-registry",
     "crates/cave-workflows",
