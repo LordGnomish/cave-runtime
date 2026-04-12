@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize module states
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let pg_state = Arc::new(cave_pg::PgState::default());
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
@@ -58,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+        .merge(cave_pg::router(pg_state))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
@@ -67,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
-    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -97,6 +99,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+            "pg": true,
         }
     }))
 }
