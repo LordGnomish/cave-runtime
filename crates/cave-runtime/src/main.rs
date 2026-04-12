@@ -60,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -76,6 +77,9 @@ async fn main() -> anyhow::Result<()> {
     let protected = Router::new()
 =======
     let cluster_state = Arc::new(cave_cluster::ClusterState::default());
+=======
+    let vault_store = Arc::new(std::sync::Mutex::new(cave_vault::VaultStore::default()));
+>>>>>>> claude/ecstatic-chebyshev
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
@@ -92,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
@@ -118,6 +123,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_docs_site::router(docs_site_state))
         .merge(cave_dns::router(dns_state))
 >>>>>>> claude/cranky-khorana
+=======
+        // Vault / Secrets Management
+        .merge(cave_vault::router(vault_store))
+>>>>>>> claude/ecstatic-chebyshev
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())

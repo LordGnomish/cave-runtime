@@ -19,6 +19,8 @@ cave-upstream = { path = "../cave-upstream" }
 cave-deploy = { path = "../cave-deploy" }
 # Platform modules
 cave-cluster = { path = "../cave-cluster" }
+# Vault / Secrets Management
+cave-vault = { path = "../cave-vault" }
 # Phase 1 modules
 cave-flags = { path = "../cave-flags" }
 # Phase 5 modules
