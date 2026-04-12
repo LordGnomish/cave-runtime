@@ -6,6 +6,10 @@ members = [
     "crates/cave-auth",
     "crates/cave-db",
     "crates/cave-ebpf-common",
+    # === Observability Stack ===
+    "crates/cave-metrics",
+    "crates/cave-logs",
+    "crates/cave-trace",
     # === Phase 1: Quick Wins ===
     "crates/cave-flags",
     "crates/cave-secrets",

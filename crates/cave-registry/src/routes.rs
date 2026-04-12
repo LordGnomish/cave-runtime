@@ -1,11 +1,7 @@
 //! HTTP routes for cave-registry.
 
 use crate::State;
-use axum::{
-    extract::State as AxumState,
-    routing::get,
-    Json, Router,
-};
+use axum::{routing::get, Json, Router};
 use std::sync::Arc;
 
 pub fn create_router(state: Arc<State>) -> Router {
