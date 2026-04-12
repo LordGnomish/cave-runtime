@@ -1,11 +1,15 @@
-//! S3-compatible object storage — store + HTTP router.
+//! S3/MinIO compatible object storage implementation.
 
-pub mod router;
+pub mod encryption;
+pub mod lifecycle;
+pub mod notification;
+pub mod policy;
+pub mod presigned;
+pub mod routes;
 pub mod store;
 pub mod types;
-#[cfg(test)]
-mod tests;
+pub mod xml;
 
-pub use router::s3_router;
-pub use store::S3Store;
-pub use types::*;
+pub use routes::s3_router;
+pub use store::ObjectStore;
+pub use types::S3Event;

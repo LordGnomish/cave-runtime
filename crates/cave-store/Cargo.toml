@@ -1,52 +1,51 @@
 [package]
 name = "cave-store"
-description = "CAVE Unified Runtime — embedded etcd-compatible KV store + S3-compatible object storage"
+description = "Unified storage engine — etcd v3 KV + MinIO/S3 object store with WAL and MVCC"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
+cave-core = { path = "../cave-core" }
+
+# Async runtime & streams
 tokio = { workspace = true }
+tokio-stream = "0.1"
+futures = "0.3"
+async-stream = "0.3"
+
+# Web framework
 axum = { workspace = true }
 tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
-tracing = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
+
+# XML (S3 responses)
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+# Encoding
+base64 = "0.22"
+hex = "0.4"
+
+# Crypto (presigned URLs, SSE-C, SigV4)
+ring = { workspace = true }
+hmac = "0.12"
+sha2 = "0.10"
+
+# IDs & time
 uuid = { workspace = true }
 chrono = { workspace = true }
-ring = { workspace = true }
-# gRPC
-tonic = { version = "0.12", features = ["transport"] }
-prost = "0.13"
-prost-types = "0.13"
-# XML for S3 API
-quick-xml = { version = "0.37", features = ["serialize"] }
-# Crypto for S3 signing/SSE/ETags
-sha2 = "0.10"
-hmac = "0.12"
-hex = "0.4"
-base64 = "0.22"
-md-5 = "0.10"
-aes-gcm = "0.10"
-# Streaming
-tokio-stream = { version = "0.1", features = ["sync"] }
-async-stream = "0.3"
-futures-core = "0.3"
-# Concurrency
-parking_lot = "0.12"
-dashmap = "6"
-# HTTP
-bytes = "1"
-http = "1"
-http-body-util = "0.1"
-tower-http = { version = "0.6", features = ["cors", "trace"] }
 
-[build-dependencies]
-tonic-build = "0.12"
-protoc-bin-vendored = "3"
+# Utilities
+thiserror = { workspace = true }
+tracing = { workspace = true }
+bytes = "1"
+rand = "0.8"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full", "test-util"] }
+tokio = { workspace = true }
+axum-test = "20"
 tempfile = "3"
