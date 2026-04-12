@@ -87,3 +87,110 @@ pub enum UpstreamTriage {
     /// Not relevant to our use case
     Skip,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{Duration, Utc};
+    use uuid::Uuid;
+
+    fn make_identity(roles: Vec<CaveRole>) -> CaveIdentity {
+        CaveIdentity {
+            cave_uid: Uuid::new_v4(),
+            tenant_id: "tenant-1".to_string(),
+            env: "prod".to_string(),
+            roles,
+            exp: Utc::now() + Duration::hours(1),
+        }
+    }
+
+    #[test]
+    fn test_platform_admin_can_read() {
+        let id = make_identity(vec![CaveRole::PlatformAdmin]);
+        assert!(id.has_permission("flags", "flags:read"));
+    }
+
+    #[test]
+    fn test_platform_admin_can_write() {
+        let id = make_identity(vec![CaveRole::PlatformAdmin]);
+        assert!(id.has_permission("flags", "flags:write"));
+    }
+
+    #[test]
+    fn test_platform_admin_can_platform() {
+        let id = make_identity(vec![CaveRole::PlatformAdmin]);
+        assert!(id.has_permission("admin", "platform:manage"));
+    }
+
+    #[test]
+    fn test_platform_admin_can_admin() {
+        let id = make_identity(vec![CaveRole::PlatformAdmin]);
+        assert!(id.has_permission("flags", "flags:admin"));
+    }
+
+    #[test]
+    fn test_tenant_admin_can_read() {
+        let id = make_identity(vec![CaveRole::TenantAdmin]);
+        assert!(id.has_permission("flags", "flags:read"));
+    }
+
+    #[test]
+    fn test_tenant_admin_can_write() {
+        let id = make_identity(vec![CaveRole::TenantAdmin]);
+        assert!(id.has_permission("flags", "flags:write"));
+    }
+
+    #[test]
+    fn test_tenant_admin_cannot_platform() {
+        let id = make_identity(vec![CaveRole::TenantAdmin]);
+        assert!(!id.has_permission("admin", "platform:manage"));
+    }
+
+    #[test]
+    fn test_tenant_admin_can_admin() {
+        let id = make_identity(vec![CaveRole::TenantAdmin]);
+        assert!(id.has_permission("flags", "flags:admin"));
+    }
+
+    #[test]
+    fn test_tenant_developer_can_read() {
+        let id = make_identity(vec![CaveRole::TenantDeveloper]);
+        assert!(id.has_permission("flags", "flags:read"));
+    }
+
+    #[test]
+    fn test_tenant_developer_can_write() {
+        let id = make_identity(vec![CaveRole::TenantDeveloper]);
+        assert!(id.has_permission("flags", "flags:write"));
+    }
+
+    #[test]
+    fn test_tenant_developer_cannot_admin() {
+        let id = make_identity(vec![CaveRole::TenantDeveloper]);
+        assert!(!id.has_permission("flags", "flags:admin"));
+    }
+
+    #[test]
+    fn test_tenant_viewer_can_read() {
+        let id = make_identity(vec![CaveRole::TenantViewer]);
+        assert!(id.has_permission("flags", "flags:read"));
+    }
+
+    #[test]
+    fn test_tenant_viewer_cannot_write() {
+        let id = make_identity(vec![CaveRole::TenantViewer]);
+        assert!(!id.has_permission("flags", "flags:write"));
+    }
+
+    #[test]
+    fn test_platform_viewer_can_read() {
+        let id = make_identity(vec![CaveRole::PlatformViewer]);
+        assert!(id.has_permission("flags", "flags:read"));
+    }
+
+    #[test]
+    fn test_platform_viewer_cannot_write() {
+        let id = make_identity(vec![CaveRole::PlatformViewer]);
+        assert!(!id.has_permission("flags", "flags:write"));
+    }
+}

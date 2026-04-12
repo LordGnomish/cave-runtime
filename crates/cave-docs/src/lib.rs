@@ -4,6 +4,8 @@
 //! Features: OpenAPI/AsyncAPI spec storage, breaking change detection, schema versioning
 
 pub mod routes;
+pub mod models;
+pub mod engine;
 
 use axum::Router;
 
