@@ -69,6 +69,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -92,6 +93,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let mesh_state = Arc::new(cave_mesh::MeshState::default());
 >>>>>>> claude/peaceful-lederberg
+=======
+    let metrics_state = Arc::new(cave_metrics::MetricsState::new());
+>>>>>>> claude/relaxed-nash
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -152,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -224,6 +229,10 @@ async fn main() -> anyhow::Result<()> {
         // Service mesh
         .merge(cave_mesh::router(mesh_state))
 >>>>>>> claude/peaceful-lederberg
+=======
+        // Metrics
+        .merge(cave_metrics::router(metrics_state))
+>>>>>>> claude/relaxed-nash
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -255,6 +264,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -279,6 +289,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Phase 4 modules: tracker");
 >>>>>>> claude/peaceful-bell
+=======
+    info!("Metrics: Prometheus/Thanos replacement active");
+>>>>>>> claude/relaxed-nash
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -314,6 +327,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -335,6 +349,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "tracker": true,
 >>>>>>> claude/peaceful-bell
+=======
+            "metrics": true,
+>>>>>>> claude/relaxed-nash
         }
     }))
 }

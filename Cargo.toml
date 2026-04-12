@@ -20,6 +20,8 @@ members = [
     "crates/cave-certs",
     # === Vault / Secrets Management ===
     "crates/cave-vault",
+    # === Metrics ===
+    "crates/cave-metrics",
     # === Phase 2: Security Core ===
     "crates/cave-security",
     "crates/cave-admission",
