@@ -18,3 +18,5 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tower = { workspace = true }
+# Crypto: SHA-256 for PAT hashing
+ring = { workspace = true }
