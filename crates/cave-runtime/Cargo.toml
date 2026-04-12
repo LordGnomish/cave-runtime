@@ -10,7 +10,7 @@ name = "cave-runtime"
 path = "src/main.rs"
 
 [dependencies]
-# Shared
+# Shared infrastructure
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
@@ -23,6 +23,33 @@ cave-docs = { path = "../cave-docs" }
 cave-status = { path = "../cave-status" }
 cave-changelog = { path = "../cave-changelog" }
 cave-certs = { path = "../cave-certs" }
+# Phase 2 modules
+cave-vulns = { path = "../cave-vulns" }
+cave-sbom = { path = "../cave-sbom" }
+cave-uptime = { path = "../cave-uptime" }
+cave-cost = { path = "../cave-cost" }
+cave-sign = { path = "../cave-sign" }
+cave-forensics = { path = "../cave-forensics" }
+# Phase 3 modules
+cave-devlake = { path = "../cave-devlake" }
+cave-ai-obs = { path = "../cave-ai-obs" }
+cave-pii = { path = "../cave-pii" }
+cave-incidents = { path = "../cave-incidents" }
+cave-chat = { path = "../cave-chat" }
+cave-slo = { path = "../cave-slo" }
+cave-alerts = { path = "../cave-alerts" }
+cave-profiler = { path = "../cave-profiler" }
+# Phase 4 modules
+cave-registry = { path = "../cave-registry" }
+cave-workflows = { path = "../cave-workflows" }
+cave-scan = { path = "../cave-scan" }
+cave-portal = { path = "../cave-portal" }
+cave-scaffold = { path = "../cave-scaffold" }
+cave-chaos = { path = "../cave-chaos" }
+cave-policy = { path = "../cave-policy" }
+cave-dast = { path = "../cave-dast" }
+cave-backup = { path = "../cave-backup" }
+cave-pam = { path = "../cave-pam" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }
@@ -32,4 +59,5 @@ tracing-subscriber = { workspace = true }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 anyhow = { workspace = true }
