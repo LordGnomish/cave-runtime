@@ -17,6 +17,8 @@ cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }
 # GitOps
 cave-deploy = { path = "../cave-deploy" }
+# Platform modules
+cave-cluster = { path = "../cave-cluster" }
 # Phase 1 modules
 cave-flags = { path = "../cave-flags" }
 # Phase 5 modules
