@@ -3,13 +3,19 @@
 //! Single binary that hosts all enabled platform modules.
 //! Native Okta/Keycloak auth, shared PostgreSQL, eBPF hooks.
 
-use axum::Router;
+use axum::{
+    response::{Html, IntoResponse},
+    routing::get,
+    Router,
+};
 use clap::Parser;
 use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
+
+static PORTAL_HTML: &str = include_str!("portal_index.html");
 
 #[derive(Parser)]
 #[command(name = "cave-runtime", version, about = "CAVE Platform Unified Runtime")]
@@ -48,9 +54,14 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the unified router with all Phase 1 modules
     let app = Router::new()
+        // Portal UI
+        .route("/", get(portal))
         // Core health endpoints
-        .route("/health", axum::routing::get(health))
-        .route("/ready", axum::routing::get(ready))
+        .route("/health", get(health))
+        .route("/ready", get(ready))
+        // API
+        .route("/api/modules", get(api_modules))
+        .route("/api/health", get(api_health))
         // Phase 1 module routers
         .merge(cave_secrets::router(secrets_state))
         .merge(cave_lint::router(lint_state))
@@ -78,6 +89,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+async fn portal() -> impl IntoResponse {
+    Html(PORTAL_HTML)
+}
+
 async fn health() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
         "status": "ok",
@@ -98,5 +113,48 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "changelog": true,
             "certs": true,
         }
+    }))
+}
+
+async fn api_modules() -> axum::Json<serde_json::Value> {
+    let phase1 = ["secrets", "lint", "docs", "status", "changelog", "certs", "portal"];
+    let modules = cave_upstream::TRACKED_PROJECTS
+        .iter()
+        .map(|p| {
+            let live = phase1.contains(&p.cave_module.trim_start_matches("cave-"));
+            serde_json::json!({
+                "id": p.cave_module.trim_start_matches("cave-"),
+                "crate": p.cave_module,
+                "upstream": p.name,
+                "github": p.github_repo,
+                "status": if live { "healthy" } else { "pending" },
+                "track_features": p.track_features,
+                "check_frequency": p.check_frequency,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    axum::Json(serde_json::json!({
+        "total": modules.len(),
+        "modules": modules,
+    }))
+}
+
+async fn api_health() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "runtime": {
+            "status": "healthy",
+            "version": env!("CARGO_PKG_VERSION"),
+        },
+        "modules": {
+            "secrets": { "status": "healthy", "endpoint": "/api/secrets/health" },
+            "lint":    { "status": "healthy", "endpoint": "/api/lint/health" },
+            "docs":    { "status": "healthy", "endpoint": "/api/docs/health" },
+            "status":  { "status": "healthy", "endpoint": "/api/status/health" },
+            "changelog":{ "status": "healthy", "endpoint": "/api/changelog/health" },
+            "certs":   { "status": "healthy", "endpoint": "/api/certs/health" },
+            "portal":  { "status": "healthy", "endpoint": "/api/portal/health" },
+        },
+        "upstream_tracked": cave_upstream::TRACKED_PROJECTS.len(),
     }))
 }
