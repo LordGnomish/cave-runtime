@@ -1,0 +1,9 @@
+//! Scrape manager: scrapes Prometheus /metrics endpoints on configurable intervals.
+//! Service discovery: static, file-based, and Kubernetes.
+
+pub mod discovery;
+pub mod manager;
+pub mod target;
+
+pub use manager::ScrapeManager;
+pub use target::{ScrapeTarget, ScrapeConfig};

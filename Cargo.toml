@@ -45,6 +45,8 @@ members = [
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === Metrics (Prometheus + VictoriaMetrics parity) ===
+    "crates/cave-metrics",
 ]
 
 [workspace.package]

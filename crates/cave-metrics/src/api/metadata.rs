@@ -1,0 +1,39 @@
+//! /api/v1/metadata
+
+use axum::{extract::{Query, State}, Json};
+use serde::Deserialize;
+use std::sync::Arc;
+use crate::state::MetricsState;
+
+#[derive(Debug, Deserialize)]
+pub struct MetadataParams {
+    pub metric: Option<String>,
+    pub limit: Option<u64>,
+}
+
+pub async fn metric_metadata(
+    State(state): State<Arc<MetricsState>>,
+    Query(params): Query<MetadataParams>,
+) -> Json<serde_json::Value> {
+    // Return metadata for all known metric names.
+    let names = if let Some(m) = params.metric {
+        vec![m]
+    } else {
+        state.tsdb.label_values("__name__", &[])
+    };
+
+    let limit = params.limit.unwrap_or(u64::MAX) as usize;
+    let data: serde_json::Map<String, serde_json::Value> = names.into_iter()
+        .take(limit)
+        .map(|name| {
+            let meta = serde_json::json!([{
+                "type": "gauge",
+                "help": "",
+                "unit": "",
+            }]);
+            (name, meta)
+        })
+        .collect();
+
+    Json(serde_json::json!({ "status": "success", "data": data }))
+}
