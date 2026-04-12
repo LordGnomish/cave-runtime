@@ -57,6 +57,7 @@ async fn main() -> anyhow::Result<()> {
     // ── Module states ─────────────────────────────────────────────────────────
     let secrets_state = Arc::new(cave_secrets::SecretsState::default());
     let lint_state = Arc::new(cave_lint::LintState::default());
+    let pg_state = Arc::new(cave_pg::PgState::default());
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -70,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
             std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
@@ -86,6 +88,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/ready", axum::routing::get(ready))
         .merge(protected)
         // Observability / transport middleware (outermost = last applied)
+=======
+        .merge(cave_pg::router(pg_state))
+        // Middleware
+>>>>>>> claude/bold-hamilton
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive()); // TODO: restrict origins in production
@@ -94,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
 
     info!(port = port, "CAVE Runtime listening");
-    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+    info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, pg");
     info!(
         auth_disabled = std::env::var("CAVE_AUTH_DISABLED")
             .map(|v| v == "true" || v == "1")
@@ -130,6 +136,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+            "pg": true,
         }
     }))
 }

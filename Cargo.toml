@@ -41,6 +41,7 @@ members = [
     "crates/cave-dast",
     "crates/cave-backup",
     "crates/cave-pam",
+<<<<<<< HEAD
     # === LLM Gateway ===
     "crates/cave-llm-gateway",
     # === Infrastructure & Networking ===
@@ -72,6 +73,9 @@ members = [
     "crates/cave-rollouts",
     # === Asset & Artifact Management ===
     "crates/cave-artifacts",
+=======
+    "crates/cave-pg",
+>>>>>>> claude/bold-hamilton
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===
