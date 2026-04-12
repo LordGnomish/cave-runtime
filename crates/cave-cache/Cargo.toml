@@ -1,20 +1,22 @@
 [package]
 name = "cave-cache"
-description = "Distributed cache — Redis/Valkey replacement with pub/sub"
+description = "CAVE Cache — full Redis parity: RESP3, all data types, pub/sub, transactions, Lua, persistence"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core = { path = "../cave-core" }
-axum = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
-thiserror = { workspace = true }
-ring = { workspace = true }
+cave-core     = { path = "../cave-core" }
+tokio         = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+uuid          = { workspace = true }
+chrono        = { workspace = true }
+thiserror     = { workspace = true }
+tracing       = { workspace = true }
+ring          = { workspace = true }
+regex         = { workspace = true }
+rand          = { workspace = true }
+
 [dev-dependencies]
-tokio = { workspace = true }
+tokio         = { workspace = true }
