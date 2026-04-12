@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/thirsty-lederberg
 use crate::models::{BackupRecord, BackupSchedule, BackupStatus};
 use chrono::Utc;
 
@@ -40,6 +43,7 @@ pub fn latest_successful<'a>(records: &'a [BackupRecord]) -> Option<&'a BackupRe
 /// Validate a cron expression (simple: must have 5 space-separated fields)
 pub fn is_valid_cron(expr: &str) -> bool {
     expr.split_whitespace().count() == 5
+<<<<<<< HEAD
 =======
 //! Core backup/restore engine logic.
 //!
@@ -122,12 +126,17 @@ pub fn apply_retention<'a>(
 
     to_delete
 >>>>>>> claude/gallant-meninsky
+=======
+>>>>>>> claude/thirsty-lederberg
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/thirsty-lederberg
     use uuid::Uuid;
     use chrono::{Duration, Utc};
 
@@ -227,6 +236,7 @@ mod tests {
         assert!(!is_valid_cron("bad"));
         assert!(!is_valid_cron("0 2 * *"));
         assert!(!is_valid_cron("0 2 * * * *"));
+<<<<<<< HEAD
 =======
     use crate::types::{
         BackupScope, BackupSpec, BackupTarget, EncryptionConfig, RetentionPolicy,
@@ -363,5 +373,7 @@ mod tests {
         let to_delete = apply_retention(&backups, &policy);
         assert!(to_delete.is_empty());
 >>>>>>> claude/gallant-meninsky
+=======
+>>>>>>> claude/thirsty-lederberg
     }
 }
