@@ -1,0 +1,22 @@
+[package]
+name = "cave-vault"
+description = "HashiCorp Vault replacement — secrets management, PKI, and transit encryption"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+ring = { workspace = true }
+base64 = "0.22"
+rcgen = "0.13"
+time = { version = "0.3", features = ["std"] }

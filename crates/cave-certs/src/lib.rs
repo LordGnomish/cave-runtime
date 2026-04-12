@@ -4,6 +4,8 @@
 //! Features: ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs
 
 pub mod routes;
+pub mod models;
+pub mod engine;
 
 use axum::Router;
 

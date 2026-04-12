@@ -3,6 +3,8 @@
 //! Replaces: Custom (Prometheus rules)
 //! Upstream tracking: see cave-upstream for monitored features.
 
+pub mod models;
+pub mod engine;
 pub mod routes;
 
 use axum::Router;

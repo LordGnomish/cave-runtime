@@ -4,6 +4,8 @@
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod routes;
+pub mod models;
+pub mod engine;
 
 use axum::Router;
 use cave_db::CavePool;

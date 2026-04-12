@@ -196,3 +196,76 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         check_frequency: "monthly",
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_tracked_projects_not_empty() {
+        assert!(TRACKED_PROJECTS.len() > 0);
+    }
+
+    #[test]
+    fn test_all_projects_have_names() {
+        for project in TRACKED_PROJECTS {
+            assert!(!project.name.is_empty(), "Project has empty name: {:?}", project);
+        }
+    }
+
+    #[test]
+    fn test_all_projects_have_github_repos() {
+        for project in TRACKED_PROJECTS {
+            assert!(
+                !project.github_repo.is_empty(),
+                "Project {} has empty github_repo",
+                project.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_github_repos_have_slash() {
+        for project in TRACKED_PROJECTS {
+            assert!(
+                project.github_repo.contains('/'),
+                "Project {} github_repo '{}' missing slash (expected org/repo format)",
+                project.name,
+                project.github_repo
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_projects_have_module() {
+        for project in TRACKED_PROJECTS {
+            assert!(
+                !project.cave_module.is_empty(),
+                "Project {} has empty cave_module",
+                project.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_cave_flags_project_exists() {
+        let found = TRACKED_PROJECTS
+            .iter()
+            .any(|p| p.cave_module == "cave-flags");
+        assert!(found, "No project with cave_module == 'cave-flags' found");
+    }
+
+    #[test]
+    fn test_unique_module_assignments() {
+        let mut seen = HashSet::new();
+        for project in TRACKED_PROJECTS {
+            assert!(
+                seen.insert(project.cave_module),
+                "Duplicate cave_module '{}' found (project: {})",
+                project.cave_module,
+                project.name
+            );
+        }
+    }
+}

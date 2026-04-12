@@ -83,3 +83,81 @@ impl RawClaims {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cave_core::types::CaveRole;
+
+    fn base_claims(cave_uid: &str) -> RawClaims {
+        RawClaims {
+            sub: "user-sub-123".to_string(),
+            cave_uid: Some(cave_uid.to_string()),
+            tenant_id: None,
+            env: None,
+            groups: None,
+            realm_access: None,
+            exp: 9999999999,
+            aud: serde_json::Value::String("cave-runtime".to_string()),
+            iss: "https://auth.example.com".to_string(),
+        }
+    }
+
+    const VALID_UUID: &str = "550e8400-e29b-41d4-a716-446655440000";
+
+    #[test]
+    fn test_okta_platform_admin_role() {
+        let mut claims = base_claims(VALID_UUID);
+        claims.groups = Some(vec!["platform-admin".to_string()]);
+        let identity = claims.to_identity().expect("should parse");
+        assert!(identity.roles.contains(&CaveRole::PlatformAdmin));
+    }
+
+    #[test]
+    fn test_okta_tenant_admin_role() {
+        let mut claims = base_claims(VALID_UUID);
+        claims.groups = Some(vec!["tenant-admin".to_string()]);
+        let identity = claims.to_identity().expect("should parse");
+        assert!(identity.roles.contains(&CaveRole::TenantAdmin));
+    }
+
+    #[test]
+    fn test_okta_tenant_developer_role() {
+        let mut claims = base_claims(VALID_UUID);
+        claims.groups = Some(vec!["tenant-developer".to_string()]);
+        let identity = claims.to_identity().expect("should parse");
+        assert!(identity.roles.contains(&CaveRole::TenantDeveloper));
+    }
+
+    #[test]
+    fn test_keycloak_role_mapping() {
+        let mut claims = base_claims(VALID_UUID);
+        claims.realm_access = Some(RealmAccess {
+            roles: vec!["cave-platform-admin".to_string()],
+        });
+        let identity = claims.to_identity().expect("should parse");
+        assert!(identity.roles.contains(&CaveRole::PlatformAdmin));
+    }
+
+    #[test]
+    fn test_valid_uuid_cave_uid() {
+        let claims = base_claims(VALID_UUID);
+        let result = claims.to_identity();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_uuid_cave_uid() {
+        let claims = base_claims("not-a-uuid");
+        let result = claims.to_identity();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_groups_no_roles() {
+        let mut claims = base_claims(VALID_UUID);
+        claims.groups = Some(vec![]);
+        let identity = claims.to_identity().expect("should parse");
+        assert!(identity.roles.is_empty());
+    }
+}
