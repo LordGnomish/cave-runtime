@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/elastic-ellis
 //! cave-trace — distributed tracing, Jaeger/Tempo replacement.
 //!
 //! Ingests spans, builds trace trees, detects anomalies, and exposes
@@ -42,6 +45,7 @@ pub fn router(state: Arc<TraceState>) -> Router {
     routes::create_router(state)
 }
 
+<<<<<<< HEAD
 =======
 //! CAVE Trace — Jaeger replacement.
 
@@ -58,4 +62,6 @@ pub mod routes;
 pub use storage::TraceStore;
 pub use error::{TraceError, TraceResult};
 >>>>>>> claude/dazzling-tesla
+=======
+>>>>>>> claude/elastic-ellis
 pub const MODULE_NAME: &str = "trace";
