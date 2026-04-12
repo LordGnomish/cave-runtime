@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 //! CAVE Auth — full enterprise authentication & authorization layer.
 //!
 //! ## What's included
@@ -32,6 +33,29 @@ use cave_core::config::AuthProvider;
 pub use auth_middleware::{AuthContext, AuthCtx, AuthLayer, AuthLayerConfig};
 
 /// Original lightweight AuthLayer (AuthN only, no RBAC/ABAC).
+=======
+//! CAVE Auth — Full Okta AuthN+AuthZ.
+//!
+//! Provides OIDC authentication flow (authorization code + PKCE), token management,
+//! RBAC, ABAC, SCIM 2.0 provisioning, Personal Access Tokens, session management,
+//! multi-tenancy, Tower middleware, and audit logging.
+
+pub mod abac;
+pub mod audit;
+pub mod claims;
+pub mod jwks;
+pub mod middleware;
+pub mod oidc;
+pub mod pat;
+pub mod rbac;
+pub mod scim;
+pub mod session;
+pub mod tenant;
+pub mod token;
+
+use cave_core::config::AuthProvider;
+
+>>>>>>> claude/great-sanderson
 pub use middleware::CaveAuthLayer;
 
 /// RBAC engine + models.
