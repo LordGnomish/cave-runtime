@@ -47,6 +47,7 @@ members = [
     # === Phase 4: Heavy Hitters ===
     "crates/cave-gateway",
     "crates/cave-artifacts",
+    "crates/cave-tracker",
     "crates/cave-registry",
     "crates/cave-workflows",
     "crates/cave-scan",
