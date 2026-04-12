@@ -6,12 +6,12 @@
 pub mod routes;
 
 use axum::Router;
-use cave_db::CavePool;
+use cave_db::Storage;
 use std::sync::Arc;
 
 /// Module state.
 pub struct State {
-    pub pool: Arc<CavePool>,
+    pub storage: Arc<dyn Storage>,
 }
 
 /// Create the axum router for this module.

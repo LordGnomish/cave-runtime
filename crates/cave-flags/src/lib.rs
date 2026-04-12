@@ -15,12 +15,12 @@ pub mod routes;
 pub mod store;
 
 use axum::Router;
-use cave_db::CavePool;
+use cave_db::Storage;
 use std::sync::Arc;
 
 /// Module state shared across request handlers.
 pub struct FlagsState {
-    pub pool: Arc<CavePool>,
+    pub storage: Arc<dyn Storage>,
 }
 
 /// Create the axum router for the flags module.
@@ -28,5 +28,5 @@ pub fn router(state: Arc<FlagsState>) -> Router {
     routes::create_router(state)
 }
 
-/// Module name for DB schema.
+/// Module name for DB schema / collection prefix.
 pub const MODULE_NAME: &str = "flags";

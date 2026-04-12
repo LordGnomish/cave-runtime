@@ -4,5 +4,5 @@ pub mod config;
 pub mod error;
 pub mod types;
 
-pub use config::CaveConfig;
+pub use config::{CaveConfig, StorageBackend, StorageConfig};
 pub use error::{CaveError, CaveResult};

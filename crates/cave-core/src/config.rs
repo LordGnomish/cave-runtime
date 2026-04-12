@@ -13,6 +13,9 @@ pub struct CaveConfig {
     pub database: DatabaseConfig,
     /// Module enable/disable flags
     pub modules: ModuleConfig,
+    /// Persistence backend selection
+    #[serde(default)]
+    pub storage: StorageConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -73,6 +76,41 @@ pub struct ModuleConfig {
     pub workflows: bool,
     pub chat: bool,
     pub incidents: bool,
+}
+
+// ── Storage config ────────────────────────────────────────────────────────────
+
+/// Which persistence backend to use for module state.
+#[derive(Debug, Deserialize, Clone, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageBackend {
+    /// In-process HashMap — suitable for tests and ephemeral local dev.
+    #[default]
+    Memory,
+    /// SQLite via rusqlite (bundled). Good for single-node deployments.
+    Sqlite,
+    /// PostgreSQL via the shared `CavePool`. Required for production.
+    Postgres,
+}
+
+/// Storage configuration block (`[storage]` in YAML).
+#[derive(Debug, Deserialize, Clone)]
+pub struct StorageConfig {
+    /// Which backend to use.
+    #[serde(default)]
+    pub backend: StorageBackend,
+    /// Path to the SQLite database file (used with `StorageBackend::Sqlite`).
+    /// Defaults to `./cave.db`.
+    pub sqlite_path: Option<String>,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            backend: StorageBackend::Memory,
+            sqlite_path: None,
+        }
+    }
 }
 
 impl Default for ServerConfig {

@@ -4,11 +4,15 @@ use crate::models::*;
 use crate::FlagsState;
 use axum::{
     extract::State,
+    http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
+use cave_db::StorageExt;
 use std::sync::Arc;
 use uuid::Uuid;
+
+const COLLECTION: &str = "flags";
 
 pub fn create_router(state: Arc<FlagsState>) -> Router {
     Router::new()
@@ -19,16 +23,22 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
 }
 
 /// GET /api/flags — list all flags
-async fn list_flags(State(_state): State<Arc<FlagsState>>) -> Json<Vec<FeatureFlag>> {
-    // TODO: query from cave_flags schema
-    Json(vec![])
+async fn list_flags(
+    State(state): State<Arc<FlagsState>>,
+) -> Result<Json<Vec<FeatureFlag>>, StatusCode> {
+    let flags = state
+        .storage
+        .list::<FeatureFlag>(COLLECTION)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Json(flags))
 }
 
 /// POST /api/flags — create a new flag
 async fn create_flag(
-    State(_state): State<Arc<FlagsState>>,
+    State(state): State<Arc<FlagsState>>,
     Json(req): Json<CreateFlagRequest>,
-) -> Json<FeatureFlag> {
+) -> Result<Json<FeatureFlag>, StatusCode> {
     let now = chrono::Utc::now();
     let flag = FeatureFlag {
         id: Uuid::new_v4(),
@@ -44,19 +54,29 @@ async fn create_flag(
         updated_at: now,
         created_by: Uuid::new_v4(), // TODO: extract from CaveIdentity
     };
-    // TODO: persist to cave_flags schema
-    Json(flag)
+
+    state
+        .storage
+        .put::<FeatureFlag>(COLLECTION, &flag.id.to_string(), &flag)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(flag))
 }
 
 /// POST /api/flags/evaluate — evaluate all flags for a context
 async fn evaluate(
-    State(_state): State<Arc<FlagsState>>,
+    State(state): State<Arc<FlagsState>>,
     Json(req): Json<EvaluateRequest>,
-) -> Json<EvaluateResponse> {
-    // TODO: load flags from DB, evaluate
-    let flags = vec![]; // placeholder
+) -> Result<Json<EvaluateResponse>, StatusCode> {
+    let flags = state
+        .storage
+        .list::<FeatureFlag>(COLLECTION)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     let evaluations = crate::engine::evaluate_flags(&flags, &req.context);
-    Json(EvaluateResponse { flags: evaluations })
+    Ok(Json(EvaluateResponse { flags: evaluations }))
 }
 
 /// GET /api/flags/health — module health check
