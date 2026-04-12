@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/interesting-khorana
 //! cave-infra — LLM+MCP-native Infrastructure-as-Code.
 //!
 //! Replaces: Terraform, Crossplane
@@ -67,6 +70,7 @@ pub fn router(state: Arc<InfraModuleState>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "infra";
+<<<<<<< HEAD
 =======
 //! `cave-infra` — LLM+MCP intent-based infrastructure as code.
 //!
@@ -93,3 +97,5 @@ pub use providers::{MockProvider, ProvisionResult, ResourceProvider, ResourceTyp
 pub use rollback::{RollbackAction, RollbackManager, RollbackPlan, RollbackStatus, RollbackStep};
 pub use state::{InfraResource, InfraState, ResourceState, StateManager};
 >>>>>>> claude/great-sanderson
+=======
+>>>>>>> claude/interesting-khorana

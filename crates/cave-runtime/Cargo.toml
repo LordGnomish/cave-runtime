@@ -21,6 +21,8 @@ cave-deploy = { path = "../cave-deploy" }
 cave-cluster = { path = "../cave-cluster" }
 # Vault / Secrets Management
 cave-vault = { path = "../cave-vault" }
+# Infrastructure-as-Code
+cave-infra = { path = "../cave-infra" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }

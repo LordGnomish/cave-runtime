@@ -64,6 +64,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -75,6 +76,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let gateway_state = Arc::new(cave_gateway::GatewayState::default());
 >>>>>>> claude/heuristic-wing
+=======
+    let infra_state = Arc::new(cave_infra::InfraModuleState::default());
+>>>>>>> claude/interesting-khorana
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -134,6 +138,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -176,6 +181,9 @@ async fn main() -> anyhow::Result<()> {
         // Gateway module
         .merge(cave_gateway::router(gateway_state))
 >>>>>>> claude/heuristic-wing
+=======
+        .merge(cave_infra::router(infra_state))
+>>>>>>> claude/interesting-khorana
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -203,6 +211,7 @@ async fn main() -> anyhow::Result<()> {
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
 <<<<<<< HEAD
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -215,6 +224,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Gateway module: routes, upstreams, rate-limiting, auth, circuit-breaker");
 >>>>>>> claude/heuristic-wing
+=======
+    info!("Infrastructure module: infra (replaces Terraform + Crossplane)");
+>>>>>>> claude/interesting-khorana
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -246,6 +258,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "certs": true,
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -254,6 +267,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "gateway": true,
 >>>>>>> claude/heuristic-wing
+=======
+            "infra": true,
+>>>>>>> claude/interesting-khorana
         }
     }))
 }

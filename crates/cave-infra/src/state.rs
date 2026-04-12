@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/interesting-khorana
 //! State management — persistent tracking, locking, drift detection, import, history.
 
 use crate::models::{DriftReport, InfraResource, InfraState, ResourceDrift, ResourceState};
@@ -135,6 +138,7 @@ pub enum StateError {
     NotLocked,
     #[error("lock owner mismatch: expected '{expected}', held by '{actual}'")]
     LockOwnerMismatch { expected: String, actual: String },
+<<<<<<< HEAD
 =======
 //! Infrastructure state management — tracks desired vs. actual state.
 
@@ -470,4 +474,6 @@ mod tests {
         assert!(restored.resources.contains_key("snap-r1"));
     }
 >>>>>>> claude/great-sanderson
+=======
+>>>>>>> claude/interesting-khorana
 }

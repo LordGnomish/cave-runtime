@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/interesting-khorana
 //! Intent engine — parse, resolve dependencies, validate, diff state.
 
 use crate::models::{
@@ -242,6 +245,7 @@ pub enum IntentError {
     ParseError(String),
     #[error("validation error: {0}")]
     ValidationError(String),
+<<<<<<< HEAD
 =======
 //! Intent parsing — from natural language to structured `ParsedIntent`.
 
@@ -484,4 +488,6 @@ mod tests {
         assert_eq!(parsed.environment, "production");
     }
 >>>>>>> claude/great-sanderson
+=======
+>>>>>>> claude/interesting-khorana
 }
