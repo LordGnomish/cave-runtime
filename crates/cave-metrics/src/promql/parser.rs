@@ -1,407 +1,497 @@
-//! PromQL recursive-descent / Pratt parser.
+//! Recursive-descent PromQL parser.
+//! Operator precedence (highest → lowest):
+//!   ^  (right-associative)
+//!   unary -
+//!   * / %
+//!   + -
+//!   == != < <= > >=
+//!   and unless
+//!   or
 
-#![allow(dead_code)]
-
-use crate::error::{MetricsError, MetricsResult};
+use crate::error::{MetricsError, Result};
 use crate::model::LabelMatcher;
-use super::ast::*;
-use super::lexer::{Lexer, Token};
+use crate::promql::ast::*;
+use crate::promql::lexer::{Lexer, Token};
 
-pub fn parse(input: &str) -> MetricsResult<Expr> {
-    let mut p = Parser { lexer: Lexer::new(input) };
-    let expr = p.parse_expr(0)?;
-    // Ensure nothing left
-    let tok = p.lexer.next()?;
-    if tok != Token::Eof {
-        return Err(MetricsError::Parse(format!("unexpected token at end: {:?}", tok)));
-    }
-    Ok(expr)
-}
-
-struct Parser {
-    lexer: Lexer,
+pub struct Parser {
+    tokens: Vec<Token>,
+    pos: usize,
 }
 
 impl Parser {
-    fn parse_expr(&mut self, min_prec: u8) -> MetricsResult<Expr> {
-        let mut lhs = self.parse_unary_or_primary()?;
-        loop {
-            let op = match self.peek_binary_op()? {
-                Some(op) => op,
-                None => break,
-            };
-            let prec = op.precedence();
-            if prec <= min_prec {
-                break;
-            }
-            // Consume the operator token(s)
-            self.consume_binary_op(op)?;
-            // Parse optional bool modifier
-            let mut return_bool = false;
-            if matches!(self.lexer.peek()?, Token::Bool) {
-                self.lexer.next()?;
-                return_bool = true;
-            }
-            // Parse optional matching modifiers
-            let mut matching = VectorMatching::default();
-            loop {
-                match self.lexer.peek()? {
-                    Token::On => {
-                        self.lexer.next()?;
-                        matching.labels = self.parse_label_list()?;
-                    }
-                    Token::Ignoring => {
-                        self.lexer.next()?;
-                        matching.labels = self.parse_label_list()?;
-                    }
-                    Token::GroupLeft => {
-                        self.lexer.next()?;
-                        matching.card = MatchingCard::ManyToOne;
-                        if matches!(self.lexer.peek()?, Token::LParen) {
-                            matching.include = self.parse_label_list()?;
-                        }
-                    }
-                    Token::GroupRight => {
-                        self.lexer.next()?;
-                        matching.card = MatchingCard::OneToMany;
-                        if matches!(self.lexer.peek()?, Token::LParen) {
-                            matching.include = self.parse_label_list()?;
-                        }
-                    }
-                    _ => break,
-                }
-            }
-            let next_min = if op.is_right_assoc() { prec - 1 } else { prec };
-            let rhs = self.parse_expr(next_min)?;
-            lhs = Expr::Binary {
-                op,
-                lhs: Box::new(lhs),
-                rhs: Box::new(rhs),
-                matching,
-                return_bool,
-            };
+    pub fn new(input: &str) -> Self {
+        let mut lex = Lexer::new(input);
+        Self { tokens: lex.tokenize(), pos: 0 }
+    }
+
+    fn peek(&self) -> &Token {
+        self.tokens.get(self.pos).unwrap_or(&Token::Eof)
+    }
+
+    fn peek2(&self) -> &Token {
+        self.tokens.get(self.pos + 1).unwrap_or(&Token::Eof)
+    }
+
+    fn advance(&mut self) -> &Token {
+        let t = &self.tokens[self.pos.min(self.tokens.len() - 1)];
+        if self.pos < self.tokens.len() { self.pos += 1; }
+        t
+    }
+
+    fn eat(&mut self, expected: &Token) -> Result<()> {
+        if std::mem::discriminant(self.peek()) == std::mem::discriminant(expected) {
+            self.advance();
+            Ok(())
+        } else {
+            Err(MetricsError::Parse(format!("expected {:?}, got {:?}", expected, self.peek())))
+        }
+    }
+
+    fn eat_ident(&mut self) -> Result<String> {
+        match self.advance().clone() {
+            Token::Ident(s) => Ok(s),
+            other => Err(MetricsError::Parse(format!("expected identifier, got {:?}", other))),
+        }
+    }
+
+    /// Parse a complete expression.
+    pub fn parse_expr(&mut self) -> Result<Expr> {
+        self.parse_or()
+    }
+
+    // or
+    fn parse_or(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_and()?;
+        while matches!(self.peek(), Token::Or) {
+            self.advance();
+            let matching = self.parse_vector_matching()?;
+            let rhs = self.parse_and()?;
+            lhs = Expr::Binary(BinaryExpr {
+                op: BinaryOp::Or, lhs: Box::new(lhs), rhs: Box::new(rhs),
+                matching, return_bool: false,
+            });
         }
         Ok(lhs)
     }
 
-    fn peek_binary_op(&mut self) -> MetricsResult<Option<BinaryOp>> {
-        let tok = self.lexer.peek()?;
-        let op = match tok {
-            Token::Add => Some(BinaryOp::Add),
-            Token::Sub => Some(BinaryOp::Sub),
-            Token::Mul => Some(BinaryOp::Mul),
-            Token::Div => Some(BinaryOp::Div),
-            Token::Mod => Some(BinaryOp::Mod),
-            Token::Pow => Some(BinaryOp::Pow),
-            Token::Eq => Some(BinaryOp::Eql),
-            Token::NotEq => Some(BinaryOp::Neq),
-            Token::Lt => Some(BinaryOp::Lss),
-            Token::Gt => Some(BinaryOp::Gtr),
-            Token::Lte => Some(BinaryOp::Lte),
-            Token::Gte => Some(BinaryOp::Gte),
-            Token::And => Some(BinaryOp::And),
-            Token::Or => Some(BinaryOp::Or),
-            Token::Unless => Some(BinaryOp::Unless),
-            Token::Atan2 => Some(BinaryOp::Atan2),
-            _ => None,
-        };
-        Ok(op)
+    // and / unless
+    fn parse_and(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_comparison()?;
+        loop {
+            let op = match self.peek() {
+                Token::And    => BinaryOp::And,
+                Token::Unless => BinaryOp::Unless,
+                _ => break,
+            };
+            self.advance();
+            let matching = self.parse_vector_matching()?;
+            let rhs = self.parse_comparison()?;
+            lhs = Expr::Binary(BinaryExpr {
+                op, lhs: Box::new(lhs), rhs: Box::new(rhs), matching, return_bool: false,
+            });
+        }
+        Ok(lhs)
     }
 
-    fn consume_binary_op(&mut self, _op: BinaryOp) -> MetricsResult<()> {
-        self.lexer.next()?;
-        Ok(())
+    // == != < <= > >=
+    fn parse_comparison(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_add()?;
+        loop {
+            let (op, return_bool) = match self.peek() {
+                Token::Eq    => (BinaryOp::Eql, false),
+                Token::Ne    => (BinaryOp::Neq, false),
+                Token::Lt    => (BinaryOp::Lss, false),
+                Token::Le    => (BinaryOp::Lte, false),
+                Token::Gt    => (BinaryOp::Gtr, false),
+                Token::Ge    => (BinaryOp::Gte, false),
+                _ => break,
+            };
+            self.advance();
+            let return_bool2 = if matches!(self.peek(), Token::Bool) {
+                self.advance();
+                true
+            } else { return_bool };
+            let matching = self.parse_vector_matching()?;
+            let rhs = self.parse_add()?;
+            lhs = Expr::Binary(BinaryExpr {
+                op, lhs: Box::new(lhs), rhs: Box::new(rhs), matching, return_bool: return_bool2,
+            });
+        }
+        Ok(lhs)
     }
 
-    fn parse_unary_or_primary(&mut self) -> MetricsResult<Expr> {
-        match self.lexer.peek()? {
-            Token::Sub => {
-                self.lexer.next()?;
-                let e = self.parse_primary()?;
-                Ok(Expr::Unary { op: UnaryOp::Neg, expr: Box::new(e) })
-            }
-            Token::Add => {
-                self.lexer.next()?;
-                let e = self.parse_primary()?;
-                Ok(Expr::Unary { op: UnaryOp::Pos, expr: Box::new(e) })
-            }
-            _ => self.parse_primary(),
+    // + -
+    fn parse_add(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_mul()?;
+        loop {
+            let op = match self.peek() {
+                Token::Plus  => BinaryOp::Add,
+                Token::Minus => BinaryOp::Sub,
+                _ => break,
+            };
+            self.advance();
+            let matching = self.parse_vector_matching()?;
+            let rhs = self.parse_mul()?;
+            lhs = Expr::Binary(BinaryExpr {
+                op, lhs: Box::new(lhs), rhs: Box::new(rhs), matching, return_bool: false,
+            });
+        }
+        Ok(lhs)
+    }
+
+    // * / % atan2
+    fn parse_mul(&mut self) -> Result<Expr> {
+        let mut lhs = self.parse_pow()?;
+        loop {
+            let op = match self.peek() {
+                Token::Star    => BinaryOp::Mul,
+                Token::Slash   => BinaryOp::Div,
+                Token::Percent => BinaryOp::Mod,
+                Token::Atan2   => BinaryOp::Atan2,
+                _ => break,
+            };
+            self.advance();
+            let matching = self.parse_vector_matching()?;
+            let rhs = self.parse_pow()?;
+            lhs = Expr::Binary(BinaryExpr {
+                op, lhs: Box::new(lhs), rhs: Box::new(rhs), matching, return_bool: false,
+            });
+        }
+        Ok(lhs)
+    }
+
+    // ^ (right-associative)
+    fn parse_pow(&mut self) -> Result<Expr> {
+        let base = self.parse_unary()?;
+        if matches!(self.peek(), Token::Caret) {
+            self.advance();
+            let matching = self.parse_vector_matching()?;
+            let exp = self.parse_pow()?; // right-associative
+            Ok(Expr::Binary(BinaryExpr {
+                op: BinaryOp::Pow, lhs: Box::new(base), rhs: Box::new(exp),
+                matching, return_bool: false,
+            }))
+        } else {
+            Ok(base)
         }
     }
 
-    fn parse_primary(&mut self) -> MetricsResult<Expr> {
-        let tok = self.lexer.peek()?.clone();
-        match tok {
-            Token::Number(n) => {
-                self.lexer.next()?;
-                Ok(Expr::NumberLiteral(n))
+    fn parse_unary(&mut self) -> Result<Expr> {
+        if matches!(self.peek(), Token::Minus) {
+            self.advance();
+            let inner = self.parse_postfix()?;
+            return Ok(Expr::Unary(UnaryExpr { expr: Box::new(inner) }));
+        }
+        if matches!(self.peek(), Token::Plus) {
+            self.advance();
+        }
+        self.parse_postfix()
+    }
+
+    fn parse_postfix(&mut self) -> Result<Expr> {
+        let mut expr = self.parse_primary()?;
+
+        // offset modifier
+        if matches!(self.peek(), Token::Offset) {
+            self.advance();
+            let dur = self.parse_duration()?;
+            expr = apply_offset(expr, dur);
+        }
+
+        // @ modifier
+        if matches!(self.peek(), Token::At) {
+            self.advance();
+            let ts = match self.advance().clone() {
+                Token::Number(n) => (n * 1000.0) as i64,
+                _ => return Err(MetricsError::Parse("expected timestamp after @".into())),
+            };
+            expr = apply_at(expr, ts);
+        }
+
+        // subquery: [range:step]
+        if matches!(self.peek(), Token::LBracket) {
+            if let Expr::VectorSelector(_) = &expr {
+                // Check if it's matrix or subquery
+                let saved = self.pos;
+                self.advance(); // [
+                if let Ok(range) = self.parse_duration() {
+                    if matches!(self.peek(), Token::Colon) {
+                        self.advance(); // :
+                        let step = if matches!(self.peek(), Token::RBracket) {
+                            0
+                        } else {
+                            self.parse_duration()?
+                        };
+                        self.eat(&Token::RBracket)?;
+                        let offset = if matches!(self.peek(), Token::Offset) {
+                            self.advance();
+                            Some(self.parse_duration()?)
+                        } else { None };
+                        let at = None;
+                        return Ok(Expr::Subquery(Subquery {
+                            expr: Box::new(expr), range_ms: range, step_ms: step, offset, at,
+                        }));
+                    } else if matches!(self.peek(), Token::RBracket) {
+                        self.advance(); // ]
+                        // Matrix selector
+                        return Ok(self.make_matrix(expr, range)?);
+                    } else {
+                        self.pos = saved;
+                    }
+                } else {
+                    self.pos = saved;
+                }
             }
-            Token::Str(s) => {
-                self.lexer.next()?;
-                Ok(Expr::StringLiteral(s))
-            }
+        }
+
+        Ok(expr)
+    }
+
+    fn make_matrix(&self, expr: Expr, range_ms: i64) -> Result<Expr> {
+        match expr {
+            Expr::VectorSelector(vs) => Ok(Expr::MatrixSelector(MatrixSelector {
+                selector: vs,
+                range_ms,
+                offset: None,
+                at: None,
+            })),
+            _ => Err(MetricsError::Parse("matrix selector requires a vector selector".into())),
+        }
+    }
+
+    fn parse_primary(&mut self) -> Result<Expr> {
+        match self.peek().clone() {
+            Token::Number(n) => { self.advance(); Ok(Expr::NumberLiteral(n)) }
+            Token::StringLit(s) => { self.advance(); Ok(Expr::StringLiteral(s)) }
+
             Token::LParen => {
-                self.lexer.next()?;
-                let inner = self.parse_expr(0)?;
-                self.expect(Token::RParen)?;
-                Ok(Expr::Paren(Box::new(inner)))
+                self.advance();
+                let inner = self.parse_expr()?;
+                self.eat(&Token::RParen)?;
+                Ok(inner)
             }
-            Token::Ident(name) => {
-                // Could be: metric selector, function call, or aggregation
-                let lower = name.to_lowercase();
-                // Check for aggregation ops
-                if let Some(agg_op) = parse_aggregate_op(&lower) {
-                    self.lexer.next()?; // consume ident
-                    return self.parse_aggregation(agg_op);
-                }
-                self.lexer.next()?; // consume ident
-                // Function call?
-                if self.lexer.peek()? == &Token::LParen {
-                    return self.parse_call(name);
-                }
-                // Vector selector with possible {matchers}
-                let mut matchers: Vec<LabelMatcher> = vec![
-                    LabelMatcher::Equal { name: "__name__".to_string(), value: name.clone() }
-                ];
-                let mut extra_name = Some(name);
-                if self.lexer.peek()? == &Token::LBrace {
-                    self.lexer.next()?;
-                    let extra = self.parse_label_matchers()?;
-                    matchers.extend(extra);
-                    self.expect(Token::RBrace)?;
-                }
-                // offset / @
-                let (offset, at) = self.parse_offset_at()?;
-                // matrix selector?
-                if self.lexer.peek()? == &Token::LBracket {
-                    self.lexer.next()?;
-                    let range_ms = self.parse_duration()?;
-                    self.expect(Token::RBracket)?;
-                    let sel = Expr::VectorSelector {
-                        name: extra_name.take(),
-                        matchers,
-                        offset,
-                        at,
-                    };
-                    return Ok(Expr::MatrixSelector {
-                        selector: Box::new(sel),
-                        range_ms,
-                    });
-                }
-                Ok(Expr::VectorSelector {
-                    name: extra_name,
-                    matchers,
-                    offset,
-                    at,
-                })
+
+            // Aggregation operators
+            Token::Sum | Token::Min | Token::Max | Token::Avg | Token::Count
+            | Token::Stddev | Token::Stdvar | Token::Topk | Token::Bottomk
+            | Token::Quantile | Token::CountValues | Token::Group => {
+                self.parse_aggregate()
             }
-            Token::LBrace => {
-                self.lexer.next()?;
-                let matchers = self.parse_label_matchers()?;
-                self.expect(Token::RBrace)?;
-                let (offset, at) = self.parse_offset_at()?;
-                if self.lexer.peek()? == &Token::LBracket {
-                    self.lexer.next()?;
-                    let range_ms = self.parse_duration()?;
-                    self.expect(Token::RBracket)?;
-                    return Ok(Expr::MatrixSelector {
-                        selector: Box::new(Expr::VectorSelector {
-                            name: None,
-                            matchers,
-                            offset,
-                            at,
-                        }),
-                        range_ms,
-                    });
+
+            // Named function or metric
+            Token::Ident(_) => {
+                // Look ahead: if next is `(`, it's a function call
+                if matches!(self.peek2(), Token::LParen) {
+                    self.parse_call()
+                } else {
+                    // Vector selector (metric name)
+                    self.parse_vector_selector()
                 }
-                Ok(Expr::VectorSelector { name: None, matchers, offset, at })
             }
-            other => Err(MetricsError::Parse(format!("unexpected token: {:?}", other))),
+
+            // Bare label selector: `{job="foo"}`
+            Token::LBrace => self.parse_vector_selector(),
+
+            _ => Err(MetricsError::Parse(format!("unexpected token: {:?}", self.peek()))),
         }
     }
 
-    fn parse_call(&mut self, func: String) -> MetricsResult<Expr> {
-        self.expect(Token::LParen)?;
-        let mut args = Vec::new();
-        if self.lexer.peek()? != &Token::RParen {
-            args.push(self.parse_expr(0)?);
-            while self.lexer.peek()? == &Token::Comma {
-                self.lexer.next()?;
-                if self.lexer.peek()? == &Token::RParen {
-                    break;
-                }
-                args.push(self.parse_expr(0)?);
-            }
-        }
-        self.expect(Token::RParen)?;
-        Ok(Expr::Call { func, args })
-    }
+    fn parse_aggregate(&mut self) -> Result<Expr> {
+        let op = match self.advance().clone() {
+            Token::Sum        => AggregateOp::Sum,
+            Token::Min        => AggregateOp::Min,
+            Token::Max        => AggregateOp::Max,
+            Token::Avg        => AggregateOp::Avg,
+            Token::Count      => AggregateOp::Count,
+            Token::Stddev     => AggregateOp::Stddev,
+            Token::Stdvar     => AggregateOp::Stdvar,
+            Token::Topk       => AggregateOp::Topk,
+            Token::Bottomk    => AggregateOp::Bottomk,
+            Token::Quantile   => AggregateOp::Quantile,
+            Token::CountValues => AggregateOp::CountValues,
+            Token::Group      => AggregateOp::Group,
+            other => return Err(MetricsError::Parse(format!("expected aggregate op, got {:?}", other))),
+        };
 
-    fn parse_aggregation(&mut self, op: AggregateOp) -> MetricsResult<Expr> {
-        // Check for "by/without" BEFORE the paren (e.g., sum by (label) (...))
-        let grouping = if matches!(self.lexer.peek()?, Token::By | Token::Without) {
-            self.parse_grouping()?
+        // Optional grouping before args: `sum by(job) (...)`
+        let grouping_before = self.try_parse_grouping()?;
+
+        self.eat(&Token::LParen)?;
+
+        // Param for topk/bottomk/quantile/count_values
+        let param = if matches!(op, AggregateOp::Topk | AggregateOp::Bottomk | AggregateOp::Quantile | AggregateOp::CountValues) {
+            let p = self.parse_expr()?;
+            self.eat(&Token::Comma)?;
+            Some(Box::new(p))
         } else {
-            Grouping::default()
+            None
         };
-        self.expect(Token::LParen)?;
-        // For topk/bottomk/quantile, first arg is the param
-        let (param, expr) = match op {
-            AggregateOp::Topk | AggregateOp::Bottomk | AggregateOp::Quantile => {
-                let p = self.parse_expr(0)?;
-                self.expect(Token::Comma)?;
-                let e = self.parse_expr(0)?;
-                (Some(Box::new(p)), e)
-            }
-            AggregateOp::CountValues => {
-                let p = self.parse_expr(0)?;
-                self.expect(Token::Comma)?;
-                let e = self.parse_expr(0)?;
-                (Some(Box::new(p)), e)
-            }
-            _ => {
-                let e = self.parse_expr(0)?;
-                (None, e)
-            }
-        };
-        self.expect(Token::RParen)?;
-        // Check for "by/without" AFTER the paren (e.g., sum(...) by (label))
-        let grouping = if grouping.labels.is_empty() && matches!(self.lexer.peek()?, Token::By | Token::Without) {
-            self.parse_grouping()?
+
+        let inner = self.parse_expr()?;
+        self.eat(&Token::RParen)?;
+
+        // Optional grouping after args: `sum(...) by(job)`
+        let grouping = if grouping_before.labels.is_empty() && !grouping_before.without {
+            self.try_parse_grouping()?
         } else {
-            grouping
+            grouping_before
         };
-        Ok(Expr::Aggregate {
+
+        Ok(Expr::Aggregate(AggregateExpr {
             op,
-            expr: Box::new(expr),
+            expr: Box::new(inner),
             param,
             grouping,
-        })
+        }))
     }
 
-    fn parse_grouping(&mut self) -> MetricsResult<Grouping> {
-        let by = match self.lexer.next()? {
-            Token::By => true,
-            Token::Without => false,
-            t => return Err(MetricsError::Parse(format!("expected by/without, got {:?}", t))),
-        };
-        let labels = self.parse_label_list()?;
-        Ok(Grouping { by, labels, specified: true })
-    }
-
-    fn parse_label_list(&mut self) -> MetricsResult<Vec<String>> {
-        self.expect(Token::LParen)?;
-        let mut labels = Vec::new();
-        if self.lexer.peek()? != &Token::RParen {
-            labels.push(self.expect_ident()?);
-            while self.lexer.peek()? == &Token::Comma {
-                self.lexer.next()?;
-                if self.lexer.peek()? == &Token::RParen {
-                    break;
+    fn try_parse_grouping(&mut self) -> Result<Grouping> {
+        match self.peek() {
+            Token::By | Token::Without => {
+                let without = matches!(self.peek(), Token::Without);
+                self.advance();
+                self.eat(&Token::LParen)?;
+                let mut labels = Vec::new();
+                while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                    match self.advance().clone() {
+                        Token::Ident(s) => labels.push(s),
+                        _ => {}
+                    }
+                    if matches!(self.peek(), Token::Comma) { self.advance(); }
                 }
-                labels.push(self.expect_ident()?);
+                self.eat(&Token::RParen)?;
+                Ok(Grouping { without, labels })
             }
-        }
-        self.expect(Token::RParen)?;
-        Ok(labels)
-    }
-
-    fn parse_label_matchers(&mut self) -> MetricsResult<Vec<LabelMatcher>> {
-        let mut matchers = Vec::new();
-        while self.lexer.peek()? != &Token::RBrace {
-            let name = self.expect_ident()?;
-            let tok = self.lexer.next()?;
-            let (is_regex, is_neg) = match &tok {
-                Token::Assign => (false, false),
-                Token::Eq => (false, false),
-                Token::NotEq => (false, true),
-                Token::EqTilde => (true, false),
-                Token::NotEqTilde => (true, true),
-                t => return Err(MetricsError::Parse(format!("expected matcher op, got {:?}", t))),
-            };
-            let value = match self.lexer.next()? {
-                Token::Str(s) => s,
-                Token::Ident(s) => s,
-                t => return Err(MetricsError::Parse(format!("expected string value, got {:?}", t))),
-            };
-            let m = match (is_regex, is_neg) {
-                (false, false) => LabelMatcher::Equal { name, value },
-                (false, true) => LabelMatcher::NotEqual { name, value },
-                (true, false) => LabelMatcher::RegexMatch { name, pattern: value },
-                (true, true) => LabelMatcher::RegexNotMatch { name, pattern: value },
-            };
-            matchers.push(m);
-            if self.lexer.peek()? == &Token::Comma {
-                self.lexer.next()?;
-            }
-        }
-        Ok(matchers)
-    }
-
-    fn parse_offset_at(&mut self) -> MetricsResult<(Option<i64>, Option<i64>)> {
-        let mut offset = None;
-        let mut at = None;
-        loop {
-            match self.lexer.peek()? {
-                Token::Offset => {
-                    self.lexer.next()?;
-                    offset = Some(self.parse_duration()?);
-                }
-                Token::At => {
-                    self.lexer.next()?;
-                    let ts = match self.lexer.next()? {
-                        Token::Number(n) => n as i64,
-                        t => return Err(MetricsError::Parse(format!("expected timestamp after @, got {:?}", t))),
-                    };
-                    at = Some(ts * 1000); // convert to ms
-                }
-                _ => break,
-            }
-        }
-        Ok((offset, at))
-    }
-
-    fn parse_duration(&mut self) -> MetricsResult<i64> {
-        match self.lexer.next()? {
-            Token::Duration(ms) => Ok(ms),
-            Token::Number(n) => Ok(n as i64), // bare number treated as seconds? Actually ms
-            t => Err(MetricsError::Parse(format!("expected duration, got {:?}", t))),
+            _ => Ok(Grouping::default()),
         }
     }
 
-    fn expect(&mut self, expected: Token) -> MetricsResult<()> {
-        let got = self.lexer.next()?;
-        if got != expected {
-            Err(MetricsError::Parse(format!("expected {:?}, got {:?}", expected, got)))
+    fn parse_call(&mut self) -> Result<Expr> {
+        let name = self.eat_ident()?;
+        self.eat(&Token::LParen)?;
+        let mut args = Vec::new();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            args.push(self.parse_expr()?);
+            if matches!(self.peek(), Token::Comma) { self.advance(); }
+        }
+        self.eat(&Token::RParen)?;
+        Ok(Expr::Call(CallExpr { func: name, args }))
+    }
+
+    fn parse_vector_selector(&mut self) -> Result<Expr> {
+        let name = if let Token::Ident(n) = self.peek().clone() {
+            self.advance();
+            Some(n)
         } else {
-            Ok(())
+            None
+        };
+
+        let mut matchers = Vec::new();
+
+        // Add __name__ matcher if we have a metric name
+        if let Some(ref n) = name {
+            if !n.is_empty() {
+                matchers.push(LabelMatcher::equal("__name__", n.as_str()));
+            }
         }
+
+        // Optional label selector block
+        if matches!(self.peek(), Token::LBrace) {
+            self.advance();
+            while !matches!(self.peek(), Token::RBrace | Token::Eof) {
+                let label_name = match self.advance().clone() {
+                    Token::Ident(s) => s,
+                    _ => break,
+                };
+                let op_tok = self.advance().clone();
+                let value  = match self.advance().clone() {
+                    Token::StringLit(s) => s,
+                    Token::Ident(s)     => s,
+                    _ => String::new(),
+                };
+                let matcher = match op_tok {
+                    Token::EqMatch  => LabelMatcher::equal(&label_name, &value),
+                    Token::Ne       => LabelMatcher::not_equal(&label_name, &value),
+                    Token::ReMatch  => LabelMatcher::regex(&label_name, &value)?,
+                    Token::NreMatch => LabelMatcher::not_regex(&label_name, &value)?,
+                    _ => LabelMatcher::equal(&label_name, &value),
+                };
+                matchers.push(matcher);
+                if matches!(self.peek(), Token::Comma) { self.advance(); }
+            }
+            self.eat(&Token::RBrace)?;
+        }
+
+        Ok(Expr::VectorSelector(VectorSelector {
+            name,
+            matchers,
+            offset: None,
+            at: None,
+        }))
     }
 
-    fn expect_ident(&mut self) -> MetricsResult<String> {
-        match self.lexer.next()? {
-            Token::Ident(s) => Ok(s),
-            // Keywords that can also be label names
-            Token::By => Ok("by".to_string()),
-            Token::On => Ok("on".to_string()),
-            t => Err(MetricsError::Parse(format!("expected identifier, got {:?}", t))),
+    fn parse_vector_matching(&mut self) -> Result<Option<VectorMatching>> {
+        let on = match self.peek() {
+            Token::On       => true,
+            Token::Ignoring => false,
+            _ => return Ok(None),
+        };
+        self.advance();
+        self.eat(&Token::LParen)?;
+        let mut labels = Vec::new();
+        while !matches!(self.peek(), Token::RParen | Token::Eof) {
+            if let Token::Ident(s) = self.advance().clone() { labels.push(s); }
+            if matches!(self.peek(), Token::Comma) { self.advance(); }
+        }
+        self.eat(&Token::RParen)?;
+
+        let card = match self.peek() {
+            Token::GroupLeft  => { self.advance(); MatchCardinality::ManyToOne }
+            Token::GroupRight => { self.advance(); MatchCardinality::OneToMany }
+            _                 => MatchCardinality::OneToOne,
+        };
+
+        let mut include = Vec::new();
+        if !matches!(card, MatchCardinality::OneToOne) && matches!(self.peek(), Token::LParen) {
+            self.advance();
+            while !matches!(self.peek(), Token::RParen | Token::Eof) {
+                if let Token::Ident(s) = self.advance().clone() { include.push(s); }
+                if matches!(self.peek(), Token::Comma) { self.advance(); }
+            }
+            self.eat(&Token::RParen)?;
+        }
+
+        Ok(Some(VectorMatching { card, on, labels, include }))
+    }
+
+    fn parse_duration(&mut self) -> Result<i64> {
+        match self.advance().clone() {
+            Token::Duration(ms) => Ok(ms),
+            Token::Number(n)    => Ok((n * 1000.0) as i64),
+            other => Err(MetricsError::Parse(format!("expected duration, got {:?}", other))),
         }
     }
 }
 
-fn parse_aggregate_op(s: &str) -> Option<AggregateOp> {
-    match s {
-        "sum" => Some(AggregateOp::Sum),
-        "avg" => Some(AggregateOp::Avg),
-        "min" => Some(AggregateOp::Min),
-        "max" => Some(AggregateOp::Max),
-        "count" => Some(AggregateOp::Count),
-        "stddev" => Some(AggregateOp::Stddev),
-        "stdvar" => Some(AggregateOp::Stdvar),
-        "quantile" => Some(AggregateOp::Quantile),
-        "topk" => Some(AggregateOp::Topk),
-        "bottomk" => Some(AggregateOp::Bottomk),
-        "count_values" => Some(AggregateOp::CountValues),
-        _ => None,
+fn apply_offset(expr: Expr, offset_ms: i64) -> Expr {
+    match expr {
+        Expr::VectorSelector(mut vs) => { vs.offset = Some(offset_ms); Expr::VectorSelector(vs) }
+        Expr::MatrixSelector(mut ms) => { ms.offset = Some(offset_ms); Expr::MatrixSelector(ms) }
+        Expr::Subquery(mut sq)       => { sq.offset = Some(offset_ms); Expr::Subquery(sq) }
+        other => other,
     }
+}
+
+fn apply_at(expr: Expr, ts_ms: i64) -> Expr {
+    match expr {
+        Expr::VectorSelector(mut vs) => { vs.at = Some(ts_ms); Expr::VectorSelector(vs) }
+        Expr::MatrixSelector(mut ms) => { ms.at = Some(ts_ms); Expr::MatrixSelector(ms) }
+        Expr::Subquery(mut sq)       => { sq.at = Some(ts_ms); Expr::Subquery(sq) }
+        other => other,
+    }
+}
+
+/// Parse a complete PromQL expression string.
+pub fn parse(input: &str) -> Result<Expr> {
+    Parser::new(input).parse_expr()
 }

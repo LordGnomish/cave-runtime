@@ -1,44 +1,48 @@
-//! Series matching API handler.
+//! /api/v1/series
 
-use std::sync::Arc;
-use axum::{
-    extract::{Query, State},
-    http::StatusCode,
-    response::Json,
-};
+use axum::{extract::{Query, State}, Json};
 use serde::Deserialize;
-use serde_json::{json, Value};
-use crate::promql::parser::parse;
-use crate::promql::ast::Expr;
+use std::sync::Arc;
 use crate::model::LabelMatcher;
 use crate::state::MetricsState;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct SeriesParams {
     #[serde(rename = "match[]")]
-    pub matchers: Vec<String>,
+    pub matchers: Option<Vec<String>>,
+    pub start: Option<String>,
+    pub end: Option<String>,
+    pub limit: Option<u64>,
 }
 
-pub async fn series(
+pub async fn list_series(
     State(state): State<Arc<MetricsState>>,
     Query(params): Query<SeriesParams>,
-) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    let mut all_matchers: Vec<LabelMatcher> = Vec::new();
-    for m in &params.matchers {
-        match parse(m) {
-            Ok(Expr::VectorSelector { matchers, .. }) => all_matchers.extend(matchers),
-            Ok(_) => {}
-            Err(e) => return Err((StatusCode::BAD_REQUEST, Json(json!({"status":"error","error":e.to_string()})))),
-        }
+) -> Json<serde_json::Value> {
+    let matchers = parse_matchers(params.matchers.as_deref().unwrap_or(&[]));
+    let series = state.tsdb.series_for(&matchers);
+    let data: Vec<serde_json::Value> = series.into_iter()
+        .map(|labels| serde_json::json!(labels.0))
+        .collect();
+    Json(serde_json::json!({ "status": "success", "data": data }))
+}
+
+fn parse_matchers(raw: &[String]) -> Vec<LabelMatcher> {
+    raw.iter().flat_map(|m| parse_single_matcher(m)).collect()
+}
+
+/// Parse a simple `{key="value"}` or `metric_name` matcher expression.
+fn parse_single_matcher(s: &str) -> Vec<LabelMatcher> {
+    use crate::promql::parse;
+    use crate::promql::ast::Expr;
+
+    let expr_str = if s.contains('{') { s.to_string() } else { format!("{}{{__name__=\"{}\"}}", s, s) };
+
+    if let Ok(Expr::VectorSelector(vs)) = parse(&expr_str) {
+        vs.matchers
+    } else if !s.is_empty() {
+        vec![LabelMatcher::equal("__name__", s)]
+    } else {
+        vec![]
     }
-
-    let series = state.tsdb.series_for(&all_matchers);
-    let result: Vec<Value> = series.into_iter().map(|labels| {
-        let metric: serde_json::Map<String, Value> = labels.0.into_iter()
-            .map(|(k, v)| (k, Value::String(v)))
-            .collect();
-        Value::Object(metric)
-    }).collect();
-
-    Ok(Json(json!({"status":"success","data":result})))
 }

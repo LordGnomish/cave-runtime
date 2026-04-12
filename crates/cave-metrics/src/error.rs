@@ -2,43 +2,40 @@
 
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum MetricsError {
-    #[error("TSDB error: {0}")]
-    Tsdb(String),
-
-    #[error("PromQL parse error: {0}")]
+    #[error("parse error: {0}")]
     Parse(String),
 
-    #[error("PromQL eval error: {0}")]
+    #[error("PromQL evaluation error: {0}")]
     Eval(String),
 
-    #[error("Scrape error: {0}")]
+    #[error("storage error: {0}")]
+    Storage(String),
+
+    #[error("ingestion error: {0}")]
+    Ingestion(String),
+
+    #[error("scrape error: {0}")]
     Scrape(String),
 
-    #[error("Remote write error: {0}")]
-    RemoteWrite(String),
-
-    #[error("Alertmanager error: {0}")]
-    Alertmanager(String),
-
-    #[error("WAL error: {0}")]
-    Wal(String),
-
-    #[error("Protobuf error: {0}")]
-    Proto(String),
-
-    #[error("Compression error: {0}")]
-    Compression(String),
+    #[error("alerting error: {0}")]
+    Alerting(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("HTTP error: {0}")]
-    Http(#[from] reqwest::Error),
+    #[error("serialization error: {0}")]
+    Serde(#[from] serde_json::Error),
 
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("HTTP error: {0}")]
+    Http(String),
+
+    #[error("invalid label name: {0}")]
+    InvalidLabel(String),
+
+    #[error("type mismatch: {0}")]
+    TypeMismatch(String),
 }
 
-pub type MetricsResult<T> = Result<T, MetricsError>;
+pub type Result<T> = std::result::Result<T, MetricsError>;

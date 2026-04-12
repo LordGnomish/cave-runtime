@@ -1,89 +1,130 @@
-//! Write-ahead log for TSDB.
+//! Write-ahead log: append-only journal with CRC32 integrity checks.
+//! Format: [4-byte length][4-byte CRC32][N-byte JSON record]
 
-#![allow(dead_code)]
-
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use crc32fast::Hasher as Crc32Hasher;
 use serde::{Deserialize, Serialize};
-use crate::error::{MetricsError, MetricsResult};
-use crate::model::{Labels, Timestamp, Value};
+use crate::model::{Labels, Sample};
+use crate::error::{MetricsError, Result};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "t")]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum WalRecord {
-    #[serde(rename = "s")]
-    Sample { fp: u64, ts: Timestamp, v: Value },
-    #[serde(rename = "m")]
-    Meta { fp: u64, labels: Labels },
+    Sample {
+        labels: std::collections::BTreeMap<String, String>,
+        timestamp_ms: i64,
+        value: f64,
+    },
+    Checkpoint {
+        ts: i64,
+    },
 }
 
-pub struct Wal {
-    path: Option<PathBuf>,
+pub struct WalWriter {
+    writer: BufWriter<std::fs::File>,
 }
 
-impl Wal {
-    pub fn new(dir: Option<&Path>) -> MetricsResult<Self> {
-        if let Some(dir) = dir {
-            std::fs::create_dir_all(dir)?;
-        }
-        Ok(Self {
-            path: dir.map(|d| d.join("wal.log")),
-        })
-    }
-
-    fn write_record(&self, record: &WalRecord) -> MetricsResult<()> {
-        let path = match &self.path {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-        let json = serde_json::to_vec(record)?;
-        let crc = crc32fast::hash(&json);
-        let mut file = std::fs::OpenOptions::new()
+impl WalWriter {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(path)?;
-        file.write_all(&crc.to_le_bytes())?;
-        let len = json.len() as u32;
-        file.write_all(&len.to_le_bytes())?;
-        file.write_all(&json)?;
+        Ok(Self { writer: BufWriter::new(file) })
+    }
+
+    pub fn append_sample(&mut self, labels: &Labels, sample: &Sample) -> Result<()> {
+        let record = WalRecord::Sample {
+            labels: labels.0.clone(),
+            timestamp_ms: sample.timestamp_ms,
+            value: sample.value,
+        };
+        self.write_record(&record)
+    }
+
+    fn write_record(&mut self, record: &WalRecord) -> Result<()> {
+        let payload = serde_json::to_vec(record)?;
+        let len = payload.len() as u32;
+
+        let mut h = Crc32Hasher::new();
+        h.update(&payload);
+        let crc = h.finalize();
+
+        self.writer.write_all(&len.to_le_bytes())?;
+        self.writer.write_all(&crc.to_le_bytes())?;
+        self.writer.write_all(&payload)?;
+        self.writer.flush()?;
         Ok(())
     }
+}
 
-    pub fn append_sample(&self, fp: u64, ts: Timestamp, value: Value) -> MetricsResult<()> {
-        self.write_record(&WalRecord::Sample { fp, ts, v: value })
+pub struct WalReader {
+    file: std::fs::File,
+}
+
+impl WalReader {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let file = std::fs::File::open(path)?;
+        Ok(Self { file })
     }
 
-    pub fn append_meta(&self, fp: u64, labels: &Labels) -> MetricsResult<()> {
-        self.write_record(&WalRecord::Meta { fp, labels: labels.clone() })
-    }
+    /// Replay the WAL, calling `f` for each valid record.
+    pub fn replay<F: FnMut(WalRecord)>(&mut self, mut f: F) -> Result<()> {
+        self.file.seek(SeekFrom::Start(0))?;
+        let mut len_buf = [0u8; 4];
+        let mut crc_buf = [0u8; 4];
 
-    pub fn replay(path: &Path) -> MetricsResult<Vec<WalRecord>> {
-        let mut file = match std::fs::File::open(path) {
-            Ok(f) => f,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]),
-            Err(e) => return Err(MetricsError::Io(e)),
-        };
-        let mut records = Vec::new();
         loop {
-            let mut crc_buf = [0u8; 4];
-            match file.read_exact(&mut crc_buf) {
-                Ok(_) => {}
+            match self.file.read_exact(&mut len_buf) {
+                Ok(_)  => {}
                 Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-                Err(e) => return Err(MetricsError::Io(e)),
+                Err(e) => return Err(e.into()),
             }
-            let stored_crc = u32::from_le_bytes(crc_buf);
-            let mut len_buf = [0u8; 4];
-            file.read_exact(&mut len_buf)?;
+            self.file.read_exact(&mut crc_buf)?;
             let len = u32::from_le_bytes(len_buf) as usize;
-            let mut json = vec![0u8; len];
-            file.read_exact(&mut json)?;
-            let computed_crc = crc32fast::hash(&json);
-            if computed_crc != stored_crc {
-                return Err(MetricsError::Wal("CRC mismatch in WAL".to_string()));
+            let expected_crc = u32::from_le_bytes(crc_buf);
+
+            let mut payload = vec![0u8; len];
+            self.file.read_exact(&mut payload)?;
+
+            let mut h = Crc32Hasher::new();
+            h.update(&payload);
+            let actual_crc = h.finalize();
+
+            if actual_crc != expected_crc {
+                // Corrupted record — skip (could log here).
+                continue;
             }
-            let record: WalRecord = serde_json::from_slice(&json)?;
-            records.push(record);
+
+            match serde_json::from_slice::<WalRecord>(&payload) {
+                Ok(record) => f(record),
+                Err(_)     => continue, // skip malformed
+            }
         }
-        Ok(records)
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_wal_roundtrip() {
+        let tmp = NamedTempFile::new().unwrap();
+        let path = tmp.path();
+
+        {
+            let mut w = WalWriter::open(path).unwrap();
+            let labels = Labels::from_pairs([("__name__", "cpu"), ("job", "test")]);
+            w.append_sample(&labels, &Sample::new(1000, 0.5)).unwrap();
+            w.append_sample(&labels, &Sample::new(2000, 0.6)).unwrap();
+        }
+
+        let mut r = WalReader::open(path).unwrap();
+        let mut records = Vec::new();
+        r.replay(|rec| records.push(rec)).unwrap();
+        assert_eq!(records.len(), 2);
     }
 }
