@@ -1,301 +1,253 @@
-//! Data models for cave-flags — full Unleash v6 API parity.
-//!
-//! Two model families coexist:
-//! - **Unleash-compatible** types: `UnleashContext`, `FeatureToggle`, `StrategyConfig`, etc.
-//! - **Legacy CAVE** types: `FeatureFlag`, `Strategy`, `EvaluationContext` (kept for backward compat)
+//! Unleash-compatible data models for feature flags.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-// ================================================================
-// Unleash Evaluation Context
-// ================================================================
+// ── Feature flag ──────────────────────────────────────────────────────────────
 
-/// Evaluation context as defined by the Unleash SDK protocol.
-///
-/// All fields are optional except for the standard ones; additional
-/// runtime properties live in `properties`.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UnleashContext {
-    pub user_id: Option<String>,
-    pub session_id: Option<String>,
-    pub remote_address: Option<String>,
-    pub current_time: Option<DateTime<Utc>>,
-    pub environment: Option<String>,
-    pub app_name: Option<String>,
-    /// Custom context properties (e.g., "region", "plan", "hostname").
-    #[serde(default)]
-    pub properties: HashMap<String, String>,
-}
-
-// ================================================================
-// Constraints
-// ================================================================
-
-/// Constraint operator types (Unleash constraint spec).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ConstraintOperator {
-    #[serde(rename = "IN")]
-    In,
-    #[serde(rename = "NOT_IN")]
-    NotIn,
-    #[serde(rename = "STR_STARTS_WITH")]
-    StrStartsWith,
-    #[serde(rename = "STR_ENDS_WITH")]
-    StrEndsWith,
-    #[serde(rename = "STR_CONTAINS")]
-    StrContains,
-    #[serde(rename = "NUM_EQ")]
-    NumEq,
-    #[serde(rename = "NUM_GT")]
-    NumGt,
-    #[serde(rename = "NUM_GTE")]
-    NumGte,
-    #[serde(rename = "NUM_LT")]
-    NumLt,
-    #[serde(rename = "NUM_LTE")]
-    NumLte,
-    #[serde(rename = "DATE_BEFORE")]
-    DateBefore,
-    #[serde(rename = "DATE_AFTER")]
-    DateAfter,
-    #[serde(rename = "SEMVER_EQ")]
-    SemverEq,
-    #[serde(rename = "SEMVER_GT")]
-    SemverGt,
-    #[serde(rename = "SEMVER_LT")]
-    SemverLt,
-}
-
-/// A constraint scoped to a single context field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+pub struct FeatureFlag {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub feature_type: FeatureType,
+    pub description: String,
+    pub enabled: bool,
+    pub stale: bool,
+    #[serde(rename = "impressionData")]
+    pub impression_data: bool,
+    pub project: String,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen_at: Option<DateTime<Utc>>,
+    pub strategies: Vec<FeatureStrategy>,
+    pub variants: Vec<Variant>,
+    pub environments: Vec<FeatureEnvironment>,
+    pub tags: Vec<Tag>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FeatureType {
+    Release,
+    Experiment,
+    Operational,
+    #[serde(rename = "kill-switch")]
+    KillSwitch,
+    Permission,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeatureEnvironment {
+    pub name: String,
+    pub enabled: bool,
+    pub strategies: Vec<FeatureStrategy>,
+    pub variants: Vec<Variant>,
+}
+
+// ── Strategies ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeatureStrategy {
+    pub id: Uuid,
+    pub name: String,
+    pub parameters: HashMap<String, String>,
+    pub constraints: Vec<Constraint>,
+    pub segments: Vec<i64>,
+    #[serde(rename = "sortOrder")]
+    pub sort_order: i32,
+    pub disabled: bool,
+    pub variants: Vec<StrategyVariant>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Strategy {
+    pub name: String,
+    #[serde(rename = "displayName", skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub parameters: Vec<StrategyParameter>,
+    pub built_in: bool,
+    pub deprecated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyParameter {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub param_type: String,
+    pub description: String,
+    pub required: bool,
+}
+
+// ── Constraints ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Constraint {
-    /// Context field name (e.g. "userId", "environment", custom property key).
+    #[serde(rename = "contextName")]
     pub context_name: String,
     pub operator: ConstraintOperator,
-    /// Multi-value operators (IN, NOT_IN, STR_*).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub values: Vec<String>,
-    /// Single-value operators (NUM_*, DATE_*, SEMVER_*).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
-    /// When true, the constraint result is negated after evaluation.
     #[serde(default)]
     pub inverted: bool,
-    /// Case-insensitive matching for string operators.
-    #[serde(default)]
+    #[serde(rename = "caseInsensitive", default)]
     pub case_insensitive: bool,
 }
 
-// ================================================================
-// Strategies
-// ================================================================
-
-/// Strategy configuration attached to a feature toggle.
-///
-/// `name` matches one of the built-in Unleash strategy names or a custom one.
-/// `parameters` is the free-form key→value map each strategy reads.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct StrategyConfig {
-    pub name: String,
-    #[serde(default)]
-    pub parameters: HashMap<String, String>,
-    #[serde(default)]
-    pub constraints: Vec<Constraint>,
-    /// Segment IDs to expand and AND with `constraints`.
-    #[serde(default)]
-    pub segments: Vec<i64>,
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ConstraintOperator {
+    In,
+    NotIn,
+    StrStartsWith,
+    StrEndsWith,
+    StrContains,
+    NumEq,
+    NumGt,
+    NumGte,
+    NumLt,
+    NumLte,
+    DateBefore,
+    DateAfter,
+    SemverEq,
+    SemverGt,
+    SemverLt,
 }
 
-// ================================================================
-// Variants
-// ================================================================
+// ── Segments ──────────────────────────────────────────────────────────────────
 
-/// How variant weight is managed.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Segment {
+    pub id: i64,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub constraints: Vec<Constraint>,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+}
+
+// ── Variants ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Variant {
+    pub name: String,
+    pub weight: u32,
+    #[serde(rename = "weightType")]
+    pub weight_type: WeightType,
+    pub stickiness: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<VariantPayload>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub overrides: Vec<VariantOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum WeightType {
-    /// Weight is adjusted automatically to fill remaining share.
     Variable,
-    /// Weight is fixed regardless of other variants.
     Fix,
 }
 
-/// Payload delivered alongside a variant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariantPayload {
-    /// One of: "string", "json", "csv", "number".
     #[serde(rename = "type")]
     pub payload_type: String,
     pub value: String,
 }
 
-/// Override: force this variant when a context field matches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct VariantOverride {
+    #[serde(rename = "contextName")]
     pub context_name: String,
     pub values: Vec<String>,
 }
 
-/// A variant option on a feature toggle.
-/// All variants on a toggle should sum to weight 1000.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Variant {
+pub struct StrategyVariant {
     pub name: String,
-    /// Weight out of 1000.
     pub weight: u32,
-    #[serde(default = "default_weight_type")]
+    #[serde(rename = "weightType")]
     pub weight_type: WeightType,
-    pub payload: Option<VariantPayload>,
-    #[serde(default)]
-    pub overrides: Vec<VariantOverride>,
-    /// Context field used for sticky assignment ("default", "userId", "sessionId", "random").
-    #[serde(default = "default_stickiness")]
     pub stickiness: String,
-}
-
-fn default_weight_type() -> WeightType {
-    WeightType::Variable
-}
-fn default_stickiness() -> String {
-    "default".to_string()
-}
-
-/// Evaluated variant result returned to a client SDK.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct VariantResult {
-    pub name: String,
-    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub payload: Option<VariantPayload>,
-    /// Whether the parent toggle itself is enabled.
-    pub feature_enabled: bool,
 }
 
-impl VariantResult {
-    pub fn disabled(feature_enabled: bool) -> Self {
-        Self {
-            name: "disabled".to_string(),
-            enabled: false,
-            payload: None,
-            feature_enabled,
-        }
-    }
-}
-
-// ================================================================
-// Feature Toggle
-// ================================================================
-
-/// A feature toggle — Unleash API-compatible representation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct FeatureToggle {
-    pub name: String,
-    pub description: Option<String>,
-    pub enabled: bool,
-    #[serde(default = "default_project")]
-    pub project: String,
-    #[serde(default)]
-    pub stale: bool,
-    #[serde(default)]
-    pub archived: bool,
-    #[serde(default)]
-    pub impression_data: bool,
-    #[serde(rename = "type", default = "default_toggle_type")]
-    pub toggle_type: String,
-    /// Active strategies (any match → enabled).
-    #[serde(default)]
-    pub strategies: Vec<StrategyConfig>,
-    #[serde(default)]
-    pub variants: Vec<Variant>,
-    #[serde(default)]
-    pub tags: Vec<Tag>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub created_by: String,
-    pub last_seen_at: Option<DateTime<Utc>>,
-}
-
-fn default_project() -> String {
-    "default".to_string()
-}
-fn default_toggle_type() -> String {
-    "release".to_string()
-}
-
-impl FeatureToggle {
-    /// Create a new toggle with a single `default` strategy (always-on).
-    pub fn new(name: impl Into<String>, created_by: impl Into<String>) -> Self {
-        let now = Utc::now();
-        Self {
-            name: name.into(),
-            description: None,
-            enabled: true,
-            project: "default".to_string(),
-            stale: false,
-            archived: false,
-            impression_data: false,
-            toggle_type: "release".to_string(),
-            strategies: vec![StrategyConfig {
-                name: "default".to_string(),
-                parameters: HashMap::new(),
-                constraints: vec![],
-                segments: vec![],
-            }],
-            variants: vec![],
-            tags: vec![],
-            created_at: now,
-            updated_at: now,
-            created_by: created_by.into(),
-            last_seen_at: None,
-        }
-    }
-}
-
-// ================================================================
-// Segment — reusable constraint groups
-// ================================================================
-
-/// A segment is a named group of constraints that strategies can reference.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Segment {
-    pub id: i64,
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    pub constraints: Vec<Constraint>,
-    pub created_at: DateTime<Utc>,
-    pub created_by: String,
-}
-
-// ================================================================
-// Project
-// ================================================================
+// ── Projects ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,
     pub name: String,
-    pub description: Option<String>,
+    pub description: String,
+    #[serde(rename = "defaultStickiness")]
+    pub default_stickiness: String,
+    pub mode: ProjectMode,
+    pub members: i64,
+    pub health: i64,
+    pub feature_count: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub health: i32,
-    pub feature_count: i32,
-    pub member_count: i32,
 }
 
-// ================================================================
-// Tag
-// ================================================================
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProjectMode {
+    Open,
+    Protected,
+    Private,
+}
+
+// ── Environments ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Environment {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub env_type: String,
+    pub enabled: bool,
+    pub protected: bool,
+    pub sort_order: i32,
+}
+
+// ── API Tokens ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiToken {
+    pub secret: String,
+    pub username: String,
+    #[serde(rename = "type")]
+    pub token_type: TokenType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub environment: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
+    pub projects: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seen_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TokenType {
+    Client,
+    Frontend,
+    Admin,
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tag {
@@ -304,49 +256,100 @@ pub struct Tag {
     pub value: String,
 }
 
-// ================================================================
-// Event / Audit Log
-// ================================================================
+// ── Context fields ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Event {
-    pub id: i64,
-    #[serde(rename = "type")]
-    pub event_type: String,
-    pub created_by: String,
-    pub data: Option<serde_json::Value>,
-    pub pre_data: Option<serde_json::Value>,
-    pub feature_name: Option<String>,
-    pub project: Option<String>,
-    pub environment: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<Tag>,
+pub struct ContextField {
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "legalValues")]
+    pub legal_values: Vec<LegalValue>,
+    #[serde(rename = "stickiness")]
+    pub used_for_stickiness: bool,
     pub created_at: DateTime<Utc>,
 }
 
-// ================================================================
-// Client SDK API Types
-// ================================================================
-
-/// Client SDK registration (POST /api/client/register).
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClientRegistration {
-    pub app_name: String,
-    pub instance_id: String,
-    pub sdk_version: Option<String>,
-    #[serde(default)]
-    pub strategies: Vec<String>,
-    pub started: DateTime<Utc>,
-    pub interval: u64,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegalValue {
+    pub value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
-/// Client SDK metrics (POST /api/client/metrics).
-#[derive(Debug, Deserialize)]
+// ── Change requests ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangeRequest {
+    pub id: i64,
+    pub title: String,
+    pub state: ChangeRequestState,
+    pub project: String,
+    pub environment: String,
+    pub min_approvals: i32,
+    pub approvals: Vec<ChangeRequestApproval>,
+    pub rejections: Vec<ChangeRequestApproval>,
+    pub changes: Vec<FeatureChange>,
+    pub created_by: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ClientMetrics {
+pub enum ChangeRequestState {
+    Draft,
+    InReview,
+    Approved,
+    Applied,
+    Rejected,
+    Cancelled,
+    Scheduled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangeRequestApproval {
+    pub created_by: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeatureChange {
+    pub feature: String,
+    pub action: String,
+    pub payload: serde_json::Value,
+}
+
+// ── Banners ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Banner {
+    pub id: i64,
+    pub message: String,
+    pub variant: BannerVariant,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    #[serde(rename = "linkText", skip_serializing_if = "Option::is_none")]
+    pub link_text: Option<String>,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BannerVariant {
+    Info,
+    Warning,
+    Error,
+    Success,
+}
+
+// ── Metrics ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct MetricsReport {
+    #[serde(rename = "appName")]
     pub app_name: String,
+    #[serde(rename = "instanceId")]
     pub instance_id: String,
     pub bucket: MetricsBucket,
 }
@@ -362,124 +365,194 @@ pub struct MetricsBucket {
 pub struct ToggleMetrics {
     pub yes: u64,
     pub no: u64,
-    #[serde(default)]
-    pub variants: HashMap<String, u64>,
+    pub variants: Option<HashMap<String, u64>>,
 }
 
-// ================================================================
-// Admin API Request Types
-// ================================================================
+// ── SDK Registration ──────────────────────────────────────────────────────────
 
-/// Create a new feature toggle (POST /api/admin/features).
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateToggleRequest {
-    pub name: String,
-    pub description: Option<String>,
-    pub project: Option<String>,
-    #[serde(rename = "type")]
-    pub toggle_type: Option<String>,
+pub struct SdkRegistration {
+    #[serde(rename = "appName")]
+    pub app_name: String,
+    #[serde(rename = "instanceId")]
+    pub instance_id: String,
+    #[serde(rename = "sdkVersion")]
+    pub sdk_version: Option<String>,
+    pub strategies: Vec<String>,
+    pub started: DateTime<Utc>,
+    pub interval: u64,
+}
+
+// ── Evaluation context ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct UnleashContext {
+    #[serde(rename = "userId")]
+    pub user_id: Option<String>,
+    #[serde(rename = "sessionId")]
+    pub session_id: Option<String>,
+    #[serde(rename = "remoteAddress")]
+    pub remote_address: Option<String>,
+    pub environment: Option<String>,
+    #[serde(rename = "appName")]
+    pub app_name: Option<String>,
+    #[serde(rename = "currentTime")]
+    pub current_time: Option<String>,
     #[serde(default)]
+    pub properties: HashMap<String, String>,
+}
+
+impl UnleashContext {
+    pub fn get_field(&self, name: &str) -> Option<String> {
+        match name {
+            "userId" => self.user_id.clone(),
+            "sessionId" => self.session_id.clone(),
+            "remoteAddress" => self.remote_address.clone(),
+            "environment" => self.environment.clone(),
+            "appName" => self.app_name.clone(),
+            "currentTime" => self.current_time.clone(),
+            _ => self.properties.get(name).cloned(),
+        }
+    }
+}
+
+// ── Client API response ───────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct ClientFeaturesResponse {
+    pub version: u8,
+    pub features: Vec<ClientFeature>,
+    pub segments: Vec<Segment>,
+    pub query: ClientQuery,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClientFeature {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub feature_type: FeatureType,
+    pub enabled: bool,
+    pub stale: bool,
+    pub strategies: Vec<FeatureStrategy>,
+    pub variants: Vec<Variant>,
+    #[serde(rename = "impressionData")]
+    pub impression_data: bool,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: Option<DateTime<Utc>>,
+    #[serde(rename = "createdAt")]
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ClientQuery {
+    #[serde(rename = "inlineSegmentConstraints")]
+    pub inline_segment_constraints: bool,
+}
+
+impl Default for ClientQuery {
+    fn default() -> Self {
+        Self { inline_segment_constraints: true }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct FrontendFeaturesResponse {
+    pub toggles: Vec<FrontendToggle>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FrontendToggle {
+    pub name: String,
+    pub enabled: bool,
+    pub variant: EvaluatedVariant,
+    #[serde(rename = "impressionData")]
     pub impression_data: bool,
 }
 
-/// Update an existing feature toggle (PUT /api/admin/features/{name}).
+#[derive(Debug, Clone, Serialize)]
+pub struct EvaluatedVariant {
+    pub name: String,
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub payload: Option<VariantPayload>,
+    #[serde(rename = "featureEnabled")]
+    pub feature_enabled: bool,
+}
+
+impl EvaluatedVariant {
+    pub fn disabled() -> Self {
+        Self {
+            name: "disabled".to_string(),
+            enabled: false,
+            payload: None,
+            feature_enabled: false,
+        }
+    }
+}
+
+// ── Admin API request types ───────────────────────────────────────────────────
+
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateToggleRequest {
+pub struct CreateFeatureRequest {
+    pub name: String,
     pub description: Option<String>,
-    pub stale: Option<bool>,
+    #[serde(rename = "type")]
+    pub feature_type: Option<FeatureType>,
+    #[serde(rename = "impressionData")]
     pub impression_data: Option<bool>,
 }
 
-/// Add a strategy to a feature toggle.
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+pub struct UpdateFeatureRequest {
+    pub description: Option<String>,
+    #[serde(rename = "type")]
+    pub feature_type: Option<FeatureType>,
+    pub stale: Option<bool>,
+    #[serde(rename = "impressionData")]
+    pub impression_data: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AddStrategyRequest {
     pub name: String,
-    #[serde(default)]
-    pub parameters: HashMap<String, String>,
-    #[serde(default)]
+    pub parameters: Option<HashMap<String, String>>,
+    pub constraints: Option<Vec<Constraint>>,
+    pub segments: Option<Vec<i64>>,
+    pub variants: Option<Vec<StrategyVariant>>,
+    #[serde(rename = "sortOrder")]
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateSegmentRequest {
+    pub name: String,
+    pub description: Option<String>,
     pub constraints: Vec<Constraint>,
-    #[serde(default)]
-    pub segments: Vec<i64>,
-}
-
-// ================================================================
-// Legacy CAVE Types — backward compat with original /api/flags/* API
-// ================================================================
-
-/// Original CAVE feature flag.  Used by the legacy /api/flags endpoints.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FeatureFlag {
-    pub id: Uuid,
-    pub name: String,
-    pub description: String,
-    pub enabled: bool,
-    pub flag_type: FlagType,
-    pub strategy: Strategy,
-    pub environments: Vec<String>,
-    pub tenant_id: Option<String>,
-    pub kill_switch: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub created_by: Uuid,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum FlagType {
-    Boolean,
-    Rollout,
-    Variant,
-    KillSwitch,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum Strategy {
-    Default { enabled: bool },
-    GradualRollout { percentage: u8, group_id: Option<String> },
-    UserIds { user_ids: Vec<String> },
-    TenantScope { tenant_ids: Vec<String> },
-    EnvironmentScope { environments: Vec<String> },
-    Custom { name: String, parameters: serde_json::Value },
-}
-
-/// Flag evaluation request — legacy CAVE API.
-#[derive(Debug, Deserialize)]
-pub struct EvaluateRequest {
-    pub context: EvaluationContext,
+    pub project: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct EvaluationContext {
-    pub user_id: Option<String>,
-    pub tenant_id: Option<String>,
+pub struct CreateApiTokenRequest {
+    pub username: String,
+    #[serde(rename = "type")]
+    pub token_type: TokenType,
+    pub environment: Option<String>,
+    pub projects: Option<Vec<String>>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateBannerRequest {
+    pub message: String,
+    pub variant: BannerVariant,
+    pub link: Option<String>,
+    pub link_text: Option<String>,
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateChangeRequestRequest {
+    pub title: Option<String>,
     pub environment: String,
-    pub properties: Option<serde_json::Value>,
-}
-
-/// Flag evaluation response — legacy CAVE API.
-#[derive(Debug, Serialize)]
-pub struct EvaluateResponse {
-    pub flags: Vec<FlagEvaluation>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct FlagEvaluation {
-    pub name: String,
-    pub enabled: bool,
-    pub variant: Option<String>,
-}
-
-/// Create flag request — legacy CAVE API.
-#[derive(Debug, Deserialize)]
-pub struct CreateFlagRequest {
-    pub name: String,
-    pub description: String,
-    pub flag_type: FlagType,
-    pub strategy: Strategy,
-    pub environments: Vec<String>,
-    pub tenant_id: Option<String>,
+    pub min_approvals: Option<i32>,
 }

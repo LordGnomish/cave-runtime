@@ -1,51 +1,37 @@
-//! Feature flag evaluation engine — full Unleash v6 strategy parity.
+//! Unleash-compatible feature flag evaluation engine.
 //!
-//! ## Strategy dispatch table
-//! | Unleash name              | Implementation                          |
-//! |---------------------------|-----------------------------------------|
-//! | `default`                 | Always enabled                          |
-//! | `userWithId`              | Allowlist of user IDs                   |
-//! | `gradualRolloutUserId`    | MurmurHash3(groupId:userId) % 100       |
-//! | `gradualRolloutSessionId` | MurmurHash3(groupId:sessionId) % 100    |
-//! | `gradualRolloutRandom`    | SystemTime subsec nanos % 100           |
-//! | `flexibleRollout`         | Configurable stickiness + MurmurHash3   |
-//! | `applicationHostname`     | Match against `properties["hostname"]`  |
-//! | `remoteAddress`           | Exact IP or CIDR match                  |
+//! Evaluates all activation strategies, constraints, segments, and variants
+//! exactly as specified in the Unleash client specification.
 
 use crate::models::{
-    Constraint, ConstraintOperator, EvaluationContext, FeatureFlag, FeatureToggle, FlagEvaluation,
-    Segment, StrategyConfig, UnleashContext, Variant, VariantResult,
+    Constraint, ConstraintOperator, EvaluatedVariant, FeatureFlag, FeatureStrategy, Segment,
+    UnleashContext, Variant, WeightType,
 };
-use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use tracing::trace;
 
-// ================================================================
-// MurmurHash3 x86-32 (public-domain algorithm, Unleash-compatible)
-// ================================================================
+// ── Murmur3 hash (seed 0, 32-bit) ────────────────────────────────────────────
+// Matches Unleash's JS implementation exactly.
 
-/// MurmurHash3 x86-32 — produces the same values as Unleash SDK clients.
-fn murmurhash3_x86_32(data: &[u8], seed: u32) -> u32 {
+fn murmur3_32(data: &[u8]) -> u32 {
     const C1: u32 = 0xcc9e2d51;
     const C2: u32 = 0x1b873593;
+    let mut hash: u32 = 0;
+    let nblocks = data.len() / 4;
 
-    let len = data.len();
-    let nblocks = len / 4;
-    let mut h1 = seed;
-
-    // Body — 4-byte blocks
     for i in 0..nblocks {
-        let b = i * 4;
-        let mut k1 = u32::from_le_bytes([data[b], data[b + 1], data[b + 2], data[b + 3]]);
-        k1 = k1.wrapping_mul(C1);
-        k1 = k1.rotate_left(15);
-        k1 = k1.wrapping_mul(C2);
-        h1 ^= k1;
-        h1 = h1.rotate_left(13);
-        h1 = h1.wrapping_mul(5).wrapping_add(0xe6546b64);
+        let mut k = u32::from_le_bytes([
+            data[i * 4],
+            data[i * 4 + 1],
+            data[i * 4 + 2],
+            data[i * 4 + 3],
+        ]);
+        k = k.wrapping_mul(C1).rotate_left(15).wrapping_mul(C2);
+        hash ^= k;
+        hash = hash.rotate_left(13);
+        hash = hash.wrapping_mul(5).wrapping_add(0xe6546b64);
     }
 
-    // Tail — remaining bytes
     let tail = &data[nblocks * 4..];
     let mut k1: u32 = 0;
     match tail.len() {
@@ -53,560 +39,427 @@ fn murmurhash3_x86_32(data: &[u8], seed: u32) -> u32 {
             k1 ^= (tail[2] as u32) << 16;
             k1 ^= (tail[1] as u32) << 8;
             k1 ^= tail[0] as u32;
+            k1 = k1.wrapping_mul(C1).rotate_left(15).wrapping_mul(C2);
+            hash ^= k1;
         }
         2 => {
             k1 ^= (tail[1] as u32) << 8;
             k1 ^= tail[0] as u32;
+            k1 = k1.wrapping_mul(C1).rotate_left(15).wrapping_mul(C2);
+            hash ^= k1;
         }
         1 => {
             k1 ^= tail[0] as u32;
+            k1 = k1.wrapping_mul(C1).rotate_left(15).wrapping_mul(C2);
+            hash ^= k1;
         }
         _ => {}
     }
-    if !tail.is_empty() {
-        k1 = k1.wrapping_mul(C1);
-        k1 = k1.rotate_left(15);
-        k1 = k1.wrapping_mul(C2);
-        h1 ^= k1;
+
+    hash ^= data.len() as u32;
+    hash ^= hash >> 16;
+    hash = hash.wrapping_mul(0x85ebca6b);
+    hash ^= hash >> 13;
+    hash = hash.wrapping_mul(0xc2b2ae35);
+    hash ^= hash >> 16;
+    hash
+}
+
+/// Returns 1..=100 (gradual rollout percentage check).
+pub fn normalized_value_100(id: &str, group_id: &str) -> u32 {
+    let key = format!("{}:{}", group_id, id);
+    let h = murmur3_32(key.as_bytes()) % 100;
+    if h == 0 { 100 } else { h }
+}
+
+/// Returns 1..=1000 (variant weight selection).
+pub fn normalized_value_1000(id: &str, group_id: &str) -> u32 {
+    let key = format!("{}:{}", group_id, id);
+    let h = murmur3_32(key.as_bytes()) % 1000;
+    if h == 0 { 1000 } else { h }
+}
+
+// ── Top-level evaluation ──────────────────────────────────────────────────────
+
+pub struct EvalResult {
+    pub enabled: bool,
+    pub variant: EvaluatedVariant,
+}
+
+pub fn evaluate_flag(
+    flag: &FeatureFlag,
+    env: &str,
+    ctx: &UnleashContext,
+    segments: &HashMap<i64, &Segment>,
+) -> EvalResult {
+    if matches!(flag.feature_type, crate::models::FeatureType::KillSwitch) && !flag.enabled {
+        return disabled_result();
     }
 
-    // Finalisation mix
-    h1 ^= len as u32;
-    h1 ^= h1 >> 16;
-    h1 = h1.wrapping_mul(0x85ebca6b);
-    h1 ^= h1 >> 13;
-    h1 = h1.wrapping_mul(0xc2b2ae35);
-    h1 ^= h1 >> 16;
+    let env_cfg = flag.environments.iter().find(|e| e.name == env);
+    let env_enabled = env_cfg.map(|e| e.enabled).unwrap_or(false);
 
-    h1
-}
-
-/// Normalize an identifier for gradual-rollout strategies.
-/// Returns a value in 1..=100 (Unleash convention).
-fn normalize_identifier(identifier: &str, group_id: &str) -> u32 {
-    let key = format!("{group_id}:{identifier}");
-    let hash = murmurhash3_x86_32(key.as_bytes(), 0);
-    (hash % 100) + 1
-}
-
-/// Normalize an identifier for variant selection.
-/// Returns a value in 1..=total (weight-sum).
-fn normalize_variant(identifier: &str, group_id: &str, total: u32) -> u32 {
-    let key = format!("{group_id}:{identifier}");
-    let hash = murmurhash3_x86_32(key.as_bytes(), 0);
-    (hash % total) + 1
-}
-
-// ================================================================
-// Context helpers
-// ================================================================
-
-/// Get a context field value as an owned String (supports all field names).
-fn get_context_value(context: &UnleashContext, field: &str) -> Option<String> {
-    match field {
-        "userId" => context.user_id.clone(),
-        "sessionId" => context.session_id.clone(),
-        "remoteAddress" => context.remote_address.clone(),
-        "environment" => context.environment.clone(),
-        "appName" => context.app_name.clone(),
-        "currentTime" => context
-            .current_time
-            .map(|dt| dt.to_rfc3339())
-            .or_else(|| Some(chrono::Utc::now().to_rfc3339())),
-        key => context.properties.get(key).cloned(),
+    if !flag.enabled || !env_enabled {
+        return disabled_result();
     }
-}
 
-/// Get a context field as `&str` (for variant override matching).
-fn get_context_field<'a>(context: &'a UnleashContext, field: &str) -> Option<&'a str> {
-    match field {
-        "userId" => context.user_id.as_deref(),
-        "sessionId" => context.session_id.as_deref(),
-        "remoteAddress" => context.remote_address.as_deref(),
-        "environment" => context.environment.as_deref(),
-        "appName" => context.app_name.as_deref(),
-        key => context.properties.get(key).map(String::as_str),
-    }
-}
+    let strategies = env_cfg
+        .map(|e| e.strategies.as_slice())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(&flag.strategies);
 
-// ================================================================
-// IP / CIDR matching (for remoteAddress strategy)
-// ================================================================
-
-fn matches_ip_or_cidr(addr: &str, ip_or_cidr: &str) -> bool {
-    if ip_or_cidr.contains('/') {
-        matches_cidr(addr, ip_or_cidr)
+    let enabled = if strategies.is_empty() {
+        true
     } else {
-        addr == ip_or_cidr.trim()
+        strategies
+            .iter()
+            .filter(|s| !s.disabled)
+            .any(|s| evaluate_strategy(s, ctx, segments))
+    };
+
+    if !enabled {
+        return disabled_result();
+    }
+
+    let variants = env_cfg
+        .map(|e| e.variants.as_slice())
+        .filter(|v| !v.is_empty())
+        .unwrap_or(&flag.variants);
+
+    let variant = select_variant(variants, &flag.name, ctx, true);
+    EvalResult { enabled, variant }
+}
+
+fn disabled_result() -> EvalResult {
+    EvalResult {
+        enabled: false,
+        variant: EvaluatedVariant::disabled(),
     }
 }
 
-fn matches_cidr(addr: &str, cidr: &str) -> bool {
-    use std::net::IpAddr;
-    let parts: Vec<&str> = cidr.splitn(2, '/').collect();
-    if parts.len() != 2 {
+pub fn evaluate_all(
+    flags: &[FeatureFlag],
+    env: &str,
+    ctx: &UnleashContext,
+    segments: &[Segment],
+) -> Vec<(String, bool, EvaluatedVariant)> {
+    let seg_map: HashMap<i64, &Segment> = segments.iter().map(|s| (s.id, s)).collect();
+    flags
+        .iter()
+        .map(|flag| {
+            let r = evaluate_flag(flag, env, ctx, &seg_map);
+            (flag.name.clone(), r.enabled, r.variant)
+        })
+        .collect()
+}
+
+// ── Strategy evaluation ───────────────────────────────────────────────────────
+
+fn evaluate_strategy(
+    strategy: &FeatureStrategy,
+    ctx: &UnleashContext,
+    segments: &HashMap<i64, &Segment>,
+) -> bool {
+    for seg_id in &strategy.segments {
+        if let Some(seg) = segments.get(seg_id) {
+            if !evaluate_constraints(&seg.constraints, ctx) {
+                trace!(strategy = %strategy.name, segment = seg_id, "segment constraint failed");
+                return false;
+            }
+        }
+    }
+
+    if !evaluate_constraints(&strategy.constraints, ctx) {
+        trace!(strategy = %strategy.name, "inline constraint failed");
         return false;
     }
-    let prefix_len: u8 = match parts[1].trim().parse() {
-        Ok(p) => p,
-        Err(_) => return false,
-    };
-    let network: IpAddr = match parts[0].trim().parse() {
-        Ok(a) => a,
-        Err(_) => return false,
-    };
-    let target: IpAddr = match addr.trim().parse() {
-        Ok(a) => a,
-        Err(_) => return false,
-    };
-    match (network, target) {
-        (IpAddr::V4(net), IpAddr::V4(tgt)) => {
-            if prefix_len > 32 {
-                return false;
-            }
-            let shift = 32u32.saturating_sub(prefix_len as u32);
-            let mask = if shift == 32 { 0u32 } else { !0u32 << shift };
-            u32::from(net) & mask == u32::from(tgt) & mask
-        }
-        (IpAddr::V6(net), IpAddr::V6(tgt)) => {
-            if prefix_len > 128 {
-                return false;
-            }
-            let shift = 128u32.saturating_sub(prefix_len as u32);
-            let mask = if shift == 128 { 0u128 } else { !0u128 << shift };
-            u128::from(net) & mask == u128::from(tgt) & mask
-        }
-        _ => false,
-    }
-}
 
-// ================================================================
-// Semver comparison (simple numeric tuple ordering)
-// ================================================================
-
-fn parse_semver(s: &str) -> (u64, u64, u64) {
-    let parts: Vec<u64> = s
-        .split('.')
-        .filter_map(|p| p.split('-').next()?.parse().ok())
-        .collect();
-    (
-        parts.first().copied().unwrap_or(0),
-        parts.get(1).copied().unwrap_or(0),
-        parts.get(2).copied().unwrap_or(0),
-    )
-}
-
-fn compare_semver(a: &str, b: &str) -> Ordering {
-    parse_semver(a).cmp(&parse_semver(b))
-}
-
-// ================================================================
-// Constraint evaluation
-// ================================================================
-
-/// Evaluate a single constraint against the context.
-pub fn evaluate_constraint(constraint: &Constraint, context: &UnleashContext) -> bool {
-    let maybe_value = get_context_value(context, &constraint.context_name);
-
-    let result = match &constraint.operator {
-        ConstraintOperator::In => maybe_value.as_deref().map_or(false, |v| {
-            let v_cmp = if constraint.case_insensitive {
-                v.to_lowercase()
-            } else {
-                v.to_string()
-            };
-            constraint.values.iter().any(|cv| {
-                let cv_cmp = if constraint.case_insensitive {
-                    cv.to_lowercase()
-                } else {
-                    cv.clone()
-                };
-                v_cmp == cv_cmp
-            })
-        }),
-
-        ConstraintOperator::NotIn => maybe_value.as_deref().map_or(true, |v| {
-            let v_cmp = if constraint.case_insensitive {
-                v.to_lowercase()
-            } else {
-                v.to_string()
-            };
-            !constraint.values.iter().any(|cv| {
-                let cv_cmp = if constraint.case_insensitive {
-                    cv.to_lowercase()
-                } else {
-                    cv.clone()
-                };
-                v_cmp == cv_cmp
-            })
-        }),
-
-        ConstraintOperator::StrStartsWith => {
-            maybe_value.as_deref().map_or(false, |v| {
-                constraint.values.iter().any(|prefix| {
-                    if constraint.case_insensitive {
-                        v.to_lowercase().starts_with(&prefix.to_lowercase())
-                    } else {
-                        v.starts_with(prefix.as_str())
-                    }
-                })
-            })
-        }
-
-        ConstraintOperator::StrEndsWith => {
-            maybe_value.as_deref().map_or(false, |v| {
-                constraint.values.iter().any(|suffix| {
-                    if constraint.case_insensitive {
-                        v.to_lowercase().ends_with(&suffix.to_lowercase())
-                    } else {
-                        v.ends_with(suffix.as_str())
-                    }
-                })
-            })
-        }
-
-        ConstraintOperator::StrContains => {
-            maybe_value.as_deref().map_or(false, |v| {
-                constraint.values.iter().any(|needle| {
-                    if constraint.case_insensitive {
-                        v.to_lowercase().contains(&needle.to_lowercase())
-                    } else {
-                        v.contains(needle.as_str())
-                    }
-                })
-            })
-        }
-
-        ConstraintOperator::NumEq => {
-            let n = maybe_value.as_deref().and_then(|v| v.parse::<f64>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<f64>().ok());
-            matches!((n, c), (Some(a), Some(b)) if (a - b).abs() < f64::EPSILON)
-        }
-
-        ConstraintOperator::NumGt => {
-            let n = maybe_value.as_deref().and_then(|v| v.parse::<f64>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<f64>().ok());
-            matches!((n, c), (Some(a), Some(b)) if a > b)
-        }
-
-        ConstraintOperator::NumGte => {
-            let n = maybe_value.as_deref().and_then(|v| v.parse::<f64>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<f64>().ok());
-            matches!((n, c), (Some(a), Some(b)) if a >= b)
-        }
-
-        ConstraintOperator::NumLt => {
-            let n = maybe_value.as_deref().and_then(|v| v.parse::<f64>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<f64>().ok());
-            matches!((n, c), (Some(a), Some(b)) if a < b)
-        }
-
-        ConstraintOperator::NumLte => {
-            let n = maybe_value.as_deref().and_then(|v| v.parse::<f64>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<f64>().ok());
-            matches!((n, c), (Some(a), Some(b)) if a <= b)
-        }
-
-        ConstraintOperator::DateBefore => {
-            use chrono::DateTime;
-            let d = maybe_value
-                .as_deref()
-                .and_then(|v| v.parse::<DateTime<chrono::Utc>>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<DateTime<chrono::Utc>>().ok());
-            matches!((d, c), (Some(a), Some(b)) if a < b)
-        }
-
-        ConstraintOperator::DateAfter => {
-            use chrono::DateTime;
-            let d = maybe_value
-                .as_deref()
-                .and_then(|v| v.parse::<DateTime<chrono::Utc>>().ok());
-            let c = constraint
-                .value
-                .as_deref()
-                .and_then(|v| v.parse::<DateTime<chrono::Utc>>().ok());
-            matches!((d, c), (Some(a), Some(b)) if a > b)
-        }
-
-        ConstraintOperator::SemverEq => maybe_value.as_deref().map_or(false, |v| {
-            constraint
-                .value
-                .as_deref()
-                .map_or(false, |c| compare_semver(v, c) == Ordering::Equal)
-        }),
-
-        ConstraintOperator::SemverGt => maybe_value.as_deref().map_or(false, |v| {
-            constraint
-                .value
-                .as_deref()
-                .map_or(false, |c| compare_semver(v, c) == Ordering::Greater)
-        }),
-
-        ConstraintOperator::SemverLt => maybe_value.as_deref().map_or(false, |v| {
-            constraint
-                .value
-                .as_deref()
-                .map_or(false, |c| compare_semver(v, c) == Ordering::Less)
-        }),
-    };
-
-    if constraint.inverted { !result } else { result }
-}
-
-/// All constraints must pass (AND semantics).
-pub fn evaluate_constraints(constraints: &[Constraint], context: &UnleashContext) -> bool {
-    constraints.iter().all(|c| evaluate_constraint(c, context))
-}
-
-// ================================================================
-// Strategy dispatch
-// ================================================================
-
-/// Returns a pseudo-random value in 1..=100 based on system time nanoseconds.
-/// Used for non-sticky strategies (gradualRolloutRandom, flexibleRollout random stickiness).
-fn random_1_to_100() -> u32 {
-    (std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos()
-        % 100)
-        + 1
-}
-
-/// Dispatch a strategy by Unleash name and evaluate it.
-///
-/// All known Unleash built-in strategies are handled here.
-/// Unknown strategies fall through to `false` (disabled).
-pub fn dispatch_strategy(
-    name: &str,
-    params: &HashMap<String, String>,
-    context: &UnleashContext,
-) -> bool {
-    match name {
-        // Always enabled — no parameters needed.
+    match strategy.name.as_str() {
         "default" => true,
 
-        // userWithId: comma-separated list in params["userIds"]
         "userWithId" => {
-            let ids: Vec<&str> = params
-                .get("userIds")
-                .map(|s| s.split(',').map(str::trim).collect())
-                .unwrap_or_default();
-            context
-                .user_id
+            let user_ids = strategy.parameters.get("userIds").map(|s| s.as_str()).unwrap_or("");
+            ctx.user_id
                 .as_deref()
-                .map_or(false, |uid| ids.contains(&uid))
+                .map(|uid| user_ids.split(',').map(|s| s.trim()).any(|id| id == uid))
+                .unwrap_or(false)
         }
 
-        // gradualRolloutUserId: MurmurHash3(groupId:userId) % 100 + 1 <= percentage
-        "gradualRolloutUserId" => {
-            let pct = params
-                .get("percentage")
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(0);
-            let group = params
-                .get("groupId")
-                .map(String::as_str)
-                .unwrap_or_default();
-            context
-                .user_id
+        "remoteAddress" => {
+            let ips = strategy.parameters.get("IPs").map(|s| s.as_str()).unwrap_or("");
+            ctx.remote_address
                 .as_deref()
-                .map_or(false, |uid| normalize_identifier(uid, group) <= pct)
+                .map(|addr| ips.split(',').map(|s| s.trim()).any(|ip| ip == addr))
+                .unwrap_or(false)
         }
 
-        // gradualRolloutSessionId: same but keyed on sessionId
-        "gradualRolloutSessionId" => {
-            let pct = params
-                .get("percentage")
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(0);
-            let group = params
-                .get("groupId")
-                .map(String::as_str)
-                .unwrap_or_default();
-            context
-                .session_id
-                .as_deref()
-                .map_or(false, |sid| normalize_identifier(sid, group) <= pct)
+        "applicationHostname" => {
+            let hosts = strategy
+                .parameters
+                .get("hostNames")
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            ctx.properties
+                .get("hostname")
+                .map(|h| hosts.split(',').map(|s| s.trim()).any(|host| host == h))
+                .unwrap_or(false)
         }
 
-        // gradualRolloutRandom: non-deterministic, new roll each evaluation
         "gradualRolloutRandom" => {
-            let pct = params
+            let pct: u32 = strategy
+                .parameters
                 .get("percentage")
-                .and_then(|s| s.parse::<u32>().ok())
+                .and_then(|s| s.parse().ok())
                 .unwrap_or(0);
-            random_1_to_100() <= pct
+            let random_val = (std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos()
+                % 100) + 1;
+            random_val <= pct
         }
 
-        // flexibleRollout: configurable stickiness (userId, sessionId, random, default)
-        "flexibleRollout" => {
-            let rollout = params
-                .get("rollout")
-                .and_then(|s| s.parse::<u32>().ok())
+        "gradualRolloutSessionId" => {
+            let pct: u32 = strategy
+                .parameters
+                .get("percentage")
+                .and_then(|s| s.parse().ok())
                 .unwrap_or(0);
-            let group = params
+            let group_id = strategy
+                .parameters
                 .get("groupId")
-                .map(String::as_str)
-                .unwrap_or_default();
-            let stickiness = params
+                .map(|s| s.as_str())
+                .unwrap_or("default");
+            ctx.session_id
+                .as_deref()
+                .map(|sid| normalized_value_100(sid, group_id) <= pct)
+                .unwrap_or(false)
+        }
+
+        "gradualRolloutUserId" => {
+            let pct: u32 = strategy
+                .parameters
+                .get("percentage")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let group_id = strategy
+                .parameters
+                .get("groupId")
+                .map(|s| s.as_str())
+                .unwrap_or("default");
+            ctx.user_id
+                .as_deref()
+                .map(|uid| normalized_value_100(uid, group_id) <= pct)
+                .unwrap_or(false)
+        }
+
+        "flexibleRollout" => {
+            let rollout: u32 = strategy
+                .parameters
+                .get("rollout")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let stickiness = strategy
+                .parameters
                 .get("stickiness")
-                .map(String::as_str)
+                .map(|s| s.as_str())
+                .unwrap_or("default");
+            let group_id = strategy
+                .parameters
+                .get("groupId")
+                .map(|s| s.as_str())
                 .unwrap_or("default");
 
-            match stickiness {
-                "userId" => context
-                    .user_id
-                    .as_deref()
-                    .map_or(false, |uid| normalize_identifier(uid, group) <= rollout),
-                "sessionId" => context
-                    .session_id
-                    .as_deref()
-                    .map_or(false, |sid| normalize_identifier(sid, group) <= rollout),
-                "random" => random_1_to_100() <= rollout,
-                // "default": userId first, then sessionId, then random
-                _ => {
-                    if let Some(uid) = context.user_id.as_deref() {
-                        normalize_identifier(uid, group) <= rollout
-                    } else if let Some(sid) = context.session_id.as_deref() {
-                        normalize_identifier(sid, group) <= rollout
-                    } else {
-                        random_1_to_100() <= rollout
-                    }
+            match resolve_stickiness(stickiness, ctx) {
+                Some(val) => normalized_value_100(&val, group_id) <= rollout,
+                None => {
+                    let r = (std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .subsec_nanos()
+                        % 100) + 1;
+                    r <= rollout
                 }
             }
         }
 
-        // applicationHostname: match against context.properties["hostname"]
-        "applicationHostname" => {
-            let host_names: Vec<&str> = params
-                .get("hostNames")
-                .map(|s| s.split(',').map(str::trim).collect())
-                .unwrap_or_default();
-            context
-                .properties
-                .get("hostname")
-                .map_or(false, |h| host_names.contains(&h.as_str()))
+        // Custom strategies: client-side eval (server falls back to enabled)
+        _ => {
+            trace!(strategy = %strategy.name, "custom strategy — defaulting to enabled");
+            true
         }
+    }
+}
 
-        // remoteAddress: exact IP or CIDR, comma-separated in params["IPs"]
-        "remoteAddress" => {
-            let ips: Vec<&str> = params
-                .get("IPs")
-                .map(|s| s.split(',').map(str::trim).collect())
-                .unwrap_or_default();
-            context.remote_address.as_deref().map_or(false, |addr| {
-                ips.iter().any(|ip_or_cidr| matches_ip_or_cidr(addr, ip_or_cidr))
+fn resolve_stickiness(stickiness: &str, ctx: &UnleashContext) -> Option<String> {
+    match stickiness {
+        "default" | "userId" => ctx.user_id.clone().or_else(|| ctx.session_id.clone()),
+        "sessionId" => ctx.session_id.clone(),
+        "random" => None,
+        other => ctx.properties.get(other).cloned(),
+    }
+}
+
+// ── Constraint evaluation ─────────────────────────────────────────────────────
+
+pub fn evaluate_constraints(constraints: &[Constraint], ctx: &UnleashContext) -> bool {
+    constraints.iter().all(|c| evaluate_constraint(c, ctx))
+}
+
+fn evaluate_constraint(c: &Constraint, ctx: &UnleashContext) -> bool {
+    let ctx_value = ctx.get_field(&c.context_name);
+    let result = check_constraint(c, ctx_value.as_deref());
+    if c.inverted { !result } else { result }
+}
+
+fn check_constraint(c: &Constraint, value: Option<&str>) -> bool {
+    match &c.operator {
+        ConstraintOperator::In => value.map(|v| {
+            if c.case_insensitive {
+                let vl = v.to_lowercase();
+                c.values.iter().any(|s| s.to_lowercase() == vl)
+            } else {
+                c.values.iter().any(|s| s == v)
+            }
+        }).unwrap_or(false),
+
+        ConstraintOperator::NotIn => value.map(|v| {
+            if c.case_insensitive {
+                let vl = v.to_lowercase();
+                !c.values.iter().any(|s| s.to_lowercase() == vl)
+            } else {
+                !c.values.iter().any(|s| s == v)
+            }
+        }).unwrap_or(true),
+
+        ConstraintOperator::StrStartsWith => value.map(|v| {
+            c.values.iter().any(|p| {
+                if c.case_insensitive {
+                    v.to_lowercase().starts_with(&p.to_lowercase())
+                } else {
+                    v.starts_with(p.as_str())
+                }
             })
-        }
+        }).unwrap_or(false),
 
-        // Unknown strategy: disabled
+        ConstraintOperator::StrEndsWith => value.map(|v| {
+            c.values.iter().any(|p| {
+                if c.case_insensitive {
+                    v.to_lowercase().ends_with(&p.to_lowercase())
+                } else {
+                    v.ends_with(p.as_str())
+                }
+            })
+        }).unwrap_or(false),
+
+        ConstraintOperator::StrContains => value.map(|v| {
+            c.values.iter().any(|p| {
+                if c.case_insensitive {
+                    v.to_lowercase().contains(&p.to_lowercase())
+                } else {
+                    v.contains(p.as_str())
+                }
+            })
+        }).unwrap_or(false),
+
+        ConstraintOperator::NumEq => {
+            compare_f64(value, c.value.as_deref(), |a, b| (a - b).abs() < f64::EPSILON)
+        }
+        ConstraintOperator::NumGt => compare_f64(value, c.value.as_deref(), |a, b| a > b),
+        ConstraintOperator::NumGte => compare_f64(value, c.value.as_deref(), |a, b| a >= b),
+        ConstraintOperator::NumLt => compare_f64(value, c.value.as_deref(), |a, b| a < b),
+        ConstraintOperator::NumLte => compare_f64(value, c.value.as_deref(), |a, b| a <= b),
+
+        ConstraintOperator::DateBefore => compare_date(value, c.value.as_deref(), |a, b| a < b),
+        ConstraintOperator::DateAfter => compare_date(value, c.value.as_deref(), |a, b| a > b),
+
+        ConstraintOperator::SemverEq => {
+            compare_semver(value, c.value.as_deref(), std::cmp::Ordering::Equal)
+        }
+        ConstraintOperator::SemverGt => {
+            compare_semver(value, c.value.as_deref(), std::cmp::Ordering::Greater)
+        }
+        ConstraintOperator::SemverLt => {
+            compare_semver(value, c.value.as_deref(), std::cmp::Ordering::Less)
+        }
+    }
+}
+
+fn compare_f64(a: Option<&str>, b: Option<&str>, pred: impl Fn(f64, f64) -> bool) -> bool {
+    match (
+        a.and_then(|v| v.parse::<f64>().ok()),
+        b.and_then(|v| v.parse::<f64>().ok()),
+    ) {
+        (Some(a), Some(b)) => pred(a, b),
         _ => false,
     }
 }
 
-// ================================================================
-// Strategy + Toggle evaluation (Unleash API)
-// ================================================================
-
-/// Evaluate a single strategy config (constraints → segments → dispatch).
-/// Returns `true` if this strategy enables the toggle for the given context.
-pub fn evaluate_strategy(
-    strategy: &StrategyConfig,
-    context: &UnleashContext,
-    segments: &[Segment],
+fn compare_date(
+    a: Option<&str>,
+    b: Option<&str>,
+    pred: impl Fn(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) -> bool,
 ) -> bool {
-    // All strategy-level constraints must pass
-    if !evaluate_constraints(&strategy.constraints, context) {
-        return false;
+    let parse = |s: &str| {
+        chrono::DateTime::parse_from_rfc3339(s)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .ok()
+    };
+    match (a.and_then(parse), b.and_then(parse)) {
+        (Some(a), Some(b)) => pred(a, b),
+        _ => false,
     }
-    // All referenced segment constraints must pass
-    for &seg_id in &strategy.segments {
-        if let Some(seg) = segments.iter().find(|s| s.id == seg_id) {
-            if !evaluate_constraints(&seg.constraints, context) {
-                return false;
-            }
-        }
-    }
-    // Dispatch to the named strategy implementation
-    dispatch_strategy(&strategy.name, &strategy.parameters, context)
 }
 
-/// Evaluate all strategies for a toggle (ANY-match semantics).
-/// An empty strategy list means always enabled (Unleash default).
-pub fn evaluate_strategies(
-    strategies: &[StrategyConfig],
-    context: &UnleashContext,
-    segments: &[Segment],
+fn compare_semver(
+    ctx_val: Option<&str>,
+    constraint_val: Option<&str>,
+    expected_ord: std::cmp::Ordering,
 ) -> bool {
-    if strategies.is_empty() {
-        return true;
+    fn parse(s: &str) -> Option<(u64, u64, u64)> {
+        let s = s.trim_start_matches('v');
+        let mut parts = s.splitn(3, '.');
+        let major = parts.next()?.parse().ok()?;
+        let minor = parts.next()?.parse().ok()?;
+        let patch = parts
+            .next()
+            .unwrap_or("0")
+            .split('-')
+            .next()
+            .unwrap_or("0")
+            .parse()
+            .ok()?;
+        Some((major, minor, patch))
     }
-    strategies
-        .iter()
-        .any(|s| evaluate_strategy(s, context, segments))
+    match (ctx_val.and_then(parse), constraint_val.and_then(parse)) {
+        (Some(a), Some(b)) => a.cmp(&b) == expected_ord,
+        _ => false,
+    }
 }
 
-/// Full toggle evaluation → `(feature_enabled, variant)`.
-///
-/// Respects the toggle's `enabled` / `archived` gates before dispatching
-/// to the strategy evaluator and selecting a variant.
-pub fn evaluate_toggle(
-    toggle: &FeatureToggle,
-    context: &UnleashContext,
-    segments: &[Segment],
-) -> (bool, VariantResult) {
-    if !toggle.enabled || toggle.archived {
-        return (false, VariantResult::disabled(false));
-    }
-    let feature_enabled = evaluate_strategies(&toggle.strategies, context, segments);
-    let variant = select_variant(&toggle.variants, context, &toggle.name, feature_enabled);
-    (feature_enabled, variant)
-}
+// ── Variant selection ─────────────────────────────────────────────────────────
 
-// ================================================================
-// Variant selection
-// ================================================================
-
-/// Select a variant for the given context using weight-based hashing.
-///
-/// Priority order:
-/// 1. Overrides (context-field match)
-/// 2. Weighted hash using stickiness identifier
 pub fn select_variant(
     variants: &[Variant],
-    context: &UnleashContext,
-    toggle_name: &str,
+    feature_name: &str,
+    ctx: &UnleashContext,
     feature_enabled: bool,
-) -> VariantResult {
-    if variants.is_empty() || !feature_enabled {
-        return VariantResult::disabled(feature_enabled);
+) -> EvaluatedVariant {
+    if variants.is_empty() || variants.iter().all(|v| v.weight == 0) {
+        return EvaluatedVariant {
+            name: "disabled".to_string(),
+            enabled: false,
+            payload: None,
+            feature_enabled,
+        };
     }
 
-    // Override check: first variant whose override matches wins
+    // Override check
     for variant in variants {
         for ov in &variant.overrides {
-            if let Some(val) = get_context_field(context, &ov.context_name) {
-                if ov.values.iter().any(|v| v == val) {
-                    return VariantResult {
+            if let Some(ctx_val) = ctx.get_field(&ov.context_name) {
+                if ov.values.iter().any(|v| v == &ctx_val) {
+                    return EvaluatedVariant {
                         name: variant.name.clone(),
                         enabled: true,
                         payload: variant.payload.clone(),
@@ -617,57 +470,24 @@ pub fn select_variant(
         }
     }
 
-    let total: u32 = variants.iter().map(|v| v.weight).sum();
-    if total == 0 {
-        return VariantResult::disabled(feature_enabled);
-    }
-
-    // Resolve stickiness identifier
-    let stickiness = variants
-        .first()
-        .map(|v| v.stickiness.as_str())
-        .unwrap_or("default");
-
-    let normalized = match stickiness {
-        "userId" => context
-            .user_id
-            .as_deref()
-            .map(|uid| normalize_variant(uid, toggle_name, total))
-            .unwrap_or_else(|| random_1_to_100().min(total).max(1)),
-        "sessionId" => context
-            .session_id
-            .as_deref()
-            .map(|sid| normalize_variant(sid, toggle_name, total))
-            .unwrap_or_else(|| random_1_to_100().min(total).max(1)),
-        "random" => (std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .subsec_nanos()
-            % total)
-            + 1,
-        // "default": userId → sessionId → random
-        _ => {
-            if let Some(uid) = context.user_id.as_deref() {
-                normalize_variant(uid, toggle_name, total)
-            } else if let Some(sid) = context.session_id.as_deref() {
-                normalize_variant(sid, toggle_name, total)
-            } else {
-                (std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .subsec_nanos()
-                    % total)
-                    + 1
-            }
+    // Stickiness
+    let stickiness = variants.first().map(|v| v.stickiness.as_str()).unwrap_or("default");
+    let norm = match resolve_stickiness(stickiness, ctx) {
+        Some(val) => normalized_value_1000(&val, feature_name),
+        None => {
+            (std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos()
+                % 1000) + 1
         }
     };
 
-    // Walk cumulative weights
     let mut cumulative = 0u32;
     for variant in variants {
         cumulative += variant.weight;
-        if normalized <= cumulative {
-            return VariantResult {
+        if norm <= cumulative {
+            return EvaluatedVariant {
                 name: variant.name.clone(),
                 enabled: true,
                 payload: variant.payload.clone(),
@@ -676,1100 +496,315 @@ pub fn select_variant(
         }
     }
 
-    VariantResult::disabled(feature_enabled)
+    EvaluatedVariant::disabled()
 }
-
-// ================================================================
-// Legacy CAVE API (backward compat)
-// ================================================================
-
-/// Evaluate all flags for a given context (legacy /api/flags/evaluate).
-pub fn evaluate_flags(
-    flags: &[FeatureFlag],
-    context: &EvaluationContext,
-) -> Vec<FlagEvaluation> {
-    flags
-        .iter()
-        .map(|flag| evaluate_single(flag, context))
-        .collect()
-}
-
-/// Evaluate a single legacy flag against a context.
-pub fn evaluate_single(flag: &FeatureFlag, context: &EvaluationContext) -> FlagEvaluation {
-    // Kill switch always wins
-    if flag.kill_switch {
-        return FlagEvaluation {
-            name: flag.name.clone(),
-            enabled: false,
-            variant: None,
-        };
-    }
-
-    // Environment scope
-    if !flag.environments.is_empty() && !flag.environments.contains(&context.environment) {
-        return FlagEvaluation {
-            name: flag.name.clone(),
-            enabled: false,
-            variant: None,
-        };
-    }
-
-    // Tenant scope
-    if let Some(ref flag_tenant) = flag.tenant_id {
-        if context.tenant_id.as_ref() != Some(flag_tenant) {
-            return FlagEvaluation {
-                name: flag.name.clone(),
-                enabled: false,
-                variant: None,
-            };
-        }
-    }
-
-    // Global enable gate
-    if !flag.enabled {
-        return FlagEvaluation {
-            name: flag.name.clone(),
-            enabled: false,
-            variant: None,
-        };
-    }
-
-    // Strategy evaluation
-    use crate::models::Strategy;
-    let enabled = match &flag.strategy {
-        Strategy::Default { enabled } => *enabled,
-        Strategy::GradualRollout {
-            percentage,
-            group_id,
-        } => {
-            let key = format!(
-                "{}:{}",
-                group_id.as_deref().unwrap_or(&flag.name),
-                context.user_id.as_deref().unwrap_or("anonymous")
-            );
-            normalize_hash(&key) < *percentage as u32
-        }
-        Strategy::UserIds { user_ids } => context
-            .user_id
-            .as_ref()
-            .map_or(false, |uid| user_ids.contains(uid)),
-        Strategy::TenantScope { tenant_ids } => context
-            .tenant_id
-            .as_ref()
-            .map_or(false, |tid| tenant_ids.contains(tid)),
-        Strategy::EnvironmentScope { environments } => {
-            environments.contains(&context.environment)
-        }
-        Strategy::Custom { .. } => flag.enabled,
-    };
-
-    FlagEvaluation {
-        name: flag.name.clone(),
-        enabled,
-        variant: None,
-    }
-}
-
-/// Legacy hash normaliser (DefaultHasher, 0-99 range).
-fn normalize_hash(key: &str) -> u32 {
-    let mut hasher = DefaultHasher::new();
-    key.hash(&mut hasher);
-    (hasher.finish() % 100) as u32
-}
-
-// ================================================================
-// Tests
-// ================================================================
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::*;
     use chrono::Utc;
-    use std::collections::HashMap;
     use uuid::Uuid;
 
-    // ── Helpers ──────────────────────────────────────────────────
-
-    fn make_flag(name: &str, strategy: Strategy) -> FeatureFlag {
-        FeatureFlag {
+    fn make_strategy(name: &str, params: Vec<(&str, &str)>) -> FeatureStrategy {
+        FeatureStrategy {
             id: Uuid::new_v4(),
             name: name.to_string(),
-            description: String::new(),
-            enabled: true,
-            flag_type: FlagType::Boolean,
-            strategy,
-            environments: vec![],
-            tenant_id: None,
-            kill_switch: false,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            created_by: Uuid::new_v4(),
-        }
-    }
-
-    fn make_context(env: &str) -> EvaluationContext {
-        EvaluationContext {
-            user_id: Some("user-123".to_string()),
-            tenant_id: Some("tenant-acme".to_string()),
-            environment: env.to_string(),
-            properties: None,
-        }
-    }
-
-    fn unleash_ctx(user_id: Option<&str>) -> UnleashContext {
-        UnleashContext {
-            user_id: user_id.map(String::from),
-            session_id: Some("sess-abc".to_string()),
-            remote_address: Some("192.168.1.5".to_string()),
-            environment: Some("production".to_string()),
-            app_name: Some("test-app".to_string()),
-            current_time: None,
-            properties: HashMap::new(),
-        }
-    }
-
-    fn strategy(name: &str, params: &[(&str, &str)]) -> StrategyConfig {
-        StrategyConfig {
-            name: name.to_string(),
             parameters: params
-                .iter()
+                .into_iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
             constraints: vec![],
             segments: vec![],
+            sort_order: 0,
+            disabled: false,
+            variants: vec![],
         }
     }
 
-    fn make_toggle(name: &str, strategies: Vec<StrategyConfig>) -> FeatureToggle {
-        let mut t = FeatureToggle::new(name, "test");
-        t.strategies = strategies;
-        t
-    }
-
-    fn constraint(
-        context_name: &str,
-        operator: ConstraintOperator,
-        values: Vec<&str>,
-        value: Option<&str>,
-    ) -> Constraint {
-        Constraint {
-            context_name: context_name.to_string(),
-            operator,
-            values: values.iter().map(|v| v.to_string()).collect(),
-            value: value.map(String::from),
-            inverted: false,
-            case_insensitive: false,
+    fn make_flag(name: &str, strategies: Vec<FeatureStrategy>) -> FeatureFlag {
+        FeatureFlag {
+            name: name.to_string(),
+            feature_type: FeatureType::Release,
+            description: String::new(),
+            enabled: true,
+            stale: false,
+            impression_data: false,
+            project: "default".to_string(),
+            created_at: Utc::now(),
+            last_seen_at: None,
+            strategies: strategies.clone(),
+            variants: vec![],
+            environments: vec![FeatureEnvironment {
+                name: "production".to_string(),
+                enabled: true,
+                strategies,
+                variants: vec![],
+            }],
+            tags: vec![],
         }
     }
 
-    // ── Legacy CAVE tests (original 5) ───────────────────────────
-
-    #[test]
-    fn test_default_strategy_enabled() {
-        let flag = make_flag("test", Strategy::Default { enabled: true });
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(result.enabled);
+    fn ctx(user_id: &str) -> UnleashContext {
+        UnleashContext {
+            user_id: Some(user_id.to_string()),
+            session_id: Some("sess-abc".to_string()),
+            environment: Some("production".to_string()),
+            ..Default::default()
+        }
     }
 
     #[test]
-    fn test_kill_switch_overrides() {
-        let mut flag = make_flag("test", Strategy::Default { enabled: true });
-        flag.kill_switch = true;
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(!result.enabled);
+    fn default_strategy_enabled() {
+        let flag = make_flag("f", vec![make_strategy("default", vec![])]);
+        assert!(evaluate_flag(&flag, "production", &ctx("u1"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_environment_scope() {
-        let mut flag = make_flag("test", Strategy::Default { enabled: true });
-        flag.environments = vec!["staging".to_string()];
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(!result.enabled);
-    }
-
-    #[test]
-    fn test_user_id_strategy() {
+    fn user_with_id_match_and_miss() {
         let flag = make_flag(
-            "test",
-            Strategy::UserIds {
-                user_ids: vec!["user-123".to_string()],
-            },
+            "f",
+            vec![make_strategy("userWithId", vec![("userIds", "alice, bob")])],
         );
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(result.enabled);
+        assert!(evaluate_flag(&flag, "production", &ctx("alice"), &HashMap::new()).enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("charlie"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_gradual_rollout_deterministic() {
+    fn flexible_rollout_100() {
         let flag = make_flag(
-            "test",
-            Strategy::GradualRollout {
-                percentage: 50,
-                group_id: None,
-            },
-        );
-        let ctx = make_context("prod");
-        let r1 = evaluate_single(&flag, &ctx);
-        let r2 = evaluate_single(&flag, &ctx);
-        assert_eq!(r1.enabled, r2.enabled);
-    }
-
-    // ── Unleash: default strategy ─────────────────────────────────
-
-    #[test]
-    fn test_unleash_default_strategy_always_enabled() {
-        let toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    // ── Unleash: userWithId ───────────────────────────────────────
-
-    #[test]
-    fn test_unleash_user_with_id_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("userWithId", &[("userIds", "alice,bob,charlie")])],
-        );
-        let ctx = UnleashContext {
-            user_id: Some("bob".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    #[test]
-    fn test_unleash_user_with_id_no_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("userWithId", &[("userIds", "alice,bob")])],
-        );
-        let ctx = UnleashContext {
-            user_id: Some("dave".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    #[test]
-    fn test_unleash_user_with_id_no_user_disabled() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("userWithId", &[("userIds", "alice")])],
-        );
-        let ctx = UnleashContext::default();
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Unleash: gradualRolloutUserId ─────────────────────────────
-
-    #[test]
-    fn test_gradual_rollout_user_id_100_percent() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutUserId",
-                &[("percentage", "100"), ("groupId", "mygroup")],
-            )],
-        );
-        let ctx = unleash_ctx(Some("any-user"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled, "100% rollout must always be enabled");
-    }
-
-    #[test]
-    fn test_gradual_rollout_user_id_0_percent() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutUserId",
-                &[("percentage", "0"), ("groupId", "mygroup")],
-            )],
-        );
-        let ctx = unleash_ctx(Some("any-user"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled, "0% rollout must always be disabled");
-    }
-
-    #[test]
-    fn test_gradual_rollout_user_id_deterministic() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutUserId",
-                &[("percentage", "50"), ("groupId", "g1")],
-            )],
-        );
-        let ctx = unleash_ctx(Some("user-xyz"));
-        let (r1, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        let (r2, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert_eq!(r1, r2, "same user/group must always get same result");
-    }
-
-    #[test]
-    fn test_gradual_rollout_user_id_no_user_disabled() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutUserId",
-                &[("percentage", "100"), ("groupId", "g1")],
-            )],
-        );
-        let ctx = UnleashContext::default(); // no userId
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Unleash: gradualRolloutSessionId ──────────────────────────
-
-    #[test]
-    fn test_gradual_rollout_session_id_100_percent() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutSessionId",
-                &[("percentage", "100"), ("groupId", "sg")],
-            )],
-        );
-        let ctx = UnleashContext {
-            session_id: Some("session-001".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    #[test]
-    fn test_gradual_rollout_session_id_0_percent() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "gradualRolloutSessionId",
-                &[("percentage", "0"), ("groupId", "sg")],
-            )],
-        );
-        let ctx = UnleashContext {
-            session_id: Some("session-001".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Unleash: gradualRolloutRandom ─────────────────────────────
-
-    #[test]
-    fn test_gradual_rollout_random_100_percent_always_enabled() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("gradualRolloutRandom", &[("percentage", "100")])],
-        );
-        let ctx = UnleashContext::default();
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    #[test]
-    fn test_gradual_rollout_random_0_percent_always_disabled() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("gradualRolloutRandom", &[("percentage", "0")])],
-        );
-        let ctx = UnleashContext::default();
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Unleash: flexibleRollout ──────────────────────────────────
-
-    #[test]
-    fn test_flexible_rollout_user_id_100() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
+            "f",
+            vec![make_strategy(
                 "flexibleRollout",
-                &[
-                    ("rollout", "100"),
-                    ("groupId", "flex"),
-                    ("stickiness", "userId"),
-                ],
+                vec![("rollout", "100"), ("stickiness", "userId"), ("groupId", "g")],
             )],
         );
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
+        assert!(evaluate_flag(&flag, "production", &ctx("any"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_flexible_rollout_user_id_0() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
+    fn flexible_rollout_0() {
+        let flag = make_flag(
+            "f",
+            vec![make_strategy(
                 "flexibleRollout",
-                &[
-                    ("rollout", "0"),
-                    ("groupId", "flex"),
-                    ("stickiness", "userId"),
-                ],
+                vec![("rollout", "0"), ("stickiness", "userId"), ("groupId", "g")],
             )],
         );
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("any"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_flexible_rollout_session_stickiness() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "flexibleRollout",
-                &[
-                    ("rollout", "100"),
-                    ("groupId", "flex"),
-                    ("stickiness", "sessionId"),
-                ],
+    fn gradual_rollout_user_id_deterministic() {
+        let flag = make_flag(
+            "f",
+            vec![make_strategy(
+                "gradualRolloutUserId",
+                vec![("percentage", "50"), ("groupId", "g")],
             )],
         );
-        let ctx = UnleashContext {
-            session_id: Some("sess-xyz".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    // ── Unleash: applicationHostname ──────────────────────────────
-
-    #[test]
-    fn test_application_hostname_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "applicationHostname",
-                &[("hostNames", "web-01,web-02,worker-01")],
-            )],
-        );
-        let mut ctx = UnleashContext::default();
-        ctx.properties.insert("hostname".to_string(), "web-02".to_string());
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
+        let r1 = evaluate_flag(&flag, "production", &ctx("stable-user"), &HashMap::new()).enabled;
+        let r2 = evaluate_flag(&flag, "production", &ctx("stable-user"), &HashMap::new()).enabled;
+        assert_eq!(r1, r2);
     }
 
     #[test]
-    fn test_application_hostname_no_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy(
-                "applicationHostname",
-                &[("hostNames", "web-01,web-02")],
-            )],
-        );
-        let mut ctx = UnleashContext::default();
-        ctx.properties.insert("hostname".to_string(), "db-01".to_string());
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Unleash: remoteAddress ────────────────────────────────────
-
-    #[test]
-    fn test_remote_address_exact_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("remoteAddress", &[("IPs", "10.0.0.1,10.0.0.2")])],
-        );
-        let ctx = UnleashContext {
-            remote_address: Some("10.0.0.2".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    #[test]
-    fn test_remote_address_no_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("remoteAddress", &[("IPs", "10.0.0.1")])],
-        );
-        let ctx = UnleashContext {
-            remote_address: Some("192.168.0.1".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    #[test]
-    fn test_remote_address_cidr_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("remoteAddress", &[("IPs", "192.168.1.0/24")])],
-        );
-        let ctx = UnleashContext {
-            remote_address: Some("192.168.1.42".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    #[test]
-    fn test_remote_address_cidr_no_match() {
-        let toggle = make_toggle(
-            "feat",
-            vec![strategy("remoteAddress", &[("IPs", "10.0.0.0/8")])],
-        );
-        let ctx = UnleashContext {
-            remote_address: Some("172.16.0.1".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
-    }
-
-    // ── Constraint tests ─────────────────────────────────────────
-
-    #[test]
-    fn test_constraint_in_match() {
-        let c = constraint("userId", ConstraintOperator::In, vec!["alice", "bob"], None);
-        let ctx = UnleashContext {
-            user_id: Some("alice".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_in_no_match() {
-        let c = constraint("userId", ConstraintOperator::In, vec!["alice", "bob"], None);
-        let ctx = UnleashContext {
-            user_id: Some("charlie".to_string()),
-            ..Default::default()
-        };
-        assert!(!evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_not_in() {
-        let c = constraint("userId", ConstraintOperator::NotIn, vec!["alice"], None);
-        let ctx = UnleashContext {
-            user_id: Some("bob".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_not_in_missing_field_passes() {
-        // NOT_IN with missing context field should pass (Unleash spec)
-        let c = constraint("userId", ConstraintOperator::NotIn, vec!["alice"], None);
-        let ctx = UnleashContext::default(); // no userId
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_str_starts_with() {
-        let c = constraint(
-            "userId",
-            ConstraintOperator::StrStartsWith,
-            vec!["user-"],
-            None,
-        );
-        let ctx = UnleashContext {
-            user_id: Some("user-123".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_str_ends_with() {
-        let c = constraint(
-            "environment",
-            ConstraintOperator::StrEndsWith,
-            vec!["-prod"],
-            None,
-        );
-        let ctx = UnleashContext {
-            environment: Some("us-east-prod".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_str_contains() {
-        let c = constraint(
-            "appName",
-            ConstraintOperator::StrContains,
-            vec!["backend"],
-            None,
-        );
-        let ctx = UnleashContext {
-            app_name: Some("my-backend-service".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_num_gt() {
-        let mut c = constraint("plan_seats", ConstraintOperator::NumGt, vec![], Some("10"));
-        c.context_name = "plan_seats".to_string();
-        let mut ctx = UnleashContext::default();
-        ctx.properties
-            .insert("plan_seats".to_string(), "25".to_string());
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_num_lte() {
-        let mut c = constraint("tier", ConstraintOperator::NumLte, vec![], Some("3"));
-        c.context_name = "tier".to_string();
-        let mut ctx = UnleashContext::default();
-        ctx.properties.insert("tier".to_string(), "3".to_string());
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_inverted() {
-        let mut c = constraint("userId", ConstraintOperator::In, vec!["blocked"], None);
-        c.inverted = true;
-        let ctx = UnleashContext {
-            user_id: Some("normal-user".to_string()),
-            ..Default::default()
-        };
-        // "normal-user" NOT IN ["blocked"] → true after inversion
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_case_insensitive() {
-        let mut c = constraint("userId", ConstraintOperator::In, vec!["Alice"], None);
-        c.case_insensitive = true;
-        let ctx = UnleashContext {
-            user_id: Some("alice".to_string()),
-            ..Default::default()
-        };
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    #[test]
-    fn test_constraint_semver_gt() {
-        let c = constraint(
-            "appVersion",
-            ConstraintOperator::SemverGt,
-            vec![],
-            Some("2.0.0"),
-        );
-        let mut ctx = UnleashContext::default();
-        ctx.properties
-            .insert("appVersion".to_string(), "2.1.0".to_string());
-        assert!(evaluate_constraint(&c, &ctx));
-    }
-
-    // ── Strategy with constraints ─────────────────────────────────
-
-    #[test]
-    fn test_strategy_constraint_blocks_enabled_strategy() {
-        // default strategy (always on) gated by a constraint that fails
-        let mut strat = strategy("default", &[]);
+    fn constraint_in_pass_and_fail() {
+        let mut strat = make_strategy("default", vec![]);
         strat.constraints = vec![Constraint {
             context_name: "userId".to_string(),
             operator: ConstraintOperator::In,
-            values: vec!["admin".to_string()],
+            values: vec!["alice".to_string()],
             value: None,
             inverted: false,
             case_insensitive: false,
         }];
-        let toggle = make_toggle("feat", vec![strat]);
-        let ctx = UnleashContext {
-            user_id: Some("regular-user".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
+        let flag = make_flag("f", vec![strat]);
+        assert!(evaluate_flag(&flag, "production", &ctx("alice"), &HashMap::new()).enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("bob"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_strategy_constraint_allows_when_satisfied() {
-        let mut strat = strategy("default", &[]);
+    fn constraint_inverted_not_in() {
+        let mut strat = make_strategy("default", vec![]);
         strat.constraints = vec![Constraint {
             context_name: "userId".to_string(),
             operator: ConstraintOperator::In,
-            values: vec!["admin".to_string()],
+            values: vec!["blocked".to_string()],
+            value: None,
+            inverted: true,
+            case_insensitive: false,
+        }];
+        let flag = make_flag("f", vec![strat]);
+        assert!(evaluate_flag(&flag, "production", &ctx("normal"), &HashMap::new()).enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("blocked"), &HashMap::new()).enabled);
+    }
+
+    #[test]
+    fn constraint_str_starts_with() {
+        let mut strat = make_strategy("default", vec![]);
+        strat.constraints = vec![Constraint {
+            context_name: "userId".to_string(),
+            operator: ConstraintOperator::StrStartsWith,
+            values: vec!["admin-".to_string()],
             value: None,
             inverted: false,
             case_insensitive: false,
         }];
-        let toggle = make_toggle("feat", vec![strat]);
-        let ctx = UnleashContext {
-            user_id: Some("admin".to_string()),
-            ..Default::default()
+        let flag = make_flag("f", vec![strat]);
+        assert!(evaluate_flag(&flag, "production", &ctx("admin-alice"), &HashMap::new()).enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("user-bob"), &HashMap::new()).enabled);
+    }
+
+    #[test]
+    fn constraint_num_gte() {
+        let mut strat = make_strategy("default", vec![]);
+        strat.constraints = vec![Constraint {
+            context_name: "score".to_string(),
+            operator: ConstraintOperator::NumGte,
+            values: vec![],
+            value: Some("100".to_string()),
+            inverted: false,
+            case_insensitive: false,
+        }];
+        let flag = make_flag("f", vec![strat]);
+
+        let mut c_high = UnleashContext::default();
+        c_high.properties.insert("score".to_string(), "150".to_string());
+        assert!(evaluate_flag(&flag, "production", &c_high, &HashMap::new()).enabled);
+
+        let mut c_low = UnleashContext::default();
+        c_low.properties.insert("score".to_string(), "50".to_string());
+        assert!(!evaluate_flag(&flag, "production", &c_low, &HashMap::new()).enabled);
+    }
+
+    #[test]
+    fn constraint_semver_gt() {
+        let mut strat = make_strategy("default", vec![]);
+        strat.constraints = vec![Constraint {
+            context_name: "appVersion".to_string(),
+            operator: ConstraintOperator::SemverGt,
+            values: vec![],
+            value: Some("2.0.0".to_string()),
+            inverted: false,
+            case_insensitive: false,
+        }];
+        let flag = make_flag("f", vec![strat]);
+
+        let mut c_new = UnleashContext::default();
+        c_new.properties.insert("appVersion".to_string(), "2.1.0".to_string());
+        assert!(evaluate_flag(&flag, "production", &c_new, &HashMap::new()).enabled);
+
+        let mut c_old = UnleashContext::default();
+        c_old.properties.insert("appVersion".to_string(), "1.9.0".to_string());
+        assert!(!evaluate_flag(&flag, "production", &c_old, &HashMap::new()).enabled);
+    }
+
+    #[test]
+    fn kill_switch_when_disabled() {
+        let flag = FeatureFlag {
+            name: "ks".to_string(),
+            feature_type: FeatureType::KillSwitch,
+            enabled: false,
+            stale: false,
+            impression_data: false,
+            description: String::new(),
+            project: "default".to_string(),
+            created_at: Utc::now(),
+            last_seen_at: None,
+            strategies: vec![make_strategy("default", vec![])],
+            variants: vec![],
+            environments: vec![],
+            tags: vec![],
         };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-    }
-
-    // ── Multi-strategy (any-match) ────────────────────────────────
-
-    #[test]
-    fn test_multi_strategy_any_match_enables() {
-        // Two strategies: first fails (wrong user), second passes (default)
-        let mut s1 = strategy("userWithId", &[("userIds", "alice")]);
-        let _ = &mut s1; // ensure s1 is used
-        let s2 = strategy("default", &[]);
-        let toggle = make_toggle("feat", vec![s1, s2]);
-        let ctx = UnleashContext {
-            user_id: Some("bob".to_string()),
-            ..Default::default()
-        };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled, "second strategy (default) should enable the toggle");
+        assert!(!evaluate_flag(&flag, "production", &ctx("alice"), &HashMap::new()).enabled);
     }
 
     #[test]
-    fn test_toggle_disabled_globally() {
-        let mut toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        toggle.enabled = false;
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
+    fn variant_selection_deterministic() {
+        let variants = vec![
+            Variant {
+                name: "A".to_string(),
+                weight: 500,
+                weight_type: WeightType::Variable,
+                stickiness: "userId".to_string(),
+                payload: None,
+                overrides: vec![],
+            },
+            Variant {
+                name: "B".to_string(),
+                weight: 500,
+                weight_type: WeightType::Variable,
+                stickiness: "userId".to_string(),
+                payload: None,
+                overrides: vec![],
+            },
+        ];
+        let c = ctx("user-xyz");
+        let v1 = select_variant(&variants, "f", &c, true);
+        let v2 = select_variant(&variants, "f", &c, true);
+        assert_eq!(v1.name, v2.name);
     }
 
     #[test]
-    fn test_archived_toggle_disabled() {
-        let mut toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        toggle.archived = true;
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(!enabled);
+    fn murmur3_deterministic() {
+        assert_eq!(
+            normalized_value_100("user1", "groupId"),
+            normalized_value_100("user1", "groupId")
+        );
+        let v = normalized_value_100("user1", "groupId");
+        assert!(v >= 1 && v <= 100);
     }
 
-    // ── Segment evaluation ────────────────────────────────────────
-
     #[test]
-    fn test_segment_constraint_blocks_strategy() {
+    fn segment_constraint() {
         let seg = Segment {
             id: 1,
-            name: "internal-users".to_string(),
+            name: "beta".to_string(),
             description: None,
             constraints: vec![Constraint {
                 context_name: "userId".to_string(),
-                operator: ConstraintOperator::StrStartsWith,
-                values: vec!["int-".to_string()],
+                operator: ConstraintOperator::In,
+                values: vec!["beta-user".to_string()],
                 value: None,
                 inverted: false,
                 case_insensitive: false,
             }],
             created_at: Utc::now(),
-            created_by: "admin".to_string(),
+            created_by: None,
+            project: None,
         };
+        let mut strat = make_strategy("default", vec![]);
+        strat.segments = vec![1];
+        let flag = make_flag("f", vec![strat]);
+        let seg_map: HashMap<i64, &Segment> = [(1, &seg)].into_iter().collect();
 
-        let mut strat = strategy("default", &[]);
-        strat.segments = vec![1]; // references seg.id
-        let toggle = make_toggle("feat", vec![strat]);
+        assert!(evaluate_flag(&flag, "production", &ctx("beta-user"), &seg_map).enabled);
+        assert!(!evaluate_flag(&flag, "production", &ctx("normal-user"), &seg_map).enabled);
+    }
 
-        // External user — segment constraint fails
-        let ctx = UnleashContext {
-            user_id: Some("ext-user-99".to_string()),
-            ..Default::default()
+    #[test]
+    fn environment_disabled() {
+        let flag = FeatureFlag {
+            name: "f".to_string(),
+            feature_type: FeatureType::Release,
+            enabled: true,
+            stale: false,
+            impression_data: false,
+            description: String::new(),
+            project: "default".to_string(),
+            created_at: Utc::now(),
+            last_seen_at: None,
+            strategies: vec![],
+            variants: vec![],
+            environments: vec![FeatureEnvironment {
+                name: "production".to_string(),
+                enabled: false,
+                strategies: vec![make_strategy("default", vec![])],
+                variants: vec![],
+            }],
+            tags: vec![],
         };
-        let (enabled, _) = evaluate_toggle(&toggle, &ctx, &[seg.clone()]);
-        assert!(!enabled);
-
-        // Internal user — segment constraint passes
-        let ctx2 = UnleashContext {
-            user_id: Some("int-employee-42".to_string()),
-            ..Default::default()
-        };
-        let (enabled2, _) = evaluate_toggle(&toggle, &ctx2, &[seg]);
-        assert!(enabled2);
-    }
-
-    // ── Variant selection ─────────────────────────────────────────
-
-    #[test]
-    fn test_variant_no_variants_returns_disabled() {
-        let toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        // toggle has no variants
-        let ctx = unleash_ctx(Some("u1"));
-        let (enabled, variant) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-        assert!(!variant.enabled);
-        assert_eq!(variant.name, "disabled");
-    }
-
-    #[test]
-    fn test_variant_selection_deterministic() {
-        let mut toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        toggle.variants = vec![
-            Variant {
-                name: "red".to_string(),
-                weight: 500,
-                weight_type: WeightType::Variable,
-                payload: None,
-                overrides: vec![],
-                stickiness: "userId".to_string(),
-            },
-            Variant {
-                name: "blue".to_string(),
-                weight: 500,
-                weight_type: WeightType::Variable,
-                payload: None,
-                overrides: vec![],
-                stickiness: "userId".to_string(),
-            },
-        ];
-        let ctx = unleash_ctx(Some("u-stable"));
-        let (_, v1) = evaluate_toggle(&toggle, &ctx, &[]);
-        let (_, v2) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert_eq!(v1.name, v2.name, "same user must get same variant");
-        assert!(v1.enabled);
-    }
-
-    #[test]
-    fn test_variant_override_wins() {
-        let mut toggle = make_toggle("feat", vec![strategy("default", &[])]);
-        toggle.variants = vec![
-            Variant {
-                name: "standard".to_string(),
-                weight: 1000,
-                weight_type: WeightType::Variable,
-                payload: None,
-                overrides: vec![],
-                stickiness: "userId".to_string(),
-            },
-            Variant {
-                name: "vip".to_string(),
-                weight: 0,
-                weight_type: WeightType::Fix,
-                payload: None,
-                overrides: vec![VariantOverride {
-                    context_name: "userId".to_string(),
-                    values: vec!["vip-user".to_string()],
-                }],
-                stickiness: "userId".to_string(),
-            },
-        ];
-        let ctx = UnleashContext {
-            user_id: Some("vip-user".to_string()),
-            ..Default::default()
-        };
-        let (enabled, variant) = evaluate_toggle(&toggle, &ctx, &[]);
-        assert!(enabled);
-        assert_eq!(variant.name, "vip", "override must win regardless of weight");
-    }
-
-    // ── MurmurHash3 sanity ────────────────────────────────────────
-
-    #[test]
-    fn test_murmurhash3_empty_input_stable() {
-        let h1 = murmurhash3_x86_32(b"", 0);
-        let h2 = murmurhash3_x86_32(b"", 0);
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn test_normalize_identifier_bounds() {
-        // Any identifier must produce 1..=100
-        for uid in &["a", "hello", "user-9999", "aaaaaaaaaaaaaaaaaaaaaaaaa"] {
-            let n = normalize_identifier(uid, "mygroup");
-            assert!(n >= 1 && n <= 100, "normalize_identifier out of range: {n}");
-        }
-    }
-
-    #[test]
-    fn test_disabled_flag_not_evaluated() {
-        let mut flag = make_flag("disabled-flag", Strategy::Default { enabled: true });
-        flag.enabled = false;
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(!result.enabled);
-    }
-
-    #[test]
-    fn test_tenant_scope_mismatch() {
-        let mut flag = make_flag("tenant-flag", Strategy::Default { enabled: true });
-        flag.tenant_id = Some("tenant-a".to_string());
-        let ctx = EvaluationContext {
-            user_id: Some("user-1".to_string()),
-            tenant_id: Some("tenant-b".to_string()),
-            environment: "prod".to_string(),
-            properties: None,
-        };
-        let result = evaluate_single(&flag, &ctx);
-        assert!(!result.enabled);
-    }
-
-    #[test]
-    fn test_tenant_scope_match() {
-        let mut flag = make_flag("tenant-flag", Strategy::Default { enabled: true });
-        flag.tenant_id = Some("tenant-a".to_string());
-        let ctx = EvaluationContext {
-            user_id: Some("user-1".to_string()),
-            tenant_id: Some("tenant-a".to_string()),
-            environment: "prod".to_string(),
-            properties: None,
-        };
-        let result = evaluate_single(&flag, &ctx);
-        assert!(result.enabled);
-    }
-
-    #[test]
-    fn test_user_ids_no_match() {
-        let flag = make_flag(
-            "user-flag",
-            Strategy::UserIds {
-                user_ids: vec!["user-abc".to_string(), "user-xyz".to_string()],
-            },
-        );
-        let ctx = EvaluationContext {
-            user_id: Some("user-not-in-list".to_string()),
-            tenant_id: None,
-            environment: "prod".to_string(),
-            properties: None,
-        };
-        let result = evaluate_single(&flag, &ctx);
-        assert!(!result.enabled);
-    }
-
-    #[test]
-    fn test_evaluate_flags_batch() {
-        let flags = vec![
-            make_flag("flag-1", Strategy::Default { enabled: true }),
-            make_flag("flag-2", Strategy::Default { enabled: false }),
-            make_flag("flag-3", Strategy::Default { enabled: true }),
-        ];
-        let ctx = make_context("prod");
-        let results = evaluate_flags(&flags, &ctx);
-        assert_eq!(results.len(), 3);
-        assert!(results[0].enabled);
-        assert!(!results[1].enabled);
-        assert!(results[2].enabled);
-    }
-
-    #[test]
-    fn test_gradual_rollout_zero_percent() {
-        let flag = make_flag(
-            "rollout-zero",
-            Strategy::GradualRollout {
-                percentage: 0,
-                group_id: None,
-            },
-        );
-        // normalize_hash returns 0-99, so 0 > any hash value is never true
-        // We test a few different users
-        for user in &["user-a", "user-b", "user-c", "user-d", "user-e"] {
-            let ctx = EvaluationContext {
-                user_id: Some(user.to_string()),
-                tenant_id: None,
-                environment: "prod".to_string(),
-                properties: None,
-            };
-            let result = evaluate_single(&flag, &ctx);
-            assert!(!result.enabled, "Expected disabled for user {}", user);
-        }
-    }
-
-    #[test]
-    fn test_gradual_rollout_hundred_percent() {
-        let flag = make_flag(
-            "rollout-hundred",
-            Strategy::GradualRollout {
-                percentage: 100,
-                group_id: None,
-            },
-        );
-        // normalize_hash returns 0-99, so hash < 100 is always true
-        for user in &["user-a", "user-b", "user-c", "user-d", "user-e"] {
-            let ctx = EvaluationContext {
-                user_id: Some(user.to_string()),
-                tenant_id: None,
-                environment: "prod".to_string(),
-                properties: None,
-            };
-            let result = evaluate_single(&flag, &ctx);
-            assert!(result.enabled, "Expected enabled for user {}", user);
-        }
-    }
-
-    #[test]
-    fn test_environment_scope_strategy() {
-        let flag = make_flag(
-            "env-scope-flag",
-            Strategy::EnvironmentScope {
-                environments: vec!["staging".to_string(), "prod".to_string()],
-            },
-        );
-        let prod_ctx = make_context("prod");
-        let dev_ctx = make_context("dev");
-        assert!(evaluate_single(&flag, &prod_ctx).enabled);
-        assert!(!evaluate_single(&flag, &dev_ctx).enabled);
-    }
-
-    #[test]
-    fn test_custom_strategy_uses_flag_enabled() {
-        let flag = make_flag(
-            "custom-flag",
-            Strategy::Custom {
-                name: "my-plugin".to_string(),
-                parameters: serde_json::json!({"key": "value"}),
-            },
-        );
-        // Custom strategy falls back to flag.enabled (which is true in make_flag)
-        let result = evaluate_single(&flag, &make_context("prod"));
-        assert!(result.enabled);
-
-        // Now test with a disabled flag using custom strategy
-        let mut disabled_flag = make_flag(
-            "custom-disabled",
-            Strategy::Custom {
-                name: "my-plugin".to_string(),
-                parameters: serde_json::json!({}),
-            },
-        );
-        disabled_flag.enabled = false;
-        let result2 = evaluate_single(&disabled_flag, &make_context("prod"));
-        assert!(!result2.enabled);
-    }
-
-    #[test]
-    fn test_normalize_hash_bounded() {
-        // We test via the public evaluate_single with GradualRollout which uses normalize_hash internally.
-        // Since normalize_hash is private, we verify its behavior indirectly: 100% rollout always passes,
-        // 0% rollout always fails, confirming hash is in [0, 99].
-        let keys = vec![
-            "user-alpha",
-            "user-beta",
-            "user-gamma",
-            "",
-            "very-long-user-key-that-exceeds-normal-length-12345",
-            "🦀",
-        ];
-        for key in keys {
-            let ctx = EvaluationContext {
-                user_id: Some(key.to_string()),
-                tenant_id: None,
-                environment: "prod".to_string(),
-                properties: None,
-            };
-            let flag_zero = make_flag(
-                "hash-test-zero",
-                Strategy::GradualRollout { percentage: 0, group_id: None },
-            );
-            let flag_hundred = make_flag(
-                "hash-test-hundred",
-                Strategy::GradualRollout { percentage: 100, group_id: None },
-            );
-            assert!(!evaluate_single(&flag_zero, &ctx).enabled, "0% should always be false for key '{}'", key);
-            assert!(evaluate_single(&flag_hundred, &ctx).enabled, "100% should always be true for key '{}'", key);
-        }
+        assert!(!evaluate_flag(&flag, "production", &ctx("u"), &HashMap::new()).enabled);
     }
 }

@@ -1,341 +1,177 @@
-//! In-memory content-addressable registry store.
-//! All public methods take `&self` and use internal RwLock for concurrency.
+//! PostgreSQL migrations for Harbor-compatible metadata
+//! (projects, robots, audit, webhooks, quotas, labels, scan results).
+//! The actual blob/manifest bytes live in RegistryStorage (in-memory / object store).
 
-use crate::types::{
-    AccessRule, StoredBlob, StoredManifest, TagPolicy, UploadSession,
-    WebhookConfig, ReplicationTarget, ScanResult, Permission,
-};
-use std::collections::HashMap;
-use tokio::sync::RwLock;
+/// v1: core Harbor schema — projects, robots, audit, webhooks, quotas, labels.
+pub const MIGRATION_V1: &str = r#"
+CREATE TABLE IF NOT EXISTS projects (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT NOT NULL UNIQUE,
+    public      BOOLEAN NOT NULL DEFAULT false,
+    owner_name  TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    repo_count  BIGINT NOT NULL DEFAULT 0,
+    metadata    JSONB NOT NULL DEFAULT '{}',
+    creation_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-// ── Digest helpers ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS robot_accounts (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    level        TEXT NOT NULL DEFAULT 'project',
+    project_id   UUID REFERENCES projects(id) ON DELETE CASCADE,
+    secret_hash  TEXT NOT NULL,
+    expires_at   TIMESTAMPTZ,
+    disabled     BOOLEAN NOT NULL DEFAULT false,
+    permissions  JSONB NOT NULL DEFAULT '[]',
+    creation_time TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_robot_name_project
+    ON robot_accounts(name, project_id);
 
-/// Compute `sha256:<hex>` for the given bytes using ring.
-pub fn compute_digest(data: &[u8]) -> String {
-    use ring::digest::{digest, SHA256};
-    let d = digest(&SHA256, data);
-    let hex: String = d.as_ref().iter().map(|b| format!("{b:02x}")).collect();
-    format!("sha256:{hex}")
-}
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id            BIGSERIAL PRIMARY KEY,
+    username      TEXT NOT NULL,
+    resource      TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    operation     TEXT NOT NULL,
+    op_time       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_op_time ON audit_logs(op_time DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_resource ON audit_logs(resource_type, operation);
 
-/// Return true if the bytes match the claimed digest string (`sha256:<hex>`).
-pub fn verify_digest(data: &[u8], claimed: &str) -> bool {
-    compute_digest(data) == claimed
-}
+CREATE TABLE IF NOT EXISTS webhook_policies (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id   UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    targets      JSONB NOT NULL DEFAULT '[]',
+    event_types  TEXT[] NOT NULL DEFAULT '{}',
+    enabled      BOOLEAN NOT NULL DEFAULT true,
+    creation_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_name_proj ON webhook_policies(project_id, name);
 
-// ── Inner state ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quotas (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ref_id        BIGINT NOT NULL,
+    ref_kind      TEXT NOT NULL DEFAULT 'project',
+    ref_name      TEXT NOT NULL DEFAULT '',
+    hard_count    BIGINT NOT NULL DEFAULT -1,
+    hard_storage  BIGINT NOT NULL DEFAULT -1,
+    used_count    BIGINT NOT NULL DEFAULT 0,
+    used_storage  BIGINT NOT NULL DEFAULT 0,
+    creation_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_date   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-#[derive(Default)]
-struct Inner {
-    blobs: HashMap<String, StoredBlob>,
-    /// (repository, digest) -> manifest
-    manifests: HashMap<(String, String), StoredManifest>,
-    /// (repository, tag) -> digest
-    tags: HashMap<(String, String), String>,
-    sessions: HashMap<String, UploadSession>,
-    /// repository -> access rules
-    access_rules: HashMap<String, Vec<AccessRule>>,
-    /// repository -> tag policy
-    tag_policies: HashMap<String, TagPolicy>,
-    scan_results: HashMap<String, Vec<ScanResult>>,
-    webhooks: Vec<WebhookConfig>,
-    replication_targets: Vec<ReplicationTarget>,
-}
+CREATE TABLE IF NOT EXISTS labels (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL DEFAULT '',
+    color         TEXT NOT NULL DEFAULT '#0000FF',
+    scope         TEXT NOT NULL DEFAULT 'g',
+    project_id    UUID REFERENCES projects(id) ON DELETE CASCADE,
+    creation_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_label_name_scope ON labels(name, scope, project_id);
+"#;
 
-// ── Public store ──────────────────────────────────────────────────────────────
+/// v2: scanning, replication, retention, immutable tag rules.
+pub const MIGRATION_V2: &str = r#"
+CREATE TABLE IF NOT EXISTS scan_reports (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    artifact_digest TEXT NOT NULL,
+    scan_status     TEXT NOT NULL DEFAULT 'not_scanned',
+    severity        TEXT NOT NULL DEFAULT 'NONE',
+    scanner         JSONB NOT NULL DEFAULT '{}',
+    vulnerabilities JSONB NOT NULL DEFAULT '[]',
+    start_time      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    end_time        TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_scan_digest ON scan_reports(artifact_digest);
 
-pub struct RegistryStore {
-    inner: RwLock<Inner>,
-}
+CREATE TABLE IF NOT EXISTS replication_registries (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            TEXT NOT NULL UNIQUE,
+    url             TEXT NOT NULL,
+    credential_type TEXT NOT NULL DEFAULT 'basic',
+    access_key      TEXT,
+    access_secret   TEXT,
+    insecure        BOOLEAN NOT NULL DEFAULT false,
+    creation_time   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-impl Default for RegistryStore {
-    fn default() -> Self {
-        Self { inner: RwLock::new(Inner::default()) }
-    }
-}
+CREATE TABLE IF NOT EXISTS replication_policies (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              TEXT NOT NULL UNIQUE,
+    description       TEXT NOT NULL DEFAULT '',
+    src_registry_id   UUID REFERENCES replication_registries(id),
+    dest_registry_id  UUID REFERENCES replication_registries(id),
+    dest_namespace    TEXT NOT NULL DEFAULT '',
+    trigger           JSONB NOT NULL DEFAULT '{"trigger_type":"manual"}',
+    filters           JSONB NOT NULL DEFAULT '[]',
+    deletion          BOOLEAN NOT NULL DEFAULT false,
+    override_dest     BOOLEAN NOT NULL DEFAULT false,
+    enabled           BOOLEAN NOT NULL DEFAULT true,
+    speed             INT,
+    creation_time     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_time       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-impl RegistryStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
+CREATE TABLE IF NOT EXISTS replication_executions (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    policy_id   UUID NOT NULL REFERENCES replication_policies(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL DEFAULT 'InProgress',
+    trigger     TEXT NOT NULL DEFAULT 'manual',
+    start_time  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    end_time    TIMESTAMPTZ,
+    succeeded   BIGINT NOT NULL DEFAULT 0,
+    failed      BIGINT NOT NULL DEFAULT 0,
+    in_progress BIGINT NOT NULL DEFAULT 0,
+    stopped     BIGINT NOT NULL DEFAULT 0
+);
 
-    // ── Blob operations ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS retention_policies (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    scope       JSONB NOT NULL DEFAULT '{"level":"project","ref":0}',
+    trigger     JSONB NOT NULL DEFAULT '{"kind":"Schedule"}',
+    rules       JSONB NOT NULL DEFAULT '[]'
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_retention_project ON retention_policies(project_id);
 
-    pub async fn get_blob(&self, digest: &str) -> Option<StoredBlob> {
-        self.inner.read().await.blobs.get(digest).cloned()
-    }
+CREATE TABLE IF NOT EXISTS immutable_tag_rules (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id   UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    disabled     BOOLEAN NOT NULL DEFAULT false,
+    tag_selectors JSONB NOT NULL DEFAULT '[]',
+    scope_selectors JSONB NOT NULL DEFAULT '{}'
+);
 
-    pub async fn blob_exists(&self, digest: &str) -> bool {
-        self.inner.read().await.blobs.contains_key(digest)
-    }
+CREATE TABLE IF NOT EXISTS preheat_providers (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT NOT NULL UNIQUE,
+    endpoint    TEXT NOT NULL,
+    auth_mode   TEXT NOT NULL DEFAULT 'none',
+    enabled     BOOLEAN NOT NULL DEFAULT true,
+    status      TEXT NOT NULL DEFAULT 'healthy'
+);
 
-    /// Store a blob; returns its digest. Returns Err if `expected_digest` is
-    /// provided and does not match.
-    pub async fn put_blob(
-        &self,
-        data: Vec<u8>,
-        expected_digest: Option<&str>,
-    ) -> Result<String, String> {
-        let digest = compute_digest(&data);
-        if let Some(expected) = expected_digest {
-            if digest != expected {
-                return Err(format!("digest mismatch: expected {expected}, got {digest}"));
-            }
-        }
-        let size = data.len() as u64;
-        self.inner.write().await.blobs.insert(
-            digest.clone(),
-            StoredBlob { digest: digest.clone(), size, content: data },
-        );
-        Ok(digest)
-    }
-
-    pub async fn delete_blob(&self, digest: &str) -> bool {
-        self.inner.write().await.blobs.remove(digest).is_some()
-    }
-
-    /// Return all blob digests not referenced by any manifest in any repo.
-    pub async fn unreferenced_blobs(&self) -> Vec<String> {
-        let inner = self.inner.read().await;
-        let mut referenced = std::collections::HashSet::new();
-        for manifest in inner.manifests.values() {
-            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&manifest.content) {
-                collect_digests(&v, &mut referenced);
-            }
-        }
-        inner
-            .blobs
-            .keys()
-            .filter(|d| !referenced.contains(d.as_str()))
-            .cloned()
-            .collect()
-    }
-
-    // ── Manifest operations ───────────────────────────────────────────────────
-
-    pub async fn get_manifest(&self, repo: &str, reference: &str) -> Option<StoredManifest> {
-        let inner = self.inner.read().await;
-        // Try as digest first, then as tag.
-        if reference.starts_with("sha256:") {
-            return inner.manifests.get(&(repo.to_string(), reference.to_string())).cloned();
-        }
-        // Look up tag -> digest
-        let digest = inner.tags.get(&(repo.to_string(), reference.to_string()))?.clone();
-        inner.manifests.get(&(repo.to_string(), digest)).cloned()
-    }
-
-    pub async fn put_manifest(
-        &self,
-        repo: &str,
-        reference: &str,
-        media_type: String,
-        content: Vec<u8>,
-    ) -> Result<String, String> {
-        let digest = compute_digest(&content);
-        let manifest = StoredManifest {
-            digest: digest.clone(),
-            media_type,
-            content,
-        };
-        let mut inner = self.inner.write().await;
-        inner.manifests.insert((repo.to_string(), digest.clone()), manifest);
-        // If reference is a tag (not a digest), store tag mapping.
-        if !reference.starts_with("sha256:") {
-            inner.tags.insert((repo.to_string(), reference.to_string()), digest.clone());
-        }
-        Ok(digest)
-    }
-
-    pub async fn delete_manifest(&self, repo: &str, reference: &str) -> bool {
-        let mut inner = self.inner.write().await;
-        let digest = if reference.starts_with("sha256:") {
-            reference.to_string()
-        } else {
-            match inner.tags.remove(&(repo.to_string(), reference.to_string())) {
-                Some(d) => d,
-                None => return false,
-            }
-        };
-        inner.manifests.remove(&(repo.to_string(), digest)).is_some()
-    }
-
-    // ── Tag operations ────────────────────────────────────────────────────────
-
-    pub async fn list_tags(&self, repo: &str) -> Vec<String> {
-        let inner = self.inner.read().await;
-        inner
-            .tags
-            .keys()
-            .filter(|(r, _)| r == repo)
-            .map(|(_, t)| t.clone())
-            .collect()
-    }
-
-    pub async fn tag_exists(&self, repo: &str, tag: &str) -> bool {
-        self.inner.read().await.tags.contains_key(&(repo.to_string(), tag.to_string()))
-    }
-
-    // ── Repository catalog ────────────────────────────────────────────────────
-
-    pub async fn list_repositories(&self) -> Vec<String> {
-        let inner = self.inner.read().await;
-        let mut repos: std::collections::HashSet<String> = inner
-            .manifests
-            .keys()
-            .map(|(r, _)| r.clone())
-            .collect();
-        repos.extend(inner.tags.keys().map(|(r, _)| r.clone()));
-        let mut v: Vec<String> = repos.into_iter().collect();
-        v.sort();
-        v
-    }
-
-    // ── Upload sessions ───────────────────────────────────────────────────────
-
-    pub async fn create_session(&self, repo: &str) -> String {
-        let id = uuid::Uuid::new_v4().to_string();
-        let session = UploadSession {
-            session_id: id.clone(),
-            repository: repo.to_string(),
-            data: Vec::new(),
-            offset: 0,
-        };
-        self.inner.write().await.sessions.insert(id.clone(), session);
-        id
-    }
-
-    pub async fn get_session(&self, id: &str) -> Option<UploadSession> {
-        self.inner.read().await.sessions.get(id).cloned()
-    }
-
-    pub async fn append_session(&self, id: &str, chunk: Vec<u8>) -> Option<u64> {
-        let mut inner = self.inner.write().await;
-        let session = inner.sessions.get_mut(id)?;
-        session.data.extend_from_slice(&chunk);
-        session.offset = session.data.len() as u64;
-        Some(session.offset)
-    }
-
-    pub async fn complete_session(
-        &self,
-        id: &str,
-        digest: &str,
-    ) -> Result<(String, String), String> {
-        let mut inner = self.inner.write().await;
-        let session = inner.sessions.remove(id).ok_or_else(|| format!("session {id} not found"))?;
-        let repo = session.repository.clone();
-        let actual = compute_digest(&session.data);
-        if actual != digest {
-            // Put session back so caller can retry
-            inner.sessions.insert(id.to_string(), session);
-            return Err(format!("digest mismatch: expected {digest}, got {actual}"));
-        }
-        let size = session.data.len() as u64;
-        inner.blobs.insert(
-            digest.to_string(),
-            StoredBlob { digest: digest.to_string(), size, content: session.data },
-        );
-        Ok((repo, actual))
-    }
-
-    pub async fn delete_session(&self, id: &str) -> bool {
-        self.inner.write().await.sessions.remove(id).is_some()
-    }
-
-    // ── Policy / access ───────────────────────────────────────────────────────
-
-    pub async fn set_tag_policy(&self, repo: &str, policy: TagPolicy) {
-        self.inner.write().await.tag_policies.insert(repo.to_string(), policy);
-    }
-
-    pub async fn get_tag_policy(&self, repo: &str) -> TagPolicy {
-        self.inner.read().await.tag_policies.get(repo).cloned().unwrap_or_default()
-    }
-
-    pub async fn is_tag_immutable(&self, repo: &str, tag: &str) -> bool {
-        let inner = self.inner.read().await;
-        let policy = match inner.tag_policies.get(repo) {
-            Some(p) => p,
-            None => return false,
-        };
-        if policy.all_immutable {
-            return true;
-        }
-        policy.immutable_tags.iter().any(|t| t == tag)
-    }
-
-    pub async fn set_access_rules(&self, repo: &str, rules: Vec<AccessRule>) {
-        self.inner.write().await.access_rules.insert(repo.to_string(), rules);
-    }
-
-    pub async fn check_permission(&self, repo: &str, subject: &str, perm: &Permission) -> bool {
-        let inner = self.inner.read().await;
-        let rules = match inner.access_rules.get(repo) {
-            Some(r) => r,
-            // No rules = open
-            None => return true,
-        };
-        rules.iter().any(|r| {
-            r.subject == subject
-                && (r.permission == *perm
-                    || r.permission == Permission::Admin
-                    || (*perm == Permission::Pull && r.permission == Permission::Push))
-        })
-    }
-
-    // ── Webhooks ──────────────────────────────────────────────────────────────
-
-    pub async fn add_webhook(&self, wh: WebhookConfig) {
-        self.inner.write().await.webhooks.push(wh);
-    }
-
-    pub async fn get_webhooks(&self) -> Vec<WebhookConfig> {
-        self.inner.read().await.webhooks.clone()
-    }
-
-    // ── Replication ───────────────────────────────────────────────────────────
-
-    pub async fn add_replication_target(&self, target: ReplicationTarget) {
-        self.inner.write().await.replication_targets.push(target);
-    }
-
-    pub async fn get_replication_targets(&self) -> Vec<ReplicationTarget> {
-        self.inner.read().await.replication_targets.clone()
-    }
-
-    // ── Scan results ──────────────────────────────────────────────────────────
-
-    pub async fn store_scan_result(&self, result: ScanResult) {
-        let mut inner = self.inner.write().await;
-        inner
-            .scan_results
-            .entry(result.manifest_digest.clone())
-            .or_default()
-            .push(result);
-    }
-
-    pub async fn get_scan_results(&self, digest: &str) -> Vec<ScanResult> {
-        self.inner.read().await.scan_results.get(digest).cloned().unwrap_or_default()
-    }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn collect_digests(value: &serde_json::Value, out: &mut std::collections::HashSet<String>) {
-    match value {
-        serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(d)) = map.get("digest") {
-                out.insert(d.clone());
-            }
-            for v in map.values() {
-                collect_digests(v, out);
-            }
-        }
-        serde_json::Value::Array(arr) => {
-            for v in arr {
-                collect_digests(v, out);
-            }
-        }
-        _ => {}
-    }
-}
+CREATE TABLE IF NOT EXISTS preheat_policies (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id   UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    provider_id  UUID NOT NULL REFERENCES preheat_providers(id),
+    filters      JSONB,
+    trigger      JSONB,
+    enabled      BOOLEAN NOT NULL DEFAULT true,
+    creation_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    update_time   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+"#;

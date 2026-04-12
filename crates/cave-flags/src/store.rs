@@ -1,274 +1,192 @@
-//! PostgreSQL persistence layer for cave-flags.
-//!
-//! All tables live in the `cave_flags` schema (created via `FlagsPool::ensure_schema`).
-//! The schema evolves through versioned migrations applied idempotently at startup.
-//!
-//! ## Schema summary
-//! | Table                 | Purpose                                              |
-//! |-----------------------|------------------------------------------------------|
-//! | `features`            | Feature toggle definitions (strategies/variants JSONB) |
-//! | `feature_environments`| Per-environment enable/disable + strategy overrides  |
-//! | `segments`            | Reusable constraint groups                          |
-//! | `projects`            | Project metadata                                    |
-//! | `events`              | Append-only audit log (feeds Sovereign Ledger)      |
-//! | `client_metrics`      | SDK usage counters (yes/no/variant per toggle)      |
-//! | `client_instances`    | Registered SDK client instances                     |
+//! PostgreSQL schema for the flags module (Unleash-compatible).
 
-use crate::pool::FlagsPool;
-
-// ================================================================
-// Migrations
-// ================================================================
-
-/// V1: Core feature toggle tables.
+/// v1: feature flags, environments, projects, segments, variants.
 pub const MIGRATION_V1: &str = r#"
-CREATE TABLE IF NOT EXISTS features (
-    name             TEXT PRIMARY KEY,
-    description      TEXT NOT NULL DEFAULT '',
-    project          TEXT NOT NULL DEFAULT 'default',
-    enabled          BOOLEAN NOT NULL DEFAULT true,
-    archived         BOOLEAN NOT NULL DEFAULT false,
-    stale            BOOLEAN NOT NULL DEFAULT false,
-    impression_data  BOOLEAN NOT NULL DEFAULT false,
-    toggle_type      TEXT NOT NULL DEFAULT 'release',
-    strategies       JSONB NOT NULL DEFAULT '[]',
-    variants         JSONB NOT NULL DEFAULT '[]',
-    tags             JSONB NOT NULL DEFAULT '[]',
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_by       TEXT NOT NULL DEFAULT 'system',
-    last_seen_at     TIMESTAMPTZ
+CREATE TABLE IF NOT EXISTS projects (
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    description         TEXT NOT NULL DEFAULT '',
+    default_stickiness  TEXT NOT NULL DEFAULT 'default',
+    mode                TEXT NOT NULL DEFAULT 'open',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+INSERT INTO projects (id, name) VALUES ('default', 'Default')
+    ON CONFLICT (id) DO NOTHING;
 
-CREATE INDEX IF NOT EXISTS idx_features_project  ON features(project);
-CREATE INDEX IF NOT EXISTS idx_features_archived ON features(archived);
+CREATE TABLE IF NOT EXISTS environments (
+    name       TEXT PRIMARY KEY,
+    type       TEXT NOT NULL DEFAULT 'production',
+    enabled    BOOLEAN NOT NULL DEFAULT true,
+    protected  BOOLEAN NOT NULL DEFAULT false,
+    sort_order INT NOT NULL DEFAULT 0
+);
+INSERT INTO environments (name, type, sort_order) VALUES
+    ('development', 'development', 1),
+    ('staging',     'staging',     2),
+    ('production',  'production',  3)
+    ON CONFLICT (name) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS features (
+    name            TEXT PRIMARY KEY,
+    feature_type    TEXT NOT NULL DEFAULT 'release',
+    description     TEXT NOT NULL DEFAULT '',
+    enabled         BOOLEAN NOT NULL DEFAULT true,
+    stale           BOOLEAN NOT NULL DEFAULT false,
+    impression_data BOOLEAN NOT NULL DEFAULT false,
+    project         TEXT NOT NULL DEFAULT 'default' REFERENCES projects(id),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at    TIMESTAMPTZ,
+    archived_at     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_features_project ON features(project);
+CREATE INDEX IF NOT EXISTS idx_features_type ON features(feature_type);
+CREATE INDEX IF NOT EXISTS idx_features_stale ON features(stale);
 
 CREATE TABLE IF NOT EXISTS feature_environments (
     feature_name TEXT NOT NULL REFERENCES features(name) ON DELETE CASCADE,
-    environment  TEXT NOT NULL,
-    enabled      BOOLEAN NOT NULL DEFAULT true,
-    strategies   JSONB NOT NULL DEFAULT '[]',
-    variants     JSONB NOT NULL DEFAULT '[]',
+    environment  TEXT NOT NULL REFERENCES environments(name),
+    enabled      BOOLEAN NOT NULL DEFAULT false,
     PRIMARY KEY (feature_name, environment)
 );
 
-CREATE TABLE IF NOT EXISTS projects (
-    id          TEXT PRIMARY KEY,
-    name        TEXT NOT NULL,
-    description TEXT NOT NULL DEFAULT '',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS feature_strategies (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    feature_name TEXT NOT NULL REFERENCES features(name) ON DELETE CASCADE,
+    environment  TEXT NOT NULL REFERENCES environments(name),
+    name         TEXT NOT NULL,
+    parameters   JSONB NOT NULL DEFAULT '{}',
+    constraints  JSONB NOT NULL DEFAULT '[]',
+    segments     BIGINT[] NOT NULL DEFAULT '{}',
+    sort_order   INT NOT NULL DEFAULT 0,
+    disabled     BOOLEAN NOT NULL DEFAULT false,
+    variants     JSONB NOT NULL DEFAULT '[]'
 );
+CREATE INDEX IF NOT EXISTS idx_strategies_feature_env ON feature_strategies(feature_name, environment);
 
-INSERT INTO projects (id, name, description) VALUES ('default', 'Default', 'Default project')
-ON CONFLICT (id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS feature_variants (
+    feature_name  TEXT NOT NULL REFERENCES features(name) ON DELETE CASCADE,
+    environment   TEXT NOT NULL REFERENCES environments(name),
+    name          TEXT NOT NULL,
+    weight        INT NOT NULL DEFAULT 1000,
+    weight_type   TEXT NOT NULL DEFAULT 'variable',
+    stickiness    TEXT NOT NULL DEFAULT 'default',
+    payload_type  TEXT,
+    payload_value TEXT,
+    overrides     JSONB NOT NULL DEFAULT '[]',
+    sort_order    INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (feature_name, environment, name)
+);
 
 CREATE TABLE IF NOT EXISTS segments (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT NOT NULL UNIQUE,
-    description TEXT NOT NULL DEFAULT '',
+    description TEXT,
     constraints JSONB NOT NULL DEFAULT '[]',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_by  TEXT NOT NULL DEFAULT 'system'
+    project     TEXT REFERENCES projects(id),
+    created_by  TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS events (
+CREATE TABLE IF NOT EXISTS tags (
+    feature_name TEXT NOT NULL REFERENCES features(name) ON DELETE CASCADE,
+    tag_type     TEXT NOT NULL DEFAULT 'simple',
+    value        TEXT NOT NULL,
+    PRIMARY KEY (feature_name, tag_type, value)
+);
+"#;
+
+/// v2: tokens, metrics, context fields, banners, change requests, impressions.
+pub const MIGRATION_V2: &str = r#"
+CREATE TABLE IF NOT EXISTS api_tokens (
+    secret       TEXT PRIMARY KEY,
+    username     TEXT NOT NULL,
+    token_type   TEXT NOT NULL DEFAULT 'client',
+    environment  TEXT REFERENCES environments(name),
+    projects     TEXT[] NOT NULL DEFAULT '{}',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at   TIMESTAMPTZ,
+    seen_at      TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_tokens_type ON api_tokens(token_type);
+
+CREATE TABLE IF NOT EXISTS metrics (
     id           BIGSERIAL PRIMARY KEY,
-    event_type   TEXT NOT NULL,
-    created_by   TEXT NOT NULL,
-    data         JSONB,
-    pre_data     JSONB,
-    feature_name TEXT,
-    project      TEXT,
-    environment  TEXT,
-    tags         JSONB NOT NULL DEFAULT '[]',
+    app_name     TEXT NOT NULL,
+    instance_id  TEXT NOT NULL,
+    feature_name TEXT NOT NULL,
+    yes_count    BIGINT NOT NULL DEFAULT 0,
+    no_count     BIGINT NOT NULL DEFAULT 0,
+    bucket_start TIMESTAMPTZ NOT NULL,
+    bucket_stop  TIMESTAMPTZ NOT NULL,
+    variants     JSONB NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_metrics_feature ON metrics(feature_name, bucket_start DESC);
+
+CREATE TABLE IF NOT EXISTS client_applications (
+    app_name    TEXT NOT NULL,
+    instance_id TEXT NOT NULL,
+    sdk_version TEXT,
+    strategies  TEXT[] NOT NULL DEFAULT '{}',
+    started     TIMESTAMPTZ,
+    interval    INT NOT NULL DEFAULT 15000,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (app_name, instance_id)
+);
+
+CREATE TABLE IF NOT EXISTS context_fields (
+    name         TEXT PRIMARY KEY,
+    description  TEXT NOT NULL DEFAULT '',
+    legal_values JSONB NOT NULL DEFAULT '[]',
+    stickiness   BOOLEAN NOT NULL DEFAULT false,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+INSERT INTO context_fields (name, description, stickiness) VALUES
+    ('userId',        'The user ID',         true),
+    ('sessionId',     'The session ID',      true),
+    ('remoteAddress', 'The remote address',  false),
+    ('environment',   'The environment',     false),
+    ('appName',       'The application name',false),
+    ('currentTime',   'The current time',    false)
+    ON CONFLICT (name) DO NOTHING;
 
-CREATE INDEX IF NOT EXISTS idx_events_feature ON events(feature_name);
-CREATE INDEX IF NOT EXISTS idx_events_type    ON events(event_type);
-"#;
-
-/// V2: Metrics and client instance tracking.
-pub const MIGRATION_V2: &str = r#"
-CREATE TABLE IF NOT EXISTS client_metrics (
-    id             BIGSERIAL PRIMARY KEY,
-    feature_name   TEXT NOT NULL,
-    app_name       TEXT NOT NULL,
-    environment    TEXT NOT NULL DEFAULT 'default',
-    timestamp      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    yes_count      BIGINT NOT NULL DEFAULT 0,
-    no_count       BIGINT NOT NULL DEFAULT 0,
-    variant_counts JSONB NOT NULL DEFAULT '{}'
+CREATE TABLE IF NOT EXISTS banners (
+    id         BIGSERIAL PRIMARY KEY,
+    message    TEXT NOT NULL,
+    variant    TEXT NOT NULL DEFAULT 'info',
+    link       TEXT,
+    link_text  TEXT,
+    enabled    BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_metrics_feature
-    ON client_metrics(feature_name, timestamp DESC);
-
-CREATE TABLE IF NOT EXISTS client_instances (
-    id            BIGSERIAL PRIMARY KEY,
-    app_name      TEXT NOT NULL,
-    instance_id   TEXT NOT NULL,
-    sdk_version   TEXT,
-    strategies    TEXT[] NOT NULL DEFAULT '{}',
-    registered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    last_seen     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(app_name, instance_id)
+CREATE TABLE IF NOT EXISTS change_requests (
+    id           BIGSERIAL PRIMARY KEY,
+    title        TEXT NOT NULL,
+    state        TEXT NOT NULL DEFAULT 'Draft',
+    project      TEXT NOT NULL REFERENCES projects(id),
+    environment  TEXT NOT NULL REFERENCES environments(name),
+    min_approvals INT NOT NULL DEFAULT 1,
+    approvals    JSONB NOT NULL DEFAULT '[]',
+    rejections   JSONB NOT NULL DEFAULT '[]',
+    changes      JSONB NOT NULL DEFAULT '[]',
+    created_by   TEXT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS idx_cr_project_env ON change_requests(project, environment, state);
+
+CREATE TABLE IF NOT EXISTS impression_events (
+    id           BIGSERIAL PRIMARY KEY,
+    event_type   TEXT NOT NULL,
+    enabled      BOOLEAN,
+    variant      TEXT,
+    feature_name TEXT NOT NULL,
+    app_name     TEXT,
+    environment  TEXT,
+    user_id      TEXT,
+    occurred_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_impression_feature ON impression_events(feature_name, occurred_at DESC);
 "#;
-
-/// All migrations in version order.
-pub const MIGRATIONS: &[(i32, &str)] = &[(1, MIGRATION_V1), (2, MIGRATION_V2)];
-
-// ================================================================
-// Flag Store
-// ================================================================
-
-/// Persistence layer for the flags module.
-///
-/// All async CRUD methods use `FlagsPool` to acquire connections from
-/// the deadpool-postgres pool.  The public methods are fully typed and
-/// ready for implementation; they return `Ok(…)` stubs today and will
-/// be wired to real SQL as `cave-flags` matures.
-pub struct FlagStore<'a> {
-    pub pool: &'a FlagsPool,
-}
-
-impl<'a> FlagStore<'a> {
-    pub fn new(pool: &'a FlagsPool) -> Self {
-        Self { pool }
-    }
-
-    // ── Startup ──────────────────────────────────────────────────
-
-    /// Apply all pending schema migrations.
-    pub async fn migrate(&self) -> Result<(), String> {
-        self.pool.run_migrations(MIGRATIONS).await
-    }
-
-    // ── Features ─────────────────────────────────────────────────
-
-    /// List all non-archived feature toggles, optionally filtered by project.
-    ///
-    /// ```sql
-    /// SELECT * FROM cave_flags.features
-    /// WHERE archived = false [AND project = $1]
-    /// ORDER BY name
-    /// ```
-    pub async fn list_features(
-        &self,
-        project: Option<&str>,
-    ) -> Result<Vec<crate::models::FeatureToggle>, String> {
-        let _ = project;
-        Ok(vec![])
-    }
-
-    /// Fetch a single toggle by name.
-    pub async fn get_feature(
-        &self,
-        name: &str,
-    ) -> Result<Option<crate::models::FeatureToggle>, String> {
-        let _ = name;
-        Ok(None)
-    }
-
-    /// Persist a newly created toggle.
-    pub async fn create_feature(
-        &self,
-        toggle: &crate::models::FeatureToggle,
-    ) -> Result<(), String> {
-        let _ = toggle;
-        Ok(())
-    }
-
-    /// Update an existing toggle's mutable fields.
-    pub async fn update_feature(
-        &self,
-        toggle: &crate::models::FeatureToggle,
-    ) -> Result<(), String> {
-        let _ = toggle;
-        Ok(())
-    }
-
-    /// Archive (soft-delete) a toggle.
-    pub async fn archive_feature(&self, name: &str) -> Result<(), String> {
-        let _ = name;
-        Ok(())
-    }
-
-    // ── Feature environments ─────────────────────────────────────
-
-    /// Enable or disable a toggle for a specific environment.
-    pub async fn set_environment_enabled(
-        &self,
-        feature_name: &str,
-        environment: &str,
-        enabled: bool,
-    ) -> Result<(), String> {
-        let _ = (feature_name, environment, enabled);
-        Ok(())
-    }
-
-    // ── Segments ─────────────────────────────────────────────────
-
-    /// List all segments.
-    pub async fn list_segments(&self) -> Result<Vec<crate::models::Segment>, String> {
-        Ok(vec![])
-    }
-
-    /// Fetch a segment by ID.
-    pub async fn get_segment(&self, id: i64) -> Result<Option<crate::models::Segment>, String> {
-        let _ = id;
-        Ok(None)
-    }
-
-    /// Create a new segment.
-    pub async fn create_segment(
-        &self,
-        segment: &crate::models::Segment,
-    ) -> Result<(), String> {
-        let _ = segment;
-        Ok(())
-    }
-
-    // ── Events ───────────────────────────────────────────────────
-
-    /// Append an event to the audit log.
-    pub async fn append_event(&self, event: &crate::models::Event) -> Result<(), String> {
-        let _ = event;
-        Ok(())
-    }
-
-    /// List recent events, newest first.
-    pub async fn list_events(&self, limit: i64) -> Result<Vec<crate::models::Event>, String> {
-        let _ = limit;
-        Ok(vec![])
-    }
-
-    // ── Metrics ──────────────────────────────────────────────────
-
-    /// Record a metrics bucket from a client SDK.
-    pub async fn record_metrics(
-        &self,
-        app_name: &str,
-        environment: &str,
-        toggles: &std::collections::HashMap<String, crate::models::ToggleMetrics>,
-    ) -> Result<(), String> {
-        let _ = (app_name, environment, toggles);
-        Ok(())
-    }
-
-    // ── Client instances ─────────────────────────────────────────
-
-    /// Upsert a client SDK registration (ON CONFLICT UPDATE last_seen).
-    pub async fn upsert_client_instance(
-        &self,
-        app_name: &str,
-        instance_id: &str,
-        sdk_version: Option<&str>,
-        strategies: &[String],
-    ) -> Result<(), String> {
-        let _ = (app_name, instance_id, sdk_version, strategies);
-        Ok(())
-    }
-}

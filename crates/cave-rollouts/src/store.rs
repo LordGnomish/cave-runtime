@@ -1,96 +1,55 @@
-//! In-memory store for rollouts, experiments, analysis templates and runs.
+//! PostgreSQL schema for rollouts, analysis templates, and analysis runs.
 
-use crate::types::{AnalysisRun, AnalysisTemplate, Experiment, Rollout};
-use tokio::sync::RwLock;
-use uuid::Uuid;
+/// v1: core rollout schema.
+pub const MIGRATION_V1: &str = r#"
+CREATE TABLE IF NOT EXISTS rollouts (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name         TEXT NOT NULL,
+    namespace    TEXT NOT NULL DEFAULT 'default',
+    workload_ref JSONB NOT NULL,
+    strategy     JSONB NOT NULL,
+    status       JSONB NOT NULL DEFAULT '{"phase":"Pending","canary_weight":0,"conditions":[]}',
+    traffic      JSONB,
+    analysis     JSONB,
+    notifications JSONB NOT NULL DEFAULT '[]',
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_rollout_name_ns ON rollouts(namespace, name);
+CREATE INDEX IF NOT EXISTS idx_rollout_phase ON rollouts((status->>'phase'));
 
-#[derive(Default)]
-pub struct RolloutsStore {
-    pub rollouts: RwLock<Vec<Rollout>>,
-    pub experiments: RwLock<Vec<Experiment>>,
-    pub templates: RwLock<Vec<AnalysisTemplate>>,
-    pub runs: RwLock<Vec<AnalysisRun>>,
-}
+CREATE TABLE IF NOT EXISTS analysis_templates (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        TEXT NOT NULL,
+    namespace   TEXT NOT NULL DEFAULT 'default',
+    metrics     JSONB NOT NULL DEFAULT '[]',
+    dry_run_metrics TEXT[] NOT NULL DEFAULT '{}',
+    args        JSONB NOT NULL DEFAULT '[]',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_tmpl_name_ns ON analysis_templates(namespace, name);
 
-impl RolloutsStore {
-    pub fn new() -> Self {
-        Self::default()
-    }
+CREATE TABLE IF NOT EXISTS analysis_runs (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rollout_id    UUID NOT NULL REFERENCES rollouts(id) ON DELETE CASCADE,
+    template_name TEXT NOT NULL,
+    phase         TEXT NOT NULL DEFAULT 'Pending',
+    metrics       JSONB NOT NULL DEFAULT '[]',
+    args          JSONB NOT NULL DEFAULT '[]',
+    started_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at  TIMESTAMPTZ,
+    message       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_analysis_run_rollout ON analysis_runs(rollout_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_run_phase ON analysis_runs(phase);
 
-    // ── Rollouts ──────────────────────────────────────────────────────────────
-
-    pub async fn insert_rollout(&self, r: Rollout) {
-        self.rollouts.write().await.push(r);
-    }
-
-    pub async fn list_rollouts(&self) -> Vec<Rollout> {
-        self.rollouts.read().await.clone()
-    }
-
-    pub async fn get_rollout(&self, id: Uuid) -> Option<Rollout> {
-        self.rollouts.read().await.iter().find(|r| r.id == id).cloned()
-    }
-
-    pub async fn update_rollout(&self, updated: Rollout) -> bool {
-        let mut rollouts = self.rollouts.write().await;
-        if let Some(r) = rollouts.iter_mut().find(|r| r.id == updated.id) {
-            *r = updated;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub async fn delete_rollout(&self, id: Uuid) -> bool {
-        let mut rollouts = self.rollouts.write().await;
-        let before = rollouts.len();
-        rollouts.retain(|r| r.id != id);
-        rollouts.len() < before
-    }
-
-    // ── Experiments ───────────────────────────────────────────────────────────
-
-    pub async fn insert_experiment(&self, e: Experiment) {
-        self.experiments.write().await.push(e);
-    }
-
-    pub async fn list_experiments(&self) -> Vec<Experiment> {
-        self.experiments.read().await.clone()
-    }
-
-    pub async fn get_experiment(&self, id: Uuid) -> Option<Experiment> {
-        self.experiments.read().await.iter().find(|e| e.id == id).cloned()
-    }
-
-    // ── Analysis Templates ────────────────────────────────────────────────────
-
-    pub async fn insert_template(&self, t: AnalysisTemplate) {
-        self.templates.write().await.push(t);
-    }
-
-    pub async fn list_templates(&self) -> Vec<AnalysisTemplate> {
-        self.templates.read().await.clone()
-    }
-
-    pub async fn get_template(&self, id: Uuid) -> Option<AnalysisTemplate> {
-        self.templates.read().await.iter().find(|t| t.id == id).cloned()
-    }
-
-    pub async fn get_template_by_name(&self, name: &str) -> Option<AnalysisTemplate> {
-        self.templates.read().await.iter().find(|t| t.name == name).cloned()
-    }
-
-    // ── Analysis Runs ─────────────────────────────────────────────────────────
-
-    pub async fn insert_run(&self, r: AnalysisRun) {
-        self.runs.write().await.push(r);
-    }
-
-    pub async fn list_runs(&self) -> Vec<AnalysisRun> {
-        self.runs.read().await.clone()
-    }
-
-    pub async fn get_run(&self, id: Uuid) -> Option<AnalysisRun> {
-        self.runs.read().await.iter().find(|r| r.id == id).cloned()
-    }
-}
+CREATE TABLE IF NOT EXISTS rollout_events (
+    id          BIGSERIAL PRIMARY KEY,
+    rollout_id  UUID NOT NULL REFERENCES rollouts(id) ON DELETE CASCADE,
+    event_type  TEXT NOT NULL,
+    reason      TEXT NOT NULL,
+    message     TEXT NOT NULL,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_rollout_events_rid ON rollout_events(rollout_id, occurred_at DESC);
+"#;
