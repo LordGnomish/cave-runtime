@@ -120,7 +120,6 @@ async fn main() -> anyhow::Result<()> {
 
     // Start background tasks
     metrics_state.clone().start().await;
-
     let app = Router::new()
         // Portal UI
         .route("/", get(portal))
