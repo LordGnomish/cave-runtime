@@ -15,6 +15,8 @@ cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }
+# HA & DR
+cave-ha = { path = "../cave-ha" }
 # Phase 1 modules
 cave-flags = { path = "../cave-flags" }
 cave-secrets = { path = "../cave-secrets" }
