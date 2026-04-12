@@ -1,0 +1,50 @@
+[package]
+name = "cave-pg"
+description = "Embedded PostgreSQL-compatible database engine — full wire protocol v3, MVCC storage, SQL executor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["codec", "io"] }
+futures-util = { version = "0.3", features = ["sink"] }
+# Byte manipulation
+bytes = "1"
+# SQL parsing
+sqlparser = { version = "=0.52.0", features = [] }
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+# Crypto — SCRAM-SHA-256 / MD5 auth
+md-5 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+base64 = "0.22"
+rand = "0.8"
+# Concurrency
+dashmap = "6"
+parking_lot = "0.12"
+# TLS
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tokio-rustls = "0.26"
+# Decimal arithmetic for NUMERIC type
+rust_decimal = { version = "1", features = ["serde-float"] }
+# Regex for SQL functions
+regex = { workspace = true }
+# Hex encoding/decoding for bytea
+hex = "0.4"
+# Bitflags for tuple infomask
+bitflags = "2"
+
+[dev-dependencies]
+tokio-postgres = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
