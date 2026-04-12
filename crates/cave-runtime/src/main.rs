@@ -72,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -101,6 +102,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
 >>>>>>> claude/romantic-kapitsa
+=======
+    let infra_state = Arc::new(cave_infra::InfraState::default());
+>>>>>>> claude/silly-matsumoto
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -166,6 +170,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -253,6 +258,9 @@ async fn main() -> anyhow::Result<()> {
         // Phase 3 module routers
         .merge(cave_logs::router(logs_state))
 >>>>>>> claude/sharp-wiles
+=======
+        .merge(cave_infra::router(infra_state))
+>>>>>>> claude/silly-matsumoto
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -279,6 +287,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Platform modules: cluster");
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -320,6 +329,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Phase 3 modules: logs");
 >>>>>>> claude/sharp-wiles
+=======
+    info!("Phase 5 modules: infra (LLM+MCP IaC)");
+>>>>>>> claude/silly-matsumoto
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()

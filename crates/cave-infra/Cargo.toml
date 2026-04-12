@@ -2,6 +2,7 @@
 name = "cave-infra"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 description = "LLM+MCP-native Infrastructure-as-Code — replaces Terraform and Crossplane"
 =======
 description = "LLM+MCP intent-based IaC — replaces Terraform/Crossplane with natural language infrastructure management"
@@ -9,6 +10,9 @@ description = "LLM+MCP intent-based IaC — replaces Terraform/Crossplane with n
 =======
 description = "LLM+MCP-native Infrastructure-as-Code — replaces Terraform and Crossplane"
 >>>>>>> claude/interesting-khorana
+=======
+description = "LLM+MCP native IaC — replaces Terraform and Crossplane with intent-driven infrastructure"
+>>>>>>> claude/silly-matsumoto
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -16,8 +20,12 @@ license.workspace = true
 [dependencies]
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> claude/interesting-khorana
+=======
+cave-core = { path = "../cave-core" }
+>>>>>>> claude/silly-matsumoto
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -27,6 +35,7 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 cave-core = { path = "../cave-core" }
@@ -44,3 +53,7 @@ reqwest = { workspace = true }
 >>>>>>> claude/great-sanderson
 =======
 >>>>>>> claude/interesting-khorana
+=======
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+>>>>>>> claude/silly-matsumoto
