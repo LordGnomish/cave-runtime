@@ -92,6 +92,12 @@ impl DashboardState {
     }
 }
 
+impl Default for DashboardState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 type AppState = Arc<DashboardState>;
 
 // ─── Error helpers ────────────────────────────────────────────────────────────

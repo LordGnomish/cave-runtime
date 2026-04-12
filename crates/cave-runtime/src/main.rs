@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
     let vulns_state = Arc::new(cave_vulns::State::default());
     let sbom_state = Arc::new(cave_sbom::State::default());
     let uptime_state = Arc::new(cave_uptime::State::default());
-    let cost_state = Arc::new(cave_cost::State::default());
+    let cost_state = Arc::new(cave_cost::CostState::default());
     let sign_state = Arc::new(cave_sign::State::default());
     let forensics_state = Arc::new(cave_forensics::State::default());
 
@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
     let chaos_state = Arc::new(cave_chaos::State::default());
     let policy_state = Arc::new(cave_policy::State::default());
     let dast_state = Arc::new(cave_dast::State::default());
-    let backup_state = Arc::new(cave_backup::State::default());
+    let backup_state = Arc::new(cave_backup::BackupState::default());
     let pam_state = Arc::new(cave_pam::State::default());
 
     // LLM Gateway
@@ -79,30 +79,28 @@ async fn main() -> anyhow::Result<()> {
 
     // Infrastructure & Networking
     let api_gateway_state = Arc::new(cave_gateway::GatewayState::default());
-    let dns_state = Arc::new(cave_dns::DnsState::default());
+    let dns_zones = Arc::new(cave_dns::zone::ZoneManager::default());
     let mesh_state = Arc::new(cave_mesh::MeshState::default());
     let cluster_state = Arc::new(cave_cluster::ClusterState::default());
-    let ha_state = Arc::new(cave_ha::HaState::default());
-    let infra_state = Arc::new(cave_infra::InfraModuleState::default());
+    let infra_state = Arc::new(cave_infra::InfraState::default());
 
     // Data & Storage
     let pg_state = Arc::new(cave_pg::PgState::default());
-    let cache_state = Arc::new(cave_cache::CacheState::default());
-    let store_state = Arc::new(cave_store::StoreState::default());
+    let store_state = cave_store::StoreState::in_memory();
     let streams_state = Arc::new(cave_streams::StreamsState::default());
 
     // Observability
-    let metrics_state = Arc::new(cave_metrics::MetricsState::new(cave_metrics::MetricsConfig::default()));
-    let logs_state = Arc::new(cave_logs::LogsState::default());
-    let trace_state = Arc::new(cave_trace::TraceState::default());
+    let metrics_state = cave_metrics::MetricsState::new();
+    let logs_state = cave_logs::default_state();
+    let trace_state = Arc::new(cave_trace::TraceState::new(&cave_trace::TraceConfig::default()));
 
     // Security & Admission
     let admission_state = Arc::new(cave_admission::AdmissionState::default());
     let security_state = Arc::new(cave_security::SecurityState::default());
-    let vault_store = Arc::new(std::sync::Mutex::new(cave_vault::VaultStore::default()));
+    let vault_state = cave_vault::VaultState::new();
 
     // Developer Experience
-    let dashboard_state = Arc::new(cave_dashboard::DashboardState::default());
+    let dashboard_state = Arc::new(cave_dashboard::DashboardState::new());
     let docs_site_state = Arc::new(cave_docs_site::DocsSiteState::default());
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
     let pipelines_state = Arc::new(cave_pipelines::State::default());
@@ -119,7 +117,8 @@ async fn main() -> anyhow::Result<()> {
     let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
 
     // Start background tasks
-    metrics_state.clone().start().await;
+    metrics_state.start_background_tasks();
+
     let app = Router::new()
         // Portal UI
         .route("/", get(portal))
@@ -168,24 +167,22 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_llm_gateway::router(llm_gateway_state))
         // Infrastructure & Networking
         .merge(cave_gateway::router(api_gateway_state))
-        .merge(cave_dns::router(dns_state))
+        .merge(cave_dns::router(dns_zones))
         .merge(cave_mesh::router(mesh_state))
         .merge(cave_cluster::router(cluster_state))
-        .merge(cave_ha::router(ha_state))
         .merge(cave_infra::router(infra_state))
         // Data & Storage
         .merge(cave_pg::router(pg_state))
-        .merge(cave_cache::router(cache_state))
         .merge(cave_store::router(store_state))
         .merge(cave_streams::router(streams_state))
         // Observability
-        .merge(metrics_state.router())
+        .merge(cave_metrics::router(metrics_state.clone()))
         .merge(cave_logs::router(logs_state))
         .merge(cave_trace::router(trace_state))
         // Security & Admission
         .merge(cave_admission::router(admission_state))
         .merge(cave_security::router(security_state))
-        .merge(cave_vault::router(vault_store))
+        .merge(cave_vault::router(vault_state))
         // Developer Experience
         .merge(cave_dashboard::router(dashboard_state))
         .merge(cave_docs_site::router(docs_site_state))

@@ -37,6 +37,15 @@ impl PipelinesState {
     }
 }
 
+impl Default for PipelinesState {
+    fn default() -> Self {
+        todo!("PipelinesState requires a database pool — use PipelinesState::new(pool)")
+    }
+}
+
+/// Legacy alias used by cave-runtime.
+pub type State = PipelinesState;
+
 pub fn router(state: Arc<PipelinesState>) -> Router {
     routes::create_router(state)
 }

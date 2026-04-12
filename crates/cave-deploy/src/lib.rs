@@ -29,6 +29,12 @@ impl DeployState {
     }
 }
 
+impl Default for DeployState {
+    fn default() -> Self {
+        todo!("DeployState requires a database pool — use DeployState::new(pool)")
+    }
+}
+
 pub fn router(state: Arc<DeployState>) -> Router {
     routes::create_router(state)
 }

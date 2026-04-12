@@ -57,6 +57,12 @@ impl FlagsState {
     }
 }
 
+impl Default for FlagsState {
+    fn default() -> Self {
+        todo!("FlagsState requires a database pool — use FlagsState::new(pool)")
+    }
+}
+
 /// Create the axum router for the flags module.
 pub fn router(state: Arc<FlagsState>) -> Router {
     routes::create_router(state)

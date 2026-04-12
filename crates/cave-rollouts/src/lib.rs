@@ -32,6 +32,12 @@ pub struct RolloutsState {
     pub pool: Arc<CavePool>,
 }
 
+impl Default for RolloutsState {
+    fn default() -> Self {
+        todo!("RolloutsState requires a database pool — use RolloutsState {{ pool }}")
+    }
+}
+
 /// Create the axum router for this module.
 pub fn router(state: Arc<RolloutsState>) -> Router {
     routes::create_router(state)

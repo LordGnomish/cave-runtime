@@ -63,6 +63,12 @@ pub struct State {
     pub pool: Arc<CavePool>,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        todo!("cave_policy::State requires a database pool")
+    }
+}
+
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {
     let policy_state = Arc::new(PolicyState::new(state.pool.clone()));
