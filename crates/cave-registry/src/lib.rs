@@ -1,90 +1,40 @@
-//! CAVE Registry — container image registry and package proxy/cache.
+//! CAVE Registry — Docker/OCI/Harbor-compatible container registry.
 //!
-//! Replaces Pulp / Harbor with a Rust-native implementation.
-//! Implements the Docker Registry HTTP API V2 / OCI Distribution Spec.
+//! Replaces: Harbor
+//! Upstream tracking: see cave-upstream.
+//!
+//! ## Implemented
+//! - Docker Registry V2 API (all 16 endpoints)
+//! - OCI Distribution Spec 1.1 (referrers, artifacts)
+//! - OCI Image Spec (manifest, index, config, layers)
+//! - Content-addressable blob storage (SHA-256)
+//! - Garbage collection
+//! - Harbor Admin API v2.0: projects, robot accounts, vulnerability scanning,
+//!   replication rules, tag retention, immutable tags, webhooks, quotas,
+//!   audit logs, labels, P2P preheat, LDAP/OIDC config
 
-pub mod docker_v2;
-pub mod engine;
-pub mod error;
 pub mod gc;
-pub mod migrations;
+pub mod harbor;
 pub mod models;
-pub mod policy;
-pub mod replication;
 pub mod routes;
-pub mod scan;
+pub mod storage;
 pub mod store;
-pub mod types;
-pub mod webhook;
 
 use axum::Router;
 use cave_db::CavePool;
-use policy::PolicyManager;
-use replication::ReplicationManager;
-use scan::ScanManager;
 use std::sync::Arc;
-use store::RegistryStore;
-use webhook::WebhookManager;
+use storage::RegistryStorage;
 
-/// Shared state injected into every request handler.
-pub struct AppState {
-    pub store: Arc<RegistryStore>,
-    pub webhooks: Arc<WebhookManager>,
-    pub replication: Arc<ReplicationManager>,
-    pub scanner: Arc<ScanManager>,
-    pub policy: Arc<PolicyManager>,
-}
-
-/// Type alias for consistency with the rest of the workspace.
-pub type RegistryState = AppState;
-pub type State = AppState;
-
-impl Default for AppState {
-    fn default() -> Self {
-        let store = Arc::new(RegistryStore::new());
-        Self {
-            webhooks: Arc::new(WebhookManager::new(Arc::clone(&store))),
-            replication: Arc::new(ReplicationManager::new(Arc::clone(&store))),
-            scanner: Arc::new(ScanManager::new(Arc::clone(&store))),
-            policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
-            store,
-        }
-    }
-}
-
-/// Full registry with DB pool (used at startup).
-pub struct Registry {
-    pub state: Arc<AppState>,
+/// Module state shared across all handlers.
+pub struct RegistryState {
     pub pool: Arc<CavePool>,
+    pub storage: Arc<RegistryStorage>,
 }
 
-impl Registry {
-    /// Create a new registry, run DB migrations, and return a ready instance.
-    pub async fn new(pool: Arc<CavePool>) -> Result<Self, String> {
-        migrations::run(&pool).await?;
-        let state = Arc::new(AppState::default());
-        Ok(Self { state, pool })
-    }
-
-    /// Return an axum Router for mounting in the main application.
-    pub fn router(&self) -> Router {
-        routes::create_router(Arc::clone(&self.state))
-    }
-
-    /// Spawn periodic garbage collection (default: every 24 hours).
-    pub fn spawn_gc(&self) {
-        gc::GarbageCollector::spawn_periodic(
-            Arc::clone(&self.state.store),
-            std::time::Duration::from_secs(86400),
-        );
-    }
-}
-
-/// Create the axum router from an `AppState` reference.
-pub fn router(state: Arc<AppState>) -> Router {
-    // docker_v2_router is not merged here because routes/mod.rs already handles
-    // all /v2/{*path} traffic via a single wildcard dispatch handler.
-    routes::create_router(state)
+/// Build the combined axum router (Docker V2 + Harbor Admin API).
+pub fn router(state: Arc<RegistryState>) -> Router {
+    routes::v2::router(Arc::clone(&state))
+        .merge(routes::harbor::router(state))
 }
 
 pub const MODULE_NAME: &str = "registry";

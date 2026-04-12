@@ -1,1144 +1,489 @@
-//! Docker Registry V2 HTTP API handlers.
+//! Docker Registry V2 + OCI Distribution Spec 1.1 routes.
 //!
-//! All paths under /v2/* are dispatched here.  Repository names may contain
-//! forward-slashes (e.g. "library/nginx"), so we use a single wildcard
-//! extractor and parse the path manually.
+//! All repository-scoped endpoints are dispatched through a single
+//! catch-all handler because axum cannot place wildcards in the middle
+//! of a path (e.g. `/v2/{*name}/manifests/{ref}` is not legal).
 
-use crate::{
-    error::RegistryError,
-    store::compute_digest,
-    types::{
-        CatalogResponse, TagsListResponse, MEDIA_MANIFEST_LIST, MEDIA_MANIFEST_V2,
-        MEDIA_OCI_INDEX, MEDIA_OCI_MANIFEST,
-    },
-    AppState,
-};
 use axum::{
     body::Bytes,
     extract::{Path, Query, State},
-    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
-    response::{IntoResponse, Response},
-    Json,
+    http::{header, Method, StatusCode},
+    response::Response,
+    routing::{any, get},
+    Router,
 };
-use serde::Deserialize;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-// ── Path parsing ──────────────────────────────────────────────────────────────
+use crate::{
+    models::{
+        classify_v2_path, Catalog, ReferrersResponse, RegistryErrors, TagList, V2Op,
+        ERR_BLOB_UNKNOWN, ERR_BLOB_UPLOAD_INVALID, ERR_BLOB_UPLOAD_UNKNOWN,
+        ERR_DIGEST_INVALID, ERR_MANIFEST_UNKNOWN, ERR_NAME_UNKNOWN, ERR_UNSUPPORTED,
+    },
+    storage::RegistryStorage,
+    RegistryState,
+};
 
-#[derive(Debug)]
-enum V2Action {
-    Catalog,
-    TagsList { name: String },
-    Manifest { name: String, reference: String },
-    BlobGet { name: String, digest: String },
-    UploadStart { name: String },
-    UploadChunk { name: String, session_id: String },
+// ── Router ────────────────────────────────────────────────────────────────────
+
+pub fn router(state: Arc<RegistryState>) -> Router {
+    Router::new()
+        .route("/v2/", get(version_check))
+        .route("/v2/_catalog", get(catalog))
+        .route("/v2/{*path}", any(dispatch))
+        .with_state(state)
 }
 
-fn parse_path(path: &str) -> Option<V2Action> {
-    let path = path.trim_start_matches('/');
+// ── Response helpers ──────────────────────────────────────────────────────────
 
-    if path == "_catalog" {
-        return Some(V2Action::Catalog);
-    }
-    if let Some(idx) = path.rfind("/manifests/") {
-        let name = path[..idx].to_string();
-        let reference = path[idx + "/manifests/".len()..].to_string();
-        if !name.is_empty() && !reference.is_empty() {
-            return Some(V2Action::Manifest { name, reference });
-        }
-    }
-    if path.ends_with("/tags/list") {
-        let name = path[..path.len() - "/tags/list".len()].to_string();
-        if !name.is_empty() {
-            return Some(V2Action::TagsList { name });
-        }
-    }
-    // uploads with session: /name/blobs/uploads/<uuid>
-    if let Some(idx) = path.rfind("/blobs/uploads/") {
-        let name = path[..idx].to_string();
-        let rest = path[idx + "/blobs/uploads/".len()..].to_string();
-        if !name.is_empty() {
-            if rest.is_empty() {
-                return Some(V2Action::UploadStart { name });
-            } else {
-                return Some(V2Action::UploadChunk { name, session_id: rest });
-            }
-        }
-    }
-    // blobs by digest: /name/blobs/sha256:...
-    if let Some(idx) = path.rfind("/blobs/") {
-        let name = path[..idx].to_string();
-        let digest = path[idx + "/blobs/".len()..].to_string();
-        if !name.is_empty() && !digest.is_empty() {
-            return Some(V2Action::BlobGet { name, digest });
-        }
-    }
-    None
+fn json_response(status: StatusCode, body: String) -> Response {
+    Response::builder()
+        .status(status)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from(body))
+        .unwrap()
 }
 
-fn is_manifest_media_type(mt: &str) -> bool {
-    matches!(
-        mt,
-        MEDIA_MANIFEST_V2 | MEDIA_MANIFEST_LIST | MEDIA_OCI_MANIFEST | MEDIA_OCI_INDEX
-    )
+fn registry_error(status: StatusCode, code: &str, message: &str) -> Response {
+    json_response(status, RegistryErrors::new(code, message).to_json())
 }
 
-fn extract_content_type(headers: &HeaderMap) -> String {
-    headers
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or(MEDIA_MANIFEST_V2)
-        .to_string()
+fn method_not_allowed() -> Response {
+    registry_error(StatusCode::METHOD_NOT_ALLOWED, ERR_UNSUPPORTED, "method not allowed")
 }
 
-// ── Query params ──────────────────────────────────────────────────────────────
+// ── Version check ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize, Default)]
-pub struct PaginationQuery {
-    pub n: Option<usize>,
-    pub last: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Default)]
-pub struct DigestQuery {
-    pub digest: Option<String>,
-}
-
-// ── V2 base check ─────────────────────────────────────────────────────────────
-
-pub async fn v2_check() -> impl IntoResponse {
-    (
-        StatusCode::OK,
-        [(
-            HeaderName::from_static("docker-distribution-api-version"),
-            HeaderValue::from_static("registry/2.0"),
-        )],
-        "",
-    )
-}
-
-// ── Wildcard dispatcher ───────────────────────────────────────────────────────
-
-pub async fn v2_dispatch(
-    method: Method,
-    Path(path): Path<String>,
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(digest_q): Query<DigestQuery>,
-    body: Bytes,
-) -> Response {
-    let action = match parse_path(&path) {
-        Some(a) => a,
-        None => return RegistryError::UnsupportedPath.into_response(),
-    };
-
-    match action {
-        V2Action::Catalog => handle_catalog(state).await,
-        V2Action::TagsList { name } => handle_tags_list(state, name).await,
-        V2Action::Manifest { name, reference } => match method {
-            Method::GET => handle_get_manifest(state, name, reference).await,
-            Method::HEAD => handle_head_manifest(state, name, reference).await,
-            Method::PUT => {
-                handle_put_manifest(state, name, reference, headers, body).await
-            }
-            Method::DELETE => handle_delete_manifest(state, name, reference).await,
-            _ => RegistryError::MethodNotAllowed.into_response(),
-        },
-        V2Action::BlobGet { name, digest } => match method {
-            Method::GET => handle_get_blob(state, name, digest).await,
-            Method::HEAD => handle_head_blob(state, name, digest).await,
-            Method::DELETE => handle_delete_blob(state, name, digest).await,
-            _ => RegistryError::MethodNotAllowed.into_response(),
-        },
-        V2Action::UploadStart { name } => match method {
-            Method::POST => handle_start_upload(state, name, digest_q, body).await,
-            _ => RegistryError::MethodNotAllowed.into_response(),
-        },
-        V2Action::UploadChunk { name, session_id } => match method {
-            Method::PATCH => handle_patch_upload(state, name, session_id, body).await,
-            Method::PUT => {
-                handle_complete_upload(state, name, session_id, digest_q, body).await
-            }
-            Method::DELETE => handle_cancel_upload(state, name, session_id).await,
-            _ => RegistryError::MethodNotAllowed.into_response(),
-        },
-    }
+/// GET /v2/  — Docker Distribution API version check.
+async fn version_check() -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Docker-Distribution-API-Version", "registry/2.0")
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(axum::body::Body::from("{}"))
+        .unwrap()
 }
 
 // ── Catalog ───────────────────────────────────────────────────────────────────
 
-async fn handle_catalog(state: Arc<AppState>) -> Response {
-    let repos = state.store.list_repositories().await;
-    Json(CatalogResponse { repositories: repos }).into_response()
+#[derive(serde::Deserialize)]
+struct PaginationQuery {
+    n: Option<usize>,
+    last: Option<String>,
 }
 
-// ── Tags list ─────────────────────────────────────────────────────────────────
-
-async fn handle_tags_list(state: Arc<AppState>, name: String) -> Response {
-    let mut tags = state.store.list_tags(&name).await;
-    tags.sort();
-    Json(TagsListResponse { name, tags }).into_response()
-}
-
-// ── Manifest handlers ─────────────────────────────────────────────────────────
-
-async fn handle_get_manifest(
-    state: Arc<AppState>,
-    name: String,
-    reference: String,
+/// GET /v2/_catalog  — list repositories.
+async fn catalog(
+    State(state): State<Arc<RegistryState>>,
+    Query(q): Query<PaginationQuery>,
 ) -> Response {
-    match state.store.get_manifest(&name, &reference).await {
-        None => RegistryError::ManifestUnknown.into_response(),
-        Some(m) => {
-            let digest = m.digest.clone();
-            let mt = m.media_type.clone();
-            (
-                StatusCode::OK,
-                [
-                    ("Content-Type", mt),
-                    ("Docker-Content-Digest", digest),
-                    ("Docker-Distribution-Api-Version", "registry/2.0".to_string()),
-                ],
-                m.content,
-            )
-                .into_response()
-        }
+    let mut repos = state.storage.list_repos().await;
+
+    if let Some(ref last) = q.last {
+        repos = repos
+            .into_iter()
+            .skip_while(|r| r != last)
+            .skip(1)
+            .collect();
     }
+    if let Some(n) = q.n {
+        repos.truncate(n);
+    }
+
+    let cat = Catalog { repositories: repos };
+    json_response(StatusCode::OK, serde_json::to_string(&cat).unwrap())
 }
 
-async fn handle_head_manifest(
-    state: Arc<AppState>,
-    name: String,
-    reference: String,
-) -> Response {
-    match state.store.get_manifest(&name, &reference).await {
-        None => RegistryError::ManifestUnknown.into_response(),
-        Some(m) => {
-            let size = m.content.len().to_string();
-            (
-                StatusCode::OK,
-                [
-                    ("Content-Type", m.media_type),
-                    ("Content-Length", size),
-                    ("Docker-Content-Digest", m.digest),
-                    ("Docker-Distribution-Api-Version", "registry/2.0".to_string()),
-                ],
-                "",
-            )
-                .into_response()
-        }
-    }
-}
+// ── Dispatcher ────────────────────────────────────────────────────────────────
 
-async fn handle_put_manifest(
-    state: Arc<AppState>,
-    name: String,
-    reference: String,
-    headers: HeaderMap,
+async fn dispatch(
+    method: Method,
+    Path(path): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    State(state): State<Arc<RegistryState>>,
+    headers: axum::http::HeaderMap,
     body: Bytes,
 ) -> Response {
-    let media_type = extract_content_type(&headers);
+    match classify_v2_path(&path) {
+        V2Op::TagsList(name) => tags_list(state, &name, &query).await,
 
-    if !is_manifest_media_type(&media_type) {
-        return RegistryError::InvalidManifest(format!("unsupported media type: {media_type}"))
-            .into_response();
+        V2Op::Manifest(name, reference) => match method {
+            Method::GET => get_manifest(state, &name, &reference, false).await,
+            Method::HEAD => get_manifest(state, &name, &reference, true).await,
+            Method::PUT => put_manifest(state, &name, &reference, headers, body).await,
+            Method::DELETE => delete_manifest(state, &name, &reference).await,
+            _ => method_not_allowed(),
+        },
+
+        V2Op::Blob(name, digest) => match method {
+            Method::GET => get_blob(state, &name, &digest, false).await,
+            Method::HEAD => get_blob(state, &name, &digest, true).await,
+            Method::DELETE => delete_blob(state, &name, &digest).await,
+            _ => method_not_allowed(),
+        },
+
+        V2Op::BlobUploadInitiate(name) if method == Method::POST => {
+            initiate_upload(state, &name, &query).await
+        }
+
+        V2Op::BlobUploadSession(name, uuid) => match method {
+            Method::PATCH => patch_upload(state, &name, &uuid, headers, body).await,
+            Method::PUT => complete_upload(state, &name, &uuid, &query, body).await,
+            Method::DELETE => cancel_upload(state, &name, &uuid).await,
+            _ => method_not_allowed(),
+        },
+
+        V2Op::Referrers(name, digest) if method == Method::GET => {
+            get_referrers(state, &name, &digest, &query).await
+        }
+
+        _ => registry_error(StatusCode::NOT_FOUND, ERR_NAME_UNKNOWN, "resource not found"),
+    }
+}
+
+// ── Tags ──────────────────────────────────────────────────────────────────────
+
+async fn tags_list(
+    state: Arc<RegistryState>,
+    name: &str,
+    query: &HashMap<String, String>,
+) -> Response {
+    let mut tags = state.storage.list_tags(name).await;
+
+    if let Some(last) = query.get("last") {
+        tags = tags.into_iter().skip_while(|t| t != last).skip(1).collect();
+    }
+    if let Some(n) = query.get("n").and_then(|v| v.parse::<usize>().ok()) {
+        tags.truncate(n);
     }
 
-    // Validate JSON
-    if serde_json::from_slice::<serde_json::Value>(&body).is_err() {
-        return RegistryError::InvalidManifest("body is not valid JSON".to_string())
-            .into_response();
-    }
+    let list = TagList {
+        name: name.to_string(),
+        tags,
+    };
+    json_response(StatusCode::OK, serde_json::to_string(&list).unwrap())
+}
 
-    // Tag immutability check
-    if state.policy.is_tag_immutable(&name, &reference).await {
-        return RegistryError::PolicyViolation(format!(
-            "tag '{reference}' in repository '{name}' is immutable"
-        ))
-        .into_response();
-    }
+// ── Manifests ────────────────────────────────────────────────────────────────
 
-    let content = body.to_vec();
-    match state
-        .store
-        .put_manifest(&name, &reference, media_type.clone(), content.clone())
-        .await
-    {
-        Err(e) => RegistryError::Storage(e).into_response(),
-        Ok(digest) => {
-            let location = format!("/v2/{name}/manifests/{digest}");
-            // Fire push webhook (non-blocking).
-            let tag = if reference.starts_with("sha256:") {
-                None
+async fn get_manifest(
+    state: Arc<RegistryState>,
+    name: &str,
+    reference: &str,
+    head_only: bool,
+) -> Response {
+    match state.storage.get_manifest(name, reference).await {
+        None => registry_error(StatusCode::NOT_FOUND, ERR_MANIFEST_UNKNOWN, "manifest unknown"),
+        Some(entry) => {
+            let size = entry.data.len();
+            let builder = Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, entry.content_type.clone())
+                .header("Docker-Content-Digest", entry.digest.clone())
+                .header(header::CONTENT_LENGTH, size)
+                .header("Docker-Distribution-API-Version", "registry/2.0");
+
+            if head_only {
+                builder.body(axum::body::Body::empty()).unwrap()
             } else {
-                Some(reference.as_str())
-            };
-            state
-                .webhooks
-                .fire(
-                    crate::types::WebhookEvent::Push,
-                    &name,
-                    Some(&digest),
-                    tag,
-                )
-                .await;
-            // Trigger replication (non-blocking).
-            state
-                .replication
-                .replicate_manifest(&name, &reference, content.clone(), media_type, digest.clone())
-                .await;
-            // Trigger scan (non-blocking; runs inline but short-circuits quickly for noop).
-            state.scanner.trigger(&digest, content).await;
-
-            (
-                StatusCode::CREATED,
-                [
-                    ("Location", location),
-                    ("Docker-Content-Digest", digest),
-                    ("Docker-Distribution-Api-Version", "registry/2.0".to_string()),
-                ],
-                "",
-            )
-                .into_response()
-        }
-    }
-}
-
-async fn handle_delete_manifest(
-    state: Arc<AppState>,
-    name: String,
-    reference: String,
-) -> Response {
-    if state.store.delete_manifest(&name, &reference).await {
-        state
-            .webhooks
-            .fire(crate::types::WebhookEvent::Delete, &name, Some(&reference), None)
-            .await;
-        StatusCode::ACCEPTED.into_response()
-    } else {
-        RegistryError::ManifestUnknown.into_response()
-    }
-}
-
-// ── Blob handlers ─────────────────────────────────────────────────────────────
-
-async fn handle_get_blob(
-    state: Arc<AppState>,
-    _name: String,
-    digest: String,
-) -> Response {
-    match state.store.get_blob(&digest).await {
-        None => RegistryError::BlobUnknown.into_response(),
-        Some(blob) => {
-            state
-                .webhooks
-                .fire(
-                    crate::types::WebhookEvent::Pull,
-                    &_name,
-                    Some(&digest),
-                    None,
-                )
-                .await;
-            (
-                StatusCode::OK,
-                [
-                    ("Content-Type", "application/octet-stream".to_string()),
-                    ("Content-Length", blob.size.to_string()),
-                    ("Docker-Content-Digest", blob.digest.clone()),
-                ],
-                blob.content,
-            )
-                .into_response()
-        }
-    }
-}
-
-async fn handle_head_blob(
-    state: Arc<AppState>,
-    _name: String,
-    digest: String,
-) -> Response {
-    match state.store.get_blob(&digest).await {
-        None => RegistryError::BlobUnknown.into_response(),
-        Some(blob) => (
-            StatusCode::OK,
-            [
-                ("Content-Length", blob.size.to_string()),
-                ("Docker-Content-Digest", blob.digest),
-            ],
-            "",
-        )
-            .into_response(),
-    }
-}
-
-async fn handle_delete_blob(
-    state: Arc<AppState>,
-    _name: String,
-    digest: String,
-) -> Response {
-    if state.store.delete_blob(&digest).await {
-        StatusCode::ACCEPTED.into_response()
-    } else {
-        RegistryError::BlobUnknown.into_response()
-    }
-}
-
-// ── Upload handlers ───────────────────────────────────────────────────────────
-
-/// POST /v2/{name}/blobs/uploads/
-/// Supports monolithic upload (body + digest query) or initiates a session.
-async fn handle_start_upload(
-    state: Arc<AppState>,
-    name: String,
-    digest_q: DigestQuery,
-    body: Bytes,
-) -> Response {
-    // Monolithic upload: body + ?digest=sha256:...
-    if let Some(ref expected) = digest_q.digest {
-        if !body.is_empty() {
-            return match state.store.put_blob(body.to_vec(), Some(expected)).await {
-                Ok(digest) => {
-                    let location = format!("/v2/{name}/blobs/{digest}");
-                    (
-                        StatusCode::CREATED,
-                        [
-                            ("Location", location),
-                            ("Docker-Content-Digest", digest),
-                        ],
-                        "",
-                    )
-                        .into_response()
-                }
-                Err(_) => RegistryError::DigestMismatch {
-                    expected: expected.clone(),
-                    got: compute_digest(&body),
-                }
-                .into_response(),
-            };
-        }
-    }
-
-    // Chunked session
-    let session_id = state.store.create_session(&name).await;
-    let location = format!("/v2/{name}/blobs/uploads/{session_id}");
-    (
-        StatusCode::ACCEPTED,
-        [
-            ("Location", location),
-            ("Docker-Upload-UUID", session_id),
-            ("Range", "0-0".to_string()),
-        ],
-        "",
-    )
-        .into_response()
-}
-
-/// PATCH /v2/{name}/blobs/uploads/{session_id}
-async fn handle_patch_upload(
-    state: Arc<AppState>,
-    name: String,
-    session_id: String,
-    body: Bytes,
-) -> Response {
-    match state.store.append_session(&session_id, body.to_vec()).await {
-        None => RegistryError::UploadNotFound(session_id).into_response(),
-        Some(offset) => {
-            let location = format!("/v2/{name}/blobs/uploads/{session_id}");
-            let range = format!("0-{}", offset.saturating_sub(1));
-            (
-                StatusCode::ACCEPTED,
-                [
-                    ("Location", location),
-                    ("Range", range),
-                    ("Docker-Upload-UUID", session_id),
-                ],
-                "",
-            )
-                .into_response()
-        }
-    }
-}
-
-/// PUT /v2/{name}/blobs/uploads/{session_id}?digest=sha256:...
-async fn handle_complete_upload(
-    state: Arc<AppState>,
-    name: String,
-    session_id: String,
-    digest_q: DigestQuery,
-    body: Bytes,
-) -> Response {
-    // Append any trailing body chunk before finalising.
-    if !body.is_empty() {
-        if state.store.append_session(&session_id, body.to_vec()).await.is_none() {
-            return RegistryError::UploadNotFound(session_id).into_response();
-        }
-    }
-
-    let expected = match digest_q.digest {
-        Some(d) => d,
-        None => {
-            return RegistryError::DigestMismatch {
-                expected: "sha256:<required>".to_string(),
-                got: String::new(),
+                builder.body(axum::body::Body::from(entry.data)).unwrap()
             }
-            .into_response()
+        }
+    }
+}
+
+async fn put_manifest(
+    state: Arc<RegistryState>,
+    name: &str,
+    reference: &str,
+    headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> Response {
+    let content_type = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/vnd.oci.image.manifest.v1+json")
+        .to_string();
+
+    // Extract subject_digest and artifact_type from the manifest for OCI 1.1 referrers
+    let (subject_digest, artifact_type) = extract_oci_fields(&body);
+
+    let digest = state
+        .storage
+        .store_manifest(name, reference, content_type, body, subject_digest, artifact_type)
+        .await;
+
+    Response::builder()
+        .status(StatusCode::CREATED)
+        .header(header::LOCATION, format!("/v2/{}/manifests/{}", name, reference))
+        .header("Docker-Content-Digest", &digest)
+        .header(header::CONTENT_LENGTH, 0)
+        .body(axum::body::Body::empty())
+        .unwrap()
+}
+
+async fn delete_manifest(
+    state: Arc<RegistryState>,
+    name: &str,
+    reference: &str,
+) -> Response {
+    if state.storage.delete_manifest(name, reference).await {
+        Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .body(axum::body::Body::empty())
+            .unwrap()
+    } else {
+        registry_error(StatusCode::NOT_FOUND, ERR_MANIFEST_UNKNOWN, "manifest unknown")
+    }
+}
+
+/// Pull subject + artifactType from a raw OCI manifest JSON (best-effort).
+fn extract_oci_fields(data: &[u8]) -> (Option<String>, Option<String>) {
+    let v: serde_json::Value = match serde_json::from_slice(data) {
+        Ok(v) => v,
+        Err(_) => return (None, None),
+    };
+    let subject = v
+        .get("subject")
+        .and_then(|s| s.get("digest"))
+        .and_then(|d| d.as_str())
+        .map(|s| s.to_string());
+    let artifact_type = v
+        .get("artifactType")
+        .and_then(|a| a.as_str())
+        .map(|s| s.to_string());
+    (subject, artifact_type)
+}
+
+// ── Blobs ─────────────────────────────────────────────────────────────────────
+
+async fn get_blob(
+    state: Arc<RegistryState>,
+    _name: &str,
+    digest: &str,
+    head_only: bool,
+) -> Response {
+    match state.storage.get_blob(digest).await {
+        None => registry_error(StatusCode::NOT_FOUND, ERR_BLOB_UNKNOWN, "blob unknown"),
+        Some(data) => {
+            let size = data.len();
+            let builder = Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/octet-stream")
+                .header(header::CONTENT_LENGTH, size)
+                .header("Docker-Content-Digest", digest);
+
+            if head_only {
+                builder.body(axum::body::Body::empty()).unwrap()
+            } else {
+                builder.body(axum::body::Body::from(data)).unwrap()
+            }
+        }
+    }
+}
+
+async fn delete_blob(
+    state: Arc<RegistryState>,
+    name: &str,
+    digest: &str,
+) -> Response {
+    if state.storage.delete_blob(digest, name).await {
+        Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .body(axum::body::Body::empty())
+            .unwrap()
+    } else {
+        registry_error(StatusCode::NOT_FOUND, ERR_BLOB_UNKNOWN, "blob unknown")
+    }
+}
+
+// ── Blob uploads ──────────────────────────────────────────────────────────────
+
+async fn initiate_upload(
+    state: Arc<RegistryState>,
+    name: &str,
+    query: &HashMap<String, String>,
+) -> Response {
+    // Cross-repo mount
+    if let (Some(mount), Some(from)) = (query.get("mount"), query.get("from")) {
+        if state.storage.mount_blob(mount, from, name).await {
+            return Response::builder()
+                .status(StatusCode::CREATED)
+                .header(
+                    header::LOCATION,
+                    format!("/v2/{}/blobs/{}", name, mount),
+                )
+                .header("Docker-Content-Digest", mount.as_str())
+                .header(header::CONTENT_LENGTH, 0)
+                .body(axum::body::Body::empty())
+                .unwrap();
+        }
+        // Mount failed — fall through to normal upload
+    }
+
+    let uuid = state.storage.start_upload(name).await;
+    Response::builder()
+        .status(StatusCode::ACCEPTED)
+        .header(
+            header::LOCATION,
+            format!("/v2/{}/blobs/uploads/{}", name, uuid),
+        )
+        .header("Docker-Upload-UUID", uuid.as_str())
+        .header("Range", "0-0")
+        .header(header::CONTENT_LENGTH, 0)
+        .body(axum::body::Body::empty())
+        .unwrap()
+}
+
+async fn patch_upload(
+    state: Arc<RegistryState>,
+    name: &str,
+    uuid: &str,
+    _headers: axum::http::HeaderMap,
+    body: Bytes,
+) -> Response {
+    match state.storage.patch_upload(uuid, body).await {
+        None => registry_error(
+            StatusCode::NOT_FOUND,
+            ERR_BLOB_UPLOAD_UNKNOWN,
+            "upload session not found",
+        ),
+        Some(offset) => Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .header(
+                header::LOCATION,
+                format!("/v2/{}/blobs/uploads/{}", name, uuid),
+            )
+            .header("Docker-Upload-UUID", uuid)
+            .header("Range", format!("0-{}", offset.saturating_sub(1)))
+            .header(header::CONTENT_LENGTH, 0)
+            .body(axum::body::Body::empty())
+            .unwrap(),
+    }
+}
+
+async fn complete_upload(
+    state: Arc<RegistryState>,
+    name: &str,
+    uuid: &str,
+    query: &HashMap<String, String>,
+    body: Bytes,
+) -> Response {
+    let digest = match query.get("digest") {
+        Some(d) => d.clone(),
+        None => {
+            return registry_error(
+                StatusCode::BAD_REQUEST,
+                ERR_DIGEST_INVALID,
+                "digest query parameter required",
+            )
         }
     };
 
-    match state.store.complete_session(&session_id, &expected).await {
-        Ok((_repo, digest)) => {
-            let location = format!("/v2/{name}/blobs/{digest}");
-            (
-                StatusCode::CREATED,
-                [
-                    ("Location", location),
-                    ("Docker-Content-Digest", digest),
-                ],
-                "",
+    match state.storage.complete_upload(uuid, body, &digest).await {
+        Err("upload session not found") => registry_error(
+            StatusCode::NOT_FOUND,
+            ERR_BLOB_UPLOAD_UNKNOWN,
+            "upload session not found",
+        ),
+        Err(_) => registry_error(
+            StatusCode::BAD_REQUEST,
+            ERR_BLOB_UPLOAD_INVALID,
+            "digest mismatch — blob corrupted",
+        ),
+        Ok((final_digest, _repo)) => Response::builder()
+            .status(StatusCode::CREATED)
+            .header(
+                header::LOCATION,
+                format!("/v2/{}/blobs/{}", name, final_digest),
             )
-                .into_response()
-        }
-        Err(e) => RegistryError::DigestMismatch {
-            expected,
-            got: e,
-        }
-        .into_response(),
+            .header("Docker-Content-Digest", final_digest.as_str())
+            .header(header::CONTENT_LENGTH, 0)
+            .body(axum::body::Body::empty())
+            .unwrap(),
     }
 }
 
-/// DELETE /v2/{name}/blobs/uploads/{session_id}  — cancel an in-progress upload.
-async fn handle_cancel_upload(
-    state: Arc<AppState>,
-    _name: String,
-    session_id: String,
+async fn cancel_upload(
+    state: Arc<RegistryState>,
+    _name: &str,
+    uuid: &str,
 ) -> Response {
-    if state.store.delete_session(&session_id).await {
-        StatusCode::NO_CONTENT.into_response()
-    } else {
-        RegistryError::UploadNotFound(session_id).into_response()
-    }
+    state.storage.cancel_upload(uuid).await;
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(axum::body::Body::empty())
+        .unwrap()
 }
 
-// ── Unit tests ────────────────────────────────────────────────────────────────
+// ── OCI 1.1 Referrers ─────────────────────────────────────────────────────────
+
+async fn get_referrers(
+    state: Arc<RegistryState>,
+    _name: &str,
+    digest: &str,
+    query: &HashMap<String, String>,
+) -> Response {
+    let artifact_type_filter = query.get("artifactType").map(|s| s.as_str());
+    let manifests = state
+        .storage
+        .get_referrers(digest, artifact_type_filter)
+        .await;
+    let resp = ReferrersResponse::new(manifests);
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/vnd.oci.image.index.v1+json")
+        .header("OCI-Referrers-State", "enabled")
+        .body(axum::body::Body::from(serde_json::to_string(&resp).unwrap()))
+        .unwrap()
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        policy::PolicyManager,
-        replication::ReplicationManager,
-        scan::ScanManager,
-        store::RegistryStore,
-        webhook::WebhookManager,
-        AppState,
-    };
-    use axum::{body::to_bytes, http::Request};
-    use tower::util::ServiceExt;
+    use crate::storage::compute_digest;
+    use bytes::Bytes;
 
-    fn make_state() -> Arc<AppState> {
-        let store = Arc::new(RegistryStore::new());
-        Arc::new(AppState {
-            store: Arc::clone(&store),
-            webhooks: Arc::new(WebhookManager::new(Arc::clone(&store))),
-            replication: Arc::new(ReplicationManager::new(Arc::clone(&store))),
-            scanner: Arc::new(ScanManager::new(Arc::clone(&store))),
-            policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
+    fn make_state() -> Arc<RegistryState> {
+        Arc::new(RegistryState {
+            pool: Arc::new(unsafe { std::mem::zeroed() }), // not used in unit tests
+            storage: Arc::new(RegistryStorage::default()),
         })
     }
 
-    fn app(state: Arc<AppState>) -> axum::Router {
-        crate::routes::create_router(state)
+    #[tokio::test]
+    async fn version_check_returns_200() {
+        let resp = version_check().await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get("docker-distribution-api-version").unwrap(),
+            "registry/2.0"
+        );
     }
-
-    // ── parse_path ────────────────────────────────────────────────────────────
-
-    #[test]
-    fn test_parse_catalog() {
-        assert!(matches!(parse_path("_catalog"), Some(V2Action::Catalog)));
-    }
-
-    #[test]
-    fn test_parse_manifest_by_tag() {
-        match parse_path("library/nginx/manifests/latest") {
-            Some(V2Action::Manifest { name, reference }) => {
-                assert_eq!(name, "library/nginx");
-                assert_eq!(reference, "latest");
-            }
-            other => panic!("expected Manifest, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_manifest_by_digest() {
-        match parse_path("myrepo/manifests/sha256:abc123") {
-            Some(V2Action::Manifest { name, reference }) => {
-                assert_eq!(name, "myrepo");
-                assert_eq!(reference, "sha256:abc123");
-            }
-            other => panic!("expected Manifest, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_tags_list() {
-        match parse_path("myrepo/tags/list") {
-            Some(V2Action::TagsList { name }) => assert_eq!(name, "myrepo"),
-            other => panic!("expected TagsList, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_upload_start() {
-        match parse_path("myrepo/blobs/uploads/") {
-            Some(V2Action::UploadStart { name }) => assert_eq!(name, "myrepo"),
-            other => panic!("expected UploadStart, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_upload_chunk() {
-        match parse_path("myrepo/blobs/uploads/session-uuid-123") {
-            Some(V2Action::UploadChunk { name, session_id }) => {
-                assert_eq!(name, "myrepo");
-                assert_eq!(session_id, "session-uuid-123");
-            }
-            other => panic!("expected UploadChunk, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_parse_blob_get() {
-        match parse_path("myrepo/blobs/sha256:deadbeef") {
-            Some(V2Action::BlobGet { name, digest }) => {
-                assert_eq!(name, "myrepo");
-                assert_eq!(digest, "sha256:deadbeef");
-            }
-            other => panic!("expected BlobGet, got {other:?}"),
-        }
-    }
-
-    // ── HTTP integration tests ────────────────────────────────────────────────
 
     #[tokio::test]
-    async fn test_v2_check_returns_200() {
+    async fn catalog_empty() {
         let state = make_state();
-        let router = app(state);
-        let resp = router
-            .oneshot(Request::builder().uri("/v2/").body(axum::body::Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let q = HashMap::new();
+        let resp = catalog(
+            State(state),
+            Query(PaginationQuery { n: None, last: None }),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_get_manifest_not_found() {
+    async fn blob_round_trip() {
         let state = make_state();
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/missing/manifests/latest")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
+        let data = Bytes::from_static(b"hello blob");
+        let digest = compute_digest(&data);
+        state.storage.store_blob(digest.clone(), data.clone(), "testrepo").await;
+
+        let resp = get_blob(Arc::clone(&state), "testrepo", &digest, false).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let resp = get_blob(Arc::clone(&state), "testrepo", "sha256:notfound", false).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_put_and_get_manifest() {
-        let state = make_state();
-        let manifest = serde_json::json!({
-            "schemaVersion": 2,
-            "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:empty" },
-            "layers": []
-        });
-        let body = serde_json::to_vec(&manifest).unwrap();
-
-        let put_resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/myrepo/manifests/latest")
-                    .header("Content-Type", MEDIA_MANIFEST_V2)
-                    .body(axum::body::Body::from(body.clone()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(put_resp.status(), StatusCode::CREATED);
-        let digest = put_resp.headers()["docker-content-digest"].to_str().unwrap().to_string();
-
-        let get_resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/myrepo/manifests/latest")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(get_resp.status(), StatusCode::OK);
-        assert_eq!(
-            get_resp.headers()["docker-content-digest"].to_str().unwrap(),
-            digest
-        );
-    }
-
-    #[tokio::test]
-    async fn test_head_manifest() {
-        let state = make_state();
-        let body = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2, "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-        app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/repo/manifests/v1")
-                    .header("Content-Type", MEDIA_MANIFEST_V2)
-                    .body(axum::body::Body::from(body))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        let resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("HEAD")
-                    .uri("/v2/repo/manifests/v1")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert!(resp.headers().contains_key("docker-content-digest"));
-    }
-
-    #[tokio::test]
-    async fn test_delete_manifest() {
-        let state = make_state();
-        let body = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2, "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-        app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/repo/manifests/todelete")
-                    .header("Content-Type", MEDIA_MANIFEST_V2)
-                    .body(axum::body::Body::from(body))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        let del = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("DELETE")
-                    .uri("/v2/repo/manifests/todelete")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(del.status(), StatusCode::ACCEPTED);
-
-        let get = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/repo/manifests/todelete")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(get.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_blob_upload_chunked_and_download() {
-        let state = make_state();
-        let data = b"hello world blob data";
-        let expected_digest = compute_digest(data);
-
-        // Start upload
-        let start = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/v2/myrepo/blobs/uploads/")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(start.status(), StatusCode::ACCEPTED);
-        let location = start.headers()["location"].to_str().unwrap().to_string();
-        let session_id = location.rsplit('/').next().unwrap().to_string();
-
-        // PATCH chunk
-        let patch = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PATCH")
-                    .uri(&format!("/v2/myrepo/blobs/uploads/{session_id}"))
-                    .body(axum::body::Body::from(data.as_ref()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(patch.status(), StatusCode::ACCEPTED);
-
-        // PUT finalize
-        let put = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri(&format!("/v2/myrepo/blobs/uploads/{session_id}?digest={expected_digest}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(put.status(), StatusCode::CREATED);
-
-        // GET blob
-        let get = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .uri(&format!("/v2/myrepo/blobs/{expected_digest}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(get.status(), StatusCode::OK);
-        let body = to_bytes(get.into_body(), usize::MAX).await.unwrap();
-        assert_eq!(body.as_ref(), data);
-    }
-
-    #[tokio::test]
-    async fn test_blob_upload_wrong_digest_rejected() {
-        let state = make_state();
-
-        let start = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/v2/repo/blobs/uploads/")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        let location = start.headers()["location"].to_str().unwrap().to_string();
-        let session_id = location.rsplit('/').next().unwrap().to_string();
-
-        app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PATCH")
-                    .uri(&format!("/v2/repo/blobs/uploads/{session_id}"))
-                    .body(axum::body::Body::from("real data"))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        let put = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri(&format!("/v2/repo/blobs/uploads/{session_id}?digest=sha256:wrongwrongwrong"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(put.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn test_monolithic_blob_upload() {
-        let state = make_state();
-        let data = b"monolithic blob";
-        let digest = compute_digest(data);
-
-        let resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri(&format!("/v2/repo/blobs/uploads/?digest={digest}"))
-                    .body(axum::body::Body::from(data.as_ref()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        assert_eq!(
-            resp.headers()["docker-content-digest"].to_str().unwrap(),
-            digest
-        );
-    }
-
-    #[tokio::test]
-    async fn test_head_blob() {
-        let state = make_state();
-        let data = b"some blob";
-        let digest = state.store.put_blob(data.to_vec(), None).await.unwrap();
-
-        let resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("HEAD")
-                    .uri(&format!("/v2/myrepo/blobs/{digest}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(
-            resp.headers()["docker-content-digest"].to_str().unwrap(),
-            digest
-        );
-    }
-
-    #[tokio::test]
-    async fn test_catalog_lists_repos() {
-        let state = make_state();
-        let manifest = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2, "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-        for repo in ["alpha", "beta", "gamma"] {
-            app(Arc::clone(&state))
-                .oneshot(
-                    Request::builder()
-                        .method("PUT")
-                        .uri(&format!("/v2/{repo}/manifests/latest"))
-                        .header("Content-Type", MEDIA_MANIFEST_V2)
-                        .body(axum::body::Body::from(manifest.clone()))
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-        }
-        let resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/_catalog")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-        let cat: CatalogResponse = serde_json::from_slice(&body).unwrap();
-        assert!(cat.repositories.contains(&"alpha".to_string()));
-        assert!(cat.repositories.contains(&"beta".to_string()));
-        assert!(cat.repositories.contains(&"gamma".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_tags_list() {
-        let state = make_state();
-        let manifest = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2, "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-        for tag in ["v1.0", "v2.0", "latest"] {
-            app(Arc::clone(&state))
-                .oneshot(
-                    Request::builder()
-                        .method("PUT")
-                        .uri(&format!("/v2/myapp/manifests/{tag}"))
-                        .header("Content-Type", MEDIA_MANIFEST_V2)
-                        .body(axum::body::Body::from(manifest.clone()))
-                        .unwrap(),
-                )
-                .await
-                .unwrap();
-        }
-        let resp = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/myapp/tags/list")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let body = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-        let tl: TagsListResponse = serde_json::from_slice(&body).unwrap();
-        assert_eq!(tl.name, "myapp");
-        assert!(tl.tags.contains(&"latest".to_string()));
-        assert!(tl.tags.contains(&"v1.0".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_digest_verification_on_manifest_push() {
-        let state = make_state();
-        let body = b"not valid json at all!!!";
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/repo/manifests/bad")
-                    .header("Content-Type", MEDIA_MANIFEST_V2)
-                    .body(axum::body::Body::from(body.as_ref()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn test_immutable_tag_policy_blocks_push() {
-        use crate::types::TagPolicy;
-        let state = make_state();
-        state
-            .policy
-            .set_tag_policy(
-                "locked",
-                TagPolicy { immutable_tags: vec!["v1.0.0".to_string()], all_immutable: false },
-            )
-            .await;
-
-        let manifest = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2, "mediaType": MEDIA_MANIFEST_V2,
-            "config": { "mediaType": MEDIA_MANIFEST_V2, "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/locked/manifests/v1.0.0")
-                    .header("Content-Type", MEDIA_MANIFEST_V2)
-                    .body(axum::body::Body::from(manifest))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::METHOD_NOT_ALLOWED);
-    }
-
-    #[tokio::test]
-    async fn test_oci_manifest_accepted() {
-        let state = make_state();
-        let manifest = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2,
-            "mediaType": MEDIA_OCI_MANIFEST,
-            "config": { "mediaType": "application/vnd.oci.image.config.v1+json", "size": 0, "digest": "sha256:x" },
-            "layers": []
-        }))
-        .unwrap();
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/oci/manifests/latest")
-                    .header("Content-Type", MEDIA_OCI_MANIFEST)
-                    .body(axum::body::Body::from(manifest))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-    }
-
-    #[tokio::test]
-    async fn test_manifest_list_accepted() {
-        let state = make_state();
-        let manifest = serde_json::to_vec(&serde_json::json!({
-            "schemaVersion": 2,
-            "mediaType": MEDIA_MANIFEST_LIST,
-            "manifests": [{
-                "mediaType": MEDIA_MANIFEST_V2,
-                "size": 100,
-                "digest": "sha256:abc",
-                "platform": { "os": "linux", "architecture": "amd64" }
-            }]
-        }))
-        .unwrap();
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .method("PUT")
-                    .uri("/v2/multiarch/manifests/latest")
-                    .header("Content-Type", MEDIA_MANIFEST_LIST)
-                    .body(axum::body::Body::from(manifest))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-    }
-
-    #[tokio::test]
-    async fn test_get_blob_not_found() {
-        let state = make_state();
-        let resp = app(state)
-            .oneshot(
-                Request::builder()
-                    .uri("/v2/myrepo/blobs/sha256:nonexistent")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_cancel_upload_session() {
-        let state = make_state();
-        let start = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/v2/repo/blobs/uploads/")
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        let location = start.headers()["location"].to_str().unwrap().to_string();
-        let session_id = location.rsplit('/').next().unwrap().to_string();
-
-        let del = app(Arc::clone(&state))
-            .oneshot(
-                Request::builder()
-                    .method("DELETE")
-                    .uri(&format!("/v2/repo/blobs/uploads/{session_id}"))
-                    .body(axum::body::Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(del.status(), StatusCode::NO_CONTENT);
     }
 }

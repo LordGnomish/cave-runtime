@@ -37,6 +37,7 @@ members = [
     "crates/cave-deploy",
     "crates/cave-artifacts",
     "crates/cave-registry",
+    "crates/cave-rollouts",
     "crates/cave-workflows",
     "crates/cave-scan",
     "crates/cave-portal",
