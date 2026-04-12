@@ -117,6 +117,8 @@ members = [
     "crates/cave-trace",
     # === Observability ===
     "crates/cave-logs",
+    # === Event Streaming ===
+    "crates/cave-streams",
 ]
 
 [workspace.package]
