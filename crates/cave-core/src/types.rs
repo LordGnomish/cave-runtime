@@ -39,7 +39,7 @@ pub struct Permission {
 
 impl CaveIdentity {
     /// Check if this identity has the required permission
-    pub fn has_permission(&self, module: &str, action: &str) -> bool {
+    pub fn has_permission(&self, _module: &str, action: &str) -> bool {
         match self.roles.first() {
             Some(CaveRole::PlatformAdmin) => true,
             Some(CaveRole::TenantAdmin) => {
