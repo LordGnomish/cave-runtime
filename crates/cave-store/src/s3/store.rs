@@ -1,725 +1,1409 @@
-//! S3-compatible object store — file-backed with in-memory index.
+//! Core S3/MinIO object store implementation.
+//!
+//! Objects are stored as files on disk (data_dir/bucket/object-path).
+//! Metadata and bucket configuration live in memory, backed by WAL.
 
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
-use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
-};
-use aes_gcm::aead::rand_core::RngCore;
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
-use bytes::Bytes;
+use crate::error::{StoreError, StoreResult};
+use crate::s3::encryption::{self, ServerKeyStore};
+use crate::s3::lifecycle;
+use crate::s3::notification;
+use crate::s3::policy::{evaluate, BucketPolicy, Effect, PolicyContext};
+use crate::s3::types::*;
+use crate::wal::{WalEntry, WalWriter};
+use base64::Engine;
 use chrono::Utc;
-use dashmap::DashMap;
-use hmac::{Hmac, Mac};
-use md5::{Digest as Md5Digest, Md5};
-use sha2::{Digest, Sha256};
+use ring::digest;
+use std::collections::HashMap;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::io::AsyncReadExt;
+use tokio::sync::{broadcast, RwLock};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::error::{Result, StoreError};
-use super::types::*;
-
-// ─── Internal bucket state ───────────────────────────────────────────────────
-
-#[derive(Debug)]
-pub struct BucketState {
-    pub info: BucketInfo,
-    /// key → vec of ObjectVersion (newest first)
-    pub objects: DashMap<String, Vec<ObjectVersion>>,
-    pub multipart: DashMap<String, MultipartUpload>,
-    pub versioning: parking_lot::RwLock<BucketVersioning>,
-    pub lifecycle: parking_lot::RwLock<Vec<LifecycleRule>>,
-    pub policy: parking_lot::RwLock<Option<BucketPolicy>>,
-    pub notification: parking_lot::RwLock<NotificationConfig>,
-    pub acl: parking_lot::RwLock<BucketAcl>,
-}
-
-impl BucketState {
-    fn new(info: BucketInfo) -> Self {
-        Self {
-            info,
-            objects: DashMap::new(),
-            multipart: DashMap::new(),
-            versioning: parking_lot::RwLock::new(BucketVersioning::default()),
-            lifecycle: parking_lot::RwLock::new(vec![]),
-            policy: parking_lot::RwLock::new(None),
-            notification: parking_lot::RwLock::new(NotificationConfig::default()),
-            acl: parking_lot::RwLock::new(BucketAcl::default()),
-        }
-    }
-}
-
-// ─── S3Store ──────────────────────────────────────────────────────────────────
-
-pub struct S3Store {
+pub struct ObjectStore {
     data_dir: PathBuf,
-    buckets: Arc<DashMap<String, Arc<BucketState>>>,
-    /// 32-byte AES-256 master key for SSE-S3
-    sse_master_key: Vec<u8>,
+    buckets: RwLock<HashMap<String, Bucket>>,
+    /// (bucket, key) → ordered list of versions (oldest first)
+    objects: RwLock<HashMap<(String, String), Vec<ObjectVersion>>>,
+    multiparts: RwLock<HashMap<String, MultipartUpload>>,
+    pub event_tx: broadcast::Sender<S3Event>,
+    wal: Arc<WalWriter>,
+    key_store: RwLock<ServerKeyStore>,
 }
 
-impl S3Store {
-    pub fn new(data_dir: impl Into<PathBuf>, sse_master_key: Vec<u8>) -> std::io::Result<Self> {
-        let data_dir = data_dir.into();
-        std::fs::create_dir_all(&data_dir)?;
-        let store = Self {
+impl ObjectStore {
+    pub fn new(data_dir: PathBuf, wal: Arc<WalWriter>) -> Self {
+        let (tx, _) = broadcast::channel(4096);
+        Self {
             data_dir,
-            buckets: Arc::new(DashMap::new()),
-            sse_master_key,
-        };
-        store.load_from_disk()?;
-        Ok(store)
+            buckets: RwLock::new(HashMap::new()),
+            objects: RwLock::new(HashMap::new()),
+            multiparts: RwLock::new(HashMap::new()),
+            event_tx: tx,
+            wal,
+            key_store: RwLock::new(ServerKeyStore::new()),
+        }
     }
 
-    /// Restore bucket metadata from disk (sidecar .meta.json files).
-    fn load_from_disk(&self) -> std::io::Result<()> {
-        for entry in std::fs::read_dir(&self.data_dir)? {
-            let entry = entry?;
-            if !entry.file_type()?.is_dir() {
-                continue;
-            }
-            let bucket_name = entry.file_name().to_string_lossy().to_string();
-            let meta_path = entry.path().join(".bucket_meta.json");
-            if let Ok(data) = std::fs::read(&meta_path) {
-                if let Ok(info) = serde_json::from_slice::<BucketInfo>(&data) {
-                    let state = Arc::new(BucketState::new(info));
-                    // Load object metadata
-                    self.load_objects(&entry.path(), &state)?;
-                    self.buckets.insert(bucket_name, state);
+    /// Replay S3-related WAL entries on startup.
+    pub async fn replay_wal(&self, entries: &[WalEntry]) {
+        for entry in entries {
+            match entry {
+                WalEntry::BucketCreate { name, region, owner } => {
+                    self.buckets.write().await.insert(
+                        name.clone(),
+                        Bucket::new(name.clone(), region.clone(), owner.clone()),
+                    );
                 }
-            }
-        }
-        Ok(())
-    }
-
-    fn load_objects(&self, bucket_dir: &Path, state: &BucketState) -> std::io::Result<()> {
-        let meta_dir = bucket_dir.join(".meta");
-        if !meta_dir.exists() {
-            return Ok(());
-        }
-        for entry in std::fs::read_dir(&meta_dir)? {
-            let entry = entry?;
-            if let Ok(data) = std::fs::read(entry.path()) {
-                if let Ok(versions) = serde_json::from_slice::<Vec<ObjectVersion>>(&data) {
-                    if let Some(first) = versions.first() {
-                        state.objects.insert(first.metadata.key.clone(), versions);
+                WalEntry::BucketDelete { name } => {
+                    self.buckets.write().await.remove(name);
+                }
+                WalEntry::BucketVersioning { name, state } => {
+                    if let Some(b) = self.buckets.write().await.get_mut(name) {
+                        b.versioning = match state.as_str() {
+                            "Enabled" => VersioningState::Enabled,
+                            "Suspended" => VersioningState::Suspended,
+                            _ => VersioningState::Disabled,
+                        };
                     }
                 }
+                WalEntry::BucketPolicy { name, policy_json } => {
+                    if let Some(b) = self.buckets.write().await.get_mut(name) {
+                        b.policy = Some(policy_json.clone());
+                    }
+                }
+                WalEntry::BucketLifecycle { name, rules_json } => {
+                    if let Some(b) = self.buckets.write().await.get_mut(name) {
+                        if let Ok(rules) = serde_json::from_str(rules_json) {
+                            b.lifecycle_rules = rules;
+                        }
+                    }
+                }
+                WalEntry::BucketNotification { name, config_json } => {
+                    if let Some(b) = self.buckets.write().await.get_mut(name) {
+                        if let Ok(cfg) = serde_json::from_str(config_json) {
+                            b.notification_config = cfg;
+                        }
+                    }
+                }
+                WalEntry::ObjectPut {
+                    bucket,
+                    key,
+                    version_id,
+                    etag,
+                    size,
+                    content_type,
+                    metadata_json,
+                    storage_path,
+                    ..
+                } => {
+                    let metadata = serde_json::from_str(metadata_json).unwrap_or_default();
+                    let v = ObjectVersion {
+                        version_id: version_id.clone(),
+                        etag: etag.clone(),
+                        size: *size,
+                        last_modified: Utc::now(),
+                        content_type: content_type.clone(),
+                        metadata,
+                        tags: HashMap::new(),
+                        storage_class: StorageClass::Standard,
+                        storage_path: storage_path.clone(),
+                        encryption: None,
+                        delete_marker: false,
+                        restore_status: None,
+                    };
+                    self.objects
+                        .write()
+                        .await
+                        .entry((bucket.clone(), key.clone()))
+                        .or_default()
+                        .push(v);
+                }
+                WalEntry::ObjectDelete {
+                    bucket,
+                    key,
+                    version_id,
+                    delete_marker,
+                } => {
+                    let mut objects = self.objects.write().await;
+                    if *delete_marker {
+                        let dm = ObjectVersion {
+                            version_id: version_id.clone(),
+                            etag: String::new(),
+                            size: 0,
+                            last_modified: Utc::now(),
+                            content_type: String::new(),
+                            metadata: HashMap::new(),
+                            tags: HashMap::new(),
+                            storage_class: StorageClass::Standard,
+                            storage_path: String::new(),
+                            encryption: None,
+                            delete_marker: true,
+                            restore_status: None,
+                        };
+                        objects
+                            .entry((bucket.clone(), key.clone()))
+                            .or_default()
+                            .push(dm);
+                    } else if let Some(vid) = version_id {
+                        if let Some(versions) = objects.get_mut(&(bucket.clone(), key.clone())) {
+                            versions.retain(|v| v.version_id.as_deref() != Some(vid.as_str()));
+                        }
+                    } else {
+                        objects.remove(&(bucket.clone(), key.clone()));
+                    }
+                }
+                WalEntry::MultipartInit {
+                    upload_id,
+                    bucket,
+                    key,
+                    metadata_json,
+                } => {
+                    let metadata = serde_json::from_str(metadata_json).unwrap_or_default();
+                    self.multiparts.write().await.insert(
+                        upload_id.clone(),
+                        MultipartUpload {
+                            upload_id: upload_id.clone(),
+                            bucket: bucket.clone(),
+                            key: key.clone(),
+                            initiated: Utc::now(),
+                            owner: "cave".to_string(),
+                            content_type: String::new(),
+                            metadata,
+                            parts: HashMap::new(),
+                        },
+                    );
+                }
+                WalEntry::MultipartPart {
+                    upload_id,
+                    part_number,
+                    etag,
+                    size,
+                    storage_path,
+                } => {
+                    if let Some(mp) = self.multiparts.write().await.get_mut(upload_id) {
+                        mp.parts.insert(
+                            *part_number,
+                            UploadedPart {
+                                part_number: *part_number,
+                                etag: etag.clone(),
+                                size: *size,
+                                storage_path: storage_path.clone(),
+                                last_modified: Utc::now(),
+                            },
+                        );
+                    }
+                }
+                WalEntry::MultipartComplete { upload_id, .. } => {
+                    self.multiparts.write().await.remove(upload_id);
+                }
+                WalEntry::MultipartAbort { upload_id } => {
+                    self.multiparts.write().await.remove(upload_id);
+                }
+                _ => {}
             }
         }
+        info!("S3 store WAL replay complete");
+    }
+
+    // ── Bucket operations ───────────────────────────────────────────────────────
+
+    pub async fn create_bucket(
+        &self,
+        name: &str,
+        region: &str,
+        owner: &str,
+    ) -> StoreResult<()> {
+        validate_bucket_name(name)?;
+        let mut buckets = self.buckets.write().await;
+        if buckets.contains_key(name) {
+            return Err(StoreError::BucketAlreadyExists(name.to_string()));
+        }
+        std::fs::create_dir_all(self.data_dir.join(name))?;
+        buckets.insert(name.to_string(), Bucket::new(name.to_string(), region.to_string(), owner.to_string()));
+        drop(buckets);
+        self.wal
+            .append(&WalEntry::BucketCreate {
+                name: name.to_string(),
+                region: region.to_string(),
+                owner: owner.to_string(),
+            })
+            .await?;
         Ok(())
     }
 
-    fn bucket(&self, name: &str) -> Result<Arc<BucketState>> {
-        self.buckets.get(name)
-            .map(|b| Arc::clone(&*b))
-            .ok_or_else(|| StoreError::BucketNotFound(name.to_string()))
-    }
-
-    fn object_data_path(&self, bucket: &str, key: &str, version_id: Option<&str>) -> PathBuf {
-        let safe_key = key.replace('/', "_SLASH_");
-        let version = version_id.unwrap_or("latest");
-        self.data_dir
-            .join(bucket)
-            .join(format!("{safe_key}.{version}.dat"))
-    }
-
-    fn object_meta_path(&self, bucket: &str, key: &str) -> PathBuf {
-        let safe_key = key.replace('/', "_SLASH_");
-        self.data_dir
-            .join(bucket)
-            .join(".meta")
-            .join(format!("{safe_key}.json"))
-    }
-
-    fn save_object_meta(&self, bucket: &str, key: &str, versions: &[ObjectVersion]) -> Result<()> {
-        let meta_path = self.object_meta_path(bucket, key);
-        std::fs::create_dir_all(meta_path.parent().unwrap())?;
-        let data = serde_json::to_vec(versions)?;
-        std::fs::write(&meta_path, data)?;
+    pub async fn delete_bucket(&self, name: &str) -> StoreResult<()> {
+        let objects = self.objects.read().await;
+        let has_objects = objects.keys().any(|(b, _)| b == name);
+        if has_objects {
+            return Err(StoreError::BucketNotEmpty(name.to_string()));
+        }
+        drop(objects);
+        self.buckets
+            .write()
+            .await
+            .remove(name)
+            .ok_or_else(|| StoreError::BucketNotFound(name.to_string()))?;
+        let _ = std::fs::remove_dir_all(self.data_dir.join(name));
+        self.wal
+            .append(&WalEntry::BucketDelete { name: name.to_string() })
+            .await?;
         Ok(())
     }
 
-    fn etag_of(data: &[u8]) -> String {
-        let mut hasher = Md5::new();
-        hasher.update(data);
-        hex::encode(hasher.finalize())
-    }
-
-    fn encrypt_sse_s3(&self, data: &[u8]) -> Result<Vec<u8>> {
-        self.aes_gcm_encrypt(data, &self.sse_master_key)
-    }
-
-    fn decrypt_sse_s3(&self, data: &[u8]) -> Result<Vec<u8>> {
-        self.aes_gcm_decrypt(data, &self.sse_master_key)
-    }
-
-    fn encrypt_sse_c(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
-        self.aes_gcm_encrypt(data, key)
-    }
-
-    fn decrypt_sse_c(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
-        self.aes_gcm_decrypt(data, key)
-    }
-
-    /// AES-256-GCM encrypt: returns [12-byte nonce || ciphertext+tag]
-    fn aes_gcm_encrypt(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
-        if key.len() != 32 {
-            return Err(StoreError::InvalidRequest("SSE key must be 32 bytes".into()));
-        }
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
-        let mut nonce_bytes = [0u8; 12];
-        OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
-        let ciphertext = cipher
-            .encrypt(nonce, data)
-            .map_err(|e| StoreError::InvalidRequest(format!("AES-GCM encrypt: {e}")))?;
-        let mut out = nonce_bytes.to_vec();
-        out.extend_from_slice(&ciphertext);
-        Ok(out)
-    }
-
-    /// AES-256-GCM decrypt: expects [12-byte nonce || ciphertext+tag]
-    fn aes_gcm_decrypt(&self, data: &[u8], key: &[u8]) -> Result<Vec<u8>> {
-        if data.len() < 12 {
-            return Err(StoreError::WalCorrupted("encrypted data too short".into()));
-        }
-        if key.len() != 32 {
-            return Err(StoreError::InvalidRequest("SSE key must be 32 bytes".into()));
-        }
-        let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
-        let nonce = Nonce::from_slice(&data[..12]);
-        let plaintext = cipher
-            .decrypt(nonce, &data[12..])
-            .map_err(|e| StoreError::InvalidRequest(format!("AES-GCM decrypt: {e}")))?;
-        Ok(plaintext)
-    }
-
-    // ── Bucket operations ─────────────────────────────────────────────────────
-
-    pub fn create_bucket(&self, name: String, region: String) -> Result<()> {
-        if self.buckets.contains_key(&name) {
-            return Err(StoreError::BucketExists(name));
-        }
-        validate_bucket_name(&name)?;
-        let dir = self.data_dir.join(&name);
-        std::fs::create_dir_all(&dir)?;
-        let info = BucketInfo { name: name.clone(), creation_date: Utc::now(), region };
-        let data = serde_json::to_vec(&info)?;
-        std::fs::write(dir.join(".bucket_meta.json"), data)?;
-        self.buckets.insert(name, Arc::new(BucketState::new(info)));
-        Ok(())
-    }
-
-    pub fn delete_bucket(&self, name: &str) -> Result<()> {
-        let state = self.bucket(name)?;
-        if !state.objects.is_empty() {
-            return Err(StoreError::InvalidRequest("bucket is not empty".into()));
-        }
-        self.buckets.remove(name);
-        let dir = self.data_dir.join(name);
-        let _ = std::fs::remove_dir_all(dir);
-        Ok(())
-    }
-
-    pub fn list_buckets(&self) -> Vec<BucketInfo> {
-        let mut buckets: Vec<BucketInfo> = self.buckets
-            .iter()
-            .map(|e| e.value().info.clone())
-            .collect();
+    pub async fn list_buckets(&self) -> Vec<Bucket> {
+        let mut buckets: Vec<Bucket> = self.buckets.read().await.values().cloned().collect();
         buckets.sort_by(|a, b| a.name.cmp(&b.name));
         buckets
     }
 
-    pub fn head_bucket(&self, name: &str) -> Result<BucketInfo> {
-        self.bucket(name).map(|b| b.info.clone())
+    pub async fn head_bucket(&self, name: &str) -> StoreResult<()> {
+        self.buckets
+            .read()
+            .await
+            .get(name)
+            .ok_or_else(|| StoreError::BucketNotFound(name.to_string()))?;
+        Ok(())
     }
 
-    // ── Object operations ─────────────────────────────────────────────────────
+    pub async fn get_bucket(&self, name: &str) -> StoreResult<Bucket> {
+        self.buckets
+            .read()
+            .await
+            .get(name)
+            .cloned()
+            .ok_or_else(|| StoreError::BucketNotFound(name.to_string()))
+    }
 
-    pub fn put_object(
+    pub async fn set_versioning(&self, bucket: &str, state: VersioningState) -> StoreResult<()> {
+        let state_str = match &state {
+            VersioningState::Enabled => "Enabled",
+            VersioningState::Suspended => "Suspended",
+            VersioningState::Disabled => "Disabled",
+        }
+        .to_string();
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.versioning = state;
+        drop(buckets);
+        self.wal
+            .append(&WalEntry::BucketVersioning {
+                name: bucket.to_string(),
+                state: state_str,
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn put_bucket_policy(&self, bucket: &str, policy_json: &str) -> StoreResult<()> {
+        // Validate JSON is parseable as a policy
+        let _: BucketPolicy = serde_json::from_str(policy_json)
+            .map_err(|e| StoreError::InvalidArgument(format!("invalid policy: {e}")))?;
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.policy = Some(policy_json.to_string());
+        drop(buckets);
+        self.wal
+            .append(&WalEntry::BucketPolicy {
+                name: bucket.to_string(),
+                policy_json: policy_json.to_string(),
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn delete_bucket_policy(&self, bucket: &str) -> StoreResult<()> {
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.policy = None;
+        Ok(())
+    }
+
+    pub async fn put_bucket_lifecycle(
+        &self,
+        bucket: &str,
+        rules: Vec<LifecycleRule>,
+    ) -> StoreResult<()> {
+        let rules_json = serde_json::to_string(&rules)?;
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.lifecycle_rules = rules;
+        drop(buckets);
+        self.wal
+            .append(&WalEntry::BucketLifecycle {
+                name: bucket.to_string(),
+                rules_json,
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn put_bucket_notification(
+        &self,
+        bucket: &str,
+        config: NotificationConfiguration,
+    ) -> StoreResult<()> {
+        let config_json = serde_json::to_string(&config)?;
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.notification_config = config;
+        drop(buckets);
+        self.wal
+            .append(&WalEntry::BucketNotification {
+                name: bucket.to_string(),
+                config_json,
+            })
+            .await?;
+        Ok(())
+    }
+
+    pub async fn put_bucket_encryption(
+        &self,
+        bucket: &str,
+        enc: BucketEncryption,
+    ) -> StoreResult<()> {
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.encryption = Some(enc);
+        Ok(())
+    }
+
+    pub async fn put_bucket_tags(
+        &self,
+        bucket: &str,
+        tags: HashMap<String, String>,
+    ) -> StoreResult<()> {
+        let mut buckets = self.buckets.write().await;
+        let b = buckets
+            .get_mut(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+        b.tags = tags;
+        Ok(())
+    }
+
+    // ── Object operations ───────────────────────────────────────────────────────
+
+    pub async fn put_object(
         &self,
         bucket: &str,
         key: &str,
-        data: Bytes,
+        data: Vec<u8>,
+        content_type: &str,
         metadata: HashMap<String, String>,
-        content_type: Option<String>,
-        sse: Option<SseConfig>,
-    ) -> Result<ObjectMetadata> {
-        let state = self.bucket(bucket)?;
-        let version_id = {
-            let v = state.versioning.read();
-            if v.status == VersioningStatus::Enabled {
-                Some(Uuid::new_v4().to_string())
-            } else {
-                None
+        tags: HashMap<String, String>,
+        sse: Option<&str>,          // "AES256" | "aws:kms" | None
+        sse_key_b64: Option<&str>,  // SSE-C key
+        storage_class: Option<StorageClass>,
+    ) -> StoreResult<PutObjectResult> {
+        // Ensure bucket exists
+        let (versioning, bucket_enc, notification_cfg) = {
+            let buckets = self.buckets.read().await;
+            let b = buckets
+                .get(bucket)
+                .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+            (b.versioning.clone(), b.encryption.clone(), b.notification_config.clone())
+        };
+
+        // Determine version ID
+        let version_id = match versioning {
+            VersioningState::Enabled => Some(Uuid::new_v4().to_string()),
+            _ => None,
+        };
+
+        // Compute etag (MD5 equivalent via SHA256 prefix)
+        let etag = compute_etag(&data);
+        let size = data.len() as u64;
+
+        // Encrypt if requested
+        let (stored_data, enc_meta) = match sse.or(bucket_enc.as_ref().map(|e| match e.sse_algorithm {
+            SseAlgorithm::Aes256 => "AES256",
+            SseAlgorithm::AwsKms => "aws:kms",
+        })) {
+            Some("AES256") => {
+                if let Some(sse_key_b64) = sse_key_b64 {
+                    // SSE-C
+                    let key = encryption::parse_sse_c_key(sse_key_b64)?;
+                    let ciphertext = encryption::encrypt_aes256gcm(&data, &key)?;
+                    let md5 = encryption::key_md5(&key);
+                    (ciphertext, Some(ObjectEncryption {
+                        algorithm: "SSE-C".to_string(),
+                        key_md5: Some(md5),
+                        kms_key_id: None,
+                    }))
+                } else {
+                    // SSE-S3
+                    let ks = self.key_store.read().await;
+                    let (key_id, root_key) = ks.current_key();
+                    let obj_key = encryption::derive_sse_s3_key(root_key, &format!("{bucket}/{key}"));
+                    let ciphertext = encryption::encrypt_aes256gcm(&data, &obj_key)?;
+                    (ciphertext, Some(ObjectEncryption {
+                        algorithm: "AES256".to_string(),
+                        key_md5: Some(key_id.to_string()),
+                        kms_key_id: None,
+                    }))
+                }
             }
+            _ => (data, None),
         };
 
-        let etag = Self::etag_of(&data);
-        let sse_algorithm = sse.as_ref().map(|s| s.algorithm.clone());
-
-        // Normalise version_id: use UUID if versioning enabled, else "latest".
-        let version_string = version_id.clone().unwrap_or_else(|| "latest".to_string());
-
-        // Encrypt if needed
-        let stored_data = match &sse {
-            Some(s) if s.algorithm == SseAlgorithm::AwsS3 => self.encrypt_sse_s3(&data)?,
-            Some(s) if s.algorithm == SseAlgorithm::Customer => {
-                let key = s.customer_key.as_ref()
-                    .ok_or_else(|| StoreError::InvalidRequest("SSE-C requires customer key".into()))?;
-                self.encrypt_sse_c(&data, key)?
-            }
-            _ => data.to_vec(),
-        };
-
-        let data_path = self.object_data_path(bucket, key, Some(&version_string));
-        std::fs::create_dir_all(data_path.parent().unwrap())?;
-        std::fs::write(&data_path, &stored_data)?;
-
-        let obj_meta = ObjectMetadata {
-            key: key.to_string(),
-            size: data.len() as u64,
-            etag,
-            last_modified: Utc::now(),
-            content_type: content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
-            storage_class: "STANDARD".to_string(),
-            version_id: version_id.clone(),
-            user_metadata: metadata,
-            sse_algorithm,
-        };
+        // Write to disk
+        let rel_path = object_path(bucket, key, version_id.as_deref());
+        let abs_path = self.data_dir.join(&rel_path);
+        if let Some(parent) = abs_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&abs_path, &stored_data)?;
 
         let version = ObjectVersion {
-            version_id: version_string.clone(),
-            is_delete_marker: false,
-            metadata: obj_meta.clone(),
+            version_id: version_id.clone(),
+            etag: etag.clone(),
+            size,
+            last_modified: Utc::now(),
+            content_type: content_type.to_string(),
+            metadata: metadata.clone(),
+            tags,
+            storage_class: storage_class.unwrap_or(StorageClass::Standard),
+            storage_path: rel_path.to_string_lossy().to_string(),
+            encryption: enc_meta,
+            delete_marker: false,
+            restore_status: None,
         };
 
-        let mut entry = state.objects.entry(key.to_string()).or_default();
-        entry.insert(0, version);
+        let meta_json = serde_json::to_string(&metadata)?;
+        self.objects
+            .write()
+            .await
+            .entry((bucket.to_string(), key.to_string()))
+            .or_default()
+            .push(version);
 
-        self.save_object_meta(bucket, key, &entry)?;
-        Ok(obj_meta)
+        self.wal
+            .append(&WalEntry::ObjectPut {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                version_id: version_id.clone(),
+                etag: etag.clone(),
+                size,
+                content_type: content_type.to_string(),
+                metadata_json: meta_json,
+                storage_path: rel_path.to_string_lossy().to_string(),
+                lease_id: None,
+            })
+            .await?;
+
+        // Dispatch event
+        let event = S3Event::object_created_put(bucket, key, size, &etag);
+        notification::dispatch(&notification_cfg, &event, &self.event_tx).await;
+
+        Ok(PutObjectResult { etag, version_id })
     }
 
-    pub fn get_object(
+    pub async fn get_object(
         &self,
         bucket: &str,
         key: &str,
         version_id: Option<&str>,
         range: Option<(u64, u64)>,
-        customer_key: Option<&[u8]>,
-    ) -> Result<(ObjectMetadata, Bytes)> {
-        let state = self.bucket(bucket)?;
-        let versions = state.objects.get(key)
-            .ok_or_else(|| StoreError::ObjectNotFound(bucket.to_string(), key.to_string()))?;
+        sse_c_key: Option<&str>,
+    ) -> StoreResult<GetObjectResult> {
+        let objects = self.objects.read().await;
+        let versions = objects
+            .get(&(bucket.to_string(), key.to_string()))
+            .ok_or_else(|| StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            })?;
 
-        let version = find_version(&versions, version_id)?;
-        let meta = version.metadata.clone();
+        let version = if let Some(vid) = version_id {
+            versions
+                .iter()
+                .rev()
+                .find(|v| v.version_id.as_deref() == Some(vid))
+        } else {
+            versions.last()
+        }
+        .ok_or_else(|| StoreError::ObjectNotFound {
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+        })?;
 
-        let data_path = self.object_data_path(bucket, key, Some(&version.version_id));
-        let raw = std::fs::read(&data_path)?;
+        if version.delete_marker {
+            return Err(StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            });
+        }
 
-        let plaintext = match &meta.sse_algorithm {
-            Some(SseAlgorithm::AwsS3) => self.decrypt_sse_s3(&raw)?,
-            Some(SseAlgorithm::Customer) => {
-                let key = customer_key
-                    .ok_or_else(|| StoreError::InvalidRequest("SSE-C: customer key required for get".into()))?;
-                self.decrypt_sse_c(&raw, key)?
+        let abs_path = self.data_dir.join(&version.storage_path);
+        let raw = std::fs::read(&abs_path)?;
+
+        // Decrypt if encrypted
+        let data = match &version.encryption {
+            Some(enc) if enc.algorithm == "SSE-C" => {
+                let key_b64 = sse_c_key.ok_or_else(|| {
+                    StoreError::EncryptionError("SSE-C key required".into())
+                })?;
+                let key = encryption::parse_sse_c_key(key_b64)?;
+                encryption::decrypt_aes256gcm(&raw, &key)?
+            }
+            Some(enc) if enc.algorithm == "AES256" => {
+                // SSE-S3: re-derive key
+                let ks = self.key_store.read().await;
+                let key_id = enc.key_md5.as_deref().unwrap_or("");
+                let root_key = ks
+                    .get_key(key_id)
+                    .ok_or_else(|| StoreError::EncryptionError("encryption key not found".into()))?;
+                let obj_key = encryption::derive_sse_s3_key(root_key, &format!("{bucket}/{key}"));
+                encryption::decrypt_aes256gcm(&raw, &obj_key)?
             }
             _ => raw,
         };
 
-        let data = if let Some((start, end)) = range {
-            let end = end.min(plaintext.len() as u64 - 1);
-            Bytes::copy_from_slice(&plaintext[start as usize..=end as usize])
+        // Apply range
+        let (body, content_range) = if let Some((start, end)) = range {
+            let end = end.min(data.len() as u64 - 1);
+            let slice = data[start as usize..=end as usize].to_vec();
+            let cr = format!("bytes {start}-{end}/{}", data.len());
+            (slice, Some(cr))
         } else {
-            Bytes::from(plaintext)
+            (data, None)
         };
 
-        Ok((meta, data))
-    }
-
-    pub fn head_object(&self, bucket: &str, key: &str, version_id: Option<&str>) -> Result<ObjectMetadata> {
-        let state = self.bucket(bucket)?;
-        let versions = state.objects.get(key)
-            .ok_or_else(|| StoreError::ObjectNotFound(bucket.to_string(), key.to_string()))?;
-        let version = find_version(&versions, version_id)?;
-        Ok(version.metadata.clone())
-    }
-
-    pub fn delete_object(&self, bucket: &str, key: &str, version_id: Option<&str>) -> Result<()> {
-        let state = self.bucket(bucket)?;
-        {
-            let v = state.versioning.read();
-            if v.status == VersioningStatus::Enabled && version_id.is_none() {
-                // Add a delete marker
-                let mut entry = state.objects.entry(key.to_string()).or_default();
-                let marker = ObjectVersion {
-                    version_id: Uuid::new_v4().to_string(),
-                    is_delete_marker: true,
-                    metadata: ObjectMetadata {
-                        key: key.to_string(),
-                        size: 0,
-                        etag: String::new(),
-                        last_modified: Utc::now(),
-                        content_type: String::new(),
-                        storage_class: "STANDARD".to_string(),
-                        version_id: None,
-                        user_metadata: HashMap::new(),
-                        sse_algorithm: None,
-                    },
-                };
-                entry.insert(0, marker);
-                return Ok(());
-            }
-        }
-
-        let mut versions = state.objects.entry(key.to_string()).or_default();
-        if let Some(vid) = version_id {
-            let pos = versions.iter().position(|v| v.version_id == vid)
-                .ok_or_else(|| StoreError::ObjectNotFound(bucket.to_string(), key.to_string()))?;
-            let v = versions.remove(pos);
-            let data_path = self.object_data_path(bucket, key, Some(&v.version_id));
-            let _ = std::fs::remove_file(data_path);
-        } else {
-            // Non-versioned: remove the most recent live version.
-            if let Some(pos) = versions.iter().position(|v| !v.is_delete_marker) {
-                let v = versions.remove(pos);
-                let data_path = self.object_data_path(bucket, key, Some(&v.version_id));
-                let _ = std::fs::remove_file(data_path);
-            }
-        }
-        if versions.is_empty() {
-            drop(versions);
-            state.objects.remove(key);
-            let meta_path = self.object_meta_path(bucket, key);
-            let _ = std::fs::remove_file(meta_path);
-        }
-        Ok(())
-    }
-
-    pub fn copy_object(
-        &self,
-        src_bucket: &str,
-        src_key: &str,
-        dst_bucket: &str,
-        dst_key: &str,
-    ) -> Result<ObjectMetadata> {
-        let (src_meta, data) = self.get_object(src_bucket, src_key, None, None, None)?;
-        let meta = src_meta.user_metadata.clone();
-        let ct = Some(src_meta.content_type.clone());
-        self.put_object(dst_bucket, dst_key, data, meta, ct, None)
-    }
-
-    pub fn list_objects_v2(
-        &self,
-        bucket: &str,
-        prefix: &str,
-        delimiter: &str,
-        continuation_token: Option<&str>,
-        max_keys: u32,
-    ) -> Result<ListObjectsV2Result> {
-        let state = self.bucket(bucket)?;
-        let max = if max_keys == 0 { 1000 } else { max_keys } as usize;
-
-        // Collect all live objects
-        let mut all_keys: Vec<String> = state.objects
-            .iter()
-            .filter(|e| {
-                let v = e.value();
-                !v.is_empty() && !v[0].is_delete_marker
-            })
-            .map(|e| e.key().clone())
-            .filter(|k| k.starts_with(prefix))
-            .collect();
-        all_keys.sort();
-
-        // Apply continuation token (key-based pagination)
-        let start = if let Some(token) = continuation_token {
-            let decoded = String::from_utf8(
-                B64.decode(token).unwrap_or_default()
-            ).unwrap_or_default();
-            all_keys.iter().position(|k| k.as_str() > decoded.as_str()).unwrap_or(all_keys.len())
-        } else {
-            0
-        };
-
-        let mut contents = Vec::new();
-        let mut common_prefixes: Vec<String> = Vec::new();
-        let mut count = 0usize;
-        let mut last_key = String::new();
-
-        for key in &all_keys[start..] {
-            if count >= max {
-                break;
-            }
-            if !delimiter.is_empty() {
-                let suffix = &key[prefix.len()..];
-                if let Some(pos) = suffix.find(delimiter) {
-                    let cp = format!("{}{}{}", prefix, &suffix[..=pos], "");
-                    let cp = format!("{}{}", prefix, &suffix[..pos + delimiter.len()]);
-                    if !common_prefixes.contains(&cp) {
-                        common_prefixes.push(cp);
-                        count += 1;
-                    }
-                    continue;
-                }
-            }
-            let versions = state.objects.get(key).unwrap();
-            contents.push(versions[0].metadata.clone());
-            last_key = key.clone();
-            count += 1;
-        }
-
-        let truncated = start + count < all_keys.len();
-        let next_token = if truncated {
-            Some(B64.encode(last_key.as_bytes()))
-        } else {
-            None
-        };
-
-        Ok(ListObjectsV2Result {
-            bucket: bucket.to_string(),
-            prefix: prefix.to_string(),
-            delimiter: delimiter.to_string(),
-            max_keys: max_keys,
-            key_count: count as u32,
-            truncated,
-            next_continuation_token: next_token,
-            contents,
-            common_prefixes,
+        Ok(GetObjectResult {
+            body,
+            content_type: version.content_type.clone(),
+            etag: version.etag.clone(),
+            last_modified: version.last_modified,
+            size: version.size,
+            version_id: version.version_id.clone(),
+            metadata: version.metadata.clone(),
+            storage_class: format!("{:?}", version.storage_class).to_uppercase(),
+            content_range,
+            encryption: version.encryption.clone(),
+            delete_marker: version.delete_marker,
         })
     }
 
-    // ── Multipart upload ──────────────────────────────────────────────────────
-
-    pub fn create_multipart_upload(
+    pub async fn head_object(
         &self,
         bucket: &str,
         key: &str,
-        metadata: HashMap<String, String>,
-        content_type: Option<String>,
-    ) -> Result<String> {
-        let state = self.bucket(bucket)?;
-        let upload_id = Uuid::new_v4().to_string();
-        let upload = MultipartUpload {
-            upload_id: upload_id.clone(),
+        version_id: Option<&str>,
+    ) -> StoreResult<HeadObjectResult> {
+        let objects = self.objects.read().await;
+        let versions = objects
+            .get(&(bucket.to_string(), key.to_string()))
+            .ok_or_else(|| StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            })?;
+        let version = if let Some(vid) = version_id {
+            versions.iter().rev().find(|v| v.version_id.as_deref() == Some(vid))
+        } else {
+            versions.last()
+        }
+        .ok_or_else(|| StoreError::ObjectNotFound {
             bucket: bucket.to_string(),
             key: key.to_string(),
-            initiated: Utc::now(),
-            parts: BTreeMap::new(),
-            metadata,
-            content_type: content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
+        })?;
+
+        Ok(HeadObjectResult {
+            content_type: version.content_type.clone(),
+            etag: version.etag.clone(),
+            last_modified: version.last_modified,
+            size: version.size,
+            version_id: version.version_id.clone(),
+            metadata: version.metadata.clone(),
+            storage_class: format!("{:?}", version.storage_class).to_uppercase(),
+            delete_marker: version.delete_marker,
+            encryption: version.encryption.clone(),
+        })
+    }
+
+    pub async fn delete_object(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: Option<&str>,
+    ) -> StoreResult<DeleteObjectResult> {
+        let (versioning, notification_cfg) = {
+            let buckets = self.buckets.read().await;
+            let b = buckets
+                .get(bucket)
+                .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+            (b.versioning.clone(), b.notification_config.clone())
         };
-        state.multipart.insert(upload_id.clone(), upload);
+
+        let mut objects = self.objects.write().await;
+        let versions = objects
+            .get_mut(&(bucket.to_string(), key.to_string()))
+            .ok_or_else(|| StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            })?;
+
+        let result = if let Some(vid) = version_id {
+            // Delete specific version
+            let idx = versions.iter().rposition(|v| v.version_id.as_deref() == Some(vid));
+            if let Some(i) = idx {
+                let removed = versions.remove(i);
+                if let Ok(p) = self.data_dir.join(&removed.storage_path).canonicalize() {
+                    let _ = std::fs::remove_file(p);
+                }
+                DeleteObjectResult {
+                    version_id: removed.version_id,
+                    delete_marker: false,
+                }
+            } else {
+                return Err(StoreError::ObjectNotFound {
+                    bucket: bucket.to_string(),
+                    key: key.to_string(),
+                });
+            }
+        } else if versioning == VersioningState::Enabled {
+            // Insert delete marker
+            let new_vid = Uuid::new_v4().to_string();
+            versions.push(ObjectVersion {
+                version_id: Some(new_vid.clone()),
+                etag: String::new(),
+                size: 0,
+                last_modified: Utc::now(),
+                content_type: String::new(),
+                metadata: HashMap::new(),
+                tags: HashMap::new(),
+                storage_class: StorageClass::Standard,
+                storage_path: String::new(),
+                encryption: None,
+                delete_marker: true,
+                restore_status: None,
+            });
+            DeleteObjectResult {
+                version_id: Some(new_vid),
+                delete_marker: true,
+            }
+        } else {
+            // Hard delete all versions
+            let removed = versions.drain(..).collect::<Vec<_>>();
+            for v in &removed {
+                if !v.storage_path.is_empty() {
+                    let _ = std::fs::remove_file(self.data_dir.join(&v.storage_path));
+                }
+            }
+            objects.remove(&(bucket.to_string(), key.to_string()));
+            DeleteObjectResult {
+                version_id: None,
+                delete_marker: false,
+            }
+        };
+
+        drop(objects);
+        self.wal
+            .append(&WalEntry::ObjectDelete {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                version_id: result.version_id.clone(),
+                delete_marker: result.delete_marker,
+            })
+            .await?;
+
+        let event = S3Event::object_removed_delete(bucket, key);
+        notification::dispatch(&notification_cfg, &event, &self.event_tx).await;
+
+        Ok(result)
+    }
+
+    pub async fn copy_object(
+        &self,
+        src_bucket: &str,
+        src_key: &str,
+        src_version: Option<&str>,
+        dst_bucket: &str,
+        dst_key: &str,
+        metadata_directive: &str, // "COPY" | "REPLACE"
+        new_metadata: Option<HashMap<String, String>>,
+    ) -> StoreResult<CopyObjectResult> {
+        let src = self.get_object(src_bucket, src_key, src_version, None, None).await?;
+        let metadata = match metadata_directive {
+            "REPLACE" => new_metadata.unwrap_or_default(),
+            _ => src.metadata.clone(),
+        };
+        let r = self
+            .put_object(
+                dst_bucket,
+                dst_key,
+                src.body,
+                &src.content_type,
+                metadata,
+                HashMap::new(),
+                None,
+                None,
+                None,
+            )
+            .await?;
+
+        let event = S3Event::object_created_copy(dst_bucket, dst_key, src.size, &r.etag);
+        let notification_cfg = self.buckets.read().await.get(dst_bucket).map(|b| b.notification_config.clone()).unwrap_or_default();
+        notification::dispatch(&notification_cfg, &event, &self.event_tx).await;
+
+        Ok(CopyObjectResult {
+            etag: r.etag,
+            last_modified: Utc::now(),
+            version_id: r.version_id,
+        })
+    }
+
+    pub async fn list_objects_v2(
+        &self,
+        bucket: &str,
+        prefix: &str,
+        delimiter: Option<&str>,
+        max_keys: u32,
+        continuation_token: Option<&str>,
+    ) -> StoreResult<ListResult> {
+        self.buckets
+            .read()
+            .await
+            .get(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+
+        let objects = self.objects.read().await;
+        let mut contents: Vec<ObjectListEntry> = Vec::new();
+        let mut common_prefixes: std::collections::BTreeSet<String> = Default::default();
+        let mut count = 0u32;
+        let mut is_truncated = false;
+
+        let skip_to = continuation_token.unwrap_or("");
+        let mut skipping = !skip_to.is_empty();
+
+        let mut keys: Vec<&(String, String)> = objects
+            .keys()
+            .filter(|(b, k)| b == bucket && k.starts_with(prefix))
+            .collect();
+        keys.sort_by(|a, b| a.1.cmp(&b.1));
+
+        for (_, key) in keys {
+            if skipping {
+                if key.as_str() == skip_to {
+                    skipping = false;
+                }
+                continue;
+            }
+            if count >= max_keys {
+                is_truncated = true;
+                break;
+            }
+            // Latest non-delete-marker version
+            let versions = &objects[&(bucket.to_string(), key.clone())];
+            let latest = versions.iter().rev().find(|v| !v.delete_marker);
+            let Some(v) = latest else { continue };
+
+            // Delimiter grouping
+            if let Some(delim) = delimiter {
+                let suffix = &key[prefix.len()..];
+                if let Some(idx) = suffix.find(delim) {
+                    let cp = format!("{}{}{}", prefix, &suffix[..=idx], delim);
+                    common_prefixes.insert(cp);
+                    continue;
+                }
+            }
+
+            contents.push(ObjectListEntry {
+                key: key.clone(),
+                last_modified: v.last_modified,
+                etag: v.etag.clone(),
+                size: v.size,
+                storage_class: format!("{:?}", v.storage_class).to_uppercase(),
+            });
+            count += 1;
+        }
+
+        Ok(ListResult {
+            contents,
+            common_prefixes: common_prefixes.into_iter().collect(),
+            is_truncated,
+            key_count: count,
+            next_continuation_token: if is_truncated {
+                contents_last_key(&*objects, bucket, prefix, max_keys, continuation_token)
+            } else {
+                None
+            },
+        })
+    }
+
+    pub async fn list_object_versions(
+        &self,
+        bucket: &str,
+        prefix: &str,
+    ) -> StoreResult<Vec<(String, Vec<ObjectVersion>)>> {
+        self.buckets
+            .read()
+            .await
+            .get(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+
+        let objects = self.objects.read().await;
+        let mut result: Vec<(String, Vec<ObjectVersion>)> = objects
+            .iter()
+            .filter(|((b, k), _)| b == bucket && k.starts_with(prefix))
+            .map(|((_, k), vs)| (k.clone(), vs.clone()))
+            .collect();
+        result.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok(result)
+    }
+
+    pub async fn delete_objects(
+        &self,
+        bucket: &str,
+        objects: Vec<DeleteObjectEntry>,
+    ) -> StoreResult<Vec<DeleteObjectEntryResult>> {
+        let mut results = Vec::new();
+        for entry in objects {
+            match self
+                .delete_object(bucket, &entry.key, entry.version_id.as_deref())
+                .await
+            {
+                Ok(r) => results.push(DeleteObjectEntryResult {
+                    key: entry.key,
+                    version_id: r.version_id,
+                    delete_marker: r.delete_marker,
+                    error: None,
+                }),
+                Err(e) => results.push(DeleteObjectEntryResult {
+                    key: entry.key,
+                    version_id: None,
+                    delete_marker: false,
+                    error: Some((e.s3_code().to_string(), e.to_string())),
+                }),
+            }
+        }
+        Ok(results)
+    }
+
+    pub async fn put_object_tagging(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: Option<&str>,
+        tags: HashMap<String, String>,
+    ) -> StoreResult<()> {
+        let mut objects = self.objects.write().await;
+        let versions = objects
+            .get_mut(&(bucket.to_string(), key.to_string()))
+            .ok_or_else(|| StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            })?;
+        let version = if let Some(vid) = version_id {
+            versions.iter_mut().rev().find(|v| v.version_id.as_deref() == Some(vid))
+        } else {
+            versions.last_mut()
+        }
+        .ok_or_else(|| StoreError::ObjectNotFound {
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+        })?;
+        version.tags = tags;
+        Ok(())
+    }
+
+    pub async fn get_object_tagging(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: Option<&str>,
+    ) -> StoreResult<HashMap<String, String>> {
+        let objects = self.objects.read().await;
+        let versions = objects
+            .get(&(bucket.to_string(), key.to_string()))
+            .ok_or_else(|| StoreError::ObjectNotFound {
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+            })?;
+        let version = if let Some(vid) = version_id {
+            versions.iter().rev().find(|v| v.version_id.as_deref() == Some(vid))
+        } else {
+            versions.last()
+        }
+        .ok_or_else(|| StoreError::ObjectNotFound {
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+        })?;
+        Ok(version.tags.clone())
+    }
+
+    // ── Multipart upload ────────────────────────────────────────────────────────
+
+    pub async fn create_multipart_upload(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: &str,
+        metadata: HashMap<String, String>,
+    ) -> StoreResult<String> {
+        self.buckets
+            .read()
+            .await
+            .get(bucket)
+            .ok_or_else(|| StoreError::BucketNotFound(bucket.to_string()))?;
+
+        let upload_id = Uuid::new_v4().to_string();
+        let meta_json = serde_json::to_string(&metadata)?;
+        self.multiparts.write().await.insert(
+            upload_id.clone(),
+            MultipartUpload {
+                upload_id: upload_id.clone(),
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                initiated: Utc::now(),
+                owner: "cave".to_string(),
+                content_type: content_type.to_string(),
+                metadata,
+                parts: HashMap::new(),
+            },
+        );
+        self.wal
+            .append(&WalEntry::MultipartInit {
+                upload_id: upload_id.clone(),
+                bucket: bucket.to_string(),
+                key: key.to_string(),
+                metadata_json: meta_json,
+            })
+            .await?;
         Ok(upload_id)
     }
 
-    pub fn upload_part(
+    pub async fn upload_part(
         &self,
-        bucket: &str,
-        key: &str,
         upload_id: &str,
         part_number: u32,
-        data: Bytes,
-    ) -> Result<String> {
-        let state = self.bucket(bucket)?;
-        let mut upload = state.multipart.get_mut(upload_id)
-            .ok_or_else(|| StoreError::UploadNotFound(upload_id.to_string()))?;
-
-        if upload.key != key {
-            return Err(StoreError::InvalidRequest("key mismatch".into()));
+        data: Vec<u8>,
+    ) -> StoreResult<String> {
+        if part_number < 1 || part_number > 10000 {
+            return Err(StoreError::InvalidPart(format!(
+                "part number {part_number} out of range [1, 10000]"
+            )));
         }
+        let (bucket, key) = {
+            let multiparts = self.multiparts.read().await;
+            let mp = multiparts
+                .get(upload_id)
+                .ok_or_else(|| StoreError::NoSuchUpload(upload_id.to_string()))?;
+            (mp.bucket.clone(), mp.key.clone())
+        };
 
-        let etag = Self::etag_of(&data);
+        let etag = compute_etag(&data);
         let size = data.len() as u64;
+        let rel_path = format!(
+            "{}/.multipart/{}/{}.part",
+            bucket, upload_id, part_number
+        );
+        let abs_path = self.data_dir.join(&rel_path);
+        if let Some(p) = abs_path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        std::fs::write(&abs_path, &data)?;
 
-        // Store part data
-        let part_path = self.data_dir
-            .join(bucket)
-            .join(format!(".mp_{upload_id}_{part_number}.dat"));
-        std::fs::create_dir_all(part_path.parent().unwrap())?;
-        std::fs::write(&part_path, &data)?;
+        self.multiparts
+            .write()
+            .await
+            .get_mut(upload_id)
+            .ok_or_else(|| StoreError::NoSuchUpload(upload_id.to_string()))?
+            .parts
+            .insert(
+                part_number,
+                UploadedPart {
+                    part_number,
+                    etag: etag.clone(),
+                    size,
+                    storage_path: rel_path.clone(),
+                    last_modified: Utc::now(),
+                },
+            );
 
-        upload.parts.insert(part_number, UploadedPart { part_number, etag: etag.clone(), size });
+        self.wal
+            .append(&WalEntry::MultipartPart {
+                upload_id: upload_id.to_string(),
+                part_number,
+                etag: etag.clone(),
+                size,
+                storage_path: rel_path,
+            })
+            .await?;
         Ok(etag)
     }
 
-    pub fn complete_multipart_upload(
+    pub async fn complete_multipart_upload(
         &self,
-        bucket: &str,
-        key: &str,
         upload_id: &str,
         parts: Vec<(u32, String)>, // (part_number, etag)
-    ) -> Result<ObjectMetadata> {
-        let state = self.bucket(bucket)?;
-        let upload = state.multipart.get(upload_id)
-            .ok_or_else(|| StoreError::UploadNotFound(upload_id.to_string()))?;
+    ) -> StoreResult<CompleteMultipartResult> {
+        let mp = self
+            .multiparts
+            .read()
+            .await
+            .get(upload_id)
+            .cloned()
+            .ok_or_else(|| StoreError::NoSuchUpload(upload_id.to_string()))?;
 
-        // Assemble parts in order
-        let mut assembled = Vec::new();
-        for (part_num, _etag) in &parts {
-            let part_path = self.data_dir
-                .join(bucket)
-                .join(format!(".mp_{upload_id}_{part_num}.dat"));
-            let data = std::fs::read(&part_path)?;
-            assembled.extend_from_slice(&data);
-            let _ = std::fs::remove_file(part_path);
+        // Validate parts: must be ordered, all present, etags match
+        if parts.is_empty() {
+            return Err(StoreError::InvalidPart("no parts provided".into()));
+        }
+        for (i, (pn, _)) in parts.iter().enumerate() {
+            if i > 0 && *pn <= parts[i - 1].0 {
+                return Err(StoreError::InvalidPart("parts must be in ascending order".into()));
+            }
         }
 
-        let meta_clone = HashMap::new();
-        let ct = Some(upload.content_type.clone());
-        drop(upload);
-        state.multipart.remove(upload_id);
+        // Assemble parts into final object
+        let mut assembled = Vec::new();
+        for (pn, expected_etag) in &parts {
+            let part = mp.parts.get(pn).ok_or_else(|| {
+                StoreError::InvalidPart(format!("part {pn} not found"))
+            })?;
+            if &part.etag != expected_etag {
+                return Err(StoreError::InvalidPart(format!(
+                    "part {pn} etag mismatch: expected {expected_etag}, got {}",
+                    part.etag
+                )));
+            }
+            // Parts < 5 MB are only valid for the last part
+            if part.size < 5 * 1024 * 1024 && pn != &parts.last().unwrap().0 {
+                return Err(StoreError::EntityTooSmall);
+            }
+            let data = std::fs::read(self.data_dir.join(&part.storage_path))?;
+            assembled.extend_from_slice(&data);
+        }
 
-        self.put_object(bucket, key, Bytes::from(assembled), meta_clone, ct, None)
-    }
+        // Compute final ETag (AWS uses MD5 of part ETags concatenated)
+        let part_etags: String = parts.iter().map(|(_, e)| e.as_str()).collect::<Vec<_>>().join("");
+        let final_etag = format!("{}-{}", compute_etag(part_etags.as_bytes()), parts.len());
 
-    pub fn abort_multipart_upload(&self, bucket: &str, key: &str, upload_id: &str) -> Result<()> {
-        let state = self.bucket(bucket)?;
-        let upload = state.multipart.remove(upload_id)
-            .ok_or_else(|| StoreError::UploadNotFound(upload_id.to_string()))?;
+        let versioning = self
+            .buckets
+            .read()
+            .await
+            .get(&mp.bucket)
+            .map(|b| b.versioning.clone())
+            .unwrap_or(VersioningState::Disabled);
+
+        let version_id = match versioning {
+            VersioningState::Enabled => Some(Uuid::new_v4().to_string()),
+            _ => None,
+        };
+
+        let rel_path = object_path(&mp.bucket, &mp.key, version_id.as_deref());
+        let abs_path = self.data_dir.join(&rel_path);
+        if let Some(p) = abs_path.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        std::fs::write(&abs_path, &assembled)?;
+
+        let size = assembled.len() as u64;
+        let version = ObjectVersion {
+            version_id: version_id.clone(),
+            etag: final_etag.clone(),
+            size,
+            last_modified: Utc::now(),
+            content_type: mp.content_type.clone(),
+            metadata: mp.metadata.clone(),
+            tags: HashMap::new(),
+            storage_class: StorageClass::Standard,
+            storage_path: rel_path.to_string_lossy().to_string(),
+            encryption: None,
+            delete_marker: false,
+            restore_status: None,
+        };
+
+        self.objects
+            .write()
+            .await
+            .entry((mp.bucket.clone(), mp.key.clone()))
+            .or_default()
+            .push(version);
 
         // Clean up part files
-        for part_num in upload.1.parts.keys() {
-            let part_path = self.data_dir
-                .join(bucket)
-                .join(format!(".mp_{upload_id}_{part_num}.dat"));
-            let _ = std::fs::remove_file(part_path);
+        for part in mp.parts.values() {
+            let _ = std::fs::remove_file(self.data_dir.join(&part.storage_path));
         }
+
+        self.multiparts.write().await.remove(upload_id);
+
+        self.wal
+            .append(&WalEntry::MultipartComplete {
+                upload_id: upload_id.to_string(),
+                final_etag: final_etag.clone(),
+                final_path: rel_path.to_string_lossy().to_string(),
+                version_id: version_id.clone(),
+            })
+            .await?;
+
+        let notification_cfg = self
+            .buckets
+            .read()
+            .await
+            .get(&mp.bucket)
+            .map(|b| b.notification_config.clone())
+            .unwrap_or_default();
+        let event = S3Event::object_created_multipart(&mp.bucket, &mp.key, size, &final_etag);
+        notification::dispatch(&notification_cfg, &event, &self.event_tx).await;
+
+        Ok(CompleteMultipartResult {
+            bucket: mp.bucket,
+            key: mp.key,
+            etag: final_etag,
+            version_id,
+        })
+    }
+
+    pub async fn abort_multipart_upload(&self, upload_id: &str) -> StoreResult<()> {
+        let mp = self
+            .multiparts
+            .write()
+            .await
+            .remove(upload_id)
+            .ok_or_else(|| StoreError::NoSuchUpload(upload_id.to_string()))?;
+
+        // Clean up part files
+        for part in mp.parts.values() {
+            let _ = std::fs::remove_file(self.data_dir.join(&part.storage_path));
+        }
+        self.wal
+            .append(&WalEntry::MultipartAbort {
+                upload_id: upload_id.to_string(),
+            })
+            .await?;
         Ok(())
     }
 
-    pub fn list_multipart_uploads(&self, bucket: &str) -> Result<Vec<MultipartUpload>> {
-        let state = self.bucket(bucket)?;
-        let mut uploads: Vec<MultipartUpload> = state.multipart
-            .iter()
-            .map(|e| e.value().clone())
-            .collect();
-        uploads.sort_by(|a, b| a.initiated.cmp(&b.initiated));
-        Ok(uploads)
+    pub async fn list_multipart_uploads(&self, bucket: &str) -> Vec<MultipartUpload> {
+        self.multiparts
+            .read()
+            .await
+            .values()
+            .filter(|m| m.bucket == bucket)
+            .cloned()
+            .collect()
     }
 
-    // ── Presigned URLs ────────────────────────────────────────────────────────
-
-    pub fn presign_url(
-        &self,
-        bucket: &str,
-        key: &str,
-        method: &str,
-        expires_in_secs: u64,
-        base_url: &str,
-    ) -> Result<String> {
-        self.bucket(bucket)?;
-        let expiry = chrono::Utc::now().timestamp() as u64 + expires_in_secs;
-        let string_to_sign = format!("{method}\n{bucket}\n{key}\n{expiry}");
-        type HmacSha256 = Hmac<Sha256>;
-        let mut mac = <HmacSha256 as hmac::Mac>::new_from_slice(&self.sse_master_key)
-            .map_err(|e| StoreError::InvalidRequest(format!("HMAC error: {e}")))?;
-        hmac::Mac::update(&mut mac, string_to_sign.as_bytes());
-        let sig = hex::encode(hmac::Mac::finalize(mac).into_bytes());
-        Ok(format!(
-            "{base_url}/{bucket}/{key}?X-Amz-Expires={expires_in_secs}&X-Amz-Expires-At={expiry}&X-Amz-Signature={sig}"
-        ))
+    pub async fn list_parts(&self, upload_id: &str) -> StoreResult<Vec<UploadedPart>> {
+        let multiparts = self.multiparts.read().await;
+        let mp = multiparts
+            .get(upload_id)
+            .ok_or_else(|| StoreError::NoSuchUpload(upload_id.to_string()))?;
+        let mut parts: Vec<UploadedPart> = mp.parts.values().cloned().collect();
+        parts.sort_by_key(|p| p.part_number);
+        Ok(parts)
     }
 
-    // ── Versioning ────────────────────────────────────────────────────────────
+    /// Background lifecycle enforcer.
+    pub async fn run_lifecycle_enforcer(store: Arc<ObjectStore>) {
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3600));
+        loop {
+            interval.tick().await;
+            let buckets = store.buckets.read().await;
+            let bucket_rules: Vec<(String, Vec<LifecycleRule>)> = buckets
+                .values()
+                .filter(|b| !b.lifecycle_rules.is_empty())
+                .map(|b| (b.name.clone(), b.lifecycle_rules.clone()))
+                .collect();
+            drop(buckets);
 
-    pub fn get_bucket_versioning(&self, bucket: &str) -> Result<BucketVersioning> {
-        Ok(self.bucket(bucket)?.versioning.read().clone())
-    }
+            for (bucket_name, rules) in bucket_rules {
+                let objects = store.objects.read().await;
+                let mut to_delete: Vec<(String, Option<String>)> = Vec::new();
 
-    pub fn put_bucket_versioning(&self, bucket: &str, config: BucketVersioning) -> Result<()> {
-        *self.bucket(bucket)?.versioning.write() = config;
-        Ok(())
-    }
+                for ((b, key), versions) in objects.iter() {
+                    if b != &bucket_name {
+                        continue;
+                    }
+                    for rule in &rules {
+                        for v in versions {
+                            if lifecycle::should_expire(rule, key, v) {
+                                to_delete.push((key.clone(), v.version_id.clone()));
+                            }
+                        }
+                    }
+                }
+                drop(objects);
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
+                for (key, version_id) in to_delete {
+                    debug!("Lifecycle expiring {bucket_name}/{key}");
+                    let _ = store.delete_object(&bucket_name, &key, version_id.as_deref()).await;
+                }
 
-    pub fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Vec<LifecycleRule>> {
-        Ok(self.bucket(bucket)?.lifecycle.read().clone())
-    }
+                // Abort incomplete multipart uploads
+                let multiparts = store.multiparts.read().await;
+                let to_abort: Vec<String> = multiparts
+                    .values()
+                    .filter(|m| m.bucket == bucket_name)
+                    .filter(|m| {
+                        let bucket_read = store.buckets.try_read().ok();
+                        bucket_read
+                            .as_ref()
+                            .and_then(|bs| bs.get(&bucket_name))
+                            .map(|b| {
+                                b.lifecycle_rules.iter().any(|rule| {
+                                    lifecycle::should_abort_multipart(rule, &m.key, &m.initiated)
+                                })
+                            })
+                            .unwrap_or(false)
+                    })
+                    .map(|m| m.upload_id.clone())
+                    .collect();
+                drop(multiparts);
 
-    pub fn put_bucket_lifecycle(&self, bucket: &str, rules: Vec<LifecycleRule>) -> Result<()> {
-        *self.bucket(bucket)?.lifecycle.write() = rules;
-        Ok(())
-    }
-
-    // ── Policy ────────────────────────────────────────────────────────────────
-
-    pub fn get_bucket_policy(&self, bucket: &str) -> Result<BucketPolicy> {
-        self.bucket(bucket)?
-            .policy.read()
-            .clone()
-            .ok_or_else(|| StoreError::InvalidRequest("no bucket policy".into()))
-    }
-
-    pub fn put_bucket_policy(&self, bucket: &str, policy: BucketPolicy) -> Result<()> {
-        *self.bucket(bucket)?.policy.write() = Some(policy);
-        Ok(())
-    }
-
-    pub fn delete_bucket_policy(&self, bucket: &str) -> Result<()> {
-        *self.bucket(bucket)?.policy.write() = None;
-        Ok(())
-    }
-
-    // ── Notification ──────────────────────────────────────────────────────────
-
-    pub fn get_bucket_notification(&self, bucket: &str) -> Result<NotificationConfig> {
-        Ok(self.bucket(bucket)?.notification.read().clone())
-    }
-
-    pub fn put_bucket_notification(&self, bucket: &str, config: NotificationConfig) -> Result<()> {
-        *self.bucket(bucket)?.notification.write() = config;
-        Ok(())
-    }
-
-    // ── ACL ───────────────────────────────────────────────────────────────────
-
-    pub fn get_bucket_acl(&self, bucket: &str) -> Result<BucketAcl> {
-        Ok(self.bucket(bucket)?.acl.read().clone())
-    }
-
-    pub fn put_bucket_acl(&self, bucket: &str, acl: BucketAcl) -> Result<()> {
-        *self.bucket(bucket)?.acl.write() = acl;
-        Ok(())
+                for upload_id in to_abort {
+                    debug!("Lifecycle aborting multipart {upload_id}");
+                    let _ = store.abort_multipart_upload(&upload_id).await;
+                }
+            }
+        }
     }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helper types ───────────────────────────────────────────────────────────────
 
-fn find_version<'a>(
-    versions: &'a dashmap::mapref::one::Ref<'_, String, Vec<ObjectVersion>>,
-    version_id: Option<&str>,
-) -> Result<&'a ObjectVersion> {
-    match version_id {
-        None => versions.iter()
-            .find(|v| !v.is_delete_marker)
-            .ok_or(StoreError::KeyNotFound),
-        Some(vid) => versions.iter()
-            .find(|v| v.version_id == vid)
-            .ok_or(StoreError::KeyNotFound),
-    }
+pub struct PutObjectResult {
+    pub etag: String,
+    pub version_id: Option<String>,
 }
 
-fn validate_bucket_name(name: &str) -> Result<()> {
+pub struct GetObjectResult {
+    pub body: Vec<u8>,
+    pub content_type: String,
+    pub etag: String,
+    pub last_modified: chrono::DateTime<Utc>,
+    pub size: u64,
+    pub version_id: Option<String>,
+    pub metadata: HashMap<String, String>,
+    pub storage_class: String,
+    pub content_range: Option<String>,
+    pub encryption: Option<ObjectEncryption>,
+    pub delete_marker: bool,
+}
+
+pub struct HeadObjectResult {
+    pub content_type: String,
+    pub etag: String,
+    pub last_modified: chrono::DateTime<Utc>,
+    pub size: u64,
+    pub version_id: Option<String>,
+    pub metadata: HashMap<String, String>,
+    pub storage_class: String,
+    pub delete_marker: bool,
+    pub encryption: Option<ObjectEncryption>,
+}
+
+pub struct DeleteObjectResult {
+    pub version_id: Option<String>,
+    pub delete_marker: bool,
+}
+
+pub struct CopyObjectResult {
+    pub etag: String,
+    pub last_modified: chrono::DateTime<Utc>,
+    pub version_id: Option<String>,
+}
+
+pub struct ObjectListEntry {
+    pub key: String,
+    pub last_modified: chrono::DateTime<Utc>,
+    pub etag: String,
+    pub size: u64,
+    pub storage_class: String,
+}
+
+pub struct ListResult {
+    pub contents: Vec<ObjectListEntry>,
+    pub common_prefixes: Vec<String>,
+    pub is_truncated: bool,
+    pub key_count: u32,
+    pub next_continuation_token: Option<String>,
+}
+
+pub struct DeleteObjectEntry {
+    pub key: String,
+    pub version_id: Option<String>,
+}
+
+pub struct DeleteObjectEntryResult {
+    pub key: String,
+    pub version_id: Option<String>,
+    pub delete_marker: bool,
+    pub error: Option<(String, String)>, // (code, message)
+}
+
+pub struct CompleteMultipartResult {
+    pub bucket: String,
+    pub key: String,
+    pub etag: String,
+    pub version_id: Option<String>,
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+
+fn validate_bucket_name(name: &str) -> StoreResult<()> {
     if name.len() < 3 || name.len() > 63 {
-        return Err(StoreError::InvalidRequest(
+        return Err(StoreError::InvalidBucketName(
             "bucket name must be 3-63 characters".into(),
         ));
     }
-    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.') {
-        return Err(StoreError::InvalidRequest(
-            "bucket name must contain only lowercase letters, digits, hyphens, and dots".into(),
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '.')
+    {
+        return Err(StoreError::InvalidBucketName(
+            "bucket name may only contain lowercase letters, numbers, hyphens, and dots".into(),
+        ));
+    }
+    if name.starts_with('-') || name.ends_with('-') || name.starts_with('.') || name.ends_with('.') {
+        return Err(StoreError::InvalidBucketName(
+            "bucket name cannot start or end with hyphen or dot".into(),
         ));
     }
     Ok(())
 }
 
-use std::collections::BTreeMap;
+fn compute_etag(data: &[u8]) -> String {
+    let d = digest::digest(&digest::SHA256, data);
+    hex::encode(&d.as_ref()[..16])
+}
+
+fn object_path(bucket: &str, key: &str, version_id: Option<&str>) -> PathBuf {
+    if let Some(vid) = version_id {
+        PathBuf::from(format!("{bucket}/{key}.{vid}"))
+    } else {
+        PathBuf::from(format!("{bucket}/{key}"))
+    }
+}
+
+fn contents_last_key(
+    objects: &HashMap<(String, String), Vec<ObjectVersion>>,
+    bucket: &str,
+    prefix: &str,
+    max_keys: u32,
+    _continuation_token: Option<&str>,
+) -> Option<String> {
+    let mut keys: Vec<&String> = objects
+        .keys()
+        .filter(|(b, k)| b == bucket && k.starts_with(prefix))
+        .map(|(_, k)| k)
+        .collect();
+    keys.sort();
+    keys.get(max_keys as usize).map(|k| k.to_string())
+}

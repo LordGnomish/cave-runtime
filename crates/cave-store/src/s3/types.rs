@@ -1,164 +1,210 @@
-//! S3-compatible data types and XML serialisation helpers.
-
-use std::collections::BTreeMap;
+//! S3/MinIO data types.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-// ─── Bucket types ─────────────────────────────────────────────────────────────
+// ── Bucket ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BucketInfo {
+pub struct Bucket {
     pub name: String,
-    pub creation_date: DateTime<Utc>,
     pub region: String,
+    pub owner: String,
+    pub created_at: DateTime<Utc>,
+    pub versioning: VersioningState,
+    pub acl: BucketAcl,
+    pub policy: Option<String>,         // JSON policy doc
+    pub lifecycle_rules: Vec<LifecycleRule>,
+    pub notification_config: NotificationConfiguration,
+    pub encryption: Option<BucketEncryption>,
+    pub tags: HashMap<String, String>,
+    pub object_lock: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum VersioningStatus {
-    Off,
-    Enabled,
-    Suspended,
-}
-
-impl Default for VersioningStatus {
-    fn default() -> Self { Self::Off }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BucketVersioning {
-    pub status: VersioningStatus,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LifecycleRule {
-    pub id: String,
-    pub prefix: String,
-    pub expiration_days: Option<u32>,
-    pub noncurrent_version_expiration_days: Option<u32>,
-    pub enabled: bool,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BucketPolicy {
-    pub version: String,
-    pub statements: Vec<PolicyStatement>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PolicyStatement {
-    pub sid: String,
-    pub effect: String,
-    pub principal: serde_json::Value,
-    pub action: Vec<String>,
-    pub resource: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct NotificationConfig {
-    pub queue_configs: Vec<QueueConfig>,
-    pub topic_configs: Vec<TopicConfig>,
-    pub lambda_configs: Vec<LambdaConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QueueConfig {
-    pub id: String,
-    pub queue_arn: String,
-    pub events: Vec<String>,
-    pub prefix_filter: Option<String>,
-    pub suffix_filter: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TopicConfig {
-    pub id: String,
-    pub topic_arn: String,
-    pub events: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LambdaConfig {
-    pub id: String,
-    pub lambda_arn: String,
-    pub events: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BucketAcl {
-    pub owner_id: String,
-    pub owner_display_name: String,
-    pub grants: Vec<Grant>,
-}
-
-impl Default for BucketAcl {
-    fn default() -> Self {
+impl Bucket {
+    pub fn new(name: String, region: String, owner: String) -> Self {
         Self {
-            owner_id: "cave-store-owner".to_string(),
-            owner_display_name: "cave-store".to_string(),
-            grants: vec![Grant {
-                grantee_type: "CanonicalUser".to_string(),
-                grantee_id: "cave-store-owner".to_string(),
-                permission: "FULL_CONTROL".to_string(),
-            }],
+            name,
+            region,
+            owner,
+            created_at: Utc::now(),
+            versioning: VersioningState::Disabled,
+            acl: BucketAcl::Private,
+            policy: None,
+            lifecycle_rules: Vec::new(),
+            notification_config: NotificationConfiguration::default(),
+            encryption: None,
+            tags: HashMap::new(),
+            object_lock: false,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Grant {
-    pub grantee_type: String,
-    pub grantee_id: String,
-    pub permission: String,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum VersioningState {
+    Disabled,
+    Enabled,
+    Suspended,
 }
 
-// ─── Object types ─────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ObjectMetadata {
-    pub key: String,
-    pub size: u64,
-    pub etag: String,
-    pub last_modified: DateTime<Utc>,
-    pub content_type: String,
-    pub storage_class: String,
-    pub version_id: Option<String>,
-    pub user_metadata: std::collections::HashMap<String, String>,
-    pub sse_algorithm: Option<SseAlgorithm>,
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum BucketAcl {
+    Private,
+    PublicRead,
+    PublicReadWrite,
+    AuthenticatedRead,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ── Lifecycle ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LifecycleRule {
+    pub id: String,
+    pub status: String, // "Enabled" | "Disabled"
+    pub prefix: String,
+    pub tags: HashMap<String, String>,
+    pub expiration: Option<Expiration>,
+    pub transitions: Vec<Transition>,
+    pub noncurrent_version_expiration: Option<NoncurrentVersionExpiration>,
+    pub abort_incomplete_multipart_upload: Option<AbortIncompleteMultipartUpload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Expiration {
+    pub days: Option<u32>,
+    pub date: Option<DateTime<Utc>>,
+    pub expired_object_delete_marker: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Transition {
+    pub days: Option<u32>,
+    pub date: Option<DateTime<Utc>>,
+    pub storage_class: StorageClass,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NoncurrentVersionExpiration {
+    pub noncurrent_days: u32,
+    pub newer_noncurrent_versions: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AbortIncompleteMultipartUpload {
+    pub days_after_initiation: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum StorageClass {
+    Standard,
+    StandardIa,
+    OnezoneIa,
+    IntelligentTiering,
+    Glacier,
+    GlacierIr,
+    DeepArchive,
+    Outposts,
+}
+
+// ── Notification ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NotificationConfiguration {
+    pub queue_configurations: Vec<QueueConfiguration>,
+    pub topic_configurations: Vec<TopicConfiguration>,
+    pub lambda_function_configurations: Vec<LambdaFunctionConfiguration>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueueConfiguration {
+    pub id: String,
+    pub queue_arn: String,
+    pub events: Vec<String>,
+    pub filter: Option<NotificationFilter>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopicConfiguration {
+    pub id: String,
+    pub topic_arn: String,
+    pub events: Vec<String>,
+    pub filter: Option<NotificationFilter>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LambdaFunctionConfiguration {
+    pub id: String,
+    pub lambda_function_arn: String,
+    pub events: Vec<String>,
+    pub filter: Option<NotificationFilter>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationFilter {
+    pub key: FilterKey,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterKey {
+    pub filter_rules: Vec<FilterRule>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterRule {
+    pub name: String,  // "prefix" | "suffix"
+    pub value: String,
+}
+
+// ── Encryption ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BucketEncryption {
+    pub sse_algorithm: SseAlgorithm,
+    pub kms_master_key_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SseAlgorithm {
-    /// Server-side encryption with S3-managed keys
-    AwsS3,
-    /// Server-side encryption with customer-provided keys
+    #[serde(rename = "AES256")]
+    Aes256,
+    #[serde(rename = "aws:kms")]
     AwsKms,
-    /// Customer-provided encryption key (SSE-C)
-    Customer,
 }
 
-#[derive(Debug, Clone)]
-pub struct SseConfig {
-    pub algorithm: SseAlgorithm,
-    /// For SSE-C: the raw key bytes (32 for AES-256)
-    pub customer_key: Option<Vec<u8>>,
-}
+// ── Object ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ObjectVersion {
-    pub version_id: String,
-    pub is_delete_marker: bool,
-    pub metadata: ObjectMetadata,
-}
-
-// ─── Multipart upload ─────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UploadedPart {
-    pub part_number: u32,
+    pub version_id: Option<String>, // None when versioning disabled
     pub etag: String,
     pub size: u64,
+    pub last_modified: DateTime<Utc>,
+    pub content_type: String,
+    pub metadata: HashMap<String, String>,
+    pub tags: HashMap<String, String>,
+    pub storage_class: StorageClass,
+    pub storage_path: String, // relative path on disk within data_dir
+    pub encryption: Option<ObjectEncryption>,
+    pub delete_marker: bool,
+    pub restore_status: Option<RestoreStatus>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectEncryption {
+    pub algorithm: String, // "AES256" | "aws:kms" | "SSE-C"
+    pub key_md5: Option<String>,
+    pub kms_key_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RestoreStatus {
+    pub is_restore_in_progress: bool,
+    pub restore_expiry_date: Option<DateTime<Utc>>,
+}
+
+// ── Multipart ─────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MultipartUpload {
@@ -166,193 +212,105 @@ pub struct MultipartUpload {
     pub bucket: String,
     pub key: String,
     pub initiated: DateTime<Utc>,
-    pub parts: BTreeMap<u32, UploadedPart>,
-    pub metadata: std::collections::HashMap<String, String>,
+    pub owner: String,
     pub content_type: String,
+    pub metadata: HashMap<String, String>,
+    pub parts: HashMap<u32, UploadedPart>,
 }
 
-// ─── List results ─────────────────────────────────────────────────────────────
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UploadedPart {
+    pub part_number: u32,
+    pub etag: String,
+    pub size: u64,
+    pub storage_path: String,
+    pub last_modified: DateTime<Utc>,
+}
 
-#[derive(Debug, Clone)]
-pub struct ListObjectsV2Result {
+// ── Presigned ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PresignedMethod {
+    Get,
+    Put,
+    Delete,
+    Head,
+}
+
+// ── S3 Events ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct S3Event {
+    pub event_name: String, // e.g. "s3:ObjectCreated:Put"
+    pub event_time: DateTime<Utc>,
     pub bucket: String,
-    pub prefix: String,
-    pub delimiter: String,
-    pub max_keys: u32,
-    pub key_count: u32,
-    pub truncated: bool,
-    pub next_continuation_token: Option<String>,
-    pub contents: Vec<ObjectMetadata>,
-    pub common_prefixes: Vec<String>,
+    pub key: String,
+    pub size: u64,
+    pub etag: String,
+    pub version_id: Option<String>,
+    pub source_ip: Option<String>,
 }
 
-// ─── XML helpers ──────────────────────────────────────────────────────────────
-
-/// Format a DateTime as S3's preferred ISO-8601 format.
-pub fn fmt_time(dt: &DateTime<Utc>) -> String {
-    dt.format("%Y-%m-%dT%H:%M:%S.000Z").to_string()
-}
-
-/// Build a minimal S3 error XML body.
-pub fn error_xml(code: &str, message: &str, resource: &str) -> String {
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-  <Code>{code}</Code>
-  <Message>{message}</Message>
-  <Resource>{resource}</Resource>
-  <RequestId>cave-store</RequestId>
-</Error>"#
-    )
-}
-
-/// ListBuckets XML response body.
-pub fn list_buckets_xml(buckets: &[BucketInfo]) -> String {
-    let mut body = String::from(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<ListAllMyBucketsResult>
-  <Owner><ID>cave-store-owner</ID><DisplayName>cave-store</DisplayName></Owner>
-  <Buckets>"#,
-    );
-    for b in buckets {
-        body.push_str(&format!(
-            "\n    <Bucket><Name>{}</Name><CreationDate>{}</CreationDate></Bucket>",
-            b.name,
-            fmt_time(&b.creation_date)
-        ));
+impl S3Event {
+    pub fn object_created_put(bucket: &str, key: &str, size: u64, etag: &str) -> Self {
+        Self {
+            event_name: "s3:ObjectCreated:Put".to_string(),
+            event_time: Utc::now(),
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+            size,
+            etag: etag.to_string(),
+            version_id: None,
+            source_ip: None,
+        }
     }
-    body.push_str("\n  </Buckets>\n</ListAllMyBucketsResult>");
-    body
-}
 
-/// ListObjectsV2 XML response body.
-pub fn list_objects_v2_xml(result: &ListObjectsV2Result) -> String {
-    let mut body = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<ListBucketResult>
-  <Name>{}</Name>
-  <Prefix>{}</Prefix>
-  <MaxKeys>{}</MaxKeys>
-  <KeyCount>{}</KeyCount>
-  <IsTruncated>{}</IsTruncated>"#,
-        result.bucket, result.prefix, result.max_keys, result.key_count, result.truncated
-    );
-    if let Some(ref token) = result.next_continuation_token {
-        body.push_str(&format!("\n  <NextContinuationToken>{token}</NextContinuationToken>"));
+    pub fn object_removed_delete(bucket: &str, key: &str) -> Self {
+        Self {
+            event_name: "s3:ObjectRemoved:Delete".to_string(),
+            event_time: Utc::now(),
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+            size: 0,
+            etag: String::new(),
+            version_id: None,
+            source_ip: None,
+        }
     }
-    for obj in &result.contents {
-        body.push_str(&format!(
-            r#"
-  <Contents>
-    <Key>{}</Key>
-    <LastModified>{}</LastModified>
-    <ETag>&quot;{}&quot;</ETag>
-    <Size>{}</Size>
-    <StorageClass>{}</StorageClass>
-  </Contents>"#,
-            obj.key,
-            fmt_time(&obj.last_modified),
-            obj.etag,
-            obj.size,
-            obj.storage_class
-        ));
-    }
-    for prefix in &result.common_prefixes {
-        body.push_str(&format!("\n  <CommonPrefixes><Prefix>{prefix}</Prefix></CommonPrefixes>"));
-    }
-    body.push_str("\n</ListBucketResult>");
-    body
-}
 
-/// CompleteMultipartUpload XML response body.
-pub fn complete_multipart_xml(bucket: &str, key: &str, etag: &str, location: &str) -> String {
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<CompleteMultipartUploadResult>
-  <Location>{location}</Location>
-  <Bucket>{bucket}</Bucket>
-  <Key>{key}</Key>
-  <ETag>&quot;{etag}&quot;</ETag>
-</CompleteMultipartUploadResult>"#
-    )
-}
-
-/// InitiateMultipartUpload XML response.
-pub fn initiate_multipart_xml(bucket: &str, key: &str, upload_id: &str) -> String {
-    format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<InitiateMultipartUploadResult>
-  <Bucket>{bucket}</Bucket>
-  <Key>{key}</Key>
-  <UploadId>{upload_id}</UploadId>
-</InitiateMultipartUploadResult>"#
-    )
-}
-
-/// AccessControlPolicy XML response.
-pub fn acl_xml(acl: &BucketAcl) -> String {
-    let mut body = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<AccessControlPolicy>
-  <Owner><ID>{}</ID><DisplayName>{}</DisplayName></Owner>
-  <AccessControlList>"#,
-        acl.owner_id, acl.owner_display_name
-    );
-    for grant in &acl.grants {
-        body.push_str(&format!(
-            r#"
-    <Grant>
-      <Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="{}">
-        <ID>{}</ID>
-      </Grantee>
-      <Permission>{}</Permission>
-    </Grant>"#,
-            grant.grantee_type, grant.grantee_id, grant.permission
-        ));
+    pub fn object_created_multipart(bucket: &str, key: &str, size: u64, etag: &str) -> Self {
+        Self {
+            event_name: "s3:ObjectCreated:CompleteMultipartUpload".to_string(),
+            event_time: Utc::now(),
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+            size,
+            etag: etag.to_string(),
+            version_id: None,
+            source_ip: None,
+        }
     }
-    body.push_str("\n  </AccessControlList>\n</AccessControlPolicy>");
-    body
-}
 
-pub fn versioning_xml(v: &BucketVersioning) -> String {
-    let status = match v.status {
-        VersioningStatus::Off => "",
-        VersioningStatus::Enabled => "Enabled",
-        VersioningStatus::Suspended => "Suspended",
-    };
-    if status.is_empty() {
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<VersioningConfiguration/>"#
-            .to_string()
-    } else {
-        format!(
-            r#"<?xml version="1.0" encoding="UTF-8"?>
-<VersioningConfiguration>
-  <Status>{status}</Status>
-</VersioningConfiguration>"#
-        )
+    pub fn object_created_copy(bucket: &str, key: &str, size: u64, etag: &str) -> Self {
+        Self {
+            event_name: "s3:ObjectCreated:Copy".to_string(),
+            event_time: Utc::now(),
+            bucket: bucket.to_string(),
+            key: key.to_string(),
+            size,
+            etag: etag.to_string(),
+            version_id: None,
+            source_ip: None,
+        }
     }
-}
 
-pub fn list_multipart_uploads_xml(bucket: &str, uploads: &[MultipartUpload]) -> String {
-    let mut body = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<ListMultipartUploadsResult>
-  <Bucket>{bucket}</Bucket>
-  <MaxUploads>1000</MaxUploads>
-  <IsTruncated>false</IsTruncated>"#
-    );
-    for u in uploads {
-        body.push_str(&format!(
-            r#"
-  <Upload>
-    <Key>{}</Key>
-    <UploadId>{}</UploadId>
-    <Initiated>{}</Initiated>
-  </Upload>"#,
-            u.key, u.upload_id, fmt_time(&u.initiated)
-        ));
+    /// Check if this event matches a notification filter rule.
+    pub fn matches_filter(&self, filter: &Option<NotificationFilter>) -> bool {
+        let Some(f) = filter else { return true };
+        f.key.filter_rules.iter().all(|rule| match rule.name.as_str() {
+            "prefix" => self.key.starts_with(&rule.value),
+            "suffix" => self.key.ends_with(&rule.value),
+            _ => true,
+        })
     }
-    body.push_str("\n</ListMultipartUploadsResult>");
-    body
 }
