@@ -70,6 +70,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -96,6 +97,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     let metrics_state = Arc::new(cave_metrics::MetricsState::new());
 >>>>>>> claude/relaxed-nash
+=======
+    let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
+>>>>>>> claude/romantic-kapitsa
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -156,6 +160,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -233,6 +238,10 @@ async fn main() -> anyhow::Result<()> {
         // Metrics
         .merge(cave_metrics::router(metrics_state))
 >>>>>>> claude/relaxed-nash
+=======
+        // FinOps
+        .merge(cave_cost_alloc::router(cost_alloc_state))
+>>>>>>> claude/romantic-kapitsa
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -259,6 +268,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Platform modules: cluster");
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -292,6 +302,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Metrics: Prometheus/Thanos replacement active");
 >>>>>>> claude/relaxed-nash
+=======
+    info!("FinOps modules: cost-alloc (showback/chargeback, replaces Kubecost/CloudHealth)");
+>>>>>>> claude/romantic-kapitsa
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -328,6 +341,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
@@ -352,6 +366,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "metrics": true,
 >>>>>>> claude/relaxed-nash
+=======
+            "cost-alloc": true,
+>>>>>>> claude/romantic-kapitsa
         }
     }))
 }
