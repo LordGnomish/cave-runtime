@@ -107,6 +107,7 @@ members = [
     # === API Gateway ===
     "crates/cave-runbook",
     # === GitOps Deploy ===
+    # === Observability / Visualization ===
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === CLI ===
