@@ -37,7 +37,6 @@ use axum::Router;
 use models::{Event, FeatureToggle, Project, Segment};
 use pool::FlagsPool;
 use std::collections::HashMap;
-use cave_db::Storage;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -55,9 +54,6 @@ pub struct MetricEntry {
     pub yes: u64,
     pub no: u64,
     pub variants: HashMap<String, u64>,
-/// Module state shared across request handlers.
-pub struct FlagsState {
-    pub storage: Arc<dyn Storage>,
 }
 
 // ================================================================
@@ -120,6 +116,12 @@ impl FlagsState {
     }
 }
 
+impl Default for FlagsState {
+    fn default() -> Self {
+        Self::in_memory()
+    }
+}
+
 // ================================================================
 // Public router factory
 // ================================================================
@@ -132,5 +134,3 @@ pub fn router(state: Arc<FlagsState>) -> Router {
     routes::create_router(Arc::clone(&state))
         .merge(unleash::unleash_router(state))
 }
-/// Module name for DB schema / collection prefix.
-pub const MODULE_NAME: &str = "flags";

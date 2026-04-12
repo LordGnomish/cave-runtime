@@ -1,8 +1,6 @@
 [package]
 name = "cave-ha"
 description = "High Availability and Disaster Recovery for the CAVE runtime"
-description = "HA/DR with Raft consensus — leader election, log replication, snapshots, failover"
-description = "High Availability and Disaster Recovery for the CAVE runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,13 +16,5 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-tracing = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
 rand = { workspace = true }
 async-trait = { workspace = true }

@@ -3,18 +3,16 @@
 //! Replaces: Custom (Prometheus rules)
 //! Upstream tracking: see cave-upstream for monitored features.
 
+use std::sync::Arc;
 pub mod models;
 pub mod engine;
 pub mod routes;
 
 use axum::Router;
-use cave_db::CavePool;
-use std::sync::Arc;
 
 /// Module state.
-pub struct State {
-    pub pool: Arc<CavePool>,
-}
+#[derive(Default)]
+pub struct State {}
 
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {

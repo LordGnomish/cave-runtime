@@ -1,8 +1,6 @@
 [package]
 name = "cave-store"
 description = "Object storage — MinIO replacement with versioning and lifecycle"
-description = "Object storage — S3/MinIO replacement with buckets, objects, multipart, presigned URLs"
-description = "Object storage — MinIO replacement with versioning and lifecycle"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -16,14 +14,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-tokio = { workspace = true }
-axum = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-uuid = { workspace = true }
-chrono = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 ring = { workspace = true }
 [dev-dependencies]
 tokio = { workspace = true }

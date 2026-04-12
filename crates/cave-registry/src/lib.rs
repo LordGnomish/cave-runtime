@@ -1,33 +1,16 @@
-pub mod engine;
-pub mod models;
-pub mod error;
-pub mod gc;
-pub mod migrations;
-pub mod policy;
-pub mod replication;
-pub mod engine;
-pub mod models;
 //! CAVE Registry — container image registry and package proxy/cache.
 //!
 //! Replaces Pulp / Harbor with a Rust-native implementation.
-//! Implements the Docker Registry HTTP API V2 / OCI Distribution Spec
-//! so that `docker push/pull`, Helm, and any OCI-compatible tool works
-//! against cave-registry without configuration changes.
-//!
-//! ## Upstream Compatibility: Docker Registry V2
-//! - Version check:    GET  /v2/
-//! - Catalog:          GET  /v2/_catalog
-//! - Manifests:        GET/HEAD/PUT /v2/:name/manifests/:reference
-//! - Blobs:            GET/HEAD     /v2/:name/blobs/:digest
-//! - Blob upload:      POST/PATCH/PUT /v2/:name/blobs/uploads/
-//! - Tags:             GET  /v2/:name/tags/list
-//!
-//! ## Upstream Tracking
-//! - OCI Distribution Spec: https://github.com/opencontainers/distribution-spec
-//! - Docker Registry API:   https://docs.docker.com/registry/spec/api/
+//! Implements the Docker Registry HTTP API V2 / OCI Distribution Spec.
+
 pub mod docker_v2;
 pub mod engine;
+pub mod error;
+pub mod gc;
+pub mod migrations;
 pub mod models;
+pub mod policy;
+pub mod replication;
 pub mod routes;
 pub mod scan;
 pub mod store;
@@ -35,7 +18,6 @@ pub mod types;
 pub mod webhook;
 
 use axum::Router;
-use cave_db::Storage;
 use cave_db::CavePool;
 use policy::PolicyManager;
 use replication::ReplicationManager;
@@ -44,13 +26,6 @@ use std::sync::Arc;
 use store::RegistryStore;
 use webhook::WebhookManager;
 
-// ── Owned state that also holds the DB pool (used at startup) ─────────────────
-
-pub struct Registry {
-    pub state: Arc<AppState>,
-    pub pool: Arc<CavePool>,
-pub const MODULE_NAME: &str = "registry";
-// ── Application state ─────────────────────────────────────────────────────────
 /// Shared state injected into every request handler.
 pub struct AppState {
     pub store: Arc<RegistryStore>,
@@ -59,8 +34,25 @@ pub struct AppState {
     pub scanner: Arc<ScanManager>,
     pub policy: Arc<PolicyManager>,
 }
-// ── Owned state that also holds the DB pool (used at startup) ─────────────────
 
+/// Type alias for consistency with the rest of the workspace.
+pub type RegistryState = AppState;
+pub type State = AppState;
+
+impl Default for AppState {
+    fn default() -> Self {
+        let store = Arc::new(RegistryStore::new());
+        Self {
+            webhooks: Arc::new(WebhookManager::new(Arc::clone(&store))),
+            replication: Arc::new(ReplicationManager::new(Arc::clone(&store))),
+            scanner: Arc::new(ScanManager::new(Arc::clone(&store))),
+            policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
+            store,
+        }
+    }
+}
+
+/// Full registry with DB pool (used at startup).
 pub struct Registry {
     pub state: Arc<AppState>,
     pub pool: Arc<CavePool>,
@@ -70,14 +62,7 @@ impl Registry {
     /// Create a new registry, run DB migrations, and return a ready instance.
     pub async fn new(pool: Arc<CavePool>) -> Result<Self, String> {
         migrations::run(&pool).await?;
-        let store = Arc::new(RegistryStore::new());
-        let state = Arc::new(AppState {
-            store: Arc::clone(&store),
-            webhooks: Arc::new(WebhookManager::new(Arc::clone(&store))),
-            replication: Arc::new(ReplicationManager::new(Arc::clone(&store))),
-            scanner: Arc::new(ScanManager::new(Arc::clone(&store))),
-            policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
-        });
+        let state = Arc::new(AppState::default());
         Ok(Self { state, pool })
     }
 
@@ -95,22 +80,10 @@ impl Registry {
     }
 }
 
-/// Convenience: build just an axum Router from an existing pool (for embedding).
-pub fn router(_pool: Arc<CavePool>) -> Router {
-    let store = Arc::new(RegistryStore::new());
-    let state = Arc::new(AppState {
-        store: Arc::clone(&store),
-        webhooks: Arc::new(WebhookManager::new(Arc::clone(&store))),
-        replication: Arc::new(ReplicationManager::new(Arc::clone(&store))),
-        scanner: Arc::new(ScanManager::new(Arc::clone(&store))),
-        policy: Arc::new(PolicyManager::new(Arc::clone(&store))),
-    });
-    routes::create_router(state)
-/// Create the axum router for this module.
-///
-/// Merges cave-native management routes with the Docker Registry V2
-/// compatible API so that OCI clients work without modification.
-pub fn router(state: Arc<State>) -> Router {
+/// Create the axum router from an `AppState` reference.
+pub fn router(state: Arc<AppState>) -> Router {
     routes::create_router(Arc::clone(&state))
         .merge(docker_v2::docker_v2_router(state))
 }
+
+pub const MODULE_NAME: &str = "registry";

@@ -1,7 +1,6 @@
 [package]
 name = "cave-dns"
 description = "DNS record management — replaces external-dns"
-description = "DNS server — CoreDNS replacement with all record types, zones, service discovery"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

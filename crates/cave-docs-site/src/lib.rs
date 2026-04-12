@@ -29,14 +29,4 @@ pub fn router(state: Arc<DocsSiteState>) -> Router {
     routes::create_router(state)
 }
 
-//! CAVE Docs Site — GitBook replacement.
-pub mod error;
-pub mod types;
-pub mod store;
-pub mod toc;
-pub mod search;
-pub mod versioning;
-pub mod openapi;
-pub use store::DocsStore;
-pub use error::{DocsError, DocsResult};
 pub const MODULE_NAME: &str = "docs-site";

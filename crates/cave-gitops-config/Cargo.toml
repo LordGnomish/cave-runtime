@@ -1,7 +1,6 @@
 [package]
 name = "cave-gitops-config"
 description = "CAVE GitOps Config — Platform-as-a-product promise management"
-description = "Platform API — Kratix/Crossplane Compositions replacement for CAVE unified runtime"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

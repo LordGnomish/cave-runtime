@@ -1,4 +1,5 @@
 //! Data models for cave-portal.
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -40,6 +41,8 @@ pub enum LinkType {
     Docs,
     Repo,
     Chat,
+}
+
 /// Overall health of a module.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,6 +52,7 @@ pub enum HealthStatus {
     Unhealthy,
     Unknown,
 }
+
 /// A card on the main dashboard representing one module.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardWidget {
@@ -61,6 +65,7 @@ pub struct DashboardWidget {
     pub upstream_replacement: String,
     pub category: String,
 }
+
 /// One entry in the sidebar navigation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NavigationItem {
@@ -72,6 +77,7 @@ pub struct NavigationItem {
     pub upstream_replacement: String,
     pub badge_count: Option<u32>,
 }
+
 /// A grouped section of sidebar navigation items.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NavigationGroup {
@@ -79,6 +85,7 @@ pub struct NavigationGroup {
     pub icon: String,
     pub items: Vec<NavigationItem>,
 }
+
 /// One hit from a global search query.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
@@ -90,6 +97,7 @@ pub struct SearchResult {
     pub link: String,
     pub relevance: f32,
 }
+
 /// Per-user portal preferences.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserPreference {
@@ -100,6 +108,7 @@ pub struct UserPreference {
     pub notification_modules: Vec<String>,
     pub dashboard_layout: String,
 }
+
 impl Default for UserPreference {
     fn default() -> Self {
         Self {
@@ -112,6 +121,7 @@ impl Default for UserPreference {
         }
     }
 }
+
 /// Severity level for a cross-module notification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -120,6 +130,7 @@ pub enum NotificationSeverity {
     Warning,
     Critical,
 }
+
 /// A notification surfaced from any CAVE module into the portal feed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Notification {
@@ -132,6 +143,7 @@ pub struct Notification {
     pub read: bool,
     pub link: Option<String>,
 }
+
 /// Quick stats for a single module, shown in the modules listing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleSummary {
@@ -142,6 +154,7 @@ pub struct ModuleSummary {
     pub category: String,
     pub stats: serde_json::Value,
 }
+
 /// Aggregated dashboard payload returned by GET /api/v1/portal/dashboard.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardData {

@@ -1,7 +1,6 @@
 [package]
 name = "cave-cluster"
 description = "Kubernetes cluster lifecycle management — Rancher/Gardener/Cluster API replacement. Multi-tenant K8s clusters on bare metal and cloud."
-description = "Rancher-like cluster lifecycle management — provision, join, health, multi-cluster, upgrades"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

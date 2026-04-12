@@ -32,17 +32,15 @@ use cave_core::config::AuthProvider;
 pub use auth_middleware::{AuthContext, AuthCtx, AuthLayer, AuthLayerConfig};
 
 /// Original lightweight AuthLayer (AuthN only, no RBAC/ABAC).
-//! CAVE Auth — Full Okta AuthN+AuthZ.
-//! Provides OIDC authentication flow (authorization code + PKCE), token management,
-//! RBAC, ABAC, SCIM 2.0 provisioning, Personal Access Tokens, session management,
-//! multi-tenancy, Tower middleware, and audit logging.
+pub use middleware::CaveAuthLayer;
+
+// Additional auth modules
 pub mod oidc;
 pub mod pat;
 pub mod scim;
 pub mod session;
 pub mod tenant;
 pub mod token;
-pub use middleware::CaveAuthLayer;
 
 /// RBAC engine + models.
 pub use rbac::{BindingScope, RbacEngine, ResourcePolicy, Role, RoleBinding};

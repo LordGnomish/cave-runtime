@@ -47,13 +47,9 @@ cave-flags = { path = "../cave-flags" }
 cave-docs-site = { path = "../cave-docs-site" }
 cave-dns = { path = "../cave-dns" }
 # Observability stack (Prometheus / Loki / OTLP compat)
-cave-metrics = { path = "../cave-metrics" }
 cave-logs    = { path = "../cave-logs" }
-cave-trace   = { path = "../cave-trace" }
-cave-flags    = { path = "../cave-flags" }
 cave-registry = { path = "../cave-registry" }
 # Phase 3 modules
-cave-logs = { path = "../cave-logs" }
 cave-llm-gateway = { path = "../cave-llm-gateway" }
 cave-secrets = { path = "../cave-secrets" }
 cave-lint = { path = "../cave-lint" }
@@ -78,7 +74,6 @@ cave-slo = { path = "../cave-slo" }
 cave-alerts = { path = "../cave-alerts" }
 cave-profiler = { path = "../cave-profiler" }
 # Phase 4 modules
-cave-registry = { path = "../cave-registry" }
 cave-workflows = { path = "../cave-workflows" }
 cave-scan = { path = "../cave-scan" }
 cave-portal = { path = "../cave-portal" }
@@ -89,41 +84,23 @@ cave-dast = { path = "../cave-dast" }
 cave-backup = { path = "../cave-backup" }
 cave-pam = { path = "../cave-pam" }
 # LLM Gateway
-cave-llm-gateway = { path = "../cave-llm-gateway" }
 # Infrastructure & Networking
 cave-gateway = { path = "../cave-gateway" }
-cave-dns = { path = "../cave-dns" }
-cave-mesh = { path = "../cave-mesh" }
-cave-cluster = { path = "../cave-cluster" }
-cave-ha = { path = "../cave-ha" }
-cave-infra = { path = "../cave-infra" }
 # Data & Storage
 cave-pg = { path = "../cave-pg" }
-cave-cache = { path = "../cave-cache" }
-cave-store = { path = "../cave-store" }
 cave-streams = { path = "../cave-streams" }
 # Observability
-cave-metrics = { path = "../cave-metrics" }
-cave-logs = { path = "../cave-logs" }
-cave-trace = { path = "../cave-trace" }
 # Security & Admission
 cave-admission = { path = "../cave-admission" }
 cave-security = { path = "../cave-security" }
-cave-vault = { path = "../cave-vault" }
 # Developer Experience
 cave-dashboard = { path = "../cave-dashboard" }
-cave-docs-site = { path = "../cave-docs-site" }
-cave-deploy = { path = "../cave-deploy" }
 cave-pipelines = { path = "../cave-pipelines" }
 cave-rollouts = { path = "../cave-rollouts" }
 # Asset Management
 cave-artifacts = { path = "../cave-artifacts" }
 # Governance
-cave-tracker = { path = "../cave-tracker" }
 cave-runbook = { path = "../cave-runbook" }
-cave-gitops-config = { path = "../cave-gitops-config" }
-cave-compliance = { path = "../cave-compliance" }
-cave-cost-alloc = { path = "../cave-cost-alloc" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }

@@ -16,6 +16,14 @@ pub struct State {
     pub storage: Arc<dyn Storage>,
 }
 
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            storage: Arc::new(cave_db::MemoryStorage::default()),
+        }
+    }
+}
+
 /// Create the axum router for this module.
 pub fn router(state: Arc<State>) -> Router {
     routes::create_router(state)

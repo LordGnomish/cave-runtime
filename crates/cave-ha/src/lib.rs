@@ -7,14 +7,6 @@
 //!
 //! Cross-datacenter DR is supported via active-passive or active-active
 //! site pairs with configurable RPO/RTO targets.
-//! cave-ha — High Availability and Disaster Recovery using Raft consensus.
-//!
-//! Provides:
-//! - Full Raft consensus engine (leader election, log replication, snapshots)
-//! - Cross-datacenter replication with configurable consistency levels
-//! - Automatic and manual failover with split-brain protection
-//! - Cluster health monitoring
-//! - Disaster recovery: backup/restore, PITR, geo-redundant snapshots
 
 pub mod dr;
 pub mod failover;
@@ -127,12 +119,3 @@ impl Default for HaState {
 pub fn router(state: Arc<HaState>) -> Router {
     routes::create_router(state)
 }
-pub mod raft;
-pub mod replication;
-pub mod snapshot;
-pub use raft::{LogEntry, NodeId, RaftMessage, RaftNode, RaftRole};
-pub use snapshot::{Snapshot, SnapshotManager};
-pub use replication::{ConsistencyLevel, CrossDcReplicator, ReplicationConfig, ReplicationStatus};
-pub use failover::{FailoverEvent, FailoverManager, FailoverReason};
-pub use health::{ClusterHealth, ClusterHealthMonitor, NodeHealth, NodeHealthStatus, ResourceUsage};
-pub use dr::{BackupMetadata, DisasterRecovery};
