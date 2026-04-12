@@ -1,0 +1,20 @@
+[package]
+name = "cave-cluster"
+description = "Rancher-like cluster lifecycle management — provision, join, health, multi-cluster, upgrades"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }

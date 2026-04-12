@@ -1,0 +1,20 @@
+[package]
+name = "cave-infra"
+description = "LLM+MCP intent-based IaC — replaces Terraform/Crossplane with natural language infrastructure management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+rand = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }

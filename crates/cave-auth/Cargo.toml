@@ -1,6 +1,6 @@
 [package]
 name = "cave-auth"
-description = "Native Okta/Keycloak OIDC authentication middleware for CAVE Runtime"
+description = "Full Okta AuthN+AuthZ — OIDC, RBAC, ABAC, SCIM 2.0, PAT, sessions, multi-tenancy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,3 +18,7 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 tower = { workspace = true }
+ring = { workspace = true }
+base64 = { workspace = true }
+rand = { workspace = true }
+anyhow = { workspace = true }

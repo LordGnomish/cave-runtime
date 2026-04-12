@@ -1,15 +1,24 @@
-//! CAVE Auth — Native Okta/Keycloak OIDC authentication.
+//! CAVE Auth — Full Okta AuthN+AuthZ.
 //!
-//! Provides JWT validation, JWKS key rotation, cave_uid extraction,
-//! and axum middleware for all runtime modules.
+//! Provides OIDC authentication flow (authorization code + PKCE), token management,
+//! RBAC, ABAC, SCIM 2.0 provisioning, Personal Access Tokens, session management,
+//! multi-tenancy, Tower middleware, and audit logging.
 
+pub mod abac;
+pub mod audit;
+pub mod claims;
 pub mod jwks;
 pub mod middleware;
-pub mod claims;
+pub mod oidc;
+pub mod pat;
+pub mod rbac;
+pub mod scim;
+pub mod session;
+pub mod tenant;
+pub mod token;
 
 use cave_core::config::AuthProvider;
 
-/// Re-export the middleware layer for easy use in axum routers.
 pub use middleware::CaveAuthLayer;
 
 /// Determine if we're running with Okta (Azure) or Keycloak (Hetzner).
