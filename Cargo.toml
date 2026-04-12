@@ -108,6 +108,8 @@ members = [
     # === Docs & Tracing ===
     "crates/cave-docs-site",
     "crates/cave-trace",
+    # === Observability ===
+    "crates/cave-logs",
 ]
 
 [workspace.package]

@@ -1,16 +1,21 @@
 [package]
 name = "cave-logs"
 <<<<<<< HEAD
+<<<<<<< HEAD
 description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
 =======
 description = "Log aggregation & query — replaces Loki. Loki-compatible push and LogQL query API."
 >>>>>>> claude/gallant-cartwright
+=======
+description = "Log aggregation — Grafana Loki + ELK replacement with full LogQL support, push API, WebSocket tail"
+>>>>>>> claude/inspiring-pascal
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+<<<<<<< HEAD
 <<<<<<< HEAD
 axum = { workspace = true }
 serde = { workspace = true }
@@ -33,3 +38,26 @@ uuid       = { workspace = true }
 chrono     = { workspace = true }
 thiserror  = { workspace = true }
 >>>>>>> claude/gallant-cartwright
+=======
+cave-db   = { path = "../cave-db" }
+
+axum        = { workspace = true, features = ["ws"] }
+tokio       = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+tracing     = { workspace = true }
+chrono      = { workspace = true }
+uuid        = { workspace = true }
+thiserror   = { workspace = true }
+regex       = { workspace = true }
+
+bytes        = "1"
+snap         = "1"
+prost        = "0.13"
+prost-types  = "0.13"
+dashmap      = "6"
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { workspace = true }
+>>>>>>> claude/inspiring-pascal
