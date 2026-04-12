@@ -16,6 +16,7 @@ cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }
 # Phase 1 modules
+cave-compliance = { path = "../cave-compliance" }
 cave-flags = { path = "../cave-flags" }
 cave-secrets = { path = "../cave-secrets" }
 cave-lint = { path = "../cave-lint" }
