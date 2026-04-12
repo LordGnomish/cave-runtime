@@ -22,6 +22,7 @@ members = [
     "crates/cave-sign",
     "crates/cave-forensics",
     # === Phase 3: Platform Intelligence ===
+    "crates/cave-logs",
     "crates/cave-devlake",
     "crates/cave-ai-obs",
     "crates/cave-pii",

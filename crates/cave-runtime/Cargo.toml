@@ -17,6 +17,8 @@ cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }
 # Phase 1 modules
 cave-flags = { path = "../cave-flags" }
+# Phase 3 modules
+cave-logs = { path = "../cave-logs" }
 cave-secrets = { path = "../cave-secrets" }
 cave-lint = { path = "../cave-lint" }
 cave-docs = { path = "../cave-docs" }
