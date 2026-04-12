@@ -36,6 +36,7 @@ members = [
     "crates/cave-logs",
     "crates/cave-devlake",
     "crates/cave-ai-obs",
+    "crates/cave-llm-gateway",
     "crates/cave-pii",
     "crates/cave-incidents",
     "crates/cave-chat",

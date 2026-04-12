@@ -74,6 +74,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -159,6 +160,11 @@ async fn main() -> anyhow::Result<()> {
 
     // Build the unified router with all Phase 1 + Phase 3 modules
 >>>>>>> claude/sharp-wiles
+=======
+    let llm_gateway_state = Arc::new(cave_llm_gateway::GatewayState::default());
+
+    // Build the unified router with all Phase 1 + Phase 3 modules
+>>>>>>> claude/vigilant-torvalds
     let app = Router::new()
         // Core health endpoints
         .route("/health", axum::routing::get(health))
@@ -174,6 +180,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_status::router())
         .merge(cave_changelog::router())
         .merge(cave_certs::router())
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -270,6 +277,10 @@ async fn main() -> anyhow::Result<()> {
         // Phase 4: runbook automation
         .merge(cave_runbook::router(runbook_state))
 >>>>>>> claude/thirsty-nobel
+=======
+        // Phase 3 module routers
+        .merge(cave_llm_gateway::router(llm_gateway_state))
+>>>>>>> claude/vigilant-torvalds
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -296,6 +307,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Platform modules: cluster");
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -345,6 +357,9 @@ async fn main() -> anyhow::Result<()> {
 =======
     info!("Phase 4 modules: runbook");
 >>>>>>> claude/thirsty-nobel
+=======
+    info!("Phase 3 modules: llm-gateway");
+>>>>>>> claude/vigilant-torvalds
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -374,6 +389,7 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "status": true,
             "changelog": true,
             "certs": true,
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -413,6 +429,9 @@ async fn ready() -> axum::Json<serde_json::Value> {
 =======
             "logs": true,
 >>>>>>> claude/sharp-wiles
+=======
+            "llm-gateway": true,
+>>>>>>> claude/vigilant-torvalds
         }
     }))
 }
