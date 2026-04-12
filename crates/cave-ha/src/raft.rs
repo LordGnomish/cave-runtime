@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 //! Simplified Raft consensus implementation.
 //!
 //! No external etcd dependency — pure in-process state machine suitable for
@@ -157,22 +156,17 @@ pub async fn step_down(state: Arc<HaState>, new_term: u64) -> Result<()> {
     }
     warn!(new_term, node = %self_id, "Stepped down to follower");
     Ok(())
-=======
 //! Full Raft consensus implementation.
 //!
 //! Uses tokio channels for inter-node communication — no network I/O,
 //! making it fully testable in unit tests.
-
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 use tracing::{debug, info};
-
 pub type NodeId = u64;
-
 /// Role of a Raft node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RaftRole {
@@ -180,7 +174,6 @@ pub enum RaftRole {
     Candidate,
     Leader,
 }
-
 /// A single entry in the Raft log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
@@ -188,7 +181,6 @@ pub struct LogEntry {
     pub term: u64,
     pub data: Vec<u8>,
 }
-
 /// All messages exchanged between Raft nodes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RaftMessage {
@@ -234,34 +226,28 @@ pub enum RaftMessage {
         target: NodeId,
     },
 }
-
 /// Volatile and persistent state of a Raft node.
 struct NodeState {
     // --- Persistent (would be written to stable storage in production) ---
     current_term: u64,
     voted_for: Option<NodeId>,
     log: Vec<LogEntry>,
-
     // --- Volatile ---
     commit_index: u64,
     last_applied: u64,
     role: RaftRole,
     leader_id: Option<NodeId>,
-
     // --- Leader-only volatile state ---
     next_index: HashMap<NodeId, u64>,
     match_index: HashMap<NodeId, u64>,
     votes_received: HashSet<NodeId>,
-
     // --- Snapshot state ---
     snapshot_index: u64,
     snapshot_term: u64,
     snapshot_data: Vec<u8>,
-
     // --- Pending client commands waiting for commit ---
     pending_commands: HashMap<u64, oneshot::Sender<Result<u64, String>>>,
 }
-
 impl NodeState {
     fn new() -> Self {
         Self {
@@ -281,7 +267,6 @@ impl NodeState {
             pending_commands: HashMap::new(),
         }
     }
-
     /// Index of the last log entry (accounting for snapshot compaction).
     fn last_log_index(&self) -> u64 {
         if self.log.is_empty() {
@@ -290,7 +275,6 @@ impl NodeState {
             self.log.last().unwrap().index
         }
     }
-
     /// Term of the last log entry.
     fn last_log_term(&self) -> u64 {
         if self.log.is_empty() {
@@ -299,7 +283,6 @@ impl NodeState {
             self.log.last().unwrap().term
         }
     }
-
     /// Returns the log entry at the given absolute index, if it exists.
     fn entry_at(&self, index: u64) -> Option<&LogEntry> {
         if index == 0 {
@@ -313,7 +296,6 @@ impl NodeState {
         let offset = (index - base - 1) as usize;
         self.log.get(offset)
     }
-
     /// Returns the term for the given log index, consulting snapshot state if needed.
     fn term_at(&self, index: u64) -> Option<u64> {
         if index == 0 {
@@ -324,7 +306,6 @@ impl NodeState {
         }
         self.entry_at(index).map(|e| e.term)
     }
-
     /// Truncate the log so only entries with index <= keep_through remain.
     fn truncate_after(&mut self, keep_through_index: u64) {
         if keep_through_index <= self.snapshot_index {
@@ -335,7 +316,6 @@ impl NodeState {
         let new_len = (keep_through_index - base) as usize;
         self.log.truncate(new_len);
     }
-
     /// Append entries, discarding any conflicting suffix first.
     fn append_entries_from(&mut self, entries: &[LogEntry]) {
         for entry in entries {
@@ -355,7 +335,6 @@ impl NodeState {
             }
         }
     }
-
     /// Apply snapshot, discarding all log entries covered by it.
     fn apply_snapshot(&mut self, last_index: u64, last_term: u64, data: Vec<u8>) {
         if last_index <= self.snapshot_index {
@@ -384,7 +363,6 @@ impl NodeState {
         }
     }
 }
-
 /// A Raft consensus node.
 pub struct RaftNode {
     pub id: NodeId,
@@ -400,7 +378,6 @@ pub struct RaftNode {
     applied_tx: broadcast::Sender<LogEntry>,
     pub applied_rx_handle: broadcast::Receiver<LogEntry>,
 }
-
 impl RaftNode {
     /// Create a new node.  `peers` maps each peer's NodeId to a channel that
     /// delivers messages to that peer's `incoming` receiver.
@@ -422,59 +399,48 @@ impl RaftNode {
             applied_rx_handle,
         }
     }
-
     /// Number of peers (not counting self).
     /// Cluster size (peers + self).
     fn cluster_size(&self) -> usize {
         self.outgoing.len() + 1
     }
-
     /// Quorum size.
     fn quorum(&self) -> usize {
         self.cluster_size() / 2 + 1
     }
-
     /// Send a message to a peer, ignoring errors (peer may be gone).
     fn send_to(&self, peer: NodeId, msg: RaftMessage) {
         if let Some(tx) = self.outgoing.get(&peer) {
             let _ = tx.send(msg);
         }
     }
-
     // -----------------------------------------------------------------------
     // Public inspection methods used in tests
     // -----------------------------------------------------------------------
-
     /// Returns the current role of this node.
     pub async fn current_role(&self) -> RaftRole {
         self.state.lock().await.role
     }
-
     /// Returns the current leader id as seen by this node.
     pub async fn current_leader(&self) -> Option<NodeId> {
         self.state.lock().await.leader_id
     }
-
     /// Returns the current term.
     pub async fn current_term(&self) -> u64 {
         self.state.lock().await.current_term
     }
-
     /// Returns the commit index.
     pub async fn commit_index(&self) -> u64 {
         self.state.lock().await.commit_index
     }
-
     // -----------------------------------------------------------------------
     // Main run loop
     // -----------------------------------------------------------------------
-
     /// Drive the Raft state machine.  Consumes `self` and runs until all
     /// incoming/command channels are closed.
     pub async fn run(mut self) {
         let node_id = self.id;
         let is_single = self.cluster_size() == 1;
-
         // Single-node cluster: immediately become leader without election.
         if is_single {
             let mut st = self.state.lock().await;
@@ -485,16 +451,13 @@ impl RaftNode {
             drop(st);
             info!(node = node_id, "single-node cluster — immediately became leader");
         }
-
         let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
         // election_deadline tracks when a follower/candidate times out.
         let election_timeout_ms = rand::thread_rng().gen_range(150u64..=300u64);
         let mut election_deadline =
             tokio::time::Instant::now() + tokio::time::Duration::from_millis(election_timeout_ms);
-
         loop {
             let role = self.state.lock().await.role;
-
             match role {
                 RaftRole::Leader => {
                     tokio::select! {
@@ -522,7 +485,6 @@ impl RaftNode {
                     } else {
                         tokio::time::Duration::from_millis(0)
                     };
-
                     tokio::select! {
                         _ = tokio::time::sleep(timeout_duration) => {
                             // Election timeout fired.
@@ -557,11 +519,9 @@ impl RaftNode {
             }
         }
     }
-
     // -----------------------------------------------------------------------
     // Leader operations
     // -----------------------------------------------------------------------
-
     async fn send_heartbeats(&self) {
         let st = self.state.lock().await;
         let peers: Vec<NodeId> = self.outgoing.keys().copied().collect();
@@ -580,7 +540,6 @@ impl RaftNode {
                 let offset = (next - base - 1) as usize;
                 st.log[offset..].to_vec()
             };
-
             // If peer is far behind, send snapshot.
             let needs_snapshot = next <= base && base > 0;
             let msg = if needs_snapshot {
@@ -606,7 +565,6 @@ impl RaftNode {
             return; // re-acquire lock for next peer
         }
     }
-
     /// Send AppendEntries to all peers.  Acquires state per peer to build correct message.
     async fn replicate_to_all(&self) {
         let peers: Vec<NodeId> = self.outgoing.keys().copied().collect();
@@ -614,7 +572,6 @@ impl RaftNode {
             self.replicate_to_peer(peer).await;
         }
     }
-
     async fn replicate_to_peer(&self, peer: NodeId) {
         let st = self.state.lock().await;
         if st.role != RaftRole::Leader {
@@ -623,7 +580,6 @@ impl RaftNode {
         let next = st.next_index.get(&peer).copied().unwrap_or(1);
         let base = st.snapshot_index;
         let needs_snapshot = next <= base && base > 0;
-
         if needs_snapshot {
             let msg = RaftMessage::InstallSnapshot {
                 term: st.current_term,
@@ -655,7 +611,6 @@ impl RaftNode {
             self.send_to(peer, msg);
         }
     }
-
     async fn handle_command(
         &mut self,
         data: Vec<u8>,
@@ -675,7 +630,6 @@ impl RaftNode {
         };
         st.log.push(entry);
         st.pending_commands.insert(new_index, resp);
-
         // Single-node: commit immediately.
         if self.outgoing.is_empty() {
             st.commit_index = new_index;
@@ -695,16 +649,13 @@ impl RaftNode {
             }
         }
         drop(st);
-
         if !self.outgoing.is_empty() {
             self.replicate_to_all().await;
         }
     }
-
     // -----------------------------------------------------------------------
     // Election
     // -----------------------------------------------------------------------
-
     async fn start_election(&mut self) {
         let mut st = self.state.lock().await;
         st.current_term += 1;
@@ -713,15 +664,12 @@ impl RaftNode {
         st.leader_id = None;
         st.votes_received.clear();
         st.votes_received.insert(self.id);
-
         let term = st.current_term;
         let last_log_index = st.last_log_index();
         let last_log_term = st.last_log_term();
         let peers: Vec<NodeId> = self.outgoing.keys().copied().collect();
         let quorum = self.quorum();
-
         debug!(node = self.id, term, "starting election");
-
         // Check if single-node (already handled in run() but guard here).
         if peers.is_empty() {
             st.role = RaftRole::Leader;
@@ -732,7 +680,6 @@ impl RaftNode {
             st.match_index.clear();
             return;
         }
-
         // Check if we already have quorum (we vote for ourselves).
         if st.votes_received.len() >= quorum {
             st.role = RaftRole::Leader;
@@ -747,9 +694,7 @@ impl RaftNode {
             self.send_heartbeats().await;
             return;
         }
-
         drop(st);
-
         for peer in peers {
             self.send_to(
                 peer,
@@ -762,11 +707,9 @@ impl RaftNode {
             );
         }
     }
-
     // -----------------------------------------------------------------------
     // Message dispatch
     // -----------------------------------------------------------------------
-
     /// Handle a single message. Returns `true` if election timer should reset.
     async fn handle_message(&mut self, msg: RaftMessage) -> bool {
         match msg {
@@ -841,7 +784,6 @@ impl RaftNode {
             }
         }
     }
-
     async fn handle_request_vote(
         &mut self,
         term: u64,
@@ -851,25 +793,20 @@ impl RaftNode {
     ) -> bool {
         let mut st = self.state.lock().await;
         let mut reset_timer = false;
-
         if term > st.current_term {
             st.current_term = term;
             st.role = RaftRole::Follower;
             st.voted_for = None;
         }
-
         let log_ok = (last_log_term > st.last_log_term())
             || (last_log_term == st.last_log_term() && last_log_index >= st.last_log_index());
-
         let vote_granted = term >= st.current_term
             && log_ok
             && (st.voted_for.is_none() || st.voted_for == Some(candidate_id));
-
         if vote_granted {
             st.voted_for = Some(candidate_id);
             reset_timer = true;
         }
-
         let reply = RaftMessage::RequestVoteReply {
             term: st.current_term,
             vote_granted,
@@ -879,21 +816,17 @@ impl RaftNode {
         self.send_to(candidate_id, reply);
         reset_timer
     }
-
     async fn handle_vote_reply(&mut self, term: u64, vote_granted: bool, from: NodeId) {
         let mut st = self.state.lock().await;
-
         if term > st.current_term {
             st.current_term = term;
             st.role = RaftRole::Follower;
             st.voted_for = None;
             return;
         }
-
         if st.role != RaftRole::Candidate || term != st.current_term {
             return;
         }
-
         if vote_granted {
             st.votes_received.insert(from);
             let votes = st.votes_received.len();
@@ -915,7 +848,6 @@ impl RaftNode {
             }
         }
     }
-
     async fn handle_append_entries(
         &mut self,
         term: u64,
@@ -926,13 +858,11 @@ impl RaftNode {
         leader_commit: u64,
     ) -> bool {
         let mut st = self.state.lock().await;
-
         if term > st.current_term {
             st.current_term = term;
             st.role = RaftRole::Follower;
             st.voted_for = None;
         }
-
         if term < st.current_term {
             let reply = RaftMessage::AppendEntriesReply {
                 term: st.current_term,
@@ -944,11 +874,9 @@ impl RaftNode {
             self.send_to(leader_id, reply);
             return false;
         }
-
         // Valid leader heartbeat: reset timer.
         st.role = RaftRole::Follower;
         st.leader_id = Some(leader_id);
-
         // Check prev_log consistency.
         let prev_ok = if prev_log_index == 0 {
             true
@@ -958,7 +886,6 @@ impl RaftNode {
         } else {
             st.term_at(prev_log_index) == Some(prev_log_term)
         };
-
         if !prev_ok {
             let reply = RaftMessage::AppendEntriesReply {
                 term: st.current_term,
@@ -970,20 +897,16 @@ impl RaftNode {
             self.send_to(leader_id, reply);
             return true;
         }
-
         st.append_entries_from(&entries);
-
         let new_match = if entries.is_empty() {
             prev_log_index
         } else {
             entries.last().unwrap().index
         };
-
         // Advance commit index.
         if leader_commit > st.commit_index {
             st.commit_index = leader_commit.min(st.last_log_index());
         }
-
         // Apply committed entries.
         let entries_to_apply: Vec<LogEntry> = st
             .log
@@ -995,7 +918,6 @@ impl RaftNode {
             st.last_applied = entry.index;
             let _ = self.applied_tx.send(entry);
         }
-
         let reply = RaftMessage::AppendEntriesReply {
             term: st.current_term,
             success: true,
@@ -1006,7 +928,6 @@ impl RaftNode {
         self.send_to(leader_id, reply);
         true
     }
-
     async fn handle_append_entries_reply(
         &mut self,
         term: u64,
@@ -1015,25 +936,21 @@ impl RaftNode {
         from: NodeId,
     ) {
         let mut st = self.state.lock().await;
-
         if term > st.current_term {
             st.current_term = term;
             st.role = RaftRole::Follower;
             st.voted_for = None;
             return;
         }
-
         if st.role != RaftRole::Leader {
             return;
         }
-
         if success {
             let prev_match = st.match_index.get(&from).copied().unwrap_or(0);
             if match_index > prev_match {
                 st.match_index.insert(from, match_index);
             }
             st.next_index.insert(from, match_index + 1);
-
             // Advance commit index if majority has replicated.
             let last = st.last_log_index();
             for n in (st.commit_index + 1..=last).rev() {
@@ -1053,7 +970,6 @@ impl RaftNode {
                     break;
                 }
             }
-
             // Apply committed entries.
             let entries_to_apply: Vec<LogEntry> = st
                 .log
@@ -1086,7 +1002,6 @@ impl RaftNode {
         }
         drop(st);
     }
-
     async fn handle_install_snapshot(
         &mut self,
         term: u64,
@@ -1096,13 +1011,11 @@ impl RaftNode {
         data: Vec<u8>,
     ) -> bool {
         let mut st = self.state.lock().await;
-
         if term > st.current_term {
             st.current_term = term;
             st.role = RaftRole::Follower;
             st.voted_for = None;
         }
-
         if term < st.current_term {
             let reply = RaftMessage::InstallSnapshotReply {
                 term: st.current_term,
@@ -1113,10 +1026,8 @@ impl RaftNode {
             self.send_to(leader_id, reply);
             return false;
         }
-
         st.leader_id = Some(leader_id);
         st.apply_snapshot(last_included_index, last_included_term, data);
-
         let reply = RaftMessage::InstallSnapshotReply {
             term: st.current_term,
             success: true,
@@ -1126,7 +1037,6 @@ impl RaftNode {
         self.send_to(leader_id, reply);
         true
     }
-
     async fn handle_install_snapshot_reply(&mut self, term: u64, success: bool, from: NodeId) {
         let mut st = self.state.lock().await;
         if term > st.current_term {
@@ -1141,7 +1051,6 @@ impl RaftNode {
             st.match_index.insert(from, snap_index);
         }
     }
-
     async fn handle_transfer_leadership(&mut self, target: NodeId) {
         let st = self.state.lock().await;
         if st.role != RaftRole::Leader {
@@ -1155,11 +1064,9 @@ impl RaftNode {
         self.send_to(target, RaftMessage::TransferLeadership { target });
     }
 }
-
 // ---------------------------------------------------------------------------
 // Helper to build a fully connected in-memory cluster for tests.
 // ---------------------------------------------------------------------------
-
 /// Build `n` Raft nodes connected by unbounded channels.
 /// Returns the nodes in order of their IDs (1..=n).
 pub fn build_cluster(n: usize) -> Vec<RaftNode> {
@@ -1171,7 +1078,6 @@ pub fn build_cluster(n: usize) -> Vec<RaftNode> {
         incoming_txs.insert(i, tx);
         incoming_rxs.insert(i, rx);
     }
-
     let mut nodes = Vec::new();
     for node_id in 1..=(n as NodeId) {
         let incoming = incoming_rxs.remove(&node_id).unwrap();
@@ -1185,24 +1091,19 @@ pub fn build_cluster(n: usize) -> Vec<RaftNode> {
     }
     nodes
 }
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tokio::time::{timeout, Duration};
-
     #[tokio::test]
     async fn test_single_node_becomes_leader() {
         let nodes = build_cluster(1);
         let node = nodes.into_iter().next().unwrap();
         let state = Arc::clone(&node.state);
-
         tokio::spawn(node.run());
-
         // Single node should become leader almost immediately.
         let result = timeout(Duration::from_secs(2), async {
             loop {
@@ -1214,21 +1115,17 @@ mod tests {
             }
         })
         .await;
-
         assert!(result.is_ok(), "timed out waiting for leader");
         assert!(result.unwrap());
     }
-
     #[tokio::test]
     async fn test_three_node_election() {
         let nodes = build_cluster(3);
         let states: Vec<Arc<Mutex<NodeState>>> =
             nodes.iter().map(|n| Arc::clone(&n.state)).collect();
-
         for node in nodes {
             tokio::spawn(node.run());
         }
-
         // Wait for a leader to emerge.
         let result = timeout(Duration::from_secs(3), async {
             loop {
@@ -1245,10 +1142,8 @@ mod tests {
             }
         })
         .await;
-
         assert!(result.is_ok(), "timed out waiting for leader in 3-node cluster");
         assert!(result.unwrap());
-
         // Verify exactly one leader.
         let mut leader_count = 0;
         for st in &states {
@@ -1258,18 +1153,15 @@ mod tests {
         }
         assert_eq!(leader_count, 1, "expected exactly 1 leader");
     }
-
     #[tokio::test]
     async fn test_log_replication() {
         let nodes = build_cluster(3);
         let states: Vec<Arc<Mutex<NodeState>>> =
             nodes.iter().map(|n| Arc::clone(&n.state)).collect();
         let command_txs: Vec<_> = nodes.iter().map(|n| n.command_tx.clone()).collect();
-
         for node in nodes {
             tokio::spawn(node.run());
         }
-
         // Wait for a leader.
         let leader_idx = timeout(Duration::from_secs(3), async {
             loop {
@@ -1283,38 +1175,31 @@ mod tests {
         })
         .await
         .expect("timed out waiting for leader");
-
         // Submit a command via the leader's command channel.
         let (resp_tx, resp_rx) = oneshot::channel();
         command_txs[leader_idx]
             .send((b"hello-raft".to_vec(), resp_tx))
             .unwrap();
-
         let result = timeout(Duration::from_secs(2), resp_rx)
             .await
             .expect("timed out waiting for command result");
         let index = result
             .expect("channel closed")
             .expect("command failed");
-
         assert!(index >= 1, "committed index should be >= 1");
-
         // Leader's commit_index should reflect the commit.
         let leader_commit = states[leader_idx].lock().await.commit_index;
         assert!(leader_commit >= 1);
     }
-
     #[tokio::test]
     async fn test_commit_index_advances() {
         let nodes = build_cluster(3);
         let states: Vec<Arc<Mutex<NodeState>>> =
             nodes.iter().map(|n| Arc::clone(&n.state)).collect();
         let command_txs: Vec<_> = nodes.iter().map(|n| n.command_tx.clone()).collect();
-
         for node in nodes {
             tokio::spawn(node.run());
         }
-
         let leader_idx = timeout(Duration::from_secs(3), async {
             loop {
                 for (i, st) in states.iter().enumerate() {
@@ -1327,7 +1212,6 @@ mod tests {
         })
         .await
         .unwrap();
-
         // Submit multiple commands.
         for i in 0..3u8 {
             let (resp_tx, resp_rx) = oneshot::channel();
@@ -1340,19 +1224,16 @@ mod tests {
                 .expect("channel closed")
                 .expect("command failed");
         }
-
         // commit_index on leader must be >= 3.
         let commit = states[leader_idx].lock().await.commit_index;
         assert!(commit >= 3, "commit_index should be >= 3, got {commit}");
     }
-
     #[tokio::test]
     async fn test_term_increments_on_timeout() {
         // Build a 1-node cluster so we can control the election easily.
         let nodes = build_cluster(1);
         let state = Arc::clone(&nodes[0].state);
         tokio::spawn(nodes.into_iter().next().unwrap().run());
-
         // After run() the term should be at least 1 (single node sets term=1).
         timeout(Duration::from_secs(2), async {
             loop {
@@ -1365,21 +1246,17 @@ mod tests {
         })
         .await
         .expect("timed out waiting for term to increment");
-
         let term = state.lock().await.current_term;
         assert!(term >= 1);
     }
-
     #[tokio::test]
     async fn test_follower_rejects_stale_term() {
         let nodes = build_cluster(3);
         let states: Vec<Arc<Mutex<NodeState>>> =
             nodes.iter().map(|n| Arc::clone(&n.state)).collect();
-
         for node in nodes {
             tokio::spawn(node.run());
         }
-
         // Wait for election.
         timeout(Duration::from_secs(3), async {
             loop {
@@ -1393,7 +1270,6 @@ mod tests {
         })
         .await
         .unwrap();
-
         // Find a follower and verify it has a term > 0.
         for st in &states {
             let locked = st.lock().await;
@@ -1403,5 +1279,4 @@ mod tests {
             }
         }
     }
->>>>>>> claude/great-sanderson
 }
