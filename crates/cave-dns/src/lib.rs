@@ -1,32 +1,30 @@
-//! CAVE DNS — DNS record management.
+//! CAVE DNS — CoreDNS-compatible authoritative and recursive DNS server.
+#![allow(dead_code, unused_imports, unused_variables, unused_mut)]
 //!
-//! Replaces: external-dns
-//! Multi-provider DNS sync, drift detection, record validation, health probes.
+//! Upstream tracking: CoreDNS
+//! Features: Full DNS protocol, all record types, DNSSEC, DoT, DoH,
+//!           zone transfers (AXFR/IXFR), dynamic updates (RFC 2136),
+//!           23 built-in plugins matching the CoreDNS plugin ecosystem.
 
-pub mod manager;
-pub mod models;
+pub mod api;
+pub mod config;
+pub mod error;
+pub mod plugins;
+pub mod protocol;
 pub mod routes;
+pub mod server;
+pub mod zone;
+
+pub use config::DnsConfig;
+pub use error::{DnsError, DnsResult};
+pub use server::DnsServer;
 
 use axum::Router;
-use models::{DnsRecord, DnsZone};
-use std::sync::{Arc, Mutex};
-
-pub struct DnsState {
-    pub zones: Arc<Mutex<Vec<DnsZone>>>,
-    pub records: Arc<Mutex<Vec<DnsRecord>>>,
-}
-
-impl Default for DnsState {
-    fn default() -> Self {
-        Self {
-            zones: Arc::new(Mutex::new(Vec::new())),
-            records: Arc::new(Mutex::new(Vec::new())),
-        }
-    }
-}
-
-pub fn router(state: Arc<DnsState>) -> Router {
-    routes::create_router(state)
-}
+use std::sync::Arc;
 
 pub const MODULE_NAME: &str = "dns";
+
+/// Build the axum management Router for embedding in the cave-runtime binary.
+pub fn router(zones: Arc<zone::ZoneManager>) -> Router {
+    routes::create_router(zones)
+}
