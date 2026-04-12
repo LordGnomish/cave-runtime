@@ -4,6 +4,8 @@
 //! Features: Auto-generated changelogs from git commits + SBOM diffs per deployment
 
 pub mod routes;
+pub mod models;
+pub mod engine;
 
 use axum::Router;
 

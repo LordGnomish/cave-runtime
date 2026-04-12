@@ -3,6 +3,8 @@
 //! Replaces: Langfuse
 //! Upstream tracking: see cave-upstream for monitored features.
 
+pub mod engine;
+pub mod models;
 pub mod routes;
 
 use axum::Router;

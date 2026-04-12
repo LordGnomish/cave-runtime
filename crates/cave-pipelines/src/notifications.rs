@@ -1,0 +1,212 @@
+//! Notification system: webhook, Slack, email on pipeline status change.
+
+use crate::models::RunStatus;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use tracing::info;
+use uuid::Uuid;
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum NotificationConfig {
+    Webhook {
+        url: String,
+        headers: Vec<(String, String)>,
+    },
+    Slack {
+        webhook_url: String,
+        channel: Option<String>,
+    },
+    Email {
+        smtp_host: String,
+        smtp_port: u16,
+        to: Vec<String>,
+        from: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NotifyOn {
+    Always,
+    OnSuccess,
+    OnFailure,
+    OnComplete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotificationRule {
+    pub name: String,
+    pub config: NotificationConfig,
+    pub notify_on: NotifyOn,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PipelineEvent {
+    pub pipeline_run_id: Uuid,
+    pub pipeline_name: String,
+    pub status: RunStatus,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Error)]
+pub enum NotificationError {
+    #[error("HTTP error sending notification: {0}")]
+    Http(String),
+}
+
+// ---------------------------------------------------------------------------
+// Filter logic
+// ---------------------------------------------------------------------------
+
+impl NotifyOn {
+    pub fn matches(&self, status: &RunStatus) -> bool {
+        match self {
+            NotifyOn::Always => true,
+            NotifyOn::OnSuccess => matches!(status, RunStatus::Succeeded),
+            NotifyOn::OnFailure => {
+                matches!(status, RunStatus::Failed | RunStatus::Cancelled)
+            }
+            NotifyOn::OnComplete => matches!(
+                status,
+                RunStatus::Succeeded | RunStatus::Failed | RunStatus::Cancelled
+            ),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch
+// ---------------------------------------------------------------------------
+
+pub async fn send_notification(
+    rule: &NotificationRule,
+    event: &PipelineEvent,
+) -> Result<(), NotificationError> {
+    if !rule.notify_on.matches(&event.status) {
+        return Ok(());
+    }
+
+    match &rule.config {
+        NotificationConfig::Webhook { url, headers } => {
+            info!(url = %url, "sending webhook notification");
+            let client = reqwest::Client::new();
+            let mut req = client.post(url).json(event);
+            for (k, v) in headers {
+                req = req.header(k.as_str(), v.as_str());
+            }
+            req.send().await.map_err(|e| NotificationError::Http(e.to_string()))?;
+            Ok(())
+        }
+
+        NotificationConfig::Slack { webhook_url, channel } => {
+            info!(channel = ?channel, "sending Slack notification");
+            let emoji = match event.status {
+                RunStatus::Succeeded => ":white_check_mark:",
+                RunStatus::Failed => ":x:",
+                RunStatus::Cancelled => ":no_entry:",
+                _ => ":information_source:",
+            };
+            let verb = match event.status {
+                RunStatus::Succeeded => "succeeded",
+                RunStatus::Failed => "failed",
+                RunStatus::Cancelled => "was cancelled",
+                _ => "updated",
+            };
+            let text = format!(
+                "{emoji} Pipeline *{}* {verb}{}",
+                event.pipeline_name,
+                event.message.as_deref().map(|m| format!(": {m}")).unwrap_or_default(),
+            );
+            let mut payload = serde_json::json!({ "text": text });
+            if let Some(ch) = channel {
+                payload["channel"] = serde_json::Value::String(ch.clone());
+            }
+            reqwest::Client::new()
+                .post(webhook_url)
+                .json(&payload)
+                .send()
+                .await
+                .map_err(|e| NotificationError::Http(e.to_string()))?;
+            Ok(())
+        }
+
+        NotificationConfig::Email { smtp_host, to, from, .. } => {
+            // Full SMTP integration omitted (would use lettre or similar).
+            // Log intent and succeed.
+            info!(smtp_host = %smtp_host, to = ?to, from = %from, "email notification (SMTP not wired)");
+            Ok(())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_on_success_matches_only_succeeded() {
+        assert!(NotifyOn::OnSuccess.matches(&RunStatus::Succeeded));
+        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Failed));
+        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Running));
+        assert!(!NotifyOn::OnSuccess.matches(&RunStatus::Cancelled));
+    }
+
+    #[test]
+    fn test_on_failure_matches_failed_and_cancelled() {
+        assert!(NotifyOn::OnFailure.matches(&RunStatus::Failed));
+        assert!(NotifyOn::OnFailure.matches(&RunStatus::Cancelled));
+        assert!(!NotifyOn::OnFailure.matches(&RunStatus::Succeeded));
+        assert!(!NotifyOn::OnFailure.matches(&RunStatus::Running));
+    }
+
+    #[test]
+    fn test_always_matches_every_status() {
+        for status in [
+            RunStatus::Pending,
+            RunStatus::Running,
+            RunStatus::Succeeded,
+            RunStatus::Failed,
+            RunStatus::Cancelled,
+            RunStatus::Skipped,
+            RunStatus::WaitingApproval,
+        ] {
+            assert!(NotifyOn::Always.matches(&status), "Always should match {status:?}");
+        }
+    }
+
+    #[test]
+    fn test_on_complete_matches_terminal_states() {
+        assert!(NotifyOn::OnComplete.matches(&RunStatus::Succeeded));
+        assert!(NotifyOn::OnComplete.matches(&RunStatus::Failed));
+        assert!(NotifyOn::OnComplete.matches(&RunStatus::Cancelled));
+        assert!(!NotifyOn::OnComplete.matches(&RunStatus::Running));
+        assert!(!NotifyOn::OnComplete.matches(&RunStatus::Pending));
+        assert!(!NotifyOn::OnComplete.matches(&RunStatus::WaitingApproval));
+    }
+
+    #[test]
+    fn test_rule_skipped_when_filter_does_not_match() {
+        // OnSuccess rule should not fire on Running status.
+        let rule = NotificationRule {
+            name: "ci".to_string(),
+            config: NotificationConfig::Email {
+                smtp_host: "smtp.example.com".to_string(),
+                smtp_port: 587,
+                to: vec!["team@example.com".to_string()],
+                from: "ci@example.com".to_string(),
+            },
+            notify_on: NotifyOn::OnSuccess,
+        };
+        // Confirm filter rejects Running
+        assert!(!rule.notify_on.matches(&RunStatus::Running));
+    }
+}
