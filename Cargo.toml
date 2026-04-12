@@ -40,6 +40,7 @@ members = [
     # === CI/CD ===
     "crates/cave-pipelines",
     # === Phase 4: Heavy Hitters ===
+    "crates/cave-gateway",
     "crates/cave-registry",
     "crates/cave-workflows",
     "crates/cave-scan",

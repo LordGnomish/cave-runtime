@@ -63,6 +63,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     let pg_state = Arc::new(cave_pg::PgState::default());
 =======
     let deploy_state = Arc::new(cave_deploy::DeployState::default());
@@ -71,6 +72,9 @@ async fn main() -> anyhow::Result<()> {
     let docs_site_state = Arc::new(cave_docs_site::DocsSiteState::default());
     let dns_state = Arc::new(cave_dns::DnsState::default());
 >>>>>>> claude/cranky-khorana
+=======
+    let gateway_state = Arc::new(cave_gateway::GatewayState::default());
+>>>>>>> claude/heuristic-wing
 
     // ── Protected module router ───────────────────────────────────────────────
     //
@@ -129,6 +133,7 @@ async fn main() -> anyhow::Result<()> {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         .merge(cave_pg::router(pg_state))
         // SCIM 2.0 provisioning (Okta user lifecycle)
         .merge(cave_auth::okta::scim_router(
@@ -167,6 +172,10 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_logs::router(logs_state))
         .merge(cave_trace::router(trace_state))
 >>>>>>> claude/gallant-cartwright
+=======
+        // Gateway module
+        .merge(cave_gateway::router(gateway_state))
+>>>>>>> claude/heuristic-wing
         // Middleware
 >>>>>>> claude/cranky-hellman
         .layer(TraceLayer::new_for_http())
@@ -193,6 +202,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Platform modules: cluster");
 >>>>>>> claude/cranky-wozniak
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs");
+<<<<<<< HEAD
     info!("Phase 5 modules: docs-site, dns");
 >>>>>>> claude/cranky-khorana
 =======
@@ -202,6 +212,9 @@ async fn main() -> anyhow::Result<()> {
     info!("Phase 1 modules: secrets, lint, docs, status, changelog, certs, flags, registry");
     info!("Observability: metrics (Prometheus compat), logs (Loki compat), trace (OTLP compat)");
 >>>>>>> claude/gallant-cartwright
+=======
+    info!("Gateway module: routes, upstreams, rate-limiting, auth, circuit-breaker");
+>>>>>>> claude/heuristic-wing
     info!(
         "Upstream tracking: {} projects",
         cave_upstream::TRACKED_PROJECTS.len()
@@ -232,11 +245,15 @@ async fn ready() -> axum::Json<serde_json::Value> {
             "changelog": true,
             "certs": true,
 <<<<<<< HEAD
+<<<<<<< HEAD
             "pg": true,
 =======
             "docs-site": true,
             "dns": true,
 >>>>>>> claude/cranky-khorana
+=======
+            "gateway": true,
+>>>>>>> claude/heuristic-wing
         }
     }))
 }
