@@ -48,6 +48,8 @@ cave-logs    = { path = "../cave-logs" }
 cave-trace   = { path = "../cave-trace" }
 cave-flags    = { path = "../cave-flags" }
 cave-registry = { path = "../cave-registry" }
+# Phase 3 modules
+cave-logs = { path = "../cave-logs" }
 cave-secrets = { path = "../cave-secrets" }
 cave-lint = { path = "../cave-lint" }
 cave-docs = { path = "../cave-docs" }

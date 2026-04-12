@@ -1,9 +1,13 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 //! Domain models for cave-logs.
 =======
 //! Data model: streams (label sets + entries), push/query API types, alerting.
 >>>>>>> claude/inspiring-pascal
+=======
+//! Domain models for cave-logs.
+>>>>>>> claude/sharp-wiles
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -11,6 +15,9 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 // ── Log Level ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +76,7 @@ impl Default for RetentionPolicy {
         Self {
             max_entries: 100_000,
             max_age_hours: 168, // 7 days
+<<<<<<< HEAD
 =======
 //! Loki-compatible data models.
 //!
@@ -169,10 +177,13 @@ impl std::hash::Hash for Labels {
         for (k, v) in pairs {
             k.hash(state);
             v.hash(state);
+=======
+>>>>>>> claude/sharp-wiles
         }
     }
 }
 
+<<<<<<< HEAD
 // ─── Label matcher ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -395,6 +406,8 @@ impl AlertCondition {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 // ── Log Query ───────────────────────────────────────────────────────────────
 
 /// Aggregation / operation type for a query (LogQL-like).
@@ -447,6 +460,7 @@ pub enum AlertCondition {
     PatternMatch,
     /// Detect anomalous error rate vs recent baseline.
     AnomalyDetected,
+<<<<<<< HEAD
 =======
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CompareOp {
@@ -457,12 +471,17 @@ pub enum CompareOp {
     Eq,
     Ne,
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AlertSeverity {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
     Info,
     Warning,
     Critical,
@@ -548,6 +567,7 @@ pub struct LogDashboard {
     pub description: String,
     pub panels: Vec<DashboardPanel>,
     pub created_at: DateTime<Utc>,
+<<<<<<< HEAD
 =======
 // ---------------------------------------------------------------------------
 // Query parameters
@@ -644,4 +664,6 @@ pub mod proto {
         pub value: String,
     }
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
 }

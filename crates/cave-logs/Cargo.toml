@@ -2,6 +2,7 @@
 name = "cave-logs"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
 =======
 description = "Log aggregation & query — replaces Loki. Loki-compatible push and LogQL query API."
@@ -9,6 +10,9 @@ description = "Log aggregation & query — replaces Loki. Loki-compatible push a
 =======
 description = "Log aggregation — Grafana Loki + ELK replacement with full LogQL support, push API, WebSocket tail"
 >>>>>>> claude/inspiring-pascal
+=======
+description = "Log aggregation, search & alerting — replaces ELK Stack / Grafana Loki"
+>>>>>>> claude/sharp-wiles
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,6 +21,9 @@ license.workspace = true
 cave-core = { path = "../cave-core" }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> claude/sharp-wiles
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -26,6 +33,7 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 regex = { workspace = true }
+<<<<<<< HEAD
 =======
 cave-auth = { path = "../cave-auth" }
 cave-db   = { path = "../cave-db" }
@@ -61,3 +69,5 @@ futures-util = "0.3"
 [dev-dependencies]
 tokio = { workspace = true }
 >>>>>>> claude/inspiring-pascal
+=======
+>>>>>>> claude/sharp-wiles
