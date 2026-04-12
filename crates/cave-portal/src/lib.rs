@@ -1,11 +1,19 @@
 //! Developer portal — replaces Backstage
 //!
+//! Single-page web application that serves as the unified UI for all 30 CAVE
+//! runtime modules. Routes are served at / (SPA) and /api/v1/portal/* (JSON API).
+//!
 //! Replaces: Backstage
 //! Upstream tracking: see cave-upstream for monitored features.
 
+<<<<<<< HEAD
 pub mod engine;
+=======
+pub mod dashboard;
+>>>>>>> claude/determined-visvesvaraya
 pub mod models;
 pub mod routes;
+pub mod ui;
 
 use axum::Router;
 use cave_db::CavePool;
