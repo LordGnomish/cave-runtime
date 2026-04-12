@@ -155,7 +155,6 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_dast::router(dast_state))
         .merge(cave_backup::router(backup_state))
         .merge(cave_pam::router(pam_state))
-<<<<<<< HEAD
         // LLM Gateway
         .merge(cave_llm_gateway::router(llm_gateway_state))
         // Infrastructure & Networking
