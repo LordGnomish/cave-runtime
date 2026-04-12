@@ -32,6 +32,8 @@ cave-gitops-config = { path = "../cave-gitops-config" }
 cave-tracker = { path = "../cave-tracker" }
 # Service mesh
 cave-mesh = { path = "../cave-mesh" }
+# Metrics
+cave-metrics = { path = "../cave-metrics" }
 # Phase 1 modules
 cave-trace = { path = "../cave-trace" }
 cave-flags = { path = "../cave-flags" }
