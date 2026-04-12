@@ -1,22 +1,70 @@
 [package]
 name = "cave-gateway"
-description = "API gateway & traffic management — replaces Kong"
+description = "API Gateway — full Kong/Envoy parity. Reverse proxy, plugin system, Admin API, xDS."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-cave-auth = { path = "../cave-auth" }
-cave-db = { path = "../cave-db" }
-axum = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Web framework
+axum = { version = "0.8", features = ["macros", "ws"] }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
+
+# Observability / metrics
 tracing = { workspace = true }
+prometheus-client = { workspace = true }
+
+# Crypto / TLS
+ring = { workspace = true }
+jsonwebtoken = { workspace = true }
+
+# HTTP client (upstream proxying)
+reqwest = { workspace = true }
+
+# Utilities
 uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
-jsonwebtoken = { workspace = true }
-reqwest = { workspace = true }
+anyhow = { workspace = true }
 regex = { workspace = true }
+base64 = "0.22"
+hmac = "0.12"
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+hex = "0.4"
+url = "2"
+ipnet = "2"
+bytes = "1"
+http = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+tokio-rustls = "0.26"
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+rustls-pki-types = "1"
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+flate2 = "1"
+lru = "0.12"
+dashmap = "6"
+rand = "0.8"
+async-trait = "0.1"
+futures = "0.3"
+pin-project-lite = "0.2"
+h2 = "0.4"
+prost = "0.13"
+prost-types = "0.13"
+
+[dev-dependencies]
+tokio = { workspace = true }
