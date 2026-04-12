@@ -1,408 +1,330 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+//! Cluster CRUD and state machine.
 
-use chrono::Utc;
+use crate::error::{ClusterError, ClusterResult};
+use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::node::ClusterNode;
-
-// ── Provider / Distro / State ────────────────────────────────────────────────
+// ── Cluster state ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ClusterProvider {
-    BareMetal,
-    HetznerCloud,
-    AzureVM,
-    Aws,
-    Gcp,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ClusterState {
+#[serde(rename_all = "PascalCase")]
+pub enum ClusterStatus {
     Provisioning,
     Running,
-    Degraded,
     Upgrading,
-    Destroying,
-    Destroyed,
+    Scaling,
+    Deleting,
+    Failed,
+    Hibernated,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum KubernetesDistro {
-    K3s,
-    Rke2,
-    Kubeadm,
+// ── Network config ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkConfig {
+    pub pod_cidr: String,
+    pub service_cidr: String,
+    pub dns_service_ip: String,
+    pub network_plugin: String,
 }
 
-// ── Spec & Cluster ───────────────────────────────────────────────────────────
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            pod_cidr: "10.244.0.0/16".into(),
+            service_cidr: "10.96.0.0/12".into(),
+            dns_service_ip: "10.96.0.10".into(),
+            network_plugin: "calico".into(),
+        }
+    }
+}
+
+// ── Cluster definition ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterSpec {
     pub name: String,
-    pub provider: ClusterProvider,
-    pub distro: KubernetesDistro,
     pub kubernetes_version: String,
-    pub control_plane_count: usize,
-    pub worker_count: usize,
     pub region: String,
-    pub tenant_id: String,
+    pub network: NetworkConfig,
+    pub tags: HashMap<String, String>,
+    /// Whether to enable RBAC (always true)
+    pub enable_rbac: bool,
+    /// Whether to enable audit logging
+    pub audit_logging: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cluster {
     pub id: Uuid,
     pub spec: ClusterSpec,
-    pub state: ClusterState,
-    /// Node IDs belonging to this cluster.
-    pub nodes: Vec<Uuid>,
-    pub api_endpoint: Option<String>,
-    /// Base64-encoded kubeconfig.
-    pub kubeconfig: Option<String>,
-    pub created_at: chrono::DateTime<Utc>,
-    pub updated_at: chrono::DateTime<Utc>,
-    pub created_by: Uuid,
-    pub labels: HashMap<String, String>,
-    pub annotations: HashMap<String, String>,
+    pub status: ClusterStatus,
+    pub api_endpoint: String,
+    pub ca_data: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub created_by: String,
+    pub error_message: Option<String>,
 }
 
 impl Cluster {
-    pub fn new(spec: ClusterSpec, created_by: Uuid) -> Self {
-        let now = Utc::now();
+    pub fn new(spec: ClusterSpec, created_by: String) -> Self {
+        let id = Uuid::new_v4();
+        let api_endpoint = format!(
+            "https://{}.cave-cluster.internal:6443",
+            spec.name
+        );
         Self {
-            id: Uuid::new_v4(),
+            id,
             spec,
-            state: ClusterState::Provisioning,
-            nodes: Vec::new(),
-            api_endpoint: None,
-            kubeconfig: None,
-            created_at: now,
-            updated_at: now,
+            status: ClusterStatus::Provisioning,
+            api_endpoint,
+            ca_data: base64::Engine::encode(
+                &base64::engine::general_purpose::STANDARD,
+                format!("CAVE-CA-{id}").as_bytes(),
+            ),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
             created_by,
-            labels: HashMap::new(),
-            annotations: HashMap::new(),
+            error_message: None,
         }
     }
 
-    pub fn is_ready(&self) -> bool {
-        self.state == ClusterState::Running
+    pub fn transition(&mut self, new_status: ClusterStatus) {
+        tracing::info!(
+            cluster = %self.spec.name,
+            from = ?self.status,
+            to = ?new_status,
+            "cluster state transition"
+        );
+        self.status = new_status;
+        self.updated_at = Utc::now();
     }
 
-    pub fn node_count(&self) -> usize {
-        self.nodes.len()
+    pub fn fail(&mut self, message: String) {
+        self.status = ClusterStatus::Failed;
+        self.error_message = Some(message);
+        self.updated_at = Utc::now();
+    }
+
+    pub fn is_mutable(&self) -> bool {
+        matches!(self.status, ClusterStatus::Running | ClusterStatus::Failed)
     }
 }
 
-// ── Error ────────────────────────────────────────────────────────────────────
+// ── Create / scale request ────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum ClusterError {
-    #[error("Cluster not found: {0}")]
-    NotFound(Uuid),
-    #[error("Cluster already exists: {0}")]
-    AlreadyExists(String),
-    #[error("Invalid state transition from {from:?} to {to:?}")]
-    InvalidStateTransition { from: ClusterState, to: ClusterState },
-    #[error("Cluster is not ready")]
-    NotReady,
-    #[error("{0}")]
-    Internal(String),
+#[derive(Debug, Deserialize)]
+pub struct CreateClusterRequest {
+    pub name: String,
+    pub kubernetes_version: String,
+    pub region: String,
+    #[serde(default)]
+    pub network: Option<NetworkConfig>,
+    #[serde(default)]
+    pub tags: HashMap<String, String>,
+    #[serde(default = "default_true")]
+    pub audit_logging: bool,
 }
 
-// ── Manager ──────────────────────────────────────────────────────────────────
-
-pub struct ClusterManager {
-    clusters: Arc<RwLock<HashMap<Uuid, Cluster>>>,
-    nodes: Arc<RwLock<HashMap<Uuid, ClusterNode>>>,
+fn default_true() -> bool {
+    true
 }
 
-impl ClusterManager {
+#[derive(Debug, Deserialize)]
+pub struct ScaleClusterRequest {
+    /// If set, scale the default node pool to this size
+    pub node_count: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpgradeClusterRequest {
+    pub kubernetes_version: String,
+}
+
+// ── Cluster store ─────────────────────────────────────────────────────────────
+
+pub struct ClusterStore {
+    /// cluster_name → Cluster
+    clusters: DashMap<String, Cluster>,
+}
+
+impl ClusterStore {
     pub fn new() -> Self {
         Self {
-            clusters: Arc::new(RwLock::new(HashMap::new())),
-            nodes: Arc::new(RwLock::new(HashMap::new())),
+            clusters: DashMap::new(),
         }
     }
 
-    /// Provision a new cluster.
-    ///
-    /// Simulates async provisioning: the cluster starts in `Provisioning` state and
-    /// is immediately transitioned to `Running` once written (no actual I/O).
-    pub async fn provision(
-        &self,
-        spec: ClusterSpec,
-        created_by: Uuid,
-    ) -> Result<Cluster, ClusterError> {
-        // Check for duplicate name within the tenant.
-        {
-            let guard = self.clusters.read().await;
-            let exists = guard
-                .values()
-                .any(|c| c.spec.name == spec.name && c.spec.tenant_id == spec.tenant_id);
-            if exists {
-                return Err(ClusterError::AlreadyExists(spec.name.clone()));
-            }
+    pub fn create(&self, req: CreateClusterRequest, created_by: &str) -> ClusterResult<Cluster> {
+        Self::validate_name(&req.name)?;
+        if self.clusters.contains_key(&req.name) {
+            return Err(ClusterError::AlreadyExists(req.name));
         }
+        // Validate the Kubernetes version
+        crate::version::validate_k8s_version(&req.kubernetes_version)?;
 
-        let mut cluster = Cluster::new(spec, created_by);
-        tracing::info!(cluster_id = %cluster.id, name = %cluster.spec.name, "provisioning cluster");
-
-        // Simulate provisioning completion.
-        cluster.state = ClusterState::Running;
-        cluster.updated_at = Utc::now();
-
-        let mut guard = self.clusters.write().await;
-        guard.insert(cluster.id, cluster.clone());
-        Ok(cluster)
+        let spec = ClusterSpec {
+            name: req.name.clone(),
+            kubernetes_version: req.kubernetes_version,
+            region: req.region,
+            network: req.network.unwrap_or_default(),
+            tags: req.tags,
+            enable_rbac: true,
+            audit_logging: req.audit_logging,
+        };
+        let mut cluster = Cluster::new(spec, created_by.to_string());
+        // Simulate synchronous provisioning for in-memory store
+        cluster.transition(ClusterStatus::Running);
+        let result = cluster.clone();
+        self.clusters.insert(req.name, cluster);
+        Ok(result)
     }
 
-    pub async fn get(&self, id: Uuid) -> Result<Cluster, ClusterError> {
-        let guard = self.clusters.read().await;
-        guard.get(&id).cloned().ok_or(ClusterError::NotFound(id))
+    pub fn get(&self, name: &str) -> ClusterResult<Cluster> {
+        self.clusters
+            .get(name)
+            .map(|c| c.clone())
+            .ok_or_else(|| ClusterError::NotFound(name.to_string()))
     }
 
-    pub async fn get_by_name(&self, name: &str) -> Option<Cluster> {
-        let guard = self.clusters.read().await;
-        guard.values().find(|c| c.spec.name == name).cloned()
+    pub fn list(&self) -> Vec<Cluster> {
+        self.clusters.iter().map(|e| e.value().clone()).collect()
     }
 
-    pub async fn list(&self, tenant_id: &str) -> Vec<Cluster> {
-        let guard = self.clusters.read().await;
-        guard
-            .values()
-            .filter(|c| c.spec.tenant_id == tenant_id)
-            .cloned()
-            .collect()
+    pub fn delete(&self, name: &str) -> ClusterResult<()> {
+        let mut cluster = self
+            .clusters
+            .get_mut(name)
+            .ok_or_else(|| ClusterError::NotFound(name.to_string()))?;
+        cluster.transition(ClusterStatus::Deleting);
+        drop(cluster);
+        self.clusters.remove(name);
+        Ok(())
     }
 
-    pub async fn join_node(
+    pub fn upgrade(
         &self,
-        cluster_id: Uuid,
-        node: ClusterNode,
-    ) -> Result<(), ClusterError> {
-        let mut clusters = self.clusters.write().await;
-        let cluster = clusters
-            .get_mut(&cluster_id)
-            .ok_or(ClusterError::NotFound(cluster_id))?;
+        name: &str,
+        target_version: &str,
+    ) -> ClusterResult<Cluster> {
+        let mut cluster = self
+            .clusters
+            .get_mut(name)
+            .ok_or_else(|| ClusterError::NotFound(name.to_string()))?;
 
-        if cluster.state == ClusterState::Destroyed
-            || cluster.state == ClusterState::Destroying
-        {
-            return Err(ClusterError::InvalidStateTransition {
-                from: cluster.state.clone(),
-                to: ClusterState::Running,
+        if cluster.status != ClusterStatus::Running {
+            return Err(ClusterError::InvalidState {
+                cluster: name.to_string(),
+                expected: "Running".into(),
+                actual: format!("{:?}", cluster.status),
             });
         }
 
-        let node_id = node.id;
-        cluster.nodes.push(node_id);
-        cluster.updated_at = Utc::now();
+        let current = cluster.spec.kubernetes_version.clone();
+        crate::version::validate_upgrade(&current, target_version)?;
 
-        let mut nodes = self.nodes.write().await;
-        nodes.insert(node_id, node);
+        cluster.transition(ClusterStatus::Upgrading);
+        cluster.spec.kubernetes_version = target_version.to_string();
+        cluster.transition(ClusterStatus::Running);
 
-        tracing::info!(cluster_id = %cluster_id, node_id = %node_id, "node joined cluster");
-        Ok(())
+        Ok(cluster.clone())
     }
 
-    pub async fn remove_node(
-        &self,
-        cluster_id: Uuid,
-        node_id: Uuid,
-    ) -> Result<(), ClusterError> {
-        let mut clusters = self.clusters.write().await;
-        let cluster = clusters
-            .get_mut(&cluster_id)
-            .ok_or(ClusterError::NotFound(cluster_id))?;
-
-        cluster.nodes.retain(|id| *id != node_id);
+    pub fn set_tags(&self, name: &str, tags: HashMap<String, String>) -> ClusterResult<Cluster> {
+        let mut cluster = self
+            .clusters
+            .get_mut(name)
+            .ok_or_else(|| ClusterError::NotFound(name.to_string()))?;
+        cluster.spec.tags = tags;
         cluster.updated_at = Utc::now();
-
-        let mut nodes = self.nodes.write().await;
-        nodes.remove(&node_id);
-
-        tracing::info!(cluster_id = %cluster_id, node_id = %node_id, "node removed from cluster");
-        Ok(())
+        Ok(cluster.clone())
     }
 
-    pub async fn destroy(&self, cluster_id: Uuid) -> Result<(), ClusterError> {
-        let mut guard = self.clusters.write().await;
-        let cluster = guard
-            .get_mut(&cluster_id)
-            .ok_or(ClusterError::NotFound(cluster_id))?;
-
-        if cluster.state == ClusterState::Destroyed {
-            return Err(ClusterError::InvalidStateTransition {
-                from: ClusterState::Destroyed,
-                to: ClusterState::Destroying,
+    fn validate_name(name: &str) -> ClusterResult<()> {
+        if name.is_empty() || name.len() > 63 {
+            return Err(ClusterError::InvalidName {
+                name: name.to_string(),
+                reason: "must be 1-63 characters".into(),
             });
         }
-
-        cluster.state = ClusterState::Destroyed;
-        cluster.updated_at = Utc::now();
-        tracing::info!(cluster_id = %cluster_id, "cluster destroyed");
-        Ok(())
-    }
-
-    pub async fn update_state(
-        &self,
-        cluster_id: Uuid,
-        state: ClusterState,
-    ) -> Result<(), ClusterError> {
-        let mut guard = self.clusters.write().await;
-        let cluster = guard
-            .get_mut(&cluster_id)
-            .ok_or(ClusterError::NotFound(cluster_id))?;
-        cluster.state = state;
-        cluster.updated_at = Utc::now();
-        Ok(())
-    }
-
-    pub async fn set_api_endpoint(
-        &self,
-        cluster_id: Uuid,
-        endpoint: String,
-    ) -> Result<(), ClusterError> {
-        let mut guard = self.clusters.write().await;
-        let cluster = guard
-            .get_mut(&cluster_id)
-            .ok_or(ClusterError::NotFound(cluster_id))?;
-        cluster.api_endpoint = Some(endpoint);
-        cluster.updated_at = Utc::now();
+        if !name.chars().all(|c| c.is_alphanumeric() || c == '-') {
+            return Err(ClusterError::InvalidName {
+                name: name.to_string(),
+                reason: "must be alphanumeric or hyphen".into(),
+            });
+        }
+        if name.starts_with('-') || name.ends_with('-') {
+            return Err(ClusterError::InvalidName {
+                name: name.to_string(),
+                reason: "must not start or end with hyphen".into(),
+            });
+        }
         Ok(())
     }
 }
-
-impl Default for ClusterManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::{NodeResources, NodeRole};
 
-    fn sample_spec(name: &str) -> ClusterSpec {
-        ClusterSpec {
+    fn store() -> ClusterStore {
+        ClusterStore::new()
+    }
+
+    fn create_req(name: &str) -> CreateClusterRequest {
+        CreateClusterRequest {
             name: name.to_string(),
-            provider: ClusterProvider::BareMetal,
-            distro: KubernetesDistro::K3s,
-            kubernetes_version: "v1.29.0".to_string(),
-            control_plane_count: 1,
-            worker_count: 2,
+            kubernetes_version: "1.29".to_string(),
             region: "eu-west-1".to_string(),
-            tenant_id: "tenant-abc".to_string(),
+            network: None,
+            tags: HashMap::new(),
+            audit_logging: true,
         }
     }
 
-    fn sample_resources() -> NodeResources {
-        NodeResources { cpu_cores: 4, memory_gb: 8, disk_gb: 100, gpu_count: 0 }
+    #[test]
+    fn create_and_get_cluster() {
+        let s = store();
+        let c = s.create(create_req("my-cluster"), "alice").unwrap();
+        assert_eq!(c.spec.name, "my-cluster");
+        assert_eq!(c.status, ClusterStatus::Running);
+        let got = s.get("my-cluster").unwrap();
+        assert_eq!(got.id, c.id);
     }
 
-    #[tokio::test]
-    async fn test_provision_creates_running_cluster() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        let cluster = mgr.provision(sample_spec("prod"), owner).await.unwrap();
-        assert_eq!(cluster.state, ClusterState::Running);
-        assert!(cluster.is_ready());
+    #[test]
+    fn duplicate_cluster_fails() {
+        let s = store();
+        s.create(create_req("dup"), "alice").unwrap();
+        assert!(matches!(s.create(create_req("dup"), "bob"), Err(ClusterError::AlreadyExists(_))));
     }
 
-    #[tokio::test]
-    async fn test_provision_duplicate_name_error() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        mgr.provision(sample_spec("prod"), owner).await.unwrap();
-        let err = mgr.provision(sample_spec("prod"), owner).await.unwrap_err();
-        assert!(matches!(err, ClusterError::AlreadyExists(_)));
+    #[test]
+    fn delete_cluster() {
+        let s = store();
+        s.create(create_req("delete-me"), "alice").unwrap();
+        s.delete("delete-me").unwrap();
+        assert!(matches!(s.get("delete-me"), Err(ClusterError::NotFound(_))));
     }
 
-    #[tokio::test]
-    async fn test_join_node_adds_node() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        let cluster = mgr.provision(sample_spec("prod"), owner).await.unwrap();
-
-        let node = ClusterNode::new(
-            cluster.id,
-            "worker-1",
-            "10.0.0.2",
-            NodeRole::Worker,
-            sample_resources(),
-        );
-        let node_id = node.id;
-        mgr.join_node(cluster.id, node).await.unwrap();
-
-        let updated = mgr.get(cluster.id).await.unwrap();
-        assert_eq!(updated.node_count(), 1);
-        assert!(updated.nodes.contains(&node_id));
+    #[test]
+    fn upgrade_cluster() {
+        let s = store();
+        s.create(create_req("upgrade-me"), "alice").unwrap();
+        let upgraded = s.upgrade("upgrade-me", "1.30").unwrap();
+        assert_eq!(upgraded.spec.kubernetes_version, "1.30");
+        assert_eq!(upgraded.status, ClusterStatus::Running);
     }
 
-    #[tokio::test]
-    async fn test_remove_node_removes_it() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        let cluster = mgr.provision(sample_spec("prod"), owner).await.unwrap();
-
-        let node = ClusterNode::new(
-            cluster.id,
-            "worker-1",
-            "10.0.0.2",
-            NodeRole::Worker,
-            sample_resources(),
-        );
-        let node_id = node.id;
-        mgr.join_node(cluster.id, node).await.unwrap();
-        mgr.remove_node(cluster.id, node_id).await.unwrap();
-
-        let updated = mgr.get(cluster.id).await.unwrap();
-        assert_eq!(updated.node_count(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_destroy_sets_destroyed_state() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        let cluster = mgr.provision(sample_spec("prod"), owner).await.unwrap();
-        mgr.destroy(cluster.id).await.unwrap();
-
-        let updated = mgr.get(cluster.id).await.unwrap();
-        assert_eq!(updated.state, ClusterState::Destroyed);
-    }
-
-    #[tokio::test]
-    async fn test_list_filters_by_tenant() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-
-        let mut spec_a = sample_spec("a");
-        spec_a.tenant_id = "tenant-A".to_string();
-        let mut spec_b = sample_spec("b");
-        spec_b.tenant_id = "tenant-B".to_string();
-
-        mgr.provision(spec_a, owner).await.unwrap();
-        mgr.provision(spec_b, owner).await.unwrap();
-
-        let tenant_a_clusters = mgr.list("tenant-A").await;
-        assert_eq!(tenant_a_clusters.len(), 1);
-        assert_eq!(tenant_a_clusters[0].spec.tenant_id, "tenant-A");
-    }
-
-    #[tokio::test]
-    async fn test_set_api_endpoint() {
-        let mgr = ClusterManager::new();
-        let owner = Uuid::new_v4();
-        let cluster = mgr.provision(sample_spec("prod"), owner).await.unwrap();
-        mgr.set_api_endpoint(cluster.id, "https://10.0.0.1:6443".to_string())
-            .await
-            .unwrap();
-        let updated = mgr.get(cluster.id).await.unwrap();
-        assert_eq!(updated.api_endpoint.as_deref(), Some("https://10.0.0.1:6443"));
+    #[test]
+    fn invalid_cluster_name() {
+        let s = store();
+        assert!(s.create(create_req(""), "a").is_err());
+        assert!(s.create(create_req("-bad"), "a").is_err());
+        assert!(s.create(create_req("bad!name"), "a").is_err());
     }
 }

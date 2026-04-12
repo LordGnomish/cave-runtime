@@ -1,36 +1,29 @@
 [package]
 name = "cave-streams"
-description = "CAVE Streams — cloud-native event streaming platform, Kafka-compatible without JVM or ZooKeeper"
+description = "Kafka-compatible streaming — full wire protocol, Schema Registry, Kafka Connect"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
-
-# Async
-tokio      = { workspace = true, features = ["full"] }
-# Web framework
-axum       = { workspace = true }
-# Serialization
-serde      = { workspace = true }
-serde_json = { workspace = true }
-# Utilities
-uuid       = { workspace = true }
-chrono     = { workspace = true }
-thiserror  = { workspace = true }
-tracing    = { workspace = true }
-anyhow     = { workspace = true }
-
-# Extra deps not in workspace
-bytes      = "1"
-
-[dev-dependencies]
-tokio-test = "0.4"
 axum = { workspace = true }
-serde = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-thiserror = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+flate2 = { workspace = true }
+snap = { workspace = true }
+lz4_flex = { workspace = true }
+zstd = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

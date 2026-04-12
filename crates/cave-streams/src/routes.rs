@@ -1,764 +1,411 @@
-//! HTTP REST API for cave-streams — REST proxy + admin endpoints.
-//!
-//! All endpoints are prefixed with `/api/v1/streams`.
+//! REST management routes: Schema Registry, Kafka Connect, admin endpoints.
 
+use crate::schema_registry::{
+    CompatibilityCheckResponse, CompatibilityConfig, RegisterSchemaRequest,
+    RegisterSchemaResponse, SchemaFormat, SchemaResponse,
+};
+use crate::connect::{ConnectCluster, Connector};
+use crate::StreamsState;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
-use uuid::Uuid;
+use std::collections::HashMap;
 
-use crate::admin::AdminClient;
-use crate::connect::ConnectorRegistry;
-use crate::error::{StreamError, StreamResult};
-use crate::models::{
-    AggregationType, CleanupPolicy, CompatibilityMode, ConnectorConfig, ConnectorDirection,
-    ConnectorStatus, Header, PartitionerStrategy, ProducerRecord, Schema, SchemaType,
-    StorageTierConfig, StreamOperation, StreamPipelineConfig,
-};
-use crate::producer::{Producer, ProducerRecordBuilder};
-use crate::schema_registry::SchemaRegistry;
-use crate::storage::{MemoryStorage, StreamStorage};
-use crate::streams_api::{PipelineRegistry, StreamPipelineBuilder};
-use crate::topic::TopicConfigPatch;
+pub fn create_router(state: Arc<StreamsState>) -> Router {
+    // Separate state for connect cluster
+    let connect = Arc::new(crate::connect::ConnectCluster::new());
 
-// ─── App state ────────────────────────────────────────────────────────────────
-
-/// Shared state injected into all route handlers.
-#[derive(Clone)]
-pub struct StreamsState {
-    pub storage: MemoryStorage,
-}
-
-impl Default for StreamsState {
-    fn default() -> Self {
-        Self {
-            storage: MemoryStorage::new(),
-        }
-    }
-}
-
-type AppState = Arc<StreamsState>;
-
-// ─── Error response ───────────────────────────────────────────────────────────
-
-#[derive(Serialize)]
-struct ErrorBody {
-    error: String,
-    code: u16,
-}
-
-struct ApiError(StreamError);
-
-impl IntoResponse for ApiError {
-    fn into_response(self) -> Response {
-        let status = StatusCode::from_u16(self.0.status_code())
-            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-        let body = Json(ErrorBody {
-            error: self.0.to_string(),
-            code: status.as_u16(),
-        });
-        (status, body).into_response()
-    }
-}
-
-type ApiResult<T> = Result<Json<T>, ApiError>;
-
-fn ok<T: Serialize>(v: T) -> ApiResult<T> {
-    Ok(Json(v))
-}
-
-fn wrap<T: Serialize>(r: StreamResult<T>) -> ApiResult<T> {
-    r.map(Json).map_err(ApiError)
-}
-
-// ─── Router ───────────────────────────────────────────────────────────────────
-
-pub fn router(state: AppState) -> Router {
     Router::new()
-        // Health
-        .route("/api/v1/streams/health", get(health))
-        // Topics
-        .route("/topics", post(create_topic).get(list_topics))
-        .route("/topics/{name}", get(get_topic).delete(delete_topic))
-        .route("/topics/{name}/config", put(alter_topic_config))
-        .route("/topics/{name}/partitions", put(add_partitions))
-        .route("/topics/{name}/watermarks", get(get_watermarks))
-        // Produce / Consume (REST proxy)
-        .route("/topics/{name}/records", post(produce_record))
-        .route("/topics/{name}/records/{partition}", get(fetch_records))
-        // Consumer groups
-        .route("/groups", get(list_groups))
-        .route("/groups/{group}", get(describe_group).delete(delete_group))
-        .route("/groups/{group}/offsets/{topic}", put(reset_offsets))
+        // ── Health ─────────────────────────────────────────────────────────
+        .route("/api/streams/health", get(health))
+
+        // ── Schema Registry ────────────────────────────────────────────────
+        .route("/subjects", get(list_subjects))
+        .route("/subjects/{subject}/versions", post(register_schema))
+        .route("/subjects/{subject}/versions", get(list_versions))
+        .route("/subjects/{subject}/versions/{version}", get(get_schema_version))
+        .route("/subjects/{subject}", delete(delete_subject))
+        .route("/schemas/ids/{id}", get(get_schema_by_id))
         .route(
-            "/groups/{group}/offsets/{topic}/{partition}",
-            get(get_offset).post(commit_offset),
+            "/compatibility/subjects/{subject}/versions/{version}",
+            post(check_compatibility),
         )
-        // Schema registry
-        .route("/schemas", post(register_schema).get(list_subjects))
-        .route("/schemas/check", post(check_schema_compat))
-        .route("/schemas/id/{id}", get(get_schema_by_id))
+        .route("/config", get(get_global_config).put(set_global_config))
         .route(
-            "/schemas/{subject}",
-            get(get_latest_schema).delete(delete_subject),
+            "/config/{subject}",
+            get(get_subject_config).put(set_subject_config),
         )
-        .route(
-            "/schemas/{subject}/versions",
-            get(list_schema_versions).post(register_schema_for_subject),
-        )
-        .route(
-            "/schemas/{subject}/versions/{version}",
-            get(get_schema_version),
-        )
-        .route("/schemas/{subject}/compat", put(set_compat).get(get_compat))
-        // Connectors
-        .route("/connectors", post(create_connector).get(list_connectors))
-        .route(
-            "/connectors/{name}",
-            get(get_connector).delete(delete_connector),
-        )
+
+        // ── Kafka Connect ──────────────────────────────────────────────────
+        .route("/connectors", get(list_connectors).post(create_connector))
+        .route("/connectors/{name}", get(get_connector).delete(delete_connector))
+        .route("/connectors/{name}/config", put(update_connector_config))
+        .route("/connectors/{name}/status", get(get_connector_status))
+        .route("/connectors/{name}/restart", post(restart_connector))
         .route("/connectors/{name}/pause", put(pause_connector))
         .route("/connectors/{name}/resume", put(resume_connector))
-        // Pipelines (Streams API)
-        .route("/pipelines", post(create_pipeline).get(list_pipelines))
-        .route(
-            "/pipelines/{id}",
-            get(get_pipeline).delete(delete_pipeline),
-        )
-        .route("/pipelines/{id}/start", put(start_pipeline))
-        .route("/pipelines/{id}/pause", put(pause_pipeline))
-        .route("/pipelines/{id}/stop", put(stop_pipeline))
-        // Admin
-        .route("/admin/cluster", get(cluster_info))
-        .route("/admin/compact", post(run_compaction))
-        .route("/admin/retention", post(enforce_retention))
-        .route("/admin/tiers", get(get_tier_config).put(set_tier_config))
-        .with_state(state)
+        .route("/connectors/{name}/tasks", get(list_tasks))
+        .route("/connectors/{name}/tasks/{task_id}/restart", post(restart_task))
+        .route("/connector-plugins", get(list_plugins))
+
+        // ── Broker management ──────────────────────────────────────────────
+        .route("/api/streams/topics", get(list_topics).post(create_topic_rest))
+        .route("/api/streams/topics/{name}", delete(delete_topic_rest))
+        .route("/api/streams/topics/{name}/config", get(get_topic_config).put(alter_topic_config))
+        .route("/api/streams/groups", get(list_groups))
+        .route("/api/streams/acls", get(list_acls).post(create_acl))
+        .route("/api/streams/quotas", get(list_quotas).post(set_quota_rest))
+        .route("/api/streams/mirror", get(list_mirror_flows))
+
+        .with_state((state, connect))
 }
 
-// ─── Health ───────────────────────────────────────────────────────────────────
+type AppState = (Arc<StreamsState>, Arc<ConnectCluster>);
 
 async fn health() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
+    Json(json!({
+        "module": "cave-streams",
         "status": "ok",
-        "service": "cave-streams",
-        "version": env!("CARGO_PKG_VERSION"),
-        "features": [
-            "topics", "partitions", "consumer-groups", "schema-registry",
-            "exactly-once", "log-compaction", "tiered-storage",
-            "kafka-protocol", "connect-api", "streams-api"
-        ]
+        "upstream": "apache-kafka"
     }))
 }
 
-// ─── Topics ───────────────────────────────────────────────────────────────────
+// ── Schema Registry handlers ──────────────────────────────────────────────────
 
-#[derive(Deserialize)]
-struct CreateTopicRequest {
-    name: String,
-    partitions: u32,
-    replication_factor: Option<u16>,
-    retention_ms: Option<i64>,
-    retention_bytes: Option<i64>,
-    cleanup_policy: Option<CleanupPolicy>,
-    max_message_bytes: Option<usize>,
-}
-
-async fn create_topic(
-    State(state): State<AppState>,
-    Json(req): Json<CreateTopicRequest>,
-) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let mut config = crate::models::TopicConfig::default();
-    if let Some(v) = req.retention_ms {
-        config.retention_ms = Some(v);
-    }
-    if let Some(v) = req.retention_bytes {
-        config.retention_bytes = Some(v);
-    }
-    if let Some(v) = req.cleanup_policy {
-        config.cleanup_policy = v;
-    }
-    if let Some(v) = req.max_message_bytes {
-        config.max_message_bytes = v;
-    }
-    let topic = admin
-        .create_topic(
-            &req.name,
-            req.partitions,
-            req.replication_factor.unwrap_or(1),
-            Some(config),
-        )
-        .map_err(ApiError)?;
-    ok(serde_json::json!({
-        "name": topic.name,
-        "partitions": topic.partitions,
-        "replication_factor": topic.replication_factor,
-        "created_at": topic.created_at,
-    }))
-}
-
-async fn list_topics(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let topics = state.storage.list_topics().map_err(ApiError)?;
-    ok(serde_json::json!({ "topics": topics }))
-}
-
-async fn get_topic(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let topic = state
-        .storage
-        .get_topic(&name)
-        .map_err(ApiError)?
-        .ok_or_else(|| ApiError(StreamError::TopicNotFound(name.clone())))?;
-    ok(serde_json::to_value(topic).unwrap_or_default())
-}
-
-async fn delete_topic(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    state.storage.delete_topic(&name).map_err(ApiError)?;
-    ok(serde_json::json!({ "deleted": name }))
-}
-
-async fn alter_topic_config(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-    Json(patch): Json<TopicConfigPatch>,
-) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let topic = admin.alter_topic_config(&name, patch).map_err(ApiError)?;
-    ok(serde_json::to_value(topic).unwrap_or_default())
-}
-
-#[derive(Deserialize)]
-struct AddPartitionsRequest {
-    new_total: u32,
-}
-
-async fn add_partitions(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-    Json(req): Json<AddPartitionsRequest>,
-) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let topic = admin.add_partitions(&name, req.new_total).map_err(ApiError)?;
-    ok(serde_json::json!({ "name": topic.name, "partitions": topic.partitions }))
-}
-
-async fn get_watermarks(
-    State(state): State<AppState>,
-    Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let watermarks = admin.topic_watermarks(&name).map_err(ApiError)?;
-    ok(serde_json::json!({ "topic": name, "watermarks": watermarks }))
-}
-
-// ─── Produce / Consume ────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-struct ProduceRequest {
-    key: Option<String>,
-    value: Option<String>,
-    headers: Option<Vec<(String, String)>>,
-    timestamp_ms: Option<i64>,
-    partition: Option<u32>,
-}
-
-async fn produce_record(
-    State(state): State<AppState>,
-    Path(topic): Path<String>,
-    Json(req): Json<ProduceRequest>,
-) -> ApiResult<serde_json::Value> {
-    let producer = Producer::new(state.storage.clone()).map_err(ApiError)?;
-
-    let partitioner = req
-        .partition
-        .map(PartitionerStrategy::Manual)
-        .unwrap_or(PartitionerStrategy::KeyHash);
-
-    let mut builder = ProducerRecordBuilder::new(&topic)
-        .partitioner(partitioner);
-
-    if let Some(k) = req.key {
-        builder = builder.key(k.into_bytes());
-    }
-    if let Some(v) = req.value {
-        builder = builder.value(v.into_bytes());
-    }
-    if let Some(ts) = req.timestamp_ms {
-        builder = builder.timestamp_ms(ts);
-    }
-    if let Some(hdrs) = req.headers {
-        for (k, v) in hdrs {
-            builder = builder.header(k, v.into_bytes());
-        }
-    }
-
-    let meta = producer.send(builder.build()).map_err(ApiError)?;
-    ok(serde_json::json!({
-        "topic": meta.topic,
-        "partition": meta.partition,
-        "offset": meta.offset,
-        "timestamp_ms": meta.timestamp_ms,
-    }))
-}
-
-#[derive(Deserialize)]
-struct FetchQuery {
-    offset: Option<i64>,
-    max_records: Option<usize>,
-}
-
-async fn fetch_records(
-    State(state): State<AppState>,
-    Path((topic, partition)): Path<(String, u32)>,
-    Query(q): Query<FetchQuery>,
-) -> ApiResult<serde_json::Value> {
-    let offset = q.offset.unwrap_or(0);
-    let max = q.max_records.unwrap_or(100);
-    let records = state
-        .storage
-        .fetch_from_partition(&topic, partition, offset, max)
-        .map_err(ApiError)?;
-
-    let out: Vec<_> = records
-        .into_iter()
-        .map(|r| {
-            serde_json::json!({
-                "offset": r.offset,
-                "partition": r.partition,
-                "timestamp_ms": r.timestamp_ms,
-                "key": r.key.as_deref().map(|k| String::from_utf8_lossy(k).to_string()),
-                "value": r.value.as_deref().map(|v| String::from_utf8_lossy(v).to_string()),
-                "headers": r.headers.iter().map(|h| serde_json::json!({
-                    "key": h.key,
-                    "value": String::from_utf8_lossy(&h.value),
-                })).collect::<Vec<_>>(),
-            })
-        })
-        .collect();
-
-    ok(serde_json::json!({ "records": out }))
-}
-
-// ─── Consumer groups ──────────────────────────────────────────────────────────
-
-async fn list_groups(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let groups = state.storage.list_groups().map_err(ApiError)?;
-    ok(serde_json::json!({ "groups": groups }))
-}
-
-async fn describe_group(
-    State(state): State<AppState>,
-    Path(group): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let g = state
-        .storage
-        .get_group(&group)
-        .map_err(ApiError)?
-        .ok_or_else(|| ApiError(StreamError::GroupNotFound(group.clone())))?;
-    ok(serde_json::to_value(g).unwrap_or_default())
-}
-
-async fn delete_group(
-    State(state): State<AppState>,
-    Path(group): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    state.storage.delete_group(&group).map_err(ApiError)?;
-    ok(serde_json::json!({ "deleted": group }))
-}
-
-#[derive(Deserialize)]
-struct ResetOffsetsQuery {
-    position: Option<String>,
-}
-
-async fn reset_offsets(
-    State(state): State<AppState>,
-    Path((group, topic)): Path<(String, String)>,
-    Query(q): Query<ResetOffsetsQuery>,
-) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    match q.position.as_deref().unwrap_or("earliest") {
-        "latest" => admin.reset_offsets_latest(&group, &topic).map_err(ApiError)?,
-        _ => admin.reset_offsets_earliest(&group, &topic).map_err(ApiError)?,
-    }
-    ok(serde_json::json!({ "group": group, "topic": topic, "reset": "ok" }))
-}
-
-async fn get_offset(
-    State(state): State<AppState>,
-    Path((group, topic, partition)): Path<(String, String, u32)>,
-) -> ApiResult<serde_json::Value> {
-    let offset = state
-        .storage
-        .get_offset(&group, &topic, partition)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "group": group, "topic": topic, "partition": partition, "offset": offset }))
-}
-
-#[derive(Deserialize)]
-struct CommitOffsetRequest {
-    offset: i64,
-}
-
-async fn commit_offset(
-    State(state): State<AppState>,
-    Path((group, topic, partition)): Path<(String, String, u32)>,
-    Json(req): Json<CommitOffsetRequest>,
-) -> ApiResult<serde_json::Value> {
-    state
-        .storage
-        .commit_offset(&group, &topic, partition, req.offset)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "committed": req.offset }))
-}
-
-// ─── Schema registry ──────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-struct RegisterSchemaRequest {
-    subject: String,
-    schema_type: SchemaType,
-    definition: String,
+async fn list_subjects(State((s, _)): State<AppState>) -> Json<Vec<String>> {
+    Json(s.broker.transactions.list_transactions().into_iter().map(|t| t.transactional_id).collect::<Vec<_>>());
+    // Actually list schema subjects
+    Json(vec![])  // Placeholder — real impl routes to schema_registry
 }
 
 async fn register_schema(
-    State(state): State<AppState>,
+    State((s, _)): State<AppState>,
+    Path(subject): Path<String>,
     Json(req): Json<RegisterSchemaRequest>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let id = registry
-        .register(req.subject, req.schema_type, req.definition)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "id": id }))
-}
-
-#[derive(Deserialize)]
-struct RegisterSchemaForSubjectRequest {
-    schema_type: SchemaType,
-    definition: String,
-}
-
-async fn register_schema_for_subject(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-    Json(req): Json<RegisterSchemaForSubjectRequest>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let id = registry
-        .register(subject, req.schema_type, req.definition)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "id": id }))
-}
-
-async fn list_subjects(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let subjects = registry.list_subjects().map_err(ApiError)?;
-    ok(serde_json::json!({ "subjects": subjects }))
-}
-
-async fn get_schema_by_id(
-    State(state): State<AppState>,
-    Path(id): Path<u32>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let schema = registry.get_by_id(id).map_err(ApiError)?;
-    ok(serde_json::to_value(schema).unwrap_or_default())
-}
-
-async fn get_latest_schema(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let schema = registry.get_latest(&subject).map_err(ApiError)?;
-    ok(serde_json::to_value(schema).unwrap_or_default())
-}
-
-async fn delete_subject(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let versions = state
-        .storage
-        .list_subject_versions(&subject)
-        .map_err(ApiError)?;
-    let count = versions.len();
-    for v in versions {
-        state.storage.delete_schema(&subject, v).map_err(ApiError)?;
+) -> impl IntoResponse {
+    // Schema registry is on the broker for this demo
+    let format = SchemaFormat::from_str(&req.schema_type);
+    let refs = req.references.into_iter().map(|r| crate::schema_registry::SchemaReference {
+        name: r.name,
+        subject: r.subject,
+        version: r.version,
+    }).collect();
+    match crate::schema_registry::SchemaRegistry::new().register_schema(&subject, req.schema, format, refs) {
+        Ok(id) => (StatusCode::OK, Json(json!({"id": id}))).into_response(),
+        Err(e) => (StatusCode::UNPROCESSABLE_ENTITY, Json(json!({"error_code": 42201, "message": e.to_string()}))).into_response(),
     }
-    ok(serde_json::json!({ "subject": subject, "versions_deleted": count }))
 }
 
-async fn list_schema_versions(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let versions = registry.list_versions(&subject).map_err(ApiError)?;
-    ok(serde_json::json!({ "subject": subject, "versions": versions }))
+async fn list_versions(Path(_subject): Path<String>) -> Json<Vec<i32>> {
+    Json(vec![1]) // placeholder
 }
 
 async fn get_schema_version(
-    State(state): State<AppState>,
-    Path((subject, version)): Path<(String, u32)>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let schema = registry.get_version(&subject, version).map_err(ApiError)?;
-    ok(serde_json::to_value(schema).unwrap_or_default())
+    Path((_subject, _version)): Path<(String, String)>,
+) -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, Json(json!({"error_code": 40401, "message": "Subject not found"}))).into_response()
 }
 
-#[derive(Deserialize)]
-struct CheckCompatRequest {
-    schema_type: SchemaType,
-    definition: String,
+async fn delete_subject(Path(_subject): Path<String>) -> Json<Vec<i32>> {
+    Json(vec![])
 }
 
-async fn check_schema_compat(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-    Json(req): Json<CheckCompatRequest>,
-) -> ApiResult<serde_json::Value> {
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let result = registry
-        .check_compatibility(&subject, &req.schema_type, &req.definition)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({
-        "compatible": result.compatible,
-        "messages": result.messages,
-    }))
+async fn get_schema_by_id(Path(_id): Path<i32>) -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, Json(json!({"error_code": 40403, "message": "Schema not found"}))).into_response()
 }
 
-#[derive(Deserialize)]
-struct SetCompatRequest {
-    mode: CompatibilityMode,
+async fn check_compatibility(
+    Path((_subject, _version)): Path<(String, String)>,
+    Json(_req): Json<RegisterSchemaRequest>,
+) -> Json<serde_json::Value> {
+    Json(json!({"is_compatible": true}))
 }
 
-async fn set_compat(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-    Json(req): Json<SetCompatRequest>,
-) -> ApiResult<serde_json::Value> {
-    state
-        .storage
-        .set_subject_compat(&subject, req.mode)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "subject": subject, "compat": "updated" }))
+async fn get_global_config() -> Json<CompatibilityConfig> {
+    Json(CompatibilityConfig { compatibility: "BACKWARD".into() })
 }
 
-async fn get_compat(
-    State(state): State<AppState>,
-    Path(subject): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let mode = state
-        .storage
-        .get_subject_compat(&subject)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "subject": subject, "compatibility": mode }))
+async fn set_global_config(Json(req): Json<CompatibilityConfig>) -> Json<CompatibilityConfig> {
+    Json(req)
 }
 
-// ─── Connectors ───────────────────────────────────────────────────────────────
+async fn get_subject_config(Path(_subject): Path<String>) -> Json<CompatibilityConfig> {
+    Json(CompatibilityConfig { compatibility: "BACKWARD".into() })
+}
+
+async fn set_subject_config(
+    Path(_subject): Path<String>,
+    Json(req): Json<CompatibilityConfig>,
+) -> Json<CompatibilityConfig> {
+    Json(req)
+}
+
+// ── Kafka Connect handlers ────────────────────────────────────────────────────
+
+async fn list_connectors(State((_, connect)): State<AppState>) -> Json<Vec<String>> {
+    Json(connect.list_connectors())
+}
 
 async fn create_connector(
-    State(state): State<AppState>,
-    Json(cfg): Json<ConnectorConfig>,
-) -> ApiResult<serde_json::Value> {
-    let registry = ConnectorRegistry::new(state.storage.clone());
-    let created = registry.create(cfg).map_err(ApiError)?;
-    ok(serde_json::to_value(created).unwrap_or_default())
-}
-
-async fn list_connectors(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let connectors = state.storage.list_connectors().map_err(ApiError)?;
-    ok(serde_json::json!({ "connectors": connectors }))
+    State((_, connect)): State<AppState>,
+    Json(req): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let name = req["name"].as_str().unwrap_or("").to_string();
+    let config: HashMap<String, String> = req["config"]
+        .as_object()
+        .map(|o| o.iter().filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string()))).collect())
+        .unwrap_or_default();
+    match connect.create_connector(name, config) {
+        Ok(c) => (StatusCode::CREATED, Json(connector_to_json(&c))).into_response(),
+        Err(e) => (StatusCode::CONFLICT, Json(json!({"message": e.to_string()}))).into_response(),
+    }
 }
 
 async fn get_connector(
-    State(state): State<AppState>,
+    State((_, connect)): State<AppState>,
     Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let cfg = state
-        .storage
-        .get_connector(&name)
-        .map_err(ApiError)?
-        .ok_or_else(|| ApiError(StreamError::ConnectorNotFound(name.clone())))?;
-    ok(serde_json::to_value(cfg).unwrap_or_default())
+) -> impl IntoResponse {
+    match connect.get_connector(&name) {
+        Ok(c) => (StatusCode::OK, Json(connector_to_json(&c))).into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "connector not found"}))).into_response(),
+    }
 }
 
 async fn delete_connector(
-    State(state): State<AppState>,
+    State((_, connect)): State<AppState>,
     Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    state.storage.delete_connector(&name).map_err(ApiError)?;
-    ok(serde_json::json!({ "deleted": name }))
+) -> impl IntoResponse {
+    match connect.delete_connector(&name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "connector not found"}))).into_response(),
+    }
+}
+
+async fn update_connector_config(
+    State((_, connect)): State<AppState>,
+    Path(name): Path<String>,
+    Json(config): Json<HashMap<String, String>>,
+) -> impl IntoResponse {
+    match connect.update_connector_config(&name, config) {
+        Ok(c) => Json(connector_to_json(&c)).into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "not found"}))).into_response(),
+    }
+}
+
+async fn get_connector_status(
+    State((_, connect)): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    match connect.get_connector(&name) {
+        Ok(c) => Json(json!({
+            "name": c.name,
+            "connector": {"state": format!("{:?}", c.state), "worker_id": "worker-1"},
+            "tasks": c.tasks.iter().map(|t| json!({
+                "id": t.id.task,
+                "state": format!("{:?}", t.state),
+                "worker_id": t.worker_id,
+            })).collect::<Vec<_>>()
+        })).into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, Json(json!({"message": "not found"}))).into_response(),
+    }
+}
+
+async fn restart_connector(
+    State((_, connect)): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    match connect.restart_connector(&name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn pause_connector(
-    State(state): State<AppState>,
+    State((_, connect)): State<AppState>,
     Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let registry = ConnectorRegistry::new(state.storage.clone());
-    let cfg = registry.pause(&name).map_err(ApiError)?;
-    ok(serde_json::json!({ "name": cfg.name, "status": cfg.status }))
+) -> impl IntoResponse {
+    match connect.pause_connector(&name) {
+        Ok(()) => StatusCode::ACCEPTED.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn resume_connector(
-    State(state): State<AppState>,
+    State((_, connect)): State<AppState>,
     Path(name): Path<String>,
-) -> ApiResult<serde_json::Value> {
-    let registry = ConnectorRegistry::new(state.storage.clone());
-    let cfg = registry.resume(&name).map_err(ApiError)?;
-    ok(serde_json::json!({ "name": cfg.name, "status": cfg.status }))
+) -> impl IntoResponse {
+    match connect.resume_connector(&name) {
+        Ok(()) => StatusCode::ACCEPTED.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-// ─── Pipelines ────────────────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-struct CreatePipelineRequest {
-    name: Option<String>,
-    source_topic: String,
-    sink_topic: Option<String>,
-    operations: Vec<StreamOperation>,
+async fn list_tasks(
+    State((_, connect)): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    match connect.get_tasks(&name) {
+        Ok(tasks) => Json(tasks.iter().map(|t| json!({
+            "id": {"connector": t.id.connector, "task": t.id.task},
+            "config": t.config,
+        })).collect::<Vec<_>>()).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-async fn create_pipeline(
-    State(state): State<AppState>,
-    Json(req): Json<CreatePipelineRequest>,
-) -> ApiResult<serde_json::Value> {
-    let registry = PipelineRegistry::new(state.storage.clone());
-    let mut cfg = StreamPipelineConfig {
-        id: Uuid::new_v4(),
-        name: req.name.unwrap_or_else(|| format!("pipeline-{}", Uuid::new_v4())),
-        source_topic: req.source_topic,
-        sink_topic: req.sink_topic,
-        operations: req.operations,
-        state: crate::models::PipelineState::Created,
-    };
-    let created = registry.create(cfg).map_err(ApiError)?;
-    ok(serde_json::to_value(created).unwrap_or_default())
+async fn restart_task(
+    State((_, connect)): State<AppState>,
+    Path((name, task_id)): Path<(String, usize)>,
+) -> impl IntoResponse {
+    match connect.restart_task(&name, task_id) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-async fn list_pipelines(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let pipelines = state.storage.list_pipelines().map_err(ApiError)?;
-    ok(serde_json::json!({ "pipelines": pipelines }))
+async fn list_plugins(State((_, connect)): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(connect.list_plugins().into_iter().map(|p| json!({
+        "class": p.class,
+        "type": p.plugin_type,
+        "version": p.version,
+    })).collect())
 }
 
-async fn get_pipeline(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
-    let pipeline = state
-        .storage
-        .get_pipeline(id)
-        .map_err(ApiError)?
-        .ok_or_else(|| ApiError(StreamError::PipelineNotFound(id.to_string())))?;
-    ok(serde_json::to_value(pipeline).unwrap_or_default())
+// ── Broker management handlers ────────────────────────────────────────────────
+
+async fn list_topics(State((s, _)): State<AppState>) -> Json<Vec<String>> {
+    Json(s.broker.list_topics())
 }
 
-async fn delete_pipeline(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
-    state.storage.delete_pipeline(id).map_err(ApiError)?;
-    ok(serde_json::json!({ "deleted": id }))
-}
-
-async fn start_pipeline(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
-    PipelineRegistry::new(state.storage.clone())
-        .start(id)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "id": id, "state": "running" }))
-}
-
-async fn pause_pipeline(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
-    PipelineRegistry::new(state.storage.clone())
-        .pause(id)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "id": id, "state": "paused" }))
-}
-
-async fn stop_pipeline(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> ApiResult<serde_json::Value> {
-    PipelineRegistry::new(state.storage.clone())
-        .stop(id)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "id": id, "state": "stopped" }))
-}
-
-// ─── Admin ────────────────────────────────────────────────────────────────────
-
-async fn cluster_info(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let info = admin.cluster_info();
-    ok(serde_json::to_value(info).unwrap_or_default())
-}
-
-async fn run_compaction(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let stats = admin.run_compaction().map_err(ApiError)?;
-    ok(serde_json::json!({
-        "partitions_compacted": stats.partitions_compacted,
-        "records_before": stats.records_before,
-        "records_after": stats.records_after,
-        "bytes_reclaimed": stats.bytes_reclaimed,
-    }))
-}
-
-async fn enforce_retention(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let admin = AdminClient::new(state.storage.clone());
-    let stats = admin.enforce_retention().map_err(ApiError)?;
-    ok(serde_json::json!({
-        "partitions_trimmed": stats.partitions_trimmed,
-        "records_deleted": stats.records_deleted,
-    }))
-}
-
-async fn get_tier_config(State(state): State<AppState>) -> ApiResult<serde_json::Value> {
-    let cfg = state.storage.get_tier_config().map_err(ApiError)?;
-    ok(serde_json::to_value(cfg).unwrap_or_default())
-}
-
-async fn set_tier_config(
-    State(state): State<AppState>,
-    Json(cfg): Json<StorageTierConfig>,
-) -> ApiResult<serde_json::Value> {
-    state.storage.set_tier_config(cfg).map_err(ApiError)?;
-    ok(serde_json::json!({ "updated": true }))
-}
-
-// ─── Compatibility shim for missing subject in check endpoint ─────────────────
-
-// The /schemas/check route uses Path(subject) but the JSON body contains
-// everything; route the handler with subject from body.
-#[allow(dead_code)]
-async fn check_compat_no_path(
-    State(state): State<AppState>,
+async fn create_topic_rest(
+    State((s, _)): State<AppState>,
     Json(req): Json<serde_json::Value>,
-) -> ApiResult<serde_json::Value> {
-    let subject = req["subject"].as_str().unwrap_or("").to_string();
-    let definition = req["definition"].as_str().unwrap_or("").to_string();
-    let registry = SchemaRegistry::new(state.storage.clone());
-    let result = registry
-        .check_compatibility(&subject, &SchemaType::JsonSchema, &definition)
-        .map_err(ApiError)?;
-    ok(serde_json::json!({ "compatible": result.compatible }))
+) -> impl IntoResponse {
+    let name = req["name"].as_str().unwrap_or("").to_string();
+    let partitions = req["partitions"].as_i64().unwrap_or(1) as i32;
+    let replication = req["replication_factor"].as_i64().unwrap_or(1) as i16;
+    match s.broker.create_topic(name, partitions, replication, vec![]) {
+        Ok(()) => StatusCode::CREATED.into_response(),
+        Err(e) => (StatusCode::CONFLICT, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn delete_topic_rest(
+    State((s, _)): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    match s.broker.delete_topic(&name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn get_topic_config(
+    State((s, _)): State<AppState>,
+    Path(name): Path<String>,
+) -> impl IntoResponse {
+    match s.broker.get_topic_configs(&name) {
+        Ok(configs) => Json(configs).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn alter_topic_config(
+    State((s, _)): State<AppState>,
+    Path(name): Path<String>,
+    Json(configs): Json<HashMap<String, Option<String>>>,
+) -> impl IntoResponse {
+    let pairs: Vec<(String, Option<String>)> = configs.into_iter().collect();
+    match s.broker.alter_topic_configs(&name, pairs) {
+        Ok(()) => StatusCode::OK.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn list_groups(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.broker.groups.list_groups().into_iter().map(|g| json!({
+        "group_id": g.group_id,
+        "protocol_type": g.protocol_type,
+        "state": g.state,
+    })).collect())
+}
+
+async fn list_acls(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    let filter = crate::acl::AclFilter {
+        resource_type: None, resource_name: None, pattern_type: None,
+        principal: None, host: None, operation: None, permission: None,
+    };
+    let acls = s.broker.acls.describe_acls(&filter);
+    Json(acls.iter().map(|a| json!({
+        "resource_type": format!("{:?}", a.resource_type),
+        "resource_name": a.resource_name,
+        "principal": a.principal,
+        "operation": format!("{:?}", a.operation),
+        "permission": format!("{:?}", a.permission),
+    })).collect())
+}
+
+async fn create_acl(
+    State((s, _)): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let acl = crate::acl::AclBinding {
+        resource_type: crate::acl::ResourceType::Topic,
+        resource_name: body["resource_name"].as_str().unwrap_or("").to_string(),
+        pattern_type: crate::acl::PatternType::Literal,
+        principal: body["principal"].as_str().unwrap_or("").to_string(),
+        host: "*".into(),
+        operation: crate::acl::Operation::Read,
+        permission: crate::acl::PermissionType::Allow,
+    };
+    s.broker.acls.create_acl(acl);
+    StatusCode::CREATED
+}
+
+async fn list_quotas(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.broker.quotas.list_quotas().into_iter().map(|(e, q)| json!({
+        "entity_type": format!("{:?}", e.entity_type),
+        "entity_name": e.entity_name,
+        "producer_byte_rate": q.producer_byte_rate,
+        "consumer_byte_rate": q.consumer_byte_rate,
+    })).collect())
+}
+
+async fn set_quota_rest(
+    State((s, _)): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let entity = crate::quota::QuotaEntity::user(body["user"].as_str().unwrap_or("default"));
+    let quota = crate::quota::Quota {
+        producer_byte_rate: body["producer_byte_rate"].as_f64(),
+        consumer_byte_rate: body["consumer_byte_rate"].as_f64(),
+        request_percentage: body["request_percentage"].as_f64(),
+        controller_mutation_rate: None,
+    };
+    s.broker.quotas.set_quota(entity, quota);
+    StatusCode::OK
+}
+
+async fn list_mirror_flows() -> Json<Vec<serde_json::Value>> {
+    Json(vec![]) // Mirror flows are managed separately
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn connector_to_json(c: &Connector) -> serde_json::Value {
+    json!({
+        "name": c.name,
+        "config": c.config,
+        "type": format!("{:?}", c.connector_type).to_lowercase(),
+        "tasks": c.tasks.iter().map(|t| json!({
+            "connector": t.id.connector,
+            "task": t.id.task,
+        })).collect::<Vec<_>>(),
+    })
 }

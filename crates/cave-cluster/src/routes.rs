@@ -1,495 +1,390 @@
-//! HTTP routes for the cave-cluster module.
+//! HTTP routes for cave-cluster.
 
-use crate::models::*;
+use crate::addons::AddonManager;
+use crate::cluster::{CreateClusterRequest, UpgradeClusterRequest};
+use crate::etcd::EtcdBackupStore;
+use crate::kubeconfig::{CredentialType, generate, to_yaml};
+use crate::nodepool::{CreateNodePoolRequest, NodePoolStore};
+use crate::tenant::TenantStore;
 use crate::ClusterState;
-use crate::{health as health_mod, provisioner, tenant as tenant_mod};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{get, post},
+    response::IntoResponse,
+    routing::{delete, get, post, put},
     Json, Router,
 };
+use serde::Deserialize;
+use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
+type AppState = Arc<InnerState>;
+
+struct InnerState {
+    cluster: Arc<crate::ClusterState>,
+    node_pools: Arc<NodePoolStore>,
+    addons: Arc<AddonManager>,
+    etcd_store: Arc<EtcdBackupStore>,
+    tenants: Arc<TenantStore>,
+}
+
 pub fn create_router(state: Arc<ClusterState>) -> Router {
+    let inner = Arc::new(InnerState {
+        cluster: Arc::clone(&state),
+        node_pools: Arc::new(NodePoolStore::new()),
+        addons: Arc::new(AddonManager::new()),
+        etcd_store: Arc::new(EtcdBackupStore::new("s3://cave-backups/etcd".into())),
+        tenants: Arc::new(TenantStore::new()),
+    });
+
     Router::new()
-        // Templates must be registered before /{id} to avoid shadowing.
-        .route("/api/v1/clusters/templates", get(list_templates))
+        // Health
+        .route("/api/cluster/health", get(health))
         // Cluster CRUD
-        .route(
-            "/api/v1/clusters",
-            get(list_clusters).post(create_cluster),
-        )
-        .route(
-            "/api/v1/clusters/{id}",
-            get(get_cluster).put(update_cluster).delete(delete_cluster),
-        )
-        // Cluster actions
-        .route("/api/v1/clusters/{id}/upgrade", post(trigger_upgrade))
-        .route("/api/v1/clusters/{id}/health", get(get_cluster_health))
-        .route("/api/v1/clusters/{id}/kubeconfig", get(get_kubeconfig))
+        .route("/api/cluster/clusters", get(list_clusters).post(create_cluster))
+        .route("/api/cluster/clusters/{name}", get(get_cluster).delete(delete_cluster))
+        .route("/api/cluster/clusters/{name}/upgrade", post(upgrade_cluster))
+        .route("/api/cluster/clusters/{name}/health", get(cluster_health))
+        .route("/api/cluster/clusters/{name}/kubeconfig", get(get_kubeconfig))
         // Node pools
         .route(
-            "/api/v1/clusters/{id}/nodepools",
+            "/api/cluster/clusters/{name}/nodepools",
             get(list_node_pools).post(create_node_pool),
         )
         .route(
-            "/api/v1/clusters/{id}/nodepools/{pool_id}",
-            get(get_node_pool)
-                .put(scale_node_pool)
-                .delete(delete_node_pool),
+            "/api/cluster/clusters/{name}/nodepools/{pool}",
+            get(get_node_pool).delete(delete_node_pool),
+        )
+        .route(
+            "/api/cluster/clusters/{name}/nodepools/{pool}/scale",
+            post(scale_node_pool),
         )
         // Add-ons
         .route(
-            "/api/v1/clusters/{id}/addons",
-            get(list_cluster_addons).post(install_addon),
-        )
-        // Tenant CRUD
-        .route(
-            "/api/v1/tenants",
-            get(list_tenants).post(create_tenant),
+            "/api/cluster/clusters/{name}/addons",
+            get(list_addons).post(install_addon),
         )
         .route(
-            "/api/v1/tenants/{id}",
-            get(get_tenant).delete(delete_tenant),
+            "/api/cluster/clusters/{name}/addons/{addon}",
+            get(get_addon).delete(uninstall_addon),
         )
-        // Tenant views
-        .route("/api/v1/tenants/{id}/clusters", get(list_tenant_clusters))
-        .route("/api/v1/tenants/{id}/quota", get(get_tenant_quota))
-        // Module health
-        .route("/api/cluster/health", get(module_health))
-        .with_state(state)
+        .route("/api/cluster/addons/available", get(available_addons))
+        // etcd backup/restore
+        .route(
+            "/api/cluster/clusters/{name}/backups",
+            get(list_backups).post(create_backup),
+        )
+        .route(
+            "/api/cluster/clusters/{name}/backups/{id}/restore",
+            post(restore_backup),
+        )
+        // Multi-tenancy
+        .route("/api/cluster/tenants", get(list_tenants).post(create_tenant))
+        .route("/api/cluster/tenants/{id}", get(get_tenant).delete(delete_tenant))
+        .route(
+            "/api/cluster/tenants/{id}/clusters/{cluster}",
+            post(attach_tenant).delete(detach_tenant),
+        )
+        // K8s version catalog
+        .route("/api/cluster/versions", get(list_versions))
+        .with_state(inner)
 }
 
-// ── Cluster ───────────────────────────────────────────────────────────────────
-
-/// GET /api/v1/clusters — list all clusters (TODO: filter by tenant via query param)
-async fn list_clusters(State(state): State<Arc<ClusterState>>) -> Json<Vec<Cluster>> {
-    let store = state.store.lock().unwrap();
-    Json(store.clusters.values().cloned().collect())
+async fn health() -> Json<serde_json::Value> {
+    Json(json!({"module": "cave-cluster", "status": "ok", "upstream": "cluster-api"}))
 }
 
-/// POST /api/v1/clusters — provision a new cluster
+// ── Cluster CRUD ─────────────────────────────────────────────────���────────────
+
+async fn list_clusters(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.cluster.store.list().into_iter().map(|c| json!({
+        "name": c.spec.name, "version": c.spec.kubernetes_version,
+        "status": format!("{:?}", c.status), "region": c.spec.region,
+        "api_endpoint": c.api_endpoint, "created_at": c.created_at,
+    })).collect())
+}
+
 async fn create_cluster(
-    State(state): State<Arc<ClusterState>>,
+    State(s): State<AppState>,
     Json(req): Json<CreateClusterRequest>,
-) -> (StatusCode, Json<Cluster>) {
-    let cluster = provisioner::provision_cluster(&req);
-    let mut store = state.store.lock().unwrap();
-    store.clusters.insert(cluster.id, cluster.clone());
-    store.events.push(crate::models::ClusterEvent {
-        id: Uuid::new_v4(),
-        cluster_id: cluster.id,
-        event_type: ClusterEventType::Created,
-        message: format!("Cluster '{}' provisioning started", cluster.name),
-        occurred_at: chrono::Utc::now(),
-    });
-    (StatusCode::CREATED, Json(cluster))
-}
-
-/// GET /api/v1/clusters/{id}
-async fn get_cluster(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Cluster>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    store
-        .clusters
-        .get(&id)
-        .cloned()
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
-}
-
-/// PUT /api/v1/clusters/{id} — update cluster metadata
-async fn update_cluster(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-    Json(req): Json<UpdateClusterRequest>,
-) -> Result<Json<Cluster>, StatusCode> {
-    let mut store = state.store.lock().unwrap();
-    let cluster = store.clusters.get_mut(&id).ok_or(StatusCode::NOT_FOUND)?;
-    if let Some(name) = req.name {
-        cluster.name = name;
-    }
-    if let Some(policy) = req.upgrade_policy {
-        cluster.upgrade_policy = policy;
-    }
-    cluster.updated_at = chrono::Utc::now();
-    Ok(Json(cluster.clone()))
-}
-
-/// DELETE /api/v1/clusters/{id} — begin graceful teardown
-async fn delete_cluster(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
-    let mut store = state.store.lock().unwrap();
-    if store.clusters.remove(&id).is_some() {
-        let event = provisioner::delete_cluster(id);
-        store.events.push(event);
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::NOT_FOUND
+) -> impl IntoResponse {
+    match s.cluster.store.create(req, "api") {
+        Ok(c) => (StatusCode::CREATED, Json(json!({
+            "name": c.spec.name, "status": format!("{:?}", c.status), "id": c.id
+        }))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
     }
 }
 
-// ── Cluster Actions ───────────────────────────────────────────────────────────
+async fn get_cluster(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.cluster.store.get(&name) {
+        Ok(c) => Json(json!({
+            "name": c.spec.name, "version": c.spec.kubernetes_version,
+            "status": format!("{:?}", c.status), "api_endpoint": c.api_endpoint,
+        })).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
 
-/// POST /api/v1/clusters/{id}/upgrade — trigger a rolling upgrade
-async fn trigger_upgrade(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
+async fn delete_cluster(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.cluster.store.delete(&name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn upgrade_cluster(
+    State(s): State<AppState>,
+    Path(name): Path<String>,
     Json(req): Json<UpgradeClusterRequest>,
-) -> Result<Json<Cluster>, StatusCode> {
-    let mut store = state.store.lock().unwrap();
-    let cluster = store.clusters.get(&id).cloned().ok_or(StatusCode::NOT_FOUND)?;
-    let upgraded = provisioner::upgrade_cluster(&cluster, &req);
-    store.clusters.insert(id, upgraded.clone());
-    store.events.push(crate::models::ClusterEvent {
-        id: Uuid::new_v4(),
-        cluster_id: id,
-        event_type: ClusterEventType::Upgraded,
-        message: format!("Upgrade to {} initiated", req.target_version),
-        occurred_at: chrono::Utc::now(),
-    });
-    Ok(Json(upgraded))
+) -> impl IntoResponse {
+    match s.cluster.store.upgrade(&name, &req.kubernetes_version) {
+        Ok(c) => Json(json!({"name": c.spec.name, "version": c.spec.kubernetes_version})).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
-/// GET /api/v1/clusters/{id}/health — live health check
-async fn get_cluster_health(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<ClusterHealth>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    let cluster = store.clusters.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-    let h = health_mod::check_cluster_health(cluster);
-    let _ = health_mod::detect_unhealthy_nodes(&h);
-    Ok(Json(h))
+async fn cluster_health(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.cluster.store.get(&name) {
+        Ok(cluster) => {
+            let np_count = s.node_pools.list(&name).iter().map(|p| p.node_count).sum();
+            let health = crate::health::check_cluster_health(&cluster, np_count);
+            Json(json!({
+                "cluster": name,
+                "overall": format!("{:?}", health.overall),
+                "components": health.components.iter().map(|c| json!({
+                    "name": c.name, "status": format!("{:?}", c.status)
+                })).collect::<Vec<_>>(),
+                "nodes": health.node_summary,
+            })).into_response()
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-/// GET /api/v1/clusters/{id}/kubeconfig — return kubeconfig reference (fetch from cave-vault)
-async fn get_kubeconfig(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<KubeconfigRef>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    let cluster = store.clusters.get(&id).ok_or(StatusCode::NOT_FOUND)?;
-    cluster
-        .kubeconfig_ref
-        .clone()
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+async fn get_kubeconfig(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.cluster.store.get(&name) {
+        Ok(cluster) => {
+            let token = crate::kubeconfig::generate_token(&cluster, "cave-admin", "kube-system");
+            match generate(&cluster, CredentialType::ServiceAccountToken(token)) {
+                Ok(kc) => match to_yaml(&kc) {
+                    Ok(yaml) => (
+                        StatusCode::OK,
+                        [("content-type", "application/yaml")],
+                        yaml,
+                    ).into_response(),
+                    Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                },
+                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+            }
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-// ── Node Pools ────────────────────────────────────────────────────────────────
+// ── Node pools ─────────────────────────────���─────────────────────────────���────
 
-/// GET /api/v1/clusters/{id}/nodepools
-async fn list_node_pools(
-    State(state): State<Arc<ClusterState>>,
-    Path(cluster_id): Path<Uuid>,
-) -> Json<Vec<NodePool>> {
-    let store = state.store.lock().unwrap();
-    let pools: Vec<NodePool> = store
-        .node_pools
-        .values()
-        .filter(|p| p.cluster_id == cluster_id)
-        .cloned()
-        .collect();
-    Json(pools)
+async fn list_node_pools(State(s): State<AppState>, Path(name): Path<String>) -> Json<Vec<serde_json::Value>> {
+    Json(s.node_pools.list(&name).into_iter().map(|p| json!({
+        "name": p.name, "node_count": p.node_count,
+        "vm_size": p.vm_size, "status": format!("{:?}", p.status),
+    })).collect())
 }
 
-/// POST /api/v1/clusters/{id}/nodepools
 async fn create_node_pool(
-    State(state): State<Arc<ClusterState>>,
-    Path(cluster_id): Path<Uuid>,
+    State(s): State<AppState>,
+    Path(name): Path<String>,
     Json(req): Json<CreateNodePoolRequest>,
-) -> (StatusCode, Json<NodePool>) {
-    let pool = NodePool {
-        id: Uuid::new_v4(),
-        cluster_id,
-        name: req.name,
-        instance_type: req.instance_type,
-        min_nodes: req.min_nodes,
-        max_nodes: req.max_nodes,
-        current_nodes: req.min_nodes,
-        labels: req.labels,
-        taints: req.taints,
-        autoscaling_enabled: req.autoscaling_enabled,
-    };
-    let mut store = state.store.lock().unwrap();
-    store.node_pools.insert(pool.id, pool.clone());
-    (StatusCode::CREATED, Json(pool))
+) -> impl IntoResponse {
+    match s.node_pools.create(&name, req) {
+        Ok(p) => (StatusCode::CREATED, Json(json!({"name": p.name, "node_count": p.node_count}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
-/// GET /api/v1/clusters/{id}/nodepools/{pool_id}
 async fn get_node_pool(
-    State(state): State<Arc<ClusterState>>,
-    Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<NodePool>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    store
-        .node_pools
-        .get(&pool_id)
-        .cloned()
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+    State(s): State<AppState>,
+    Path((cluster, pool)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.node_pools.get(&cluster, &pool) {
+        Ok(p) => Json(json!({"name": p.name, "node_count": p.node_count, "vm_size": p.vm_size})).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-/// PUT /api/v1/clusters/{id}/nodepools/{pool_id} — scale a node pool
-async fn scale_node_pool(
-    State(state): State<Arc<ClusterState>>,
-    Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
-    Json(req): Json<ScaleNodePoolRequest>,
-) -> Result<Json<NodePool>, StatusCode> {
-    let mut store = state.store.lock().unwrap();
-    let pool = store
-        .node_pools
-        .get(&pool_id)
-        .cloned()
-        .ok_or(StatusCode::NOT_FOUND)?;
-    let scaled = provisioner::scale_node_pool(&pool, &req);
-    store.node_pools.insert(pool_id, scaled.clone());
-    Ok(Json(scaled))
-}
-
-/// DELETE /api/v1/clusters/{id}/nodepools/{pool_id}
 async fn delete_node_pool(
-    State(state): State<Arc<ClusterState>>,
-    Path((_cluster_id, pool_id)): Path<(Uuid, Uuid)>,
-) -> StatusCode {
-    let mut store = state.store.lock().unwrap();
-    if store.node_pools.remove(&pool_id).is_some() {
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::NOT_FOUND
+    State(s): State<AppState>,
+    Path((cluster, pool)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.node_pools.delete(&cluster, &pool) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct ScaleRequest {
+    node_count: i32,
+}
+
+async fn scale_node_pool(
+    State(s): State<AppState>,
+    Path((cluster, pool)): Path<(String, String)>,
+    Json(req): Json<ScaleRequest>,
+) -> impl IntoResponse {
+    match s.node_pools.scale(&cluster, &pool, req.node_count) {
+        Ok(p) => Json(json!({"name": p.name, "node_count": p.node_count})).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
     }
 }
 
 // ── Add-ons ───────────────────────────────────────────────────────────────────
 
-/// GET /api/v1/clusters/{id}/addons
-async fn list_cluster_addons(
-    State(state): State<Arc<ClusterState>>,
-    Path(cluster_id): Path<Uuid>,
-) -> Json<Vec<ClusterAddon>> {
-    let store = state.store.lock().unwrap();
-    let addons = store
-        .addons
-        .get(&cluster_id)
-        .cloned()
-        .unwrap_or_default();
-    Json(addons)
+async fn list_addons(State(s): State<AppState>, Path(name): Path<String>) -> Json<Vec<serde_json::Value>> {
+    Json(s.addons.list(&name).into_iter().map(|a| json!({
+        "name": a.name, "version": a.current_version,
+        "status": format!("{:?}", a.status), "namespace": a.namespace,
+    })).collect())
 }
 
-/// POST /api/v1/clusters/{id}/addons — install an add-on
+#[derive(Deserialize)]
+struct InstallAddonRequest {
+    name: String,
+    version: Option<String>,
+    config: Option<HashMap<String, String>>,
+}
+
 async fn install_addon(
-    State(state): State<Arc<ClusterState>>,
-    Path(cluster_id): Path<Uuid>,
+    State(s): State<AppState>,
+    Path(cluster): Path<String>,
     Json(req): Json<InstallAddonRequest>,
-) -> Result<(StatusCode, Json<ClusterAddon>), StatusCode> {
-    // Verify cluster exists
-    {
-        let store = state.store.lock().unwrap();
-        if !store.clusters.contains_key(&cluster_id) {
-            return Err(StatusCode::NOT_FOUND);
-        }
+) -> impl IntoResponse {
+    match s.addons.install(&cluster, &req.name, req.version, req.config.unwrap_or_default()) {
+        Ok(a) => (StatusCode::CREATED, Json(json!({"name": a.name, "version": a.current_version}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
     }
-
-    let addon = provisioner::install_addons(cluster_id, &req);
-    let mut store = state.store.lock().unwrap();
-    store
-        .addons
-        .entry(cluster_id)
-        .or_default()
-        .push(addon.clone());
-    store.events.push(crate::models::ClusterEvent {
-        id: Uuid::new_v4(),
-        cluster_id,
-        event_type: ClusterEventType::AddonInstalled,
-        message: format!("Add-on {:?} v{} installation started", addon.addon_type, addon.version),
-        occurred_at: chrono::Utc::now(),
-    });
-    Ok((StatusCode::CREATED, Json(addon)))
 }
 
-// ── Tenants ───────────────────────────────────────────────────────────────────
-
-/// GET /api/v1/tenants
-async fn list_tenants(State(state): State<Arc<ClusterState>>) -> Json<Vec<Tenant>> {
-    let store = state.store.lock().unwrap();
-    Json(store.tenants.values().cloned().collect())
+async fn get_addon(
+    State(s): State<AppState>,
+    Path((cluster, addon)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.addons.get(&cluster, &addon) {
+        Ok(a) => Json(json!({"name": a.name, "version": a.current_version, "status": format!("{:?}", a.status)})).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-/// POST /api/v1/tenants
+async fn uninstall_addon(
+    State(s): State<AppState>,
+    Path((cluster, addon)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.addons.uninstall(&cluster, &addon) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn available_addons() -> Json<Vec<serde_json::Value>> {
+    Json(AddonManager::list_available().into_iter().map(|a| json!({
+        "name": a.name, "description": a.description, "latest_version": a.latest_version,
+    })).collect())
+}
+
+// ── etcd backup/restore ───────────────────────────────────────────────────────
+
+async fn list_backups(State(s): State<AppState>, Path(name): Path<String>) -> Json<Vec<serde_json::Value>> {
+    Json(s.etcd_store.list_backups(&name).into_iter().map(|b| json!({
+        "id": b.id, "status": format!("{:?}", b.status),
+        "size_bytes": b.size_bytes, "created_at": b.created_at,
+    })).collect())
+}
+
+async fn create_backup(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.cluster.store.get(&name) {
+        Ok(cluster) => {
+            match s.etcd_store.create_backup(&name, &cluster.spec.kubernetes_version) {
+                Ok(b) => (StatusCode::CREATED, Json(json!({"id": b.id, "status": format!("{:?}", b.status)}))).into_response(),
+                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+            }
+        }
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn restore_backup(
+    State(s): State<AppState>,
+    Path((name, id)): Path<(String, Uuid)>,
+) -> impl IntoResponse {
+    match s.etcd_store.restore_from_backup(&name, id) {
+        Ok(r) => Json(json!({"id": r.id, "status": format!("{:?}", r.status)})).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+// ── Tenants ───────────────────���─────────────────────────────��─────────────────
+
+async fn list_tenants(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.tenants.list().into_iter().map(|t| json!({
+        "id": t.id, "name": t.name, "namespace": t.namespace, "clusters": t.clusters,
+    })).collect())
+}
+
+#[derive(Deserialize)]
+struct CreateTenantRequest {
+    id: String,
+    name: String,
+}
+
 async fn create_tenant(
-    State(state): State<Arc<ClusterState>>,
+    State(s): State<AppState>,
     Json(req): Json<CreateTenantRequest>,
-) -> (StatusCode, Json<Tenant>) {
-    let t = tenant_mod::create_tenant(&req);
-    let mut store = state.store.lock().unwrap();
-    store.tenants.insert(t.id, t.clone());
-    (StatusCode::CREATED, Json(t))
-}
-
-/// GET /api/v1/tenants/{id}
-async fn get_tenant(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Tenant>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    store
-        .tenants
-        .get(&id)
-        .cloned()
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
-}
-
-/// DELETE /api/v1/tenants/{id}
-async fn delete_tenant(
-    State(state): State<Arc<ClusterState>>,
-    Path(id): Path<Uuid>,
-) -> StatusCode {
-    let mut store = state.store.lock().unwrap();
-    // TODO: reject if tenant still has active clusters
-    if store.tenants.remove(&id).is_some() {
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::NOT_FOUND
+) -> impl IntoResponse {
+    match s.tenants.create(req.id, req.name) {
+        Ok(t) => (StatusCode::CREATED, Json(json!({"id": t.id, "namespace": t.namespace}))).into_response(),
+        Err(e) => (StatusCode::CONFLICT, Json(json!({"error": e.to_string()}))).into_response(),
     }
 }
 
-/// GET /api/v1/tenants/{id}/clusters — all clusters owned by a tenant
-async fn list_tenant_clusters(
-    State(state): State<Arc<ClusterState>>,
-    Path(tenant_id): Path<Uuid>,
-) -> Result<Json<Vec<Cluster>>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    if !store.tenants.contains_key(&tenant_id) {
-        return Err(StatusCode::NOT_FOUND);
+async fn get_tenant(State(s): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
+    match s.tenants.get(&id) {
+        Ok(t) => Json(json!({"id": t.id, "name": t.name, "namespace": t.namespace})).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
-    let clusters: Vec<Cluster> = store
-        .clusters
-        .values()
-        .filter(|c| c.tenant_id == tenant_id)
-        .cloned()
-        .collect();
-    Ok(Json(clusters))
 }
 
-/// GET /api/v1/tenants/{id}/quota — quota usage snapshot
-async fn get_tenant_quota(
-    State(state): State<Arc<ClusterState>>,
-    Path(tenant_id): Path<Uuid>,
-) -> Result<Json<QuotaUsage>, StatusCode> {
-    let store = state.store.lock().unwrap();
-    let tenant = store.tenants.get(&tenant_id).ok_or(StatusCode::NOT_FOUND)?;
-    let clusters: Vec<Cluster> = store
-        .clusters
-        .values()
-        .filter(|c| c.tenant_id == tenant_id)
-        .cloned()
-        .collect();
-    let pools: Vec<NodePool> = store
-        .node_pools
-        .values()
-        .filter(|p| clusters.iter().any(|c| c.id == p.cluster_id))
-        .cloned()
-        .collect();
-    let usage = tenant_mod::calculate_quota_usage(tenant, &clusters, &pools);
-    Ok(Json(usage))
+async fn delete_tenant(State(s): State<AppState>, Path(id): Path<String>) -> impl IntoResponse {
+    match s.tenants.delete(&id) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-// ── Templates ─────────────────────────────────────────────────────────────────
-
-/// GET /api/v1/clusters/templates — predefined cluster shapes
-async fn list_templates() -> Json<Vec<ClusterTemplate>> {
-    Json(builtin_templates())
+async fn attach_tenant(
+    State(s): State<AppState>,
+    Path((tenant_id, cluster_name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.tenants.attach_to_cluster(&tenant_id, &cluster_name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-fn builtin_templates() -> Vec<ClusterTemplate> {
-    vec![
-        ClusterTemplate {
-            id: Uuid::new_v4(),
-            name: "small-dev".into(),
-            tier: TemplateTier::Dev,
-            description: "Single-node control plane, 1–3 workers. Ideal for dev/test.".into(),
-            default_version: "1.31.0".into(),
-            node_pools: vec![NodePoolTemplate {
-                name: "workers".into(),
-                instance_type: "cx21".into(),
-                min_nodes: 1,
-                max_nodes: 3,
-                autoscaling_enabled: true,
-            }],
-            default_addons: vec![ClusterAddonType::CertManager, ClusterAddonType::IngressNginx],
-        },
-        ClusterTemplate {
-            id: Uuid::new_v4(),
-            name: "medium-staging".into(),
-            tier: TemplateTier::Staging,
-            description: "HA control plane (3 nodes), 3–10 workers. Mirrors production.".into(),
-            default_version: "1.31.0".into(),
-            node_pools: vec![NodePoolTemplate {
-                name: "workers".into(),
-                instance_type: "cx31".into(),
-                min_nodes: 3,
-                max_nodes: 10,
-                autoscaling_enabled: true,
-            }],
-            default_addons: vec![
-                ClusterAddonType::CertManager,
-                ClusterAddonType::IngressNginx,
-                ClusterAddonType::MonitoringStack,
-                ClusterAddonType::CaveEbpfAgent,
-            ],
-        },
-        ClusterTemplate {
-            id: Uuid::new_v4(),
-            name: "large-production".into(),
-            tier: TemplateTier::Production,
-            description: "HA control plane (3 nodes), 5–50 workers, full observability.".into(),
-            default_version: "1.31.0".into(),
-            node_pools: vec![
-                NodePoolTemplate {
-                    name: "system".into(),
-                    instance_type: "cx41".into(),
-                    min_nodes: 3,
-                    max_nodes: 5,
-                    autoscaling_enabled: false,
-                },
-                NodePoolTemplate {
-                    name: "workload".into(),
-                    instance_type: "cx51".into(),
-                    min_nodes: 2,
-                    max_nodes: 45,
-                    autoscaling_enabled: true,
-                },
-            ],
-            default_addons: vec![
-                ClusterAddonType::CertManager,
-                ClusterAddonType::IngressNginx,
-                ClusterAddonType::MonitoringStack,
-                ClusterAddonType::CaveEbpfAgent,
-            ],
-        },
-    ]
+async fn detach_tenant(
+    State(s): State<AppState>,
+    Path((tenant_id, cluster_name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match s.tenants.detach_from_cluster(&tenant_id, &cluster_name) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
-// ── Module Health ─────────────────────────────────────────────────────────────
-
-/// GET /api/cluster/health
-async fn module_health() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
-        "module": "cave-cluster",
-        "status": "ok",
-        "replaces": ["rancher", "gardener", "cluster-api"],
-        "upstream_tracked_versions": {
-            "rancher": "2.x",
-            "gardener": "1.x",
-            "cluster-api": "1.x"
-        }
-    }))
+async fn list_versions() -> Json<Vec<serde_json::Value>> {
+    Json(crate::version::supported_versions().into_iter().map(|v| json!({
+        "version": v.version, "supported": v.is_supported,
+        "latest": v.is_latest, "eol": v.end_of_life,
+    })).collect())
 }

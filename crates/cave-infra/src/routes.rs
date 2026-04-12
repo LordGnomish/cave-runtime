@@ -1,333 +1,311 @@
 //! HTTP routes for cave-infra.
 
-use crate::executor;
-use crate::intent;
-use crate::models::{ExecutionPlan, McpProvider};
-use crate::planner;
-use crate::state::StateSnapshot;
-use crate::InfraModuleState;
+use crate::mcp::{JsonRpcRequest, McpServer};
+use crate::nlp::parse_intent;
+use crate::plan::generate_plan;
+use crate::provider::ProviderRegistry;
+use crate::resource::{ResourceKind, ResourceSpec, ResourceState};
+use crate::templates::TemplateRegistry;
+use crate::InfraState;
 use axum::{
-    extract::State,
-    routing::{get, post},
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde_json::json;
+use std::collections::HashMap;
 use std::sync::Arc;
-use uuid::Uuid;
 
-pub fn create_router(state: Arc<InfraModuleState>) -> Router {
-    Router::new()
-        .route("/api/v1/infra/intent", post(submit_intent))
-        .route("/api/v1/infra/plan", post(generate_plan))
-        .route("/api/v1/infra/apply", post(apply_plan))
-        .route("/api/v1/infra/destroy", post(destroy_resources))
-        .route("/api/v1/infra/state", get(get_state))
-        .route("/api/v1/infra/drift", get(detect_drift))
-        .route(
-            "/api/v1/infra/providers",
-            get(list_providers).post(register_provider),
-        )
-        .route("/api/v1/infra/history", get(state_history))
-        .route("/api/v1/infra/import", post(import_resource))
-        .route("/api/v1/infra/cost", post(estimate_cost))
-        .route("/api/v1/infra/health", get(health))
-        .with_state(state)
+type AppState = Arc<InnerState>;
+
+struct InnerState {
+    infra: Arc<crate::InfraState>,
+    registry: Arc<ProviderRegistry>,
+    templates: Arc<TemplateRegistry>,
+    mcp: Arc<McpServer>,
 }
 
-// ── Request / Response DTOs ──────────────────────────────────────────────────
+pub fn create_router(state: Arc<InfraState>) -> Router {
+    let registry = Arc::new(ProviderRegistry::new());
+    let templates = Arc::new(TemplateRegistry::new());
+    let mcp = Arc::new(McpServer::new(
+        Arc::clone(&state.store),
+        Arc::clone(&registry),
+    ));
+    let inner = Arc::new(InnerState {
+        infra: state,
+        registry,
+        templates,
+        mcp,
+    });
 
-#[derive(Deserialize)]
-struct IntentRequest {
-    description: String,
-    yaml: Option<String>,
+    Router::new()
+        .route("/api/infra/health", get(health))
+        // Resources
+        .route("/api/infra/resources", get(list_resources))
+        .route("/api/infra/resources/{kind}/{name}", get(get_resource).delete(delete_resource))
+        // Plan + Apply
+        .route("/api/infra/plan", post(plan_resources))
+        .route("/api/infra/apply", post(apply_resources))
+        // Drift
+        .route("/api/infra/drift", get(drift_report))
+        .route("/api/infra/resources/{kind}/{name}/reconcile", post(reconcile_resource))
+        // Rollback
+        .route("/api/infra/resources/{kind}/{name}/rollback", post(rollback_resource))
+        .route("/api/infra/resources/{kind}/{name}/history", get(resource_history))
+        // Templates
+        .route("/api/infra/templates", get(list_templates))
+        .route("/api/infra/templates/{name}", get(get_template))
+        .route("/api/infra/templates/{name}/render", post(render_template))
+        // Providers
+        .route("/api/infra/providers", get(list_providers))
+        // NLP
+        .route("/api/infra/natural", post(natural_language))
+        // MCP protocol endpoint
+        .route("/mcp", post(mcp_endpoint))
+        .with_state(inner)
+}
+
+async fn health() -> Json<serde_json::Value> {
+    Json(json!({"module": "cave-infra", "status": "ok", "upstream": "terraform"}))
+}
+
+async fn list_resources(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.infra.store.list().into_iter().map(|r| json!({
+        "key": r.key(),
+        "kind": r.spec.kind.as_str(),
+        "name": r.spec.name,
+        "provider": r.spec.provider,
+        "status": format!("{:?}", r.status),
+        "provider_id": r.provider_id,
+    })).collect())
+}
+
+async fn get_resource(
+    State(s): State<AppState>,
+    Path((kind, name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let key = format!("{kind}/{name}");
+    match s.infra.store.get(&key) {
+        Ok(r) => Json(json!({
+            "key": r.key(),
+            "spec": r.spec.properties,
+            "status": format!("{:?}", r.status),
+            "outputs": r.outputs,
+            "provider_id": r.provider_id,
+            "version": r.version,
+        })).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn delete_resource(
+    State(s): State<AppState>,
+    Path((kind, name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let key = format!("{kind}/{name}");
+    match s.infra.store.delete(&key) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[derive(Deserialize)]
 struct PlanRequest {
-    description: String,
-    yaml: Option<String>,
+    resources: Vec<ResourceSpecDto>,
 }
 
 #[derive(Deserialize)]
-struct ApplyRequest {
-    plan_id: Uuid,
-}
-
-#[derive(Deserialize)]
-struct DestroyRequest {
-    resource_names: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct RegisterProviderRequest {
-    name: String,
-    endpoint: String,
-}
-
-#[derive(Deserialize)]
-struct ImportRequest {
+struct ResourceSpecDto {
+    kind: String,
     name: String,
     provider: String,
-    resource_type: String,
-    actual_id: String,
+    #[serde(default)]
+    properties: HashMap<String, serde_json::Value>,
+    #[serde(default)]
+    depends_on: Vec<String>,
+}
+
+impl From<ResourceSpecDto> for ResourceSpec {
+    fn from(d: ResourceSpecDto) -> Self {
+        ResourceSpec {
+            kind: ResourceKind::from_str(&d.kind),
+            name: d.name,
+            provider: d.provider,
+            properties: d.properties,
+            depends_on: d.depends_on,
+            tags: HashMap::new(),
+        }
+    }
+}
+
+async fn plan_resources(
+    State(s): State<AppState>,
+    Json(req): Json<PlanRequest>,
+) -> impl IntoResponse {
+    let specs: Vec<ResourceSpec> = req.resources.into_iter().map(Into::into).collect();
+    match generate_plan(&specs, &s.infra.store) {
+        Ok(plan) => Json(json!({
+            "plan_id": plan.id,
+            "has_changes": plan.has_changes(),
+            "summary": plan.summary,
+            "changes": plan.changes,
+        })).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn apply_resources(
+    State(s): State<AppState>,
+    Json(req): Json<PlanRequest>,
+) -> impl IntoResponse {
+    let specs: Vec<ResourceSpec> = req.resources.into_iter().map(Into::into).collect();
+
+    // Validate and order
+    let ordered = match crate::graph::apply_order(&specs) {
+        Ok(o) => o,
+        Err(e) => return (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    };
+
+    let mut applied = Vec::new();
+    for spec in ordered {
+        let result = s.registry.create(&spec.provider, spec).await;
+        match result {
+            Ok(prov_result) => {
+                let mut state = ResourceState::new(spec.clone());
+                state.apply_actual(prov_result.actual, Some(prov_result.provider_id));
+                let key = s.infra.store.upsert(state);
+                applied.push(key);
+            }
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
+                    "error": e.to_string(),
+                    "applied_so_far": applied,
+                }))).into_response();
+            }
+        }
+    }
+
+    Json(json!({"applied": applied})).into_response()
+}
+
+async fn drift_report(State(s): State<AppState>) -> Json<serde_json::Value> {
+    let report = crate::drift::detect_drift(&s.infra.store, &s.registry).await;
+    Json(json!({
+        "checked_at": report.checked_at,
+        "total": report.total_resources,
+        "drifted": report.drifted.len(),
+        "healthy": report.healthy,
+        "resources": report.drifted,
+    }))
+}
+
+async fn reconcile_resource(
+    State(s): State<AppState>,
+    Path((kind, name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let key = format!("{kind}/{name}");
+    match crate::drift::reconcile(&s.infra.store, &s.registry, &key).await {
+        Ok(r) => Json(json!({"key": r.key(), "status": format!("{:?}", r.status)})).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn rollback_resource(
+    State(s): State<AppState>,
+    Path((kind, name)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let key = format!("{kind}/{name}");
+    match crate::rollback::rollback_resource(&s.infra.store, &s.registry, &key).await {
+        Ok(record) => Json(json!({
+            "success": record.success,
+            "from_version": record.from_version,
+            "to_version": record.to_version,
+        })).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn resource_history(
+    State(s): State<AppState>,
+    Path((kind, name)): Path<(String, String)>,
+) -> Json<Vec<serde_json::Value>> {
+    let key = format!("{kind}/{name}");
+    Json(s.infra.store.history(&key).into_iter().map(|r| json!({
+        "version": r.version,
+        "status": format!("{:?}", r.status),
+        "updated_at": r.updated_at,
+    })).collect())
+}
+
+async fn list_templates(State(s): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.templates.list().into_iter().map(|t| json!({
+        "name": t.name,
+        "description": t.description,
+        "version": t.version,
+        "params": t.params.iter().map(|p| json!({"name": p.name, "required": p.required})).collect::<Vec<_>>(),
+    })).collect())
+}
+
+async fn get_template(State(s): State<AppState>, Path(name): Path<String>) -> impl IntoResponse {
+    match s.templates.get(&name) {
+        Ok(t) => Json(json!({"name": t.name, "description": t.description, "params": t.params})).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn render_template(
+    State(s): State<AppState>,
+    Path(name): Path<String>,
+    Json(params): Json<HashMap<String, serde_json::Value>>,
+) -> impl IntoResponse {
+    match s.templates.render(&name, &params) {
+        Ok(specs) => Json(json!({
+            "template": name,
+            "resources": specs.iter().map(|s| json!({
+                "kind": s.kind.as_str(),
+                "name": s.name,
+                "provider": s.provider,
+                "depends_on": s.depends_on,
+            })).collect::<Vec<_>>(),
+        })).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn list_providers(State(s): State<AppState>) -> Json<Vec<String>> {
+    Json(s.registry.list_names())
 }
 
 #[derive(Deserialize)]
-struct CostRequest {
-    description: String,
-    yaml: Option<String>,
+struct NaturalRequest {
+    text: String,
 }
 
-#[derive(Serialize)]
-struct PlanSummary {
-    id: Uuid,
-    intent_id: Uuid,
-    steps: usize,
-    risk_score: u8,
-    monthly_usd: f64,
-    explanation: String,
-    status: String,
-}
-
-impl From<&ExecutionPlan> for PlanSummary {
-    fn from(p: &ExecutionPlan) -> Self {
-        PlanSummary {
-            id: p.id,
-            intent_id: p.intent_id,
-            steps: p.steps.len(),
-            risk_score: p.risk_score,
-            monthly_usd: p.cost_estimate.monthly_usd,
-            explanation: p.explanation.clone(),
-            status: format!("{:?}", p.status),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct ProviderSummary {
-    id: Uuid,
-    name: String,
-    endpoint: String,
-    healthy: bool,
-    tool_count: usize,
-}
-
-impl From<&McpProvider> for ProviderSummary {
-    fn from(p: &McpProvider) -> Self {
-        ProviderSummary {
-            id: p.id,
-            name: p.name.clone(),
-            endpoint: p.endpoint.clone(),
-            healthy: p.healthy,
-            tool_count: p.capabilities.len(),
-        }
-    }
-}
-
-// ── Handlers ─────────────────────────────────────────────────────────────────
-
-/// Submit an infrastructure intent (natural language or YAML).
-async fn submit_intent(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<IntentRequest>,
+async fn natural_language(
+    State(_s): State<AppState>,
+    Json(req): Json<NaturalRequest>,
 ) -> Json<serde_json::Value> {
-    match intent::parse_intent(&req.description, req.yaml.as_deref()) {
-        Ok(infra_intent) => {
-            let id = infra_intent.id;
-            let constraints = infra_intent.constraints.clone();
-            let resource_count = infra_intent.resources.len();
-            state.intents.lock().await.push(infra_intent);
-            Json(serde_json::json!({
-                "intent_id": id,
-                "resources_inferred": resource_count,
-                "constraints": constraints,
-            }))
-        }
-        Err(e) => Json(serde_json::json!({"error": e.to_string()})),
-    }
-}
-
-/// Generate an execution plan from an intent.
-async fn generate_plan(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<PlanRequest>,
-) -> Json<serde_json::Value> {
-    let infra_intent = match intent::parse_intent(&req.description, req.yaml.as_deref()) {
-        Ok(i) => i,
-        Err(e) => return Json(serde_json::json!({"error": e.to_string()})),
-    };
-
-    let registry = state.registry.lock().await;
-    let store = state.store.lock().await;
-
-    let plan = planner::generate_plan(&infra_intent, &store.state, &registry.providers);
-    let summary = PlanSummary::from(&plan);
-    drop(registry);
-    drop(store);
-
-    state.plans.lock().await.push(plan);
-    Json(serde_json::json!(summary))
-}
-
-/// Apply an existing plan — execute it via MCP.
-async fn apply_plan(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<ApplyRequest>,
-) -> Json<serde_json::Value> {
-    // Clone the plan so we can release the plans lock before acquiring other locks.
-    let plan_clone = {
-        let plans = state.plans.lock().await;
-        plans.iter().find(|p| p.id == req.plan_id).cloned()
-    };
-
-    let Some(mut plan) = plan_clone else {
-        return Json(serde_json::json!({"error": "plan not found"}));
-    };
-
-    let registry = state.registry.lock().await;
-    let mut store = state.store.lock().await;
-    let result = executor::execute_plan(&mut plan, &*registry, &mut *store).await;
-    drop(registry);
-    drop(store);
-
-    // Persist updated plan status.
-    let mut plans = state.plans.lock().await;
-    if let Some(p) = plans.iter_mut().find(|p| p.id == req.plan_id) {
-        p.status = plan.status;
-    }
-
-    Json(serde_json::json!({
-        "plan_id": result.plan_id,
-        "succeeded": result.succeeded,
-        "steps_completed": result.steps_completed,
-        "steps_failed": result.steps_failed,
-        "error": result.error,
+    let intent = parse_intent(&req.text);
+    Json(json!({
+        "action": format!("{:?}", intent.action),
+        "confidence": intent.confidence,
+        "resources": intent.resource_specs.iter().map(|s| json!({
+            "kind": s.kind.as_str(),
+            "name": s.name,
+            "provider": s.provider,
+            "properties": s.properties,
+        })).collect::<Vec<_>>(),
     }))
 }
 
-/// Destroy named resources — generates a delete plan and immediately applies it.
-async fn destroy_resources(
-    State(_state): State<Arc<InfraModuleState>>,
-    Json(req): Json<DestroyRequest>,
+async fn mcp_endpoint(
+    State(s): State<AppState>,
+    Json(req): Json<JsonRpcRequest>,
 ) -> Json<serde_json::Value> {
-    let description = format!(
-        "destroy resources: {}",
-        req.resource_names.join(", ")
-    );
-    Json(serde_json::json!({
-        "message": "destroy plan queued",
-        "description": description,
-        "resource_count": req.resource_names.len(),
-        "note": "submit to /apply with the returned plan_id to execute",
-    }))
-}
-
-/// Get the current infrastructure state.
-async fn get_state(State(state): State<Arc<InfraModuleState>>) -> Json<serde_json::Value> {
-    let store = state.store.lock().await;
-    let s = &store.state;
-    Json(serde_json::json!({
-        "version": s.version,
-        "resource_count": s.resources.len(),
-        "last_applied": s.last_applied,
-        "locked_by": s.locked_by,
-        "resources": s.resources.values()
-            .map(|r| serde_json::json!({
-                "id": r.id,
-                "name": r.name,
-                "provider": r.provider,
-                "type": r.resource_type,
-                "state": format!("{:?}", r.state),
-            }))
-            .collect::<Vec<_>>(),
-    }))
-}
-
-/// Detect drift between desired and actual cloud state.
-async fn detect_drift(State(state): State<Arc<InfraModuleState>>) -> Json<serde_json::Value> {
-    let store = state.store.lock().await;
-    let report = store.detect_drift().await;
-    Json(serde_json::json!({
-        "id": report.id,
-        "detected_at": report.detected_at,
-        "total_drifted": report.total_drifted,
-        "drifted_resources": report.drifted_resources,
-    }))
-}
-
-/// List all registered MCP providers.
-async fn list_providers(State(state): State<Arc<InfraModuleState>>) -> Json<Vec<ProviderSummary>> {
-    let registry = state.registry.lock().await;
-    Json(registry.providers.iter().map(ProviderSummary::from).collect())
-}
-
-/// Register a new MCP provider (cloud integration server).
-async fn register_provider(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<RegisterProviderRequest>,
-) -> Json<serde_json::Value> {
-    let mut registry = state.registry.lock().await;
-    let provider = registry.register(req.name, req.endpoint);
-    Json(serde_json::json!(ProviderSummary::from(&provider)))
-}
-
-/// State change history (lightweight version list).
-async fn state_history(State(state): State<Arc<InfraModuleState>>) -> Json<Vec<StateSnapshot>> {
-    let store = state.store.lock().await;
-    Json(store.state_history().to_vec())
-}
-
-/// Import an existing cloud resource into state.
-async fn import_resource(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<ImportRequest>,
-) -> Json<serde_json::Value> {
-    let mut store = state.store.lock().await;
-    let resource = store.import_resource(
-        req.name,
-        req.provider,
-        req.resource_type,
-        req.actual_id,
-        Default::default(),
-    );
-    Json(serde_json::json!({
-        "id": resource.id,
-        "name": resource.name,
-        "provider": resource.provider,
-        "type": resource.resource_type,
-        "actual_id": resource.actual_id,
-        "state": format!("{:?}", resource.state),
-    }))
-}
-
-/// Estimate cost for an intent without generating a full plan.
-async fn estimate_cost(
-    State(state): State<Arc<InfraModuleState>>,
-    Json(req): Json<CostRequest>,
-) -> Json<serde_json::Value> {
-    let infra_intent = match intent::parse_intent(&req.description, req.yaml.as_deref()) {
-        Ok(i) => i,
-        Err(e) => return Json(serde_json::json!({"error": e.to_string()})),
-    };
-
-    let registry = state.registry.lock().await;
-    let store = state.store.lock().await;
-    let plan = planner::generate_plan(&infra_intent, &store.state, &registry.providers);
-    let cost = planner::estimate_cost(&plan);
-
-    Json(serde_json::json!({
-        "monthly_usd": cost.monthly_usd,
-        "hourly_usd": cost.hourly_usd,
-        "currency": cost.currency,
-        "breakdown": cost.breakdown,
-    }))
-}
-
-async fn health() -> Json<serde_json::Value> {
-    Json(serde_json::json!({
-        "module": "cave-infra",
-        "status": "ok",
-        "upstream": "Terraform + Crossplane",
-        "approach": "LLM+MCP-native IaC",
-    }))
+    let resp = s.mcp.handle(req).await;
+    Json(serde_json::to_value(resp).unwrap_or(json!({"error": "serialization failed"})))
 }

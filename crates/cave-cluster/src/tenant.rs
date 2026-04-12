@@ -1,101 +1,320 @@
-//! Tenant management: registration, quota enforcement, and network isolation.
-//!
-//! Tenants are the top-level billing and isolation boundary. Each tenant gets
-//! their own clusters; cross-tenant network traffic is blocked via CNI
-//! NetworkPolicies deployed by `isolate_tenant`.
+//! Multi-tenancy: namespace per tenant, resource quotas, limit ranges.
 
-use crate::models::*;
-use chrono::Utc;
-use tracing::{info, warn};
-use uuid::Uuid;
+use crate::error::{ClusterError, ClusterResult};
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-/// Register a new tenant with the given quota and billing info.
-pub fn create_tenant(req: &CreateTenantRequest) -> Tenant {
-    info!(name = %req.name, "Creating tenant");
-    Tenant {
-        id: Uuid::new_v4(),
-        name: req.name.clone(),
-        quota: req.quota.clone(),
-        billing_info: req.billing_info.clone(),
-        created_at: Utc::now(),
+// ── Resource quota ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceQuota {
+    /// CPU limit (e.g. "10", "10000m")
+    pub cpu_limit: String,
+    /// Memory limit (e.g. "20Gi", "40960Mi")
+    pub memory_limit: String,
+    /// CPU request
+    pub cpu_request: String,
+    /// Memory request
+    pub memory_request: String,
+    /// Max pods
+    pub max_pods: Option<i32>,
+    /// Max PVCs
+    pub max_pvcs: Option<i32>,
+    /// Max services
+    pub max_services: Option<i32>,
+    /// Max configmaps
+    pub max_configmaps: Option<i32>,
+}
+
+impl Default for ResourceQuota {
+    fn default() -> Self {
+        Self {
+            cpu_limit: "10".into(),
+            memory_limit: "20Gi".into(),
+            cpu_request: "4".into(),
+            memory_request: "8Gi".into(),
+            max_pods: Some(100),
+            max_pvcs: Some(20),
+            max_services: Some(20),
+            max_configmaps: Some(50),
+        }
     }
 }
 
-/// Calculate a tenant's current quota usage from their live clusters.
-pub fn calculate_quota_usage(
-    tenant: &Tenant,
-    clusters: &[Cluster],
-    node_pools: &[NodePool],
-) -> QuotaUsage {
-    let clusters_used = clusters.len() as u32;
-    let nodes_used: u32 = node_pools.iter().map(|p| p.current_nodes).sum();
+// ── Limit range ───────────────────────────────────────────────────────────────
 
-    // TODO: look up actual CPU/memory per instance type from cave-infra
-    let cpu_used: u32 = nodes_used * 4; // placeholder: assume 4 vCPU per node
-    let memory_used_gib: u64 = nodes_used as u64 * 8; // placeholder: 8 GiB per node
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LimitRange {
+    /// Default CPU limit per container
+    pub default_cpu_limit: String,
+    /// Default memory limit per container
+    pub default_memory_limit: String,
+    /// Default CPU request per container
+    pub default_cpu_request: String,
+    /// Default memory request per container
+    pub default_memory_request: String,
+    /// Max CPU per container
+    pub max_cpu: String,
+    /// Max memory per container
+    pub max_memory: String,
+}
 
-    QuotaUsage {
-        clusters_used,
-        clusters_limit: tenant.quota.max_clusters,
-        nodes_used,
-        nodes_limit: tenant.quota.max_nodes,
-        cpu_used,
-        cpu_limit: tenant.quota.max_cpu,
-        memory_used_gib,
-        memory_limit_gib: tenant.quota.max_memory_gib,
+impl Default for LimitRange {
+    fn default() -> Self {
+        Self {
+            default_cpu_limit: "500m".into(),
+            default_memory_limit: "512Mi".into(),
+            default_cpu_request: "100m".into(),
+            default_memory_request: "128Mi".into(),
+            max_cpu: "4".into(),
+            max_memory: "8Gi".into(),
+        }
     }
 }
 
-/// Return `true` if the tenant can create one more cluster, `false` if at limit.
-pub fn enforce_quota(tenant: &Tenant, quota_usage: &QuotaUsage) -> bool {
-    let allowed = quota_usage.clusters_used < quota_usage.clusters_limit
-        && quota_usage.nodes_used < quota_usage.nodes_limit
-        && quota_usage.cpu_used < quota_usage.cpu_limit
-        && quota_usage.memory_used_gib < quota_usage.memory_limit_gib;
+// ── Tenant ────────────────────────────────────────────────────────────────────
 
-    if !allowed {
-        warn!(
-            tenant_id = %tenant.id,
-            clusters = %quota_usage.clusters_used,
-            limit = %quota_usage.clusters_limit,
-            "Tenant quota exceeded"
-        );
-    }
-
-    allowed
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tenant {
+    pub id: String,
+    pub name: String,
+    /// The K8s namespace for this tenant on each cluster
+    pub namespace: String,
+    pub quota: ResourceQuota,
+    pub limits: LimitRange,
+    pub labels: HashMap<String, String>,
+    pub annotations: HashMap<String, String>,
+    pub clusters: Vec<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// Generate the `NetworkPolicy` that isolates a tenant's clusters.
-///
-/// The returned policy is applied to every new cluster for this tenant.
-/// Cilium `CiliumNetworkPolicy` CRDs (TODO) are preferred over vanilla k8s
-/// NetworkPolicies for cross-node enforcement.
-pub fn isolate_tenant(tenant_id: Uuid) -> NetworkPolicy {
-    info!(tenant_id = %tenant_id, "Building tenant network isolation policy");
+impl Tenant {
+    pub fn new(id: String, name: String) -> Self {
+        let namespace = name
+            .to_lowercase()
+            .replace(' ', "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect();
+        let mut labels = HashMap::new();
+        labels.insert("cave.io/tenant".into(), id.clone());
+        labels.insert("cave.io/managed-by".into(), "cave-cluster".into());
+        Self {
+            id,
+            name,
+            namespace,
+            quota: ResourceQuota::default(),
+            limits: LimitRange::default(),
+            labels,
+            annotations: HashMap::new(),
+            clusters: Vec::new(),
+            created_at: chrono::Utc::now(),
+        }
+    }
 
-    // TODO: allocate a unique pod/service CIDR per tenant from a central IPAM
-    // TODO: generate Cilium policy that denies cross-tenant ingress/egress
-    NetworkPolicy {
-        pod_cidr: "10.244.0.0/16".into(),    // TODO: IPAM-allocated
-        service_cidr: "10.96.0.0/12".into(), // TODO: IPAM-allocated
-        cni_plugin: CniPlugin::Cilium,
-        tenant_isolation: true,
+    /// Generate Kubernetes YAML manifests for this tenant.
+    pub fn to_k8s_manifests(&self) -> Vec<String> {
+        let mut manifests = Vec::new();
+
+        // Namespace
+        let labels_yaml: String = self.labels.iter()
+            .map(|(k, v)| format!("    {k}: {v}"))
+            .collect::<Vec<_>>().join("\n");
+        manifests.push(format!(
+            r#"apiVersion: v1
+kind: Namespace
+metadata:
+  name: {ns}
+  labels:
+{labels}"#,
+            ns = self.namespace,
+            labels = labels_yaml,
+        ));
+
+        // ResourceQuota
+        let mut quota_hard = Vec::new();
+        quota_hard.push(format!("    limits.cpu: {}", self.quota.cpu_limit));
+        quota_hard.push(format!("    limits.memory: {}", self.quota.memory_limit));
+        quota_hard.push(format!("    requests.cpu: {}", self.quota.cpu_request));
+        quota_hard.push(format!("    requests.memory: {}", self.quota.memory_request));
+        if let Some(pods) = self.quota.max_pods {
+            quota_hard.push(format!("    pods: {pods}"));
+        }
+        if let Some(pvcs) = self.quota.max_pvcs {
+            quota_hard.push(format!("    persistentvolumeclaims: {pvcs}"));
+        }
+        manifests.push(format!(
+            r#"apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {tenant}-quota
+  namespace: {ns}
+spec:
+  hard:
+{hard}"#,
+            tenant = self.id,
+            ns = self.namespace,
+            hard = quota_hard.join("\n"),
+        ));
+
+        // LimitRange
+        manifests.push(format!(
+            r#"apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {tenant}-limits
+  namespace: {ns}
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: {cpu_limit}
+      memory: {mem_limit}
+    defaultRequest:
+      cpu: {cpu_req}
+      memory: {mem_req}
+    max:
+      cpu: {max_cpu}
+      memory: {max_mem}"#,
+            tenant = self.id,
+            ns = self.namespace,
+            cpu_limit = self.limits.default_cpu_limit,
+            mem_limit = self.limits.default_memory_limit,
+            cpu_req = self.limits.default_cpu_request,
+            mem_req = self.limits.default_memory_request,
+            max_cpu = self.limits.max_cpu,
+            max_mem = self.limits.max_memory,
+        ));
+
+        manifests
     }
 }
 
-/// Aggregate all clusters for a tenant into a dashboard summary.
-pub fn tenant_dashboard(
-    tenant: &Tenant,
-    clusters: Vec<Cluster>,
-    node_pools: &[NodePool],
-) -> TenantDashboard {
-    let total_nodes: u32 = node_pools.iter().map(|p| p.current_nodes).sum();
-    let quota_usage = calculate_quota_usage(tenant, &clusters, node_pools);
+// ── Tenant store ──────────────────────────────────────────────────────────────
 
-    TenantDashboard {
-        tenant: tenant.clone(),
-        clusters,
-        total_nodes,
-        quota_usage,
+pub struct TenantStore {
+    tenants: DashMap<String, Tenant>,
+}
+
+impl TenantStore {
+    pub fn new() -> Self {
+        Self {
+            tenants: DashMap::new(),
+        }
+    }
+
+    pub fn create(&self, id: String, name: String) -> ClusterResult<Tenant> {
+        if self.tenants.contains_key(&id) {
+            return Err(ClusterError::TenantAlreadyExists(id));
+        }
+        let tenant = Tenant::new(id.clone(), name);
+        let result = tenant.clone();
+        self.tenants.insert(id, tenant);
+        Ok(result)
+    }
+
+    pub fn get(&self, id: &str) -> ClusterResult<Tenant> {
+        self.tenants
+            .get(id)
+            .map(|t| t.clone())
+            .ok_or_else(|| ClusterError::TenantNotFound(id.to_string()))
+    }
+
+    pub fn list(&self) -> Vec<Tenant> {
+        self.tenants.iter().map(|e| e.value().clone()).collect()
+    }
+
+    pub fn delete(&self, id: &str) -> ClusterResult<()> {
+        self.tenants
+            .remove(id)
+            .ok_or_else(|| ClusterError::TenantNotFound(id.to_string()))?;
+        Ok(())
+    }
+
+    pub fn update_quota(&self, id: &str, quota: ResourceQuota) -> ClusterResult<Tenant> {
+        let mut tenant = self
+            .tenants
+            .get_mut(id)
+            .ok_or_else(|| ClusterError::TenantNotFound(id.to_string()))?;
+        tenant.quota = quota;
+        Ok(tenant.clone())
+    }
+
+    pub fn update_limits(&self, id: &str, limits: LimitRange) -> ClusterResult<Tenant> {
+        let mut tenant = self
+            .tenants
+            .get_mut(id)
+            .ok_or_else(|| ClusterError::TenantNotFound(id.to_string()))?;
+        tenant.limits = limits;
+        Ok(tenant.clone())
+    }
+
+    pub fn attach_to_cluster(&self, tenant_id: &str, cluster_name: &str) -> ClusterResult<()> {
+        let mut tenant = self
+            .tenants
+            .get_mut(tenant_id)
+            .ok_or_else(|| ClusterError::TenantNotFound(tenant_id.to_string()))?;
+        if !tenant.clusters.contains(&cluster_name.to_string()) {
+            tenant.clusters.push(cluster_name.to_string());
+        }
+        Ok(())
+    }
+
+    pub fn detach_from_cluster(&self, tenant_id: &str, cluster_name: &str) -> ClusterResult<()> {
+        let mut tenant = self
+            .tenants
+            .get_mut(tenant_id)
+            .ok_or_else(|| ClusterError::TenantNotFound(tenant_id.to_string()))?;
+        tenant.clusters.retain(|c| c != cluster_name);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn store() -> TenantStore {
+        TenantStore::new()
+    }
+
+    #[test]
+    fn create_tenant() {
+        let s = store();
+        let t = s.create("team-a".into(), "Team Alpha".into()).unwrap();
+        assert_eq!(t.namespace, "team-alpha");
+        assert!(t.labels.contains_key("cave.io/tenant"));
+    }
+
+    #[test]
+    fn duplicate_tenant_fails() {
+        let s = store();
+        s.create("t1".into(), "Team One".into()).unwrap();
+        assert!(matches!(
+            s.create("t1".into(), "Team One Dup".into()),
+            Err(ClusterError::TenantAlreadyExists(_))
+        ));
+    }
+
+    #[test]
+    fn manifests_include_namespace_quota_limits() {
+        let s = store();
+        let t = s.create("eng".into(), "Engineering".into()).unwrap();
+        let manifests = t.to_k8s_manifests();
+        assert_eq!(manifests.len(), 3);
+        assert!(manifests[0].contains("Namespace"));
+        assert!(manifests[1].contains("ResourceQuota"));
+        assert!(manifests[2].contains("LimitRange"));
+    }
+
+    #[test]
+    fn attach_and_detach_cluster() {
+        let s = store();
+        s.create("t1".into(), "T1".into()).unwrap();
+        s.attach_to_cluster("t1", "prod").unwrap();
+        assert!(s.get("t1").unwrap().clusters.contains(&"prod".to_string()));
+        s.detach_from_cluster("t1", "prod").unwrap();
+        assert!(s.get("t1").unwrap().clusters.is_empty());
     }
 }

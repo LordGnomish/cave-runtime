@@ -1,6 +1,6 @@
 [package]
 name = "cave-infra"
-description = "LLM+MCP-native Infrastructure-as-Code — replaces Terraform and Crossplane"
+description = "LLM+MCP-driven IaC — NL to infra, drift detection, change plans, rollback"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,15 +8,18 @@ license.workspace = true
 [dependencies]
 cave-core = { path = "../cave-core" }
 axum = { workspace = true }
+tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-thiserror = { workspace = true }
-anyhow = { workspace = true }
-rand = { workspace = true }
+dashmap = { workspace = true }
 async-trait = { workspace = true }
+petgraph = { workspace = true }
 reqwest = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

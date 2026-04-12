@@ -1,115 +1,203 @@
-//! Semantic response cache — hash prompt → cached LlmResponse.
+//! Prompt caching — exact-match cache keyed on request fingerprint.
 
-use crate::models::{LlmRequest, LlmResponse, Message, SemanticCacheEntry};
-use crate::GatewayState;
-use chrono::Utc;
+use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
+use dashmap::DashMap;
+use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use tracing::{debug, info};
+use std::time::{Duration, Instant};
 
-/// Produce a deterministic hex string key for a set of messages.
-pub fn prompt_hash(messages: &[Message]) -> String {
-    let mut hasher = DefaultHasher::new();
-    for msg in messages {
-        msg.role.hash(&mut hasher);
-        msg.content.hash(&mut hasher);
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    pub enabled: bool,
+    /// TTL in seconds; 0 = no expiry
+    pub ttl_secs: u64,
+    pub max_entries: usize,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self { enabled: true, ttl_secs: 3600, max_entries: 10_000 }
     }
-    format!("{:016x}", hasher.finish())
 }
 
-/// Check the cache for a fresh response matching this request.
-pub fn semantic_cache_lookup(state: &GatewayState, request: &LlmRequest) -> Option<LlmResponse> {
-    let hash = prompt_hash(&request.messages);
-    let mut cache = state.cache.lock().unwrap();
-
-    // Stale entries are evicted on miss.
-    if let Some(entry) = cache.get_mut(&hash) {
-        if entry.is_fresh() && entry.model == request.model {
-            entry.hit_count += 1;
-            let mut response = entry.response.clone();
-            response.cached = true;
-            debug!(hash = %hash, hits = entry.hit_count, "Cache hit");
-            return Some(response);
-        }
-        // Entry exists but is stale — drop it.
-        cache.remove(&hash);
-    }
-
-    None
+struct CacheEntry {
+    response: ChatCompletionResponse,
+    inserted_at: Instant,
+    ttl: Duration,
+    hits: u64,
 }
 
-/// Store a completed response in the cache with the given TTL.
-pub fn cache_store(
-    state: &GatewayState,
-    request: &LlmRequest,
-    response: &LlmResponse,
-    ttl_seconds: u64,
-) {
-    let hash = prompt_hash(&request.messages);
-    let entry = SemanticCacheEntry {
-        prompt_hash: hash.clone(),
-        response: response.clone(),
-        created_at: Utc::now(),
-        ttl_seconds,
-        hit_count: 0,
-        model: request.model.clone(),
-    };
-    state.cache.lock().unwrap().insert(hash, entry);
-    info!(model = %request.model, ttl = ttl_seconds, "Response cached");
-}
-
-/// Evict cache entries matching the given filters.
-/// Returns the number of entries removed.
-pub fn cache_invalidate(
-    state: &GatewayState,
-    model_filter: Option<&str>,
-    max_age_seconds: Option<u64>,
-) -> usize {
-    let mut cache = state.cache.lock().unwrap();
-    let before = cache.len();
-
-    cache.retain(|_, entry| {
-        if model_filter.is_some_and(|m| entry.model == m) {
+impl CacheEntry {
+    fn is_expired(&self) -> bool {
+        if self.ttl.is_zero() {
             return false;
         }
-        if let Some(max_age) = max_age_seconds {
-            let age = Utc::now()
-                .signed_duration_since(entry.created_at)
-                .num_seconds();
-            if age >= 0 && (age as u64) >= max_age {
-                return false;
+        self.inserted_at.elapsed() > self.ttl
+    }
+}
+
+pub struct PromptCache {
+    config: CacheConfig,
+    store: DashMap<u64, CacheEntry>,
+    /// Stats
+    hits: std::sync::atomic::AtomicU64,
+    misses: std::sync::atomic::AtomicU64,
+}
+
+impl PromptCache {
+    pub fn new(config: CacheConfig) -> Self {
+        Self {
+            config,
+            store: DashMap::new(),
+            hits: std::sync::atomic::AtomicU64::new(0),
+            misses: std::sync::atomic::AtomicU64::new(0),
+        }
+    }
+
+    fn fingerprint(req: &ChatCompletionRequest) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        req.model.hash(&mut hasher);
+        for msg in &req.messages {
+            format!("{:?}", msg.role).hash(&mut hasher);
+            if let Some(text) = msg.content.as_text() {
+                text.hash(&mut hasher);
             }
         }
-        true
-    });
+        // Include key sampling params that affect output deterministically
+        if let Some(seed) = req.seed {
+            seed.hash(&mut hasher);
+        }
+        // temperature = 0 is deterministic; cache that case
+        let temp = req.temperature.unwrap_or(1.0);
+        if temp == 0.0 {
+            0u32.hash(&mut hasher);
+        }
+        hasher.finish()
+    }
 
-    before - cache.len()
+    pub fn get(&self, req: &ChatCompletionRequest) -> Option<ChatCompletionResponse> {
+        if !self.config.enabled {
+            return None;
+        }
+
+        let key = Self::fingerprint(req);
+        if let Some(mut entry) = self.store.get_mut(&key) {
+            if entry.is_expired() {
+                drop(entry);
+                self.store.remove(&key);
+                self.misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                return None;
+            }
+            entry.hits += 1;
+            self.hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return Some(entry.response.clone());
+        }
+
+        self.misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        None
+    }
+
+    pub fn insert(&self, req: &ChatCompletionRequest, resp: ChatCompletionResponse) {
+        if !self.config.enabled {
+            return;
+        }
+
+        // Evict if over limit (simple: remove a random entry)
+        if self.store.len() >= self.config.max_entries {
+            if let Some(old_key) = self.store.iter().next().map(|e| *e.key()) {
+                self.store.remove(&old_key);
+            }
+        }
+
+        let key = Self::fingerprint(req);
+        let ttl = if self.config.ttl_secs == 0 {
+            Duration::ZERO
+        } else {
+            Duration::from_secs(self.config.ttl_secs)
+        };
+        self.store.insert(key, CacheEntry { response: resp, inserted_at: Instant::now(), ttl, hits: 0 });
+    }
+
+    pub fn invalidate(&self, req: &ChatCompletionRequest) -> bool {
+        let key = Self::fingerprint(req);
+        self.store.remove(&key).is_some()
+    }
+
+    pub fn clear(&self) {
+        self.store.clear();
+    }
+
+    pub fn stats(&self) -> CacheStats {
+        let hits = self.hits.load(std::sync::atomic::Ordering::Relaxed);
+        let misses = self.misses.load(std::sync::atomic::Ordering::Relaxed);
+        let total = hits + misses;
+        CacheStats {
+            entries: self.store.len(),
+            hits,
+            misses,
+            hit_rate: if total == 0 { 0.0 } else { hits as f64 / total as f64 },
+        }
+    }
 }
 
-/// Fuzzy prompt match for cache hits on semantically similar (not byte-identical) prompts.
-///
-/// Current implementation falls back to exact hash matching. A future version can
-/// compare prompt embeddings from cave-ai-obs once that module exposes an embedding
-/// endpoint.
-pub fn similarity_match(
-    state: &GatewayState,
-    request: &LlmRequest,
-    _similarity_threshold: f64,
-) -> Option<LlmResponse> {
-    semantic_cache_lookup(state, request)
+impl Default for PromptCache {
+    fn default() -> Self {
+        Self::new(CacheConfig::default())
+    }
 }
 
-/// Return a JSON summary of cache metrics.
-pub fn cache_stats(state: &GatewayState) -> serde_json::Value {
-    let cache = state.cache.lock().unwrap();
-    let total = cache.len();
-    let fresh = cache.values().filter(|e| e.is_fresh()).count();
-    let total_hits: u64 = cache.values().map(|e| e.hit_count).sum();
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheStats {
+    pub entries: usize,
+    pub hits: u64,
+    pub misses: u64,
+    pub hit_rate: f64,
+}
 
-    serde_json::json!({
-        "total_entries": total,
-        "fresh_entries": fresh,
-        "stale_entries": total - fresh,
-        "total_hits": total_hits,
-    })
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::openai::{ChatMessage, Usage};
+
+    fn make_req(text: &str) -> ChatCompletionRequest {
+        ChatCompletionRequest {
+            model: "gpt-4o".into(),
+            messages: vec![ChatMessage::user(text)],
+            temperature: Some(0.0),
+            seed: Some(42),
+            top_p: None, max_tokens: None, stream: None, stop: None,
+            presence_penalty: None, frequency_penalty: None, n: None,
+            user: None, tools: None, tool_choice: None, response_format: None, logprobs: None,
+        }
+    }
+
+    #[test]
+    fn cache_hit() {
+        let cache = PromptCache::new(CacheConfig::default());
+        let req = make_req("hello");
+        let resp = ChatCompletionResponse::simple("gpt-4o", "hi".into(), Usage::new(5, 2));
+        cache.insert(&req, resp.clone());
+        assert!(cache.get(&req).is_some());
+        assert_eq!(cache.stats().hits, 1);
+    }
+
+    #[test]
+    fn cache_miss_different_text() {
+        let cache = PromptCache::new(CacheConfig::default());
+        let req1 = make_req("hello");
+        let req2 = make_req("world");
+        let resp = ChatCompletionResponse::simple("gpt-4o", "hi".into(), Usage::new(5, 2));
+        cache.insert(&req1, resp);
+        assert!(cache.get(&req2).is_none());
+    }
+
+    #[test]
+    fn disabled_cache_never_hits() {
+        let cache = PromptCache::new(CacheConfig { enabled: false, ttl_secs: 3600, max_entries: 1000 });
+        let req = make_req("hi");
+        let resp = ChatCompletionResponse::simple("gpt-4o", "hello".into(), Usage::new(5, 2));
+        cache.insert(&req, resp);
+        assert!(cache.get(&req).is_none());
+    }
 }

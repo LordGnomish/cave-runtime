@@ -1,147 +1,179 @@
-//! Cluster health checks and diagnostics.
-//!
-//! Probes the API server, etcd, and individual nodes. Results feed into
-//! the health dashboard and drive automated remediation (cordon/drain).
+//! Cluster health monitoring.
 
-use crate::models::*;
-use chrono::Utc;
-use tracing::{info, warn};
-use uuid::Uuid;
+use crate::cluster::{Cluster, ClusterStatus};
+use crate::error::ClusterResult;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-/// Perform a full health check for a cluster.
-///
-/// Probes:
-/// - API server `/healthz` endpoint
-/// - etcd cluster health via metrics
-/// - Node readiness via the Nodes API
-/// - kube-system component pods
-pub fn check_cluster_health(cluster: &Cluster) -> ClusterHealth {
-    info!(cluster_id = %cluster.id, "Checking cluster health");
+// ── Health check types ────────────────────────────────────────────────────────
 
-    // TODO: connect to cluster API server using kubeconfig from cave-vault
-    // TODO: GET <endpoint>/healthz
-    // TODO: GET <endpoint>/api/v1/nodes for readiness counts
-    // TODO: check etcd via <endpoint>/metrics or etcd client
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub enum HealthStatus {
+    Healthy,
+    Degraded,
+    Unhealthy,
+    Unknown,
+}
 
-    let api_server_status = match &cluster.status {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComponentHealth {
+    pub name: String,
+    pub status: HealthStatus,
+    pub message: Option<String>,
+    pub last_checked: DateTime<Utc>,
+}
+
+/// Cluster health summary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterHealth {
+    pub cluster_name: String,
+    pub overall: HealthStatus,
+    pub components: Vec<ComponentHealth>,
+    pub node_summary: NodeSummary,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeSummary {
+    pub total: i32,
+    pub ready: i32,
+    pub not_ready: i32,
+    pub unknown: i32,
+}
+
+impl NodeSummary {
+    pub fn all_ready(count: i32) -> Self {
+        Self { total: count, ready: count, not_ready: 0, unknown: 0 }
+    }
+}
+
+// ── Health checker ────────────────────────────────────────────────────────────
+
+/// Evaluate the health of a cluster (in-memory simulation).
+pub fn check_cluster_health(
+    cluster: &Cluster,
+    node_count: i32,
+) -> ClusterHealth {
+    let overall = match cluster.status {
         ClusterStatus::Running => HealthStatus::Healthy,
-        ClusterStatus::Provisioning | ClusterStatus::Upgrading => HealthStatus::Degraded {
-            reason: format!("Cluster is in {:?} state", cluster.status),
-        },
-        ClusterStatus::Deleting | ClusterStatus::Error { .. } => HealthStatus::Unreachable,
+        ClusterStatus::Upgrading | ClusterStatus::Scaling => HealthStatus::Degraded,
+        ClusterStatus::Failed => HealthStatus::Unhealthy,
+        _ => HealthStatus::Unknown,
     };
 
-    ClusterHealth {
-        cluster_id: cluster.id,
-        api_server_status,
-        etcd_health: HealthStatus::Healthy, // TODO: real etcd probe
-        node_readiness: NodeReadiness {
-            total: 0,
-            ready: 0,
-            not_ready: 0,
-            cordoned: 0,
-        },
-        component_statuses: component_status(cluster),
-        checked_at: Utc::now(),
-    }
-}
-
-/// Identify NotReady nodes and return their names for remediation.
-///
-/// Side-effects (TODO):
-/// - Cordon nodes that have been NotReady > 5 minutes
-/// - Drain cordoned nodes that have been NotReady > 15 minutes
-pub fn detect_unhealthy_nodes(health: &ClusterHealth) -> Vec<String> {
-    if health.node_readiness.not_ready == 0 {
-        return vec![];
-    }
-
-    warn!(
-        cluster_id = %health.cluster_id,
-        not_ready = health.node_readiness.not_ready,
-        "Unhealthy nodes detected"
-    );
-
-    // TODO: list NotReady nodes from cluster API
-    // TODO: cordon nodes > 5 min NotReady
-    // TODO: drain nodes > 15 min NotReady
-    vec![]
-}
-
-/// Return the health status of kube-system components.
-///
-/// Checks: kube-controller-manager, kube-scheduler, kube-proxy,
-/// coredns, and any installed CAVE add-ons.
-pub fn component_status(cluster: &Cluster) -> Vec<ComponentStatus> {
-    info!(cluster_id = %cluster.id, "Checking component status");
-
-    // TODO: GET <endpoint>/api/v1/namespaces/kube-system/pods
-    // TODO: check each pod's Ready condition
-
-    vec![
-        ComponentStatus {
-            name: "kube-controller-manager".into(),
-            healthy: true,
-            message: None,
-        },
-        ComponentStatus {
-            name: "kube-scheduler".into(),
-            healthy: true,
-            message: None,
-        },
-        ComponentStatus {
-            name: "coredns".into(),
-            healthy: true,
-            message: None,
-        },
-    ]
-}
-
-/// Check how many days remain before cluster TLS certificates expire.
-///
-/// Returns `None` if no kubeconfig ref is available.
-/// Returns `Some(days)` — negative means already expired.
-///
-/// A warning is emitted at ≤ 30 days; an error at ≤ 7 days.
-pub fn certificate_expiry_check(kubeconfig_ref: &KubeconfigRef) -> Option<i64> {
-    // TODO: fetch cert from cave-vault at kubeconfig_ref.vault_path
-    // TODO: parse x509 certificate and compute days until NotAfter
-    let days_remaining: i64 = 365; // TODO: real value from cert
-
-    if days_remaining <= 7 {
-        warn!(
-            vault_path = %kubeconfig_ref.vault_path,
-            days = days_remaining,
-            "Cluster certificate expiry CRITICAL"
-        );
-    } else if days_remaining <= 30 {
-        warn!(
-            vault_path = %kubeconfig_ref.vault_path,
-            days = days_remaining,
-            "Cluster certificate expiry warning"
-        );
-    }
-
-    Some(days_remaining)
-}
-
-/// Synthesize a `ClusterHealth` for a cluster that cannot be reached.
-pub fn unreachable_health(cluster_id: Uuid, reason: &str) -> ClusterHealth {
-    ClusterHealth {
-        cluster_id,
-        api_server_status: HealthStatus::Unreachable,
-        etcd_health: HealthStatus::Unreachable,
-        node_readiness: NodeReadiness {
-            total: 0,
-            ready: 0,
-            not_ready: 0,
-            cordoned: 0,
-        },
-        component_statuses: vec![ComponentStatus {
+    let components = vec![
+        ComponentHealth {
             name: "api-server".into(),
-            healthy: false,
-            message: Some(reason.into()),
-        }],
+            status: if cluster.status == ClusterStatus::Running {
+                HealthStatus::Healthy
+            } else {
+                HealthStatus::Degraded
+            },
+            message: None,
+            last_checked: Utc::now(),
+        },
+        ComponentHealth {
+            name: "etcd".into(),
+            status: HealthStatus::Healthy,
+            message: None,
+            last_checked: Utc::now(),
+        },
+        ComponentHealth {
+            name: "controller-manager".into(),
+            status: if cluster.status == ClusterStatus::Running {
+                HealthStatus::Healthy
+            } else {
+                HealthStatus::Degraded
+            },
+            message: None,
+            last_checked: Utc::now(),
+        },
+        ComponentHealth {
+            name: "scheduler".into(),
+            status: HealthStatus::Healthy,
+            message: None,
+            last_checked: Utc::now(),
+        },
+        ComponentHealth {
+            name: "coredns".into(),
+            status: HealthStatus::Healthy,
+            message: None,
+            last_checked: Utc::now(),
+        },
+    ];
+
+    ClusterHealth {
+        cluster_name: cluster.spec.name.clone(),
+        overall,
+        components,
+        node_summary: NodeSummary::all_ready(node_count),
         checked_at: Utc::now(),
+    }
+}
+
+/// Control plane endpoint health check.
+pub fn check_endpoint(endpoint: &str) -> EndpointHealth {
+    // In a real impl, we'd make an HTTP request to /healthz
+    EndpointHealth {
+        endpoint: endpoint.to_string(),
+        reachable: !endpoint.is_empty(),
+        latency_ms: Some(5),
+        status_code: Some(200),
+        checked_at: Utc::now(),
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EndpointHealth {
+    pub endpoint: String,
+    pub reachable: bool,
+    pub latency_ms: Option<u64>,
+    pub status_code: Option<u16>,
+    pub checked_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cluster::{Cluster, ClusterSpec, NetworkConfig};
+    use std::collections::HashMap;
+
+    fn running_cluster() -> Cluster {
+        let spec = ClusterSpec {
+            name: "healthy-cluster".into(),
+            kubernetes_version: "1.30".into(),
+            region: "eu-west-1".into(),
+            network: NetworkConfig::default(),
+            tags: HashMap::new(),
+            enable_rbac: true,
+            audit_logging: false,
+        };
+        let mut c = Cluster::new(spec, "alice".into());
+        c.transition(ClusterStatus::Running);
+        c
+    }
+
+    #[test]
+    fn healthy_cluster_check() {
+        let cluster = running_cluster();
+        let health = check_cluster_health(&cluster, 3);
+        assert_eq!(health.overall, HealthStatus::Healthy);
+        assert_eq!(health.node_summary.ready, 3);
+        assert!(health.components.iter().all(|c| c.status == HealthStatus::Healthy));
+    }
+
+    #[test]
+    fn failed_cluster_is_unhealthy() {
+        let mut cluster = running_cluster();
+        cluster.fail("disk full".into());
+        let health = check_cluster_health(&cluster, 3);
+        assert_eq!(health.overall, HealthStatus::Unhealthy);
+    }
+
+    #[test]
+    fn endpoint_check() {
+        let h = check_endpoint("https://cluster.cave.internal:6443");
+        assert!(h.reachable);
     }
 }

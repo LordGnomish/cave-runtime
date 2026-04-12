@@ -1,6 +1,6 @@
 [package]
 name = "cave-llm-gateway"
-description = "Unified LLM routing proxy — replaces LiteLLM / AI Gateway"
+description = "LLM router/proxy — multi-provider, OpenAI compat, rate limiting, cost tracking, guardrails"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,10 +8,19 @@ license.workspace = true
 [dependencies]
 cave-core = { path = "../cave-core" }
 axum = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
+thiserror = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
-thiserror = { workspace = true }
+dashmap = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+reqwest = { workspace = true }
+bytes = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
