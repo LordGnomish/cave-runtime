@@ -45,6 +45,8 @@ members = [
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === Event Streaming ===
+    "crates/cave-streams",
 ]
 
 [workspace.package]
