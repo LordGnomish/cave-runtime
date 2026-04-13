@@ -6,6 +6,11 @@ pub mod error;
 pub mod response;
 pub mod token;
 
+// ── Enterprise trait boundaries ───────────────────────────────────────────────
+pub mod adapters;
+pub mod backend;
+pub mod factory;
+
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::RwLock;
@@ -199,5 +204,11 @@ pub fn router(state: Arc<VaultState>) -> Router {
         .merge(engines::cubbyhole::router(state.clone()))
         .merge(engines::identity::router(state.clone()))
 }
+
+/// Enterprise secrets engine trait + built-in implementation.
+pub use backend::{SecretsEngine, SecretsError, SecretsEngineProfile, SecretsResult, SecretValue, BuiltinSecretsEngine};
+
+/// Factory: build the secrets engine from config/env.
+pub use factory::{create_secrets_engine, create_secrets_engine_from_env};
 
 pub const MODULE_NAME: &str = "vault";

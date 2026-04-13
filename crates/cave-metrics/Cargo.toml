@@ -28,6 +28,10 @@ tracing = { workspace = true }
 # Error handling
 thiserror = { workspace = true }
 anyhow    = { workspace = true }
+async-trait = { workspace = true }
+# AWS Sig V4 signing for CloudWatch adapter
+sha2 = "0.10"
+hmac = "0.12"
 
 # Time
 chrono = { workspace = true }

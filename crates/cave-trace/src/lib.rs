@@ -39,8 +39,19 @@ pub mod storage;
 pub mod traceql;
 pub mod types;
 
+// ── Enterprise trait boundaries ───────────────────────────────────────────────
+pub mod adapters;
+pub mod backend;
+pub mod factory;
+
 pub use error::{Result, TraceError};
 pub use types::{Span, SpanKind, SpanStatus, TagValue, Trace, TraceId, SpanId};
+
+/// Enterprise trace backend trait + built-in implementation.
+pub use backend::{TraceBackend, TraceBackendError, TraceBackendProfile, TraceResult, BuiltinTraceBackend};
+
+/// Factory: build the backend from config/env.
+pub use factory::{create_trace_backend, create_trace_backend_from_env};
 
 use std::sync::Arc;
 use std::time::Duration;

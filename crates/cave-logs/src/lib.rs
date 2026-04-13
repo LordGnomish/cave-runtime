@@ -47,9 +47,20 @@ pub mod routes;
 pub mod store;
 pub mod tail;
 
+// ── Enterprise trait boundaries ───────────────────────────────────────────────
+pub mod adapters;
+pub mod backend;
+pub mod factory;
+
 pub use routes::{router, AppState};
 pub use store::LogStore;
 pub use limits::LimitsRegistry;
+
+/// Enterprise logs backend trait + built-in implementation.
+pub use backend::{LogsBackend, LogsBackendError, LogsBackendProfile, LogsResult, LogStreamBatch, BuiltinLogsBackend};
+
+/// Factory: build the backend from config/env.
+pub use factory::{create_logs_backend, create_logs_backend_from_env};
 
 /// Create a fully initialised `AppState` with default configuration.
 pub fn default_state() -> AppState {

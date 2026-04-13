@@ -24,6 +24,12 @@ pub mod okta;
 pub mod rbac;
 pub mod tokens;
 
+// ── Enterprise trait boundaries ───────────────────────────────────────────────
+pub mod adapters;
+pub mod builtin;
+pub mod factory;
+pub mod provider;
+
 use cave_core::config::AuthProvider;
 
 // ── Convenient re-exports for common usage ────────────────────────────────────
@@ -33,6 +39,12 @@ pub use auth_middleware::{AuthContext, AuthCtx, AuthLayer, AuthLayerConfig};
 
 /// Original lightweight AuthLayer (AuthN only, no RBAC/ABAC).
 pub use middleware::CaveAuthLayer;
+
+/// Enterprise auth backend trait + verified identity type.
+pub use provider::{AuthBackend, AuthBackendError, AuthBackendProfile, AuthBackendResult, VerifiedIdentity};
+
+/// Factory: build the backend from config/env.
+pub use factory::{create_auth_backend, create_auth_backend_from_env};
 
 // Additional auth modules
 pub mod oidc;

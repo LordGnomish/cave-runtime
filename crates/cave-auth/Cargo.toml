@@ -23,3 +23,4 @@ ring = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }

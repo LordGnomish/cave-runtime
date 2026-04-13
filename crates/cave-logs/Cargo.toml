@@ -42,6 +42,11 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+# AWS Sig V4 signing for CloudWatch Logs adapter
+sha2 = "0.10"
+hmac = "0.12"
 regex = { workspace = true }
 dashmap = "6"
 bytes = "1"

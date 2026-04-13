@@ -22,11 +22,22 @@ pub mod scrape;
 pub mod state;
 pub mod tsdb;
 
+// ── Enterprise trait boundaries ───────────────────────────────────────────────
+pub mod adapters;
+pub mod backend;
+pub mod factory;
+
 pub use error::{MetricsError, Result};
 pub use model::{Labels, LabelMatcher, MatchOp, MetricType, QueryResult, Sample, TimeSeries};
 pub use promql::{Engine, parse};
 pub use tsdb::{Tsdb, TsdbConfig};
 pub use state::MetricsState;
+
+/// Enterprise metrics backend trait + built-in implementation.
+pub use backend::{MetricsBackend, MetricsBackendError, MetricsBackendProfile, MetricsResult, BuiltinMetricsBackend};
+
+/// Factory: build the backend from config/env.
+pub use factory::{create_metrics_backend, create_metrics_backend_from_env};
 
 use axum::Router;
 use std::sync::Arc;

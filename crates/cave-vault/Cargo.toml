@@ -16,6 +16,8 @@ uuid = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
 ring = { workspace = true }
 ed25519-dalek = { workspace = true }
 regex = { workspace = true }
@@ -27,6 +29,8 @@ hex = "0.4"
 rand = "0.8"
 rsa = { version = "0.9", features = ["sha2"] }
 sha2 = "0.10"
+hmac = "0.12"
+bytes = "1"
 
 [dev-dependencies]
 tokio = { workspace = true }
