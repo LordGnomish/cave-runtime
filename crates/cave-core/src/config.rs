@@ -32,7 +32,7 @@ pub struct ServerConfig {
 pub struct AuthConfig {
     /// OIDC provider: "okta" or "keycloak"
     pub provider: AuthProvider,
-    /// OIDC issuer URL (e.g., https://idp.cave.caveplatform.dev or https://keycloak.cave.caveplatform.dev/realms/cave)
+    /// OIDC issuer URL (e.g., https://your-org.okta.com or https://keycloak.cave.caveplatform.dev/realms/cave)
     pub issuer_url: String,
     /// OIDC audience
     pub audience: String,
