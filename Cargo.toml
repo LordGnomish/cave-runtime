@@ -81,6 +81,9 @@ members = [
     "crates/cave-tracker",
     # === Policy ===
     "crates/cave-policy",
+    # === Search ===
+    "crates/cave-search",
+    "crates/cave-vector-search",
     # === Runtime Binary ===
     "crates/cave-runtime",
     # === Upstream Tracker ===

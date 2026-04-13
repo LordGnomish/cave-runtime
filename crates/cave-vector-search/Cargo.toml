@@ -1,0 +1,22 @@
+[package]
+name = "cave-vector-search"
+description = "Vector similarity search engine — replaces Qdrant with built-in HNSW index"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core   = { path = "../cave-core" }
+cave-auth   = { path = "../cave-auth" }
+axum        = { workspace = true }
+serde       = { workspace = true }
+serde_json  = { workspace = true }
+tokio       = { workspace = true }
+tracing     = { workspace = true }
+uuid        = { workspace = true }
+chrono      = { workspace = true }
+thiserror   = { workspace = true }
+dashmap     = { workspace = true }
+parking_lot = { workspace = true }
+rand        = { workspace = true }
+async-trait = { workspace = true }

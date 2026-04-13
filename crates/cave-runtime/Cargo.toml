@@ -101,6 +101,9 @@ cave-rollouts = { path = "../cave-rollouts" }
 cave-artifacts = { path = "../cave-artifacts" }
 # Governance
 cave-runbook = { path = "../cave-runbook" }
+# Search
+cave-search = { path = "../cave-search" }
+cave-vector-search = { path = "../cave-vector-search" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }

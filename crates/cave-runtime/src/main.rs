@@ -116,6 +116,10 @@ async fn main() -> anyhow::Result<()> {
     let compliance_state = Arc::new(cave_compliance::ComplianceState::default());
     let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
 
+    // Search
+    let search_state = Arc::new(cave_search::SearchState::default());
+    let vector_search_state = Arc::new(cave_vector_search::VectorState::default());
+
     // Start background tasks
     metrics_state.start_background_tasks();
 
@@ -197,6 +201,9 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_gitops_config::router(gitops_state))
         .merge(cave_compliance::router(compliance_state))
         .merge(cave_cost_alloc::router(cost_alloc_state))
+        // Search
+        .merge(cave_search::router(search_state))
+        .merge(cave_vector_search::router(vector_search_state))
         // SCIM 2.0 provisioning
         .merge(cave_auth::okta::scim_router(
             std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
