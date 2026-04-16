@@ -2,10 +2,10 @@
 //! and chat payload construction.
 
 use anyhow::{Context, Result};
-use cave_llm_gateway::embedded::{default_model_path, lookup, CATALOG};
+use cave_llm_gateway::embedded::{CATALOG, default_model_path, lookup};
 use colored::Colorize;
 use futures::StreamExt;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
@@ -45,9 +45,7 @@ pub async fn catalog(_c: &ApiClient) -> Result<()> {
 
 pub async fn pull(id: &str, force: bool) -> Result<()> {
     let entry = lookup(id).with_context(|| {
-        format!(
-            "Unknown model id `{id}`. Run `cave llm catalog` to see available models."
-        )
+        format!("Unknown model id `{id}`. Run `cave llm catalog` to see available models.")
     })?;
 
     let dest = default_model_path(entry.filename);

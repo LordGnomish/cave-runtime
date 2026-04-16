@@ -25,7 +25,10 @@ pub struct InsightsEngine {
 
 impl InsightsEngine {
     pub fn new(router: Arc<GatewayRouter>, model: impl Into<String>) -> Self {
-        Self { router, model: model.into() }
+        Self {
+            router,
+            model: model.into(),
+        }
     }
 
     pub fn model(&self) -> &str {
@@ -149,7 +152,10 @@ impl InsightsEngine {
 
     // ── Metric anomaly ───────────────────────────────────────────────────────
 
-    pub async fn explain_anomaly(&self, series: &MetricSeries<'_>) -> GatewayResult<AnomalyExplanation> {
+    pub async fn explain_anomaly(
+        &self,
+        series: &MetricSeries<'_>,
+    ) -> GatewayResult<AnomalyExplanation> {
         let samples = series
             .samples
             .iter()
@@ -231,7 +237,9 @@ pub struct RemediationPlan {
     pub requires_approval: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnomalyExplanation {
@@ -297,7 +305,9 @@ mod tests {
         let router = Arc::new(GatewayRouter::new(
             providers,
             aliases,
-            RoutingStrategy::Fixed { provider: "mock".into() },
+            RoutingStrategy::Fixed {
+                provider: "mock".into(),
+            },
         ));
         InsightsEngine::new(router, "mock-model")
     }

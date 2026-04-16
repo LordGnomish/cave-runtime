@@ -44,7 +44,9 @@ pub struct GatewayConfig {
     pub aliases: Vec<ModelAlias>,
 }
 
-fn default_enabled() -> bool { true }
+fn default_enabled() -> bool {
+    true
+}
 
 fn default_strategy() -> RoutingStrategy {
     RoutingStrategy::Fallback { providers: vec![] }
