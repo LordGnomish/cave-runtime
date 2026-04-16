@@ -4,6 +4,7 @@ use colored::Colorize;
 use serde_json::json;
 
 mod client;
+mod llm;
 use client::ApiClient;
 
 // ── Root CLI ──────────────────────────────────────────────────────────────────
@@ -201,6 +202,42 @@ enum Commands {
     Status {
         #[command(subcommand)]
         cmd: StatusCmd,
+    },
+    /// Embedded LLM management — pull GGUF weights, list catalog, chat
+    Llm {
+        #[command(subcommand)]
+        cmd: LlmCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum LlmCmd {
+    /// List GGUF models the runtime knows how to fetch
+    Catalog,
+    /// Download a GGUF model from the catalog to ~/.cave/models/
+    Pull {
+        /// Model id from `cave llm catalog`
+        id: String,
+        /// Overwrite an existing file
+        #[arg(long, default_value = "false")]
+        force: bool,
+    },
+    /// List models currently served by the runtime gateway
+    Models,
+    /// Send a one-shot chat completion through the runtime
+    Chat {
+        /// Model id or alias (e.g. embedded, qwen2.5-coder-7b, triage)
+        #[arg(long, default_value = "embedded")]
+        model: String,
+        /// User prompt
+        #[arg(long)]
+        prompt: String,
+        /// Optional system prompt
+        #[arg(long)]
+        system: Option<String>,
+        /// Max tokens to generate
+        #[arg(long, default_value = "512")]
+        max_tokens: u32,
     },
 }
 
@@ -1163,6 +1200,17 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Status { cmd } => match cmd {
             StatusCmd::Services => c.get("/api/status/services").await,
             StatusCmd::Health => c.get("/health").await,
+        },
+
+        // ── LLM ───────────────────────────────────────────────────────────────
+        Commands::Llm { cmd } => match cmd {
+            LlmCmd::Catalog => llm::catalog(&c).await,
+            LlmCmd::Pull { id, force } => llm::pull(&id, force).await,
+            LlmCmd::Models => c.get("/v1/models").await,
+            LlmCmd::Chat { model, prompt, system, max_tokens } => {
+                let payload = llm::build_chat_payload(&model, &prompt, system.as_deref(), max_tokens);
+                c.post("/v1/chat/completions", payload).await
+            }
         },
     }
 }

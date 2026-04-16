@@ -74,8 +74,9 @@ async fn main() -> anyhow::Result<()> {
     let backup_state = Arc::new(cave_backup::BackupState::default());
     let pam_state = Arc::new(cave_pam::State::default());
 
-    // LLM Gateway
-    let llm_gateway_state = Arc::new(cave_llm_gateway::GatewayState::default());
+    // LLM Gateway — load `llm_gateway:` section from the config file if present,
+    // otherwise fall back to the mock-only default.
+    let llm_gateway_state = Arc::new(load_llm_gateway_state(&cli.config));
 
     // Infrastructure & Networking
     let api_gateway_state = Arc::new(cave_gateway::GatewayState::default());
@@ -252,6 +253,43 @@ async fn api_modules() -> axum::Json<serde_json::Value> {
         "total": modules.len(),
         "modules": modules,
     }))
+}
+
+/// Parse the `llm_gateway:` section of the runtime YAML and build the
+/// gateway state from it. Returns the mock-only default if the file is
+/// missing, malformed, or has no such section so an absent config never
+/// breaks startup.
+fn load_llm_gateway_state(config_path: &str) -> cave_llm_gateway::GatewayState {
+    let raw = match std::fs::read_to_string(config_path) {
+        Ok(s) => s,
+        Err(_) => {
+            tracing::info!(config = config_path, "no config file — llm-gateway in mock mode");
+            return cave_llm_gateway::GatewayState::default();
+        }
+    };
+    let root: serde_yaml::Value = match serde_yaml::from_str(&raw) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to parse runtime config YAML");
+            return cave_llm_gateway::GatewayState::default();
+        }
+    };
+    let Some(section) = root.get("llm_gateway") else {
+        return cave_llm_gateway::GatewayState::default();
+    };
+    let cfg: cave_llm_gateway::GatewayConfig = match serde_yaml::from_value(section.clone()) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!(error = %e, "invalid llm_gateway config — using defaults");
+            return cave_llm_gateway::GatewayState::default();
+        }
+    };
+    if !cfg.enabled {
+        tracing::info!("llm-gateway disabled by config");
+        return cave_llm_gateway::GatewayState::default();
+    }
+    tracing::info!(providers = cfg.providers.len(), "llm-gateway loaded from config");
+    cave_llm_gateway::GatewayState::from_config(&cfg)
 }
 
 async fn api_health() -> axum::Json<serde_json::Value> {
