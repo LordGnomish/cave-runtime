@@ -144,7 +144,9 @@ fn render_mistral(messages: &[ChatMessage]) -> String {
                 out.push_str(&format!("[INST] {content} [/INST]"));
             }
             Role::Assistant => out.push_str(&format!(" {} </s>", role_text(m))),
-            Role::Tool | Role::Function => out.push_str(&format!("[INST] {} [/INST]", role_text(m))),
+            Role::Tool | Role::Function => {
+                out.push_str(&format!("[INST] {} [/INST]", role_text(m)))
+            }
         }
     }
     out
@@ -169,7 +171,10 @@ fn render_phi3(messages: &[ChatMessage]) -> String {
 /// runtime / CLI / dev tools.
 pub fn default_model_path(filename: &str) -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".cave").join("models").join(filename)
+    PathBuf::from(home)
+        .join(".cave")
+        .join("models")
+        .join(filename)
 }
 
 // ── Provider implementation ───────────────────────────────────────────────────
@@ -182,7 +187,10 @@ pub struct EmbeddedProvider {
 impl EmbeddedProvider {
     pub fn new(config: EmbeddedConfig) -> GatewayResult<Self> {
         let inner = EmbeddedInner::load(&config)?;
-        Ok(Self { config, inner: Arc::new(inner) })
+        Ok(Self {
+            config,
+            inner: Arc::new(inner),
+        })
     }
 
     pub fn config(&self) -> &EmbeddedConfig {
@@ -248,8 +256,7 @@ mod backend {
     static BACKEND: OnceLock<LlamaBackend> = OnceLock::new();
 
     fn backend() -> GatewayResult<&'static LlamaBackend> {
-        BACKEND
-            .get_or_init(|| LlamaBackend::init().expect("llama backend init"));
+        BACKEND.get_or_init(|| LlamaBackend::init().expect("llama backend init"));
         Ok(BACKEND.get().unwrap())
     }
 
@@ -279,7 +286,11 @@ mod backend {
                 .with_n_threads(cfg.threads as i32)
                 .with_n_threads_batch(cfg.threads as i32);
 
-            Ok(Self { model, ctx_params, lock: Mutex::new(()) })
+            Ok(Self {
+                model,
+                ctx_params,
+                lock: Mutex::new(()),
+            })
         }
 
         pub fn is_loaded(&self) -> bool {
@@ -323,10 +334,8 @@ mod backend {
             let eos = self.model.token_eos();
 
             for _ in 0..max_tokens {
-                let mut candidates = LlamaTokenDataArray::from_iter(
-                    ctx.candidates_ith(batch.n_tokens() - 1),
-                    false,
-                );
+                let mut candidates =
+                    LlamaTokenDataArray::from_iter(ctx.candidates_ith(batch.n_tokens() - 1), false);
                 ctx.sample_top_p(&mut candidates, top_p, 1);
                 ctx.sample_temp(&mut candidates, temperature);
                 let next = ctx.sample_token(&mut candidates);
@@ -375,7 +384,8 @@ mod backend {
     impl EmbeddedInner {
         pub fn load(_cfg: &EmbeddedConfig) -> GatewayResult<Self> {
             Err(GatewayError::Internal(
-                "embedded LLM support not compiled in — rebuild with `--features embedded-llm`".into(),
+                "embedded LLM support not compiled in — rebuild with `--features embedded-llm`"
+                    .into(),
             ))
         }
 
