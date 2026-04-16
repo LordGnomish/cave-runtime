@@ -1,9 +1,15 @@
 [package]
 name = "cave-llm-gateway"
-description = "LLM router/proxy — multi-provider, OpenAI compat, rate limiting, cost tracking, guardrails"
+description = "LLM router/proxy — multi-provider, OpenAI compat, rate limiting, cost tracking, guardrails, optional embedded GGUF inference"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+
+[features]
+default = []
+# Compile in the in-process llama.cpp inference engine (Metal on macOS, CUDA on Linux).
+# Heavy build (links C++ + GPU backends); kept off in CI by default.
+embedded-llm = ["dep:llama-cpp-2", "dep:tokio-stream"]
 
 [dependencies]
 cave-core = { path = "../cave-core" }
@@ -21,6 +27,11 @@ async-trait = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
 bytes = { workspace = true }
+parking_lot = { workspace = true }
+
+# Embedded inference (optional)
+llama-cpp-2 = { version = "0.1", optional = true, default-features = false, features = ["metal"] }
+tokio-stream = { version = "0.1", optional = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

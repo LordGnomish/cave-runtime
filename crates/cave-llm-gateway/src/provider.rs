@@ -23,20 +23,36 @@ pub trait LlmProvider: Send + Sync {
 pub struct ProviderConfig {
     pub name: String,
     pub provider_type: ProviderType,
+    #[serde(default)]
     pub base_url: String,
     pub api_key: Option<String>,
+    #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
+    #[serde(default = "default_retries")]
     pub max_retries: u32,
+    #[serde(default = "default_weight")]
     pub weight: u32,
+    #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Embedded-only configuration. Required when `provider_type == Embedded`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedded: Option<crate::embedded::EmbeddedConfig>,
 }
+
+fn default_timeout() -> u64 { 60 }
+fn default_retries() -> u32 { 3 }
+fn default_weight() -> u32 { 1 }
+fn default_enabled() -> bool { true }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderType {
     OpenAi,
     Anthropic,
+    /// Remote OpenAI-compatible endpoint (Ollama, vLLM, LM Studio).
     Local,
+    /// In-process GGUF model loaded via llama.cpp.
+    Embedded,
     Mock,
 }
 
@@ -51,6 +67,7 @@ impl Default for ProviderConfig {
             max_retries: 3,
             weight: 1,
             enabled: true,
+            embedded: None,
         }
     }
 }
@@ -348,13 +365,27 @@ impl ProviderRegistry {
     pub fn from_config(configs: Vec<ProviderConfig>) -> Self {
         let r = Self::new();
         for cfg in configs {
-            let provider: Arc<dyn LlmProvider> = match cfg.provider_type {
-                ProviderType::OpenAi => Arc::new(OpenAiProvider::new(cfg)),
-                ProviderType::Anthropic => Arc::new(AnthropicProvider::new(cfg)),
-                ProviderType::Local => Arc::new(LocalProvider::new(cfg)),
-                ProviderType::Mock => Arc::new(MockProvider::new(cfg.name)),
+            if !cfg.enabled {
+                continue;
+            }
+            let name = cfg.name.clone();
+            let result: GatewayResult<Arc<dyn LlmProvider>> = match cfg.provider_type {
+                ProviderType::OpenAi => Ok(Arc::new(OpenAiProvider::new(cfg))),
+                ProviderType::Anthropic => Ok(Arc::new(AnthropicProvider::new(cfg))),
+                ProviderType::Local => Ok(Arc::new(LocalProvider::new(cfg))),
+                ProviderType::Embedded => match cfg.embedded.clone() {
+                    Some(embedded_cfg) => crate::embedded::EmbeddedProvider::new(embedded_cfg)
+                        .map(|p| Arc::new(p) as Arc<dyn LlmProvider>),
+                    None => Err(GatewayError::Internal(
+                        "embedded provider missing `embedded` config block".into(),
+                    )),
+                },
+                ProviderType::Mock => Ok(Arc::new(MockProvider::new(cfg.name))),
             };
-            r.register(provider);
+            match result {
+                Ok(p) => r.register(p),
+                Err(e) => tracing::warn!(provider = %name, error = %e, "skipping provider"),
+            }
         }
         r
     }

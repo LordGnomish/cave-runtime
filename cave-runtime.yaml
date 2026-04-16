@@ -15,6 +15,43 @@ database:
   url: "postgres://cave:cave@localhost:5432/cave_runtime"
   max_pool_size: 10
 
+llm_gateway:
+  enabled: true
+  # Try the embedded model first, fall back to the mock provider so the
+  # runtime stays functional before the GGUF file is downloaded.
+  strategy:
+    fallback:
+      providers: [embedded, mock]
+  providers:
+    - name: embedded
+      type: embedded
+      enabled: true
+      embedded:
+        name: embedded
+        model_path: ~/.cave/models/qwen2.5-coder-7b-instruct-q4_k_m.gguf
+        model_id: qwen2.5-coder-7b
+        context_size: 16384
+        gpu_layers: -1        # Apple Silicon: offload everything to Metal
+        batch_size: 512
+        threads: 6
+        chat_template: qwen
+        default_temperature: 0.2
+        default_top_p: 0.95
+        default_max_tokens: 1024
+    - name: mock
+      type: mock
+      enabled: true
+  aliases:
+    # Routed by the insights engine for obs/self-healing tasks.
+    - alias: triage
+      provider: embedded
+      model: qwen2.5-coder-7b
+      description: "Log triage / incident summary / anomaly explain"
+    - alias: code
+      provider: embedded
+      model: qwen2.5-coder-7b
+      description: "Coding assistance"
+
 modules:
   # Phase 1 — enabled by default
   flags: true
