@@ -47,8 +47,8 @@ pub fn create_router(state: Arc<SecurityState>) -> Router {
         .route("/api/rules", get(list_rules))
         .route("/api/rules", put(update_rules))
         // Alerts
-        .route("/api/alerts", get(list_alerts))
-        .route("/api/alerts/stream", get(alerts_stream))
+        .route("/api/security/alerts", get(list_alerts))
+        .route("/api/security/alerts/stream", get(alerts_stream))
         // SBOM
         .route("/api/sbom/{image}", get(get_sbom))
         // Health

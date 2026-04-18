@@ -521,7 +521,7 @@ pub async fn rotate_crl(
 pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
     let m = mount.to_string();
     Router::new()
-        .route(&format!("/v1/{}/root/generate/:type", mount), post({
+        .route(&format!("/v1/{}/root/generate/{{type}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(gen_type): Path<String>, Json(body): Json<Value>| {
@@ -530,7 +530,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { generate_root(State(state), headers, Path((mount, gen_type)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/intermediate/generate/:type", mount), post({
+        .route(&format!("/v1/{}/intermediate/generate/{{type}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(gen_type): Path<String>, Json(body): Json<Value>| {
@@ -593,7 +593,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { list_roles(State(state), headers, Path(mount)).await }
             }
         }))
-        .route(&format!("/v1/{}/roles/:role_name", mount), post({
+        .route(&format!("/v1/{}/roles/{{role_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(role_name): Path<String>, Json(body): Json<Value>| {
@@ -618,7 +618,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { delete_role(State(state), headers, Path((mount, role_name))).await }
             }
         }))
-        .route(&format!("/v1/{}/issue/:role_name", mount), post({
+        .route(&format!("/v1/{}/issue/{{role_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(role_name): Path<String>, Json(body): Json<Value>| {
@@ -627,7 +627,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { issue_cert(State(state), headers, Path((mount, role_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/sign/:role_name", mount), post({
+        .route(&format!("/v1/{}/sign/{{role_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(role_name): Path<String>, Json(body): Json<Value>| {
@@ -645,7 +645,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { revoke_cert(State(state), headers, Path(mount), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/cert/:serial", mount), get({
+        .route(&format!("/v1/{}/cert/{{serial}}", mount), get({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(serial): Path<String>| {

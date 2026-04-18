@@ -36,12 +36,12 @@ use crate::{
 
 pub fn create_router(state: Arc<TraceState>) -> Router {
     Router::new()
-        .route("/api/traces/:trace_id",              get(get_trace))
-        .route("/api/search",                        get(search_traces).post(search_traceql))
-        .route("/api/search/tags",                   get(search_tags))
-        .route("/api/search/tag/:name/values",       get(search_tag_values))
-        .route("/api/echo",                          get(echo))
-        .route("/api/status/buildinfo",              get(build_info))
+        .route("/tempo/api/traces/{trace_id}",        get(get_trace))
+        .route("/tempo/api/search",                  get(search_traces).post(search_traceql))
+        .route("/tempo/api/search/tags",             get(search_tags))
+        .route("/tempo/api/search/tag/{name}/values", get(search_tag_values))
+        .route("/tempo/api/echo",                    get(echo))
+        .route("/tempo/api/status/buildinfo",        get(build_info))
         .with_state(state)
 }
 

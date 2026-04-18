@@ -176,8 +176,8 @@ pub async fn login(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/userpass/users", get(list_users))
-        .route("/v1/auth/userpass/users/:username", post(create_user).get(read_user).delete(delete_user))
-        .route("/v1/auth/userpass/users/:username/password", post(update_user))
-        .route("/v1/auth/userpass/login/:username", post(login))
+        .route("/v1/auth/userpass/users/{username}", post(create_user).get(read_user).delete(delete_user))
+        .route("/v1/auth/userpass/users/{username}/password", post(update_user))
+        .route("/v1/auth/userpass/login/{username}", post(login))
         .with_state(state)
 }

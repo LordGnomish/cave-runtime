@@ -49,10 +49,10 @@ pub fn create_router(state: Arc<PolicyState>) -> Router {
         .route("/api/policy/health", get(health))
         // ── OPA Data API ───────────────────────────────────────────────────
         .route("/v1/data", get(opa_get_data_root).post(opa_query_root).put(opa_put_data_root).patch(opa_patch_data_root))
-        .route("/v1/data/*path", get(opa_get_data).post(opa_query_data).put(opa_put_data).patch(opa_patch_data).delete(opa_delete_data))
+        .route("/v1/data/{*path}", get(opa_get_data).post(opa_query_data).put(opa_put_data).patch(opa_patch_data).delete(opa_delete_data))
         // ── OPA Policy API ─────────────────────────────────────────────────
         .route("/v1/policies", get(opa_list_policies))
-        .route("/v1/policies/:id", get(opa_get_policy).put(opa_put_policy).delete(opa_delete_policy))
+        .route("/v1/policies/{id}", get(opa_get_policy).put(opa_put_policy).delete(opa_delete_policy))
         // ── OPA Compile API ────────────────────────────────────────────────
         .route("/v1/compile", post(opa_compile))
         // ── OPA Query API ──────────────────────────────────────────────────
@@ -62,7 +62,7 @@ pub fn create_router(state: Arc<PolicyState>) -> Router {
         .route("/v1/status", get(opa_status))
         // ── Kyverno ClusterPolicy API ──────────────────────────────────────
         .route("/api/kyverno/policies", get(kyverno_list_policies).post(kyverno_create_policy))
-        .route("/api/kyverno/policies/:name", get(kyverno_get_policy).put(kyverno_update_policy).delete(kyverno_delete_policy))
+        .route("/api/kyverno/policies/{name}", get(kyverno_get_policy).put(kyverno_update_policy).delete(kyverno_delete_policy))
         .route("/api/kyverno/evaluate", post(kyverno_evaluate))
         .route("/api/kyverno/reports", get(kyverno_list_reports))
         // ── Admission Webhooks ─────────────────────────────────────────────

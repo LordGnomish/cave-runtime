@@ -424,7 +424,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
     let m = mount.to_string();
     Router::new()
         .route(
-            &format!("/v1/{}/data/*path", mount),
+            &format!("/v1/{}/data/{{*path}}", mount),
             get({
                 let s = state.clone();
                 let mount = m.clone();
@@ -463,7 +463,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             }),
         )
         .route(
-            &format!("/v1/{}/delete/*path", mount),
+            &format!("/v1/{}/delete/{{*path}}", mount),
             post({
                 let s = state.clone();
                 let mount = m.clone();
@@ -475,7 +475,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             }),
         )
         .route(
-            &format!("/v1/{}/undelete/*path", mount),
+            &format!("/v1/{}/undelete/{{*path}}", mount),
             post({
                 let s = state.clone();
                 let mount = m.clone();
@@ -487,7 +487,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             }),
         )
         .route(
-            &format!("/v1/{}/destroy/*path", mount),
+            &format!("/v1/{}/destroy/{{*path}}", mount),
             post({
                 let s = state.clone();
                 let mount = m.clone();
@@ -499,7 +499,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             }),
         )
         .route(
-            &format!("/v1/{}/metadata/*path", mount),
+            &format!("/v1/{}/metadata/{{*path}}", mount),
             get({
                 let s = state.clone();
                 let mount = m.clone();

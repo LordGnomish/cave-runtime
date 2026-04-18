@@ -129,7 +129,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
 
     Router::new()
         .route(
-            &format!("/v1/{}/*path", mount),
+            &format!("/v1/{}/{{*path}}", mount),
             get({
                 let s = state.clone();
                 move |headers: HeaderMap, Path(path): Path<String>, Query(q): Query<ListQuery>| {

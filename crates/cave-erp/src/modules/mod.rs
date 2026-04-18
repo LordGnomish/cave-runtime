@@ -1,0 +1,9 @@
+pub mod hr;
+pub mod recruitment;
+pub mod crm;
+pub mod sales;
+pub mod purchase;
+pub mod inventory;
+pub mod accounting;
+pub mod manufacturing;
+pub mod projects;

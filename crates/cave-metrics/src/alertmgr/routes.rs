@@ -18,7 +18,7 @@ pub fn create_router(state: Arc<AlertmgrState>) -> Router {
     Router::new()
         .route("/api/v2/alerts",            get(get_alerts).post(post_alerts))
         .route("/api/v2/silences",          get(get_silences).post(create_silence))
-        .route("/api/v2/silence/:id",       delete(delete_silence))
+        .route("/api/v2/silence/{id}",       delete(delete_silence))
         .route("/api/v2/status",            get(get_status))
         .route("/api/v2/receivers",         get(get_receivers))
         .with_state(state)

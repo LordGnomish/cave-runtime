@@ -33,7 +33,10 @@ pub struct RegistryState {
 
 impl Default for RegistryState {
     fn default() -> Self {
-        todo!("RegistryState requires a database pool and storage backend")
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+            storage: Arc::new(RegistryStorage::default()),
+        }
     }
 }
 

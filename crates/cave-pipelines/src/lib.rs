@@ -39,7 +39,11 @@ impl PipelinesState {
 
 impl Default for PipelinesState {
     fn default() -> Self {
-        todo!("PipelinesState requires a database pool — use PipelinesState::new(pool)")
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+            active_runs: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            catalog: Arc::new(catalog::TaskCatalog::builtin()),
+        }
     }
 }
 

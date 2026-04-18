@@ -39,7 +39,7 @@ pub fn create_router(state: Arc<MetricsState>) -> Router {
         // Label values:   GET /api/v1/label/{name}/values
         .route("/api/v1/label/{name}/values", get(label_values))
         // ── Self-metrics (Prometheus exposition format) ────────────────────
-        .route("/metrics", get(self_metrics))
+        .route("/api/metrics/self", get(self_metrics))
         .with_state(state)
 }
 

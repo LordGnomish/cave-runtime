@@ -78,21 +78,21 @@ pub fn create_router(state: Arc<CostState>) -> Router {
         // Pricing
         .route("/api/cost/pricing", post(create_pricing))
         .route("/api/cost/pricing", get(list_pricing))
-        .route("/api/cost/pricing/:id", get(get_pricing))
-        .route("/api/cost/pricing/:id", delete(delete_pricing))
+        .route("/api/cost/pricing/{id}", get(get_pricing))
+        .route("/api/cost/pricing/{id}", delete(delete_pricing))
         // Reports
         .route("/api/cost/reports", post(create_report))
         .route("/api/cost/reports", get(list_reports))
-        .route("/api/cost/reports/:id", get(get_report))
-        .route("/api/cost/reports/:id/export", get(export_report))
+        .route("/api/cost/reports/{id}", get(get_report))
+        .route("/api/cost/reports/{id}/export", get(export_report))
         // Showback / chargeback
         .route("/api/cost/showback", get(get_showback))
         // Budgets
         .route("/api/cost/budgets", post(create_budget))
         .route("/api/cost/budgets", get(list_budgets))
-        .route("/api/cost/budgets/:id", get(get_budget))
-        .route("/api/cost/budgets/:id", delete(delete_budget))
-        .route("/api/cost/budgets/:id/evaluate", post(evaluate_budget_handler))
+        .route("/api/cost/budgets/{id}", get(get_budget))
+        .route("/api/cost/budgets/{id}", delete(delete_budget))
+        .route("/api/cost/budgets/{id}/evaluate", post(evaluate_budget_handler))
         // Alerts
         .route("/api/cost/alerts", get(list_alerts))
         // Recommendations

@@ -224,8 +224,8 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/ldap/config", post(configure).get(read_config))
         .route("/v1/auth/ldap/groups", get(list_groups))
-        .route("/v1/auth/ldap/groups/:group_name", post(create_group).get(read_group).delete(delete_group))
-        .route("/v1/auth/ldap/users/:username", post(create_user_policy).delete(delete_user_policy))
-        .route("/v1/auth/ldap/login/:username", post(login))
+        .route("/v1/auth/ldap/groups/{group_name}", post(create_group).get(read_group).delete(delete_group))
+        .route("/v1/auth/ldap/users/{username}", post(create_user_policy).delete(delete_user_policy))
+        .route("/v1/auth/ldap/login/{username}", post(login))
         .with_state(state)
 }

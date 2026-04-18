@@ -336,11 +336,11 @@ pub async fn login(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/approle/role", get(list_roles))
-        .route("/v1/auth/approle/role/:role_name", post(create_role).get(read_role).delete(delete_role))
-        .route("/v1/auth/approle/role/:role_name/role-id", get(read_role_id).post(update_role_id))
-        .route("/v1/auth/approle/role/:role_name/secret-id", post(generate_secret_id))
-        .route("/v1/auth/approle/role/:role_name/secret-id/lookup", post(lookup_secret_id))
-        .route("/v1/auth/approle/role/:role_name/secret-id/destroy", post(destroy_secret_id))
+        .route("/v1/auth/approle/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
+        .route("/v1/auth/approle/role/{role_name}/role-id", get(read_role_id).post(update_role_id))
+        .route("/v1/auth/approle/role/{role_name}/secret-id", post(generate_secret_id))
+        .route("/v1/auth/approle/role/{role_name}/secret-id/lookup", post(lookup_secret_id))
+        .route("/v1/auth/approle/role/{role_name}/secret-id/destroy", post(destroy_secret_id))
         .route("/v1/auth/approle/login", post(login))
         .with_state(state)
 }

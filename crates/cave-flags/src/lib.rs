@@ -59,7 +59,10 @@ impl FlagsState {
 
 impl Default for FlagsState {
     fn default() -> Self {
-        todo!("FlagsState requires a database pool — use FlagsState::new(pool)")
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+            cache: Arc::new(RwLock::new(FeatureCache::default())),
+        }
     }
 }
 

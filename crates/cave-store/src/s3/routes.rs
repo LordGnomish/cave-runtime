@@ -831,17 +831,17 @@ pub fn s3_router(state: Arc<StoreState>) -> Router {
         .route("/", get(list_buckets))
         .route("/presign", post(generate_presigned_url))
         // Bucket-level
-        .route("/:bucket", put(create_bucket))
-        .route("/:bucket", delete(delete_bucket))
-        .route("/:bucket", head(head_bucket))
-        .route("/:bucket", get(get_bucket))
-        .route("/:bucket", post(delete_objects_batch)) // ?delete
+        .route("/{bucket}", put(create_bucket))
+        .route("/{bucket}", delete(delete_bucket))
+        .route("/{bucket}", head(head_bucket))
+        .route("/{bucket}", get(get_bucket))
+        .route("/{bucket}", post(delete_objects_batch)) // ?delete
         // Object-level (key may contain slashes, use wildcard)
-        .route("/:bucket/*key", put(put_object))
-        .route("/:bucket/*key", get(get_object))
-        .route("/:bucket/*key", head(head_object))
-        .route("/:bucket/*key", delete(delete_object))
-        .route("/:bucket/*key", post(post_object))
+        .route("/{bucket}/{*key}", put(put_object))
+        .route("/{bucket}/{*key}", get(get_object))
+        .route("/{bucket}/{*key}", head(head_object))
+        .route("/{bucket}/{*key}", delete(delete_object))
+        .route("/{bucket}/{*key}", post(post_object))
         .with_state(state)
 }
 

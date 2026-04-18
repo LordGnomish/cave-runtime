@@ -53,7 +53,12 @@ impl GatewayState {
 
 impl Default for GatewayState {
     fn default() -> Self {
-        todo!("GatewayState requires provider configuration — use GatewayState::new(router)")
+        let providers = Arc::new(provider::ProviderRegistry::new());
+        let aliases = Arc::new(alias::AliasRegistry::new());
+        let strategy = router::RoutingStrategy::Fallback { providers: vec![] };
+        Self {
+            router: Arc::new(GatewayRouter::new(providers, aliases, strategy)),
+        }
     }
 }
 

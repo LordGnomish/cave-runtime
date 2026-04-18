@@ -23,7 +23,7 @@ pub fn create_router(state: Arc<MetricsState>) -> Router {
 
         // ── Metadata ──────────────────────────────────────────────────────
         .route("/api/v1/labels",                    get(labels::list_labels).post(labels::list_labels))
-        .route("/api/v1/label/:name/values",        get(labels::label_values))
+        .route("/api/v1/label/{name}/values",        get(labels::label_values))
         .route("/api/v1/series",                    get(series::list_series).post(series::list_series))
         .route("/api/v1/metadata",                  get(metadata::metric_metadata))
 

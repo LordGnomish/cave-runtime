@@ -115,7 +115,8 @@ pub fn admin_router(state: Arc<GatewayState>) -> Router {
     Router::new()
         .nest("/admin/v1", admin::admin_router(state.store.clone()))
         // Kong-style: also mount at root for compat
-        .nest("", admin::admin_router(state.store.clone()))
+        // removed: root nest breaks axum 0.8
+        // .nest("", admin::admin_router(state.store.clone()))
 }
 
 /// Build the xDS router (Envoy control plane).

@@ -36,9 +36,9 @@ use crate::{
 pub fn create_router(state: Arc<TraceState>) -> Router {
     Router::new()
         .route("/api/traces",                            get(search_traces))
-        .route("/api/traces/:trace_id",                  get(get_trace))
+        .route("/api/traces/{trace_id}",                  get(get_trace))
         .route("/api/services",                          get(get_services))
-        .route("/api/services/:service/operations",      get(get_operations))
+        .route("/api/services/{service}/operations",      get(get_operations))
         .route("/api/dependencies",                      get(get_dependencies))
         .route("/api/metrics/calls",                     get(metrics_calls))
         .route("/api/metrics/errors",                    get(metrics_errors))

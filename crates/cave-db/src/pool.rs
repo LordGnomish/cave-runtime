@@ -28,6 +28,17 @@ impl CavePool {
         Ok(Self { pool })
     }
 
+    /// Lazy no-connect pool for modules that boot with Default but don't
+    /// touch the database in their hot-path. Connection only attempted on `.get()`.
+    pub fn mock() -> Self {
+        let cfg = DatabaseConfig {
+            url: "postgres://disabled@127.0.0.1:1/disabled".to_string(),
+            max_pool_size: Some(1),
+            enable_rls: false,
+        };
+        Self::new(&cfg).expect("cave-db: lazy mock pool construction failed")
+    }
+
     /// Get a connection from the pool.
     pub async fn get(
         &self,

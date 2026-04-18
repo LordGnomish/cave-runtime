@@ -85,6 +85,8 @@ members = [
     "crates/cave-runtime",
     # === Upstream Tracker ===
     "crates/cave-upstream",
+    # === Sovereign Ledger ===
+    "crates/cave-ledger",
 ]
 
 [workspace.package]
@@ -125,6 +127,9 @@ thiserror = "2"
 anyhow = "1"
 config = "0.14"
 clap = { version = "4", features = ["derive"] }
+# Cryptography
+sha2 = "0.10"
+hex = "0.4"
 # Security scanning
 aho-corasick = "1"
 regex = "1"

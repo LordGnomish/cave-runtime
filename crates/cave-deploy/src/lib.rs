@@ -31,7 +31,7 @@ impl DeployState {
 
 impl Default for DeployState {
     fn default() -> Self {
-        todo!("DeployState requires a database pool — use DeployState::new(pool)")
+        Self { pool: Arc::new(cave_db::CavePool::mock()) }
     }
 }
 

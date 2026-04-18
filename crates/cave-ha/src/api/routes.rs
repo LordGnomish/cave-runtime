@@ -38,15 +38,15 @@ pub struct ApiState {
 
 pub fn router(state: Arc<ApiState>) -> Router {
     Router::new()
-        .route("/health", get(health))
-        .route("/status", get(status))
-        .route("/propose", post(propose))
-        .route("/members", post(add_member))
-        .route("/members/:id", delete(remove_member))
-        .route("/transfer", post(transfer_leadership))
-        .route("/snapshot", post(trigger_snapshot))
-        .route("/metrics", get(metrics))
-        .route("/dr/status", get(dr_status))
+        .route("/api/ha/health", get(health))
+        .route("/api/ha/status", get(status))
+        .route("/api/ha/propose", post(propose))
+        .route("/api/ha/members", post(add_member))
+        .route("/members/{id}", delete(remove_member))
+        .route("/api/ha/transfer", post(transfer_leadership))
+        .route("/api/ha/snapshot", post(trigger_snapshot))
+        .route("/api/ha/metrics", get(metrics))
+        .route("/api/ha/dr/status", get(dr_status))
         .with_state(state)
 }
 

@@ -65,7 +65,10 @@ pub struct State {
 
 impl Default for State {
     fn default() -> Self {
-        todo!("cave_policy::State requires a database pool")
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+            
+        }
     }
 }
 

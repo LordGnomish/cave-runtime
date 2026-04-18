@@ -39,7 +39,10 @@ impl ArtifactsState {
 
 impl Default for ArtifactsState {
     fn default() -> Self {
-        todo!("ArtifactsState requires a database pool — use ArtifactsState::new(pool)")
+        Self {
+            pool: Arc::new(cave_db::CavePool::mock()),
+            task_queue: Arc::new(tasks::TaskQueue::new()),
+        }
     }
 }
 

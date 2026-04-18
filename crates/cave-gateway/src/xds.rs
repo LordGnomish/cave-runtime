@@ -25,10 +25,10 @@ use std::collections::HashMap;
 pub fn xds_router(store: SharedStore) -> Router {
     Router::new()
         // Discovery endpoints (REST/JSON)
-        .route("/xds/v3/discovery:listeners", post(lds_handler))
-        .route("/xds/v3/discovery:routes", post(rds_handler))
-        .route("/xds/v3/discovery:clusters", post(cds_handler))
-        .route("/xds/v3/discovery:endpoints", post(eds_handler))
+        .route("/xds/v3/discovery/listeners", post(lds_handler))
+        .route("/xds/v3/discovery/routes", post(rds_handler))
+        .route("/xds/v3/discovery/clusters", post(cds_handler))
+        .route("/xds/v3/discovery/endpoints", post(eds_handler))
         // Individual resource queries
         .route("/xds/v3/listener/{name}", get(get_listener))
         .route("/xds/v3/route_configuration/{name}", get(get_route_config))

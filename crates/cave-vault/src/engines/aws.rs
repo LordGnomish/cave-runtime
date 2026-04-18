@@ -255,7 +255,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { list_roles(State(state), headers, Path(mount)).await }
             }
         }))
-        .route(&format!("/v1/{}/roles/:role_name", mount), post({
+        .route(&format!("/v1/{}/roles/{{role_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(role_name): Path<String>, Json(body): Json<Value>| {
@@ -280,7 +280,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { delete_role(State(state), headers, Path((mount, role_name))).await }
             }
         }))
-        .route(&format!("/v1/{}/creds/:role_name", mount), get({
+        .route(&format!("/v1/{}/creds/{{role_name}}", mount), get({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(role_name): Path<String>| {

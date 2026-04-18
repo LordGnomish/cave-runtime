@@ -246,11 +246,11 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/jwt/config", post(configure).get(read_config))
         .route("/v1/auth/jwt/role", get(list_roles))
-        .route("/v1/auth/jwt/role/:role_name", post(create_role).get(read_role).delete(delete_role))
+        .route("/v1/auth/jwt/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
         .route("/v1/auth/jwt/login", post(jwt_login))
         .route("/v1/auth/oidc/config", post(configure).get(read_config))
         .route("/v1/auth/oidc/role", get(list_roles))
-        .route("/v1/auth/oidc/role/:role_name", post(create_role).get(read_role).delete(delete_role))
+        .route("/v1/auth/oidc/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
         .route("/v1/auth/oidc/login", post(jwt_login))
         .with_state(state)
 }

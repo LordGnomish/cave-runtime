@@ -24,46 +24,46 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
     Router::new()
         // ── Client SDK ────────────────────────────────────────────────────────
         .route("/api/client/features", get(client_features))
-        .route("/api/client/features/:name", get(client_feature_single))
+        .route("/api/client/features/{name}", get(client_feature_single))
         .route("/api/client/metrics", post(client_metrics))
         .route("/api/client/register", post(client_register))
         // ── Frontend ─────────────────────────────────────────────────────────
         .route("/api/frontend", get(frontend_toggles_get).post(frontend_toggles_post))
         .route("/api/frontend/features", get(frontend_features_list))
-        .route("/api/frontend/features/:name", get(frontend_feature_single))
+        .route("/api/frontend/features/{name}", get(frontend_feature_single))
         // ── Admin: features ──────────────────────────────────────────────────
         .route(
             "/api/admin/features",
             get(admin_list_features).post(admin_create_feature),
         )
         .route(
-            "/api/admin/features/:name",
+            "/api/admin/features/{name}",
             get(admin_get_feature)
                 .put(admin_update_feature)
                 .delete(admin_archive_feature),
         )
         .route(
-            "/api/admin/features/:name/environments/:env/on",
+            "/api/admin/features/{name}/environments/{env}/on",
             post(admin_enable_feature_env),
         )
         .route(
-            "/api/admin/features/:name/environments/:env/off",
+            "/api/admin/features/{name}/environments/{env}/off",
             post(admin_disable_feature_env),
         )
         .route(
-            "/api/admin/features/:name/environments/:env/strategies",
+            "/api/admin/features/{name}/environments/{env}/strategies",
             get(admin_list_strategies).post(admin_add_strategy),
         )
         .route(
-            "/api/admin/features/:name/environments/:env/strategies/:sid",
+            "/api/admin/features/{name}/environments/{env}/strategies/{sid}",
             put(admin_update_strategy).delete(admin_delete_strategy),
         )
         .route(
-            "/api/admin/features/:name/variants",
+            "/api/admin/features/{name}/variants",
             get(admin_get_variants).put(admin_set_variants),
         )
         .route(
-            "/api/admin/features/:name/tags",
+            "/api/admin/features/{name}/tags",
             get(admin_get_tags).post(admin_add_tag),
         )
         // ── Admin: projects ──────────────────────────────────────────────────
@@ -72,12 +72,12 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
             get(admin_list_projects).post(admin_create_project),
         )
         .route(
-            "/api/admin/projects/:id",
+            "/api/admin/projects/{id}",
             get(admin_get_project).put(admin_update_project).delete(admin_delete_project),
         )
         // ── Admin: environments ──────────────────────────────────────────────
         .route("/api/admin/environments", get(admin_list_environments))
-        .route("/api/admin/environments/:name", get(admin_get_environment))
+        .route("/api/admin/environments/{name}", get(admin_get_environment))
         // ── Admin: strategies ────────────────────────────────────────────────
         .route("/api/admin/strategies", get(admin_list_strategy_definitions))
         // ── Admin: segments ──────────────────────────────────────────────────
@@ -86,7 +86,7 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
             get(admin_list_segments).post(admin_create_segment),
         )
         .route(
-            "/api/admin/segments/:id",
+            "/api/admin/segments/{id}",
             get(admin_get_segment).put(admin_update_segment).delete(admin_delete_segment),
         )
         // ── Admin: context fields ────────────────────────────────────────────
@@ -96,27 +96,27 @@ pub fn create_router(state: Arc<FlagsState>) -> Router {
             "/api/admin/api-tokens",
             get(admin_list_tokens).post(admin_create_token),
         )
-        .route("/api/admin/api-tokens/:secret", delete(admin_delete_token))
+        .route("/api/admin/api-tokens/{secret}", delete(admin_delete_token))
         // ── Admin: banners ───────────────────────────────────────────────────
         .route(
             "/api/admin/banners",
             get(admin_list_banners).post(admin_create_banner),
         )
         .route(
-            "/api/admin/banners/:id",
+            "/api/admin/banners/{id}",
             put(admin_update_banner).delete(admin_delete_banner),
         )
         // ── Admin: change requests ───────────────────────────────────────────
         .route(
-            "/api/admin/projects/:project/change-requests",
+            "/api/admin/projects/{project}/change-requests",
             get(admin_list_change_requests).post(admin_create_change_request),
         )
         .route(
-            "/api/admin/projects/:project/change-requests/:id/approve",
+            "/api/admin/projects/{project}/change-requests/{id}/approve",
             post(admin_approve_change_request),
         )
         .route(
-            "/api/admin/projects/:project/change-requests/:id/apply",
+            "/api/admin/projects/{project}/change-requests/{id}/apply",
             post(admin_apply_change_request),
         )
         // ── Health ───────────────────────────────────────────────────────────

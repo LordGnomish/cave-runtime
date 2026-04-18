@@ -431,17 +431,17 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         // Entity
         .route("/v1/identity/entity", post(create_entity).get(list_entities))
-        .route("/v1/identity/entity/id/:id", get(read_entity_by_id).post(update_entity).delete(delete_entity))
-        .route("/v1/identity/entity/name/:name", get(read_entity_by_name))
+        .route("/v1/identity/entity/id/{id}", get(read_entity_by_id).post(update_entity).delete(delete_entity))
+        .route("/v1/identity/entity/name/{name}", get(read_entity_by_name))
         // Entity Alias
         .route("/v1/identity/entity-alias", post(create_entity_alias).get(list_entity_aliases))
-        .route("/v1/identity/entity-alias/id/:id", get(read_entity_alias).delete(delete_entity_alias))
+        .route("/v1/identity/entity-alias/id/{id}", get(read_entity_alias).delete(delete_entity_alias))
         // Group
         .route("/v1/identity/group", post(create_group).get(list_groups))
-        .route("/v1/identity/group/id/:id", get(read_group_by_id).delete(delete_group))
-        .route("/v1/identity/group/name/:name", get(read_group_by_name))
+        .route("/v1/identity/group/id/{id}", get(read_group_by_id).delete(delete_group))
+        .route("/v1/identity/group/name/{name}", get(read_group_by_name))
         // Group Alias
         .route("/v1/identity/group-alias", post(create_group_alias).get(list_group_aliases))
-        .route("/v1/identity/group-alias/id/:id", get(read_group_alias).delete(delete_group_alias))
+        .route("/v1/identity/group-alias/id/{id}", get(read_group_alias).delete(delete_group_alias))
         .with_state(state)
 }

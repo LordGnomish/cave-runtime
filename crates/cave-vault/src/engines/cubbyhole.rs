@@ -156,7 +156,7 @@ pub async fn list_secrets(
 pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route(
-            "/v1/cubbyhole/*path",
+            "/v1/cubbyhole/{*path}",
             get({
                 let s = state.clone();
                 move |headers: HeaderMap, Path(path): Path<String>, Query(q): Query<ListQuery>| {

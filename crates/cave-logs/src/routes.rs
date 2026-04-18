@@ -366,7 +366,7 @@ pub fn router(state: AppState) -> Router {
         .route("/loki/api/v1/query_range", get(query_range_handler))
         // Label discovery
         .route("/loki/api/v1/labels", get(labels_handler))
-        .route("/loki/api/v1/label/:name/values", get(label_values_handler))
+        .route("/loki/api/v1/label/{name}/values", get(label_values_handler))
         // Series
         .route("/loki/api/v1/series", get(series_handler))
         // Index stats
@@ -374,7 +374,7 @@ pub fn router(state: AppState) -> Router {
         // Tail (WebSocket)
         .route("/loki/api/v1/tail", get(tail_handler))
         // Health / metrics
-        .route("/ready", get(ready_handler))
-        .route("/metrics", get(metrics_handler))
+        .route("/api/logs/ready", get(ready_handler))
+        .route("/api/logs/metrics", get(metrics_handler))
         .with_state(state)
 }

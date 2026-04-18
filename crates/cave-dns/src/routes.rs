@@ -26,18 +26,18 @@ pub fn create_router(zones: Arc<ZoneManager>) -> Router {
 
     let zone_router = Router::new()
         .route("/api/v1/zones", get(list_zones).post(create_zone))
-        .route("/api/v1/zones/:zone", get(get_zone).delete(delete_zone))
-        .route("/api/v1/zones/:zone/export", get(export_zone))
+        .route("/api/v1/zones/{zone}", get(get_zone).delete(delete_zone))
+        .route("/api/v1/zones/{zone}/export", get(export_zone))
         .with_state(zone_state);
 
     let record_router = Router::new()
         .route(
-            "/api/v1/zones/:zone/records",
+            "/api/v1/zones/{zone}/records",
             get(list_records).post(create_record),
         )
-        .route("/api/v1/zones/:zone/records/batch", post(batch_records))
+        .route("/api/v1/zones/{zone}/records/batch", post(batch_records))
         .route(
-            "/api/v1/zones/:zone/records/:name/:rtype",
+            "/api/v1/zones/{zone}/records/{name}/{rtype}",
             delete(delete_record),
         )
         .with_state(record_state);

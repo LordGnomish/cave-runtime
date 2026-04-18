@@ -198,7 +198,7 @@ pub fn router(state: Arc<VaultState>) -> Router {
     Router::new()
         .route("/v1/auth/kubernetes/config", post(configure).get(read_config))
         .route("/v1/auth/kubernetes/role", get(list_roles))
-        .route("/v1/auth/kubernetes/role/:role_name", post(create_role).get(read_role).delete(delete_role))
+        .route("/v1/auth/kubernetes/role/{role_name}", post(create_role).get(read_role).delete(delete_role))
         .route("/v1/auth/kubernetes/login", post(login))
         .with_state(state)
 }

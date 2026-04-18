@@ -1,10 +1,20 @@
 //! Runtime configuration — loaded from YAML, env vars, and Kubernetes ConfigMaps.
+//!
+//! Configuration resolves in this order:
+//! 1. Profile defaults (from DeploymentProfile)
+//! 2. YAML config file overrides
+//! 3. Environment variable overrides (CAVE_ prefix)
+//! 4. CLI argument overrides
 
+use crate::profile::{DeploymentProfile, Environment, Provider};
 use serde::Deserialize;
 
 /// Top-level configuration for the CAVE Unified Runtime.
 #[derive(Debug, Deserialize, Clone)]
 pub struct CaveConfig {
+    /// Active deployment profile
+    #[serde(default)]
+    pub profile: ProfileSelector,
     /// Runtime server settings
     pub server: ServerConfig,
     /// Authentication provider settings
@@ -13,9 +23,65 @@ pub struct CaveConfig {
     pub database: DatabaseConfig,
     /// Module enable/disable flags
     pub modules: ModuleConfig,
-    /// Persistence backend selection
+    /// Storage backend configuration
     #[serde(default)]
     pub storage: StorageConfig,
+}
+
+/// Profile selector in config YAML.
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ProfileSelector {
+    /// Simple name: "hetzner-dev", "azure-prod", "local"
+    Name(String),
+    /// Explicit fields
+    Explicit {
+        environment: Option<Environment>,
+        provider: Option<Provider>,
+    },
+}
+
+impl Default for ProfileSelector {
+    fn default() -> Self {
+        Self::Name("local".to_string())
+    }
+}
+
+impl ProfileSelector {
+    /// Resolve to a DeploymentProfile.
+    pub fn resolve(&self) -> Result<DeploymentProfile, crate::CaveError> {
+        match self {
+            Self::Name(name) => match name.as_str() {
+                "local" => Ok(DeploymentProfile::local()),
+                "hetzner-dev" => Ok(DeploymentProfile::new(Environment::Dev, Provider::Hetzner)),
+                "hetzner-staging" => {
+                    Ok(DeploymentProfile::new(Environment::Staging, Provider::Hetzner))
+                }
+                "hetzner-prod" => {
+                    Ok(DeploymentProfile::new(Environment::Prod, Provider::Hetzner))
+                }
+                "azure-dev" => Ok(DeploymentProfile::new(Environment::Dev, Provider::Azure)),
+                "azure-staging" => {
+                    Ok(DeploymentProfile::new(Environment::Staging, Provider::Azure))
+                }
+                "azure-prod" => Ok(DeploymentProfile::new(Environment::Prod, Provider::Azure)),
+                other => Err(crate::CaveError::Config(format!(
+                    "Unknown profile: {other}. Valid profiles: local, hetzner-dev, hetzner-staging, hetzner-prod, azure-dev, azure-staging, azure-prod"
+                ))),
+            },
+            Self::Explicit {
+                environment,
+                provider,
+            } => match (environment, provider) {
+                (Some(env), Some(prov)) => Ok(DeploymentProfile::new(*env, *prov)),
+                (None, None) => Ok(DeploymentProfile::local()),
+                _ => Err(crate::CaveError::Config(
+                    "Profile requires both environment and provider, or neither (for local)"
+                        .to_string(),
+                )),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -32,7 +98,7 @@ pub struct ServerConfig {
 pub struct AuthConfig {
     /// OIDC provider: "okta" or "keycloak"
     pub provider: AuthProvider,
-    /// OIDC issuer URL (e.g., https://your-org.okta.com or https://keycloak.cave.caveplatform.dev/realms/cave)
+    /// OIDC issuer URL (e.g., https://keycloak.cave.caveplatform.dev/realms/cave)
     pub issuer_url: String,
     /// OIDC audience
     pub audience: String,
@@ -53,6 +119,48 @@ pub struct DatabaseConfig {
     pub url: String,
     /// Max pool size (default: 20)
     pub max_pool_size: Option<u32>,
+    /// Enable Row-Level Security enforcement
+    #[serde(default)]
+    pub enable_rls: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct StorageConfig {
+    /// Storage backend type
+    #[serde(default)]
+    pub backend: StorageBackend,
+    /// S3/MinIO endpoint (for object storage)
+    pub s3_endpoint: Option<String>,
+    /// S3 bucket name
+    pub s3_bucket: Option<String>,
+    /// Azure storage account (for ADLS Gen2)
+    pub azure_account: Option<String>,
+    /// Azure container
+    pub azure_container: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageBackend {
+    /// MinIO (Hetzner/local)
+    #[default]
+    Minio,
+    /// Azure Data Lake Storage Gen2
+    Adls,
+    /// Local filesystem (development only)
+    Local,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            backend: StorageBackend::default(),
+            s3_endpoint: None,
+            s3_bucket: None,
+            azure_account: None,
+            azure_container: None,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -76,41 +184,6 @@ pub struct ModuleConfig {
     pub workflows: bool,
     pub chat: bool,
     pub incidents: bool,
-}
-
-// ── Storage config ────────────────────────────────────────────────────────────
-
-/// Which persistence backend to use for module state.
-#[derive(Debug, Deserialize, Clone, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum StorageBackend {
-    /// In-process HashMap — suitable for tests and ephemeral local dev.
-    #[default]
-    Memory,
-    /// SQLite via rusqlite (bundled). Good for single-node deployments.
-    Sqlite,
-    /// PostgreSQL via the shared `CavePool`. Required for production.
-    Postgres,
-}
-
-/// Storage configuration block (`[storage]` in YAML).
-#[derive(Debug, Deserialize, Clone)]
-pub struct StorageConfig {
-    /// Which backend to use.
-    #[serde(default)]
-    pub backend: StorageBackend,
-    /// Path to the SQLite database file (used with `StorageBackend::Sqlite`).
-    /// Defaults to `./cave.db`.
-    pub sqlite_path: Option<String>,
-}
-
-impl Default for StorageConfig {
-    fn default() -> Self {
-        Self {
-            backend: StorageBackend::Memory,
-            sqlite_path: None,
-        }
-    }
 }
 
 impl Default for ServerConfig {
@@ -146,5 +219,65 @@ impl Default for ModuleConfig {
             chat: false,
             incidents: false,
         }
+    }
+}
+
+impl CaveConfig {
+    /// Load config from file, with env var overrides.
+    pub fn load(path: &std::path::Path) -> Result<Self, crate::CaveError> {
+        let contents = std::fs::read_to_string(path).map_err(|e| {
+            crate::CaveError::Config(format!("Failed to read config {}: {e}", path.display()))
+        })?;
+        let mut config: Self = serde_yaml::from_str(&contents).map_err(|e| {
+            crate::CaveError::Config(format!("Failed to parse config: {e}"))
+        })?;
+
+        // Environment variable overrides (CAVE_ prefix)
+        if let Ok(port) = std::env::var("CAVE_PORT") {
+            if let Ok(p) = port.parse() {
+                config.server.port = p;
+            }
+        }
+        if let Ok(db_url) = std::env::var("CAVE_DATABASE_URL") {
+            config.database.url = db_url;
+        }
+        if let Ok(profile) = std::env::var("CAVE_PROFILE") {
+            config.profile = ProfileSelector::Name(profile);
+        }
+
+        Ok(config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_profile_resolve_local() {
+        let sel = ProfileSelector::Name("local".to_string());
+        let profile = sel.resolve().unwrap();
+        assert!(profile.is_local());
+    }
+
+    #[test]
+    fn test_profile_resolve_hetzner_prod() {
+        let sel = ProfileSelector::Name("hetzner-prod".to_string());
+        let profile = sel.resolve().unwrap();
+        assert!(profile.is_production());
+        assert_eq!(profile.provider(), Some(Provider::Hetzner));
+    }
+
+    #[test]
+    fn test_profile_resolve_invalid() {
+        let sel = ProfileSelector::Name("invalid".to_string());
+        assert!(sel.resolve().is_err());
+    }
+
+    #[test]
+    fn test_default_profile_is_local() {
+        let sel = ProfileSelector::default();
+        let profile = sel.resolve().unwrap();
+        assert!(profile.is_local());
     }
 }

@@ -639,7 +639,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { list_keys(State(state), headers, Path(mount)).await }
             }
         }))
-        .route(&format!("/v1/{}/keys/:key_name", mount), post({
+        .route(&format!("/v1/{}/keys/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<Value>| {
@@ -664,7 +664,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { delete_key(State(state), headers, Path((mount, key_name))).await }
             }
         }))
-        .route(&format!("/v1/{}/keys/:key_name/rotate", mount), post({
+        .route(&format!("/v1/{}/keys/{{key_name}}/rotate", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>| {
@@ -673,7 +673,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { rotate_key(State(state), headers, Path((mount, key_name))).await }
             }
         }))
-        .route(&format!("/v1/{}/encrypt/:key_name", mount), post({
+        .route(&format!("/v1/{}/encrypt/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<EncryptRequest>| {
@@ -682,7 +682,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { encrypt(State(state), headers, Path((mount, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/decrypt/:key_name", mount), post({
+        .route(&format!("/v1/{}/decrypt/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<DecryptRequest>| {
@@ -691,7 +691,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { decrypt(State(state), headers, Path((mount, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/rewrap/:key_name", mount), post({
+        .route(&format!("/v1/{}/rewrap/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<DecryptRequest>| {
@@ -700,7 +700,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { rewrap(State(state), headers, Path((mount, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/sign/:key_name", mount), post({
+        .route(&format!("/v1/{}/sign/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<SignRequest>| {
@@ -709,7 +709,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { sign(State(state), headers, Path((mount, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/verify/:key_name", mount), post({
+        .route(&format!("/v1/{}/verify/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path(key_name): Path<String>, Json(body): Json<VerifyRequest>| {
@@ -718,7 +718,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { verify(State(state), headers, Path((mount, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/datakey/:plaintext_or_wrapped/:key_name", mount), post({
+        .route(&format!("/v1/{}/datakey/{{plaintext_or_wrapped}}/{{key_name}}", mount), post({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path((pow, key_name)): Path<(String, String)>, Json(body): Json<GenerateDataKeyRequest>| {
@@ -727,7 +727,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
                 async move { generate_data_key(State(state), headers, Path((mount, pow, key_name)), Json(body)).await }
             }
         }))
-        .route(&format!("/v1/{}/export/:key_type/:key_name/:version", mount), get({
+        .route(&format!("/v1/{}/export/{{key_type}}/{{key_name}}/{{version}}", mount), get({
             let s = state.clone();
             let mount = m.clone();
             move |headers: HeaderMap, Path((kt, key_name, version)): Path<(String, String, String)>| {
