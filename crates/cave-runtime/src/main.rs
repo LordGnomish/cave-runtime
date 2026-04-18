@@ -116,6 +116,13 @@ async fn main() -> anyhow::Result<()> {
     let compliance_state = Arc::new(cave_compliance::ComplianceState::default());
     let cost_alloc_state = Arc::new(cave_cost_alloc::CostAllocState::default());
 
+    // New crates (this session)
+    let oncall_state = cave_oncall::new_state();
+    let container_scan_state = cave_container_scan::new_state();
+    let erp_state = cave_erp::new_state();
+    let docdb_state = cave_docdb::new_state();
+    let rdbms_state = cave_rdbms::new_state();
+
     // Start background tasks
     metrics_state.start_background_tasks();
 
@@ -201,6 +208,33 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_auth::okta::scim_router(
             std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
         ))
+        // New crates (this session)
+        .merge(cave_oncall::router(oncall_state))
+        .merge(cave_container_scan::router(container_scan_state))
+        .merge(cave_erp::router(erp_state))
+        .merge(cave_docdb::router(docdb_state.clone()))
+        .merge(cave_rdbms::router(rdbms_state.clone()))
+        // Auth endpoints
+        .merge(cave_auth::auth_routes::router())
+        // JWT auth middleware
+        .layer(axum::middleware::from_fn(|mut req: axum::extract::Request, next: axum::middleware::Next| async move {
+            let state = req.extensions().get::<Arc<cave_auth::jwt_middleware::AuthState>>().cloned();
+            match state {
+                Some(s) => cave_auth::jwt_middleware::auth_middleware_inner(s, req, next).await,
+                None => next.run(req).await,
+            }
+        }))
+        .layer(axum::Extension(Arc::new(cave_auth::jwt_middleware::AuthState {
+            jwt_secret: std::env::var("CAVE_JWT_SECRET")
+                .unwrap_or_else(|_| "dev-secret-change-me".to_string()),
+            bypass_paths: vec![
+                "/health".into(), "/ready".into(),
+                "/api/modules".into(), "/api/health".into(),
+                "/portal/".into(), "/api/portal/".into(), "/api/auth/".into(),
+                "/api/upstream/".into(), "/v2/".into(),
+                "/loki/".into(), "/tempo/".into(),
+            ],
+        })))
         // Middleware
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())

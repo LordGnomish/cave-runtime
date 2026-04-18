@@ -87,6 +87,12 @@ members = [
     "crates/cave-upstream",
     # === Sovereign Ledger ===
     "crates/cave-ledger",
+    # === New crates (this session) ===
+    "crates/cave-oncall",
+    "crates/cave-container-scan",
+    "crates/cave-erp",
+    "crates/cave-docdb",
+    "crates/cave-rdbms",
 ]
 
 [workspace.package]

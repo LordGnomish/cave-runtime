@@ -101,6 +101,12 @@ cave-rollouts = { path = "../cave-rollouts" }
 cave-artifacts = { path = "../cave-artifacts" }
 # Governance
 cave-runbook = { path = "../cave-runbook" }
+# New crates (this session)
+cave-oncall = { path = "../cave-oncall" }
+cave-container-scan = { path = "../cave-container-scan" }
+cave-erp = { path = "../cave-erp" }
+cave-docdb = { path = "../cave-docdb" }
+cave-rdbms = { path = "../cave-rdbms" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }

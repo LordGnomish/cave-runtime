@@ -17,8 +17,10 @@
 pub mod abac;
 pub mod audit;
 pub mod auth_middleware;
+pub mod auth_routes;
 pub mod claims;
 pub mod jwks;
+pub mod jwt_middleware;
 pub mod middleware;
 pub mod okta;
 pub mod rbac;
