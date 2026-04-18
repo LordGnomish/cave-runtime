@@ -16,6 +16,8 @@
 pub mod gc;
 pub mod harbor;
 pub mod models;
+pub mod pipeline;
+pub mod proxy;
 pub mod routes;
 pub mod storage;
 pub mod store;
@@ -29,6 +31,8 @@ use storage::RegistryStorage;
 pub struct RegistryState {
     pub pool: Arc<CavePool>,
     pub storage: Arc<RegistryStorage>,
+    pub proxy: proxy::ProxyClient,
+    pub pipeline: pipeline::ScanPipeline,
 }
 
 impl Default for RegistryState {
@@ -36,14 +40,18 @@ impl Default for RegistryState {
         Self {
             pool: Arc::new(cave_db::CavePool::mock()),
             storage: Arc::new(RegistryStorage::default()),
+            proxy: proxy::ProxyClient::new(proxy::ProxyConfig::default()),
+            pipeline: pipeline::ScanPipeline::new(pipeline::ScanPipelineConfig::default()),
         }
     }
 }
 
-/// Build the combined axum router (Docker V2 + Harbor Admin API).
+/// Build the combined axum router (Docker V2 + Harbor Admin API + proxy + pipeline).
 pub fn router(state: Arc<RegistryState>) -> Router {
     routes::v2::router(Arc::clone(&state))
-        .merge(routes::harbor::router(state))
+        .merge(routes::harbor::router(Arc::clone(&state)))
+    // NOTE: proxy routes not yet integrated — requires RegistryStorage methods
+    // .merge(routes::proxy::router(state))
 }
 
 pub const MODULE_NAME: &str = "registry";

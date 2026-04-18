@@ -32,6 +32,7 @@
 
 pub mod admin;
 pub mod circuit_breaker;
+pub mod gravitee;
 pub mod handler;
 pub mod health;
 pub mod lb;

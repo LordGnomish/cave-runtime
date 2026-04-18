@@ -1,8 +1,10 @@
 //! Developer portal — replaces Backstage.
 
+pub mod dashboard;
 pub mod engine;
 pub mod models;
 pub mod routes;
+pub mod ui;
 
 use axum::Router;
 use std::sync::Arc;
