@@ -228,11 +228,13 @@ async fn main() -> anyhow::Result<()> {
             jwt_secret: std::env::var("CAVE_JWT_SECRET")
                 .unwrap_or_else(|_| "dev-secret-change-me".to_string()),
             bypass_paths: vec![
+                "_exact:/".into(),
                 "/health".into(), "/ready".into(),
                 "/api/modules".into(), "/api/health".into(),
                 "/portal/".into(), "/api/portal/".into(), "/api/auth/".into(),
                 "/api/upstream/".into(), "/v2/".into(),
                 "/loki/".into(), "/tempo/".into(),
+                "/api/registry/".into(),
             ],
         })))
         // Middleware
