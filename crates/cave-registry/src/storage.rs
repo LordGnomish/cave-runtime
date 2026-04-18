@@ -30,10 +30,10 @@ struct ManifestIndex {
 /// Thread-safe, content-addressable registry storage.
 pub struct RegistryStorage {
     blobs: RwLock<HashMap<String, Bytes>>,
-    /// which repos reference each blob digest
     blob_refs: RwLock<HashMap<String, HashSet<String>>>,
     manifests: RwLock<ManifestIndex>,
     uploads: RwLock<HashMap<String, UploadState>>,
+    aliases: RwLock<HashMap<String, String>>,
 }
 
 impl Default for RegistryStorage {
@@ -43,7 +43,21 @@ impl Default for RegistryStorage {
             blob_refs: RwLock::new(HashMap::new()),
             manifests: RwLock::new(ManifestIndex::default()),
             uploads: RwLock::new(HashMap::new()),
+            aliases: RwLock::new(HashMap::new()),
         }
+    }
+}
+
+impl RegistryStorage {
+    pub async fn get_blob_by_alias(&self, alias: &str) -> Option<Bytes> {
+        let digest = self.aliases.read().await.get(alias).cloned()?;
+        self.blobs.read().await.get(&digest).cloned()
+    }
+
+    pub async fn put_blob_with_alias(&self, alias: String, data: Bytes) {
+        let digest = compute_digest(&data);
+        self.blobs.write().await.entry(digest.clone()).or_insert(data);
+        self.aliases.write().await.insert(alias, digest);
     }
 }
 

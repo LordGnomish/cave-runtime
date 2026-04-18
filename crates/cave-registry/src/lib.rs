@@ -46,12 +46,11 @@ impl Default for RegistryState {
     }
 }
 
-/// Build the combined axum router (Docker V2 + Harbor Admin API + proxy + pipeline).
+/// Build the combined axum router (Docker V2 + Harbor Admin API + proxy).
 pub fn router(state: Arc<RegistryState>) -> Router {
     routes::v2::router(Arc::clone(&state))
         .merge(routes::harbor::router(Arc::clone(&state)))
-    // NOTE: proxy routes not yet integrated — requires RegistryStorage methods
-    // .merge(routes::proxy::router(state))
+        .merge(routes::proxy::router(state))
 }
 
 pub const MODULE_NAME: &str = "registry";

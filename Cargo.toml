@@ -87,6 +87,8 @@ members = [
     "crates/cave-upstream",
     # === Sovereign Ledger ===
     "crates/cave-ledger",
+    # === Crossplane ===
+    "crates/cave-crossplane",
     # === New crates (this session) ===
     "crates/cave-oncall",
     "crates/cave-container-scan",
