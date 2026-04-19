@@ -1,6 +1,6 @@
 //! CAVE Flags — Unleash-compatible feature flag service.
 //!
-//! Replaces: Unleash
+//! Compatible with: Unleash
 //! Upstream tracking: see cave-upstream (Unleash v6.x).
 //!
 //! ## Implemented

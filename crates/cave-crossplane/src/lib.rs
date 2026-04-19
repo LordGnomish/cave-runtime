@@ -1,5 +1,5 @@
 //! CAVE Crossplane — Crossplane v2 XRD composition engine.
-//! Replaces: crossplane/crossplane
+//! Compatible with: crossplane/crossplane
 //! Features: XRD parser, composition engine, patch transforms, claims, composites, providers, reconciler.
 
 pub mod claim;

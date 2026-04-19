@@ -1,6 +1,6 @@
-//! Privileged access management — replaces Teleport CE
+//! Privileged access management — compatible with Teleport CE
 //!
-//! Replaces: Teleport CE
+//! Compatible with: Teleport CE
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

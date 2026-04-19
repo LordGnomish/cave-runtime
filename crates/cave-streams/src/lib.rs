@@ -1,6 +1,6 @@
 //! CAVE Streams — Kafka-compatible streaming platform.
 //!
-//! Replaces: Apache Kafka + Confluent Schema Registry + Kafka Connect
+//! Compatible with: Apache Kafka + Confluent Schema Registry + Kafka Connect
 //!
 //! Features:
 //! - Full Kafka wire protocol (API keys 0-67)

@@ -1,6 +1,6 @@
 [package]
 name = "cave-cost-alloc"
-description = "FinOps showback/chargeback — replaces Kubecost/CloudHealth"
+description = "FinOps showback/chargeback — compatible with Kubecost/CloudHealth"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

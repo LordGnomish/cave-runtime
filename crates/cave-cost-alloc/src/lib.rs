@@ -1,6 +1,6 @@
-//! FinOps showback/chargeback — replaces Kubecost/CloudHealth
+//! FinOps showback/chargeback — compatible with Kubecost/CloudHealth
 //!
-//! Replaces: Kubecost, CloudHealth
+//! Compatible with: Kubecost, CloudHealth
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod allocator;

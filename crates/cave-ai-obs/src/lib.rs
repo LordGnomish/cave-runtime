@@ -1,6 +1,6 @@
-//! LLM observability — replaces Langfuse
+//! LLM observability — compatible with Langfuse
 //!
-//! Replaces: Langfuse
+//! Compatible with: Langfuse
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

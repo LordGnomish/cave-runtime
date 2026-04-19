@@ -1,6 +1,6 @@
 [package]
 name = "cave-docs"
-description = "API spec registry — replaces Apicurio + openapi-diff"
+description = "API spec registry — compatible with Apicurio + openapi-diff"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

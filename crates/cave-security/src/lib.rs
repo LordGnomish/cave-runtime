@@ -1,6 +1,6 @@
 //! CAVE Security — Falco runtime rule engine + Trivy vulnerability scanner.
 //!
-//! Replaces: Falco + Trivy (full feature parity)
+//! Compatible with: Falco + Trivy (full feature parity)
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod falco;

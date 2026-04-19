@@ -1,6 +1,6 @@
 [package]
 name = "cave-alerts"
-description = "Alert routing & management — replaces Alertmanager"
+description = "Alert routing & management — compatible with Alertmanager"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,4 +1,4 @@
-//! API spec registry — replaces Apicurio + openapi-diff
+//! API spec registry — compatible with Apicurio + openapi-diff
 //!
 //! Upstream tracking: apicurio + openapi-diff
 //! Features: OpenAPI/AsyncAPI spec storage, breaking change detection, schema versioning

@@ -1,6 +1,6 @@
 [package]
 name = "cave-pg"
-description = "PostgreSQL management — replaces pgAdmin/CloudNativePG"
+description = "PostgreSQL management — compatible with pgAdmin/CloudNativePG"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

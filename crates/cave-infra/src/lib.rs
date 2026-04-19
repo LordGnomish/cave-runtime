@@ -1,6 +1,6 @@
 //! CAVE Infra — LLM + MCP-driven Infrastructure-as-Code engine.
 //!
-//! Replaces: Terraform, Pulumi, custom IaC tooling
+//! Compatible with: Terraform, Pulumi, custom IaC tooling
 //!
 //! Features:
 //! - Natural language to infrastructure (describe → provision)

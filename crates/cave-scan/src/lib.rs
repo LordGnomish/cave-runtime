@@ -1,6 +1,6 @@
-//! Code quality & SAST — replaces SonarQube
+//! Code quality & SAST — compatible with SonarQube
 //!
-//! Replaces: SonarQube
+//! Compatible with: SonarQube
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

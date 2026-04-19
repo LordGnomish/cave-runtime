@@ -1,6 +1,6 @@
 //! CAVE Dashboard — Grafana-compatible dashboard engine.
 //!
-//! Replaces: Grafana v10
+//! Compatible with: Grafana v10
 //! Upstream tracking: see cave-upstream for monitored features.
 //!
 //! ## Feature parity

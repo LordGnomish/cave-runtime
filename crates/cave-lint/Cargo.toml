@@ -1,6 +1,6 @@
 [package]
 name = "cave-lint"
-description = "Config & image linting — replaces Hadolint + Checkov + Pluto + kubent"
+description = "Config & image linting — compatible with Hadolint + Checkov + Pluto + kubent"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

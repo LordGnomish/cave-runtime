@@ -1,6 +1,6 @@
 [package]
 name = "cave-erp"
-description = "Sovereign open-source ERP — replaces Odoo Community Edition"
+description = "Sovereign open-source ERP — compatible with Odoo Community Edition"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

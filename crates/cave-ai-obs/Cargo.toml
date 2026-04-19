@@ -1,6 +1,6 @@
 [package]
 name = "cave-ai-obs"
-description = "LLM observability — replaces Langfuse"
+description = "LLM observability — compatible with Langfuse"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,6 +1,6 @@
 //! CAVE LLM Gateway — Multi-provider LLM router and proxy.
 //!
-//! Replaces: LiteLLM, custom AI gateway, OpenAI proxy
+//! Compatible with: LiteLLM, custom AI gateway, OpenAI proxy
 //!
 //! Features:
 //! - Multi-provider routing (OpenAI, Anthropic, local models)

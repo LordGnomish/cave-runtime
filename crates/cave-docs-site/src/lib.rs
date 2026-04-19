@@ -1,6 +1,6 @@
 //! CAVE Docs Site — Developer documentation platform.
 //!
-//! Replaces: GitBook / Docusaurus
+//! Compatible with: GitBook / Docusaurus
 //! Multi-version docs, full-text search, hierarchical nav, team collaboration.
 
 pub mod models;

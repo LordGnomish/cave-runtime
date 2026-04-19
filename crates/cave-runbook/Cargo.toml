@@ -1,6 +1,6 @@
 [package]
 name = "cave-runbook"
-description = "Runbook automation engine — replaces manual runbooks"
+description = "Runbook automation engine — compatible with manual runbooks"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

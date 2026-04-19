@@ -59,9 +59,9 @@ pub async fn create_token(
         ));
     }
 
-    // Get JWT secret from env
+    // Get JWT secret from env (required)
     let secret = std::env::var("CAVE_JWT_SECRET")
-        .unwrap_or_else(|_| "dev-secret-change-me".to_string());
+        .expect("CAVE_JWT_SECRET must be set (use any string for dev)");
 
     // Create claims
     let exp = (Utc::now().timestamp() + 3600) as usize; // 1 hour expiry

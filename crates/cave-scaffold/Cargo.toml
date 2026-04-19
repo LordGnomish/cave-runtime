@@ -1,6 +1,6 @@
 [package]
 name = "cave-scaffold"
-description = "Project template engine — replaces Backstage scaffolder"
+description = "Project template engine — compatible with Backstage scaffolder"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

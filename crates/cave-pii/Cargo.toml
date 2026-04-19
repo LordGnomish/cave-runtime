@@ -1,6 +1,6 @@
 [package]
 name = "cave-pii"
-description = "PII detection & redaction — replaces Presidio"
+description = "PII detection & redaction — compatible with Presidio"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

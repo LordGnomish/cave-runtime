@@ -1,6 +1,6 @@
 [package]
 name = "cave-docs-site"
-description = "Developer documentation platform — replaces GitBook / Docusaurus"
+description = "Developer documentation platform — compatible with GitBook / Docusaurus"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

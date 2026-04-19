@@ -1,4 +1,4 @@
-//! Developer portal — replaces Backstage.
+//! Developer portal — compatible with Backstage.
 
 pub mod dashboard;
 pub mod engine;

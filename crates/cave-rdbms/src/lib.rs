@@ -1,6 +1,6 @@
 //! CAVE RDBMS — PostgreSQL-wire-protocol-compatible SQL database.
 //!
-//! Replaces: PostgreSQL (management + query surface). Standard Postgres
+//! Compatible with: PostgreSQL (management + query surface). Standard Postgres
 //! clients (psql, libpq, pgjdbc, psycopg, pgx, sqlx, node-pg) connect on
 //! port 5432 unmodified.
 //!

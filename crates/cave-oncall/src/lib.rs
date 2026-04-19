@@ -1,6 +1,6 @@
-//! On-call scheduling, paging, and escalation — replaces Grafana OnCall.
+//! On-call scheduling, paging, and escalation — compatible with Grafana OnCall.
 //!
-//! Replaces: Grafana OnCall
+//! Compatible with: Grafana OnCall
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

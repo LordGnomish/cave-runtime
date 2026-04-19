@@ -1,6 +1,6 @@
 [package]
 name = "cave-scan"
-description = "Code quality & SAST — replaces SonarQube"
+description = "Code quality & SAST — compatible with SonarQube"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

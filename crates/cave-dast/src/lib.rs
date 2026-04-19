@@ -1,6 +1,6 @@
-//! Dynamic security testing — replaces ZAP
+//! Dynamic security testing — compatible with ZAP
 //!
-//! Replaces: OWASP ZAP
+//! Compatible with: OWASP ZAP
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

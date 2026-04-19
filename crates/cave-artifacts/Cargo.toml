@@ -1,6 +1,6 @@
 [package]
 name = "cave-artifacts"
-description = "Artifact repository — replaces Pulp (v3 API)"
+description = "Artifact repository — compatible with Pulp (v3 API)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -24,7 +24,7 @@ impl SnapshotStore {
         Ok(Self { dir })
     }
 
-    /// Persist a snapshot. Atomically replaces the previous snapshot.
+    /// Persist a snapshot. Atomically compatible with the previous snapshot.
     pub async fn save(&self, snapshot: &Snapshot) -> HaResult<()> {
         let tmp_path = self.dir.join(format!("snapshot-{}.tmp", snapshot.meta.index));
         let final_path = self.dir.join(format!("snapshot-{}.snap", snapshot.meta.index));

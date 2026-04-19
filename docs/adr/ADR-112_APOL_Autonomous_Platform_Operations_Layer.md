@@ -2,7 +2,9 @@
 
 **Status:** Accepted
 
-**Category:** AI Governance
+**Scope:** Universal
+
+**Category:** AI Governance / Operations
 
 **Related ADRs:** 092, 118, 125, 128, 136
 

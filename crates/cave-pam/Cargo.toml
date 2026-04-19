@@ -1,6 +1,6 @@
 [package]
 name = "cave-pam"
-description = "Privileged access management — replaces Teleport CE"
+description = "Privileged access management — compatible with Teleport CE"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

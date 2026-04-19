@@ -1,6 +1,6 @@
-//! DevOps analytics — replaces DevLake
+//! DevOps analytics — compatible with DevLake
 //!
-//! Replaces: DevLake
+//! Compatible with: DevLake
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

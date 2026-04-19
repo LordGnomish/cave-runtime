@@ -1,6 +1,6 @@
 [package]
 name = "cave-devlake"
-description = "DevOps analytics — replaces DevLake"
+description = "DevOps analytics — compatible with DevLake"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

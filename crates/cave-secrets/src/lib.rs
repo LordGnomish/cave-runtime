@@ -1,6 +1,6 @@
 //! CAVE Secrets — Secret detection engine.
 //!
-//! Replaces: Trufflehog + gitleaks
+//! Compatible with: Trufflehog + gitleaks
 //! Pre-commit and CI secret scanning. Regex + entropy-based detection.
 
 pub mod detector;

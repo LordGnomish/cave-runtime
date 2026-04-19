@@ -1,6 +1,6 @@
 [package]
 name = "cave-registry"
-description = "Docker/OCI/Harbor-compatible container registry — replaces Harbor"
+description = "Docker/OCI/Harbor-compatible container registry — compatible with Harbor"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

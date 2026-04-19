@@ -1,6 +1,6 @@
 [package]
 name = "cave-chat"
-description = "LLM chat interface — replaces LibreChat"
+description = "LLM chat interface — compatible with LibreChat"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

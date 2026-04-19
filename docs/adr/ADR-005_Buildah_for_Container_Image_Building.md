@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** Infrastructure — CI/CD
 
 **Related ADRs:** 023 (ARC), 028 (Harbor), 032 (cosign), 077 (Sigstore), 101 (SLSA L3), 108 (Supply Chain)

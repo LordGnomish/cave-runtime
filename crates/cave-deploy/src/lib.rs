@@ -1,6 +1,6 @@
 //! CAVE Deploy — GitOps deployment engine.
 //!
-//! Replaces: ArgoCD + Flux
+//! Compatible with: ArgoCD + Flux
 //! Implements: Application CRD, ApplicationSet generators, sync engine,
 //! health assessment, diff engine, rollback, App of Apps, Helm/Kustomize/YAML,
 //! project-level RBAC, notifications, SSO patterns.

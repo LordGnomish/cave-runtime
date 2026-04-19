@@ -1,6 +1,6 @@
 [package]
 name = "cave-admission"
-description = "Admission controller — replaces Kyverno + Gatekeeper"
+description = "Admission controller — compatible with Kyverno + Gatekeeper"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

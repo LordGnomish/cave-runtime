@@ -2,9 +2,11 @@
 
 **Status:** Accepted
 
-**Category:** Security
+**Scope:** Universal
 
-**Related ADRs:** 010, 017, 018, 019, 023
+**Category:** Security / Finding Management
+
+**Related ADRs:** 010, 017, 018, 019, 023, 034, 069
 
 **Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
 
@@ -34,23 +36,49 @@
 - **Jira as finding tracker:** No deduplication, no multi-tool import, no SLA tracking, no severity auto-classification. Manual overhead.
 - **SonarQube as aggregator:** Only aggregates its own findings. Cannot import Trivy, ZAP, gitleaks results.
 
+## Implementation Reference
+
+**Implementation Status:** Production
+
+- **cave-security** crate: DefectDojo + DTrack deployment, finding import pipelines
+- **Integration:** CI stages 2, 3, 4, 10, 16, 18, 21, 23 push findings via REST API
+- **SLA policy:** Critical findings 7d fix deadline, High 30d, Medium 90d, Low 180d (tracked in DefectDojo, alerts to on-call)
+
 ## Consequences
 
-## **Positive:**
-- Single dashboard for all security findings across 7+ tools.
-- Cross-tool deduplication prevents duplicate triage effort.
-- Per-severity SLA tracking (Critical: 7d fix, High: 30d, Medium: 90d, Low: 180d).
-- Product-per-tenant isolation — tenants see only their findings.
-- API-driven: CI pipeline auto-imports findings, no manual upload.
+### Positive
 
-**Negative:**
-- DefectDojo server requires PostgreSQL + ~1GB RAM.
-- Finding volume can be high (hundreds per pipeline run across all tools) — requires triage discipline.
-- Two tools (DefectDojo + DTrack) for comprehensive coverage — DTrack handles continuous SBOM monitoring between pipeline runs.
+- **Single pane of glass:** All 7+ tool findings (gitleaks, SonarQube, Semgrep, DTrack, Trivy, Checkov, ZAP, Kubescape) in one dashboard.
+- **Cross-tool deduplication:** Same vuln found by Trivy + Checkov = deduplicated, triaged once.
+- **Per-severity SLA tracking:** Critical 7d fix deadline, High 30d, Medium 90d tracked with automated escalation.
+- **Multi-tenancy:** Product-per-tenant isolation. Tenant A cannot see tenant B's findings.
+- **API-driven automation:** CI pipeline auto-imports findings on completion. No manual upload.
+- **Risk acceptance workflow:** Security team approves risk waivers (ADR-140) through DefectDojo UI.
+
+### Negative
+
+- **Infrastructure overhead:** DefectDojo + DTrack = 2 services, 2 DBs, ~2GB RAM combined.
+- **Finding volume:** 100+ findings per pipeline run common (especially in SAST stages). Triage fatigue requires discipline.
+- **Two tools for complete coverage:** DTrack continuously monitors SBOM, DefectDojo aggregates all types. Operational model split.
+
+### Risks & Mitigations
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Critical finding missed due to dedup failure | Low | High | Audit findings in DefectDojo per severity. Weekly review of high-severity backlog. |
+| SLA breach (critical not fixed in 7d) | Medium | Medium | Automated P1 alert when approaching deadline. Escalation to DevOps lead. Waiver process for unavoidable delays (ADR-140). |
+| DefectDojo database corruption | Low | High | PostgreSQL HA via CNPG (ADR-105). Daily automated backups. Restore test monthly. |
+
+## License
+
+**DefectDojo:** BSD 3-Clause (https://github.com/DefectDojo/defectdojo/blob/dev/LICENSE)
 
 ## Compliance Mapping
 
-## SOC2 CC7.1 (vulnerability management lifecycle). ISO A.8.8 (technical vulnerability management). NIS2 Art.21 (vulnerability management). GDPR Art.32 (security assessment evidence).
+**SOC2 CC7.1:** Vulnerability management lifecycle — DefectDojo tracks finding from discovery to remediation to closure.
+**ISO/IEC 27001 A.8.8:** Technical vulnerability management — systematic tracking of all security findings.
+**NIS2 Directive Article 21:** Vulnerability and incident management — documented SLA-driven remediation.
+**GDPR Article 32:** Security of processing — evidence of vulnerability assessments and remediation tracked in DefectDojo.
 
 **Absorbed Decisions:** The following tool-level decisions are absorbed into this ADR for traceability
 

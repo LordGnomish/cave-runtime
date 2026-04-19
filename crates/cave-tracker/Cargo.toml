@@ -1,6 +1,6 @@
 [package]
 name = "cave-tracker"
-description = "Issue & project tracking — replaces Jira"
+description = "Issue & project tracking — compatible with Jira"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

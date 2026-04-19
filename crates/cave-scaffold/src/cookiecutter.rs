@@ -940,7 +940,7 @@ mod tests {
     }
 
     #[test]
-    fn substitute_replaces_cookiecutter_vars() {
+    fn substitute_compatible with_cookiecutter_vars() {
         let mut values = HashMap::new();
         values.insert("name".to_string(), "billing".to_string());
         let out = substitute("service-{{ cookiecutter.name }}-v1", &values);

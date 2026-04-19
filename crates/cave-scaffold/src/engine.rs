@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_render_template_replaces_vars() {
+    fn test_render_template_compatible with_vars() {
         let mut params = HashMap::new();
         params.insert("name".to_string(), "World".to_string());
         let result = render_template("Hello {{name}}!", &params);

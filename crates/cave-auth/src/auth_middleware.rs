@@ -150,7 +150,10 @@ impl AuthLayer {
     pub fn new(config: AuthLayerConfig) -> Self {
         let jwks_cache = Arc::new(JwksCache::new(config.jwks_uri));
         jwks_cache.clone().start_background_refresh();
-        let token_store = Arc::new(TokenStore::new(b"change-me-in-production"));
+        let secret = std::env::var("CAVE_JWT_SECRET")
+            .expect("CAVE_JWT_SECRET must be set (use any string for dev)")
+            .into_bytes();
+        let token_store = Arc::new(TokenStore::new(&secret));
         let audit = Arc::new(AuditLogger::new());
 
         Self {
@@ -169,7 +172,10 @@ impl AuthLayer {
     /// Injects a platform-admin `AuthContext` without any JWT validation.
     pub fn dev_bypass() -> Self {
         let jwks_cache = Arc::new(JwksCache::new("http://localhost/jwks".to_string()));
-        let token_store = Arc::new(TokenStore::new(b"dev-secret"));
+        let secret = std::env::var("CAVE_JWT_SECRET")
+            .unwrap_or_else(|_| "dev-secret".to_string())
+            .into_bytes();
+        let token_store = Arc::new(TokenStore::new(&secret));
         let audit = Arc::new(AuditLogger::new());
 
         Self {

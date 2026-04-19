@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** Infrastructure — Networking
 
 **Related ADRs:** 027 (Kong), 031 (Tetragon), 068 (Istio Ambient Mandatory), 084 (Default-Deny), 110 (Egress Governance), 121 (Ambient Multi-Cluster), 122 (Cilium Gateway API)

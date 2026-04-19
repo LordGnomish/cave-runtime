@@ -1,5 +1,5 @@
 //! CAVE Runbook — Runbook automation engine.
-//! Replaces: manual runbooks, PagerDuty runbooks.
+//! Compatible with: manual runbooks, PagerDuty runbooks.
 //! Features: YAML-defined runbooks, multi-step execution, approvals, scheduling.
 
 pub mod engine;

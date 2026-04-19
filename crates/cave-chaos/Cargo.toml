@@ -1,6 +1,6 @@
 [package]
 name = "cave-chaos"
-description = "Chaos engineering — replaces Chaos Mesh"
+description = "Chaos engineering — compatible with Chaos Mesh"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

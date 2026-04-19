@@ -1,6 +1,6 @@
-//! Synthetic monitoring — replaces Uptime Kuma
+//! Synthetic monitoring — compatible with Uptime Kuma
 //!
-//! Replaces: Uptime Kuma
+//! Compatible with: Uptime Kuma
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

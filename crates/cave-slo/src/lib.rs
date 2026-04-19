@@ -1,6 +1,6 @@
 //! SLO tracking engine — error budgets, burn rates
 //!
-//! Replaces: Custom (Prometheus rules)
+//! Compatible with: Custom (Prometheus rules)
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

@@ -1,6 +1,6 @@
 [package]
 name = "cave-dast"
-description = "Dynamic security testing — replaces ZAP"
+description = "Dynamic security testing — compatible with ZAP"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

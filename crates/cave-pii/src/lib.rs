@@ -1,6 +1,6 @@
-//! PII detection & redaction — replaces Presidio
+//! PII detection & redaction — compatible with Presidio
 //!
-//! Replaces: Presidio
+//! Compatible with: Presidio
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

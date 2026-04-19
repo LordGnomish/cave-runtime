@@ -1,6 +1,6 @@
 [package]
 name = "cave-sign"
-description = "Image signing & verification — replaces Sigstore Policy Controller"
+description = "Image signing & verification — compatible with Sigstore Policy Controller"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

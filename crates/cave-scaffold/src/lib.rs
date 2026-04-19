@@ -1,6 +1,6 @@
-//! Project template engine — replaces Backstage scaffolder
+//! Project template engine — compatible with Backstage scaffolder
 //!
-//! Replaces: Backstage scaffolder
+//! Compatible with: Backstage scaffolder
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

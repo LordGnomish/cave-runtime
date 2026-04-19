@@ -1,6 +1,6 @@
 //! CAVE Pipelines — CI/CD pipeline engine.
 //!
-//! Replaces: Tekton Pipelines + Jenkins
+//! Compatible with: Tekton Pipelines + Jenkins
 //! Implements: Pipeline/Task CRDs, DAG execution, triggers, catalog,
 //! Jenkins Jenkinsfile compatibility, artifact passing, log streaming.
 

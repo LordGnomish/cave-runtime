@@ -1,6 +1,6 @@
-//! Container, IaC, filesystem, secret, and malware scanner — replaces Trivy.
+//! Container, IaC, filesystem, secret, and malware scanner — compatible with Trivy.
 //!
-//! Replaces: Aqua Trivy (Apache-2.0). Sovereign-safe.
+//! Compatible with: Aqua Trivy (Apache-2.0). Sovereign-safe.
 
 pub mod engine;
 pub mod models;

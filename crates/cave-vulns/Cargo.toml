@@ -1,6 +1,6 @@
 [package]
 name = "cave-vulns"
-description = "Vulnerability aggregation hub — replaces DefectDojo"
+description = "Vulnerability aggregation hub — compatible with DefectDojo"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

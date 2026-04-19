@@ -1,6 +1,6 @@
 //! CAVE Registry — Docker/OCI/Harbor-compatible container registry.
 //!
-//! Replaces: Harbor
+//! Compatible with: Harbor
 //! Upstream tracking: see cave-upstream.
 //!
 //! ## Implemented

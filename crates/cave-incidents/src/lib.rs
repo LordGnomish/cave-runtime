@@ -1,6 +1,6 @@
-//! Incident management — replaces Grafana OnCall (partial)
+//! Incident management — compatible with Grafana OnCall (partial)
 //!
-//! Replaces: Grafana OnCall
+//! Compatible with: Grafana OnCall
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod models;

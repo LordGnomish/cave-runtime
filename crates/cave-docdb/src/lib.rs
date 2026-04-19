@@ -1,6 +1,6 @@
 //! CAVE DocDB — MongoDB 6.0-compatible document database.
 //!
-//! Replaces: MongoDB Community Edition (SSPL-1.1).
+//! Compatible with: MongoDB Community Edition (SSPL-1.1).
 //! Sovereign-safe alternative pattern — wire-protocol compatibility + fully
 //! in-memory Rust engine. Backs drivers (pymongo, mongo-rust-driver, Node
 //! mongoose, Java driver) without modification on port 27017.

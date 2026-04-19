@@ -1,6 +1,6 @@
-//! LLM chat interface — replaces LibreChat
+//! LLM chat interface — compatible with LibreChat
 //!
-//! Replaces: LibreChat
+//! Compatible with: LibreChat
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

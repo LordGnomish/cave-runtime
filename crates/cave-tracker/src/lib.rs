@@ -1,5 +1,5 @@
 //! CAVE Tracker — Issue & project tracking engine.
-//! Replaces: Jira
+//! Compatible with: Jira
 //! Features: Projects, boards, sprints, issues, workflows, custom fields, JQL-like queries.
 
 pub mod models;

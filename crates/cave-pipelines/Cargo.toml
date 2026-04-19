@@ -1,6 +1,6 @@
 [package]
 name = "cave-pipelines"
-description = "CI/CD pipeline engine — replaces Tekton + Jenkins"
+description = "CI/CD pipeline engine — compatible with Tekton + Jenkins"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

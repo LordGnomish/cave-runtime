@@ -1,6 +1,6 @@
 [package]
 name = "cave-profiler"
-description = "Continuous profiling — replaces Pyroscope/Parca"
+description = "Continuous profiling — compatible with Pyroscope/Parca"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

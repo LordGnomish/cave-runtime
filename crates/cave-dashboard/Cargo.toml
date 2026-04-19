@@ -1,6 +1,6 @@
 [package]
 name = "cave-dashboard"
-description = "Grafana-compatible dashboard engine — replaces Grafana v10"
+description = "Grafana-compatible dashboard engine — compatible with Grafana v10"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

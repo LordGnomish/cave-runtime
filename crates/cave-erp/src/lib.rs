@@ -1,6 +1,6 @@
 //! CAVE ERP — Sovereign open-source ERP.
 //!
-//! Replaces: Odoo Community Edition.
+//! Compatible with: Odoo Community Edition.
 //! Modules: HR, Recruitment, CRM, Sales, Purchase, Inventory, Accounting,
 //! Manufacturing, Projects.
 

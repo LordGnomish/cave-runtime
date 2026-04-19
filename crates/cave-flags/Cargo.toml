@@ -1,6 +1,6 @@
 [package]
 name = "cave-flags"
-description = "Feature flag service — replaces Unleash. Evaluation engine, REST API, SSE streaming."
+description = "Feature flag service — compatible with Unleash. Evaluation engine, REST API, SSE streaming."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

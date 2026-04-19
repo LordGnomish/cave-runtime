@@ -1,6 +1,6 @@
-//! Event-driven automation — replaces n8n
+//! Event-driven automation — compatible with n8n
 //!
-//! Replaces: n8n
+//! Compatible with: n8n
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

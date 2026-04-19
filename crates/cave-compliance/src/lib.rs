@@ -1,5 +1,5 @@
 //! CAVE Compliance — Compliance & audit engine.
-//! Replaces: Manual CIS Benchmark checks, SOC2/PCI-DSS/HIPAA audit tooling.
+//! Compatible with: Manual CIS Benchmark checks, SOC2/PCI-DSS/HIPAA audit tooling.
 //! Features: Automated control checks, evidence collection, audit trail, policy mapping.
 
 pub mod models;

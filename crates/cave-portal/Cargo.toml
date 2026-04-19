@@ -1,6 +1,6 @@
 [package]
 name = "cave-portal"
-description = "Developer portal — replaces Backstage"
+description = "Developer portal — compatible with Backstage"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

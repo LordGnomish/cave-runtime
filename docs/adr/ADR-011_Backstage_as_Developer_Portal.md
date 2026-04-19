@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** Platform
 
 **Related ADRs:** 025, 123

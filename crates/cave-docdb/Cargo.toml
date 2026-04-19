@@ -1,6 +1,6 @@
 [package]
 name = "cave-docdb"
-description = "MongoDB-compatible document database — replaces MongoDB (wire protocol + BSON + aggregation)"
+description = "MongoDB-compatible document database — compatible with MongoDB (wire protocol + BSON + aggregation)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

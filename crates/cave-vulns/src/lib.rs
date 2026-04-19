@@ -1,6 +1,6 @@
-//! Vulnerability aggregation hub — replaces DefectDojo
+//! Vulnerability aggregation hub — compatible with DefectDojo
 //!
-//! Replaces: DefectDojo
+//! Compatible with: DefectDojo
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod engine;

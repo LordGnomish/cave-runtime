@@ -1,6 +1,6 @@
-//! PostgreSQL management — replaces pgAdmin / CloudNativePG.
+//! PostgreSQL management — compatible with pgAdmin / CloudNativePG.
 //!
-//! Replaces: pgAdmin, CloudNativePG
+//! Compatible with: pgAdmin, CloudNativePG
 //! Upstream tracking: see cave-upstream for monitored features.
 //!
 //! # Features

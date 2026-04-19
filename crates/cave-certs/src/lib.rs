@@ -1,4 +1,4 @@
-//! TLS certificate lifecycle — replaces cert-manager
+//! TLS certificate lifecycle — compatible with cert-manager
 //!
 //! Upstream tracking: cert-manager
 //! Features: ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs

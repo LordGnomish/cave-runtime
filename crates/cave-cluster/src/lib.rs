@@ -1,6 +1,6 @@
 //! CAVE Cluster — Kubernetes cluster lifecycle management.
 //!
-//! Replaces: Rancher, Cluster API, cluster management tooling
+//! Compatible with: Rancher, Cluster API, cluster management tooling
 //!
 //! Features:
 //! - Cluster CRUD (create, scale, upgrade, delete)

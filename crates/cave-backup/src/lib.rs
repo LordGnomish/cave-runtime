@@ -1,6 +1,6 @@
 //! CAVE Backup — Kubernetes backup/restore engine.
 //!
-//! Replaces: Velero
+//! Compatible with: Velero
 //! Upstream tracking: see cave-upstream for monitored features.
 //! Provides backup scheduling, storage location management, filesystem
 //! backup via restic/kopia, and garbage collection of expired backups.

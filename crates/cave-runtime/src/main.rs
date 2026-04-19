@@ -206,7 +206,11 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_cost_alloc::router(cost_alloc_state))
         // SCIM 2.0 provisioning
         .merge(cave_auth::okta::scim_router(
-            std::sync::Arc::new(cave_auth::TokenStore::new(b"change-me")),
+            std::sync::Arc::new(cave_auth::TokenStore::new(
+                std::env::var("CAVE_JWT_SECRET")
+                    .expect("CAVE_JWT_SECRET must be set (use any string for dev)")
+                    .as_bytes(),
+            )),
         ))
         // New crates (this session)
         .merge(cave_oncall::router(oncall_state))
@@ -226,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
         }))
         .layer(axum::Extension(Arc::new(cave_auth::jwt_middleware::AuthState {
             jwt_secret: std::env::var("CAVE_JWT_SECRET")
-                .unwrap_or_else(|_| "dev-secret-change-me".to_string()),
+                .expect("CAVE_JWT_SECRET must be set (use any string for dev)"),
             bypass_paths: vec![
                 "_exact:/".into(),
                 "/health".into(), "/ready".into(),

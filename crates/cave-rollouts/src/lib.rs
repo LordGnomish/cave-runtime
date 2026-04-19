@@ -1,6 +1,6 @@
 //! CAVE Rollouts — Progressive delivery engine.
 //!
-//! Replaces: Flagger + Argo Rollouts
+//! Compatible with: Flagger + Argo Rollouts
 //! Upstream tracking: see cave-upstream.
 //!
 //! ## Supported strategies

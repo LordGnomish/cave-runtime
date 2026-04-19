@@ -1,6 +1,6 @@
 [package]
 name = "cave-backup"
-description = "Kubernetes backup/restore — replaces Velero"
+description = "Kubernetes backup/restore — compatible with Velero"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

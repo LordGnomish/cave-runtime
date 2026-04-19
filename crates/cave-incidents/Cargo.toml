@@ -1,6 +1,6 @@
 [package]
 name = "cave-incidents"
-description = "Incident management — replaces Grafana OnCall (partial)"
+description = "Incident management — compatible with Grafana OnCall (partial)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

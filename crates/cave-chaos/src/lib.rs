@@ -1,6 +1,6 @@
-//! Chaos engineering — replaces Chaos Mesh
+//! Chaos engineering — compatible with Chaos Mesh
 //!
-//! Replaces: Chaos Mesh
+//! Compatible with: Chaos Mesh
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

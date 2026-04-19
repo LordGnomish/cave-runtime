@@ -1,6 +1,6 @@
-//! FinOps & cost tracking — replaces Kubecost/OpenCost
+//! FinOps & cost tracking — compatible with Kubecost/OpenCost
 //!
-//! Replaces: OpenCost / Kubecost
+//! Compatible with: OpenCost / Kubecost
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod allocation;

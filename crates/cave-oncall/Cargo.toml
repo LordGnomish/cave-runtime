@@ -1,6 +1,6 @@
 [package]
 name = "cave-oncall"
-description = "On-call scheduling, paging, and escalation — replaces Grafana OnCall"
+description = "On-call scheduling, paging, and escalation — compatible with Grafana OnCall"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

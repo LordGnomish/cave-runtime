@@ -1,6 +1,6 @@
 [package]
 name = "cave-workflows"
-description = "Event-driven automation — replaces n8n"
+description = "Event-driven automation — compatible with n8n"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

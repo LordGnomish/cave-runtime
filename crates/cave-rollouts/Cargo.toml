@@ -1,6 +1,6 @@
 [package]
 name = "cave-rollouts"
-description = "Progressive delivery engine — replaces Flagger + Argo Rollouts"
+description = "Progressive delivery engine — compatible with Flagger + Argo Rollouts"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

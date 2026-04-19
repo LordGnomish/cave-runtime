@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 /// Persistent state store — tracks desired vs actual infrastructure.
 ///
-/// Conceptually replaces `terraform.tfstate` but with richer semantics:
+/// Conceptually compatible with `terraform.tfstate` but with richer semantics:
 /// versioned snapshots, state locking, and drift detection via MCP.
 #[derive(Default)]
 pub struct InfraStateStore {

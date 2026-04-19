@@ -1,6 +1,6 @@
 //! Runtime forensics — consumes Tetragon eBPF data
 //!
-//! Replaces: Tetragon (consumer)
+//! Compatible with: Tetragon (consumer)
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

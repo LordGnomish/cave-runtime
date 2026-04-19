@@ -1,6 +1,6 @@
 //! CAVE Store — Unified storage engine.
 //!
-//! Replaces: etcd (KV store) + MinIO (S3 object storage).
+//! Compatible with: etcd (KV store) + MinIO (S3 object storage).
 //!
 //! Features:
 //! - Full etcd v3 HTTP/JSON API (KV, Watch, Lease, Auth, Cluster)

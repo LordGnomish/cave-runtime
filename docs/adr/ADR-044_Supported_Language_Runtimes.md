@@ -2,9 +2,11 @@
 
 **Status:** Accepted
 
-**Category:** CI/CD
+**Scope:** Universal
 
-**Related ADRs:** 010, 043
+**Category:** CI/CD / Build
+
+**Related ADRs:** 010, 043, 076
 
 **Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
 
@@ -41,18 +43,42 @@ Each language gets a Backstage scaffolder template that produces: Dockerfile (mu
 - **All languages from Phase 1:** Each language requires dedicated template, build adapter, and CI testing. Spreading too thin. Phase 1 focuses on the two most common (Java + Python), Phase 2 adds Go and Node.js.
 - **Language-specific CI pipelines:** Separate pipeline per language = maintenance explosion. CAVE uses shared 27-stage pipeline with language-specific build adapter only (stage 8).
 
+## Implementation Reference
+
+**Implementation Status:** Phase 1 complete (Java + Python), Phase 2 in progress (Go + Node.js)
+
+- **cave-scaffold** crate: Backstage scaffolder templates per language
+- **Build adapters:** Stage 8 of CI pipeline has language-specific Buildah invocation + dependency resolution (Maven for Java, pip for Python, go mod for Go, npm for Node.js)
+- **Supported versions:** Java 11+, Python 3.9+, Go 1.19+, Node.js 16+ (LTS-only)
+
 ## Consequences
 
-## **Positive:**
-- Golden Path templates reduce time-to-first-deployment to < 5 minutes per language.
-- Standardized CI stages across languages (only build adapter differs).
-- New language support = new build adapter + new Backstage template.
+### Positive
 
-**Negative:**
-- Each language requires dedicated template maintenance.
-- Language-specific debugging knowledge needed for CI issues.
-- Phase 1 limits to Java + Python — tenants needing Go/Node must wait or use Expert Path.
+- **Golden Path templates:** Backstage scaffolder creates complete project (Dockerfile, Helm chart, k6 tests, Flyway migrations) in <5min per language.
+- **Standardized CI:** All 73 components + all tenant workloads run same 27-stage pipeline. Only stage 8 (build) changes per language.
+- **Phase approach:** Phase 1 (Java + Python) covers ~70% of tenant use cases. Phases 2-3 add on-demand (Go, Node.js, Rust, .NET).
+- **Developer experience:** Language-familiar build tools (Maven, pip, go, npm). No "forced" standardization to alien toolchains.
+
+### Negative
+
+- **Per-language maintenance:** Each language needs template + CI test coverage. 5 languages = 5 build adapters to maintain.
+- **Phasing friction:** Tenants needing Go in Phase 1 must use "Expert Path" (manual pipeline setup). Workaround: contribute build adapter.
+- **Language-specific knowledge:** Debug CI failures requires language expertise. Java GC issues different from Python import resolution issues.
+
+### Risks & Mitigations
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Unsupported language request blocks tenant | Medium | Low | Expert Path provides manual setup path. Roadmap (ADR-127) prioritizes new languages based on tenant demand. |
+| Build adapter regression breaks all Java builds | Low | High | Staging tests all languages. Adapter changes require extensive CI testing. Runbook for quick rollback. |
+| Language version EOL breaks builds | Medium | Low | Upgrade policy: Java LTS only (11, 17). Python 3.9+. Regular EOL scanning (Renovate ADR-041). |
+
+## License
+
+Build tools: Maven (Apache 2.0), Python (PSF), Go (BSD), Node.js (MIT)
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (standardized development practices). ISO A.8.25 (secure development lifecycle per language).
+**SOC2 CC8.1:** Standardized development practices — shared 27-stage pipeline enforces consistent build quality across languages.
+**ISO/IEC 27001 A.8.25:** Secure development lifecycle — language-agnostic security scanning (SAST, SBOM, image scan) per language.

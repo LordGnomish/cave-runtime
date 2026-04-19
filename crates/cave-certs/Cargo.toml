@@ -1,6 +1,6 @@
 [package]
 name = "cave-certs"
-description = "TLS certificate lifecycle — replaces cert-manager"
+description = "TLS certificate lifecycle — compatible with cert-manager"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

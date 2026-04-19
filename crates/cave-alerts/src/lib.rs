@@ -1,6 +1,6 @@
-//! Alert routing & management — replaces Alertmanager
+//! Alert routing & management — compatible with Alertmanager
 //!
-//! Replaces: Alertmanager
+//! Compatible with: Alertmanager
 //! Upstream tracking: see cave-upstream for monitored features.
 
 pub mod models;

@@ -1,6 +1,6 @@
 //! CAVE Knative — serverless workloads.
 //!
-//! Replaces: knative/serving, knative/eventing
+//! Compatible with: knative/serving, knative/eventing
 //!
 //! Features:
 //! - Knative Serving: Service, Revision, Route, scale-to-zero, traffic splitting

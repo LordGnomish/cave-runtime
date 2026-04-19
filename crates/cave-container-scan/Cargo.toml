@@ -1,6 +1,6 @@
 [package]
 name = "cave-container-scan"
-description = "OCI image + IaC + FS + secret + YARA + namespace-confusion scanner — replaces Trivy"
+description = "OCI image + IaC + FS + secret + YARA + namespace-confusion scanner — compatible with Trivy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

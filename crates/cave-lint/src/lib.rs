@@ -1,6 +1,6 @@
 //! CAVE Lint — Config & image linting engine.
 //!
-//! Replaces: Hadolint + Checkov + Pluto + kubent
+//! Compatible with: Hadolint + Checkov + Pluto + kubent
 //! Dockerfile linting, K8s manifest validation, deprecated API detection.
 
 pub mod rules;

@@ -1,6 +1,6 @@
 //! cave-metrics — Prometheus + VictoriaMetrics parity
 //!
-//! Replaces: Prometheus, VictoriaMetrics
+//! Compatible with: Prometheus, VictoriaMetrics
 //! Provides:
 //!   - TSDB with Gorilla XOR compression, inverted index, downsampling, retention
 //!   - Full PromQL engine (all operators, aggregators, functions)

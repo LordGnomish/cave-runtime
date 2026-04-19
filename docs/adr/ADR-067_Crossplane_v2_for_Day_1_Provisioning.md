@@ -2,7 +2,9 @@
 
 **Status:** Accepted
 
-**Category:** Platform
+**Scope:** Universal
+
+**Category:** Platform / Infrastructure
 
 **Related ADRs:** 119, 124
 

@@ -1,6 +1,6 @@
-//! SBOM & dependency intelligence — replaces DependencyTrack
+//! SBOM & dependency intelligence — compatible with DependencyTrack
 //!
-//! Replaces: DependencyTrack
+//! Compatible with: DependencyTrack
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

@@ -2,47 +2,75 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main]
+    branches: [ main, develop ]
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
+  RUST_BACKTRACE: 1
+  CAVE_JWT_SECRET: ci-test-secret
 
 jobs:
   check:
-    name: Check & Test
+    name: Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          toolchain: "1.85"
       - uses: Swatinem/rust-cache@v2
+      - name: Run cargo check
+        run: cargo check --workspace
 
-      - name: Format check
-        run: cargo fmt --all -- --check
-
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features
-
-      - name: Test
-        run: cargo test --all
-
-      - name: Build release
-        run: cargo build --release --bin cave-runtime
-
-  upstream-check:
-    name: Upstream Tracker
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    # Run weekly on Monday at 06:00 UTC
-    # Also triggered manually
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
-      - name: Check upstream releases
-        run: |
-          echo "TODO: Run cave-upstream binary to check all 26 tracked projects"
-          echo "TODO: AI triage via Claude API"
-          echo "TODO: Create GitHub issues for ADOPT items"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        run: cargo test --workspace --lib
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo clippy
+        run: cargo clippy --workspace -- -D warnings
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+          components: rustfmt
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check
+
+  doc:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo doc
+        run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings

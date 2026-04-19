@@ -1,6 +1,6 @@
 //! CAVE GitOps Config — Platform-as-a-product promise management.
 //!
-//! Replaces: Kratix
+//! Compatible with: Kratix
 //! Promise-based platform API with pipeline transformation and GitOps state management.
 
 pub mod engine;

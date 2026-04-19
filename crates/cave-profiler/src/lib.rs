@@ -1,6 +1,6 @@
-//! Continuous profiling — replaces Pyroscope/Parca
+//! Continuous profiling — compatible with Pyroscope/Parca
 //!
-//! Replaces: Pyroscope
+//! Compatible with: Pyroscope
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

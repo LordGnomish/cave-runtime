@@ -1,6 +1,6 @@
-//! Image signing & verification — replaces Sigstore Policy Controller
+//! Image signing & verification — compatible with Sigstore Policy Controller
 //!
-//! Replaces: Sigstore Policy Controller
+//! Compatible with: Sigstore Policy Controller
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;

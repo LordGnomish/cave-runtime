@@ -1,6 +1,6 @@
 [package]
 name = "cave-cost"
-description = "FinOps & cost tracking — replaces Kubecost/OpenCost"
+description = "FinOps & cost tracking — compatible with Kubecost/OpenCost"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

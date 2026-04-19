@@ -2,9 +2,11 @@
 
 **Status:** Accepted
 
-**Category:** Security
+**Scope:** Universal
 
-**Related ADRs:** 032, 101, 107
+**Category:** Security / Admission Control
+
+**Related ADRs:** 032, 101, 107, 108
 
 **Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
 
@@ -32,21 +34,47 @@
 - **Connaisseur:** Smaller community. Less native integration with cosign keyless flow. No SLSA predicate support.
 - **No admission verification:** Images could be tampered between Harbor push and K8s deployment. Unacceptable supply chain risk.
 
+## Implementation Reference
+
+**Implementation Status:** Production
+
+- **cave-sign** crate: cosign integration, keyless signing via Sigstore/Fulcio
+- **Policy Controller:** Deployed as K8s webhook. ClusterImagePolicy CRDs define trust rules per profile (Hetzner GitHub OIDC issuer, Azure Gitea OIDC issuer).
+- **Verification:** SLSA Provenance v1 predicate checked on all images. Build repo, build trigger, build timestamp verified.
+
 ## Consequences
 
-## **Positive:**
-- Only CI-built images with cryptographic provenance run in any environment.
-- Keyless OIDC eliminates static signing key management.
-- Supply chain attack surface eliminated at admission layer.
+### Positive
 
-**Negative:**
-- Fail-closed: if Policy Controller is down, no new pods can start (safe default but blocks deployments).
-- ClusterImagePolicy must be maintained as trust policies evolve.
-- Pull-through cached images from upstream (Harbor) must have their upstream signatures verified.
+- **Supply chain integrity:** Only cryptographically-signed CI images run in production. Tampered images rejected at admission.
+- **Keyless workflow:** No static signing keys to rotate/secure. OIDC token from CI issuer (GitHub/Gitea) proves identity.
+- **SLSA compliance:** Provenance verification proves build hermiticity (ADR-101) at deployment time.
+- **Fail-closed:** Policy Controller down → all pod creation blocked (safer than allowing unsigned images).
+
+### Negative
+
+- **Deployment blocks if Policy Controller down:** Mitigation required: Policy Controller must be highly available (deployed on multiple nodes, PDB).
+- **ClusterImagePolicy maintenance:** Trust policies must evolve as new CI issuers added or compromised. Runbook for policy updates required.
+- **Upstream image verification:** Pull-through cached images from Docker Hub/quay.io lack CI signatures. Trust policy must allow upstream publishers or use digest pinning (ADR-108).
+
+### Risks & Mitigations
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Policy Controller pod crash blocks deployments | Low | High | Deploy on 3+ nodes with Pod Disruption Budget. Monitoring alert if <2 replicas healthy. |
+| Signature verification false positive | Low | Medium | Staging environment tests policy before prod rollout. Human review of policy changes. |
+| Upstream image (Alpine 3.18) lacks signature | Medium | Low | Digest pinning (ADR-108) for upstream images. If signature unavailable, use digest. |
+
+## License
+
+**Sigstore Policy Controller:** Apache 2.0 (https://github.com/sigstore/policy-controller/blob/main/LICENSE)
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (integrity of deployed artifacts). ISO A.8.24 (cryptographic controls). SLSA Level 3 (hermetic build + signed provenance). NIS2 Art.21 (supply chain security).
+**SOC2 CC8.1:** Integrity of deployed artifacts — image signatures + provenance verification.
+**ISO/IEC 27001 A.8.24:** Cryptographic controls — digital signatures on container images.
+**SLSA Level 3:** Provenance verification matches hermetic build requirement.
+**NIS2 Directive Article 21:** Supply chain security — artifact integrity verified before deployment.
 
 **Absorbed Decisions:** The following tool-level decisions are absorbed into this ADR for traceability
 

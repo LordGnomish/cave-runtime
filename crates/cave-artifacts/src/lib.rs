@@ -1,6 +1,6 @@
 //! CAVE Artifacts — Pulp v3-compatible artifact repository engine.
 //!
-//! Replaces: Pulp
+//! Compatible with: Pulp
 //! Implements: Repository CRUD, versions, content types (RPM/Debian/PyPI/OCI/
 //! File/Ansible/Maven), remotes, distributions, publications, content guards,
 //! chunked upload, async task queue, import/export, signing, RBAC, repair.
