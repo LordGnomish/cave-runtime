@@ -19,29 +19,11 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All 73 upstream projects tracked by cave-runtime.
+/// All 61 upstream projects tracked by cave-runtime.
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // PROVIDER-ABSTRACTED: Kubernetes
     // ============================================================
-    TrackedProject {
-        name: "Talos Linux",
-        github_repo: "siderolabs/talos",
-        cave_module: "cave-cluster",
-        track_features: "Machine config API, upgrade sequences, etcd management, immutable OS releases",
-        check_frequency: "biweekly",
-        category: "kubernetes",
-        phase: 1,
-    },
-    TrackedProject {
-        name: "AKS (Azure Kubernetes Service)",
-        github_repo: "Azure/AKS",
-        cave_module: "cave-cluster",
-        track_features: "API version changes, Karpenter GA, node autoprovision, confidential compute",
-        check_frequency: "monthly",
-        category: "kubernetes",
-        phase: 1,
-    },
 
     // ============================================================
     // PROVIDER-ABSTRACTED: Database
@@ -52,15 +34,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         cave_module: "cave-pg",
         track_features: "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt",
         check_frequency: "biweekly",
-        category: "database",
-        phase: 2,
-    },
-    TrackedProject {
-        name: "Azure Database for PostgreSQL",
-        github_repo: "MicrosoftDocs/azure-docs",
-        cave_module: "cave-pg",
-        track_features: "Flexible Server API changes, new SKUs, pgvector improvements, Terraform provider coverage",
-        check_frequency: "monthly",
         category: "database",
         phase: 2,
     },
@@ -164,15 +137,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         check_frequency: "monthly",
         category: "secrets",
         phase: 1,
-    },
-    TrackedProject {
-        name: "Teleport",
-        github_repo: "gravitational/teleport",
-        cave_module: "cave-pam",
-        track_features: "Session recording formats, RBAC model, Kubernetes access patterns, MCP integration",
-        check_frequency: "monthly",
-        category: "identity",
-        phase: 3,
     },
 
     // ============================================================
@@ -331,24 +295,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 3,
     },
     TrackedProject {
-        name: "ARC (Actions Runner Controller)",
-        github_repo: "actions/actions-runner-controller",
-        cave_module: "cave-pipelines",
-        track_features: "Runner registration API, autoscaling listener, ephemeral runners, OIDC support",
-        check_frequency: "monthly",
-        category: "gitops",
-        phase: 3,
-    },
-    TrackedProject {
-        name: "Renovate",
-        github_repo: "renovatebot/renovate",
-        cave_module: "cave-upstream",
-        track_features: "Manager types, versioning schemes, auto-merge rules, group strategies",
-        check_frequency: "monthly",
-        category: "gitops",
-        phase: 3,
-    },
-    TrackedProject {
         name: "Pulp",
         github_repo: "pulp/pulpcore",
         cave_module: "cave-registry",
@@ -452,24 +398,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 3,
     },
     TrackedProject {
-        name: "Trufflehog",
-        github_repo: "trufflesecurity/trufflehog",
-        cave_module: "cave-secrets",
-        track_features: "New detector patterns, custom detector format, verification API",
-        check_frequency: "weekly",
-        category: "security",
-        phase: 1,
-    },
-    TrackedProject {
-        name: "Hadolint",
-        github_repo: "hadolint/hadolint",
-        cave_module: "cave-lint",
-        track_features: "New Dockerfile rules, best practice changes",
-        check_frequency: "monthly",
-        category: "security",
-        phase: 1,
-    },
-    TrackedProject {
         name: "SonarQube",
         github_repo: "SonarSource/sonarqube",
         cave_module: "cave-scan",
@@ -531,24 +459,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // DATA PLATFORM
     // ============================================================
-    TrackedProject {
-        name: "Spark Operator",
-        github_repo: "kubeflow/spark-operator",
-        cave_module: "cave-pipelines",
-        track_features: "SparkApplication CRD, scheduling, dynamic allocation, Volcano integration",
-        check_frequency: "monthly",
-        category: "data-platform",
-        phase: 4,
-    },
-    TrackedProject {
-        name: "JupyterHub",
-        github_repo: "jupyterhub/jupyterhub",
-        cave_module: "cave-portal",
-        track_features: "Spawner API, authenticator interface, named servers, proxy routing",
-        check_frequency: "monthly",
-        category: "data-platform",
-        phase: 4,
-    },
     TrackedProject {
         name: "MLflow",
         github_repo: "mlflow/mlflow",
@@ -648,15 +558,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         phase: 3,
     },
     TrackedProject {
-        name: "n8n",
-        github_repo: "n8n-io/n8n",
-        cave_module: "cave-workflows",
-        track_features: "New node types, workflow execution model, credential handling, AI agent nodes",
-        check_frequency: "monthly",
-        category: "operations",
-        phase: 3,
-    },
-    TrackedProject {
         name: "vcluster",
         github_repo: "loft-sh/vcluster",
         cave_module: "cave-cluster",
@@ -705,15 +606,6 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "infrastructure",
         phase: 1,
     },
-    TrackedProject {
-        name: "OpenTofu",
-        github_repo: "opentofu/opentofu",
-        cave_module: "cave-infra",
-        track_features: "State encryption, provider registry, module registry, state locking improvements",
-        check_frequency: "monthly",
-        category: "infrastructure",
-        phase: 1,
-    },
 
     // ============================================================
     // PHASE 4: EXTENSIONS (opt-in)
@@ -746,8 +638,8 @@ mod tests {
     #[test]
     fn test_tracked_projects_count() {
         assert!(
-            TRACKED_PROJECTS.len() >= 70,
-            "Expected at least 70 tracked projects, got {}",
+            TRACKED_PROJECTS.len() >= 55,
+            "Expected at least 55 tracked projects, got {}",
             TRACKED_PROJECTS.len()
         );
     }
@@ -834,7 +726,7 @@ mod tests {
         let core = [
             "Prometheus", "Grafana", "Loki", "Tempo", "Kong", "Istio",
             "Cilium", "ArgoCD", "Keycloak", "OpenBao", "OPA Gatekeeper",
-            "Talos Linux", "Crossplane", "Backstage", "Valkey", "MinIO",
+            "Crossplane", "Backstage", "Valkey", "MinIO",
         ];
         for name in &core {
             assert!(names.contains(name), "Core project '{}' not tracked", name);
