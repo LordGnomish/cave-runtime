@@ -10,7 +10,7 @@
 
 ## Context
 
-Istio ambient single-cluster is CAVE's production baseline. Multi-cluster ambient could enable active-active multi-region within same provider. Current upstream status: Beta (not Stable).
+Istio ambient single-cluster is CAVE's production baseline. Multi-cluster ambient could enable active-active multi-region within same provider. Current upstream status: Beta (promoted from alpha at KubeCon EU 2026) — not yet Stable.
 
 ## Candidates
 
@@ -22,7 +22,7 @@ Istio ambient single-cluster is CAVE's production baseline. Multi-cluster ambien
 
 ## Decision
 
-Ambient single-cluster is production baseline. Multicluster remains non-baseline until: (1) upstream reaches Istio **Stable** (not Beta), AND (2) CAVE completes parity tests, failure drills, and tenant SLA validation. Guardian sign-off alone insufficient — upstream maturity is prerequisite. Current multi-region: Cloudflare DNS failover.
+Ambient single-cluster is production baseline. Multicluster remains non-baseline until: (1) upstream reaches Istio **Stable** (currently Beta as of KubeCon EU April 2026), AND (2) CAVE completes parity tests, failure drills, and tenant SLA validation. Guardian sign-off alone insufficient — upstream maturity is prerequisite. Current multi-region: Cloudflare DNS failover.
 
 ## Rejected
 

@@ -69,7 +69,7 @@ Every pipeline run produces a single `Pipeline Attestation` in Sovereign Ledger 
 
 - **GitLab CI:** Would require self-hosting GitLab (heavy infrastructure). GitHub Actions ecosystem is larger. OIDC token exchange and SLSA provenance more mature on GitHub Actions.
 - **Jenkins:** Legacy. Plugin maintenance burden. No native OIDC. No native SLSA. Groovy pipeline syntax less maintainable than YAML.
-- **Tekton:** K8s-native (good) but small ecosystem. No marketplace equivalent. Backstage integration less mature. Building 27 custom Tekton Tasks is more work than leveraging GitHub Actions marketplace.
+- **Tekton:** K8s-native (good) but small ecosystem. No marketplace equivalent. Backstage integration less mature. Building 27 custom Tekton Tasks is more work than leveraging GitHub Actions marketplace. *(CNCF Incubating as of March 2026, but ecosystem size and marketplace concerns remain.)*
 
 ## Consequences
 

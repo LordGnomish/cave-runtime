@@ -8,6 +8,7 @@
 
 **Related ADRs:** 001 (Hetzner), 004 (Cilium+Istio), 085 (Rolling Upgrades), 088 (Resurrection), 098 (Immutable Infra)
 
+**Version State (April 2026):** Talos Linux v1.12.6 (latest stable) ships kernel 6.18 and Kubernetes 1.36.0-rc.1. Linux kernel 7.0 is the CAVE minimum requirement (ADR-014); Talos 7.0-based image support is pending upstream.
 
 ## Context
 
