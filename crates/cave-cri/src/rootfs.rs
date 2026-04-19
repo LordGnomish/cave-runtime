@@ -69,7 +69,11 @@ pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBu
     Ok(merged)
 }
 
-/// Extract a tar.gz layer into a directory.
+/// Extract a tar.gz layer into a directory, handling OCI whiteout files.
+///
+/// Whiteout semantics (OCI spec §7.3.2):
+///  - `.wh.<name>`        — delete file/dir `<name>` from lower layers
+///  - `.wh..wh..opq`     — opaque whiteout: ignore all lower-layer contents for this dir
 pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult<()> {
     let file = std::fs::File::open(archive_path)
         .map_err(|e| CriError::Rootfs(format!("cannot open layer: {}", e)))?;
@@ -77,8 +81,51 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
     let decoder = flate2::read::GzDecoder::new(file);
     let mut archive = tar::Archive::new(decoder);
 
-    archive.unpack(target_dir)
-        .map_err(|e| CriError::Rootfs(format!("layer extraction failed: {}", e)))?;
+    for entry in archive.entries()
+        .map_err(|e| CriError::Rootfs(format!("layer read failed: {}", e)))?
+    {
+        let mut entry = entry
+            .map_err(|e| CriError::Rootfs(format!("layer entry error: {}", e)))?;
+
+        let entry_path = entry.path()
+            .map_err(|e| CriError::Rootfs(format!("entry path error: {}", e)))?
+            .to_path_buf();
+
+        let file_name = entry_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+
+        if file_name == ".wh..wh..opq" {
+            // Opaque whiteout: mark directory so overlay ignores lower layers
+            // In a real overlayfs setup the kernel handles this via trusted.overlay.opaque xattr.
+            // For our non-overlayfs fallback we mark it with a sentinel file.
+            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
+            std::fs::create_dir_all(&parent).ok();
+            std::fs::write(parent.join(".wh..wh..opq"), b"").ok();
+            continue;
+        }
+
+        if let Some(whiteout_name) = file_name.strip_prefix(".wh.") {
+            // Whiteout: delete the named file/dir from this layer dir
+            let parent = target_dir.join(entry_path.parent().unwrap_or(Path::new("")));
+            let target = parent.join(whiteout_name);
+            if target.is_dir() {
+                std::fs::remove_dir_all(&target).ok();
+            } else if target.exists() {
+                std::fs::remove_file(&target).ok();
+            }
+            continue;
+        }
+
+        // Regular file: unpack into target_dir
+        let dest = target_dir.join(&entry_path);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+        entry.unpack(&dest)
+            .map_err(|e| CriError::Rootfs(format!("layer extraction failed for {:?}: {}", entry_path, e)))?;
+    }
 
     Ok(())
 }
@@ -207,6 +254,79 @@ mod tests {
         // Should succeed if directory doesn't exist
         let result = cleanup_rootfs("totally-nonexistent-container-id-xyz");
         assert!(result.is_ok());
+    }
+
+    fn make_tar_gz(dir: &tempfile::TempDir, entries: &[(&str, &[u8])]) -> PathBuf {
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        let archive_path = dir.path().join("layer.tar.gz");
+        let file = std::fs::File::create(&archive_path).unwrap();
+        let gz = GzEncoder::new(file, Compression::default());
+        let mut tar = tar::Builder::new(gz);
+        for (name, data) in entries {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(data.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            tar.append_data(&mut header, name, *data).unwrap();
+        }
+        tar.finish().unwrap();
+        archive_path
+    }
+
+    #[test]
+    fn test_extract_layer_regular_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive = make_tar_gz(&dir, &[("hello.txt", b"hello world")]);
+        let target = dir.path().join("extracted");
+        std::fs::create_dir_all(&target).unwrap();
+        extract_layer(&archive, &target).unwrap();
+        assert!(target.join("hello.txt").exists());
+        assert_eq!(std::fs::read_to_string(target.join("hello.txt")).unwrap(), "hello world");
+    }
+
+    #[test]
+    fn test_extract_layer_whiteout_deletes_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("extracted");
+        std::fs::create_dir_all(&target).unwrap();
+        // Pre-create file that whiteout will delete
+        std::fs::write(target.join("todelete.txt"), b"old").unwrap();
+        // Layer with whiteout
+        let archive = make_tar_gz(&dir, &[(".wh.todelete.txt", b"")]);
+        extract_layer(&archive, &target).unwrap();
+        assert!(!target.join("todelete.txt").exists(), "whiteout should have deleted file");
+    }
+
+    #[test]
+    fn test_extract_layer_whiteout_missing_file_ok() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("extracted");
+        std::fs::create_dir_all(&target).unwrap();
+        let archive = make_tar_gz(&dir, &[(".wh.nonexistent.txt", b"")]);
+        // Should not error even if target doesn't exist
+        assert!(extract_layer(&archive, &target).is_ok());
+    }
+
+    #[test]
+    fn test_extract_layer_opaque_whiteout_creates_sentinel() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("extracted");
+        std::fs::create_dir_all(&target).unwrap();
+        let archive = make_tar_gz(&dir, &[(".wh..wh..opq", b"")]);
+        extract_layer(&archive, &target).unwrap();
+        assert!(target.join(".wh..wh..opq").exists(), "opaque whiteout sentinel should exist");
+    }
+
+    #[test]
+    fn test_extract_layer_whiteout_in_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("extracted");
+        std::fs::create_dir_all(target.join("subdir")).unwrap();
+        std::fs::write(target.join("subdir").join("old.txt"), b"old").unwrap();
+        let archive = make_tar_gz(&dir, &[("subdir/.wh.old.txt", b"")]);
+        extract_layer(&archive, &target).unwrap();
+        assert!(!target.join("subdir").join("old.txt").exists());
     }
 
     #[test]

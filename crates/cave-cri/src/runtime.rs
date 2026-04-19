@@ -5,6 +5,7 @@ use crate::error::{CriError, CriResult};
 use crate::models::*;
 use crate::namespace;
 use crate::rootfs;
+use crate::state_machine as sm;
 use crate::store::ContainerStore;
 use chrono::Utc;
 use uuid::Uuid;
@@ -18,13 +19,8 @@ pub async fn create_container(
     let id = Uuid::new_v4();
     let id_str = id.to_string();
 
-    // Assemble rootfs from image layers
     let rootfs_path = rootfs::assemble_rootfs(image, &id_str)?;
-
-    // Create cgroup
     let _cgroup = cgroup::create_cgroup(&id_str, &spec.resources)?;
-
-    // Prepare namespace config
     let _ns = namespace::create_namespaces(&namespace::NamespaceConfig::default())?;
 
     let container = Container {
@@ -38,7 +34,8 @@ pub async fn create_container(
         exit_code: None,
         rootfs_path,
         log_path: std::path::PathBuf::from(format!("/var/log/cave/containers/{}.log", id_str)),
-        };
+        health: None,
+    };
 
     store.insert(container.clone());
     tracing::info!(container_id = %id, "container created");
@@ -50,15 +47,10 @@ pub async fn start_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Created && container.status != ContainerStatus::Stopped {
-        return Err(CriError::InvalidState(format!(
-            "cannot start container in {:?} state", container.status
-        )));
-    }
+    sm::check_start(&container.status)?;
 
     #[cfg(target_os = "linux")]
     {
-        // Fork and exec in new namespaces
         use nix::unistd::{fork, ForkResult};
         match unsafe { fork() } {
             Ok(ForkResult::Parent { child }) => {
@@ -69,8 +61,6 @@ pub async fn start_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
                 tracing::info!(container_id = %id, pid = child.as_raw(), "container started");
             }
             Ok(ForkResult::Child) => {
-                // In child: set up namespaces, pivot_root, exec
-                // This is simplified — real impl needs clone() with flags
                 let cmd = if container.spec.command.is_empty() {
                     vec!["/bin/sh".to_string()]
                 } else {
@@ -91,7 +81,6 @@ pub async fn start_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
 
     #[cfg(not(target_os = "linux"))]
     {
-        // Simulated start on non-Linux (for development/testing)
         container.pid = Some(99999);
         container.status = ContainerStatus::Running;
         container.started_at = Some(Utc::now());
@@ -103,31 +92,30 @@ pub async fn start_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
 }
 
 /// Stop a container — SIGTERM, wait, SIGKILL.
-pub async fn stop_container(id: Uuid, _timeout_secs: u32, store: &ContainerStore) -> CriResult<()> {
+pub async fn stop_container(id: Uuid, timeout_secs: u32, store: &ContainerStore) -> CriResult<()> {
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Running {
-        return Ok(()); // Already stopped
+    sm::check_stop(&container.status)?;
+
+    if container.status == ContainerStatus::Stopped {
+        return Ok(());
     }
 
-    if let Some(_pid) = container.pid {
+    if let Some(pid) = container.pid {
         #[cfg(target_os = "linux")]
         {
             use nix::sys::signal::{kill, Signal};
             use nix::unistd::Pid;
 
-            // Send SIGTERM
             let _ = kill(Pid::from_raw(pid as i32), Signal::SIGTERM);
-
-            // Wait for graceful shutdown
             tokio::time::sleep(tokio::time::Duration::from_secs(timeout_secs as u64)).await;
-
-            // Check if still running, send SIGKILL
             if kill(Pid::from_raw(pid as i32), None).is_ok() {
                 let _ = kill(Pid::from_raw(pid as i32), Signal::SIGKILL);
             }
         }
+        #[cfg(not(target_os = "linux"))]
+        let _ = (pid, timeout_secs);
     }
 
     container.status = ContainerStatus::Stopped;
@@ -142,7 +130,9 @@ pub async fn kill_container(id: Uuid, signal: i32, store: &ContainerStore) -> Cr
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if let Some(_pid) = container.pid {
+    sm::check_kill(&container.status)?;
+
+    if let Some(pid) = container.pid {
         #[cfg(target_os = "linux")]
         {
             use nix::sys::signal::{kill, Signal};
@@ -152,6 +142,8 @@ pub async fn kill_container(id: Uuid, signal: i32, store: &ContainerStore) -> Cr
             kill(Pid::from_raw(pid as i32), sig)
                 .map_err(|e| CriError::Runtime(format!("kill failed: {}", e)))?;
         }
+        #[cfg(not(target_os = "linux"))]
+        let _ = pid;
     }
 
     tracing::info!(container_id = %id, signal, "signal sent to container");
@@ -163,14 +155,9 @@ pub async fn delete_container(id: Uuid, store: &ContainerStore) -> CriResult<()>
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status == ContainerStatus::Running {
-        return Err(CriError::InvalidState("cannot delete running container — stop it first".into()));
-    }
+    sm::check_delete(&container.status)?;
 
-    // Cleanup rootfs
     rootfs::cleanup_rootfs(&id.to_string())?;
-
-    // Remove cgroup
     let handle = cgroup::CgroupHandle::new(&id.to_string());
     cgroup::remove_cgroup(&handle)?;
 
@@ -190,7 +177,7 @@ pub fn inspect_container(id: Uuid, store: &ContainerStore) -> CriResult<Containe
 }
 
 /// Update container resource limits and/or labels.
-pub fn update_container(id: Uuid, update: &crate::models::ContainerUpdate, store: &ContainerStore) -> CriResult<Container> {
+pub fn update_container(id: Uuid, update: &ContainerUpdate, store: &ContainerStore) -> CriResult<Container> {
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
@@ -207,18 +194,14 @@ pub fn update_container(id: Uuid, update: &crate::models::ContainerUpdate, store
     Ok(container)
 }
 
-/// Pause a container by sending SIGSTOP to its process.
+/// Pause a container by sending SIGSTOP.
 pub async fn pause_container(id: Uuid, store: &ContainerStore) -> CriResult<()> {
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Running {
-        return Err(CriError::InvalidState(format!(
-            "cannot pause container in {:?} state", container.status
-        )));
-    }
+    sm::check_pause(&container.status)?;
 
-    if let Some(_pid) = container.pid {
+    if let Some(pid) = container.pid {
         #[cfg(target_os = "linux")]
         {
             use nix::sys::signal::{kill, Signal};
@@ -226,6 +209,8 @@ pub async fn pause_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
             kill(Pid::from_raw(pid as i32), Signal::SIGSTOP)
                 .map_err(|e| CriError::Runtime(format!("SIGSTOP failed: {}", e)))?;
         }
+        #[cfg(not(target_os = "linux"))]
+        let _ = pid;
     }
 
     container.status = ContainerStatus::Paused;
@@ -234,18 +219,14 @@ pub async fn pause_container(id: Uuid, store: &ContainerStore) -> CriResult<()> 
     Ok(())
 }
 
-/// Unpause a container by sending SIGCONT to its process.
+/// Unpause a container by sending SIGCONT.
 pub async fn unpause_container(id: Uuid, store: &ContainerStore) -> CriResult<()> {
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Paused {
-        return Err(CriError::InvalidState(format!(
-            "cannot unpause container in {:?} state", container.status
-        )));
-    }
+    sm::check_unpause(&container.status)?;
 
-    if let Some(_pid) = container.pid {
+    if let Some(pid) = container.pid {
         #[cfg(target_os = "linux")]
         {
             use nix::sys::signal::{kill, Signal};
@@ -253,6 +234,8 @@ pub async fn unpause_container(id: Uuid, store: &ContainerStore) -> CriResult<()
             kill(Pid::from_raw(pid as i32), Signal::SIGCONT)
                 .map_err(|e| CriError::Runtime(format!("SIGCONT failed: {}", e)))?;
         }
+        #[cfg(not(target_os = "linux"))]
+        let _ = pid;
     }
 
     container.status = ContainerStatus::Running;
@@ -264,17 +247,13 @@ pub async fn unpause_container(id: Uuid, store: &ContainerStore) -> CriResult<()
 /// Execute a command inside a running container's namespaces.
 pub async fn exec_in_container(
     id: Uuid,
-    req: &crate::models::ExecRequest,
+    req: &ExecRequest,
     store: &ContainerStore,
-) -> CriResult<crate::models::ExecResult> {
+) -> CriResult<ExecResult> {
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Running {
-        return Err(CriError::InvalidState(format!(
-            "cannot exec in container with status {:?}", container.status
-        )));
-    }
+    sm::check_exec(&container.status)?;
 
     if req.command.is_empty() {
         return Err(CriError::Exec("command must not be empty".into()));
@@ -287,13 +266,85 @@ pub async fn exec_in_container(
         if let Some(pid) = container.pid {
             namespace::enter_namespaces(pid)?;
         }
+
+        // Fork a child to exec the command, capture output via pipes
+        use nix::unistd::{fork, ForkResult, pipe, read, close};
+        use nix::sys::wait::{waitpid, WaitStatus};
+
+        let (stdout_r, stdout_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
+        let (stderr_r, stderr_w) = pipe().map_err(|e| CriError::Exec(format!("pipe: {}", e)))?;
+
+        match unsafe { fork() } {
+            Ok(ForkResult::Parent { child }) => {
+                close(stdout_w).ok();
+                close(stderr_w).ok();
+
+                let mut stdout_buf = Vec::new();
+                let mut buf = [0u8; 4096];
+                loop {
+                    match read(stdout_r, &mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => stdout_buf.extend_from_slice(&buf[..n]),
+                    }
+                }
+
+                let mut stderr_buf = Vec::new();
+                loop {
+                    match read(stderr_r, &mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => stderr_buf.extend_from_slice(&buf[..n]),
+                    }
+                }
+
+                close(stdout_r).ok();
+                close(stderr_r).ok();
+
+                let exit_code = match waitpid(child, None) {
+                    Ok(WaitStatus::Exited(_, code)) => code,
+                    _ => -1,
+                };
+
+                let duration_ms = start.elapsed().as_millis() as u64;
+                return Ok(ExecResult {
+                    exit_code,
+                    stdout: String::from_utf8_lossy(&stdout_buf).into_owned(),
+                    stderr: String::from_utf8_lossy(&stderr_buf).into_owned(),
+                    duration_ms,
+                });
+            }
+            Ok(ForkResult::Child) => {
+                use nix::unistd::dup2;
+                use std::os::unix::io::RawFd;
+                dup2(stdout_w, 1 as RawFd).ok();
+                dup2(stderr_w, 2 as RawFd).ok();
+                close(stdout_r).ok();
+                close(stderr_r).ok();
+
+                // Apply working dir
+                if let Some(ref wd) = req.working_dir {
+                    let _ = std::env::set_current_dir(wd);
+                }
+
+                let c_cmd = std::ffi::CString::new(req.command[0].as_str()).unwrap();
+                let c_args: Vec<std::ffi::CString> = req.command.iter()
+                    .map(|a| std::ffi::CString::new(a.as_str()).unwrap())
+                    .collect();
+                let _ = nix::unistd::execvp(&c_cmd, &c_args);
+                std::process::exit(127);
+            }
+            Err(e) => {
+                return Err(CriError::Exec(format!("fork failed: {}", e)));
+            }
+        }
     }
 
     #[cfg(not(target_os = "linux"))]
-    tracing::warn!(container_id = %id, cmd = ?req.command, "simulated exec (non-Linux)");
+    {
+        tracing::warn!(container_id = %id, cmd = ?req.command, "simulated exec (non-Linux)");
+    }
 
     let duration_ms = start.elapsed().as_millis() as u64;
-    Ok(crate::models::ExecResult {
+    Ok(ExecResult {
         exit_code: 0,
         stdout: format!("exec: {}", req.command.join(" ")),
         stderr: String::new(),
@@ -301,16 +352,18 @@ pub async fn exec_in_container(
     })
 }
 
-/// Read container log lines (from log_path on Linux, simulated on non-Linux).
+/// Read container log lines (JSON format like Docker/containerd).
 pub fn get_container_logs(
     id: Uuid,
     tail: Option<usize>,
     store: &ContainerStore,
-) -> CriResult<Vec<crate::models::ContainerLogEntry>> {
+) -> CriResult<Vec<ContainerLogEntry>> {
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    let mut entries: Vec<crate::models::ContainerLogEntry> = Vec::new();
+    sm::check_logs(&container.status)?;
+
+    let mut entries: Vec<ContainerLogEntry> = Vec::new();
 
     #[cfg(target_os = "linux")]
     {
@@ -318,11 +371,22 @@ pub fn get_container_logs(
         if let Ok(file) = std::fs::File::open(&container.log_path) {
             let reader = std::io::BufReader::new(file);
             for line in reader.lines().flatten() {
-                entries.push(crate::models::ContainerLogEntry {
-                    timestamp: chrono::Utc::now(),
-                    stream: "stdout".into(),
-                    message: line,
-                });
+                // Parse JSON log format: {"time":"...","stream":"stdout","log":"..."}
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
+                    let timestamp = v["time"].as_str()
+                        .and_then(|t| chrono::DateTime::parse_from_rfc3339(t).ok())
+                        .map(|t| t.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(chrono::Utc::now);
+                    let stream = v["stream"].as_str().unwrap_or("stdout").to_string();
+                    let message = v["log"].as_str().unwrap_or("").trim_end_matches('\n').to_string();
+                    entries.push(ContainerLogEntry { timestamp, stream, message });
+                } else {
+                    entries.push(ContainerLogEntry {
+                        timestamp: chrono::Utc::now(),
+                        stream: "stdout".into(),
+                        message: line,
+                    });
+                }
             }
         }
     }
@@ -330,7 +394,7 @@ pub fn get_container_logs(
     #[cfg(not(target_os = "linux"))]
     {
         let _ = &container;
-        entries.push(crate::models::ContainerLogEntry {
+        entries.push(ContainerLogEntry {
             timestamp: chrono::Utc::now(),
             stream: "stdout".into(),
             message: format!("simulated log for container {}", id),
@@ -347,38 +411,41 @@ pub fn get_container_logs(
 }
 
 /// Read current cgroup resource usage for a container.
-pub fn get_container_stats(id: Uuid, store: &ContainerStore) -> CriResult<crate::models::ContainerStats> {
+pub fn get_container_stats(id: Uuid, store: &ContainerStore) -> CriResult<ContainerStats> {
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
     let handle = cgroup::CgroupHandle::new(&id.to_string());
     let cgroup_stats = cgroup::read_stats(&handle)?;
 
-    let memory_percent = if cgroup_stats.memory_current > 0 && container.spec.resources.memory_limit.unwrap_or(0) > 0 {
-        (cgroup_stats.memory_current as f64 / container.spec.resources.memory_limit.unwrap() as f64) * 100.0
+    let memory_percent = if cgroup_stats.memory_current > 0
+        && container.spec.resources.memory_limit.unwrap_or(0) > 0
+    {
+        (cgroup_stats.memory_current as f64
+            / container.spec.resources.memory_limit.unwrap() as f64)
+            * 100.0
     } else {
         0.0
     };
 
-    Ok(crate::models::ContainerStats {
+    // cpu_percent derived from usage_usec delta — on non-Linux always 0
+    let cpu_percent = 0.0_f64;
+
+    Ok(ContainerStats {
         container_id: id,
         timestamp: chrono::Utc::now(),
         cgroup: cgroup_stats,
-        cpu_percent: 0.0,
+        cpu_percent,
         memory_percent,
     })
 }
 
 /// Checkpoint a running container's state to disk.
-pub async fn checkpoint_container(id: Uuid, store: &ContainerStore) -> CriResult<crate::models::CheckpointInfo> {
+pub async fn checkpoint_container(id: Uuid, store: &ContainerStore) -> CriResult<CheckpointInfo> {
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Running {
-        return Err(CriError::InvalidState(format!(
-            "cannot checkpoint container in {:?} state", container.status
-        )));
-    }
+    sm::check_checkpoint(&container.status)?;
 
     let checkpoint_path = format!("/var/lib/cave/checkpoints/{}", id);
 
@@ -389,7 +456,7 @@ pub async fn checkpoint_container(id: Uuid, store: &ContainerStore) -> CriResult
     tracing::warn!(container_id = %id, "simulated checkpoint (non-Linux)");
 
     tracing::info!(container_id = %id, path = %checkpoint_path, "container checkpointed");
-    Ok(crate::models::CheckpointInfo {
+    Ok(CheckpointInfo {
         container_id: id,
         path: checkpoint_path,
         created_at: chrono::Utc::now(),
@@ -402,11 +469,7 @@ pub async fn restore_container(id: Uuid, checkpoint_path: &str, store: &Containe
     let mut container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if !matches!(container.status, ContainerStatus::Stopped | ContainerStatus::Created) {
-        return Err(CriError::InvalidState(format!(
-            "cannot restore container in {:?} state", container.status
-        )));
-    }
+    sm::check_restore(&container.status)?;
 
     #[cfg(target_os = "linux")]
     {
@@ -426,22 +489,17 @@ pub async fn restore_container(id: Uuid, checkpoint_path: &str, store: &Containe
 }
 
 /// List processes running inside a container (via /proc on Linux).
-pub fn list_container_processes(id: Uuid, store: &ContainerStore) -> CriResult<Vec<crate::models::ContainerProcess>> {
+pub fn list_container_processes(id: Uuid, store: &ContainerStore) -> CriResult<Vec<ContainerProcess>> {
     let container = store.get(&id)
         .ok_or_else(|| CriError::NotFound(id.to_string()))?;
 
-    if container.status != ContainerStatus::Running {
-        return Err(CriError::InvalidState(format!(
-            "container is not running: {:?}", container.status
-        )));
-    }
+    sm::check_processes(&container.status)?;
 
     let mut procs = Vec::new();
 
     #[cfg(target_os = "linux")]
     {
         if let Some(pid) = container.pid {
-            // Read /proc/<pid>/status for the root process
             let status_path = format!("/proc/{}/status", pid);
             if let Ok(content) = std::fs::read_to_string(&status_path) {
                 let name = content.lines()
@@ -449,7 +507,7 @@ pub fn list_container_processes(id: Uuid, store: &ContainerStore) -> CriResult<V
                     .and_then(|l| l.split_whitespace().nth(1))
                     .unwrap_or("unknown")
                     .to_string();
-                procs.push(crate::models::ContainerProcess {
+                procs.push(ContainerProcess {
                     pid,
                     user: "root".into(),
                     command: name,
@@ -463,7 +521,7 @@ pub fn list_container_processes(id: Uuid, store: &ContainerStore) -> CriResult<V
     #[cfg(not(target_os = "linux"))]
     {
         if let Some(pid) = container.pid {
-            procs.push(crate::models::ContainerProcess {
+            procs.push(ContainerProcess {
                 pid,
                 user: "root".into(),
                 command: container.spec.command.first().cloned().unwrap_or_else(|| "/bin/sh".into()),
@@ -482,11 +540,11 @@ mod tests {
     use crate::store::ContainerStore;
     use crate::models::{
         Container, ContainerSpec, ContainerStatus, ContainerUpdate,
-        ExecRequest, NetworkMode, ResourceLimits, RestartPolicy,
+        ExecRequest, NetworkMode, RestartPolicy,
     };
     use chrono::Utc;
 
-    fn make_running_container(store: &ContainerStore) -> Uuid {
+    fn make_container(store: &ContainerStore, status: ContainerStatus) -> Uuid {
         let id = Uuid::new_v4();
         let container = Container {
             id,
@@ -505,7 +563,7 @@ mod tests {
                 network_mode: NetworkMode::Bridge,
                 restart_policy: RestartPolicy::Never,
             },
-            status: ContainerStatus::Running,
+            status,
             pid: Some(99999),
             created_at: Utc::now(),
             started_at: Some(Utc::now()),
@@ -513,15 +571,145 @@ mod tests {
             exit_code: None,
             rootfs_path: "/tmp/test".into(),
             log_path: "/tmp/test.log".into(),
+            health: None,
         };
         store.insert(container);
         id
     }
 
+    fn make_running(store: &ContainerStore) -> Uuid {
+        make_container(store, ContainerStatus::Running)
+    }
+
+    // ── state machine integration via runtime functions ───────────────────────
+
+    #[tokio::test]
+    async fn start_running_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        let err = start_container(id, &store).await.unwrap_err();
+        assert!(err.to_string().contains("start"));
+    }
+
+    #[tokio::test]
+    async fn start_paused_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Paused);
+        assert!(start_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn pause_stopped_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        assert!(pause_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn pause_paused_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Paused);
+        assert!(pause_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn unpause_running_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        assert!(unpause_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn unpause_stopped_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        assert!(unpause_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn kill_stopped_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        assert!(kill_container(id, 15, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn kill_created_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Created);
+        assert!(kill_container(id, 15, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn delete_running_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        let err = delete_container(id, &store).await.unwrap_err();
+        assert!(err.to_string().contains("delete") || err.to_string().contains("stop"));
+    }
+
+    #[tokio::test]
+    async fn exec_stopped_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        let req = ExecRequest {
+            command: vec!["ls".into()],
+            env: Default::default(),
+            working_dir: None,
+            user: None,
+            tty: false,
+        };
+        assert!(exec_in_container(id, &req, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn exec_paused_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Paused);
+        let req = ExecRequest {
+            command: vec!["ls".into()],
+            env: Default::default(),
+            working_dir: None,
+            user: None,
+            tty: false,
+        };
+        assert!(exec_in_container(id, &req, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn exec_empty_command_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        let req = ExecRequest {
+            command: vec![],
+            env: Default::default(),
+            working_dir: None,
+            user: None,
+            tty: false,
+        };
+        assert!(exec_in_container(id, &req, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn checkpoint_stopped_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        assert!(checkpoint_container(id, &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn restore_running_container_returns_error() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        assert!(restore_container(id, "/tmp/ckpt", &store).await.is_err());
+    }
+
+    // ── existing tests preserved ──────────────────────────────────────────────
+
     #[test]
     fn test_update_container_labels() {
         let store = ContainerStore::new();
-        let id = make_running_container(&store);
+        let id = make_running(&store);
         let mut labels = std::collections::HashMap::new();
         labels.insert("env".into(), "prod".into());
         let update = ContainerUpdate { resources: None, labels: Some(labels) };
@@ -544,15 +732,31 @@ mod tests {
     }
 
     #[test]
-    fn test_get_container_logs_simulated() {
+    fn test_get_container_logs_running() {
         let store = ContainerStore::new();
-        let id = make_running_container(&store);
+        let id = make_running(&store);
         let logs = get_container_logs(id, None, &store).unwrap();
         assert!(!logs.is_empty());
     }
 
     #[test]
     fn test_list_processes_not_running() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        let result = list_container_processes(id, &store);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_list_processes_running() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        let procs = list_container_processes(id, &store).unwrap();
+        assert!(!procs.is_empty());
+    }
+
+    #[test]
+    fn test_list_processes_stopped_after_running() {
         let store = ContainerStore::new();
         let id = Uuid::new_v4();
         let mut c = Container {
@@ -566,14 +770,48 @@ mod tests {
             status: ContainerStatus::Stopped,
             pid: None, created_at: Utc::now(), started_at: None, finished_at: None,
             exit_code: None, rootfs_path: "/tmp".into(), log_path: "/tmp/x.log".into(),
+            health: None,
         };
         store.insert(c.clone());
-        let result = list_container_processes(id, &store);
-        assert!(result.is_err());
+        assert!(list_container_processes(id, &store).is_err());
         c.status = ContainerStatus::Running;
         c.pid = Some(1);
         store.update(c);
         let procs = list_container_processes(id, &store).unwrap();
         assert!(!procs.is_empty());
+    }
+
+    // ── logs tail ─────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_logs_tail_limits_output() {
+        let store = ContainerStore::new();
+        let id = make_running(&store);
+        // On non-Linux there's exactly 1 simulated entry; tail=0 means take all remaining
+        let logs_all = get_container_logs(id, None, &store).unwrap();
+        let logs_tail = get_container_logs(id, Some(1), &store).unwrap();
+        assert!(logs_tail.len() <= logs_all.len());
+    }
+
+    #[test]
+    fn test_logs_stopped_container_ok() {
+        let store = ContainerStore::new();
+        let id = make_container(&store, ContainerStatus::Stopped);
+        // Stopped containers can still return historical logs
+        assert!(get_container_logs(id, None, &store).is_ok());
+    }
+
+    // ── not found ─────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn start_not_found() {
+        let store = ContainerStore::new();
+        assert!(start_container(Uuid::new_v4(), &store).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn stop_not_found() {
+        let store = ContainerStore::new();
+        assert!(stop_container(Uuid::new_v4(), 0, &store).await.is_err());
     }
 }

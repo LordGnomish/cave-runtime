@@ -46,6 +46,7 @@ pub struct Container {
     pub exit_code: Option<i32>,
     pub rootfs_path: PathBuf,
     pub log_path: PathBuf,
+    pub health: Option<HealthStatus>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -442,6 +443,91 @@ pub struct ImageHistoryEntry {
     pub created_by: String,
     pub size_bytes: u64,
     pub comment: String,
+}
+
+/// Health check configuration (exec / http / tcp).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthCheck {
+    pub kind: HealthCheckKind,
+    pub interval_secs: u64,
+    pub timeout_secs: u64,
+    pub retries: u32,
+    pub start_period_secs: u64,
+}
+
+impl Default for HealthCheck {
+    fn default() -> Self {
+        Self {
+            kind: HealthCheckKind::Exec { command: vec![] },
+            interval_secs: 30,
+            timeout_secs: 30,
+            retries: 3,
+            start_period_secs: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HealthCheckKind {
+    Exec { command: Vec<String> },
+    Http { url: String, expected_status: u16 },
+    Tcp  { host: String, port: u16 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HealthState {
+    Starting,
+    Healthy,
+    Unhealthy,
+}
+
+/// Current health check status for a container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthStatus {
+    pub state: HealthState,
+    pub failing_streak: u32,
+    pub last_output: String,
+    pub last_checked_at: Option<DateTime<Utc>>,
+}
+
+impl Default for HealthStatus {
+    fn default() -> Self {
+        Self {
+            state: HealthState::Starting,
+            failing_streak: 0,
+            last_output: String::new(),
+            last_checked_at: None,
+        }
+    }
+}
+
+/// Log rotation configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LogConfig {
+    pub max_size_bytes: u64,
+    pub max_files: u32,
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        Self { max_size_bytes: 10 * 1024 * 1024, max_files: 5 }
+    }
+}
+
+/// Extended cgroup v2 stats including io and throttling.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CgroupStatsV2 {
+    pub cpu_usage_usec: u64,
+    pub cpu_user_usec: u64,
+    pub cpu_system_usec: u64,
+    pub cpu_nr_throttled: u64,
+    pub memory_current: u64,
+    pub memory_peak: u64,
+    pub memory_swap_current: u64,
+    pub pids_current: u64,
+    pub pids_max_reached: u64,
+    pub io_read_bytes: u64,
+    pub io_write_bytes: u64,
 }
 
 #[cfg(test)]
