@@ -272,4 +272,171 @@ mod tests {
         assert!(r.cpu_shares.is_none());
         assert!(r.memory_limit.is_none());
     }
+
+    // --- ImageReference edge cases ---
+
+    #[test]
+    fn test_parse_org_repo_no_registry() {
+        let r = ImageReference::parse("myorg/myapp");
+        assert_eq!(r.registry, "docker.io");
+        assert_eq!(r.repository, "myorg/myapp");
+        assert_eq!(r.tag, None);
+        assert_eq!(r.digest, None);
+    }
+
+    #[test]
+    fn test_parse_localhost_registry() {
+        let r = ImageReference::parse("localhost/myapp:v1");
+        assert_eq!(r.registry, "localhost");
+        assert_eq!(r.repository, "myapp");
+        assert_eq!(r.tag, Some("v1".into()));
+    }
+
+    #[test]
+    fn test_parse_port_registry() {
+        let r = ImageReference::parse("myregistry:5000/myapp:latest");
+        assert_eq!(r.registry, "myregistry:5000");
+        assert_eq!(r.tag, Some("latest".into()));
+    }
+
+    #[test]
+    fn test_parse_digest_no_tag() {
+        let r = ImageReference::parse("nginx@sha256:deadbeef");
+        assert_eq!(r.tag, None);
+        assert_eq!(r.digest, Some("sha256:deadbeef".into()));
+        assert_eq!(r.registry, "docker.io");
+    }
+
+    #[test]
+    fn test_parse_bare_name_no_tag() {
+        let r = ImageReference::parse("ubuntu");
+        assert_eq!(r.registry, "docker.io");
+        assert_eq!(r.repository, "library/ubuntu");
+        assert_eq!(r.tag, None);
+    }
+
+    // --- full_reference ---
+
+    #[test]
+    fn test_full_reference_no_tag_no_digest() {
+        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: None, digest: None };
+        assert_eq!(r.full_reference(), "docker.io/library/nginx");
+    }
+
+    #[test]
+    fn test_full_reference_tag_only() {
+        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: Some("1.25".into()), digest: None };
+        assert_eq!(r.full_reference(), "docker.io/library/nginx:1.25");
+    }
+
+    #[test]
+    fn test_full_reference_digest_only() {
+        let r = ImageReference { registry: "docker.io".into(), repository: "library/nginx".into(), tag: None, digest: Some("sha256:abc".into()) };
+        assert_eq!(r.full_reference(), "docker.io/library/nginx@sha256:abc");
+    }
+
+    // --- Enum serialization round-trips ---
+
+    #[test]
+    fn test_network_mode_all_variants_roundtrip() {
+        for json in [r#""Host""#, r#""Bridge""#, r#""None""#] {
+            let _: NetworkMode = serde_json::from_str(json).unwrap();
+        }
+        let modes: Vec<NetworkMode> = vec![NetworkMode::Host, NetworkMode::Bridge, NetworkMode::None];
+        for m in modes {
+            let s = serde_json::to_string(&m).unwrap();
+            let _: NetworkMode = serde_json::from_str(&s).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_network_mode_default_is_bridge() {
+        assert!(matches!(NetworkMode::default(), NetworkMode::Bridge));
+    }
+
+    #[test]
+    fn test_restart_policy_all_variants_roundtrip() {
+        let policies: Vec<RestartPolicy> = vec![
+            RestartPolicy::Never,
+            RestartPolicy::Always,
+            RestartPolicy::OnFailure { max_retries: 5 },
+        ];
+        for p in policies {
+            let s = serde_json::to_string(&p).unwrap();
+            let _: RestartPolicy = serde_json::from_str(&s).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_restart_policy_default_is_never() {
+        assert!(matches!(RestartPolicy::default(), RestartPolicy::Never));
+    }
+
+    #[test]
+    fn test_mount_type_all_variants_roundtrip() {
+        for mt in [MountType::Bind, MountType::Volume, MountType::Tmpfs] {
+            let s = serde_json::to_string(&mt).unwrap();
+            let _: MountType = serde_json::from_str(&s).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_container_status_all_variants_roundtrip() {
+        let variants = vec![
+            ContainerStatus::Created,
+            ContainerStatus::Running,
+            ContainerStatus::Paused,
+            ContainerStatus::Stopped,
+            ContainerStatus::Failed("oom killed".into()),
+        ];
+        for s in variants {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: ContainerStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn test_container_status_failed_preserves_message() {
+        let s = ContainerStatus::Failed("exit code 137".into());
+        let json = serde_json::to_string(&s).unwrap();
+        let back: ContainerStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ContainerStatus::Failed("exit code 137".into()));
+    }
+
+    // --- ResourceLimits boundary values ---
+
+    #[test]
+    fn test_resource_limits_zero_values() {
+        let r = ResourceLimits { cpu_shares: Some(0), cpu_quota: Some(0), memory_limit: Some(0), pids_limit: Some(0) };
+        let json = serde_json::to_string(&r).unwrap();
+        let back: ResourceLimits = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.cpu_shares, Some(0));
+        assert_eq!(back.memory_limit, Some(0));
+        assert_eq!(back.pids_limit, Some(0));
+    }
+
+    #[test]
+    fn test_resource_limits_max_values() {
+        let r = ResourceLimits { cpu_shares: Some(u64::MAX), cpu_quota: Some(i64::MAX), memory_limit: Some(u64::MAX), pids_limit: Some(u64::MAX) };
+        let json = serde_json::to_string(&r).unwrap();
+        let back: ResourceLimits = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.cpu_shares, Some(u64::MAX));
+        assert_eq!(back.memory_limit, Some(u64::MAX));
+    }
+
+    // --- Mount struct ---
+
+    #[test]
+    fn test_mount_serialization() {
+        let m = Mount {
+            source: "/host/path".into(),
+            destination: "/container/path".into(),
+            read_only: true,
+            mount_type: MountType::Bind,
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        assert!(json.contains("host/path"));
+        assert!(json.contains("Bind"));
+    }
 }

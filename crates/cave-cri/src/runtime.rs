@@ -188,3 +188,227 @@ pub fn list_containers(store: &ContainerStore) -> Vec<Container> {
 pub fn inspect_container(id: Uuid, store: &ContainerStore) -> CriResult<Container> {
     store.get(&id).ok_or_else(|| CriError::NotFound(id.to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Container, ContainerSpec, ContainerStatus, NetworkMode, RestartPolicy};
+    use crate::store::ContainerStore;
+    use chrono::Utc;
+
+    fn make_store_with_container(status: ContainerStatus) -> (ContainerStore, Uuid) {
+        let store = ContainerStore::new();
+        let id = Uuid::new_v4();
+        let c = Container {
+            id,
+            spec: ContainerSpec {
+                name: "test".into(),
+                image: "nginx:latest".into(),
+                command: vec!["/bin/sh".into()],
+                args: vec![],
+                env: Default::default(),
+                mounts: vec![],
+                resources: Default::default(),
+                labels: Default::default(),
+                working_dir: None,
+                user: None,
+                hostname: None,
+                network_mode: NetworkMode::Bridge,
+                restart_policy: RestartPolicy::Never,
+            },
+            status,
+            pid: None,
+            created_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            exit_code: None,
+            rootfs_path: "/tmp/rootfs".into(),
+            log_path: "/tmp/test.log".into(),
+        };
+        store.insert(c);
+        (store, id)
+    }
+
+    // --- list_containers ---
+
+    #[test]
+    fn test_list_containers_empty() {
+        let store = ContainerStore::new();
+        assert!(list_containers(&store).is_empty());
+    }
+
+    #[test]
+    fn test_list_containers_populated() {
+        let (store, _) = make_store_with_container(ContainerStatus::Created);
+        // Insert a second container directly
+        let id2 = Uuid::new_v4();
+        store.insert(Container {
+            id: id2,
+            spec: ContainerSpec {
+                name: "test2".into(),
+                image: "alpine:latest".into(),
+                command: vec![],
+                args: vec![],
+                env: Default::default(),
+                mounts: vec![],
+                resources: Default::default(),
+                labels: Default::default(),
+                working_dir: None,
+                user: None,
+                hostname: None,
+                network_mode: NetworkMode::Host,
+                restart_policy: RestartPolicy::Always,
+            },
+            status: ContainerStatus::Stopped,
+            pid: None,
+            created_at: Utc::now(),
+            started_at: None,
+            finished_at: None,
+            exit_code: Some(0),
+            rootfs_path: "/tmp/rootfs2".into(),
+            log_path: "/tmp/test2.log".into(),
+        });
+        assert_eq!(list_containers(&store).len(), 2);
+    }
+
+    // --- inspect_container ---
+
+    #[test]
+    fn test_inspect_container_not_found() {
+        let store = ContainerStore::new();
+        let id = Uuid::new_v4();
+        let err = inspect_container(id, &store).unwrap_err();
+        assert!(matches!(err, CriError::NotFound(_)));
+        assert!(err.to_string().contains(&id.to_string()));
+    }
+
+    #[test]
+    fn test_inspect_container_found() {
+        let (store, id) = make_store_with_container(ContainerStatus::Created);
+        let c = inspect_container(id, &store).unwrap();
+        assert_eq!(c.id, id);
+        assert_eq!(c.status, ContainerStatus::Created);
+    }
+
+    // --- start_container ---
+
+    #[tokio::test]
+    async fn test_start_container_not_found() {
+        let store = ContainerStore::new();
+        let err = start_container(Uuid::new_v4(), &store).await.unwrap_err();
+        assert!(matches!(err, CriError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_start_container_from_created_state() {
+        let (store, id) = make_store_with_container(ContainerStatus::Created);
+        start_container(id, &store).await.unwrap();
+        let c = store.get(&id).unwrap();
+        assert_eq!(c.status, ContainerStatus::Running);
+        assert!(c.pid.is_some());
+        assert!(c.started_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_start_container_already_running_fails() {
+        let (store, id) = make_store_with_container(ContainerStatus::Running);
+        let err = start_container(id, &store).await.unwrap_err();
+        assert!(matches!(err, CriError::InvalidState(_)));
+        assert!(err.to_string().contains("Running"));
+    }
+
+    #[tokio::test]
+    async fn test_start_container_from_paused_fails() {
+        let (store, id) = make_store_with_container(ContainerStatus::Paused);
+        let err = start_container(id, &store).await.unwrap_err();
+        assert!(matches!(err, CriError::InvalidState(_)));
+    }
+
+    #[tokio::test]
+    async fn test_start_container_from_stopped_succeeds() {
+        let (store, id) = make_store_with_container(ContainerStatus::Stopped);
+        // Stopped → can be restarted
+        start_container(id, &store).await.unwrap();
+        let c = store.get(&id).unwrap();
+        assert_eq!(c.status, ContainerStatus::Running);
+    }
+
+    // --- stop_container ---
+
+    #[tokio::test]
+    async fn test_stop_container_not_found() {
+        let store = ContainerStore::new();
+        let err = stop_container(Uuid::new_v4(), 0, &store).await.unwrap_err();
+        assert!(matches!(err, CriError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_stop_running_container() {
+        let (store, id) = make_store_with_container(ContainerStatus::Running);
+        // Give it a fake pid so the kill logic doesn't blow up
+        {
+            let mut c = store.get(&id).unwrap();
+            c.pid = Some(99999);
+            store.update(c);
+        }
+        stop_container(id, 0, &store).await.unwrap();
+        let c = store.get(&id).unwrap();
+        assert_eq!(c.status, ContainerStatus::Stopped);
+        assert!(c.finished_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_stop_already_stopped_is_noop() {
+        let (store, id) = make_store_with_container(ContainerStatus::Stopped);
+        // Already stopped → returns Ok without changing anything
+        stop_container(id, 0, &store).await.unwrap();
+        assert_eq!(store.get(&id).unwrap().status, ContainerStatus::Stopped);
+    }
+
+    // --- kill_container ---
+
+    #[tokio::test]
+    async fn test_kill_container_not_found() {
+        let store = ContainerStore::new();
+        let err = kill_container(Uuid::new_v4(), 15, &store).await.unwrap_err();
+        assert!(matches!(err, CriError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_kill_container_no_pid_is_noop() {
+        // Container with no PID (never started) — kill is silently skipped
+        let (store, id) = make_store_with_container(ContainerStatus::Created);
+        kill_container(id, 15, &store).await.unwrap();
+    }
+
+    // --- delete_container ---
+
+    #[tokio::test]
+    async fn test_delete_container_not_found() {
+        let store = ContainerStore::new();
+        let err = delete_container(Uuid::new_v4(), &store).await.unwrap_err();
+        assert!(matches!(err, CriError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn test_delete_running_container_fails() {
+        let (store, id) = make_store_with_container(ContainerStatus::Running);
+        let err = delete_container(id, &store).await.unwrap_err();
+        assert!(matches!(err, CriError::InvalidState(_)));
+        assert!(err.to_string().contains("stop it first"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_stopped_container_removes_from_store() {
+        let (store, id) = make_store_with_container(ContainerStatus::Stopped);
+        delete_container(id, &store).await.unwrap();
+        assert!(store.get(&id).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_delete_created_container_removes_from_store() {
+        let (store, id) = make_store_with_container(ContainerStatus::Created);
+        delete_container(id, &store).await.unwrap();
+        assert!(store.get(&id).is_none());
+    }
+}
