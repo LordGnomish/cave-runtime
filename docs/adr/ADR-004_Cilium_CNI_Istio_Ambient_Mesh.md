@@ -8,11 +8,9 @@
 
 **Related ADRs:** 027 (Kong), 031 (Tetragon), 068 (Istio Ambient Mandatory), 084 (Default-Deny), 110 (Egress Governance), 121 (Ambient Multi-Cluster), 122 (Cilium Gateway API)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs a CNI plugin and service mesh for Kubernetes networking across all profiles. Requirements:
+CAVE needs a CNI plugin and service mesh for Kubernetes networking across all profiles. Requirements:
 
 - Network policy enforcement (default-deny per tenant per environment, ADR-084)
 - mTLS between all services (zero-trust east-west traffic)
@@ -27,7 +25,7 @@
 
 ## Candidates
 
-## ### 3.1 CNI Comparison
+### 3.1 CNI Comparison
 
 | Criteria | Cilium | Calico | Flannel | AWS VPC CNI | Azure CNI |
 |---|---|---|---|---|---|
@@ -76,7 +74,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 
 ## Decision
 
-## **Cilium** as CNI for L3/L4 networking, network policy, eBPF observability (Hubble), and egress governance.
+**Cilium** as CNI for L3/L4 networking, network policy, eBPF observability (Hubble), and egress governance.
 
 **Istio Ambient** (sidecar-less) as service mesh for L4 mTLS (ztunnel) and optional L7 policy (Waypoint proxies).
 
@@ -86,7 +84,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 
 ## Rejected
 
-## ### 4.1 Calico — Rejected (CNI)
+### 4.1 Calico — Rejected (CNI)
 
 **Primary:** No native eBPF observability. Cilium's Hubble provides L3/L4/L7 flow visibility out of the box — critical for CAVE's runtime forensics (ADR-090) and tenant network debugging. Calico's flow visualization is Enterprise-only (proprietary, paid). CAVE's observability stack (ADR-029) depends on Hubble Prometheus metrics for network dashboards.
 
@@ -134,7 +132,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 
 ## Consequences
 
-## ### Positive
+### Positive
 
 - eBPF-native networking: near-kernel performance, bypasses iptables
 - Hubble provides L3/L4/L7 flow visibility without additional tooling
@@ -163,7 +161,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (network segmentation — Cilium default-deny + Istio mTLS). SOC2 CC6.6 (encryption in transit — Istio ambient mTLS). ISO A.8.22 (segregation in networks — eBPF kernel-level enforcement). ISO A.8.24 (cryptographic controls — SPIFFE identity, mTLS). NIS2 Art.21 (network security — zero-trust architecture). GDPR Art.32 (security of processing — encrypted service-to-service communication).
+SOC2 CC6.1 (network segmentation — Cilium default-deny + Istio mTLS). SOC2 CC6.6 (encryption in transit — Istio ambient mTLS). ISO A.8.22 (segregation in networks — eBPF kernel-level enforcement). ISO A.8.24 (cryptographic controls — SPIFFE identity, mTLS). NIS2 Art.21 (network security — zero-trust architecture). GDPR Art.32 (security of processing — encrypted service-to-service communication).
 
 **Absorbed Decisions:** The following tool-level decisions are absorbed into this ADR for traceability
 
