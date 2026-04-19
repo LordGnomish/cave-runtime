@@ -18,3 +18,7 @@ dashmap = "6"
 bytes = "1"
 async-trait = "0.1"
 tokio-stream = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
