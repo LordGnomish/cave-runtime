@@ -58,6 +58,16 @@ CAVE Hetzner profile needs a self-hosted OIDC/SAML identity provider for user au
 - Upgrade path requires careful realm migration testing (realm export → upgrade → import → validate).
 - Red Hat upstream changes (Quarkus rewrite completed, but future direction is Red Hat-influenced).
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Keycloak community stagnates (Red Hat deprioritizes) | Low | High | Apache 2.0 license. Fork viable. Authentik is ready backup (migration: realm export → Authentik import). |
+| Resource overhead on small Hetzner profiles (4GB+ for HA) | Medium | Medium | Dedicated Keycloak node or shared infra node. Monitor via OpenCost. Single-instance acceptable for dev profile. |
+| Zitadel matures SAML federation | Medium (2027) | Low | **Watch:** Zitadel is adding SAML IdP brokering to its roadmap. If GA by 2027 with full claim mapping, re-evaluate — Zitadel offers 4x lower resource footprint and modern API. Annual review. |
+| Keycloak Java SPI breaks on major upgrade | Low | Medium | Pin Keycloak version. Test cave_uid SPI in staging before prod upgrade. SPI contract is stable across minor versions. |
+| Realm migration failure during upgrade | Low | High | Realm export stored in WORM (ADR-088). Automated realm import/export validation in CI. Rollback: restore previous Keycloak version + realm backup. |
+
 Compliance Mapping
 
 SOC2 CC6.1-6.3 (identity management, authentication, access provisioning). ISO A.5.15-17 (access control policy, identity management, authentication). ISO A.5.18 (access rights). GDPR Art.32 (security of processing — centralized identity). NIS2 Art.21 (access control policies).
