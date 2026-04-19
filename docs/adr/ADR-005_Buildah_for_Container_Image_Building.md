@@ -24,7 +24,7 @@ CAVE's 27-stage CI/CD pipeline (stages 12-13) needs a container image build tool
 
 ## Candidates
 
-## ### 3.1 Container Build Tool Comparison
+### 3.1 Container Build Tool Comparison
 
 | Criteria | Buildah | Kaniko | Docker (BuildKit) | Podman Build | Jib (Java) | ko (Go) |
 |---|---|---|---|---|---|---|
@@ -71,7 +71,7 @@ Buildah is ~30% slower than Docker BuildKit on cold builds due to rootless overh
 
 ## Rejected
 
-## ### 4.1 Kaniko — Rejected
+### 4.1 Kaniko — Rejected
 
 **Primary:** No native hermetic build mode. Kaniko runs as a container and can access the network during build unless constrained by external K8s NetworkPolicy. SLSA Level 3 (ADR-101) requires hermetic builds — Buildah's `--no-network` flag provides this natively at the tool level. Relying on NetworkPolicy for hermeticity is an infrastructure-level control, not a build-level control — easier to misconfigure or bypass.
 
@@ -113,7 +113,7 @@ Stage 14: cosign signs image (keyless, OIDC from ARC runner SA)
 
 ## Consequences
 
-## ### Positive
+### Positive
 
 - Rootless + daemonless = zero privilege escalation in CI
 - Native `--no-network` enforces SLSA L3 hermetic builds at tool level
@@ -136,6 +136,7 @@ Stage 14: cosign signs image (keyless, OIDC from ARC runner SA)
 | Buildah regression breaks CI | Low | High | Buildah version pinned + digest (ADR-108). Staging validates before prod. |
 | Rootless performance degrades | Low | Medium | Monitor CI pipeline duration (DORA metrics, ADR-042). Fallback: BuildKit rootless if needed. |
 | Red Hat deprioritizes Buildah | Very Low | Medium | Apache 2.0 license. Podman ecosystem depends on Buildah — discontinuation unlikely. |
+| apko/Wolfi disrupts Dockerfile model | Low (2027+) | Medium | **Watch:** Chainguard's apko + Wolfi OS produces distroless, CVE-free base images without Dockerfiles. If adoption accelerates, evaluate apko as complementary tool for base image generation (Buildah still needed for app-layer builds). Review annually. |
 
 ## Compliance Mapping
 
