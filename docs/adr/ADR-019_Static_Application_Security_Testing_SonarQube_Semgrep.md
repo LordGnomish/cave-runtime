@@ -28,12 +28,37 @@ CAVE needs static analysis to detect code quality issues, security vulnerabiliti
 
 **SonarQube Community** (CI stage 3) for code quality + basic security. **Semgrep OSS** (CI stage 4) for OWASP-focused security rules. Complementary: SonarQube catches code quality and maintainability issues; Semgrep catches security-specific patterns (injection, auth bypass, crypto misuse).
 
-## Rejected
+## Rejected Options
 
-- **SonarQube only:** SonarQube Community has limited security rules compared to Enterprise edition. Semgrep fills the OWASP gap at zero cost.
-- **Semgrep only:** Semgrep focuses on pattern matching (security). SonarQube provides deeper code quality analysis (complexity, duplication, maintainability).
-- **CodeQL:** GitHub-hosted analysis. Cannot run on self-hosted Gitea. Less flexible for custom rules.
-- **Checkmarx:** Proprietary. Expensive. SaaS-focused.
+### SonarQube Only — Rejected
+
+**Primary:** Insufficient OWASP coverage. SonarQube Community Edition has basic security rules but lacks the depth of Semgrep's OWASP-focused rulesets. Enterprise Edition has better security rules but costs €15K+/year. Semgrep OSS fills the security gap at zero cost.
+
+**Secondary:** No taint analysis in Community Edition. SonarQube Enterprise can track data flow (source → sink) for injection detection. Community cannot. Semgrep's pattern matching catches many of the same injection patterns without requiring taint tracking.
+
+### Semgrep Only — Rejected
+
+**Primary:** No code quality analysis. Semgrep matches patterns but does not analyze complexity, duplication, cognitive load, or maintainability. SonarQube's quality gates (“no new code below B rating”) enforce team-wide code quality standards that Semgrep cannot provide.
+
+**Secondary:** No SonarQube-equivalent dashboard. SonarQube's UI shows quality trends over time, technical debt estimates, and per-project quality gates. Semgrep outputs findings but has no integrated quality tracking dashboard.
+
+### CodeQL — Rejected (but Watch)
+
+**Primary:** GitHub-hosted execution model. CodeQL analysis runs on GitHub Actions compute (github.com-hosted) or requires GitHub Advanced Security license for self-hosted runners. CAVE's Gitea fallback (Phase 4) would lose CodeQL capability.
+
+**Secondary:** Smaller rule library than Semgrep for non-GitHub-native languages. CodeQL excels at C/C++/Java but has fewer rules for Python/TypeScript compared to Semgrep Registry.
+
+**Watch:** CodeQL is MIT-licensed and increasingly self-hostable. If CAVE remains GitHub-only (no Gitea fallback), CodeQL could replace Semgrep for security analysis. Re-evaluate annually.
+
+### Checkmarx — Rejected
+
+**Primary:** Proprietary, SaaS-focused. €50K+/year licensing. No self-hosted option. Contradicts CAVE's OSS-first principle and sovereign hosting requirement.
+
+### Licensing Watch Note
+
+**SonarSource trend:** SonarQube Community Edition is progressively losing features to paid editions (branch analysis removed 2024). If Community becomes too limited, evaluate **SonarQube Community Branch Plugin** (third-party) or migrate quality gates to **MegaLinter** (MIT, aggregates multiple linters).
+
+**Semgrep license shift:** Semgrep's registry rules are moving toward restricted access. CAVE should vendor (snapshot) the OWASP rule pack and maintain independently if registry access is restricted. Semgrep OSS engine remains LGPL.
 
 ## Consequences
 
