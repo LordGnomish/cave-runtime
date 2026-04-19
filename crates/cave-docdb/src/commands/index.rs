@@ -130,7 +130,7 @@ pub async fn list_indexes(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Doc
             Value::Object(idx_obj)
         })
         .collect();
-    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

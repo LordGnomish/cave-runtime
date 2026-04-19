@@ -1,6 +1,5 @@
 //! Abstract syntax tree for SQL.
 
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {

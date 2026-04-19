@@ -36,7 +36,7 @@ pub async fn get_more(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<D
             )
         })
         .collect();
-    cursor.insert("next_batch".to_string(), Value::Array(next_batch));
+    cursor.insert("nextBatch".to_string(), Value::Array(next_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

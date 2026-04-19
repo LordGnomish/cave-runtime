@@ -1,7 +1,7 @@
 //! Built-in SQL functions.
 
 use crate::types::SqlValue;
-use chrono::{Local, NaiveDate};
+use chrono::Local;
 
 pub fn call_builtin(name: &str, args: &[SqlValue]) -> Result<SqlValue, String> {
     match name.to_lowercase().as_str() {

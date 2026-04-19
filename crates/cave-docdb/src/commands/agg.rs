@@ -12,11 +12,18 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
+    // Collection name: value of "aggregate" key (standard format) or
+    // first non-$ non-parameter key (cave-docdb native format).
     let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$'))
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+        .get("aggregate")
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_else(|| {
+            cmd_doc
+                .keys()
+                .find(|k| !k.starts_with('$') && !matches!(k.as_str(), "aggregate" | "pipeline" | "cursor"))
+                .cloned()
+                .unwrap_or_else(|| "collection".to_string())
+        });
 
     let pipeline = cmd_doc
         .get("pipeline")
@@ -137,7 +144,7 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
             )
         })
         .collect();
-    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));
@@ -206,6 +213,82 @@ fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>
     }
 
     grouped_results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::crud::insert;
+    use serde_json::json;
+
+    async fn seed(engine: &Arc<Engine>, col: &str, db: &str, docs: serde_json::Value) {
+        let mut d = Document::new();
+        d.insert(col.to_string(), Value::Number(1.into()));
+        d.insert("$db".to_string(), Value::String(db.to_string()));
+        d.insert("documents".to_string(), docs);
+        insert(&d, engine.clone()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_match_stage() {
+        let engine = Arc::new(Engine::new());
+        seed(&engine, "scores", "agg_db", json!([{"score": 80}, {"score": 90}, {"score": 70}])).await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("scores".to_string()));
+        cmd.insert("$db".to_string(), Value::String("agg_db".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$match": {"score": {"$gte": 80}}}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2); // scores 80 and 90
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_limit_skip() {
+        let engine = Arc::new(Engine::new());
+        seed(&engine, "nums", "agg_db2", json!([{"n": 1}, {"n": 2}, {"n": 3}, {"n": 4}])).await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("nums".to_string()));
+        cmd.insert("$db".to_string(), Value::String("agg_db2".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$skip": 1}, {"$limit": 2}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_group_sum() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "sales",
+            "agg_db3",
+            json!([
+                {"dept": "eng", "amount": 100},
+                {"dept": "eng", "amount": 200},
+                {"dept": "hr", "amount": 50}
+            ]),
+        ).await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("sales".to_string()));
+        cmd.insert("$db".to_string(), Value::String("agg_db3".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$group": {"_id": "$dept", "total": {"$sum": "$amount"}}}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        assert_eq!(resp.get("ok"), Some(&Value::Number(1.into())));
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2); // two departments
+    }
 }
 
 fn compare_values(a: Option<&Value>, b: Option<&Value>) -> std::cmp::Ordering {

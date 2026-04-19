@@ -369,9 +369,75 @@ mod tests {
 
     #[test]
     fn test_parse_query_message() {
-        let mut body = b"SELECT * FROM users\0".to_vec();
+        let body = b"SELECT * FROM users\0".to_vec();
         let msg = FrontendMessage::parse_from_bytes(b'Q', &body);
         assert!(matches!(msg, Ok(FrontendMessage::Query(ref q)) if q == "SELECT * FROM users"));
+    }
+
+    #[test]
+    fn test_parse_parse_message() {
+        // P message: name\0query\0 + i16 param_count (0)
+        let mut body = Vec::new();
+        body.extend_from_slice(b"stmt1\0");
+        body.extend_from_slice(b"SELECT 1\0");
+        body.extend_from_slice(&0i16.to_be_bytes());
+        let msg = FrontendMessage::parse_from_bytes(b'P', &body).unwrap();
+        match msg {
+            FrontendMessage::Parse { name, query, param_types } => {
+                assert_eq!(name, "stmt1");
+                assert_eq!(query, "SELECT 1");
+                assert!(param_types.is_empty());
+            }
+            _ => panic!("expected Parse"),
+        }
+    }
+
+    #[test]
+    fn test_parse_bind_message_no_params() {
+        // B message: portal\0 statement\0 + i16 format_count(0) + i16 param_count(0) + i16 result_format_count(0)
+        let mut body = Vec::new();
+        body.extend_from_slice(b"portal1\0");
+        body.extend_from_slice(b"stmt1\0");
+        body.extend_from_slice(&0i16.to_be_bytes()); // param_format_count
+        body.extend_from_slice(&0i16.to_be_bytes()); // param_count
+        body.extend_from_slice(&0i16.to_be_bytes()); // result_format_count
+        let msg = FrontendMessage::parse_from_bytes(b'B', &body).unwrap();
+        match msg {
+            FrontendMessage::Bind { portal, statement, params, result_format } => {
+                assert_eq!(portal, "portal1");
+                assert_eq!(statement, "stmt1");
+                assert!(params.is_empty());
+                assert!(result_format.is_empty());
+            }
+            _ => panic!("expected Bind"),
+        }
+    }
+
+    #[test]
+    fn test_parse_execute_message() {
+        let mut body = Vec::new();
+        body.extend_from_slice(b"portal1\0");
+        body.extend_from_slice(&0i32.to_be_bytes()); // max_rows = 0 (unlimited)
+        let msg = FrontendMessage::parse_from_bytes(b'E', &body).unwrap();
+        match msg {
+            FrontendMessage::Execute { portal, max_rows } => {
+                assert_eq!(portal, "portal1");
+                assert_eq!(max_rows, 0);
+            }
+            _ => panic!("expected Execute"),
+        }
+    }
+
+    #[test]
+    fn test_parse_sync_and_terminate() {
+        assert!(matches!(
+            FrontendMessage::parse_from_bytes(b'S', &[]),
+            Ok(FrontendMessage::Sync)
+        ));
+        assert!(matches!(
+            FrontendMessage::parse_from_bytes(b'X', &[]),
+            Ok(FrontendMessage::Terminate)
+        ));
     }
 
     #[test]
@@ -390,5 +456,75 @@ mod tests {
         };
         let buf = msg.serialize().unwrap();
         assert_eq!(buf[0], b'S');
+    }
+
+    #[test]
+    fn test_serialize_row_description_multi_field() {
+        let fields = vec![
+            FieldDescription {
+                name: "id".to_string(),
+                table_oid: 0,
+                column_attr_num: 1,
+                type_oid: 23, // int4
+                type_len: 4,
+                type_mod: -1,
+                format: 0,
+            },
+            FieldDescription {
+                name: "name".to_string(),
+                table_oid: 0,
+                column_attr_num: 2,
+                type_oid: 25, // text
+                type_len: -1,
+                type_mod: -1,
+                format: 0,
+            },
+        ];
+        let msg = BackendMessage::RowDescription { fields };
+        let buf = msg.serialize().unwrap();
+        assert_eq!(buf[0], b'T');
+        // 2 fields encoded in i16
+        let field_count = i16::from_be_bytes([buf[5], buf[6]]);
+        assert_eq!(field_count, 2);
+    }
+
+    #[test]
+    fn test_serialize_data_row_with_nulls() {
+        let values = vec![
+            Some(Bytes::from_static(b"42")),
+            None, // NULL
+            Some(Bytes::from_static(b"hello")),
+        ];
+        let msg = BackendMessage::DataRow { values };
+        let buf = msg.serialize().unwrap();
+        assert_eq!(buf[0], b'D');
+        // column count = 3 (i16 starting at buf[5])
+        let col_count = i16::from_be_bytes([buf[5], buf[6]]);
+        assert_eq!(col_count, 3);
+    }
+
+    #[test]
+    fn test_serialize_command_complete() {
+        let msg = BackendMessage::CommandComplete { tag: "SELECT 3".to_string() };
+        let buf = msg.serialize().unwrap();
+        assert_eq!(buf[0], b'C');
+        let tag_bytes = &buf[5..buf.len() - 1]; // exclude trailing \0
+        assert_eq!(tag_bytes, b"SELECT 3");
+    }
+
+    #[test]
+    fn test_serialize_ready_for_query() {
+        let msg = BackendMessage::ReadyForQuery { status: 'I' };
+        let buf = msg.serialize().unwrap();
+        assert_eq!(buf[0], b'Z');
+        assert_eq!(buf[5], b'I');
+    }
+
+    #[test]
+    fn test_serialize_parse_and_bind_complete() {
+        let buf = BackendMessage::ParseComplete.serialize().unwrap();
+        assert_eq!(buf[0], b'1');
+        let buf = BackendMessage::BindComplete.serialize().unwrap();
+        assert_eq!(buf[0], b'2');
     }
 }

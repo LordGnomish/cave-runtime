@@ -2,6 +2,7 @@
 
 use crate::bson::Document;
 use crate::index::Index;
+use crate::query::matches_query;
 use crate::update::apply_update;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -60,7 +61,7 @@ impl Collection {
 
         for (_id, doc) in docs.iter() {
             if let Some(f) = filter {
-                if matches_filter(doc, f) {
+                if matches_query(doc, f) {
                     results.push(doc.clone());
                 }
             } else {
@@ -76,7 +77,7 @@ impl Collection {
 
         for (_id, doc) in docs.iter() {
             if let Some(f) = filter {
-                if matches_filter(doc, f) {
+                if matches_query(doc, f) {
                     return Ok(Some(doc.clone()));
                 }
             } else {
@@ -99,7 +100,7 @@ impl Collection {
             .iter()
             .filter_map(|(id, doc)| {
                 let matches = if let Some(f) = filter {
-                    matches_filter(doc, f)
+                    matches_query(doc, f)
                 } else {
                     true
                 };
@@ -129,7 +130,7 @@ impl Collection {
             .iter()
             .filter_map(|(id, doc)| {
                 let matches = if let Some(f) = filter {
-                    matches_filter(doc, f)
+                    matches_query(doc, f)
                 } else {
                     true
                 };
@@ -154,7 +155,7 @@ impl Collection {
             .iter()
             .filter(|(_id, doc)| {
                 if let Some(f) = filter {
-                    matches_filter(doc, f)
+                    matches_query(doc, f)
                 } else {
                     true
                 }
@@ -314,39 +315,6 @@ pub struct EngineStats {
 
 use serde::{Deserialize, Serialize};
 
-fn matches_filter(doc: &Document, filter: &Document) -> bool {
-    for (key, filter_value) in filter {
-        match doc.get(key) {
-            Some(doc_value) => {
-                if !value_matches(doc_value, filter_value) {
-                    return false;
-                }
-            }
-            None => return false,
-        }
-    }
-    true
-}
-
-fn value_matches(doc_value: &Value, filter_value: &Value) -> bool {
-    match (doc_value, filter_value) {
-        (a, b) if a == b => true,
-        (Value::Object(doc_obj), Value::Object(filter_obj)) => {
-            for (k, v) in filter_obj {
-                match doc_obj.get(k) {
-                    Some(doc_v) => {
-                        if !value_matches(doc_v, v) {
-                            return false;
-                        }
-                    }
-                    None => return false,
-                }
-            }
-            true
-        }
-        _ => false,
-    }
-}
 
 #[cfg(test)]
 mod tests {

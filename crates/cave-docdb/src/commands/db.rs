@@ -61,7 +61,7 @@ pub async fn list_collections(cmd_doc: &Document, engine: Arc<Engine>) -> Result
         col_obj.insert("type".to_string(), Value::String("collection".to_string()));
         first_batch.push(Value::Object(col_obj));
     }
-    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

@@ -17,16 +17,14 @@ pub async fn find(
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
+    const FIND_PARAMS: &[&str] = &[
+        "filter", "projection", "sort", "limit", "skip", "hint", "batchSize",
+        "singleBatch", "comment", "maxTimeMS", "readConcern",
+    ];
     let col_name = cmd_doc
         .keys()
-        .find(|k| !k.starts_with('$'))
-        .and_then(|k| {
-            if cmd_doc.get(k).is_some() {
-                Some(k.clone())
-            } else {
-                None
-            }
-        })
+        .find(|k| !k.starts_with('$') && !FIND_PARAMS.contains(&k.as_str()))
+        .cloned()
         .unwrap_or_else(|| "collection".to_string());
 
     let filter_spec = cmd_doc.get("filter");
@@ -104,7 +102,7 @@ pub async fn find(
             )
         })
         .collect();
-    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));
@@ -210,7 +208,7 @@ pub async fn delete(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
 
     let col_name = cmd_doc
         .keys()
-        .find(|k| !k.starts_with('$'))
+        .find(|k| !k.starts_with('$') && *k != "filter")
         .cloned()
         .unwrap_or_else(|| "collection".to_string());
 
@@ -238,6 +236,104 @@ pub async fn delete(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
     Ok(resp)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cursor::CursorStore;
+    use serde_json::json;
+
+    fn make_insert_doc(col: &str, db: &str, docs: serde_json::Value) -> Document {
+        let mut d = Document::new();
+        d.insert(col.to_string(), Value::Number(1.into()));
+        d.insert("$db".to_string(), Value::String(db.to_string()));
+        d.insert("documents".to_string(), docs);
+        d
+    }
+
+    fn make_find_doc(col: &str, db: &str) -> Document {
+        let mut d = Document::new();
+        d.insert(col.to_string(), Value::Number(1.into()));
+        d.insert("$db".to_string(), Value::String(db.to_string()));
+        d
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_find_via_commands() {
+        let engine = Arc::new(Engine::new());
+        let cursors = Arc::new(CursorStore::new());
+
+        let insert_cmd = make_insert_doc(
+            "items",
+            "testdb",
+            json!([{"name": "alpha", "val": 1}, {"name": "beta", "val": 2}]),
+        );
+        let resp = insert(&insert_cmd, engine.clone()).await.unwrap();
+        assert_eq!(resp.get("ok"), Some(&Value::Number(1.into())));
+        let ids = resp.get("insertedIds").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(ids.len(), 2);
+
+        let find_cmd = make_find_doc("items", "testdb");
+        let resp = find(&find_cmd, engine.clone(), cursors.clone()).await.unwrap();
+        assert_eq!(resp.get("ok"), Some(&Value::Number(1.into())));
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_find_with_filter_via_command() {
+        let engine = Arc::new(Engine::new());
+        let cursors = Arc::new(CursorStore::new());
+
+        let insert_cmd = make_insert_doc(
+            "things",
+            "testdb",
+            json!([{"x": 10}, {"x": 20}, {"x": 30}]),
+        );
+        insert(&insert_cmd, engine.clone()).await.unwrap();
+
+        let mut find_cmd = make_find_doc("things", "testdb");
+        find_cmd.insert("filter".to_string(), json!({"x": {"$gt": 15}}));
+        let resp = find(&find_cmd, engine.clone(), cursors.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2); // x=20 and x=30
+    }
+
+    #[tokio::test]
+    async fn test_count_via_command() {
+        let engine = Arc::new(Engine::new());
+        let insert_cmd = make_insert_doc(
+            "widgets",
+            "testdb",
+            json!([{"a": 1}, {"a": 2}]),
+        );
+        insert(&insert_cmd, engine.clone()).await.unwrap();
+
+        let count_cmd = make_find_doc("widgets", "testdb");
+        let resp = count(&count_cmd, engine.clone()).await.unwrap();
+        assert_eq!(resp.get("n"), Some(&Value::Number(2.into())));
+    }
+
+    #[tokio::test]
+    async fn test_delete_via_command() {
+        let engine = Arc::new(Engine::new());
+        let insert_cmd = make_insert_doc(
+            "trash",
+            "testdb",
+            json!([{"keep": false}, {"keep": true}]),
+        );
+        insert(&insert_cmd, engine.clone()).await.unwrap();
+
+        let mut del_cmd = Document::new();
+        del_cmd.insert("trash".to_string(), Value::Number(1.into()));
+        del_cmd.insert("$db".to_string(), Value::String("testdb".to_string()));
+        del_cmd.insert("filter".to_string(), json!({"keep": false}));
+        let resp = delete(&del_cmd, engine.clone()).await.unwrap();
+        assert_eq!(resp.get("deletedCount"), Some(&Value::Number(1.into())));
+    }
+}
+
 pub async fn count(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document, String> {
     let db_name = cmd_doc
         .get("$db")
@@ -246,7 +342,7 @@ pub async fn count(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document, 
 
     let col_name = cmd_doc
         .keys()
-        .find(|k| !k.starts_with('$'))
+        .find(|k| !k.starts_with('$') && *k != "filter")
         .cloned()
         .unwrap_or_else(|| "collection".to_string());
 
