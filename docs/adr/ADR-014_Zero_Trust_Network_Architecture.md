@@ -10,6 +10,8 @@
 
 ## Context
 
+**Minimum Kernel Requirement: Linux 7.0** (released 12 April 2026). CAVE does not support older kernels. Kernel 7.0 provides: official Rust kernel module support, improved eBPF BTF type lookups, enhanced io_uring performance, and the latest eBPF verifier improvements. Talos Linux and Ubuntu 26.04 LTS both ship with kernel 7.0.
+
 CAVE is a multi-tenant platform where workloads from different tenants share cluster infrastructure. Traditional perimeter-based security (firewall at edge, trust inside) is insufficient — any compromised pod could reach any other pod. Zero-trust requires verifying every connection, regardless of source.
 
 ## Candidates
