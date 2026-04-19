@@ -54,6 +54,12 @@ pub enum EtcdError {
 
     #[error("invalid token")]
     InvalidToken,
+
+    #[error("permission already granted")]
+    PermissionAlreadyGranted,
+
+    #[error("role not granted to user")]
+    RoleNotGranted,
 }
 
 pub type EtcdResult<T> = Result<T, EtcdError>;

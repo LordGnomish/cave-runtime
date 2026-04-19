@@ -511,6 +511,64 @@ pub struct VersionResponse {
     pub etcdcluster: String,
 }
 
+// ── Watch config (internal, not serialised over the wire) ─────────────────
+
+#[derive(Debug, Clone)]
+pub struct WatchConfig {
+    pub watch_id: i64,
+    pub key: Vec<u8>,
+    pub range_end: Option<Vec<u8>>,
+    pub start_revision: Option<u64>,
+    pub prev_kv: bool,
+}
+
+// ── Auth grant / revoke ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthUserGrantRoleRequest {
+    pub user: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthUserGrantRoleResponse {
+    pub header: ResponseHeader,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthUserRevokeRoleRequest {
+    pub name: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthUserRevokeRoleResponse {
+    pub header: ResponseHeader,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthRoleGrantPermissionRequest {
+    pub name: String,
+    pub perm: Permission,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthRoleGrantPermissionResponse {
+    pub header: ResponseHeader,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthRoleRevokePermissionRequest {
+    pub role: String,
+    pub key: String,
+    pub range_end: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthRoleRevokePermissionResponse {
+    pub header: ResponseHeader,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
