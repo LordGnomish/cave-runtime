@@ -27,11 +27,37 @@ CAVE needs defense-in-depth at the container runtime level: preventing container
 
 **Pod Security Admission (PSA) Restricted** for all namespaces + **Tetragon** for runtime monitoring and enforcement. PSA prevents privileged containers, host networking, and dangerous capabilities at admission. Tetragon monitors syscalls, file access, and network at kernel level via eBPF, exporting to WORM forensic bucket (ADR-090).
 
-## Rejected
+## Rejected Options
 
-- **Falco instead of Tetragon:** Both are eBPF-based runtime security. Tetragon is the Cilium ecosystem project (Isovalent) — shares eBPF infrastructure with Cilium and Hubble. Running Falco alongside Cilium means two separate eBPF program sets on the same kernel — potential conflicts, higher overhead.
-- **Seccomp profiles only:** Static syscall filtering. No monitoring, no forensic export, no file access tracking. Defense without detection.
-- **gVisor/Kata Containers:** VM-level sandboxing provides strongest isolation but significant performance overhead (~20-30% CPU). Incompatible with Talos immutable OS (no gVisor/Kata support). Overkill for most workloads.
+### Falco — Rejected
+
+**Primary:** Dual eBPF overhead. Falco and Cilium both load eBPF programs into the kernel. Running both means two independent eBPF program sets competing for kernel resources — potential verifier conflicts, doubled probe overhead, and two separate event pipelines to maintain. Tetragon is the Cilium ecosystem project (Isovalent/Cisco) — shares eBPF infrastructure with Cilium agent and Hubble, resulting in a single unified eBPF layer.
+
+**Secondary:** Different ecosystems. Falco (Sysdig/CNCF Graduated) has a larger community but its output format and rule language are incompatible with Cilium's policy model. Tetragon's TracingPolicy CRD integrates natively with CiliumNetworkPolicy — one policy language for both network and runtime enforcement. Falco would require a separate Falco-to-SIEM pipeline alongside Hubble's.
+
+### Seccomp Profiles Only — Rejected
+
+**Primary:** Static defense without detection. Seccomp profiles whitelist/blacklist syscalls at container start — they cannot detect anomalous behavior patterns, file access violations, or process lineage. A compromised container making allowed syscalls in suspicious sequence (e.g.,  →  → ) would pass seccomp but trigger Tetragon's behavioral policy.
+
+**Secondary:** No forensic export. Seccomp blocks or allows — it doesn't log. Tetragon exports every matching event to WORM forensic bucket (ADR-090) for post-incident investigation. Compliance requires detection evidence, not just prevention (SOC2 CC7.2).
+
+### gVisor / Kata Containers — Rejected
+
+**Primary:** Performance overhead. gVisor intercepts every syscall through a userspace kernel (~20-30% CPU overhead). Kata runs each pod in a lightweight VM (~100-200MB overhead per pod). On Hetzner's cost-optimized profiles, this overhead is prohibitive for 500+ pod clusters.
+
+**Secondary:** Incompatible with Talos Linux. Talos's immutable, API-only OS does not support gVisor's  runtime or Kata's QEMU/Cloud Hypervisor installation. Supporting these would require a different OS — contradicting ADR-003.
+
+## Runtime Security Layers (Defense-in-Depth)
+
+| Layer | Tool | When | What it does |
+|---|---|---|---|
+| Admission | PSA Restricted | Pod creation | Blocks privileged containers, host namespaces, dangerous capabilities |
+| Admission (extended) | OPA Gatekeeper (ADR-030) | Pod creation | Custom policies: image allowlist, label requirements, resource limits |
+| Build-time | Trivy (ADR-018) | CI pipeline | Scans container image for CVEs before deployment |
+| Runtime monitoring | Tetragon | Pod execution | Monitors syscalls, file access, network at kernel level via eBPF |
+| Runtime enforcement | Tetragon | Pod execution | Kills process on policy violation (e.g., shell spawn in production) |
+| Network | Cilium (ADR-004) | Pod networking | Default-deny L3/L4, FQDN-based egress control |
+| Forensics | Tetragon → WORM | Post-incident | Tamper-proof event log for investigation (ADR-090) |
 
 ## Consequences
 
