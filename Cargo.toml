@@ -90,6 +90,7 @@ members = [
     # === Crossplane ===
     "crates/cave-apiserver",
     "crates/cave-cri",
+    "crates/cave-kubelet",
     "crates/cave-scheduler",
     "crates/cave-etcd",
     "crates/cave-crossplane",
