@@ -8,18 +8,6 @@
 
 **Related ADRs:** 002, 067
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-002, 067
-
-Back to Index:
-
 ## Context
 
 CAVE's Azure profile requires Day-0 infrastructure provisioning: VNet (10.20.0.0/16), subnets, NSGs, AKS cluster (with Cilium BYOCNI, Karpenter), Key Vault, Private DNS Zones, Storage Account (for state), and Private Endpoints. Same rationale as Hetzner Day-0 (ADR-061): Crossplane cannot provision its own cluster.

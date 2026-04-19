@@ -8,18 +8,6 @@
 
 **Related ADRs:** 067, 093, 106, 135 | Absorbs: ADR-048
 
-Status:
-
-Category:
-
-Data
-
-Related ADRs:
-
-067, 093, 106, 135
-
-Back to Index:
-
 ## Context
 
 CAVE needs object storage for: Loki log chunks, Tempo traces, Velero backups, MLflow artifacts, Sovereign Ledger (WORM), Thanos long-term metrics, tenant application data. Must support S3 API compatibility (industry standard).

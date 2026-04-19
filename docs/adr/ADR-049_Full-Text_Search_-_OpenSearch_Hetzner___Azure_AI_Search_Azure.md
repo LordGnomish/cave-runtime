@@ -8,18 +8,6 @@
 
 **Related ADRs:** 067, 114, 135
 
-Status:
-
-Category:
-
-Data
-
-Related ADRs:
-
-067, 114, 135
-
-Back to Index:
-
 ## Context
 
 CAVE tenants need full-text search for application data, log analytics (via Loki, not Elasticsearch), and tenant-facing search features. Solution must be Crossplane XR-abstracted.

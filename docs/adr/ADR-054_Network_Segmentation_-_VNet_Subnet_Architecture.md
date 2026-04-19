@@ -8,18 +8,6 @@
 
 **Related ADRs:** 004, 014, 084
 
-Status:
-
-Category:
-
-Security
-
-Related ADRs:
-
-004, 014, 084
-
-Back to Index:
-
 ## Context
 
 CAVE runs on two providers with fundamentally different networking models. IP address spaces must be non-overlapping (for potential future VPN peering), subnets must isolate different workload types, and the network topology must support private endpoints for all managed services on Azure.

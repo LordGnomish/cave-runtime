@@ -8,18 +8,6 @@
 
 **Related ADRs:** 099, 127, 132, 133, 134 | Absorbs: ADR-094
 
-Status:
-
-Category:
-
-Operations
-
-Related ADRs:
-
-099, 127, 132, 133, 134
-
-Back to Index:
-
 ## Context
 
 73 components must be upgraded regularly (security patches, new features, upstream EOL). Upgrades must be safe, reversible, and evidence-producing.

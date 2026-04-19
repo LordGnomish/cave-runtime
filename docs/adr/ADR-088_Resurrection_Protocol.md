@@ -8,18 +8,6 @@
 
 **Related ADRs:** 079 | Absorbs: ADR-097
 
-Status:
-
-Category:
-
-DR
-
-Related ADRs:
-
-079
-
-Back to Index:
-
 ## Context
 
 CAVE must be recoverable from complete cluster destruction (data center fire, catastrophic cloud failure, hostile takeover). Recovery must be independently achievable without depending on the destroyed infrastructure.

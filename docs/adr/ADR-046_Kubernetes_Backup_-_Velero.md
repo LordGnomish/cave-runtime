@@ -8,18 +8,6 @@
 
 **Related ADRs:** 080, 088
 
-Status:
-
-Category:
-
-DR
-
-Related ADRs:
-
-080, 088
-
-Back to Index:
-
 ## Context
 
 CAVE needs cluster-level backup for K8s resources (Deployments, ConfigMaps, CRDs, Crossplane XRs) and persistent volumes. Database-level backup is handled by CNPG/Azure PG (ADR-047). Velero covers the K8s resource layer.

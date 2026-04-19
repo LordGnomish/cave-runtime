@@ -8,18 +8,6 @@
 
 **Related ADRs:** 001, 002, 135
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-001, 002, 135
-
-Back to Index:
-
 ## Context
 
 CAVE supports two providers. Should tenants be able to choose? Can they switch later? Can workloads span providers?

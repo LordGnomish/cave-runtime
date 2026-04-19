@@ -8,18 +8,6 @@
 
 **Related ADRs:** 067, 135
 
-Status:
-
-Category:
-
-Data
-
-Related ADRs:
-
-067, 135
-
-Back to Index:
-
 ## Context
 
 PostgreSQL is CAVE's primary relational database for tenant workloads, Backstage catalog, Keycloak, DevLake, Unleash, and Langfuse. Needs HA, automated backup, PITR, and Crossplane XR abstraction across both providers.

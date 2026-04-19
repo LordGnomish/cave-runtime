@@ -8,18 +8,6 @@
 
 **Related ADRs:** 007
 
-Status:
-
-Category:
-
-Identity
-
-Related ADRs:
-
-007
-
-Back to Index:
-
 ## Context
 
 Azure profile has two identity systems: Okta (Workforce Identity) and Entra ID (native Azure). Without clear boundaries, both could handle app authentication, creating overlap, confusion, and security gaps.

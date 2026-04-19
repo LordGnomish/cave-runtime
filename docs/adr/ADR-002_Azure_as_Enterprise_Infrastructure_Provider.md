@@ -107,7 +107,7 @@ Costs are comparable across hyperscalers. Decision is not cost-driven.
 
 ### Positive
 
-- Native Entra ID integration aligns with Knauf's Microsoft ecosystem
+- Native Entra ID integration aligns with the target organization's Microsoft ecosystem
 - Azure OpenAI exclusive access with enterprise DPA (ADR-103)
 - AKS free control plane reduces per-profile cost
 - BSI C5 certification strengthens German enterprise sales

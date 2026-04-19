@@ -8,18 +8,6 @@
 
 **Related ADRs:** 024, 027
 
-Status:
-
-Category:
-
-Security
-
-Related ADRs:
-
-024, 027
-
-Back to Index:
-
 ## Context
 
 CAVE's external-facing endpoints (Kong API gateway, Backstage portal, Grafana dashboards) are internet-accessible and need protection against DDoS attacks, bot traffic, and common web application attacks (SQLi, XSS, SSRF). Protection must work across both providers without cloud-specific WAF dependencies.

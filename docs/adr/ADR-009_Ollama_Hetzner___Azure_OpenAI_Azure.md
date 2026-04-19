@@ -8,18 +8,6 @@
 
 **Related ADRs:** 013, 103, 111
 
-Status:
-
-Category:
-
-AI/LLM
-
-Related ADRs:
-
-013, 103, 111
-
-Back to Index:
-
 ## Context
 
 CAVE needs LLM inference on both providers. Sovereign profile requires data to never leave the cluster. Enterprise profile needs GPT-4/o1 quality.
@@ -46,7 +34,7 @@ CAVE needs LLM inference on both providers. Sovereign profile requires data to n
 
 - **vLLM:** Higher performance for GPU inference but requires CUDA — Hetzner has no GPU instances. Overkill for platform team size.
 - **LocalAI:** Less mature, smaller model ecosystem, fewer community contributions than Ollama.
-- **AWS Bedrock/GCP Vertex:** Not available on Hetzner. Azure OpenAI exclusive GPT-4 access + Knauf ecosystem alignment (ADR-002).
+- **AWS Bedrock/GCP Vertex:** Not available on Hetzner. Azure OpenAI exclusive GPT-4 access + enterprise ecosystem alignment (ADR-002).
 
 
 ## Consequences

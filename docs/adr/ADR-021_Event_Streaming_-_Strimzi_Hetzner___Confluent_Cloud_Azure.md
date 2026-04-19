@@ -8,18 +8,6 @@
 
 **Related ADRs:** 059, 060, 067, 135
 
-Status:
-
-Category:
-
-Data & Messaging
-
-Related ADRs:
-
-059, 060, 067, 135
-
-Back to Index:
-
 ## Context
 
 CAVE tenants need event streaming for asynchronous communication, event sourcing, CDC pipelines, and real-time data integration. The solution must be available on both providers via Crossplane XR abstraction.

@@ -8,18 +8,6 @@
 
 **Related ADRs:** 003
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-003
-
-Back to Index:
-
 ## Context
 
 Hetzner profile needs a K8s-optimized, security-hardened, immutable OS. Configuration drift must be impossible. SSH access must not exist.

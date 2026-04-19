@@ -8,21 +8,9 @@
 
 **Related ADRs:** 006, 064, 104, 129, 130
 
-Status:
-
-Category:
-
-Identity
-
-Related ADRs:
-
-006, 064, 104, 129, 130
-
-Back to Index:
-
 ## Context
 
-Azure profile needs enterprise identity. Knauf uses Microsoft 365 + Entra ID. Platform needs OIDC for all applications + Azure RBAC for resource access.
+Azure profile needs enterprise identity. The target organization uses Microsoft 365 + Entra ID. Platform needs OIDC for all applications + Azure RBAC for resource access.
 
 
 ## Candidates

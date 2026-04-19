@@ -8,18 +8,6 @@
 
 **Related ADRs:** 026
 
-Status:
-
-Category:
-
-CI/CD
-
-Related ADRs:
-
-026
-
-Back to Index:
-
 ## Context
 
 AKS offers a built-in GitOps add-on based on Flux. CAVE must decide whether to use this managed offering or self-host ArgoCD on AKS, same as Hetzner.

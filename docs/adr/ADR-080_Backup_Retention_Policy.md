@@ -8,18 +8,6 @@
 
 **Related ADRs:** 046, 088
 
-Status:
-
-Category:
-
-DR
-
-Related ADRs:
-
-046, 088
-
-Back to Index:
-
 ## Context
 
 CAVE needs defined backup retention periods per data type, per environment. Retention must balance: recovery capability, storage cost, compliance requirements (GDPR storage limitation), and forensic needs.

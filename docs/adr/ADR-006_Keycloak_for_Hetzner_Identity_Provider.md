@@ -8,18 +8,6 @@
 
 **Related ADRs:** 007, 064, 104, 129
 
-Status:
-
-Category:
-
-Identity
-
-Related ADRs:
-
-007, 064, 104, 129
-
-Back to Index:
-
 ## Context
 
 CAVE Hetzner profile needs a self-hosted OIDC/SAML identity provider for user authentication, tenant RBAC, and federation. The provider must support multi-tenancy (realm-per-tenant), IdP brokering for BYOID (ADR-129), and SCIM for user lifecycle management.

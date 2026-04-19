@@ -8,18 +8,6 @@
 
 **Related ADRs:** 067, 135
 
-Status:
-
-Category:
-
-Data
-
-Related ADRs:
-
-067, 135
-
-Back to Index:
-
 ## Context
 
 CAVE tenants need an in-memory cache/data structure store for session management, rate limiting, pub/sub, and application caching. The solution must be available on both providers via Crossplane XR abstraction and support the Redis protocol for broad application compatibility.

@@ -8,18 +8,6 @@
 
 **Related ADRs:** 015, 066 | Absorbs: ADR-065
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-015, 066
-
-Back to Index:
-
 ## Context
 
 CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must support: DNS-01 ACME challenge (for cert-manager), geographic failover (for multi-provider), DDoS protection, and fast global resolution.
