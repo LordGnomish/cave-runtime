@@ -89,6 +89,7 @@ members = [
     "crates/cave-ledger",
     # === Crossplane ===
     "crates/cave-cri",
+    "crates/cave-etcd",
     "crates/cave-crossplane",
     # === New crates (this session) ===
     "crates/cave-oncall",

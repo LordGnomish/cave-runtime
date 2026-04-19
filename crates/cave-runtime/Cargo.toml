@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Shared infrastructure
+cave-etcd = { path = "../cave-etcd" }
 cave-cri = { path = "../cave-cri" }
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
