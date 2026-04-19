@@ -23,3 +23,7 @@ bytes = "1"
 thiserror = "1"
 dashmap = "6"
 async-trait = "0.1"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+tempfile = "3"

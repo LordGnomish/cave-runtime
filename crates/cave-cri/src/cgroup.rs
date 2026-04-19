@@ -143,4 +143,85 @@ mod tests {
         let stats = read_stats(&h).unwrap();
         assert_eq!(stats.cpu_usage_usec, 0);
     }
+
+    #[test]
+    fn test_cgroup_handle_path_with_hyphens() {
+        let id = "abc-def-123-456";
+        let h = CgroupHandle::new(id);
+        assert!(h.path.to_string_lossy().contains("abc-def-123-456"));
+        assert_eq!(h.container_id, id);
+    }
+
+    #[test]
+    fn test_cgroup_handle_path_structure() {
+        let h = CgroupHandle::new("mycontainer");
+        let path = h.path.to_string_lossy();
+        assert!(path.starts_with("/sys/fs/cgroup"));
+        assert!(path.contains("cave"));
+        assert!(path.ends_with("mycontainer"));
+    }
+
+    #[test]
+    fn test_cgroup_handle_empty_id() {
+        let h = CgroupHandle::new("");
+        // Empty id should still produce a valid path under cave/
+        assert!(h.path.to_string_lossy().contains("cave"));
+        assert_eq!(h.container_id, "");
+    }
+
+    #[test]
+    fn test_create_cgroup_returns_handle() {
+        let limits = ResourceLimits::default();
+        let h = create_cgroup("create-test-id", &limits).unwrap();
+        assert!(h.path.to_string_lossy().contains("create-test-id"));
+    }
+
+    #[test]
+    fn test_create_cgroup_zero_limits() {
+        let limits = ResourceLimits {
+            cpu_shares: Some(0),
+            cpu_quota: Some(0),
+            memory_limit: Some(0),
+            pids_limit: Some(0),
+        };
+        let h = create_cgroup("zero-limits-id", &limits).unwrap();
+        assert_eq!(h.container_id, "zero-limits-id");
+    }
+
+    #[test]
+    fn test_update_cgroup_default_limits() {
+        let h = CgroupHandle::new("update-test");
+        let limits = ResourceLimits::default();
+        assert!(update_cgroup(&h, &limits).is_ok());
+    }
+
+    #[test]
+    fn test_update_cgroup_all_limits_set() {
+        let h = CgroupHandle::new("update-all");
+        let limits = ResourceLimits {
+            cpu_shares: Some(1024),
+            cpu_quota: Some(50000),
+            memory_limit: Some(512 * 1024 * 1024),
+            pids_limit: Some(100),
+        };
+        assert!(update_cgroup(&h, &limits).is_ok());
+    }
+
+    #[test]
+    fn test_remove_cgroup_nonexistent_path() {
+        let h = CgroupHandle::new("nonexistent-xyz-999");
+        // Should succeed because on non-linux it's a no-op
+        // and on linux it checks path.exists() first
+        assert!(remove_cgroup(&h).is_ok());
+    }
+
+    #[test]
+    fn test_read_stats_all_fields_zero_on_non_linux() {
+        let h = CgroupHandle::new("stats-zero-test");
+        let stats = read_stats(&h).unwrap();
+        assert_eq!(stats.cpu_usage_usec, 0);
+        assert_eq!(stats.memory_current, 0);
+        assert_eq!(stats.memory_peak, 0);
+        assert_eq!(stats.pids_current, 0);
+    }
 }
