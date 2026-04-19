@@ -1,6 +1,6 @@
 //! RDBMS execution engine.
 
-use crate::storage::schema::{ColumnDef, Database, Schema, Table};
+use crate::storage::schema::{ColumnDef, Database, Table};
 use crate::types::SqlValue;
 use std::sync::Arc;
 use tokio::sync::RwLock;

@@ -288,8 +288,8 @@ fn decode_element(
         }
         TYPE_REGEX => {
             let (pattern, new_pos) = read_cstring(&bytes[pos..])?;
-            let (flags, new_pos2) = read_cstring(&bytes[pos + new_pos + 1..])?;
-            pos += new_pos + 1 + new_pos2 + 1;
+            let (flags, new_pos2) = read_cstring(&bytes[pos + new_pos..])?;
+            pos += new_pos + new_pos2;
             Value::Object(
                 vec![
                     ("pattern".to_string(), Value::String(pattern)),
@@ -330,7 +330,7 @@ fn read_cstring(bytes: &[u8]) -> Result<(String, usize), BsonError> {
         if b == 0 {
             let s = String::from_utf8(bytes[..i].to_vec())
                 .map_err(|e| BsonError::DecodeError(format!("invalid utf8: {}", e)))?;
-            return Ok((s, i));
+            return Ok((s, i + 1)); // +1 to consume the null terminator
         }
     }
     Err(BsonError::DecodeError("unterminated cstring".to_string()))

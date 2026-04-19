@@ -114,7 +114,7 @@ pub async fn list_indexes(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Doc
         Value::String(format!("{}.{}.$cmd.listIndexes", db_name, col_name)),
     );
 
-    let firstBatch: Vec<Value> = indexes
+    let first_batch: Vec<Value> = indexes
         .iter()
         .map(|idx| {
             let mut idx_obj = serde_json::Map::new();
@@ -130,7 +130,7 @@ pub async fn list_indexes(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Doc
             Value::Object(idx_obj)
         })
         .collect();
-    cursor.insert("firstBatch".to_string(), Value::Array(firstBatch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

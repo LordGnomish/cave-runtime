@@ -25,7 +25,7 @@ fn coerce_pair(a: &SqlValue, b: &SqlValue) -> Option<SqlValue> {
         (SqlValue::Numeric(x), SqlValue::Numeric(y)) => {
             Some(SqlValue::Numeric(if x >= y { *x } else { *y }))
         }
-        (SqlValue::Text(x), SqlValue::Text(y)) => Some(SqlValue::Text(x.clone())),
+        (SqlValue::Text(x), SqlValue::Text(_y)) => Some(SqlValue::Text(x.clone())),
         (SqlValue::Bool(x), SqlValue::Bool(y)) => Some(SqlValue::Bool(*x || *y)),
         _ => None,
     }

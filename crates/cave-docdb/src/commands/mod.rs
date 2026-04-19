@@ -55,9 +55,3 @@ pub async fn dispatch(
     }
 }
 
-fn command_name_from_doc(doc: &Document) -> String {
-    doc.keys()
-        .next()
-        .cloned()
-        .unwrap_or_else(|| "unknown".to_string())
-}

@@ -53,6 +53,7 @@ pub fn encode_op_msg(reply: &OpMsg, request_id: i32, response_to: i32) -> Result
     for section in &reply.sections {
         match section {
             Section::Body(doc) => {
+                payload.push(0x00); // Section kind: body
                 let encoded = bson::encode_doc(doc)
                     .map_err(|e| WireError::BsonError(e.to_string()))?;
                 payload.extend_from_slice(&encoded);
@@ -218,10 +219,31 @@ mod tests {
 
         let msg = OpMsg::new(doc);
         let encoded = encode_op_msg(&msg, 42, 0).unwrap();
-        let (req_id, _decoded) = decode_op_msg(&encoded).unwrap();
+        let (req_id, decoded) = decode_op_msg(&encoded).unwrap();
 
         assert_eq!(req_id, 42);
-        assert!(encoded.len() > 16); // At least header + some payload
+        assert!(encoded.len() > 16);
+        // Verify body is decoded correctly
+        let body = decoded.body().expect("should have body section");
+        assert_eq!(body.get("command"), Some(&Value::String("find".to_string())));
+    }
+
+    #[test]
+    fn test_encode_decode_roundtrip_body() {
+        let mut doc = Document::new();
+        doc.insert("ok".to_string(), Value::Number(1.into()));
+        doc.insert("n".to_string(), Value::Number(42.into()));
+        doc.insert("msg".to_string(), Value::String("hello".to_string()));
+
+        let msg = OpMsg::new(doc);
+        let encoded = encode_op_msg(&msg, 7, 0).unwrap();
+        let (req_id, decoded) = decode_op_msg(&encoded).unwrap();
+
+        assert_eq!(req_id, 7);
+        let body = decoded.body().expect("must have body");
+        assert_eq!(body.get("ok"), Some(&Value::Number(1.into())));
+        assert_eq!(body.get("n"), Some(&Value::Number(42.into())));
+        assert_eq!(body.get("msg"), Some(&Value::String("hello".to_string())));
     }
 
     #[test]

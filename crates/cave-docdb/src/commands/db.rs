@@ -54,14 +54,14 @@ pub async fn list_collections(cmd_doc: &Document, engine: Arc<Engine>) -> Result
     cursor.insert("id".to_string(), Value::Number(0.into()));
     cursor.insert("ns".to_string(), Value::String(format!("{}.$cmd.listCollections", db_name)));
 
-    let mut firstBatch = Vec::new();
+    let mut first_batch = Vec::new();
     for col_name in collections {
         let mut col_obj = serde_json::Map::new();
         col_obj.insert("name".to_string(), Value::String(col_name));
         col_obj.insert("type".to_string(), Value::String("collection".to_string()));
-        firstBatch.push(Value::Object(col_obj));
+        first_batch.push(Value::Object(col_obj));
     }
-    cursor.insert("firstBatch".to_string(), Value::Array(firstBatch));
+    cursor.insert("firstBatch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));
