@@ -32,9 +32,19 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 
 ## Rejected Options
 
-- **AWS Route 53:** AWS-coupled. Using AWS DNS for a platform that runs on Hetzner and Azure creates unnecessary AWS dependency.
-- **Azure DNS:** Azure-coupled. Same reasoning.
-- **Hetzner DNS:** Limited API. No geographic failover. No DDoS protection. Insufficient for production multi-provider platform.
+### AWS Route 53 — Rejected
+
+**Primary:** AWS-coupled. Route 53 requires an AWS account and IAM credentials. CAVE runs on Hetzner and Azure — introducing AWS solely for DNS creates a third cloud dependency with its own billing, IAM, and operational surface. Cloudflare is genuinely provider-independent.
+
+**Secondary:** Per-query pricing. Route 53 charges per million DNS queries. Cloudflare's unlimited DNS queries (free tier) is more predictable for a platform with many tenant subdomains.
+
+### Azure DNS — Rejected
+
+**Primary:** Azure-coupled. Same reasoning as Route 53 — DNS should be independent of compute providers so that Hetzner ↔ Azure failover is controlled by a neutral third party, not by one of the providers being failed-over from.
+
+### Hetzner DNS — Rejected
+
+**Primary:** Limited API and no geographic failover. Hetzner DNS has no health check or geographic routing capability. Cannot automatically redirect traffic from Hetzner to Azure during a Hetzner outage. Also no DDoS protection — critical for public-facing platform endpoints.
 
 
 ## Consequences
@@ -50,6 +60,15 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 - Cloudflare dependency (single external provider for DNS). If Cloudflare has major outage, all CAVE endpoints unreachable. Mitigated: Cloudflare 100% SLA, multi-region anycast.
 - Cloudflare API token is in Break-glass Kit (ADR-079) — critical credential.
 - Cloudflare proxying adds ~10ms latency (optional — can use DNS-only mode).
+
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Cloudflare major outage (all DNS down) | Very Low | Critical | Cloudflare anycast = 300+ PoPs, multi-region. Historical uptime >99.99%. Break-glass: pre-cached DNS records at registrar (72h TTL failsafe). |
+| Cloudflare API token compromise | Low | Critical | Token stored in OpenBao (ADR-020) + Break-glass Kit (ADR-079). Scoped to DNS-only permissions. Rotate quarterly. |
+| Cloudflare pricing change (free → paid for features used) | Low | Medium | CAVE uses DNS + basic proxy (free tier). Enterprise features not required. If pricing changes, migrate to secondary provider (pre-tested annually). |
+| Cloudflare WARP/Zero Trust scope creep | Low | Low | CAVE uses Cloudflare ONLY for DNS and DDoS. Zero Trust networking stays Cilium+Istio (ADR-004, ADR-014). No Cloudflare Tunnel, no WARP. Clear boundary. |
 
 Compliance Mapping
 
