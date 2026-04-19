@@ -87,6 +87,18 @@ Every pipeline run produces a single `Pipeline Attestation` in Sovereign Ledger 
 - DefectDojo finding volume can be high — triage discipline required.
 - Each new language requires a build-stage adapter (Buildah + language-specific build commands).
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| GitHub outage blocks all CI | Low | High | Gitea self-hosted mirror as fallback (Phase 4). Critical hotfix path: manual Buildah + cosign on operator laptop with break-glass credentials. |
+| Pipeline execution > 15 min SLO | Medium | Medium | Stages 3+4, 9+10+11, 17+18+19 parallelized. Cache Buildah layers in Harbor. Skip unchanged stages via path-filter. Monitor p95 via DORA metrics (ADR-042). |
+| DefectDojo finding fatigue (too many alerts) | Medium | Medium | Severity-based gates (only CRITICAL/HIGH block). Weekly triage rotation. Auto-close findings resolved in next build. |
+| GitHub Actions runner escape (ARC security) | Very Low | Critical | ARC runners ephemeral (pod destroyed after job). No Docker socket mount. Buildah rootless (ADR-005). Network policy isolates runner pods. |
+| SLSA provenance spec breaking change | Low | Medium | Pin slsa-github-generator version. Staging validates before prod. SLSA v1.0 spec is stable. |
+| Dagger.io disrupts CI landscape | Low (2027+) | Low | **Watch:** Dagger offers portable CI pipelines (write once, run on any CI engine). If Dagger matures and GitHub Actions lock-in becomes a concern, evaluate Dagger as pipeline abstraction layer. Does not replace GitHub Actions — sits on top. Annual review. |
+| GitHub Enterprise licensing cost | Medium | Medium | ARC self-hosted runners avoid per-minute charges. Monitor GitHub plan vs Gitea+Woodpecker self-hosted alternative. Cost-benefit analysis annually. |
+
 ## Compliance Mapping
 
 SOC2 CC8.1 (change management — automated pipeline enforces process). SOC2 CC7.1 (vulnerability detection — multi-layer scanning). ISO A.8.25-28 (secure development lifecycle). ISO A.8.8 (vulnerability management). SLSA Level 3 (hermetic build + signed provenance). NIS2 Art.21 (supply chain security, vulnerability management).
