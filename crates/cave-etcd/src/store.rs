@@ -287,14 +287,24 @@ impl Default for KvStore {
 mod tests {
     use super::*;
 
+    fn put(store: &KvStore, key: &str, value: &str) {
+        store.put(&PutRequest { key: key.into(), value: value.into(), lease: None, prev_kv: false });
+    }
+
+    fn get(store: &KvStore, key: &str) -> RangeResponse {
+        store.range(&RangeRequest {
+            key: key.into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap()
+    }
+
+    // --- put ---
+
     #[test]
     fn test_put_and_get() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "foo".into(), value: "bar".into(), lease: None, prev_kv: false });
-        let resp = store.range(&RangeRequest {
-            key: "foo".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
+        put(&store, "foo", "bar");
+        let resp = get(&store, "foo");
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].value_str(), "bar");
     }
@@ -308,33 +318,96 @@ mod tests {
     }
 
     #[test]
+    fn test_put_with_lease() {
+        let store = KvStore::new();
+        let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
+        store.put(&PutRequest { key: "leased".into(), value: "val".into(), lease: Some(lease.id), prev_kv: false });
+        let resp = get(&store, "leased");
+        assert_eq!(resp.kvs[0].lease, Some(lease.id));
+    }
+
+    #[test]
     fn test_put_prev_kv() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "x".into(), value: "old".into(), lease: None, prev_kv: false });
+        put(&store, "x", "old");
         let resp = store.put(&PutRequest { key: "x".into(), value: "new".into(), lease: None, prev_kv: true });
         assert!(resp.prev_kv.is_some());
         assert_eq!(resp.prev_kv.unwrap().value_str(), "old");
     }
 
     #[test]
-    fn test_delete() {
+    fn test_put_overwrite_increments_version() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "del_me".into(), value: "v".into(), lease: None, prev_kv: false });
-        let resp = store.delete_range(&DeleteRangeRequest { key: "del_me".into(), range_end: None, prev_kv: true });
-        assert_eq!(resp.deleted, 1);
-        assert_eq!(resp.prev_kvs[0].value_str(), "v");
-
-        let get = store.range(&RangeRequest { key: "del_me".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false }).unwrap();
-        assert_eq!(get.kvs.len(), 0);
+        put(&store, "k", "v1");
+        put(&store, "k", "v2");
+        let resp = get(&store, "k");
+        assert_eq!(resp.kvs[0].version, 2);
+        assert_eq!(resp.kvs[0].value_str(), "v2");
     }
 
     #[test]
-    fn test_range_query() {
+    fn test_put_overwrite_preserves_create_revision() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "/a/1".into(), value: "v1".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "/a/2".into(), value: "v2".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "/b/1".into(), value: "v3".into(), lease: None, prev_kv: false });
+        put(&store, "stable", "v1");
+        let create_rev = get(&store, "stable").kvs[0].create_revision;
+        put(&store, "stable", "v2");
+        let resp = get(&store, "stable");
+        assert_eq!(resp.kvs[0].create_revision, create_rev);
+        assert!(resp.kvs[0].mod_revision > create_rev);
+    }
 
+    #[test]
+    fn test_put_empty_key() {
+        let store = KvStore::new();
+        put(&store, "", "val");
+        let resp = get(&store, "");
+        assert_eq!(resp.kvs.len(), 1);
+        assert_eq!(resp.kvs[0].value_str(), "val");
+    }
+
+    #[test]
+    fn test_put_empty_value() {
+        let store = KvStore::new();
+        put(&store, "k", "");
+        let resp = get(&store, "k");
+        assert_eq!(resp.kvs[0].value_str(), "");
+    }
+
+    #[test]
+    fn test_put_very_long_key_value() {
+        let store = KvStore::new();
+        let long_key = "k".repeat(10_000);
+        let long_val = "v".repeat(100_000);
+        store.put(&PutRequest { key: long_key.clone(), value: long_val.clone(), lease: None, prev_kv: false });
+        let resp = get(&store, &long_key);
+        assert_eq!(resp.kvs[0].value_str(), long_val);
+    }
+
+    // --- range ---
+
+    #[test]
+    fn test_range_single_key_hit() {
+        let store = KvStore::new();
+        put(&store, "hit", "v");
+        let resp = get(&store, "hit");
+        assert_eq!(resp.kvs.len(), 1);
+        assert_eq!(resp.count, 1);
+    }
+
+    #[test]
+    fn test_range_single_key_miss() {
+        let store = KvStore::new();
+        let resp = get(&store, "nonexistent");
+        assert_eq!(resp.kvs.len(), 0);
+        assert_eq!(resp.count, 0);
+    }
+
+    #[test]
+    fn test_range_scan() {
+        let store = KvStore::new();
+        put(&store, "/a/1", "v1");
+        put(&store, "/a/2", "v2");
+        put(&store, "/b/1", "v3");
         let resp = store.range(&RangeRequest {
             key: "/a/".into(), range_end: Some("/a0".into()), limit: None,
             revision: None, keys_only: false, count_only: false,
@@ -343,11 +416,50 @@ mod tests {
     }
 
     #[test]
+    fn test_range_with_limit() {
+        let store = KvStore::new();
+        put(&store, "a", "1");
+        put(&store, "b", "2");
+        put(&store, "c", "3");
+        let resp = store.range(&RangeRequest {
+            key: "a".into(), range_end: Some("z".into()), limit: Some(2),
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs.len(), 2);
+        assert!(resp.more);
+    }
+
+    #[test]
+    fn test_range_limit_not_exceeded_no_more() {
+        let store = KvStore::new();
+        put(&store, "a", "1");
+        put(&store, "b", "2");
+        let resp = store.range(&RangeRequest {
+            key: "a".into(), range_end: Some("z".into()), limit: Some(5),
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs.len(), 2);
+        assert!(!resp.more);
+    }
+
+    #[test]
+    fn test_range_keys_only() {
+        let store = KvStore::new();
+        put(&store, "k", "secret");
+        let resp = store.range(&RangeRequest {
+            key: "k".into(), range_end: Some("l".into()), limit: None,
+            revision: None, keys_only: true, count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs.len(), 1);
+        assert!(resp.kvs[0].value.is_empty());
+        assert_eq!(resp.kvs[0].key_str(), "k");
+    }
+
+    #[test]
     fn test_count_only() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "k1".into(), value: "v1".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "k2".into(), value: "v2".into(), lease: None, prev_kv: false });
-
+        put(&store, "k1", "v1");
+        put(&store, "k2", "v2");
         let resp = store.range(&RangeRequest {
             key: "k".into(), range_end: Some("l".into()), limit: None,
             revision: None, keys_only: false, count_only: true,
@@ -357,43 +469,320 @@ mod tests {
     }
 
     #[test]
-    fn test_lease_grant_and_revoke() {
+    fn test_range_compacted_revision_error() {
+        let store = KvStore::new();
+        put(&store, "k", "v1");
+        put(&store, "k", "v2");
+        store.compact(5);
+        let result = store.range(&RangeRequest {
+            key: "k".into(), range_end: None, limit: None,
+            revision: Some(2), keys_only: false, count_only: false,
+        });
+        assert!(matches!(result, Err(EtcdError::RevisionCompacted { .. })));
+    }
+
+    #[test]
+    fn test_range_valid_revision_after_compact() {
+        let store = KvStore::new();
+        put(&store, "k", "v");
+        store.compact(3);
+        // revision 10 > compacted 3, should not error
+        let result = store.range(&RangeRequest {
+            key: "k".into(), range_end: None, limit: None,
+            revision: Some(10), keys_only: false, count_only: false,
+        });
+        assert!(result.is_ok());
+    }
+
+    // --- delete_range ---
+
+    #[test]
+    fn test_delete_single_key_with_prev_kv() {
+        let store = KvStore::new();
+        put(&store, "del_me", "v");
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "del_me".into(), range_end: None, prev_kv: true,
+        });
+        assert_eq!(resp.deleted, 1);
+        assert_eq!(resp.prev_kvs[0].value_str(), "v");
+        assert_eq!(get(&store, "del_me").kvs.len(), 0);
+    }
+
+    #[test]
+    fn test_delete_range_deletes_multiple() {
+        let store = KvStore::new();
+        put(&store, "/k/1", "v1");
+        put(&store, "/k/2", "v2");
+        put(&store, "/m/1", "v3");
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "/k/".into(), range_end: Some("/k0".into()), prev_kv: false,
+        });
+        assert_eq!(resp.deleted, 2);
+        let remaining = store.range(&RangeRequest {
+            key: "/".into(), range_end: Some("0".into()), limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(remaining.kvs.len(), 1);
+    }
+
+    #[test]
+    fn test_delete_range_non_existent() {
+        let store = KvStore::new();
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "nonexistent".into(), range_end: None, prev_kv: false,
+        });
+        assert_eq!(resp.deleted, 0);
+        assert!(resp.prev_kvs.is_empty());
+    }
+
+    #[test]
+    fn test_delete_range_without_prev_kv() {
+        let store = KvStore::new();
+        put(&store, "key1", "v1");
+        put(&store, "key2", "v2");
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "key".into(), range_end: Some("keyz".into()), prev_kv: false,
+        });
+        assert_eq!(resp.deleted, 2);
+        assert!(resp.prev_kvs.is_empty());
+    }
+
+    // --- lease_grant ---
+
+    #[test]
+    fn test_lease_grant_auto_id() {
         let store = KvStore::new();
         let resp = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
         assert!(resp.id > 0);
         assert_eq!(resp.ttl, 60);
-
-        assert!(store.lease_revoke(resp.id).is_ok());
-        assert!(store.lease_revoke(99999).is_err());
     }
 
     #[test]
-    fn test_watch_notification() {
+    fn test_lease_grant_with_custom_id() {
+        let store = KvStore::new();
+        let resp = store.lease_grant(&LeaseGrantRequest { ttl: 30, id: Some(12345) });
+        assert_eq!(resp.id, 12345);
+        assert_eq!(resp.ttl, 30);
+    }
+
+    #[test]
+    fn test_lease_grant_zero_ttl() {
+        let store = KvStore::new();
+        let resp = store.lease_grant(&LeaseGrantRequest { ttl: 0, id: None });
+        assert!(resp.id > 0);
+        assert_eq!(resp.ttl, 0);
+    }
+
+    #[test]
+    fn test_lease_grant_auto_ids_are_unique() {
+        let store = KvStore::new();
+        let r1 = store.lease_grant(&LeaseGrantRequest { ttl: 10, id: None });
+        let r2 = store.lease_grant(&LeaseGrantRequest { ttl: 10, id: None });
+        assert_ne!(r1.id, r2.id);
+    }
+
+    // --- lease_revoke ---
+
+    #[test]
+    fn test_lease_revoke_valid() {
+        let store = KvStore::new();
+        let resp = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
+        assert!(store.lease_revoke(resp.id).is_ok());
+    }
+
+    #[test]
+    fn test_lease_revoke_non_existent() {
+        let store = KvStore::new();
+        assert!(matches!(store.lease_revoke(99999), Err(EtcdError::LeaseNotFound(99999))));
+    }
+
+    #[test]
+    fn test_lease_revoke_twice_errors() {
+        let store = KvStore::new();
+        let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
+        store.lease_revoke(lease.id).unwrap();
+        assert!(store.lease_revoke(lease.id).is_err());
+    }
+
+    #[test]
+    fn test_lease_revoke_with_associated_keys() {
+        let store = KvStore::new();
+        let lease = store.lease_grant(&LeaseGrantRequest { ttl: 60, id: None });
+        // Put a key referencing this lease
+        store.put(&PutRequest { key: "leased_key".into(), value: "val".into(), lease: Some(lease.id), prev_kv: false });
+        // Revoking the lease should succeed (keys aren't tracked in lease.keys in current impl)
+        assert!(store.lease_revoke(lease.id).is_ok());
+        // Lease is gone
+        assert!(store.lease_revoke(lease.id).is_err());
+    }
+
+    // --- compact ---
+
+    #[test]
+    fn test_compact_removes_old_revisions() {
+        let store = KvStore::new();
+        put(&store, "a", "1");
+        let old_rev = store.current_revision();
+        put(&store, "b", "2");
+        store.compact(old_rev + 1);
+        // old_rev is now below the compacted boundary
+        let result = store.range(&RangeRequest {
+            key: "a".into(), range_end: None, limit: None,
+            revision: Some(old_rev), keys_only: false, count_only: false,
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compact_keeps_current_data() {
+        let store = KvStore::new();
+        put(&store, "a", "current");
+        let rev = store.current_revision();
+        store.compact(rev);
+        let resp = get(&store, "a");
+        assert_eq!(resp.kvs[0].value_str(), "current");
+    }
+
+    #[test]
+    fn test_compact_sets_compacted_revision() {
+        let store = KvStore::new();
+        put(&store, "x", "v");
+        store.compact(42);
+        // Any revision < 42 should now fail
+        let result = store.range(&RangeRequest {
+            key: "x".into(), range_end: None, limit: None,
+            revision: Some(1), keys_only: false, count_only: false,
+        });
+        assert!(matches!(result, Err(EtcdError::RevisionCompacted { compacted: 42, .. })));
+    }
+
+    // --- subscribe / watch ---
+
+    #[test]
+    fn test_watch_put_event() {
         let store = KvStore::new();
         let mut rx = store.subscribe();
-
-        store.put(&PutRequest { key: "watched".into(), value: "v1".into(), lease: None, prev_kv: false });
-
+        put(&store, "watched", "v1");
         let event = rx.try_recv().unwrap();
         assert_eq!(event.kv.key_str(), "watched");
         assert!(matches!(event.event_type, EventType::Put));
     }
 
     #[test]
-    fn test_compact() {
+    fn test_watch_delete_event() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false });
-        store.put(&PutRequest { key: "b".into(), value: "2".into(), lease: None, prev_kv: false });
-        let rev = store.current_revision();
-        store.compact(rev);
-        // After compaction, old revision reads should fail
+        put(&store, "watch_del", "v");
+        let mut rx = store.subscribe();
+        store.delete_range(&DeleteRangeRequest { key: "watch_del".into(), range_end: None, prev_kv: false });
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(event.event_type, EventType::Delete));
+        assert_eq!(event.kv.key_str(), "watch_del");
     }
 
     #[test]
-    fn test_status() {
+    fn test_watch_event_ordering() {
         let store = KvStore::new();
-        store.put(&PutRequest { key: "s".into(), value: "t".into(), lease: None, prev_kv: false });
+        let mut rx = store.subscribe();
+        put(&store, "e1", "v1");
+        put(&store, "e2", "v2");
+        let ev1 = rx.try_recv().unwrap();
+        let ev2 = rx.try_recv().unwrap();
+        assert_eq!(ev1.kv.key_str(), "e1");
+        assert_eq!(ev2.kv.key_str(), "e2");
+    }
+
+    #[test]
+    fn test_watch_put_with_prev_kv() {
+        let store = KvStore::new();
+        put(&store, "wp", "old");
+        let mut rx = store.subscribe();
+        store.put(&PutRequest { key: "wp".into(), value: "new".into(), lease: None, prev_kv: true });
+        let event = rx.try_recv().unwrap();
+        assert!(event.prev_kv.is_some());
+        assert_eq!(event.prev_kv.unwrap().value_str(), "old");
+    }
+
+    // --- status ---
+
+    #[test]
+    fn test_status_fields() {
+        let store = KvStore::new();
+        put(&store, "s", "t");
         let status = store.status();
         assert!(status.get("version").is_some());
+        assert!(status.get("leader").is_some());
+        assert!(status.get("raftIndex").is_some());
+        assert!(status.get("raftTerm").is_some());
+        assert!(status.get("dbSize").is_some());
+        assert!(status.get("header").is_some());
+    }
+
+    #[test]
+    fn test_status_db_size_reflects_entries() {
+        let store = KvStore::new();
+        let before = store.status()["dbSize"].as_u64().unwrap();
+        put(&store, "extra", "v");
+        let after = store.status()["dbSize"].as_u64().unwrap();
+        assert!(after > before);
+    }
+
+    // --- current_revision ---
+
+    #[test]
+    fn test_current_revision_increments_on_put() {
+        let store = KvStore::new();
+        let r0 = store.current_revision();
+        put(&store, "x", "y");
+        assert!(store.current_revision() > r0);
+    }
+
+    // --- concurrent access ---
+
+    #[test]
+    fn test_concurrent_put_get() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let store = Arc::new(KvStore::new());
+        let handles: Vec<_> = (0..10).map(|i| {
+            let s = store.clone();
+            thread::spawn(move || {
+                let key = format!("concurrent_{}", i);
+                s.put(&PutRequest { key: key.clone(), value: format!("val_{}", i), lease: None, prev_kv: false });
+                let resp = s.range(&RangeRequest {
+                    key, range_end: None, limit: None,
+                    revision: None, keys_only: false, count_only: false,
+                }).unwrap();
+                assert_eq!(resp.kvs.len(), 1);
+            })
+        }).collect();
+        for h in handles { h.join().unwrap(); }
+    }
+
+    #[test]
+    fn test_concurrent_mixed_ops() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let store = Arc::new(KvStore::new());
+        // Pre-populate
+        for i in 0..5 {
+            put(&store, &format!("shared_{}", i), "init");
+        }
+
+        let handles: Vec<_> = (0..5).map(|i| {
+            let s = store.clone();
+            thread::spawn(move || {
+                // Overwrite
+                s.put(&PutRequest { key: format!("shared_{}", i), value: format!("updated_{}", i), lease: None, prev_kv: false });
+                // Read back
+                let resp = s.range(&RangeRequest {
+                    key: format!("shared_{}", i), range_end: None, limit: None,
+                    revision: None, keys_only: false, count_only: false,
+                }).unwrap();
+                assert_eq!(resp.kvs.len(), 1);
+            })
+        }).collect();
+        for h in handles { h.join().unwrap(); }
     }
 }
