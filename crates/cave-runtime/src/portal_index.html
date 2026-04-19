@@ -325,7 +325,7 @@ const MODS = {
   // Core
   db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null,loc:820,relatedAdrs:[47,43],github:null},
   auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null,loc:1240,relatedAdrs:[6,7,64,104,129,142],github:null},
-  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 61 reimplemented OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null,loc:640,relatedAdrs:[127],github:null},
+  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 66 reimplemented OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null,loc:640,relatedAdrs:[127],github:null},
   // Security
   secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health',loc:960,relatedAdrs:[17,20,79,83,115],github:'https://github.com/trufflesecurity/trufflehog'},
   certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health',loc:760,relatedAdrs:[15,56,105],github:'https://github.com/cert-manager/cert-manager'},
@@ -378,19 +378,13 @@ const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'
 // 73 tracked OSS projects
 const UPSTREAM_PROJECTS=[
   // Infrastructure
-  {name:'Hetzner Cloud',gh:'https://github.com/hetznercloud/hcloud-go',cave:'(infra)',cat:'Infrastructure',phase:1,parity:30},
-  {name:'Azure / AKS',gh:'https://github.com/Azure/AKS',cave:'(infra)',cat:'Infrastructure',phase:1,parity:25},
-  {name:'Talos Linux',gh:'https://github.com/siderolabs/talos',cave:'(infra)',cat:'Infrastructure',phase:1,parity:30},
   {name:'Cilium CNI',gh:'https://github.com/cilium/cilium',cave:'(infra)',cat:'Networking',phase:1,parity:25},
   {name:'Istio Ambient Mesh',gh:'https://github.com/istio/istio',cave:'(infra)',cat:'Networking',phase:2,parity:25},
   {name:'ArgoCD',gh:'https://github.com/argoproj/argo-cd',cave:'(infra)',cat:'GitOps',phase:1,parity:30},
   {name:'Crossplane',gh:'https://github.com/crossplane/crossplane',cave:'(infra)',cat:'Infrastructure',phase:2,parity:25},
   {name:'vcluster',gh:'https://github.com/loft-sh/vcluster',cave:'(infra)',cat:'Infrastructure',phase:1,parity:25},
-  {name:'OpenTofu',gh:'https://github.com/opentofu/opentofu',cave:'(infra)',cat:'Infrastructure',phase:1,parity:30},
-  {name:'Cloudflare DNS / CDN',gh:'https://github.com/cloudflare',cave:'(infra)',cat:'Networking',phase:1,parity:30},
   {name:'Kong API Gateway',gh:'https://github.com/Kong/kong',cave:'(infra)',cat:'Networking',phase:2,parity:20},
   // Security
-  {name:'TruffleHog',gh:'https://github.com/trufflesecurity/trufflehog',cave:'secrets',cat:'Security',phase:1,parity:30},
   {name:'Gitleaks',gh:'https://github.com/gitleaks/gitleaks',cave:'secrets',cat:'Security',phase:1,parity:30},
   {name:'cert-manager',gh:'https://github.com/cert-manager/cert-manager',cave:'certs',cat:'Security',phase:1,parity:30},
   {name:'Sigstore / Cosign',gh:'https://github.com/sigstore/cosign',cave:'sign',cat:'Security',phase:2,parity:20},
@@ -403,7 +397,6 @@ const UPSTREAM_PROJECTS=[
   {name:'External Secrets Operator',gh:'https://github.com/external-secrets/external-secrets',cave:'secrets',cat:'Security',phase:1,parity:25},
   {name:'Falco',gh:'https://github.com/falcosecurity/falco',cave:'forensics',cat:'Security',phase:3,parity:15},
   {name:'Tetragon',gh:'https://github.com/cilium/tetragon',cave:'forensics',cat:'Security',phase:3,parity:15},
-  {name:'Teleport',gh:'https://github.com/gravitational/teleport',cave:'pam',cat:'Security',phase:3,parity:15},
   {name:'Kubescape',gh:'https://github.com/kubescape/kubescape',cave:'scan',cat:'Security',phase:3,parity:15},
   {name:'Cilium Network Policy',gh:'https://github.com/cilium/cilium',cave:'policy',cat:'Security',phase:1,parity:25},
   // Security Scanning
@@ -439,9 +432,7 @@ const UPSTREAM_PROJECTS=[
   {name:'Backstage',gh:'https://github.com/backstage/backstage',cave:'portal',cat:'Dev Tools',phase:1,parity:25},
   {name:'Harbor OCI Registry',gh:'https://github.com/goharbor/harbor',cave:'registry',cat:'Dev Tools',phase:2,parity:20},
   {name:'Buildah',gh:'https://github.com/containers/buildah',cave:'(infra)',cat:'Dev Tools',phase:1,parity:30},
-  {name:'Renovate',gh:'https://github.com/renovatebot/renovate',cave:'(infra)',cat:'Dev Tools',phase:1,parity:30},
   {name:'k6 Load Testing',gh:'https://github.com/grafana/k6',cave:'(infra)',cat:'Dev Tools',phase:2,parity:20},
-  {name:'Hadolint',gh:'https://github.com/hadolint/hadolint',cave:'lint',cat:'Dev Tools',phase:1,parity:30},
   {name:'Apicurio Registry',gh:'https://github.com/Apicurio/apicurio-registry',cave:'docs',cat:'Dev Tools',phase:1,parity:25},
   {name:'Apache DevLake',gh:'https://github.com/apache/incubator-devlake',cave:'devlake',cat:'Dev Tools',phase:3,parity:15},
   {name:'Flyway / Alembic',gh:'https://github.com/flyway/flyway',cave:'db',cat:'Dev Tools',phase:1,parity:25},
@@ -449,7 +440,6 @@ const UPSTREAM_PROJECTS=[
   {name:'Unleash Feature Flags',gh:'https://github.com/Unleash/unleash',cave:'flags',cat:'Platform',phase:2,parity:20},
   {name:'Argo Rollouts',gh:'https://github.com/argoproj/argo-rollouts',cave:'(infra)',cat:'Platform',phase:2,parity:25},
   {name:'Argo Workflows',gh:'https://github.com/argoproj/argo-workflows',cave:'workflows',cat:'Platform',phase:3,parity:15},
-  {name:'n8n',gh:'https://github.com/n8n-io/n8n',cave:'workflows',cat:'Platform',phase:3,parity:10},
   {name:'KEDA',gh:'https://github.com/kedacore/keda',cave:'(infra)',cat:'Platform',phase:2,parity:25},
   {name:'Knative',gh:'https://github.com/knative/serving',cave:'(infra)',cat:'Platform',phase:4,parity:10},
   {name:'LibreChat',gh:'https://github.com/danny-avila/LibreChat',cave:'chat',cat:'Platform',phase:3,parity:15},
@@ -678,7 +668,7 @@ function renderOverview(){
       <div class="stat-card"><div class="stat-lbl">Total Modules</div><div class="stat-val c-accent">${all.length}</div><div class="stat-sub">across all phases</div></div>
       <div class="stat-card"><div class="stat-lbl">Healthy</div><div class="stat-val c-green">${healthy}</div><div class="stat-sub">Phase 1 live</div></div>
       <div class="stat-card"><div class="stat-lbl">Phase 1</div><div class="stat-val">${all.filter(m=>m.phase===1).length}</div><div class="stat-sub">implemented</div></div>
-      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">61</div><div class="stat-sub">reimplemented</div></div>
+      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">66</div><div class="stat-sub">reimplemented</div></div>
       <div class="stat-card"><div class="stat-lbl">ADRs</div><div class="stat-val c-accent">142</div><div class="stat-sub">decisions recorded</div></div>
       <div class="stat-card"><div class="stat-lbl">Runtime</div><div class="stat-val" style="font-size:18px">${hstate}</div><div class="stat-sub">v${S.ver}</div></div>
     </div>

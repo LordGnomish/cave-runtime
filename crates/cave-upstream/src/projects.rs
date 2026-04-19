@@ -19,8 +19,57 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All 61 upstream projects tracked by cave-runtime.
+/// All 66 upstream projects tracked by cave-runtime.
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
+    // ============================================================
+    // KUBERNETES CORE (reimplemented as cave-* crates)
+    // ============================================================
+    TrackedProject {
+        name: "containerd",
+        github_repo: "containerd/containerd",
+        cave_module: "cave-cri",
+        track_features: "container lifecycle, OCI images, namespaces, cgroups",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+    TrackedProject {
+        name: "etcd",
+        github_repo: "etcd-io/etcd",
+        cave_module: "cave-etcd",
+        track_features: "KV store, MVCC, watch, leases, transactions",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+    TrackedProject {
+        name: "kube-apiserver",
+        github_repo: "kubernetes/kubernetes",
+        cave_module: "cave-apiserver",
+        track_features: "resource CRUD, admission, RBAC, watch/list",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+    TrackedProject {
+        name: "kube-scheduler",
+        github_repo: "kubernetes/kubernetes",
+        cave_module: "cave-scheduler",
+        track_features: "pod scheduling, filter/score/bind, affinity, taints",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+    TrackedProject {
+        name: "kubelet",
+        github_repo: "kubernetes/kubernetes",
+        cave_module: "cave-kubelet",
+        track_features: "pod lifecycle, node status, container management",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+
     // ============================================================
     // PROVIDER-ABSTRACTED: Kubernetes
     // ============================================================
@@ -638,7 +687,7 @@ mod tests {
     #[test]
     fn test_tracked_projects_count() {
         assert!(
-            TRACKED_PROJECTS.len() >= 55,
+            TRACKED_PROJECTS.len() >= 60,
             "Expected at least 55 tracked projects, got {}",
             TRACKED_PROJECTS.len()
         );
