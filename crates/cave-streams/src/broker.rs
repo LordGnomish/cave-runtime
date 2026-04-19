@@ -1,6 +1,6 @@
 //! In-memory Kafka broker — topic/partition log, offset tracking.
 
-use crate::acl::{AclBinding, AclFilter, AclStore};
+use crate::acl::AclStore;
 use crate::compression::Codec;
 use crate::consumer_group::GroupCoordinator;
 use crate::error::{StreamsError, StreamsResult};
@@ -321,6 +321,7 @@ pub struct Broker {
     committed_offsets: DashMap<(String, String, i32), i64>,
     /// Partition reassignments in progress: topic → partition → target replicas
     pending_reassignments: DashMap<String, HashMap<i32, Vec<i32>>>,
+    #[allow(dead_code)]
     generation: AtomicI32,
 }
 

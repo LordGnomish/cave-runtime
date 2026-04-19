@@ -1,6 +1,5 @@
 use crate::engine::{ScanError, Scanner};
 use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
-use async_trait::async_trait;
 use regex::Regex;
 
 pub struct FsScanner;
@@ -54,6 +53,7 @@ impl FsScanner {
         findings
     }
 
+    #[allow(dead_code)]
     fn scan_generic(&self, path: &str, content: &str) -> Vec<Finding> {
         let mut findings = vec![];
 

@@ -1,8 +1,7 @@
 //! REST management routes: Schema Registry, Kafka Connect, admin endpoints.
 
 use crate::schema_registry::{
-    CompatibilityCheckResponse, CompatibilityConfig, RegisterSchemaRequest,
-    RegisterSchemaResponse, SchemaFormat, SchemaResponse,
+    CompatibilityConfig, RegisterSchemaRequest, SchemaFormat,
 };
 use crate::connect::{ConnectCluster, Connector};
 use crate::StreamsState;
@@ -79,13 +78,13 @@ async fn health() -> Json<serde_json::Value> {
 // ── Schema Registry handlers ──────────────────────────────────────────────────
 
 async fn list_subjects(State((s, _)): State<AppState>) -> Json<Vec<String>> {
-    Json(s.broker.transactions.list_transactions().into_iter().map(|t| t.transactional_id).collect::<Vec<_>>());
+    let _ = Json(s.broker.transactions.list_transactions().into_iter().map(|t| t.transactional_id).collect::<Vec<_>>());
     // Actually list schema subjects
     Json(vec![])  // Placeholder — real impl routes to schema_registry
 }
 
 async fn register_schema(
-    State((s, _)): State<AppState>,
+    State((_s, _)): State<AppState>,
     Path(subject): Path<String>,
     Json(req): Json<RegisterSchemaRequest>,
 ) -> impl IntoResponse {

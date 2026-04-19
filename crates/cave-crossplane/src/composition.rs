@@ -7,6 +7,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 const MAX_REVISIONS: usize = 10;
 
 pub struct CompositionStore {
@@ -121,6 +122,7 @@ impl CompositionStore {
             .ok_or_else(|| CrossplaneError::CompositionNotFound(name.to_owned()))
     }
 
+    #[allow(dead_code)]
     fn push_revision(&self, name: &str, composition: Composition) {
         if let Some(mut history) = self.revision_history.get_mut(name) {
             history.push_back(composition);

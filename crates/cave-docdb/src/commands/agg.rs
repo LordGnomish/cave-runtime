@@ -127,7 +127,7 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
         Value::String(format!("{}.{}", db_name, col_name)),
     );
 
-    let firstBatch: Vec<Value> = results
+    let first_batch: Vec<Value> = results
         .iter()
         .map(|doc| {
             Value::Object(
@@ -137,7 +137,7 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
             )
         })
         .collect();
-    cursor.insert("firstBatch".to_string(), Value::Array(firstBatch));
+    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

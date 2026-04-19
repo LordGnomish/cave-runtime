@@ -63,6 +63,7 @@ struct AlertQuery {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CalendarQuery {
     from: Option<String>,
     to: Option<String>,
@@ -402,7 +403,7 @@ async fn delete_schedule(
 // Rotations
 async fn create_rotation(
     AxumState(store): AxumState<Arc<OnCallStore>>,
-    Path(schedule_id): Path<Uuid>,
+    Path(_schedule_id): Path<Uuid>,
     Json(req): Json<CreateRotationRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let rotation = Rotation {
@@ -456,7 +457,7 @@ async fn delete_rotation(
 // Overrides
 async fn create_override(
     AxumState(store): AxumState<Arc<OnCallStore>>,
-    Path(schedule_id): Path<Uuid>,
+    Path(_schedule_id): Path<Uuid>,
     Json(req): Json<CreateOverrideRequest>,
 ) -> Json<serde_json::Value> {
     let override_shift = ShiftOverride {
@@ -658,7 +659,7 @@ async fn resolve_alert(
 async fn snooze_alert(
     AxumState(store): AxumState<Arc<OnCallStore>>,
     Path(id): Path<Uuid>,
-    Json(req): Json<SnoozeRequest>,
+    Json(_req): Json<SnoozeRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let mut alerts = store.alerts.write().await;
     let alert = alerts

@@ -55,6 +55,7 @@ pub async fn dispatch(
     }
 }
 
+#[allow(dead_code)]
 fn command_name_from_doc(doc: &Document) -> String {
     doc.keys()
         .next()

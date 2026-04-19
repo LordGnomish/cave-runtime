@@ -19,7 +19,6 @@
 use crate::proxy::{Ecosystem, FetchedArtifact};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::future::join_all;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
@@ -423,6 +422,7 @@ pub fn aggregate_verdict(findings: &[ScanFindingSummary]) -> VerdictDecision {
 
 // Utility kept pub(crate) because callers outside this module may want to
 // hash upstream bytes themselves before handing them to the pipeline.
+#[allow(dead_code)]
 pub(crate) fn sha256_hex(b: &Bytes) -> String {
     use sha2::{Digest, Sha256};
     hex::encode(Sha256::digest(b))

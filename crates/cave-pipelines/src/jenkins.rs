@@ -108,6 +108,7 @@ pub enum JenkinsParseError {
 }
 
 /// Tokenizer for Groovy/Jenkinsfile DSL (simplified).
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
     Ident(String),
@@ -123,12 +124,14 @@ enum Token {
     EOF,
 }
 
+#[allow(dead_code)]
 struct Tokenizer<'a> {
     input: &'a str,
     pos: usize,
     line: usize,
 }
 
+#[allow(dead_code)]
 impl<'a> Tokenizer<'a> {
     fn new(input: &'a str) -> Self {
         Self { input, pos: 0, line: 1 }

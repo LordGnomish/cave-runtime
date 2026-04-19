@@ -13,16 +13,14 @@ use crate::plugins::{PluginChain, PluginCtx};
 use crate::proxy::ProxyEngine;
 use crate::store::SharedStore;
 use axum::{
-    body::{Body, Bytes},
     extract::{ConnectInfo, Request, State},
-    http::{HeaderMap, Method, StatusCode, Uri},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use bytes::Buf;
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tracing::{debug, error};
 
 pub struct GatewayHandlerState {
     pub store: SharedStore,
@@ -108,7 +106,7 @@ pub async fn proxy_handler(
     ctx.service_id = Some(service.id);
 
     // Gather applicable plugins (global + service + route)
-    let mut plugin_configs: Vec<(String, serde_json::Value)> = state
+    let plugin_configs: Vec<(String, serde_json::Value)> = state
         .store
         .global_plugins()
         .into_iter()
@@ -124,7 +122,7 @@ pub async fn proxy_handler(
     }
 
     // Resolve upstream
-    let upstream_url = resolve_upstream_url(&state.store, &service, &match_result, &path);
+    let _upstream_url = resolve_upstream_url(&state.store, &service, &match_result, &path);
 
     // Proxy the request
     let http_method = reqwest::Method::from_bytes(ctx.method.as_bytes())
@@ -197,7 +195,7 @@ pub async fn proxy_handler(
 }
 
 fn resolve_upstream_url(
-    store: &SharedStore,
+    _store: &SharedStore,
     service: &Service,
     match_result: &crate::matcher::MatchResult,
     path: &str,
