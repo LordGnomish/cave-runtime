@@ -91,6 +91,7 @@ members = [
     "crates/cave-apiserver",
     "crates/cave-cri",
     "crates/cave-kubelet",
+    "crates/cave-net",
     "crates/cave-scheduler",
     "crates/cave-etcd",
     "crates/cave-crossplane",

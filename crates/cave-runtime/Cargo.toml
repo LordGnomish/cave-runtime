@@ -13,6 +13,7 @@ path = "src/main.rs"
 # Shared infrastructure
 cave-etcd = { path = "../cave-etcd" }
 cave-apiserver = { path = "../cave-apiserver" }
+cave-net = { path = "../cave-net" }
 cave-kubelet = { path = "../cave-kubelet" }
 cave-scheduler = { path = "../cave-scheduler" }
 cave-cri = { path = "../cave-cri" }
