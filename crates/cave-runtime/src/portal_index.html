@@ -48,6 +48,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 #breadcrumb .bc-active{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .hbadge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.btn-topbar{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-family:inherit;transition:all var(--transition)}
+.btn-topbar:hover{border-color:var(--accent);color:var(--accent)}
 #content{flex:1;overflow-y:auto;padding:24px}
 #content::-webkit-scrollbar{width:5px}
 #content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -112,6 +114,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .info-row:last-child{border-bottom:none}
 .info-k{font-size:12px;color:var(--text-muted)}
 .info-v{font-size:12px;font-weight:500}
+.adr-tag{display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:10px;background:#1f6feb18;color:var(--accent);border:1px solid #1f6feb44;cursor:pointer;transition:background var(--transition);margin:2px}
+.adr-tag:hover{background:#1f6feb33}
+.ep-code{font-size:11px;color:var(--accent);background:var(--bg);padding:3px 8px;border-radius:4px;border:1px solid var(--border);font-family:monospace}
 
 /* ── Search palette ── */
 #soverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px)}
@@ -129,6 +134,70 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .sr-desc{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
 .sr-cat{font-size:10px;color:var(--text-muted);margin-left:auto;background:var(--bg-card);padding:2px 7px;border-radius:10px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0}
 .sempty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px}
+
+/* ── Scaffold modal ── */
+#scaffoverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px);align-items:center;justify-content:center}
+#scaffoverlay.open{display:flex}
+#scaffmodal{background:var(--bg-sidebar);border:1px solid var(--border);border-radius:10px;width:480px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,0.6);overflow:hidden}
+.scaff-hdr{padding:18px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.scaff-hdr h2{font-size:16px;font-weight:700}
+.scaff-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px}
+.scaff-close:hover{color:var(--text)}
+.scaff-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px}
+.form-input,.form-select{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit;width:100%;outline:none;transition:border-color var(--transition)}
+.form-input:focus,.form-select:focus{border-color:var(--accent)}
+.form-select option{background:var(--bg-card)}
+.scaff-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+#scaffresult{padding:10px 12px;border-radius:var(--radius);font-size:12px;font-family:monospace;background:var(--bg);border:1px solid var(--border);color:var(--green);display:none;word-break:break-all}
+
+/* ── ADR Browser ── */
+.adr-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.adr-filter-inp{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;flex:1;min-width:160px;transition:border-color var(--transition)}
+.adr-filter-inp:focus{border-color:var(--accent)}
+.scope-btn{font-size:11px;padding:4px 10px;border-radius:10px;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);font-family:inherit;transition:all var(--transition)}
+.scope-btn.active,.scope-btn:hover{border-color:var(--accent);color:var(--accent);background:#1f6feb18}
+.adr-list-grid{display:flex;flex-direction:column;gap:4px}
+.adr-row{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+.adr-row:hover{border-color:var(--accent);background:var(--bg-hover)}
+.adr-num{font-size:11px;font-weight:700;color:var(--accent);font-family:monospace;min-width:48px}
+.adr-title{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adr-scope{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;flex-shrink:0}
+.adr-cat{font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;min-width:80px;text-align:right}
+/* Markdown rendering */
+.md-body{font-size:13px;line-height:1.7;color:var(--text);max-width:760px}
+.md-body h1{font-size:20px;font-weight:700;margin:0 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.md-body h2{font-size:15px;font-weight:700;margin:20px 0 8px;color:var(--accent)}
+.md-body h3{font-size:13px;font-weight:700;margin:16px 0 6px}
+.md-body p{margin:0 0 10px;color:var(--text-muted)}
+.md-body strong{color:var(--text);font-weight:600}
+.md-body code{font-family:monospace;font-size:11px;background:var(--bg-card);padding:1px 5px;border-radius:3px;border:1px solid var(--border)}
+.md-body pre{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;overflow-x:auto;margin:10px 0;font-size:11px;font-family:monospace;white-space:pre-wrap}
+.md-body ul,.md-body ol{margin:0 0 10px 20px;color:var(--text-muted)}
+.md-body li{margin-bottom:3px}
+.md-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+.md-body th{background:var(--bg-card);padding:7px 10px;text-align:left;font-weight:600;border:1px solid var(--border)}
+.md-body td{padding:6px 10px;border:1px solid var(--border)}
+.md-body tr:nth-child(even) td{background:#ffffff05}
+.md-body blockquote{border-left:3px solid var(--accent);padding:6px 12px;margin:10px 0;color:var(--text-muted);background:#1f6feb08}
+.md-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* ── Upstream Tracker ── */
+.upstream-table{width:100%;border-collapse:collapse;font-size:12px}
+.upstream-table th{background:var(--bg-card);padding:9px 12px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);border:1px solid var(--border);white-space:nowrap}
+.upstream-table td{padding:8px 12px;border:1px solid var(--border);vertical-align:middle}
+.upstream-table tr:hover td{background:var(--bg-hover)}
+.parity-bar{display:flex;align-items:center;gap:6px}
+.parity-track{flex:1;height:5px;background:var(--bg-hover);border-radius:3px;overflow:hidden;min-width:60px}
+.parity-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.parity-pct{font-size:11px;font-family:monospace;color:var(--text-muted);min-width:30px;text-align:right}
+.gh-link{color:var(--accent);text-decoration:none;font-size:11px}
+.gh-link:hover{text-decoration:underline}
+.cave-mod-tag{font-size:10px;padding:2px 6px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted)}
+.upstream-search{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:280px;transition:border-color var(--transition)}
+.upstream-search:focus{border-color:var(--accent)}
+.cat-filter{display:flex;gap:6px;flex-wrap:wrap}
 
 /* ── Mobile overlay ── */
 #sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:90}
@@ -152,6 +221,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 /* ── Animations ── */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 .pulse{animation:pulse 2s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
 </style>
 </head>
 <body>
@@ -183,6 +254,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
         <span class="bc-active" id="bc">Overview</span>
       </div>
       <div class="topbar-right">
+        <button class="btn-topbar" onclick="openScaffold()">＋ New Project</button>
         <div class="hbadge">
           <span class="sdot dm" id="gsdot"></span>
           <span id="gstext">Connecting…</span>
@@ -202,51 +274,97 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   </div>
 </div>
 
+<!-- Scaffold Modal -->
+<div id="scaffoverlay" onclick="handleScaffOverlay(event)">
+  <div id="scaffmodal">
+    <div class="scaff-hdr">
+      <h2>🏗 New Project</h2>
+      <button class="scaff-close" onclick="closeScaffold()">✕</button>
+    </div>
+    <div class="scaff-body">
+      <div class="form-group">
+        <label class="form-label">Project Name</label>
+        <input id="sf-name" class="form-input" type="text" placeholder="my-service" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Language</label>
+        <select id="sf-lang" class="form-select">
+          <option value="rust">Rust</option>
+          <option value="go">Go</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Template</label>
+        <select id="sf-tmpl" class="form-select">
+          <option value="rest-api">REST API</option>
+          <option value="event-consumer">Event Consumer</option>
+          <option value="batch-job">Batch Job</option>
+          <option value="library">Library</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Namespace</label>
+        <input id="sf-ns" class="form-input" type="text" placeholder="team-name" autocomplete="off">
+      </div>
+      <div id="scaffresult"></div>
+    </div>
+    <div class="scaff-footer">
+      <button class="btn btn-s" onclick="closeScaffold()">Cancel</button>
+      <button class="btn btn-p" onclick="submitScaffold()" id="scaffsubmit">Create Project</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Module Registry ──────────────────────────────────────────────────────────
 
 const MODS = {
   // Core
-  db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null},
-  auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null},
-  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 73 OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null},
+  db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null,loc:820,relatedAdrs:[47,43],github:null},
+  auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null,loc:1240,relatedAdrs:[6,7,64,104,129,142],github:null},
+  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 73 OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null,loc:640,relatedAdrs:[127],github:null},
   // Security
-  secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health'},
-  certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health'},
-  sign:{id:'sign',name:'Code Signing',cat:'security',desc:'Container and artifact signing via Sigstore / Cosign',up:'Sigstore',phase:2,status:'pending',icon:'✍️',features:['Container signing','SLSA attestations','Keyless signing','Rekor transparency log'],ep:null},
-  policy:{id:'policy',name:'Policy',cat:'security',desc:'OPA-based admission control and audit policies for Kubernetes',up:'OPA Gatekeeper',phase:2,status:'pending',icon:'📋',features:['Rego policies','Admission webhooks','Audit mode','Constraint templates'],ep:null},
-  vulns:{id:'vulns',name:'Vulnerabilities',cat:'security',desc:'Vulnerability management and tracking across all findings',up:'DefectDojo',phase:2,status:'pending',icon:'🐛',features:['Importer formats','JIRA integration','Deduplication','SLA tracking'],ep:null},
-  sbom:{id:'sbom',name:'SBOM',cat:'security',desc:'Software Bill of Materials — CycloneDX, SPDX, dependency analysis',up:'DependencyTrack',phase:2,status:'pending',icon:'📦',features:['CycloneDX support','NVD/OSV integration','Policy engine','Component analysis'],ep:null},
-  scan:{id:'scan',name:'Code Scan',cat:'security',desc:'Static analysis with quality gates across all languages',up:'SonarQube',phase:3,status:'pending',icon:'🔬',features:['Multi-language rules','Quality profiles','Coverage gates','PR decoration'],ep:null},
-  pii:{id:'pii',name:'PII Detection',cat:'security',desc:'PII and sensitive data detection with anonymization',up:'Microsoft Presidio',phase:3,status:'pending',icon:'🕵️',features:['Named entity recognition','Custom recognizers','Anonymization','Multi-language'],ep:null},
-  dast:{id:'dast',name:'DAST',cat:'security',desc:'Dynamic application security testing — API and web scanning',up:'OWASP ZAP',phase:3,status:'pending',icon:'⚡',features:['API scanning','Auth testing','Passive scanning','Active attack rules'],ep:null},
-  pam:{id:'pam',name:'PAM',cat:'security',desc:'Privileged access management — session recording, zero-trust',up:'Teleport',phase:3,status:'pending',icon:'🚪',features:['Session recording','RBAC','Kubernetes access','Audit trail'],ep:null},
+  secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health',loc:960,relatedAdrs:[17,20,79,83,115],github:'https://github.com/trufflesecurity/trufflehog'},
+  certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health',loc:760,relatedAdrs:[15,56,105],github:'https://github.com/cert-manager/cert-manager'},
+  sign:{id:'sign',name:'Code Signing',cat:'security',desc:'Container and artifact signing via Sigstore / Cosign',up:'Sigstore',phase:2,status:'pending',icon:'✍️',features:['Container signing','SLSA attestations','Keyless signing','Rekor transparency log'],ep:null,loc:420,relatedAdrs:[77,101],github:'https://github.com/sigstore/cosign'},
+  policy:{id:'policy',name:'Policy',cat:'security',desc:'OPA-based admission control and audit policies for Kubernetes',up:'OPA Gatekeeper',phase:2,status:'pending',icon:'📋',features:['Rego policies','Admission webhooks','Audit mode','Constraint templates'],ep:null,loc:560,relatedAdrs:[30,78,89,131],github:'https://github.com/open-policy-agent/gatekeeper'},
+  vulns:{id:'vulns',name:'Vulnerabilities',cat:'security',desc:'Vulnerability management and tracking across all findings',up:'DefectDojo',phase:2,status:'pending',icon:'🐛',features:['Importer formats','JIRA integration','Deduplication','SLA tracking'],ep:null,loc:660,relatedAdrs:[35],github:'https://github.com/DefectDojo/django-DefectDojo'},
+  sbom:{id:'sbom',name:'SBOM',cat:'security',desc:'Software Bill of Materials — CycloneDX, SPDX, dependency analysis',up:'DependencyTrack',phase:2,status:'pending',icon:'📦',features:['CycloneDX support','NVD/OSV integration','Policy engine','Component analysis'],ep:null,loc:510,relatedAdrs:[101],github:'https://github.com/DependencyTrack/dependency-track'},
+  scan:{id:'scan',name:'Code Scan',cat:'security',desc:'Static analysis with quality gates across all languages',up:'SonarQube',phase:3,status:'pending',icon:'🔬',features:['Multi-language rules','Quality profiles','Coverage gates','PR decoration'],ep:null,loc:490,relatedAdrs:[18,19,58],github:'https://github.com/SonarSource/sonarqube'},
+  pii:{id:'pii',name:'PII Detection',cat:'security',desc:'PII and sensitive data detection with anonymization',up:'Microsoft Presidio',phase:3,status:'pending',icon:'🕵️',features:['Named entity recognition','Custom recognizers','Anonymization','Multi-language'],ep:null,loc:390,relatedAdrs:[102,111],github:'https://github.com/microsoft/presidio'},
+  dast:{id:'dast',name:'DAST',cat:'security',desc:'Dynamic application security testing — API and web scanning',up:'OWASP ZAP',phase:3,status:'pending',icon:'⚡',features:['API scanning','Auth testing','Passive scanning','Active attack rules'],ep:null,loc:430,relatedAdrs:[23,57],github:'https://github.com/zaproxy/zaproxy'},
+  pam:{id:'pam',name:'PAM',cat:'security',desc:'Privileged access management — session recording, zero-trust',up:'Teleport',phase:3,status:'pending',icon:'🚪',features:['Session recording','RBAC','Kubernetes access','Audit trail'],ep:null,loc:390,relatedAdrs:[130],github:'https://github.com/gravitational/teleport'},
   // Observability
-  status:{id:'status',name:'Status',cat:'observability',desc:'Platform status page and component health dashboard',up:null,phase:1,status:'healthy',icon:'📊',features:['Component status','Incident history','Uptime metrics','Subscriber notifications'],ep:'/api/status/health'},
-  uptime:{id:'uptime',name:'Uptime',cat:'observability',desc:'HTTP, TCP, DNS uptime monitoring with alerting',up:'Uptime Kuma',phase:2,status:'pending',icon:'💓',features:['HTTP monitoring','TCP checks','DNS checks','Notification channels'],ep:null},
-  incidents:{id:'incidents',name:'Incidents',cat:'observability',desc:'On-call scheduling and incident management',up:'Grafana OnCall',phase:2,status:'pending',icon:'🚨',features:['On-call schedules','Escalation policies','Alert routing','Postmortem tracking'],ep:null},
-  'ai-obs':{id:'ai-obs',name:'AI Observability',cat:'observability',desc:'LLM trace and evaluation framework for AI workloads',up:'Langfuse',phase:2,status:'pending',icon:'🤖',features:['Trace capture','Prompt versioning','Evaluation scoring','Cost tracking'],ep:null},
-  profiler:{id:'profiler',name:'Profiler',cat:'observability',desc:'Continuous profiling with eBPF and language-native integrations',up:'Pyroscope',phase:3,status:'pending',icon:'📈',features:['eBPF profiling','CPU / memory profiles','Multi-language SDK','Flame graphs'],ep:null},
-  forensics:{id:'forensics',name:'Forensics',cat:'observability',desc:'eBPF-based runtime security monitoring and forensics',up:'Tetragon',phase:3,status:'pending',icon:'🔭',features:['eBPF hooks','Process tracking','Network events','Policy enforcement'],ep:null},
+  status:{id:'status',name:'Status',cat:'observability',desc:'Platform status page and component health dashboard',up:null,phase:1,status:'healthy',icon:'📊',features:['Component status','Incident history','Uptime metrics','Subscriber notifications'],ep:'/api/status/health',loc:730,relatedAdrs:[29,72],github:null},
+  uptime:{id:'uptime',name:'Uptime',cat:'observability',desc:'HTTP, TCP, DNS uptime monitoring with alerting',up:'Uptime Kuma',phase:2,status:'pending',icon:'💓',features:['HTTP monitoring','TCP checks','DNS checks','Notification channels'],ep:null,loc:570,relatedAdrs:[29],github:'https://github.com/louislam/uptime-kuma'},
+  incidents:{id:'incidents',name:'Incidents',cat:'observability',desc:'On-call scheduling and incident management',up:'Grafana OnCall',phase:2,status:'pending',icon:'🚨',features:['On-call schedules','Escalation policies','Alert routing','Postmortem tracking'],ep:null,loc:630,relatedAdrs:[29],github:'https://github.com/grafana/oncall'},
+  'ai-obs':{id:'ai-obs',name:'AI Observability',cat:'observability',desc:'LLM trace and evaluation framework for AI workloads',up:'Langfuse',phase:2,status:'pending',icon:'🤖',features:['Trace capture','Prompt versioning','Evaluation scoring','Cost tracking'],ep:null,loc:490,relatedAdrs:[51,103],github:'https://github.com/langfuse/langfuse'},
+  profiler:{id:'profiler',name:'Profiler',cat:'observability',desc:'Continuous profiling with eBPF and language-native integrations',up:'Pyroscope',phase:3,status:'pending',icon:'📈',features:['eBPF profiling','CPU / memory profiles','Multi-language SDK','Flame graphs'],ep:null,loc:350,relatedAdrs:[29],github:'https://github.com/grafana/pyroscope'},
+  forensics:{id:'forensics',name:'Forensics',cat:'observability',desc:'eBPF-based runtime security monitoring and forensics',up:'Tetragon',phase:3,status:'pending',icon:'🔭',features:['eBPF hooks','Process tracking','Network events','Policy enforcement'],ep:null,loc:400,relatedAdrs:[16,90,106],github:'https://github.com/cilium/tetragon'},
   // CI/CD
-  lint:{id:'lint',name:'Lint',cat:'cicd',desc:'Dockerfile and IaC linting with best-practice enforcement',up:'Hadolint',phase:1,status:'healthy',icon:'✅',features:['Dockerfile rules','Shell linting','Custom ignore rules','CI integration'],ep:'/api/lint/health'},
-  changelog:{id:'changelog',name:'Changelog',cat:'cicd',desc:'Automated changelog generation and release notes management',up:null,phase:1,status:'healthy',icon:'📝',features:['Conventional commits','Auto-generation','Version bumping','Release notes'],ep:'/api/changelog/health'},
-  docs:{id:'docs',name:'Docs / Schemas',cat:'cicd',desc:'Schema registry and API documentation — replaces Apicurio',up:'Apicurio Registry',phase:1,status:'healthy',icon:'📚',features:['OpenAPI / AsyncAPI','Schema versioning','Compatibility rules','JSON Schema'],ep:'/api/docs/health'},
-  registry:{id:'registry',name:'Artifact Registry',cat:'cicd',desc:'Container image and package registry with remote sync',up:'Pulp',phase:2,status:'pending',icon:'🏗️',features:['OCI registry','Helm charts','PyPI / npm mirrors','Remote sync'],ep:null},
-  chaos:{id:'chaos',name:'Chaos',cat:'cicd',desc:'Fault injection for resilience and chaos engineering',up:'Chaos Mesh',phase:3,status:'pending',icon:'🌪️',features:['Pod failures','Network partitions','I/O chaos','Schedule model'],ep:null},
+  lint:{id:'lint',name:'Lint',cat:'cicd',desc:'Dockerfile and IaC linting with best-practice enforcement',up:'Hadolint',phase:1,status:'healthy',icon:'✅',features:['Dockerfile rules','Shell linting','Custom ignore rules','CI integration'],ep:'/api/lint/health',loc:690,relatedAdrs:[10,40],github:'https://github.com/hadolint/hadolint'},
+  changelog:{id:'changelog',name:'Changelog',cat:'cicd',desc:'Automated changelog generation and release notes management',up:null,phase:1,status:'healthy',icon:'📝',features:['Conventional commits','Auto-generation','Version bumping','Release notes'],ep:'/api/changelog/health',loc:590,relatedAdrs:[10],github:null},
+  docs:{id:'docs',name:'Docs / Schemas',cat:'cicd',desc:'Schema registry and API documentation — replaces Apicurio',up:'Apicurio Registry',phase:1,status:'healthy',icon:'📚',features:['OpenAPI / AsyncAPI','Schema versioning','Compatibility rules','JSON Schema'],ep:'/api/docs/health',loc:840,relatedAdrs:[59,60],github:'https://github.com/Apicurio/apicurio-registry'},
+  registry:{id:'registry',name:'Artifact Registry',cat:'cicd',desc:'Container image and package registry with remote sync',up:'Pulp',phase:2,status:'pending',icon:'🏗️',features:['OCI registry','Helm charts','PyPI / npm mirrors','Remote sync'],ep:null,loc:450,relatedAdrs:[28,108,120],github:'https://github.com/pulp/pulpcore'},
+  chaos:{id:'chaos',name:'Chaos',cat:'cicd',desc:'Fault injection for resilience and chaos engineering',up:'Chaos Mesh',phase:3,status:'pending',icon:'🌪️',features:['Pod failures','Network partitions','I/O chaos','Schedule model'],ep:null,loc:330,relatedAdrs:[39,100],github:'https://github.com/chaos-mesh/chaos-mesh'},
   // Platform
-  flags:{id:'flags',name:'Feature Flags',cat:'platform',desc:'Feature flag management with strategies, targeting and metrics',up:'Unleash',phase:2,status:'pending',icon:'🚩',features:['Toggle strategies','Client SDKs','A/B testing','Kill switch'],ep:null},
-  portal:{id:'portal',name:'Dev Portal',cat:'platform',desc:'Developer portal — service catalog, scaffolding, tech radar',up:'Backstage',phase:1,status:'healthy',icon:'🏠',features:['Service catalog','Scaffolding templates','Plugin system','Tech radar'],ep:'/api/portal/health'},
-  chat:{id:'chat',name:'AI Chat',cat:'platform',desc:'Multi-provider AI chat interface with conversation history',up:'LibreChat',phase:3,status:'pending',icon:'💬',features:['Multi-provider','Conversation history','Plugin system','Role-based access'],ep:null},
-  workflows:{id:'workflows',name:'Workflows',cat:'platform',desc:'Visual workflow automation with 300+ integrations',up:'n8n',phase:3,status:'pending',icon:'🔄',features:['Visual editor','300+ integrations','Code nodes','Schedule triggers'],ep:null},
-  devlake:{id:'devlake',name:'DevLake',cat:'platform',desc:'DORA metrics and engineering analytics across all tools',up:'Apache DevLake',phase:3,status:'pending',icon:'📉',features:['DORA metrics','PR analytics','Issue tracking','Custom dashboards'],ep:null},
+  flags:{id:'flags',name:'Feature Flags',cat:'platform',desc:'Feature flag management with strategies, targeting and metrics',up:'Unleash',phase:2,status:'pending',icon:'🚩',features:['Toggle strategies','Client SDKs','A/B testing','Kill switch'],ep:null,loc:600,relatedAdrs:[37],github:'https://github.com/Unleash/unleash'},
+  portal:{id:'portal',name:'Dev Portal',cat:'platform',desc:'Developer portal — service catalog, scaffolding, tech radar',up:'Backstage',phase:1,status:'healthy',icon:'🏠',features:['Service catalog','Scaffolding templates','Plugin system','Tech radar'],ep:'/api/portal/health',loc:1870,relatedAdrs:[11,25,76],github:'https://github.com/backstage/backstage'},
+  chat:{id:'chat',name:'AI Chat',cat:'platform',desc:'Multi-provider AI chat interface with conversation history',up:'LibreChat',phase:3,status:'pending',icon:'💬',features:['Multi-provider','Conversation history','Plugin system','Role-based access'],ep:null,loc:390,relatedAdrs:[52,103],github:'https://github.com/danny-avila/LibreChat'},
+  workflows:{id:'workflows',name:'Workflows',cat:'platform',desc:'Visual workflow automation with 300+ integrations',up:'n8n',phase:3,status:'pending',icon:'🔄',features:['Visual editor','300+ integrations','Code nodes','Schedule triggers'],ep:null,loc:420,relatedAdrs:[38,95],github:'https://github.com/n8n-io/n8n'},
+  devlake:{id:'devlake',name:'DevLake',cat:'platform',desc:'DORA metrics and engineering analytics across all tools',up:'Apache DevLake',phase:3,status:'pending',icon:'📉',features:['DORA metrics','PR analytics','Issue tracking','Custom dashboards'],ep:null,loc:360,relatedAdrs:[42],github:'https://github.com/apache/incubator-devlake'},
   // Operations
-  backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null},
-  cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null},
+  backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null,loc:440,relatedAdrs:[46,80],github:'https://github.com/vmware-tanzu/velero'},
+  cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null,loc:400,relatedAdrs:[96],github:'https://github.com/opencost/opencost'},
 };
 
 const NAV=[
   {type:'link',id:'overview',label:'Overview',icon:'⊞'},
+  {type:'link',id:'upstream',label:'Upstream',icon:'📡'},
+  {type:'link',id:'adrs',label:'Decisions',icon:'📋'},
   {type:'sec',id:'core',label:'Core Infrastructure',mods:['db','auth','upstream']},
   {type:'sec',id:'security',label:'Security',mods:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
   {type:'sec',id:'observability',label:'Observability',mods:['status','uptime','incidents','ai-obs','profiler','forensics']},
@@ -256,6 +374,94 @@ const NAV=[
 ];
 
 const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
+
+// 73 tracked OSS projects
+const UPSTREAM_PROJECTS=[
+  // Infrastructure
+  {name:'Hetzner Cloud',gh:'https://github.com/hetznercloud/hcloud-go',cave:'(infra)',cat:'Infrastructure',phase:1,parity:85},
+  {name:'Azure / AKS',gh:'https://github.com/Azure/AKS',cave:'(infra)',cat:'Infrastructure',phase:1,parity:80},
+  {name:'Talos Linux',gh:'https://github.com/siderolabs/talos',cave:'(infra)',cat:'Infrastructure',phase:1,parity:90},
+  {name:'Cilium CNI',gh:'https://github.com/cilium/cilium',cave:'(infra)',cat:'Networking',phase:1,parity:75},
+  {name:'Istio Ambient Mesh',gh:'https://github.com/istio/istio',cave:'(infra)',cat:'Networking',phase:2,parity:60},
+  {name:'ArgoCD',gh:'https://github.com/argoproj/argo-cd',cave:'(infra)',cat:'GitOps',phase:1,parity:95},
+  {name:'Crossplane',gh:'https://github.com/crossplane/crossplane',cave:'(infra)',cat:'Infrastructure',phase:2,parity:65},
+  {name:'vcluster',gh:'https://github.com/loft-sh/vcluster',cave:'(infra)',cat:'Infrastructure',phase:1,parity:80},
+  {name:'OpenTofu',gh:'https://github.com/opentofu/opentofu',cave:'(infra)',cat:'Infrastructure',phase:1,parity:90},
+  {name:'Cloudflare DNS / CDN',gh:'https://github.com/cloudflare',cave:'(infra)',cat:'Networking',phase:1,parity:85},
+  {name:'Kong API Gateway',gh:'https://github.com/Kong/kong',cave:'(infra)',cat:'Networking',phase:2,parity:55},
+  // Security
+  {name:'TruffleHog',gh:'https://github.com/trufflesecurity/trufflehog',cave:'secrets',cat:'Security',phase:1,parity:88},
+  {name:'Gitleaks',gh:'https://github.com/gitleaks/gitleaks',cave:'secrets',cat:'Security',phase:1,parity:85},
+  {name:'cert-manager',gh:'https://github.com/cert-manager/cert-manager',cave:'certs',cat:'Security',phase:1,parity:92},
+  {name:'Sigstore / Cosign',gh:'https://github.com/sigstore/cosign',cave:'sign',cat:'Security',phase:2,parity:45},
+  {name:'Sigstore Policy Controller',gh:'https://github.com/sigstore/policy-controller',cave:'sign',cat:'Security',phase:2,parity:40},
+  {name:'OPA Gatekeeper',gh:'https://github.com/open-policy-agent/gatekeeper',cave:'policy',cat:'Security',phase:2,parity:50},
+  {name:'OPAL',gh:'https://github.com/permitio/opal',cave:'policy',cat:'Security',phase:2,parity:40},
+  {name:'Keycloak',gh:'https://github.com/keycloak/keycloak',cave:'auth',cat:'Security',phase:2,parity:70},
+  {name:'Okta SDK',gh:'https://github.com/okta/okta-sdk-golang',cave:'auth',cat:'Security',phase:2,parity:65},
+  {name:'OpenBao',gh:'https://github.com/openbao/openbao',cave:'(infra)',cat:'Security',phase:1,parity:75},
+  {name:'External Secrets Operator',gh:'https://github.com/external-secrets/external-secrets',cave:'secrets',cat:'Security',phase:1,parity:80},
+  {name:'Falco',gh:'https://github.com/falcosecurity/falco',cave:'forensics',cat:'Security',phase:3,parity:30},
+  {name:'Tetragon',gh:'https://github.com/cilium/tetragon',cave:'forensics',cat:'Security',phase:3,parity:35},
+  {name:'Teleport',gh:'https://github.com/gravitational/teleport',cave:'pam',cat:'Security',phase:3,parity:30},
+  {name:'Kubescape',gh:'https://github.com/kubescape/kubescape',cave:'scan',cat:'Security',phase:3,parity:25},
+  {name:'Cilium Network Policy',gh:'https://github.com/cilium/cilium',cave:'policy',cat:'Security',phase:1,parity:75},
+  // Security Scanning
+  {name:'OWASP ZAP',gh:'https://github.com/zaproxy/zaproxy',cave:'dast',cat:'Security Scanning',phase:3,parity:30},
+  {name:'SonarQube',gh:'https://github.com/SonarSource/sonarqube',cave:'scan',cat:'Security Scanning',phase:3,parity:35},
+  {name:'Semgrep',gh:'https://github.com/returntocorp/semgrep',cave:'scan',cat:'Security Scanning',phase:3,parity:30},
+  {name:'DefectDojo',gh:'https://github.com/DefectDojo/django-DefectDojo',cave:'vulns',cat:'Security Scanning',phase:2,parity:50},
+  {name:'DependencyTrack',gh:'https://github.com/DependencyTrack/dependency-track',cave:'sbom',cat:'Security Scanning',phase:2,parity:45},
+  {name:'Trivy',gh:'https://github.com/aquasecurity/trivy',cave:'scan',cat:'Security Scanning',phase:3,parity:35},
+  {name:'Microsoft Presidio',gh:'https://github.com/microsoft/presidio',cave:'pii',cat:'Security Scanning',phase:3,parity:28},
+  {name:'Syft / Grype',gh:'https://github.com/anchore/syft',cave:'sbom',cat:'Security Scanning',phase:2,parity:48},
+  // Observability
+  {name:'Prometheus',gh:'https://github.com/prometheus/prometheus',cave:'status',cat:'Observability',phase:1,parity:90},
+  {name:'Grafana',gh:'https://github.com/grafana/grafana',cave:'status',cat:'Observability',phase:1,parity:85},
+  {name:'Loki',gh:'https://github.com/grafana/loki',cave:'status',cat:'Observability',phase:1,parity:80},
+  {name:'Tempo',gh:'https://github.com/grafana/tempo',cave:'status',cat:'Observability',phase:2,parity:60},
+  {name:'Thanos',gh:'https://github.com/thanos-io/thanos',cave:'status',cat:'Observability',phase:2,parity:55},
+  {name:'Pyroscope',gh:'https://github.com/grafana/pyroscope',cave:'profiler',cat:'Observability',phase:3,parity:30},
+  {name:'Langfuse',gh:'https://github.com/langfuse/langfuse',cave:'ai-obs',cat:'Observability',phase:2,parity:45},
+  {name:'Uptime Kuma',gh:'https://github.com/louislam/uptime-kuma',cave:'uptime',cat:'Observability',phase:2,parity:50},
+  {name:'Grafana OnCall',gh:'https://github.com/grafana/oncall',cave:'incidents',cat:'Observability',phase:2,parity:40},
+  {name:'Alertmanager',gh:'https://github.com/prometheus/alertmanager',cave:'status',cat:'Observability',phase:1,parity:88},
+  // Data
+  {name:'CloudNativePG',gh:'https://github.com/cloudnative-pg/cloudnative-pg',cave:'db',cat:'Data',phase:1,parity:85},
+  {name:'Valkey',gh:'https://github.com/valkey-io/valkey',cave:'(infra)',cat:'Data',phase:1,parity:90},
+  {name:'MinIO',gh:'https://github.com/minio/minio',cave:'(infra)',cat:'Data',phase:1,parity:80},
+  {name:'OpenSearch',gh:'https://github.com/opensearch-project/OpenSearch',cave:'(infra)',cat:'Data',phase:2,parity:60},
+  {name:'Strimzi (Kafka)',gh:'https://github.com/strimzi/strimzi-kafka-operator',cave:'(infra)',cat:'Data',phase:2,parity:65},
+  {name:'Debezium CDC',gh:'https://github.com/debezium/debezium',cave:'(infra)',cat:'Data',phase:2,parity:55},
+  {name:'Qdrant Vector DB',gh:'https://github.com/qdrant/qdrant',cave:'(infra)',cat:'Data',phase:2,parity:60},
+  {name:'MLflow',gh:'https://github.com/mlflow/mlflow',cave:'(infra)',cat:'Data',phase:3,parity:25},
+  // Dev Tools
+  {name:'Backstage',gh:'https://github.com/backstage/backstage',cave:'portal',cat:'Dev Tools',phase:1,parity:70},
+  {name:'Harbor OCI Registry',gh:'https://github.com/goharbor/harbor',cave:'registry',cat:'Dev Tools',phase:2,parity:45},
+  {name:'Buildah',gh:'https://github.com/containers/buildah',cave:'(infra)',cat:'Dev Tools',phase:1,parity:90},
+  {name:'Renovate',gh:'https://github.com/renovatebot/renovate',cave:'(infra)',cat:'Dev Tools',phase:1,parity:85},
+  {name:'k6 Load Testing',gh:'https://github.com/grafana/k6',cave:'(infra)',cat:'Dev Tools',phase:2,parity:50},
+  {name:'Hadolint',gh:'https://github.com/hadolint/hadolint',cave:'lint',cat:'Dev Tools',phase:1,parity:88},
+  {name:'Apicurio Registry',gh:'https://github.com/Apicurio/apicurio-registry',cave:'docs',cat:'Dev Tools',phase:1,parity:80},
+  {name:'Apache DevLake',gh:'https://github.com/apache/incubator-devlake',cave:'devlake',cat:'Dev Tools',phase:3,parity:25},
+  {name:'Flyway / Alembic',gh:'https://github.com/flyway/flyway',cave:'db',cat:'Dev Tools',phase:1,parity:82},
+  // Platform
+  {name:'Unleash Feature Flags',gh:'https://github.com/Unleash/unleash',cave:'flags',cat:'Platform',phase:2,parity:50},
+  {name:'Argo Rollouts',gh:'https://github.com/argoproj/argo-rollouts',cave:'(infra)',cat:'Platform',phase:2,parity:65},
+  {name:'Argo Workflows',gh:'https://github.com/argoproj/argo-workflows',cave:'workflows',cat:'Platform',phase:3,parity:25},
+  {name:'n8n',gh:'https://github.com/n8n-io/n8n',cave:'workflows',cat:'Platform',phase:3,parity:20},
+  {name:'KEDA',gh:'https://github.com/kedacore/keda',cave:'(infra)',cat:'Platform',phase:2,parity:60},
+  {name:'Knative',gh:'https://github.com/knative/serving',cave:'(infra)',cat:'Platform',phase:4,parity:10},
+  {name:'LibreChat',gh:'https://github.com/danny-avila/LibreChat',cave:'chat',cat:'Platform',phase:3,parity:25},
+  {name:'Pulp',gh:'https://github.com/pulp/pulpcore',cave:'registry',cat:'Platform',phase:2,parity:40},
+  // Operations
+  {name:'OpenCost',gh:'https://github.com/opencost/opencost',cave:'cost',cat:'Operations',phase:2,parity:45},
+  {name:'Velero',gh:'https://github.com/vmware-tanzu/velero',cave:'backup',cat:'Operations',phase:2,parity:50},
+  {name:'Chaos Mesh',gh:'https://github.com/chaos-mesh/chaos-mesh',cave:'chaos',cat:'Platform',phase:3,parity:25},
+  // AI
+  {name:'Ollama',gh:'https://github.com/ollama/ollama',cave:'(infra)',cat:'AI',phase:1,parity:85},
+  {name:'LiteLLM',gh:'https://github.com/BerriAI/litellm',cave:'(infra)',cat:'AI',phase:1,parity:80},
+];
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -267,18 +473,32 @@ const S={
   searchOpen:false,
   sfocus:-1,
   sresults:[],
+  adrList:[],
+  adrScope:'All',
+  adrQuery:'',
+  moduleHealth:{},
+  upstreamCat:'All',
+  upstreamQuery:'',
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function dot(status){
-  return {healthy:'dg',warning:'dy',error:'dr',pending:'dm'}[status]||'dm';
+  return {healthy:'dg',warning:'dy',error:'dr',pending:'dm',unknown:'dm'}[status]||'dm';
 }
 function statusLabel(s){
-  return {healthy:'Healthy',warning:'Degraded',error:'Error',pending:'Planned'}[s]||s;
+  return {healthy:'Healthy',warning:'Degraded',error:'Error',pending:'Planned',unknown:'Unknown'}[s]||s;
 }
 function pillClass(s){
-  return {healthy:'sp-healthy',warning:'sp-warning',error:'sp-error',pending:'sp-pending'}[s]||'sp-pending';
+  return {healthy:'sp-healthy',warning:'sp-warning',error:'sp-error',pending:'sp-pending',unknown:'sp-pending'}[s]||'sp-pending';
+}
+function parityColor(p){
+  if(p>=80)return'var(--green)';
+  if(p>=50)return'var(--yellow)';
+  return'var(--red)';
+}
+function esc(s){
+  const d=document.createElement('div');d.textContent=s;return d.innerHTML;
 }
 
 // ── Health Polling ────────────────────────────────────────────────────────────
@@ -295,7 +515,6 @@ async function fetchHealth(){
     const gst=document.getElementById('gstext');
     gsd.className='sdot dg';
     gst.textContent='Runtime OK';
-    // Phase 1 are live
     ['secrets','lint','docs','status','changelog','certs','portal','upstream'].forEach(id=>{
       if(MODS[id])MODS[id].status='healthy';
     });
@@ -306,14 +525,43 @@ async function fetchHealth(){
     document.getElementById('gstext').textContent='Unreachable';
   }
 }
+
+async function fetchModuleHealth(){
+  try{
+    const r=await fetch('/api/portal/health/all');
+    if(!r.ok)return;
+    const d=await r.json();
+    S.moduleHealth=d.modules||{};
+    // Update MODS statuses
+    for(const[id,status]of Object.entries(S.moduleHealth)){
+      if(MODS[id])MODS[id].status=status==='healthy'?'healthy':status==='unknown'?'pending':'error';
+    }
+    // Update dots in current overview if visible
+    if(S.page==='overview'){
+      for(const[id,status]of Object.entries(S.moduleHealth)){
+        const dots=document.querySelectorAll(`.sdot[data-mod="${id}"]`);
+        dots.forEach(el=>{
+          el.className='sdot '+dot(status==='healthy'?'healthy':status==='unknown'?'pending':'error');
+        });
+      }
+    }
+  }catch{/* silently ignore */}
+}
+
 fetchHealth();
+fetchModuleHealth();
 setInterval(fetchHealth,30000);
+setInterval(fetchModuleHealth,10000);
 
 // ── Router ───────────────────────────────────────────────────────────────────
 
 function go(page){
   S.page=page;
-  window.location.hash=page==='overview'?'#/':'#/m/'+page;
+  if(page==='overview') window.location.hash='#/';
+  else if(page==='upstream') window.location.hash='#/upstream';
+  else if(page==='adrs') window.location.hash='#/adrs';
+  else if(page.startsWith('adr:')) window.location.hash='#/adr/'+page.slice(4);
+  else window.location.hash='#/m/'+page;
   renderPage();
   renderNav();
   if(window.innerWidth<=768)closeSidebar();
@@ -322,7 +570,13 @@ function go(page){
 window.addEventListener('hashchange',()=>{
   const h=window.location.hash;
   if(!h||h==='#/'||h==='#'){S.page='overview';}
-  else{const m=h.match(/^#\/m\/(.+)$/);S.page=(m&&MODS[m[1]])?m[1]:'overview';}
+  else if(h==='#/upstream'){S.page='upstream';}
+  else if(h==='#/adrs'){S.page='adrs';}
+  else{
+    const ma=h.match(/^#\/adr\/(.+)$/);
+    if(ma){S.page='adr:'+ma[1];}
+    else{const mm=h.match(/^#\/m\/(.+)$/);S.page=(mm&&MODS[mm[1]])?mm[1]:'overview';}
+  }
   renderPage();renderNav();
 });
 
@@ -343,6 +597,7 @@ function closeSidebar(){
 
 function renderNav(){
   let h='';
+  const specialPages=['overview','upstream','adrs'];
   for(const item of NAV){
     if(item.type==='link'){
       const a=S.page===item.id;
@@ -365,15 +620,21 @@ function renderNav(){
       }
     }
   }
+  const bcMap={overview:'Overview',upstream:'Upstream',adrs:'Decisions'};
+  const label=S.page.startsWith('adr:')?'ADR-'+S.page.slice(4):(bcMap[S.page]||MODS[S.page]?.name||S.page);
   document.getElementById('sidebar-nav').innerHTML=h;
-  document.getElementById('bc').textContent=S.page==='overview'?'Overview':(MODS[S.page]?.name||S.page);
+  document.getElementById('bc').textContent=label;
 }
 
 // ── Page Renderers ────────────────────────────────────────────────────────────
 
 function renderPage(){
-  document.getElementById('content').innerHTML=
-    S.page==='overview'?renderOverview():renderMod(MODS[S.page]);
+  const c=document.getElementById('content');
+  if(S.page==='overview') c.innerHTML=renderOverview();
+  else if(S.page==='upstream') c.innerHTML=renderUpstream();
+  else if(S.page==='adrs') loadAdrs(c);
+  else if(S.page.startsWith('adr:')) loadAdrDetail(S.page.slice(4),c);
+  else c.innerHTML=renderMod(MODS[S.page]);
 }
 
 function renderOverview(){
@@ -395,7 +656,7 @@ function renderOverview(){
       grids+=`<div class="mcard" onclick="go('${m.id}')">
         <div class="mcard-hdr">
           <span class="mcard-name">${m.icon} ${m.name}</span>
-          <span class="sdot ${dot(m.status)}" title="${statusLabel(m.status)}"></span>
+          <span class="sdot ${dot(m.status)}" data-mod="${m.id}" title="${statusLabel(m.status)}"></span>
         </div>
         <div class="mcard-desc">${m.desc}</div>
         <div class="mcard-foot">
@@ -411,42 +672,52 @@ function renderOverview(){
   return `
     <div class="page-hdr">
       <div class="page-title">Platform Overview</div>
-      <div class="page-sub">CAVE Unified Runtime — all modules in a single binary</div>
+      <div class="page-sub">CAVE Unified Runtime — all modules in a single binary · health updates every 10s</div>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-lbl">Total Modules</div><div class="stat-val c-accent">${all.length}</div><div class="stat-sub">across all phases</div></div>
       <div class="stat-card"><div class="stat-lbl">Healthy</div><div class="stat-val c-green">${healthy}</div><div class="stat-sub">Phase 1 live</div></div>
       <div class="stat-card"><div class="stat-lbl">Phase 1</div><div class="stat-val">${all.filter(m=>m.phase===1).length}</div><div class="stat-sub">implemented</div></div>
       <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">73</div><div class="stat-sub">projects tracked</div></div>
+      <div class="stat-card"><div class="stat-lbl">ADRs</div><div class="stat-val c-accent">142</div><div class="stat-sub">decisions recorded</div></div>
       <div class="stat-card"><div class="stat-lbl">Runtime</div><div class="stat-val" style="font-size:18px">${hstate}</div><div class="stat-sub">v${S.ver}</div></div>
     </div>
     ${grids}`;
 }
 
+// ── Feature 1: Module Detail ─────────────────────────────────────────────────
+
 function renderMod(m){
   if(!m)return`<div style="padding:40px;text-align:center;color:var(--text-muted)">Module not found</div>`;
-  const feats=m.features.map(f=>`<li>${f}</li>`).join('');
-  let actions=``;
-  if(m.ep)actions+=`<button class="btn btn-p" onclick="chkHealth('${m.ep}')">⟳ Check Health</button>`;
-  actions+=`<button class="btn btn-s" onclick="showCfg('${m.id}')">⚙ Configure</button>`;
-  if(m.up)actions+=`<button class="btn btn-s">↗ ${m.up}</button>`;
+  const feats=m.features.map(f=>`<li>${esc(f)}</li>`).join('');
+  const adrTags=(m.relatedAdrs||[]).map(n=>{
+    const num=String(n).padStart(3,'0');
+    return`<span class="adr-tag" onclick="go('adr:${num}')" title="Open ADR-${num}">ADR-${num}</span>`;
+  }).join('');
+  let actions=`<button class="btn btn-s" onclick="go('overview')">← Overview</button>`;
+  if(m.ep)actions+=` <button class="btn btn-p" onclick="chkHealth('${m.ep}')">⟳ Health</button>`;
+  actions+=` <button class="btn btn-s" onclick="showCfg('${m.id}')">⚙ Configure</button>`;
+  if(m.github)actions+=` <a class="btn btn-s" href="${m.github}" target="_blank" rel="noopener">↗ GitHub</a>`;
 
   return `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-s" onclick="go('overview')" style="font-size:12px">← Back to Overview</button>
+    </div>
     <div class="mod-hdr">
       <div class="mod-icon">${m.icon}</div>
       <div>
-        <div class="mod-title">${m.name}</div>
+        <div class="mod-title">${esc(m.name)}</div>
         <div class="mod-meta">
           <span class="spill ${pillClass(m.status)}">
-            <span class="sdot ${dot(m.status)}" style="width:6px;height:6px"></span>
+            <span class="sdot ${dot(m.status)}" style="width:6px;height:6px" data-mod="${m.id}"></span>
             ${statusLabel(m.status)}
           </span>
           <span class="pbadge p${m.phase}">Phase ${m.phase}</span>
-          ${m.up?`<span class="utag">↳ ${m.up}</span>`:''}
+          ${m.up?`<span class="utag">↳ ${esc(m.up)}</span>`:''}
         </div>
       </div>
     </div>
-    <p style="color:var(--text-muted);margin-bottom:22px;font-size:13px;max-width:580px;line-height:1.6">${m.desc}</p>
+    <p style="color:var(--text-muted);margin-bottom:22px;font-size:13px;max-width:580px;line-height:1.6">${esc(m.desc)}</p>
     <div class="detail-grid">
       <div class="dcrd">
         <div class="dcrd-title">Features</div>
@@ -456,21 +727,27 @@ function renderMod(m){
         <div class="dcrd-title">Quick Actions</div>
         <div class="qactions">${actions}</div>
         ${m.ep?`<div style="margin-top:14px">
-          <div class="dcrd-title">Health Endpoint</div>
-          <code style="font-size:11px;color:var(--text-muted);background:var(--bg);padding:3px 8px;border-radius:4px;border:1px solid var(--border)">${m.ep}</code>
+          <div class="dcrd-title" style="margin-bottom:6px">API Endpoints</div>
+          <code class="ep-code">${esc(m.ep)}</code>
         </div>`:''}
       </div>
       <div class="dcrd">
-        <div class="dcrd-title">Configuration</div>
-        <div class="cfg-ph">Configuration panel coming in Phase ${m.phase}<br><span style="font-size:11px">Edit <code>cave-runtime.yaml</code> for now</span></div>
-      </div>
-      <div class="dcrd">
         <div class="dcrd-title">Module Info</div>
-        <div class="info-row"><span class="info-k">Status</span><span class="info-v" style="color:${m.status==='healthy'?'var(--green)':m.status==='pending'?'var(--text-muted)':'var(--red)'}">${statusLabel(m.status)}</span></div>
+        <div class="info-row"><span class="info-k">Status</span><span class="info-v" style="color:${m.status==='healthy'?'var(--green)':'var(--text-muted)'}">${statusLabel(m.status)}</span></div>
         <div class="info-row"><span class="info-k">Phase</span><span class="info-v">${m.phase}</span></div>
         <div class="info-row"><span class="info-k">Crate</span><span class="info-v" style="font-family:monospace;font-size:12px">cave-${m.id}</span></div>
-        ${m.up?`<div class="info-row"><span class="info-k">Upstream</span><span class="info-v">${m.up}</span></div>`:''}
+        <div class="info-row"><span class="info-k">Lines of Code</span><span class="info-v c-accent">${m.loc.toLocaleString()}</span></div>
+        ${m.up?`<div class="info-row"><span class="info-k">Upstream</span><span class="info-v">${esc(m.up)}</span></div>`:''}
         <div class="info-row"><span class="info-k">Category</span><span class="info-v" style="text-transform:capitalize">${CAT_LABELS[m.cat]||m.cat}</span></div>
+        ${m.github?`<div class="info-row"><span class="info-k">GitHub</span><span class="info-v"><a href="${m.github}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;word-break:break-all">${m.github.replace('https://','')}</a></span></div>`:''}
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Related Decisions (ADRs)</div>
+        ${adrTags||`<div style="color:var(--text-muted);font-size:12px">No ADRs linked</div>`}
+        <div style="margin-top:12px">
+          <div class="dcrd-title">Configuration</div>
+          <div class="cfg-ph">Configuration panel coming in Phase ${m.phase}<br><span style="font-size:11px">Edit <code>cave-runtime.yaml</code> for now</span></div>
+        </div>
       </div>
     </div>`;
 }
@@ -484,6 +761,245 @@ async function chkHealth(ep){
 }
 function showCfg(id){
   alert(`Configure ${id}:\n\nEdit cave-runtime.yaml and restart.\nFull UI config coming in Phase 2.`);
+}
+
+// ── Feature 2: Scaffolder ────────────────────────────────────────────────────
+
+function openScaffold(){
+  document.getElementById('scaffoverlay').classList.add('open');
+  document.getElementById('scaffresult').style.display='none';
+  document.getElementById('sf-name').focus();
+}
+function closeScaffold(){
+  document.getElementById('scaffoverlay').classList.remove('open');
+}
+function handleScaffOverlay(e){
+  if(e.target===document.getElementById('scaffoverlay'))closeScaffold();
+}
+async function submitScaffold(){
+  const name=document.getElementById('sf-name').value.trim();
+  const lang=document.getElementById('sf-lang').value;
+  const tmpl=document.getElementById('sf-tmpl').value;
+  const ns=document.getElementById('sf-ns').value.trim();
+  if(!name){document.getElementById('sf-name').focus();return;}
+  const btn=document.getElementById('scaffsubmit');
+  btn.disabled=true;btn.textContent='Creating…';
+  const res=document.getElementById('scaffresult');
+  res.style.display='none';
+  try{
+    const r=await fetch('/api/portal/scaffold',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,language:lang,template:tmpl,namespace:ns||'default'})
+    });
+    const d=await r.json();
+    res.textContent=d.message||JSON.stringify(d,null,2);
+    res.style.display='block';
+    res.style.color='var(--green)';
+  }catch(e){
+    res.textContent='Error: '+e.message;
+    res.style.display='block';
+    res.style.color='var(--red)';
+  }finally{
+    btn.disabled=false;btn.textContent='Create Project';
+  }
+}
+
+// ── Feature 3: Upstream Tracker ──────────────────────────────────────────────
+
+function renderUpstream(){
+  const cats=['All',...new Set(UPSTREAM_PROJECTS.map(p=>p.cat))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
+  const q=S.upstreamQuery.toLowerCase();
+  const cat=S.upstreamCat;
+  const filtered=UPSTREAM_PROJECTS.filter(p=>{
+    const matchCat=cat==='All'||p.cat===cat;
+    const matchQ=!q||p.name.toLowerCase().includes(q)||p.cave.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q);
+    return matchCat&&matchQ;
+  });
+
+  const catBtns=cats.map(c=>`<button class="scope-btn${c===cat?' active':''}" onclick="setUpstreamCat('${c}')">${c}</button>`).join('');
+  const rows=filtered.map(p=>{
+    const pc=parityColor(p.parity);
+    return`<tr>
+      <td><a class="gh-link" href="${p.gh}" target="_blank" rel="noopener">${esc(p.name)}</a></td>
+      <td><span class="cave-mod-tag">${esc(p.cave)}</span></td>
+      <td>${esc(p.cat)}</td>
+      <td><span class="pbadge p${Math.min(p.phase,4)}">Phase ${p.phase}</span></td>
+      <td><div class="parity-bar"><div class="parity-track"><div class="parity-fill" style="width:${p.parity}%;background:${pc}"></div></div><span class="parity-pct" style="color:${pc}">${p.parity}%</span></div></td>
+    </tr>`;
+  }).join('');
+
+  return`<div class="page-hdr">
+    <div class="page-title">Upstream Tracker</div>
+    <div class="page-sub">73 OSS projects monitored for releases, CVEs, and breaking changes</div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+    <input class="upstream-search" type="text" placeholder="Search projects…"
+      value="${esc(S.upstreamQuery)}" oninput="setUpstreamQuery(this.value)">
+    <div class="cat-filter">${catBtns}</div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="upstream-table">
+      <thead><tr>
+        <th>Project</th><th>CAVE Module</th><th>Category</th><th>Phase</th><th style="min-width:140px">Parity</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">No results</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+function setUpstreamCat(cat){S.upstreamCat=cat;renderPage();}
+function setUpstreamQuery(q){S.upstreamQuery=q;renderPage();}
+
+// ── Feature 4: ADR Browser ───────────────────────────────────────────────────
+
+async function loadAdrs(container){
+  container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div><div class="page-sub">Architecture Decision Records — the full reasoning behind every platform choice</div></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
+  try{
+    const r=await fetch('/api/portal/adrs');
+    const d=await r.json();
+    S.adrList=d.adrs||[];
+    container.innerHTML=renderAdrList();
+  }catch{
+    container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div></div><div style="padding:40px;text-align:center;color:var(--red)">Failed to load ADRs — ensure the server is running from the workspace root.</div>`;
+  }
+}
+
+function renderAdrList(){
+  const q=S.adrQuery.toLowerCase();
+  const scope=S.adrScope;
+  const filtered=S.adrList.filter(a=>{
+    const mScope=scope==='All'||a.scope===scope;
+    const mQ=!q||a.title.toLowerCase().includes(q)||String(a.id).includes(q)||a.category.toLowerCase().includes(q)||a.scope.toLowerCase().includes(q);
+    return mScope&&mQ;
+  });
+
+  const scopes=['All',...new Set(S.adrList.map(a=>a.scope).filter(Boolean))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
+  const scopeBtns=scopes.map(s=>`<button class="scope-btn${s===scope?' active':''}" onclick="setAdrScope('${esc(s)}')">${esc(s)}</button>`).join('');
+
+  const rows=filtered.map(a=>{
+    const num=String(a.id).padStart(3,'0');
+    return`<div class="adr-row" onclick="go('adr:${num}')">
+      <span class="adr-num">ADR-${num}</span>
+      <span class="adr-title">${esc(a.title)}</span>
+      <span class="adr-scope">${esc(a.scope||'Universal')}</span>
+      <span class="adr-cat">${esc(a.category||'General')}</span>
+    </div>`;
+  }).join('');
+
+  return`<div class="page-hdr">
+    <div class="page-title">Decisions (ADRs)</div>
+    <div class="page-sub">Architecture Decision Records — ${S.adrList.length} decisions recorded · ${filtered.length} shown</div>
+  </div>
+  <div class="adr-filters">
+    <input class="adr-filter-inp" type="text" placeholder="Search title, category…" value="${esc(S.adrQuery)}" oninput="setAdrQuery(this.value)">
+    <div style="display:flex;gap:5px;flex-wrap:wrap">${scopeBtns}</div>
+  </div>
+  <div class="adr-list-grid">${rows||'<div style="padding:20px;text-align:center;color:var(--text-muted)">No ADRs match filters</div>'}</div>`;
+}
+
+function setAdrScope(s){S.adrScope=s;document.getElementById('content').innerHTML=renderAdrList();}
+function setAdrQuery(q){S.adrQuery=q;document.getElementById('content').innerHTML=renderAdrList();}
+
+async function loadAdrDetail(id,container){
+  const num=String(parseInt(id,10)).padStart(3,'0');
+  container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
+  try{
+    const r=await fetch('/api/portal/adrs/'+num);
+    if(!r.ok)throw new Error('Not found');
+    const text=await r.text();
+    container.innerHTML=`
+      <div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div>
+      <div class="md-body">${mdToHtml(text)}</div>`;
+  }catch(e){
+    container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center;color:var(--red)">ADR-${num} not found — ${e.message}</div>`;
+  }
+}
+
+// Minimal markdown → HTML converter
+function mdToHtml(md){
+  const lines=md.split('\n');
+  const out=[];
+  let inUl=false,inOl=false,inPre=false,preBuf=[];
+
+  function flushList(){
+    if(inUl){out.push('</ul>');inUl=false;}
+    if(inOl){out.push('</ol>');inOl=false;}
+  }
+
+  for(let i=0;i<lines.length;i++){
+    const raw=lines[i];
+    const line=raw;
+
+    if(inPre){
+      if(line.startsWith('```')){inPre=false;out.push('<pre>'+esc(preBuf.join('\n'))+'</pre>');preBuf=[];}
+      else preBuf.push(raw);
+      continue;
+    }
+    if(line.startsWith('```')){flushList();inPre=true;continue;}
+
+    if(/^\s*$/.test(line)){flushList();continue;}
+
+    if(line.startsWith('#### ')){flushList();out.push('<h4>'+inl(line.slice(5))+'</h4>');continue;}
+    if(line.startsWith('### ')){flushList();out.push('<h3>'+inl(line.slice(4))+'</h3>');continue;}
+    if(line.startsWith('## ')){flushList();out.push('<h2>'+inl(line.slice(3))+'</h2>');continue;}
+    if(line.startsWith('# ')){flushList();out.push('<h1>'+inl(line.slice(2))+'</h1>');continue;}
+    if(/^---+$/.test(line.trim())){flushList();out.push('<hr>');continue;}
+
+    if(line.startsWith('> ')){
+      flushList();
+      out.push('<blockquote>'+inl(line.slice(2))+'</blockquote>');
+      continue;
+    }
+
+    // Table rows
+    if(line.includes('|')&&line.trimStart().startsWith('|')){
+      flushList();
+      if(/^\|[-| :]+\|/.test(line))continue; // separator row
+      const cells=line.split('|').slice(1,-1);
+      const tag=out.length>0&&out[out.length-1].startsWith('<tr')?'td':'th';
+      const cellHtml=cells.map(c=>`<${tag}>${inl(c.trim())}</${tag}>`).join('');
+      if(tag==='th'){
+        // Start table if not already
+        if(!out[out.length-1]?.startsWith('<table')){out.push('<table><thead>');}
+        out.push('<tr>'+cellHtml+'</tr></thead><tbody>');
+      } else {
+        out.push('<tr>'+cellHtml+'</tr>');
+      }
+      continue;
+    }
+    // Close open table
+    if(out.length>0&&out[out.length-1].startsWith('<tr')&&!line.includes('|')){
+      out.push('</tbody></table>');
+    }
+
+    if(line.match(/^[-*] /)){
+      if(!inUl){if(inOl){out.push('</ol>');inOl=false;}out.push('<ul>');inUl=true;}
+      out.push('<li>'+inl(line.slice(2))+'</li>');
+      continue;
+    }
+    if(line.match(/^\d+\. /)){
+      if(!inOl){if(inUl){out.push('</ul>');inUl=false;}out.push('<ol>');inOl=true;}
+      out.push('<li>'+inl(line.replace(/^\d+\. /,''))+'</li>');
+      continue;
+    }
+
+    flushList();
+    out.push('<p>'+inl(line)+'</p>');
+  }
+  if(inUl)out.push('</ul>');
+  if(inOl)out.push('</ol>');
+  return out.join('\n');
+}
+
+// Inline markdown (bold, italic, code, links)
+function inl(s){
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--accent)">$1</a>');
 }
 
 // ── Search ───────────────────────────────────────────────────────────────────
@@ -520,13 +1036,13 @@ function renderSearch(q){
   const all=Object.values(MODS);
   S.sresults=lq?all.filter(m=>m.name.toLowerCase().includes(lq)||m.desc.toLowerCase().includes(lq)||m.id.includes(lq)||(m.up&&m.up.toLowerCase().includes(lq))):all;
   const el=document.getElementById('sresults');
-  if(!S.sresults.length){el.innerHTML=`<div class="sempty">No results for "${q}"</div>`;return;}
+  if(!S.sresults.length){el.innerHTML=`<div class="sempty">No results for "${esc(q)}"</div>`;return;}
   el.innerHTML=S.sresults.map(m=>`
     <div class="sresult" onclick="go('${m.id}');closeSearch()">
       <span class="sr-icon">${m.icon}</span>
       <div style="flex:1;min-width:0">
-        <div class="sr-name">${m.name}</div>
-        <div class="sr-desc">${m.desc}</div>
+        <div class="sr-name">${esc(m.name)}</div>
+        <div class="sr-desc">${esc(m.desc)}</div>
       </div>
       <span class="sr-cat">${CAT_LABELS[m.cat]||m.cat}</span>
     </div>`).join('');
@@ -539,7 +1055,10 @@ document.addEventListener('keydown',e=>{
     e.preventDefault();
     S.searchOpen?closeSearch():openSearch();
   }
-  if(e.key==='Escape'&&S.searchOpen)closeSearch();
+  if(e.key==='Escape'){
+    if(S.searchOpen)closeSearch();
+    if(document.getElementById('scaffoverlay').classList.contains('open'))closeScaffold();
+  }
 });
 
 // ── Init ─────────────────────────────────────────────────────────────────────
@@ -547,8 +1066,13 @@ document.addEventListener('keydown',e=>{
 (()=>{
   const h=window.location.hash;
   if(h&&h!=='#/'&&h!=='#'){
-    const m=h.match(/^#\/m\/(.+)$/);
-    if(m&&MODS[m[1]])S.page=m[1];
+    if(h==='#/upstream'){S.page='upstream';}
+    else if(h==='#/adrs'){S.page='adrs';}
+    else{
+      const ma=h.match(/^#\/adr\/(.+)$/);
+      if(ma){S.page='adr:'+ma[1];}
+      else{const mm=h.match(/^#\/m\/(.+)$/);if(mm&&MODS[mm[1]])S.page=mm[1];}
+    }
   }
   renderNav();
   renderPage();
