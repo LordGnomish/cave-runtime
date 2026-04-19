@@ -54,6 +54,21 @@ CAVE tenants need event streaming for asynchronous communication, event sourcing
 - Confluent Cloud cost can be significant for high-throughput tenants.
 - Schema Registry implementations differ (Apicurio vs Confluent SR) — compatibility mode ensures format compatibility but advanced features may differ.
 
+### KRaft Migration Note
+
+Apache Kafka is migrating from ZooKeeper to KRaft (Kafka Raft) for metadata management. ZooKeeper is deprecated in Kafka 3.5+ and will be removed in Kafka 4.0 (expected 2026-2027). Strimzi supports KRaft mode since Strimzi 0.40+. CAVE should deploy new Strimzi clusters in KRaft mode and plan migration of existing ZK clusters before Kafka 4.0.
+
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Strimzi ZooKeeper removal (Kafka 4.0) | High (2027) | Medium | Deploy new clusters in KRaft mode. Migrate existing ZK clusters via Strimzi KRaft migration procedure. Test in staging first. |
+| Confluent Cloud pricing increase | Medium | Medium | FinOps monitoring (ADR-096). Strimzi on AKS is fallback (self-hosted, same as Hetzner). Annual cost review. |
+| Cross-provider offset migration (Hz→Az) | Low | High | Accept clean cutover model. Consumers replay from earliest. RPO = data in transit during cutover. Document in runbook. |
+| Strimzi operator upgrade breaks brokers | Low | High | Pin Strimzi version. Staging validates upgrade. Broker rolling restart policy. |
+| Schema Registry divergence (Apicurio vs Confluent SR) | Medium | Medium | Parity tests (ADR-135) cover schema registration and compatibility validation. Stick to Avro + backward compatibility mode on both. |
+| WarpStream disrupts Kafka landscape | Low (2027+) | Low | **Watch:** Confluent acquired WarpStream (Kafka on object storage). If WarpStream becomes managed offering on Azure, evaluate as Confluent Cloud alternative with potentially lower cost. |
+
 Compliance Mapping
 
 SOC2 CC6.1 (access controls — SASL/SCRAM per tenant). SOC2 CC6.6 (encryption — TLS in transit). ISO A.8.24 (encryption). GDPR Art.32 (security of processing — tenant data isolation via topic ACLs). NIS2 Art.21 (secure communications).
