@@ -15,15 +15,15 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
         .route("/api/etcd/health", get(health))
         .route("/api/etcd/status", get(status))
         // KV operations (etcd v3 REST API)
-        .route("/v3/kv/range", post(kv_range))
-        .route("/v3/kv/put", post(kv_put))
-        .route("/v3/kv/deleterange", post(kv_delete_range))
-        .route("/v3/kv/txn", post(kv_txn))
+        .route("/api/etcd/v3/kv/range", post(kv_range))
+        .route("/api/etcd/v3/kv/put", post(kv_put))
+        .route("/api/etcd/v3/kv/deleterange", post(kv_delete_range))
+        .route("/api/etcd/v3/kv/txn", post(kv_txn))
         // Lease
-        .route("/v3/lease/grant", post(lease_grant))
-        .route("/v3/lease/revoke", post(lease_revoke))
+        .route("/api/etcd/v3/lease/grant", post(lease_grant))
+        .route("/api/etcd/v3/lease/revoke", post(lease_revoke))
         // Maintenance
-        .route("/v3/maintenance/status", post(maintenance_status))
+        .route("/api/etcd/v3/maintenance/status", post(maintenance_status))
         .with_state(state)
 }
 
