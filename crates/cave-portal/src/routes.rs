@@ -21,7 +21,7 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/portal/notifications", get(notifications_api))
         .route("/api/portal/scaffold", post(scaffold_project))
         .route("/api/portal/adrs", get(list_adrs))
-        .route("/api/portal/adrs/:id", get(get_adr))
+        .route("/api/portal/adrs/{id}", get(get_adr))
         .route("/portal/tracker", get(serve_tracker_ui))
         .route("/portal/registry", get(serve_registry_ui))
         .route("/portal/scan", get(serve_scan_ui))
