@@ -1,5 +1,6 @@
 //! REST API routes — etcd v3 API compatible.
 
+use crate::b64;
 use crate::models::*;
 use crate::store::KvStore;
 use axum::{
@@ -77,6 +78,37 @@ fn extract_token(headers: &HeaderMap) -> Option<String> {
 
 // ── Health / Status ────────────────────────────────────────────────────────
 
+
+/// Decode base64 keys/values in PutRequest (etcd v3 API compat).
+fn decode_put_request(mut req: PutRequest) -> PutRequest {
+    req.key = String::from_utf8_lossy(&b64::decode(&req.key)).to_string();
+    req.value = String::from_utf8_lossy(&b64::decode(&req.value)).to_string();
+    req
+}
+
+/// Decode base64 key in RangeRequest.
+fn decode_range_request(mut req: RangeRequest) -> RangeRequest {
+    req.key = String::from_utf8_lossy(&b64::decode(&req.key)).to_string();
+    if let Some(ref end) = req.range_end {
+        req.range_end = Some(String::from_utf8_lossy(&b64::decode(end)).to_string());
+    }
+    req
+}
+
+/// Decode base64 key in DeleteRangeRequest.
+fn decode_delete_request(mut req: DeleteRangeRequest) -> DeleteRangeRequest {
+    req.key = String::from_utf8_lossy(&b64::decode(&req.key)).to_string();
+    if let Some(ref end) = req.range_end {
+        req.range_end = Some(String::from_utf8_lossy(&b64::decode(end)).to_string());
+    }
+    req
+}
+
+/// Encode KeyValue fields to base64 for response.
+fn encode_kv(kv: &mut KeyValue) {
+    kv.key = b64::encode(&kv.key).into_bytes();
+    kv.value = b64::encode(&kv.value).into_bytes();
+}
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "module": "cave-etcd",
@@ -113,10 +145,15 @@ async fn kv_put(
     Json(req): Json<PutRequest>,
 ) -> Result<Json<PutResponse>, (StatusCode, String)> {
     let token = extract_token(&headers);
+    let req = decode_put_request(req);
     store
         .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
-    Ok(Json(store.put(&req)))
+    let mut resp = store.put(&req);
+    if let Some(ref mut kv) = resp.prev_kv {
+        encode_kv(kv);
+    }
+    Ok(Json(resp))
 }
 
 async fn kv_delete_range(
@@ -128,6 +165,7 @@ async fn kv_delete_range(
     store
         .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    let req = decode_delete_request(req);
     Ok(Json(store.delete_range(&req)))
 }
 
