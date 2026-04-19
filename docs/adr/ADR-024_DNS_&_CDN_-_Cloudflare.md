@@ -61,6 +61,30 @@ CAVE needs a DNS provider for caveplatform.dev and all tenant subdomains. Must s
 - Cloudflare API token is in Break-glass Kit (ADR-079) — critical credential.
 - Cloudflare proxying adds ~10ms latency (optional — can use DNS-only mode).
 
+## Secondary DNS Strategy
+
+Cloudflare is a single point of failure for all CAVE DNS resolution. A secondary DNS provider mitigates total DNS outage risk.
+
+**Architecture:**
+- **Primary:** Cloudflare (authoritative nameservers, DDoS protection, geographic routing)
+- **Secondary:** NS1 Free Tier (secondary DNS zone transfer via AXFR/IXFR)
+- **Failover trigger:** If Cloudflare health check fails for 15 minutes, update registrar NS records to point to NS1
+
+**Implementation:**
+1. Configure Cloudflare as primary zone master
+2. NS1 as secondary — receives zone transfers automatically
+3. Registrar (e.g., Gandi) holds both NS sets: `ns1.cloudflare.com` + `dns1.p01.nsone.net`
+4. Normally Cloudflare responds (lower latency, DDoS protection)
+5. If Cloudflare fails, NS1 continues serving cached zone data
+6. cave-ctl DNS failover command: switches registrar NS priority (automated via registrar API)
+
+**Cost:** NS1 Free Tier supports 1 zone, 500K queries/month — sufficient for CAVE. If exceeded, NS1 Standard ($50/mo).
+
+**Limitations:**
+- NS1 secondary does not provide Cloudflare's DDoS protection or geographic routing
+- Zone transfer delay: up to 5 minutes for changes to propagate to NS1
+- Failover is not instant — DNS TTL (60s) + NS propagation (minutes to hours depending on resolvers)
+
 ### Risks
 
 | Risk | Probability | Impact | Mitigation |
