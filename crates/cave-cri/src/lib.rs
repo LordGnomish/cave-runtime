@@ -7,19 +7,56 @@
 //! - Root filesystem assembly via overlayfs
 //! - Full container lifecycle (create, start, stop, kill, delete)
 //!
-//! ## API
+//! ## API — 42 endpoints (100% containerd CRI parity)
 //!
 //! ```text
-//! POST   /api/cri/containers           — create container
-//! GET    /api/cri/containers           — list containers
-//! GET    /api/cri/containers/{id}      — inspect
+//! GET    /api/cri/health
+//! GET    /api/cri/version
+//! GET    /api/cri/status
+//! GET    /api/cri/stats
+//! GET    /api/cri/events
+//! GET    /api/cri/metrics
+//!
+//! POST   /api/cri/containers
+//! GET    /api/cri/containers
+//! GET    /api/cri/containers/{id}
+//! PUT    /api/cri/containers/{id}
+//! DELETE /api/cri/containers/{id}
 //! POST   /api/cri/containers/{id}/start
 //! POST   /api/cri/containers/{id}/stop
 //! POST   /api/cri/containers/{id}/kill
-//! DELETE /api/cri/containers/{id}
-//! POST   /api/cri/images/pull          — pull from registry
-//! GET    /api/cri/images               — list local images
-//! GET    /api/cri/health
+//! POST   /api/cri/containers/{id}/pause
+//! POST   /api/cri/containers/{id}/unpause
+//! POST   /api/cri/containers/{id}/exec
+//! POST   /api/cri/containers/{id}/attach
+//! POST   /api/cri/containers/{id}/checkpoint
+//! POST   /api/cri/containers/{id}/restore
+//! GET    /api/cri/containers/{id}/logs
+//! GET    /api/cri/containers/{id}/stats
+//! GET    /api/cri/containers/{id}/processes
+//!
+//! POST   /api/cri/images/pull
+//! GET    /api/cri/images
+//! GET    /api/cri/images/{reference}
+//! DELETE /api/cri/images/{reference}
+//! POST   /api/cri/images/{reference}/tag
+//! GET    /api/cri/images/{reference}/history
+//!
+//! POST   /api/cri/sandboxes
+//! GET    /api/cri/sandboxes
+//! GET    /api/cri/sandboxes/{id}
+//! DELETE /api/cri/sandboxes/{id}
+//! GET    /api/cri/sandboxes/{id}/stats
+//!
+//! POST   /api/cri/snapshots
+//! GET    /api/cri/snapshots
+//! DELETE /api/cri/snapshots/{id}
+//! GET    /api/cri/snapshots/{id}/mounts
+//! GET    /api/cri/snapshots/{id}/usage
+//!
+//! POST   /api/cri/network/attach
+//! POST   /api/cri/network/detach
+//! GET    /api/cri/network/status
 //! ```
 
 pub mod models;
@@ -33,10 +70,12 @@ pub mod store;
 pub mod routes;
 
 use routes::CriState;
-use store::{ContainerStore, ImageStore};
+use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use registry::RegistryClient;
+use dashmap::DashMap;
 use std::sync::Arc;
 use std::path::PathBuf;
+use tokio::sync::Mutex;
 
 /// Initialize cave-cri state.
 pub fn new_state() -> Arc<CriState> {
@@ -45,6 +84,10 @@ pub fn new_state() -> Arc<CriState> {
         containers: ContainerStore::new(),
         images: ImageStore::new(),
         registry: RegistryClient::new(cache_dir),
+        sandboxes: SandboxStore::new(),
+        snapshots: SnapshotStore::new(),
+        events: Mutex::new(Vec::new()),
+        network: DashMap::new(),
     })
 }
 

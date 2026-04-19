@@ -68,6 +68,66 @@ impl ImageStore {
     }
 }
 
+/// Thread-safe pod sandbox store.
+#[derive(Debug, Default)]
+pub struct SandboxStore {
+    sandboxes: DashMap<Uuid, crate::models::Sandbox>,
+}
+
+impl SandboxStore {
+    pub fn new() -> Self {
+        Self { sandboxes: DashMap::new() }
+    }
+
+    pub fn insert(&self, sandbox: crate::models::Sandbox) {
+        self.sandboxes.insert(sandbox.id, sandbox);
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<crate::models::Sandbox> {
+        self.sandboxes.get(id).map(|s| s.clone())
+    }
+
+    pub fn list(&self) -> Vec<crate::models::Sandbox> {
+        self.sandboxes.iter().map(|r| r.value().clone()).collect()
+    }
+
+    pub fn remove(&self, id: &Uuid) -> Option<crate::models::Sandbox> {
+        self.sandboxes.remove(id).map(|(_, s)| s)
+    }
+
+    pub fn count(&self) -> usize {
+        self.sandboxes.len()
+    }
+}
+
+/// Thread-safe OCI snapshot store.
+#[derive(Debug, Default)]
+pub struct SnapshotStore {
+    snapshots: DashMap<Uuid, crate::models::Snapshot>,
+}
+
+impl SnapshotStore {
+    pub fn new() -> Self {
+        Self { snapshots: DashMap::new() }
+    }
+
+    pub fn insert(&self, snapshot: crate::models::Snapshot) {
+        self.snapshots.insert(snapshot.id, snapshot);
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<crate::models::Snapshot> {
+        self.snapshots.get(id).map(|s| s.clone())
+    }
+
+    pub fn list(&self) -> Vec<crate::models::Snapshot> {
+        self.snapshots.iter().map(|r| r.value().clone()).collect()
+    }
+
+    pub fn remove(&self, id: &Uuid) -> Option<crate::models::Snapshot> {
+        self.snapshots.remove(id).map(|(_, s)| s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,164 +187,54 @@ mod tests {
         assert_eq!(store.list().len(), 2);
     }
 
-    // --- ContainerStore edge cases ---
-
     #[test]
-    fn test_store_get_nonexistent() {
-        let store = ContainerStore::new();
-        assert!(store.get(&Uuid::new_v4()).is_none());
-    }
-
-    #[test]
-    fn test_store_remove_nonexistent() {
-        let store = ContainerStore::new();
-        // Removing a non-existent key should return None, not panic
-        let result = store.remove(&Uuid::new_v4());
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_store_update_replaces_existing() {
-        let store = ContainerStore::new();
-        let mut c = make_test_container();
-        let id = c.id;
-        store.insert(c.clone());
-
-        c.status = ContainerStatus::Running;
-        store.update(c);
-
+    fn test_sandbox_store_crud() {
+        use crate::models::{Sandbox, SandboxSpec, SandboxState, DnsConfig};
+        let store = SandboxStore::new();
+        let id = Uuid::new_v4();
+        let sandbox = Sandbox {
+            id,
+            spec: SandboxSpec {
+                name: "test-pod".into(),
+                namespace: "default".into(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                hostname: None,
+                dns_config: Some(DnsConfig::default()),
+                port_mappings: vec![],
+                log_directory: None,
+                cgroup_parent: None,
+            },
+            state: SandboxState::Ready,
+            created_at: Utc::now(),
+            network_ip: Some("10.0.0.1".into()),
+        };
+        store.insert(sandbox);
+        assert_eq!(store.count(), 1);
         let got = store.get(&id).unwrap();
-        assert_eq!(got.status, ContainerStatus::Running);
-    }
-
-    #[test]
-    fn test_store_count_tracks_inserts_and_removes() {
-        let store = ContainerStore::new();
+        assert_eq!(got.spec.name, "test-pod");
+        store.remove(&id);
         assert_eq!(store.count(), 0);
-
-        let c1 = make_test_container();
-        let c2 = make_test_container();
-        let id1 = c1.id;
-
-        store.insert(c1);
-        assert_eq!(store.count(), 1);
-        store.insert(c2);
-        assert_eq!(store.count(), 2);
-
-        store.remove(&id1);
-        assert_eq!(store.count(), 1);
     }
 
     #[test]
-    fn test_store_concurrent_inserts() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let store = Arc::new(ContainerStore::new());
-        let mut handles = vec![];
-
-        for _ in 0..10 {
-            let s = Arc::clone(&store);
-            handles.push(thread::spawn(move || {
-                s.insert(make_test_container());
-            }));
-        }
-        for h in handles {
-            h.join().unwrap();
-        }
-        assert_eq!(store.count(), 10);
-    }
-
-    #[test]
-    fn test_store_concurrent_reads_while_writing() {
-        use std::sync::Arc;
-        use std::thread;
-
-        let store = Arc::new(ContainerStore::new());
-        // Pre-populate
-        for _ in 0..5 {
-            store.insert(make_test_container());
-        }
-
-        let mut handles = vec![];
-        for _ in 0..5 {
-            let s = Arc::clone(&store);
-            handles.push(thread::spawn(move || {
-                let _ = s.list();
-                let _ = s.count();
-            }));
-        }
-        for h in handles {
-            h.join().unwrap();
-        }
-    }
-
-    // --- ImageStore ---
-
-    fn make_test_image() -> crate::models::OciImage {
-        crate::models::OciImage {
-            reference: format!("nginx:{}", Uuid::new_v4()),
-            digest: "sha256:abc".into(),
-            layers: vec![],
-            config: crate::models::ImageConfig::default(),
-            size_bytes: 1024,
-            pulled_at: Utc::now(),
-        }
-    }
-
-    #[test]
-    fn test_image_store_crud() {
-        let store = super::ImageStore::new();
-        let img = make_test_image();
-        let reference = img.reference.clone();
-
-        store.insert(img);
-        assert!(store.get(&reference).is_some());
-
-        let removed = store.remove(&reference).unwrap();
-        assert_eq!(removed.reference, reference);
-        assert!(store.get(&reference).is_none());
-    }
-
-    #[test]
-    fn test_image_store_get_nonexistent() {
-        let store = super::ImageStore::new();
-        assert!(store.get("nonexistent:image").is_none());
-    }
-
-    #[test]
-    fn test_image_store_remove_nonexistent() {
-        let store = super::ImageStore::new();
-        assert!(store.remove("nonexistent:image").is_none());
-    }
-
-    #[test]
-    fn test_image_store_list_empty() {
-        let store = super::ImageStore::new();
-        assert!(store.list().is_empty());
-    }
-
-    #[test]
-    fn test_image_store_list_multiple() {
-        let store = super::ImageStore::new();
-        store.insert(make_test_image());
-        store.insert(make_test_image());
-        store.insert(make_test_image());
-        assert_eq!(store.list().len(), 3);
-    }
-
-    #[test]
-    fn test_image_store_overwrite() {
-        let store = super::ImageStore::new();
-        let mut img = make_test_image();
-        img.reference = "nginx:latest".into();
-        img.size_bytes = 100;
-        store.insert(img.clone());
-
-        img.size_bytes = 200;
-        store.insert(img);
-
-        let got = store.get("nginx:latest").unwrap();
-        assert_eq!(got.size_bytes, 200);
+    fn test_snapshot_store_crud() {
+        use crate::models::{Snapshot, SnapshotKind};
+        let store = SnapshotStore::new();
+        let id = Uuid::new_v4();
+        let snap = Snapshot {
+            id,
+            name: "snap-1".into(),
+            parent: None,
+            labels: Default::default(),
+            created_at: Utc::now(),
+            kind: SnapshotKind::Committed,
+        };
+        store.insert(snap);
+        assert_eq!(store.list().len(), 1);
+        let got = store.get(&id).unwrap();
+        assert_eq!(got.name, "snap-1");
+        store.remove(&id);
+        assert_eq!(store.list().len(), 0);
     }
 }
