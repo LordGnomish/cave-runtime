@@ -209,7 +209,7 @@ const MODS = {
   // Core
   db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null},
   auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null},
-  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 26 OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null},
+  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 73 OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null},
   // Security
   secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health'},
   certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health'},
@@ -417,7 +417,7 @@ function renderOverview(){
       <div class="stat-card"><div class="stat-lbl">Total Modules</div><div class="stat-val c-accent">${all.length}</div><div class="stat-sub">across all phases</div></div>
       <div class="stat-card"><div class="stat-lbl">Healthy</div><div class="stat-val c-green">${healthy}</div><div class="stat-sub">Phase 1 live</div></div>
       <div class="stat-card"><div class="stat-lbl">Phase 1</div><div class="stat-val">${all.filter(m=>m.phase===1).length}</div><div class="stat-sub">implemented</div></div>
-      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">26</div><div class="stat-sub">projects tracked</div></div>
+      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">73</div><div class="stat-sub">projects tracked</div></div>
       <div class="stat-card"><div class="stat-lbl">Runtime</div><div class="stat-val" style="font-size:18px">${hstate}</div><div class="stat-sub">v${S.ver}</div></div>
     </div>
     ${grids}`;
