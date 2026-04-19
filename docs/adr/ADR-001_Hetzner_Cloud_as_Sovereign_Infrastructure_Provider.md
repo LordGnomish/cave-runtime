@@ -8,18 +8,6 @@
 
 **Related ADRs:** 002 (Azure), 003 (Talos), 061 (Storage), 065 (Load Balancer), 066 (Provider Choice), 098 (Immutable Infra)
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-002 (Azure), 003 (Talos), 061 (Storage), 065 (Load Balancer), 066 (Provider Choice), 098 (Immutable Infra)
-
-Back to Index:
-
 ## Context
 
 CAVE requires a primary infrastructure provider for the sovereign (self-hosted) deployment target. The provider must support:
@@ -135,7 +123,7 @@ For CAVE's sovereign profile, US CLOUD Act exposure is a disqualifying factor. T
 - Simple, transparent pricing (no hidden egress/LCU/NAT gateway costs)
 - 20TB egress included per server — critical for multi-profile sync and observability
 - Mature OpenTofu provider for reliable Day 0 automation
-- German company = same legal jurisdiction as Knauf (Iphofen, Germany)
+- German company = same legal jurisdiction as the operating entity
 
 ### Negative
 
