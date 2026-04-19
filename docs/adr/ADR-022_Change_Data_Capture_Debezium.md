@@ -27,11 +27,23 @@ CAVE tenants need real-time data integration between PostgreSQL and downstream s
 
 **Debezium** via Kafka Connect for CDC from PostgreSQL (CNPG/Azure PG) to Kafka topics. Deployed as Strimzi KafkaConnector CRD (Hetzner) or Confluent managed connector (Azure). Avro serialization with Schema Registry (ADR-060).
 
-## Rejected
+## Rejected Options
 
-- **Maxwell:** MySQL-only. CAVE's primary database is PostgreSQL.
-- **pg_logical_replication:** PostgreSQL-native but only replicates to another PostgreSQL. No Kafka integration. No schema evolution.
-- **Custom triggers:** Brittle, application-coupled, no standardized event format. Anti-pattern for platform-managed CDC.
+### Maxwell — Rejected
+
+**Primary:** MySQL-only. CAVE's primary relational database is PostgreSQL (CNPG on Hetzner, Azure PG Flexible on Azure — ADR-047). Maxwell has zero PostgreSQL support.
+
+### pg_logical_replication — Rejected
+
+**Primary:** No Kafka integration. PostgreSQL's native logical replication only streams to another PostgreSQL instance. CAVE needs CDC events on Kafka topics for downstream consumers (search indexing, analytics, event sourcing).
+
+**Secondary:** No schema evolution. Logical replication streams raw SQL changes. No Avro/JSON serialization, no Schema Registry integration.
+
+### Custom Database Triggers — Rejected
+
+**Primary:** Application-coupled anti-pattern. Triggers execute inside the database transaction — trigger failure blocks the write. CDC should be decoupled: capture happens asynchronously from WAL.
+
+**Secondary:** No standardized event format, no snapshot mode, no offset tracking, no automatic recovery. Debezium provides all of these out of the box.
 
 ## Consequences
 
