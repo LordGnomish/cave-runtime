@@ -47,6 +47,16 @@ CAVE is a multi-tenant platform where workloads from different tenants share clu
 - eBPF kernel compatibility requirements (compatibility matrix triple — ADR-133).
 - Debugging network issues requires understanding both Cilium and Istio layers.
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Cilium + Istio interaction bug (L4 allows, L7 denies or vice versa) | Low | High | Cilium authoritative for L3/L4. Istio ztunnel for mTLS only. Document conflict resolution in Runbook. Staging validates policy changes. |
+| eBPF kernel compatibility on AKS nodes | Medium | Medium | Pin AKS node image to tested kernel version. Compatibility matrix (ADR-133) tracks Cilium↔kernel↔Istio triple. Test on every AKS upgrade. |
+| Istio ambient ztunnel crash (node-level) | Low | High | ztunnel is DaemonSet — K8s auto-restarts. During restart, L4 traffic continues (Cilium), L7 mTLS briefly unavailable. Pod readiness probes detect mTLS loss. |
+| SPIFFE identity spoofing | Very Low | Critical | SPIFFE identities issued by Istio CA (not self-issued). CA certificate rotation automated (cert-manager, ADR-015). Mutual verification — both sides must present valid SVID. |
+| Zero-trust enforcement blocks legitimate traffic during rollout | Medium | Medium | Gradual rollout: observe-only mode first (Cilium Hubble flow logs), then warn-only (log violations), then enforce. Per-namespace rollout, not cluster-wide. |
+
 ## Compliance Mapping
 
 SOC2 CC6.1 (network segmentation). SOC2 CC6.6 (encryption in transit — mTLS). ISO A.8.22 (segregation in networks). ISO A.8.24 (cryptographic controls — mTLS). NIS2 Art.21 (network security). GDPR Art.32 (security of processing — encryption in transit).
