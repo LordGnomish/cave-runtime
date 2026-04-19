@@ -54,6 +54,17 @@ CAVE tenants need an in-memory cache/data structure store for session management
 - Spotahome operator is community-maintained (not official Valkey project). Operator maturity less than CNPG or Strimzi.
 - Azure Cache for Redis uses the original Redis codebase — technical parity with Valkey is high now but may diverge over time. Parity tests (ADR-135) must cover cache behavior.
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Valkey/Redis protocol divergence over time | Medium (2027+) | Medium | Parity contract tests (ADR-135) catch behavioral differences. Pin to stable Valkey release. Crossplane XR abstracts provider-specific quirks. |
+| Spotahome operator unmaintained | Medium | Medium | **Watch:** Valkey community is discussing an official operator. If Spotahome stalls, migrate to official operator or Helm-only deployment with StatefulSet. Monitor GitHub activity quarterly. |
+| Dragonfly relicenses to permissive | Low (2026+) | Low | **Watch:** Dragonfly claims 25x throughput vs Redis/Valkey on single instance. If it moves from BSL to Apache/MIT, evaluate as Valkey replacement for high-throughput tenants. Annual review. |
+| Azure Cache for Redis deprecates Redis protocol | Very Low | High | Microsoft has no incentive to break Redis compatibility. Valkey on AKS is fallback (self-hosted, same as Hetzner). |
+| Valkey-Glide client maturity | Low | Low | **Watch:** Linux Foundation's official Valkey client (Glide) is maturing. Current Redis clients (Jedis, Lettuce, ioredis) work fine. Migrate to Glide when GA for better Valkey-specific optimizations. |
+| Data loss on Valkey pod restart (no persistence) | Low | High | RDB + AOF persistence enabled by default. K8s PVC for data volume. Daily backup to MinIO/ADLS (ADR-050). |
+
 Compliance Mapping
 
 SOC2 CC6.1 (access controls — ACL per tenant). ISO A.8.24 (encryption — TLS in transit, encryption at rest for persistent data). GDPR Art.32 (security of processing — tenant data isolation in shared cache).
