@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 **Category:** Governance
 
 **Related ADRs:** 076

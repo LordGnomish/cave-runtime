@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 030 (OPA), 089 (Policy Provenance), 093 (Ledger), 137 (Constitutional Tiering)

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** Observability
 
 **Related ADRs:** 029

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Hetzner, Runtime
+
 **Category:** Platform
 
 **Related ADRs:** 092, 112

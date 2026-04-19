@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 **Category:** Compliance
 
 **Related ADRs:** 102

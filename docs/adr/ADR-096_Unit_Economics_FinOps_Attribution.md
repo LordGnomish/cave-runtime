@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Hetzner, Universal
+
 **Category:** FinOps
 
 **Related ADRs:** 110, 126

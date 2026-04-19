@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Runtime, Universal
+
 **Category:** Platform
 
 **Related ADRs:** 067

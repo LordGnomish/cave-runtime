@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** Identity & Secrets
 
 **Related ADRs:** 020, 079, 083

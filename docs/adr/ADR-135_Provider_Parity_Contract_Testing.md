@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 066 (Provider Choice), 067 (Crossplane v2), 071 (kuttl Testing), 113 (Data Residency)

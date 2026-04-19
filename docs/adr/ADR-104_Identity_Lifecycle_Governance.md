@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Identity
 
 **Related ADRs:** 006, 007, 064, 129, 130

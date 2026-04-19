@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** Security
 
 **Related ADRs:** 020, 079

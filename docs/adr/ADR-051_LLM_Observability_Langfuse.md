@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** AI
 
 **Related ADRs:** 013, 103

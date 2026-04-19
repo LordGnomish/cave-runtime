@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Universal
+
 **Category:** Security/FinOps
 
 **Related ADRs:** 084, 096

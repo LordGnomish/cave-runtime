@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Universal
+
 **Category:** Platform Governance — Multi-Tenancy
 
 **Related ADRs:** 012 (vcluster), 084 (Default-Deny), 087 (Quotas), 096 (Unit Economics), 109 (Observability Multi-Tenancy), 110 (Egress), 126 (Workload Criticality)

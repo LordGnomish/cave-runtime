@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Runtime, Universal
+
 **Category:** AI Governance
 
 **Related ADRs:** 125

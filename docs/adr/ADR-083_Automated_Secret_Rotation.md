@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Universal
+
 **Category:** Security
 
 **Related ADRs:** 020, 053

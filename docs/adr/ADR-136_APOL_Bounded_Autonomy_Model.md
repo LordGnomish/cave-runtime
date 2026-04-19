@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Platform Governance — AI Operations
 
 **Related ADRs:** 092 (AI Guardrails), 095 (Reflex Engine), 112 (APOL), 118 (APOL Fallback), 119 (Crossplane Operations), 125 (APOL CoT Audit), 128 (Attestation Redaction)

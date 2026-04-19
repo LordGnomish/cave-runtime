@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 093 (Sovereign Ledger), 112 (APOL), 133 (Compatibility Matrix), 136 (Bounded Autonomy)

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** AI Governance
 
 **Related ADRs:** 112, 128

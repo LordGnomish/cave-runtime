@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 **Category:** Data & Messaging
 
 **Related ADRs:** 021, 060, 139

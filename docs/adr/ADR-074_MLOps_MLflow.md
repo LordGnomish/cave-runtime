@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Universal
+
 **Category:** AI/ML
 
 **Related ADRs:** 051, 038

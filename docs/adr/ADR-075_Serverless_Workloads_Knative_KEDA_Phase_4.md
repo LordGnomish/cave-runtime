@@ -2,6 +2,8 @@
 
 **Status:** Proposed (Phase 4)
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** Platform
 
 **Related ADRs:** 067, 095

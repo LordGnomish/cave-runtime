@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** CI/CD
 
 **Related ADRs:** 026, 037

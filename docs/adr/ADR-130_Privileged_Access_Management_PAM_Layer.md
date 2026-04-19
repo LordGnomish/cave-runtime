@@ -2,6 +2,8 @@
 
 **Status:** Proposed
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 ## Category:
 
 **Related ADRs:** 006, 007, 020, 053, 064, 079, 083, 092, 104, 112, 125, 128, 129

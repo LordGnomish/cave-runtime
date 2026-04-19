@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Runtime, Universal
+
 **Category:** Platform Governance — Data
 
 **Related ADRs:** 021 (Strimzi/Confluent), 047 (CNPG), 059 (Schema Registry), 060 (Debezium CDC), 074 (MLflow), 086 (Tenant Offboarding), 102 (Data Classification), 113 (Data Residency)

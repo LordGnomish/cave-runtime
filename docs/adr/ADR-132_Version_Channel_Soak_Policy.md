@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 085 (Rolling Upgrades), 099 (Deprecation Guardrails), 127 (Roadmap Intelligence), 133 (Compatibility Matrix)

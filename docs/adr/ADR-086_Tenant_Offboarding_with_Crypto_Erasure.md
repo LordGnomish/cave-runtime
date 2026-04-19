@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime
+
 **Category:** Multi-Tenancy
 
 **Related ADRs:** 139

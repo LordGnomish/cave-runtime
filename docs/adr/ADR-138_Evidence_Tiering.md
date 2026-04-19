@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 093 (Sovereign Ledger), 100 (Resilience Attestation), 101 (SLSA L3), 132 (Version Channels), 135 (Parity)

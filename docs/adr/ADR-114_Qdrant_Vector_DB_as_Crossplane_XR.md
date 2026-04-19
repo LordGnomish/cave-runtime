@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** Data
 
 **Related ADRs:** 067

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Runtime, Universal
+
 **Category:** Governance
 
 **Related ADRs:** 006, 007, 064, 104

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime, Universal
+
 **Category:** Platform Governance
 
 **Related ADRs:** 085 (Upgrades), 099 (Pluto/kubent), 127 (Roadmap Scan), 132 (Version Channels), 133 (Compatibility Matrix)

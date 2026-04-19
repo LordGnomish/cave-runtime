@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Universal
+
 **Category:** Multi-Tenancy
 
 **Related ADRs:** 070, 084

@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Universal
+
 **Category:** Governance
 
 **Related ADRs:** 106

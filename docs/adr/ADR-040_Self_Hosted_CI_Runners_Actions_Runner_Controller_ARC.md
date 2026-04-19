@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure
+
 **Category:** CI/CD
 
 **Related ADRs:** 010, 115

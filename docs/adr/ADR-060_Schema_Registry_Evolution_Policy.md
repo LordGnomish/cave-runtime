@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Azure, Hetzner, Universal
+
 **Category:** Data & Messaging
 
 **Related ADRs:** 021, 059, 139

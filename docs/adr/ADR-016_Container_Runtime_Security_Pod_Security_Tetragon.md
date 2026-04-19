@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Hetzner, Universal
+
 **Category:** Security
 
 **Related ADRs:** 090, 098

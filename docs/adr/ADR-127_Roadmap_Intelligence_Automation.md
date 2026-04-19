@@ -2,6 +2,8 @@
 
 **Status:** Accepted
 
+**Scope:** Runtime
+
 **Category:** Governance
 
 **Related ADRs:** ## Context
