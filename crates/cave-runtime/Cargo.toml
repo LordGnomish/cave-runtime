@@ -107,6 +107,7 @@ cave-container-scan = { path = "../cave-container-scan" }
 cave-erp = { path = "../cave-erp" }
 cave-docdb = { path = "../cave-docdb" }
 cave-rdbms = { path = "../cave-rdbms" }
+cave-kamaji = { path = "../cave-kamaji" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }

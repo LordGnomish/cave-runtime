@@ -122,6 +122,7 @@ async fn main() -> anyhow::Result<()> {
     let erp_state = cave_erp::new_state();
     let docdb_state = cave_docdb::new_state();
     let rdbms_state = cave_rdbms::new_state();
+    let kamaji_state = Arc::new(cave_kamaji::KamajiState::default());
 
     // Start background tasks
     metrics_state.start_background_tasks();
@@ -218,6 +219,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_erp::router(erp_state))
         .merge(cave_docdb::router(docdb_state.clone()))
         .merge(cave_rdbms::router(rdbms_state.clone()))
+        .merge(cave_kamaji::router(kamaji_state))
         // Auth endpoints
         .merge(cave_auth::auth_routes::router())
         // JWT auth middleware
