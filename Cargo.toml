@@ -88,6 +88,7 @@ members = [
     # === Sovereign Ledger ===
     "crates/cave-ledger",
     # === Crossplane ===
+    "crates/cave-cri",
     "crates/cave-crossplane",
     # === New crates (this session) ===
     "crates/cave-oncall",
