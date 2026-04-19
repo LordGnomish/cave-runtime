@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010, 108, 127, 099
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE has 73 components, each with upstream dependencies (container images, Helm charts, Crossplane providers, npm/pip packages). Manual dependency tracking is unsustainable.
+CAVE has 73 components, each with upstream dependencies (container images, Helm charts, Crossplane providers, npm/pip packages). Manual dependency tracking is unsustainable.
 
 ## Candidates
 
-## | Criteria | Renovate | Dependabot | WhiteSource Renovate (Mend) | Manual |
+| Criteria | Renovate | Dependabot | WhiteSource Renovate (Mend) | Manual |
 |---|---|---|---|---|
 | Self-hosted | ✅ Self-hosted runner | ⚠️ GitHub-hosted only | ✅ | N/A |
 | Digest pinning | ✅ Native (ADR-108) | ⚠️ Limited | ✅ | ❌ |
@@ -27,11 +25,11 @@
 
 ## Decision
 
-## **Renovate** (self-hosted) for automated dependency updates across all repositories. Digest pinning enforced (ADR-108). PRs grouped by ecosystem (e.g., all Cilium-related updates in one PR). Auto-merge for patch versions with passing CI. Major/minor versions require human review. Integrated with roadmap intelligence (ADR-127).
+**Renovate** (self-hosted) for automated dependency updates across all repositories. Digest pinning enforced (ADR-108). PRs grouped by ecosystem (e.g., all Cilium-related updates in one PR). Auto-merge for patch versions with passing CI. Major/minor versions require human review. Integrated with roadmap intelligence (ADR-127).
 
 ## Rejected
 
-## - **Dependabot:** GitHub-hosted only (no self-hosting). Limited ecosystem support (no Crossplane, limited Helm). No PR grouping — creates PR flood for 73 components.
+- **Dependabot:** GitHub-hosted only (no self-hosting). Limited ecosystem support (no Crossplane, limited Helm). No PR grouping — creates PR flood for 73 components.
 - **Manual tracking:** Unsustainable at 73 components. Missed updates create vulnerability exposure.
 
 ## Implementation Reference

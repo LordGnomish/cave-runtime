@@ -8,15 +8,13 @@
 
 **Related ADRs:** 112, 136
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## AI agents (APOL roles, Backstage AI, LibreChat) interact with the platform via cave-ctl MCP. Without guardrails, AI can perform destructive operations.
+AI agents (APOL roles, Backstage AI, LibreChat) interact with the platform via cave-ctl MCP. Without guardrails, AI can perform destructive operations.
 
 ## Candidates
 
-## | Control | Mechanism | Scope |
+| Control | Mechanism | Scope |
 |---|---|---|
 | Allowlist | MCP method whitelist per AI role | AI SRE: pod restart, HPA scale, namespace quarantine |
 | Denylist | MCP method blacklist (all roles) | namespace delete, terraform apply, raw secret access, policy mutation |
@@ -26,17 +24,17 @@
 
 ## Decision
 
-## AI assistants via MCP restricted by: (1) Allowlist per role — specific operations each role can invoke. (2) Denylist — operations no role can ever invoke. (3) Privilege ceiling — AI never exceeds initiating user's RBAC. (4) Rate limiting per role. (5) Environment scoping (prod stricter). Every MCP call logged to Sovereign Ledger with caller identity, action, parameters, result.
+AI assistants via MCP restricted by: (1) Allowlist per role — specific operations each role can invoke. (2) Denylist — operations no role can ever invoke. (3) Privilege ceiling — AI never exceeds initiating user's RBAC. (4) Rate limiting per role. (5) Environment scoping (prod stricter). Every MCP call logged to Sovereign Ledger with caller identity, action, parameters, result.
 
 ## Rejected
 
-## - **No guardrails:** Uncontrolled AI. APOL could delete namespaces, modify security policies, access raw secrets.
+- **No guardrails:** Uncontrolled AI. APOL could delete namespaces, modify security policies, access raw secrets.
 - **Per-request human approval:** Defeats automation purpose. Operator fatigue leads to rubber-stamp approvals.
 - **Full autonomy with post-hoc audit:** Damage already done before audit detects it. Prevention > detection.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - AI agents cannot perform destructive operations outside bounded authority.
 - Privilege ceiling prevents privilege escalation via AI.
 - Immutable audit trail for every AI action.
@@ -49,4 +47,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (AI access controls). ISO A.5.23 (information security for cloud services — AI as cloud service). NIS2 Art.21 (security of automated systems).
+SOC2 CC6.1 (AI access controls). ISO A.5.23 (information security for cloud services — AI as cloud service). NIS2 Art.21 (security of automated systems).

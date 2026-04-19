@@ -8,11 +8,9 @@
 
 **Related ADRs:** 021 (Strimzi/Confluent), 047 (CNPG), 059 (Schema Registry), 060 (Debezium CDC), 074 (MLflow), 086 (Tenant Offboarding), 102 (Data Classification), 113 (Data Residency)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's data platform spans PostgreSQL, Kafka, OpenSearch, Qdrant, MinIO/ADLS, MLflow, and Databricks. Data flows between these systems via CDC (Debezium), event streaming (Kafka), ML pipelines (Spark/Argo Workflows), and search indexing. Without formal data contract governance:
+CAVE's data platform spans PostgreSQL, Kafka, OpenSearch, Qdrant, MinIO/ADLS, MLflow, and Databricks. Data flows between these systems via CDC (Debezium), event streaming (Kafka), ML pipelines (Spark/Argo Workflows), and search indexing. Without formal data contract governance:
 
 - Schema breaking changes propagate across services causing cascading failures
 - Tenant offboarding leaves orphaned data across downstream systems
@@ -24,7 +22,7 @@
 
 ## Candidates
 
-## | Approach | Platform-enforced data contracts (chosen) | Application-managed (no platform rules) | Platform owns all schemas | Eventual consistency |
+| Approach | Platform-enforced data contracts (chosen) | Application-managed (no platform rules) | Platform owns all schemas | Eventual consistency |
 |---|---|---|---|---|
 | Breaking change prevention | ✅ CI-enforced BACKWARD | ❌ Runtime failures | ✅ | ❌ Degrades over time |
 | Team ownership clarity | ✅ Tenant owns domain, platform enforces | ❌ Unclear | ❌ Platform bottleneck | ⚠️ |
@@ -66,7 +64,7 @@
 
 ## Rejected
 
-## - **No schema governance (application-managed):** Breaking schema changes detected only at runtime. Consumer failures. Data pipeline corruption. No platform-level enforcement.
+- **No schema governance (application-managed):** Breaking schema changes detected only at runtime. Consumer failures. Data pipeline corruption. No platform-level enforcement.
 - **Platform owns all schemas:** Platform team becomes bottleneck for every schema change. Tenants must own their domain schemas — platform enforces compatibility rules.
 - **Eventual consistency (no contract enforcement):** Data quality degrades over time. Cross-tenant data boundaries become unclear. Audit impossible without contracts.
 
@@ -85,4 +83,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (data contract management). ISO A.5.12 (information classification — contract-level). GDPR Art.25 (data protection by design — schema governance). GDPR Art.30 (processing records — data contract documentation). NIS2 Art.21 (data governance).
+SOC2 CC8.1 (data contract management). ISO A.5.12 (information classification — contract-level). GDPR Art.25 (data protection by design — schema governance). GDPR Art.30 (processing records — data contract documentation). NIS2 Art.21 (data governance).

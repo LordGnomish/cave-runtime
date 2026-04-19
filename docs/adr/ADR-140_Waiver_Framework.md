@@ -8,11 +8,9 @@
 
 **Related ADRs:** 030 (OPA), 089 (Policy Provenance), 093 (Ledger), 137 (Constitutional Tiering)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Zero-exception policy enforcement is theoretically ideal but operationally brittle. Real-world scenarios require temporary exceptions: CVE risk acceptance while fix is in progress, deprecated API usage during migration, relaxed egress policy for vendor integration testing, security policy exception for legacy tenant migration.
+Zero-exception policy enforcement is theoretically ideal but operationally brittle. Real-world scenarios require temporary exceptions: CVE risk acceptance while fix is in progress, deprecated API usage during migration, relaxed egress policy for vendor integration testing, security policy exception for legacy tenant migration.
 
 Without a formal waiver process, exceptions happen informally (Slack message to guardian, undocumented OPA rule override) — creating audit gaps and compliance risk.
 
@@ -20,7 +18,7 @@ Without a formal waiver process, exceptions happen informally (Slack message to 
 
 ## Candidates
 
-## | Approach | TTL-bounded waiver framework (chosen) | No waivers (absolute policies) | Permanent waivers | Informal exceptions |
+| Approach | TTL-bounded waiver framework (chosen) | No waivers (absolute policies) | Permanent waivers | Informal exceptions |
 |---|---|---|---|---|
 | Edge case handling | ✅ Documented exception path | ❌ Shadow workarounds | ✅ | ⚠️ Tribal knowledge |
 | Policy integrity | ✅ Waivers expire, force re-evaluation | ✅ Maximum | ❌ Permanent erosion | ❌ Undocumented drift |
@@ -30,7 +28,7 @@ Without a formal waiver process, exceptions happen informally (Slack message to 
 
 ## Decision
 
-## | Element | Requirement |
+| Element | Requirement |
 |---|---|
 | **Scope** | Specific: tenant + namespace + resource (never platform-wide, never wildcard) |
 | **Justification** | Written risk assessment: what policy is waived, why, what compensating controls exist, what is the blast radius |
@@ -47,7 +45,7 @@ Without a formal waiver process, exceptions happen informally (Slack message to 
 
 ## Rejected
 
-## - **No waiver process (all policies absolute):** Some edge cases legitimately need temporary exceptions (e.g., upstream CVE without fix, performance-critical workload needing host networking). Absolute policies with no exception path create shadow workarounds.
+- **No waiver process (all policies absolute):** Some edge cases legitimately need temporary exceptions (e.g., upstream CVE without fix, performance-critical workload needing host networking). Absolute policies with no exception path create shadow workarounds.
 - **Permanent waivers:** Waivers without TTL become permanent policy erosion. Max 90d (renewable once) forces re-evaluation.
 - **Team-level waiver for all tiers:** Tier A (immutable) should never be waived. Tier B requires guardian judgment. Only Tier C is team-lead-adjustable.
 
@@ -65,4 +63,4 @@ Without a formal waiver process, exceptions happen informally (Slack message to 
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (policy exception management). ISO A.5.1 (policy governance — exception process). ISO A.5.36 (compliance — documented exceptions with TTL). NIS2 Art.21 (risk management — formal exception process).
+SOC2 CC6.1 (policy exception management). ISO A.5.1 (policy governance — exception process). ISO A.5.36 (compliance — documented exceptions with TTL). NIS2 Art.21 (risk management — formal exception process).

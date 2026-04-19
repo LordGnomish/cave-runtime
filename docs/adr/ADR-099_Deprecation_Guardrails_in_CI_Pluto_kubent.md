@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010, 127, 134
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Kubernetes deprecates APIs across minor versions. Helm charts and manifests using deprecated APIs will break after upgrade. Must detect deprecated APIs before they reach production.
+Kubernetes deprecates APIs across minor versions. Helm charts and manifests using deprecated APIs will break after upgrade. Must detect deprecated APIs before they reach production.
 
 ## Candidates
 
-## | Criteria | Pluto + kubent | kubent only | Pluto only | Manual review |
+| Criteria | Pluto + kubent | kubent only | Pluto only | Manual review |
 |---|---|---|---|---|
 | Deprecated K8s APIs | ✅ Both detect | ✅ | ✅ | ❌ |
 | Helm chart scanning | ✅ Pluto scans Helm releases | ❌ | ✅ | ❌ |
@@ -26,16 +24,16 @@
 
 ## Decision
 
-## **Pluto** (CI stage 20) for pre-deployment deprecation scanning of Helm charts and manifests. **kubent** for in-cluster scanning of running resources. BLOCK gate in CI on deprecated APIs for prod profile. WARN for dev/staging. Integration with deprecation runway (ADR-134) for migration planning.
+**Pluto** (CI stage 20) for pre-deployment deprecation scanning of Helm charts and manifests. **kubent** for in-cluster scanning of running resources. BLOCK gate in CI on deprecated APIs for prod profile. WARN for dev/staging. Integration with deprecation runway (ADR-134) for migration planning.
 
 ## Rejected
 
-## - **Manual review:** Unsustainable. K8s deprecates APIs silently across minor versions. Engineers miss deprecation warnings.
+- **Manual review:** Unsustainable. K8s deprecates APIs silently across minor versions. Engineers miss deprecation warnings.
 - **Single tool only:** Pluto catches pre-deployment (CI). kubent catches in-cluster (drift). Both needed for complete coverage.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Deprecated K8s APIs caught before production deployment.
 - Pluto (pre-deployment) + kubent (in-cluster) provides complete coverage.
 - BLOCK gate prevents deprecated APIs from reaching prod.
@@ -48,4 +46,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management — API compatibility validation). ISO A.14.2 (secure development — compatibility testing).
+SOC2 CC8.1 (change management — API compatibility validation). ISO A.14.2 (secure development — compatibility testing).

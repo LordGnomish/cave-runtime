@@ -8,15 +8,13 @@
 
 **Related ADRs:** 004, 122
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs an API gateway for north-south traffic: tenant-facing API routing, rate limiting, authentication, request transformation, and API lifecycle management.
+CAVE needs an API gateway for north-south traffic: tenant-facing API routing, rate limiting, authentication, request transformation, and API lifecycle management.
 
 ## Candidates
 
-## | Criteria | Kong | NGINX Ingress | Traefik | Envoy Gateway | Emissary |
+| Criteria | Kong | NGINX Ingress | Traefik | Envoy Gateway | Emissary |
 |---|---|---|---|---|---|
 | Rate limiting | ✅ Native plugin (per-tenant, per-user, per-API) | ⚠️ Basic (annotation-based) | ⚠️ Basic middleware | ⚠️ Via Envoy filters | ⚠️ |
 | JWT/OAuth2 auth | ✅ Native plugins | ❌ Requires external auth proxy | ⚠️ ForwardAuth middleware | ⚠️ Via ext_authz | ⚠️ |
@@ -31,11 +29,11 @@
 
 ## Decision
 
-## **Kong** (OSS) for north-south API gateway.
+**Kong** (OSS) for north-south API gateway.
 
 ## Rejected
 
-## - **NGINX Ingress:** No native rate limiting, JWT auth, or OpenAPI validation plugins. Would require external tools (OPA sidecar, custom auth proxy) for features Kong provides natively. Too much glue code.
+- **NGINX Ingress:** No native rate limiting, JWT auth, or OpenAPI validation plugins. Would require external tools (OPA sidecar, custom auth proxy) for features Kong provides natively. Too much glue code.
 - **Traefik:** Good for simple routing but lacks Kong's rich plugin ecosystem for enterprise API management (rate limiting tiers, API deprecation headers, request transformation).
 - **Envoy Gateway / Emissary:** Envoy is the proxy Kong uses internally. Going direct adds operational complexity without the plugin abstraction Kong provides.
 
@@ -43,9 +41,9 @@
 
 ## Consequences
 
-## (+) Rich plugin ecosystem covers all API gateway needs. Native rate limiting per tenant tier. OpenAPI validation. Sunset/Deprecation headers for API lifecycle. Prometheus metrics for FinOps (per-request per-tenant cost attribution).
+(+) Rich plugin ecosystem covers all API gateway needs. Native rate limiting per tenant tier. OpenAPI validation. Sunset/Deprecation headers for API lifecycle. Prometheus metrics for FinOps (per-request per-tenant cost attribution).
 (-) Kong configuration complexity (mitigated by decK declarative config in Git, ArgoCD-managed). Resource overhead (~500MB RAM). Kong upgrades require careful plugin compatibility testing.
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (API access controls), NIS2 Art.21 (API security).
+SOC2 CC6.1 (API access controls), NIS2 Art.21 (API security).

@@ -8,15 +8,13 @@
 
 **Related ADRs:** 020, 086, 105
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE stores tenant data across multiple systems: PostgreSQL, Kafka, MinIO/ADLS, OpenSearch/AI Search, Qdrant, etcd, backup storage, Sovereign Ledger. All data at rest must be encrypted — both for compliance (GDPR Art.32, SOC2 CC6.7) and for crypto-erasure capability (ADR-086: destroying encryption key renders data irrecoverable).
+CAVE stores tenant data across multiple systems: PostgreSQL, Kafka, MinIO/ADLS, OpenSearch/AI Search, Qdrant, etcd, backup storage, Sovereign Ledger. All data at rest must be encrypted — both for compliance (GDPR Art.32, SOC2 CC6.7) and for crypto-erasure capability (ADR-086: destroying encryption key renders data irrecoverable).
 
 ## Candidates
 
-## | Approach | Per-service encryption (chosen) | Volume-level encryption only | No encryption |
+| Approach | Per-service encryption (chosen) | Volume-level encryption only | No encryption |
 |---|---|---|---|
 | Granularity | ✅ Per-service, per-tenant key possible | ⚠️ Volume-level only | ❌ |
 | Crypto-erasure | ✅ Per-tenant key destruction | ❌ Can't shred per-tenant | ❌ |
@@ -25,7 +23,7 @@
 
 ## Decision
 
-## All data services encrypted at rest with the strongest available method:
+All data services encrypted at rest with the strongest available method:
 
 | Data Service | Hetzner Encryption | Azure Encryption | Per-Tenant Key |
 |---|---|---|---|
@@ -42,13 +40,13 @@ Per-tenant encryption keys stored in OpenBao (Hetzner) / Key Vault (Azure). Key 
 
 ## Rejected
 
-## - **Volume-level encryption only:** Encrypts the disk but not per-tenant. Cannot destroy per-tenant key for crypto-erasure. Insufficient for GDPR "effective erasure."
+- **Volume-level encryption only:** Encrypts the disk but not per-tenant. Cannot destroy per-tenant key for crypto-erasure. Insufficient for GDPR "effective erasure."
 - **No encryption:** GDPR Art.32 violation. SOC2 CC6.7 violation. Unacceptable.
 - **Application-level encryption only:** Would require every application to implement encryption — platform-level enforcement is more reliable.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Complete encryption at rest across all data stores.
 - Per-tenant keys enable crypto-shredding for GDPR Art.17 erasure.
 - Managed services (Azure) encrypt by default — minimal additional configuration.
@@ -62,4 +60,4 @@ Per-tenant encryption keys stored in OpenBao (Hetzner) / Key Vault (Azure). Key 
 
 ## Compliance Mapping
 
-## SOC2 CC6.7 (encryption of stored data). ISO A.8.24 (cryptographic controls — encryption at rest). GDPR Art.32 (security of processing — encryption). GDPR Art.17 (right to erasure — crypto-erasure via key destruction). NIS2 Art.21 (data protection — encryption).
+SOC2 CC6.7 (encryption of stored data). ISO A.8.24 (cryptographic controls — encryption at rest). GDPR Art.32 (security of processing — encryption). GDPR Art.17 (right to erasure — crypto-erasure via key destruction). NIS2 Art.21 (data protection — encryption).

@@ -8,15 +8,13 @@
 
 **Related ADRs:** 067
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE tenants need vector search for RAG, semantic search, and ML similarity workloads. Vector DB must be abstracted behind the same XR pattern as other data services.
+CAVE tenants need vector search for RAG, semantic search, and ML similarity workloads. Vector DB must be abstracted behind the same XR pattern as other data services.
 
 ## Candidates
 
-## | Criteria | Qdrant (Hz) + Azure AI Search (Az) | Weaviate | Milvus | Pinecone |
+| Criteria | Qdrant (Hz) + Azure AI Search (Az) | Weaviate | Milvus | Pinecone |
 |---|---|---|---|---|
 | Self-hosted K8s operator | ✅ Qdrant Kubernetes | ✅ Weaviate operator | ✅ Milvus operator | ❌ SaaS only |
 | Azure managed equivalent | ✅ Azure AI Search vector | ❌ | ❌ | ❌ |
@@ -26,17 +24,17 @@
 
 ## Decision
 
-## Unified VectorDB XRD. Hetzner: Qdrant operator. Azure: Azure AI Search vector capability. Same developer API (VectorDB XR) regardless of backend. Classification and residency enforced via standard XR labels.
+Unified VectorDB XRD. Hetzner: Qdrant operator. Azure: Azure AI Search vector capability. Same developer API (VectorDB XR) regardless of backend. Classification and residency enforced via standard XR labels.
 
 ## Rejected
 
-## - **Weaviate:** No Azure managed equivalent. Would require self-hosting on both providers, breaking managed-service model on Azure.
+- **Weaviate:** No Azure managed equivalent. Would require self-hosting on both providers, breaking managed-service model on Azure.
 - **Milvus:** Heavy dependency chain (etcd, MinIO, Pulsar). Resource footprint too high for per-tenant vector DB.
 - **Pinecone:** SaaS only. No self-hosting. Vendor lock-in. Contradicts sovereign profile.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Same XR API for vector search across both providers.
 - Lightweight on Hetzner (Qdrant), managed on Azure (AI Search).
 - Classification + residency enforcement inherited from XR framework.
@@ -48,4 +46,4 @@
 
 ## Compliance Mapping
 
-## GDPR Art.25 (data protection by design — residency on vector data). ISO A.5.12 (classification of vector embeddings).
+GDPR Art.25 (data protection by design — residency on vector data). ISO A.5.12 (classification of vector embeddings).

@@ -8,15 +8,13 @@
 
 **Related ADRs:** 125
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## APOL reasoning traces contain operational details (metric values, hostnames, IPs, token names). Writing raw details to Sovereign Ledger creates security and privacy risks.
+APOL reasoning traces contain operational details (metric values, hostnames, IPs, token names). Writing raw details to Sovereign Ledger creates security and privacy risks.
 
 ## Candidates
 
-## | Content | Ledger (redacted) | Forensic WORM (full) |
+| Content | Ledger (redacted) | Forensic WORM (full) |
 |---|---|---|
 | Metrics | Deviation ratios only (e.g., "3.2x P95") | Raw values |
 | Playbooks | Reference ID only | Full playbook YAML |
@@ -26,17 +24,17 @@
 
 ## Decision
 
-## Traces in Sovereign Ledger redacted before write: metric IDs + deviation ratios (not raw values), playbook references (not inline payloads), action summaries (not hostnames/IPs/secrets/PII). Statistical evidence (deviation ratios) permitted — sufficient for post-mortem without exposing operational details. Full forensic context in WORM bucket (§38), linked by incident ID. Redaction enforced by cave-ctl MCP layer.
+Traces in Sovereign Ledger redacted before write: metric IDs + deviation ratios (not raw values), playbook references (not inline payloads), action summaries (not hostnames/IPs/secrets/PII). Statistical evidence (deviation ratios) permitted — sufficient for post-mortem without exposing operational details. Full forensic context in WORM bucket (§38), linked by incident ID. Redaction enforced by cave-ctl MCP layer.
 
 ## Rejected
 
-## - **Raw CoT dump to Ledger:** Leaks operational details (IPs, hostnames, secret names, internal URLs). Ledger is immutable — leaked data cannot be removed. Security risk.
+- **Raw CoT dump to Ledger:** Leaks operational details (IPs, hostnames, secret names, internal URLs). Ledger is immutable — leaked data cannot be removed. Security risk.
 - **No redaction (full data in Ledger):** Ledger storage explosion. Attestation size grows 10-50x with raw data.
 - **No reasoning trace:** Opaque AI. Can't audit decisions. Compliance failure.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Ledger contains structured, queryable, redacted traces — sufficient for audit and post-mortem.
 - No operational secrets in immutable WORM storage.
 - Full forensic detail available via WORM link when needed.
@@ -49,4 +47,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC7.2 (monitoring evidence — appropriate detail level). GDPR Art.25 (data minimisation in audit logs). ISO A.8.15 (logging — proportionate detail). NIS2 Art.21 (audit trail security).
+SOC2 CC7.2 (monitoring evidence — appropriate detail level). GDPR Art.25 (data minimisation in audit logs). ISO A.8.15 (logging — proportionate detail). NIS2 Art.21 (audit trail security).

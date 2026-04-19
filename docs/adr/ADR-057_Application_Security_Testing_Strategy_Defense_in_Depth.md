@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010, 017, 018, 019, 023, 035, 058
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's security testing must span the entire software lifecycle — from pre-commit through runtime. No single tool catches all vulnerability types. A layered strategy ensures coverage across secrets, code quality, dependencies, containers, infrastructure, compliance, and runtime behavior.
+CAVE's security testing must span the entire software lifecycle — from pre-commit through runtime. No single tool catches all vulnerability types. A layered strategy ensures coverage across secrets, code quality, dependencies, containers, infrastructure, compliance, and runtime behavior.
 
 ## Candidates
 
-## | Approach | Multi-layer (chosen) | Single SAST tool | SaaS scanner | Manual review only |
+| Approach | Multi-layer (chosen) | Single SAST tool | SaaS scanner | Manual review only |
 |---|---|---|---|---|
 | Coverage | ✅ 7 layers | ⚠️ Code only | ⚠️ Vendor-dependent | ❌ Human bandwidth limited |
 | Automation | ✅ CI-integrated | ✅ | ✅ | ❌ |
@@ -24,7 +22,7 @@
 
 ## Decision
 
-## **Seven-layer defense-in-depth security testing integrated into 27-stage CI pipeline (ADR-010):**
+**Seven-layer defense-in-depth security testing integrated into 27-stage CI pipeline (ADR-010):**
 
 | Layer | Tool | CI Stage | Gate | Finding Destination |
 |---|---|---|---|---|
@@ -40,13 +38,13 @@ All findings aggregated in DefectDojo (ADR-035) for unified lifecycle management
 
 ## Rejected
 
-## - **Single SAST tool only:** Catches code-level issues but misses dependencies, containers, infrastructure, runtime. Single tool = single perspective = blind spots.
+- **Single SAST tool only:** Catches code-level issues but misses dependencies, containers, infrastructure, runtime. Single tool = single perspective = blind spots.
 - **SaaS security scanner (Snyk, Checkmarx):** Proprietary, per-scan pricing, code sent to external service. Contradicts sovereign profile.
 - **Manual security review only:** Doesn't scale for 27-stage pipeline across multiple tenants. Human review complements but cannot replace automated scanning.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Seven layers of automated security testing — comprehensive coverage.
 - CI-integrated — no manual steps between development and deployment.
 - All findings in one dashboard (DefectDojo) — unified triage and SLA tracking.
@@ -60,4 +58,4 @@ All findings aggregated in DefectDojo (ADR-035) for unified lifecycle management
 
 ## Compliance Mapping
 
-## SOC2 CC7.1 (multi-layer vulnerability management). ISO A.8.25-28 (complete secure development lifecycle). OWASP Top 10 (covered by SAST + DAST). NIS2 Art.21 (comprehensive vulnerability management). SLSA Level 3 (supply chain scanning).
+SOC2 CC7.1 (multi-layer vulnerability management). ISO A.8.25-28 (complete secure development lifecycle). OWASP Top 10 (covered by SAST + DAST). NIS2 Art.21 (comprehensive vulnerability management). SLSA Level 3 (supply chain scanning).

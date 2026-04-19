@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010, 116
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Database schema changes are a top cause of production incidents. CAVE's CI pipeline (stage 6) must validate that every schema migration is: (1) forward-applicable, (2) backward-rollbackable, and (3) compatible with the running application version.
+Database schema changes are a top cause of production incidents. CAVE's CI pipeline (stage 6) must validate that every schema migration is: (1) forward-applicable, (2) backward-rollbackable, and (3) compatible with the running application version.
 
 ## Candidates
 
-## | Criteria | Flyway (Java) + Alembic (Python) | Liquibase | Atlas | Manual SQL |
+| Criteria | Flyway (Java) + Alembic (Python) | Liquibase | Atlas | Manual SQL |
 |---|---|---|---|---|
 | Language support | ✅ Flyway (Java/JVM), Alembic (Python) | ✅ Multi-language | ✅ Go, any | N/A |
 | Rollback validation | ✅ Undo migrations (Flyway), downgrade (Alembic) | ✅ | ✅ | ❌ |
@@ -26,17 +24,17 @@
 
 ## Decision
 
-## **Flyway** for Java/JVM applications. **Alembic** for Python applications. CI stage 6 runs: (1) forward migration on ephemeral DB, (2) rollback migration, (3) verify DB returns to previous state. Schema evolution blocked during cross-provider migration freeze (ADR-066).
+**Flyway** for Java/JVM applications. **Alembic** for Python applications. CI stage 6 runs: (1) forward migration on ephemeral DB, (2) rollback migration, (3) verify DB returns to previous state. Schema evolution blocked during cross-provider migration freeze (ADR-066).
 
 ## Rejected
 
-## - **Liquibase:** Capable but Flyway is more widely adopted for Java. Both are acceptable — Flyway chosen for simpler syntax.
+- **Liquibase:** Capable but Flyway is more widely adopted for Java. Both are acceptable — Flyway chosen for simpler syntax.
 - **Atlas:** Newer, Go-based. Less mature ecosystem. Would require additional tooling for Java/Python projects.
 - **Manual SQL scripts:** No version tracking, no rollback validation, no CI integration. Anti-pattern.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Every schema change validated for forward and rollback before reaching staging.
 - Ephemeral DB test — no impact on real data.
 - Version tracking prevents migration conflicts across branches.
@@ -48,4 +46,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management — schema changes validated). ISO A.14.2.9 (system acceptance testing — DB migration testing).
+SOC2 CC8.1 (change management — schema changes validated). ISO A.14.2.9 (system acceptance testing — DB migration testing).

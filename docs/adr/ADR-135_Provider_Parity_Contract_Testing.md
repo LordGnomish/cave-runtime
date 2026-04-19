@@ -8,11 +8,9 @@
 
 **Related ADRs:** 066 (Provider Choice), 067 (Crossplane v2), 071 (kuttl Testing), 113 (Data Residency)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's core promise is "same developer experience regardless of infrastructure target." Every Crossplane XR abstracts provider differences — a `Database` XR provisions CloudNativePG on Hetzner and Azure PG Flexible on Azure. But without automated verification, this parity is an assertion, not a guarantee.
+CAVE's core promise is "same developer experience regardless of infrastructure target." Every Crossplane XR abstracts provider differences — a `Database` XR provisions CloudNativePG on Hetzner and Azure PG Flexible on Azure. But without automated verification, this parity is an assertion, not a guarantee.
 
 Scenarios where parity can silently break:
 - Azure PG adds a feature that changes default backup behavior — Hetzner CNPG doesn't match
@@ -24,7 +22,7 @@ Scenarios where parity can silently break:
 
 ## Candidates
 
-## | Approach | kuttl parity tests, 6 dimensions (chosen) | Trust Crossplane abstraction | Full parity guaranteed | Provider-specific testing only |
+| Approach | kuttl parity tests, 6 dimensions (chosen) | Trust Crossplane abstraction | Full parity guaranteed | Provider-specific testing only |
 |---|---|---|---|---|
 | Parity validation | ✅ Automated, measurable | ❌ Assumption-only | ❌ Impossible (different services) | ❌ Not cross-provider |
 | Exception documentation | ✅ parity-exceptions.yaml | ❌ | ⚠️ Blocked by reality | ⚠️ Per-provider |
@@ -34,7 +32,7 @@ Scenarios where parity can silently break:
 
 ## Decision
 
-## Every Crossplane XR must pass **parity contract tests** that verify behavioral equivalence across Hetzner and Azure compositions.
+Every Crossplane XR must pass **parity contract tests** that verify behavioral equivalence across Hetzner and Azure compositions.
 
 ### Parity Dimensions
 
@@ -66,7 +64,7 @@ Some capabilities are inherently provider-specific (e.g., Azure PG HA uses zone-
 
 ## Rejected
 
-## - **No parity testing (trust Crossplane abstractions):** Crossplane Compositions may have bugs or provider-specific behavioral differences. Without testing, parity is an assertion, not a fact.
+- **No parity testing (trust Crossplane abstractions):** Crossplane Compositions may have bugs or provider-specific behavioral differences. Without testing, parity is an assertion, not a fact.
 - **Full parity (identical behavior guaranteed):** Impossible between self-hosted (Hetzner) and managed (Azure) services. Some differences are inherent (backup semantics, failover behavior). Parity exceptions must be documented.
 - **Provider-specific testing only:** Tests that only validate one provider don't prove portability. Cross-provider parity tests are specifically designed to validate that the same XR produces equivalent behavior on both providers.
 
@@ -84,4 +82,4 @@ Some capabilities are inherently provider-specific (e.g., Azure PG HA uses zone-
 
 ## Compliance Mapping
 
-## SOC2 CC9.1 (risk mitigation — provider exit strategy validated by parity tests). ISO A.5.23 (cloud service agreements — provider portability). ISO A.5.30 (ICT readiness — exit strategy). NIS2 Art.21 (supply chain — provider independence). GDPR Art.44-49 (data transfers — parity validates residency across providers).
+SOC2 CC9.1 (risk mitigation — provider exit strategy validated by parity tests). ISO A.5.23 (cloud service agreements — provider portability). ISO A.5.30 (ICT readiness — exit strategy). NIS2 Art.21 (supply chain — provider independence). GDPR Art.44-49 (data transfers — parity validates residency across providers).

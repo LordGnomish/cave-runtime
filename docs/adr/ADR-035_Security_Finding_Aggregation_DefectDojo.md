@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010, 017, 018, 019, 023, 034, 069
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's 27-stage CI pipeline produces security findings from 7+ tools (gitleaks, SonarQube, Semgrep, DTrack, Trivy, Checkov, ZAP). Without aggregation, findings are scattered across tool-specific dashboards. Need a single pane for finding lifecycle management: deduplication, triage, risk acceptance, SLA tracking.
+CAVE's 27-stage CI pipeline produces security findings from 7+ tools (gitleaks, SonarQube, Semgrep, DTrack, Trivy, Checkov, ZAP). Without aggregation, findings are scattered across tool-specific dashboards. Need a single pane for finding lifecycle management: deduplication, triage, risk acceptance, SLA tracking.
 
 ## Candidates
 
-## | Criteria | DefectDojo | Dependency-Track (DTrack) | Jira (manual) | SonarQube (as aggregator) |
+| Criteria | DefectDojo | Dependency-Track (DTrack) | Jira (manual) | SonarQube (as aggregator) |
 |---|---|---|---|---|
 | Multi-tool import | ✅ 150+ parser plugins (Trivy, ZAP, Semgrep, gitleaks, Checkov, etc.) | ⚠️ SBOM-focused only | ❌ Manual entry | ❌ SonarQube findings only |
 | Deduplication | ✅ Cross-tool deduplication | ⚠️ SBOM-level only | ❌ | ❌ |
@@ -28,11 +26,11 @@
 
 ## Decision
 
-## **DefectDojo** for security finding aggregation and lifecycle management. **DTrack** (Dependency-Track) as complementary SBOM vulnerability tracker. Both deployed per-profile. DefectDojo Product-per-tenant for multi-tenant isolation. DTrack provides continuous SBOM monitoring; DefectDojo aggregates all finding types.
+**DefectDojo** for security finding aggregation and lifecycle management. **DTrack** (Dependency-Track) as complementary SBOM vulnerability tracker. Both deployed per-profile. DefectDojo Product-per-tenant for multi-tenant isolation. DTrack provides continuous SBOM monitoring; DefectDojo aggregates all finding types.
 
 ## Rejected
 
-## - **DTrack alone:** SBOM/dependency vulnerabilities only. Cannot import SAST, DAST, IaC scan, or secret scan findings.
+- **DTrack alone:** SBOM/dependency vulnerabilities only. Cannot import SAST, DAST, IaC scan, or secret scan findings.
 - **Jira as finding tracker:** No deduplication, no multi-tool import, no SLA tracking, no severity auto-classification. Manual overhead.
 - **SonarQube as aggregator:** Only aggregates its own findings. Cannot import Trivy, ZAP, gitleaks results.
 

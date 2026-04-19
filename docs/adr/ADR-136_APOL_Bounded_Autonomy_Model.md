@@ -8,11 +8,9 @@
 
 **Related ADRs:** 092 (AI Guardrails), 095 (Reflex Engine), 112 (APOL), 118 (APOL Fallback), 119 (Crossplane Operations), 125 (APOL CoT Audit), 128 (Attestation Redaction)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## APOL's four AI roles (AI SRE, Compliance Officer, FinOps Governor, Change Manager) operate via cave-ctl MCP. ADR-092 defines allowlist/denylist/ceiling, and ADR-112 defines roles and trust boundaries. However, the boundary between "autonomous execution" and "recommendation only" is not formally structured.
+APOL's four AI roles (AI SRE, Compliance Officer, FinOps Governor, Change Manager) operate via cave-ctl MCP. ADR-092 defines allowlist/denylist/ceiling, and ADR-112 defines roles and trust boundaries. However, the boundary between "autonomous execution" and "recommendation only" is not formally structured.
 
 Without explicit boundaries:
 - An AI SRE could chain multiple autonomous actions that individually are safe but collectively create blast-radius exceeding expectations
@@ -23,7 +21,7 @@ Without explicit boundaries:
 
 ## Candidates
 
-## | Approach | Class A-D bounded autonomy (chosen) | Full autonomy (no bounds) | No AI automation | Per-action human approval |
+| Approach | Class A-D bounded autonomy (chosen) | Full autonomy (no bounds) | No AI automation | Per-action human approval |
 |---|---|---|---|---|
 | Blast-radius control | ✅ Class C guardrails enforce | ❌ Unbounded | N/A | ✅ Pre-approved |
 | Operator fatigue | ✅ Routine operations automated | ✅ | ❌ Full manual burden | ❌ Approval fatigue |
@@ -117,4 +115,4 @@ ADR-092 already limits per-role (allowlist/denylist). But cross-role interaction
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (access controls — AI bounded authority). SOC2 CC7.2 (monitoring — AI reasoning traces). ISO A.5.23 (automated system governance). ISO A.8.16 (monitoring activities — continuous AI audit). NIS2 Art.21 (automated security measures — bounded). GDPR Art.22 (automated decision-making — bounded autonomy with human override).
+SOC2 CC6.1 (access controls — AI bounded authority). SOC2 CC7.2 (monitoring — AI reasoning traces). ISO A.5.23 (automated system governance). ISO A.8.16 (monitoring activities — continuous AI audit). NIS2 Art.21 (automated security measures — bounded). GDPR Art.22 (automated decision-making — bounded autonomy with human override).

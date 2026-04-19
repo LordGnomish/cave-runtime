@@ -8,8 +8,6 @@
 
 **Related ADRs:** 072, 106, 109, 042
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE platform requires unified observability across all 73 components, 7 profiles, and 10+ tenants:

@@ -8,8 +8,6 @@
 
 **Related ADRs:** 053, 083, 105, 115
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE manages multiple classes of secrets across all profiles and tenants:

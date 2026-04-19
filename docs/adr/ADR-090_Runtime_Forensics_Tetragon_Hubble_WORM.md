@@ -8,15 +8,13 @@
 
 **Related ADRs:** 031
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Incident investigation requires kernel-level (syscall) and network-level (flow) evidence that cannot be tampered with after the fact.
+Incident investigation requires kernel-level (syscall) and network-level (flow) evidence that cannot be tampered with after the fact.
 
 ## Candidates
 
-## | Layer | Tool | Data Captured | Storage |
+| Layer | Tool | Data Captured | Storage |
 |---|---|---|---|
 | Syscall | Tetragon (eBPF) | Process execution, file access, network syscalls | WORM forensic bucket |
 | Network | Cilium Hubble | L3/L4/L7 flow logs, DNS queries | WORM forensic bucket |
@@ -25,17 +23,17 @@
 
 ## Decision
 
-## Tetragon (syscall-level) + Cilium Hubble (network flow) + K8s audit logs → dedicated WORM forensic bucket. Retention: 90d dev, 180d staging, 2y prod. APOL AI SRE queries forensic data during incident analysis. Reasoning traces reference forensic data by incident ID (ADR-128).
+Tetragon (syscall-level) + Cilium Hubble (network flow) + K8s audit logs → dedicated WORM forensic bucket. Retention: 90d dev, 180d staging, 2y prod. APOL AI SRE queries forensic data during incident analysis. Reasoning traces reference forensic data by incident ID (ADR-128).
 
 ## Rejected
 
-## - **Application-level logging only:** Misses kernel and network layer. Insider threats, container escapes, lateral movement invisible.
+- **Application-level logging only:** Misses kernel and network layer. Insider threats, container escapes, lateral movement invisible.
 - **Falco instead of Tetragon:** Both are eBPF-based runtime security. Tetragon is same ecosystem as Cilium (Isovalent/Cilium project) — shared eBPF infrastructure, unified Hubble integration. Falco would be a separate eBPF layer.
 - **Non-WORM storage:** Forensic evidence can be tampered with or deleted. Unacceptable for legal/compliance proceedings.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Multi-layer forensic evidence: syscall + network + API + application.
 - WORM storage ensures evidence immutability for legal proceedings.
 - Same eBPF ecosystem (Cilium + Tetragon + Hubble) — unified agent, shared kernel hooks.
@@ -47,4 +45,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC7.2 (system monitoring evidence). ISO A.8.15 (logging). ISO A.8.16 (monitoring activities). NIS2 Art.21 (incident detection and forensics). GDPR Art.30 (processing records).
+SOC2 CC7.2 (system monitoring evidence). ISO A.8.15 (logging). ISO A.8.16 (monitoring activities). NIS2 Art.21 (incident detection and forensics). GDPR Art.30 (processing records).

@@ -8,15 +8,13 @@
 
 **Related ADRs:** 006, 007, 064, 129, 130
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Identity sprawl (dormant accounts, stale roles, orphaned identities) is a persistent security risk. Manual lifecycle management doesn't scale.
+Identity sprawl (dormant accounts, stale roles, orphaned identities) is a persistent security risk. Manual lifecycle management doesn't scale.
 
 ## Candidates
 
-## | Control | Mechanism | Cycle |
+| Control | Mechanism | Cycle |
 |---|---|---|
 | Dormant detection | `cave-ctl identity dormant --since 90d` (daily CronJob) | 90d no-login → auto-disable |
 | RBAC recertification | Quarterly review (Tenant Admin confirms all roles) | Unconfirmed roles auto-revoked after 14d |
@@ -26,18 +24,18 @@
 
 ## Decision
 
-## Automated identity lifecycle: dormant detection (90d → disable), quarterly RBAC recertification, JIT admin (4h TTL, dual-approval), break-glass (dual-approval, PAM-recorded, Ledger-attested), RBAC drift detection. Canonical identity: `cave_uid` (stable UUID across IdP migrations). Token contract: sub (IdP-specific), cave_uid (stable), tenant_id, env.
+Automated identity lifecycle: dormant detection (90d → disable), quarterly RBAC recertification, JIT admin (4h TTL, dual-approval), break-glass (dual-approval, PAM-recorded, Ledger-attested), RBAC drift detection. Canonical identity: `cave_uid` (stable UUID across IdP migrations). Token contract: sub (IdP-specific), cave_uid (stable), tenant_id, env.
 
 ## Rejected
 
-## - **No dormant detection:** Stale admin accounts accumulate. Attacker can compromise unused accounts undetected.
+- **No dormant detection:** Stale admin accounts accumulate. Attacker can compromise unused accounts undetected.
 - **Annual recertification:** SOC2 CC6.2 recommends more frequent review. Annual cycles miss role changes.
 - **Permanent admin access:** Standing privilege. Attacker who compromises admin has indefinite access. JIT limits exposure window to 4 hours.
 - **sub-based identity:** IdP-specific `sub` claim changes when IdP migrates. cave_uid provides stable identity.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - No stale accounts. Dormant detection is automated and continuous.
 - Least-privilege enforced via JIT (4h TTL) — no permanent admin.
 - Quarterly recertification catches role drift before audit.
@@ -51,4 +49,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC6.2-6.3 (user lifecycle). ISO A.5.16-18 (identity management, authentication, access rights). NIS2 Art.21 (access control policies).
+SOC2 CC6.2-6.3 (user lifecycle). ISO A.5.16-18 (identity management, authentication, access rights). NIS2 Art.21 (access control policies).

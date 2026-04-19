@@ -8,15 +8,13 @@
 
 **Related ADRs:** 025, 123
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs a unified developer portal that provides self-service infrastructure provisioning, service catalog, documentation, CI/CD visibility, and API catalog — across both Hetzner and Azure profiles.
+CAVE needs a unified developer portal that provides self-service infrastructure provisioning, service catalog, documentation, CI/CD visibility, and API catalog — across both Hetzner and Azure profiles.
 
 ## Candidates
 
-## | Criteria | Backstage | Port | Cortex | Custom Build |
+| Criteria | Backstage | Port | Cortex | Custom Build |
 |---|---|---|---|---|
 | Self-hosted | ✅ K8s Helm | ❌ SaaS only | ❌ SaaS-focused | ✅ |
 | Plugin ecosystem | 300+ community plugins | Limited | Limited | N/A |
@@ -31,19 +29,19 @@
 
 ## Decision
 
-## **Backstage** (self-hosted on K8s via Helm).
+**Backstage** (self-hosted on K8s via Helm).
 
 ## Rejected
 
-## - **Port:** SaaS-only. No self-hosting option. Contradicts sovereign profile requirement. Vendor lock-in.
+- **Port:** SaaS-only. No self-hosting option. Contradicts sovereign profile requirement. Vendor lock-in.
 - **Cortex:** SaaS-focused. Less extensible catalog model. Smaller plugin ecosystem. No declarative integration.
 - **Custom portal:** Build cost prohibitive. Backstage ecosystem provides 300+ plugins out of box. Maintaining custom portal for 73 components is unsustainable.
 
 ## Consequences
 
-## (+) CNCF project with massive community. Rich plugin ecosystem. Declarative Integration eliminates TypeScript maintenance (ADR-123). Software catalog indexes all 73 components + tenant services. Templates scaffold complete projects in <5min.
+(+) CNCF project with massive community. Rich plugin ecosystem. Declarative Integration eliminates TypeScript maintenance (ADR-123). Software catalog indexes all 73 components + tenant services. Templates scaffold complete projects in <5min.
 (-) TypeScript/Node.js stack (team must maintain runtime). Resource-intensive (~1-2GB RAM). Backstage upgrades sometimes breaking — mitigated by Declarative Integration (no custom TS code to break). PostgreSQL dependency for catalog backend.
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management visibility), ISO A.5.37 (documented operating procedures via TechDocs).
+SOC2 CC8.1 (change management visibility), ISO A.5.37 (documented operating procedures via TechDocs).

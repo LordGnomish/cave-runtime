@@ -8,8 +8,6 @@
 
 **Related ADRs:** 063, 120, 036, 101
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE needs a GitOps engine to continuously reconcile desired state (Git) with actual state (cluster) for all 73 platform components and unlimited tenant workloads across 7 profiles (3 Hetzner + 4 Azure). GitOps provides:

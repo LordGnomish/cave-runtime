@@ -8,11 +8,9 @@
 
 **Related ADRs:** 093 (Sovereign Ledger), 100 (Resilience Attestation), 101 (SLSA L3), 132 (Version Channels), 135 (Parity)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's governance model demands extensive evidence: compatibility proof, parity proof, signed provenance, Ledger attestations, soak evidence, rollback rehearsal, chaos evidence, policy verification. This proof burden is justified for production deployments affecting regulated tenants but creates disproportionate overhead for dev/staging changes and non-critical updates.
+CAVE's governance model demands extensive evidence: compatibility proof, parity proof, signed provenance, Ledger attestations, soak evidence, rollback rehearsal, chaos evidence, policy verification. This proof burden is justified for production deployments affecting regulated tenants but creates disproportionate overhead for dev/staging changes and non-critical updates.
 
 Risk: platform team spends more time producing evidence than building platform.
 
@@ -20,7 +18,7 @@ Risk: platform team spends more time producing evidence than building platform.
 
 ## Candidates
 
-## | Approach | Three-tier evidence (chosen) | Tier 1 everywhere (max evidence) | No evidence (CI pass only) | Per-component custom rules |
+| Approach | Three-tier evidence (chosen) | Tier 1 everywhere (max evidence) | No evidence (CI pass only) | Per-component custom rules |
 |---|---|---|---|---|
 | Evidence cost | ✅ Proportional to risk | ❌ Expensive for all changes | ✅ Cheapest | ⚠️ Variable |
 | Audit-readiness | ✅ Tier 2 export covers regulated | ✅ Always ready | ❌ Insufficient | ⚠️ Inconsistent |
@@ -64,7 +62,7 @@ Risk: platform team spends more time producing evidence than building platform.
 
 ## Rejected
 
-## - **Same evidence for all changes (Tier 1 everywhere):** Prohibitively expensive. Every change requiring canary + chaos + soak + parity + Ledger would slow delivery to a crawl. Evidence must be proportional to risk.
+- **Same evidence for all changes (Tier 1 everywhere):** Prohibitively expensive. Every change requiring canary + chaos + soak + parity + Ledger would slow delivery to a crawl. Evidence must be proportional to risk.
 - **No evidence requirements (trust CI pass):** CI pass alone doesn't prove production readiness. Canary analysis, soak windows, and parity tests catch issues that unit/integration tests miss.
 - **Per-component evidence (custom per ADR):** Too many custom evidence rules to maintain. Three tiers provide sufficient granularity while remaining manageable.
 
@@ -82,4 +80,4 @@ Risk: platform team spends more time producing evidence than building platform.
 
 ## Compliance Mapping
 
-## SOC2 CC7.1-7.2 (evidence requirements scaled by risk). SOC2 CC8.1 (change evidence proportional to impact). ISO A.5.36 (compliance — evidence production). ISO A.18.2 (information security reviews — evidence standards). NIS2 Art.21 (compliance evidence — tiered requirements).
+SOC2 CC7.1-7.2 (evidence requirements scaled by risk). SOC2 CC8.1 (change evidence proportional to impact). ISO A.5.36 (compliance — evidence production). ISO A.18.2 (information security reviews — evidence standards). NIS2 Art.21 (compliance evidence — tiered requirements).

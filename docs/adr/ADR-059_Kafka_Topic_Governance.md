@@ -8,15 +8,13 @@
 
 **Related ADRs:** 021, 060, 139
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's multi-tenant Kafka (Strimzi on Hetzner, Confluent on Azure) requires strict topic governance. Without it: topic naming sprawl, uncontrolled partition allocation, inconsistent retention, cross-tenant data access, and orphaned topics after tenant offboarding.
+CAVE's multi-tenant Kafka (Strimzi on Hetzner, Confluent on Azure) requires strict topic governance. Without it: topic naming sprawl, uncontrolled partition allocation, inconsistent retention, cross-tenant data access, and orphaned topics after tenant offboarding.
 
 ## Candidates
 
-## | Approach | Platform-enforced governance (chosen) | Application-managed | No governance |
+| Approach | Platform-enforced governance (chosen) | Application-managed | No governance |
 |---|---|---|---|
 | Naming convention | ✅ OPA validates at creation | ❌ Developer choice | ❌ |
 | ACL enforcement | ✅ SASL/SCRAM per tenant | ❌ Application-level | ❌ |
@@ -25,7 +23,7 @@
 
 ## Decision
 
-## **Platform-enforced Kafka topic governance:**
+**Platform-enforced Kafka topic governance:**
 
 | Aspect | Policy |
 |---|---|
@@ -40,13 +38,13 @@
 
 ## Rejected
 
-## - **Application-managed topics:** Developers create topics with arbitrary names. Topic sprawl. No naming convention. No automated cleanup. Cross-tenant access possible without ACL enforcement.
+- **Application-managed topics:** Developers create topics with arbitrary names. Topic sprawl. No naming convention. No automated cleanup. Cross-tenant access possible without ACL enforcement.
 - **No governance:** Complete anarchy. Topics accumulate. Retention inconsistent. ACLs missing.
 - **Topic-per-microservice (not per-tenant):** Doesn't provide tenant isolation. Cross-tenant data visible on shared topics.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Structured naming enables automated cleanup, monitoring, and cost attribution.
 - ACL isolation prevents cross-tenant data access at Kafka protocol level.
 - Schema enforcement prevents breaking changes in event contracts.
@@ -60,4 +58,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (topic access controls — SASL/SCRAM per tenant). GDPR Art.32 (tenant data isolation in messaging). ISO A.8.22 (data segregation — topic-level isolation). NIS2 Art.21 (secure communications — encrypted Kafka with TLS).
+SOC2 CC6.1 (topic access controls — SASL/SCRAM per tenant). GDPR Art.32 (tenant data isolation in messaging). ISO A.8.22 (data segregation — topic-level isolation). NIS2 Art.21 (secure communications — encrypted Kafka with TLS).

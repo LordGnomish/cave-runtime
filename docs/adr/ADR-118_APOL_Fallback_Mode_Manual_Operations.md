@@ -8,15 +8,13 @@
 
 **Related ADRs:** 112
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## APOL depends on LiteLLM + Prometheus + Argo Workflows. If all are unavailable simultaneously, the platform must continue operating with human-driven procedures.
+APOL depends on LiteLLM + Prometheus + Argo Workflows. If all are unavailable simultaneously, the platform must continue operating with human-driven procedures.
 
 ## Candidates
 
-## | Mode | APOL Normal | APOL Fallback |
+| Mode | APOL Normal | APOL Fallback |
 |---|---|---|
 | Class C (autonomous execution) | ✅ Active | ❌ Disabled |
 | Reflex Engine (KEDA playbooks) | ✅ Active | ✅ Active (no LLM dependency) |
@@ -25,17 +23,17 @@
 
 ## Decision
 
-## When APOL fully unavailable: `cave-ctl apol fallback --enable`. Class C disabled. Reflex Engine pre-approved playbooks continue via KEDA (Prometheus-triggered, no LLM). Alerts escalate to Grafana OnCall. Guardian uses cave-ctl CLI + documented top-20 operations runbook. Resume: `cave-ctl apol fallback --disable` after 10-minute stability window.
+When APOL fully unavailable: `cave-ctl apol fallback --enable`. Class C disabled. Reflex Engine pre-approved playbooks continue via KEDA (Prometheus-triggered, no LLM). Alerts escalate to Grafana OnCall. Guardian uses cave-ctl CLI + documented top-20 operations runbook. Resume: `cave-ctl apol fallback --disable` after 10-minute stability window.
 
 ## Rejected
 
-## - **No fallback:** APOL failure = platform operationally blind. No automated remediation. Alerts may not escalate.
+- **No fallback:** APOL failure = platform operationally blind. No automated remediation. Alerts may not escalate.
 - **Automatic AI restart without stability check:** Could cause oscillation (APOL starts → fails → restarts → fails → ...).
 - **APOL required for platform operation:** Circular dependency. Platform must operate without AI — AI is an enhancement, not a prerequisite.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Platform remains operable without AI.
 - Pre-approved KEDA playbooks handle critical remediation without LLM.
 - Clear fallback activation/deactivation procedure.
@@ -48,4 +46,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC7.2 (continuity of monitoring during failure). ISO A.5.29 (operations during disruption). NIS2 Art.21 (business continuity).
+SOC2 CC7.2 (continuity of monitoring during failure). ISO A.5.29 (operations during disruption). NIS2 Art.21 (business continuity).

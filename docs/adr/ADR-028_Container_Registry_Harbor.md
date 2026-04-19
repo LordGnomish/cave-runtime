@@ -8,8 +8,6 @@
 
 **Related ADRs:** 005, 026, 077, 108, 120
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE needs a container registry for storing:

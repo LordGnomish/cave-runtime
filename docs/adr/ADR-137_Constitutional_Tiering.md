@@ -8,11 +8,9 @@
 
 **Related ADRs:** 093 (Sovereign Ledger), 112 (APOL), 133 (Compatibility Matrix), 136 (Bounded Autonomy)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE designates certain artifacts as "constitutional" — protected from automation and requiring multi-sig governance. However, grouping all governed artifacts at the same protection level creates:
+CAVE designates certain artifacts as "constitutional" — protected from automation and requiring multi-sig governance. However, grouping all governed artifacts at the same protection level creates:
 
 - **Guardian bottleneck:** Every soak window change, FinOps threshold adjustment, or alert routing update requires 2-of-3 guardian multi-sig + hardware key. Guardians become approval bottlenecks for routine operational tuning.
 - **Change velocity reduction:** Platform evolution slows because trivial config changes get the same governance overhead as identity root modifications.
@@ -24,7 +22,7 @@ The solution is tiered protection: highest protection for identity/trust roots, 
 
 ## Candidates
 
-## | Approach | Three-tier constitutional (chosen) | No tiering (guardian for all) | Binary (critical/non-critical) | Tagging without enforcement |
+| Approach | Three-tier constitutional (chosen) | No tiering (guardian for all) | Binary (critical/non-critical) | Tagging without enforcement |
 |---|---|---|---|---|
 | Guardian bottleneck | ✅ Tier C is team-lead approval | ❌ All changes need guardian | ⚠️ Only 2 tiers | ✅ |
 | Change velocity | ✅ Proportional to impact | ❌ Slow for all changes | ⚠️ | ✅ Fastest |
@@ -64,7 +62,7 @@ The solution is tiered protection: highest protection for identity/trust roots, 
 
 ## Rejected
 
-## - **No tiering (all changes require guardian approval):** Guardian bottleneck for routine operational changes. Slows platform iteration. Guardians fatigue from reviewing low-impact changes.
+- **No tiering (all changes require guardian approval):** Guardian bottleneck for routine operational changes. Slows platform iteration. Guardians fatigue from reviewing low-impact changes.
 - **Two tiers only (critical/non-critical):** Too coarse. "Protected but evolvable" (Tier B) is a distinct category — more impactful than operational tuning (Tier C) but not immutable like identity root (Tier A).
 - **Tiering without enforcement (advisory only):** Tier labels without corresponding approval workflow are cosmetic. Constitutional registry + Ledger attestation makes tiering enforceable.
 
@@ -87,4 +85,4 @@ The solution is tiered protection: highest protection for identity/trust roots, 
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (governance — tiered change control). SOC2 CC8.1 (change management — approval levels by impact). ISO A.5.1 (policy governance — tiered policy management). ISO A.5.4 (management responsibilities — guardian multi-sig for Tier A). NIS2 Art.21 (governance — structured change control).
+SOC2 CC6.1 (governance — tiered change control). SOC2 CC8.1 (change management — approval levels by impact). ISO A.5.1 (policy governance — tiered policy management). ISO A.5.4 (management responsibilities — guardian multi-sig for Tier A). NIS2 Art.21 (governance — structured change control).

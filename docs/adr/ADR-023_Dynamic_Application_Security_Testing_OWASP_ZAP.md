@@ -8,8 +8,6 @@
 
 **Related ADRs:** 010, 019, 035
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 Static analysis (ADR-019: SonarQube + Semgrep) catches code-level vulnerabilities before deployment. DAST (Dynamic Application Security Testing) complements by testing running applications for runtime vulnerabilities that only manifest during execution:

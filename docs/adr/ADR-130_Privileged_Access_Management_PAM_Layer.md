@@ -8,8 +8,6 @@
 
 **Related ADRs:** 006, 007, 020, 053, 064, 079, 083, 092, 104, 112, 125, 128, 129
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 ## ### 1.1 Current Identity Stack
@@ -239,7 +237,7 @@ schema:
 
 ## Decision
 
-## **Azure (Enterprise):** CyberArk Privilege Cloud as PAM layer, integrated with Okta (SAML federation) and Entra ID (Azure RBAC target).
+**Azure (Enterprise):** CyberArk Privilege Cloud as PAM layer, integrated with Okta (SAML federation) and Entra ID (Azure RBAC target).
 
 **Hetzner (Sovereign):** Teleport Community Edition (self-hosted on K8s) as PAM layer, integrated with Keycloak (user sync, future OIDC) and OpenBao (credential brokering).
 
@@ -357,4 +355,4 @@ PAM is not in resurrection critical path. GOT within 10% threshold.
 
 ## Compliance Mapping
 
-## SOC2 CC6.1-6.3 (privileged access management, session recording, JIT access). SOC2 CC7.2 (monitoring — session recording for forensics). ISO A.5.15 (access control — PAM enforces least privilege). ISO A.8.2 (privileged access rights). ISO A.8.5 (secure authentication — MFA + session recording). NIS2 Art.21 (access control — privileged session governance). GDPR Art.32 (security of processing — controlled admin access).
+SOC2 CC6.1-6.3 (privileged access management, session recording, JIT access). SOC2 CC7.2 (monitoring — session recording for forensics). ISO A.5.15 (access control — PAM enforces least privilege). ISO A.8.2 (privileged access rights). ISO A.8.5 (secure authentication — MFA + session recording). NIS2 Art.21 (access control — privileged session governance). GDPR Art.32 (security of processing — controlled admin access).

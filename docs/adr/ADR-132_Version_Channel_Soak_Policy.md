@@ -8,11 +8,9 @@
 
 **Related ADRs:** 085 (Rolling Upgrades), 099 (Deprecation Guardrails), 127 (Roadmap Intelligence), 133 (Compatibility Matrix)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE runs ~73 distinct components across 7 profiles. Each component has its own release cadence — Kubernetes targets 3 releases/year, ArgoCD and Crossplane release monthly, Cilium quarterly, Istio quarterly. Without a formal channel policy, prod environments risk running unvalidated versions, and dev environments may lag behind, missing integration issues early.
+CAVE runs ~73 distinct components across 7 profiles. Each component has its own release cadence — Kubernetes targets 3 releases/year, ArgoCD and Crossplane release monthly, Cilium quarterly, Istio quarterly. Without a formal channel policy, prod environments risk running unvalidated versions, and dev environments may lag behind, missing integration issues early.
 
 Key upstream cadence realities:
 - **Kubernetes:** 3 minor releases/year, N-2 patch support. Skew policy: kubelet within 1 minor of API server. Talos pins to specific K8s minor.
@@ -26,7 +24,7 @@ Key upstream cadence realities:
 
 ## Candidates
 
-## | Approach | Multi-channel soak windows (chosen) | Single channel (everyone gets latest) | LTS only (6-12 month lag) | No soak (immediate prod) |
+| Approach | Multi-channel soak windows (chosen) | Single channel (everyone gets latest) | LTS only (6-12 month lag) | No soak (immediate prod) |
 |---|---|---|---|---|
 | Risk containment | ✅ Staging absorbs regressions | ❌ Prod is the test | ✅ | ❌ |
 | Feature velocity | ✅ Fast channel available | ✅ Fastest | ❌ Slow | ✅ Fastest |
@@ -127,4 +125,4 @@ Too much operational overhead. Channel assignment by component class (control pl
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management — soak windows validate before promotion). ISO A.14.2.9 (system acceptance testing — soak as extended validation). ISO A.8.8 (vulnerability management — controlled upgrade cadence). NIS2 Art.21 (change management — graduated promotion).
+SOC2 CC8.1 (change management — soak windows validate before promotion). ISO A.14.2.9 (system acceptance testing — soak as extended validation). ISO A.8.8 (vulnerability management — controlled upgrade cadence). NIS2 Art.21 (change management — graduated promotion).

@@ -8,8 +8,6 @@
 
 **Related ADRs:** 089, 131, 057
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE needs policy enforcement across the full stack:
@@ -23,7 +21,7 @@ Single policy language (Rego) reusable across all contexts reduces maintenance v
 
 ## Candidates
 
-## | Criteria | OPA Gatekeeper + OPAL | Kyverno | Kubewarden | Cedar (AWS) |
+| Criteria | OPA Gatekeeper + OPAL | Kyverno | Kubewarden | Cedar (AWS) |
 |---|---|---|---|---|
 | Policy language | Rego (universal, used in CI + admission + IaC) | YAML/Kyverno policy (K8s-only) | Wasm modules | Cedar (AWS-specific) |
 | K8s admission | ✅ Webhook | ✅ Webhook | ✅ Webhook | ❌ |
@@ -38,7 +36,7 @@ Single policy language (Rego) reusable across all contexts reduces maintenance v
 
 ## Decision
 
-## **OPA Gatekeeper** for admission + audit. **Conftest** for CI + IaC (same Rego). **OPAL** for real-time data distribution (ADR-131). Git is sole policy source of truth.
+**OPA Gatekeeper** for admission + audit. **Conftest** for CI + IaC (same Rego). **OPAL** for real-time data distribution (ADR-131). Git is sole policy source of truth.
 
 ## Implementation Reference
 

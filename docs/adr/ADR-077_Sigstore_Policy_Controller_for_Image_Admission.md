@@ -8,15 +8,13 @@
 
 **Related ADRs:** 032, 101, 107, 108
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE requires that only images built by the platform's CI pipeline run in any environment. Images must have cryptographic proof of provenance.
+CAVE requires that only images built by the platform's CI pipeline run in any environment. Images must have cryptographic proof of provenance.
 
 ## Candidates
 
-## | Criteria | Sigstore Policy Controller | Notary v2 | Connaisseur | Manual verification |
+| Criteria | Sigstore Policy Controller | Notary v2 | Connaisseur | Manual verification |
 |---|---|---|---|---|
 | cosign integration | ✅ Native (same project) | ❌ Different signing model | ⚠️ Supports cosign | N/A |
 | Keyless (OIDC) | ✅ CI OIDC issuer verification | ❌ Key-based only | ⚠️ | N/A |
@@ -26,11 +24,11 @@
 
 ## Decision
 
-## **Sigstore Policy Controller** for image signature + SLSA provenance verification at K8s admission. cosign keyless signing via CI OIDC (GitHub/Gitea). ClusterImagePolicy CRDs define trust policies.
+**Sigstore Policy Controller** for image signature + SLSA provenance verification at K8s admission. cosign keyless signing via CI OIDC (GitHub/Gitea). ClusterImagePolicy CRDs define trust policies.
 
 ## Rejected
 
-## - **Notary v2:** Different signing model (not cosign-compatible). No keyless OIDC flow. No SLSA provenance predicate verification. Would require separate tooling for CI signing + admission verification.
+- **Notary v2:** Different signing model (not cosign-compatible). No keyless OIDC flow. No SLSA provenance predicate verification. Would require separate tooling for CI signing + admission verification.
 - **Connaisseur:** Smaller community. Less native integration with cosign keyless flow. No SLSA predicate support.
 - **No admission verification:** Images could be tampered between Harbor push and K8s deployment. Unacceptable supply chain risk.
 

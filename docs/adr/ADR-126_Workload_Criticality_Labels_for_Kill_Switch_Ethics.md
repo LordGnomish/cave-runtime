@@ -8,15 +8,13 @@
 
 **Related ADRs:** 096
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## FinOps kill-switch must know which workloads can be suspended and which are business-critical. Without labels, kill-switch could suspend payment processing.
+FinOps kill-switch must know which workloads can be suspended and which are business-critical. Without labels, kill-switch could suspend payment processing.
 
 ## Candidates
 
-## | Label | Budget Threshold | Suspension | Example Workloads |
+| Label | Budget Threshold | Suspension | Example Workloads |
 |---|---|---|---|
 | `business-critical` | Never auto-suspended | ❌ Human-only | Payment service, auth, core data pipeline |
 | `standard` | 150% | ✅ Automatic (graceful) | Application services, APIs, dashboards |
@@ -24,17 +22,17 @@
 
 ## Decision
 
-## Three mandatory labels on all Deployments/StatefulSets. OPA rejects unlabeled workloads. K8s PriorityClass enforces scheduling priority (business-critical > standard > batch). Kill-switch ethics: business-critical and identity/auth services NEVER auto-suspended. Graceful shutdown: SIGTERM → preStop → drain → checkpoint verification. StatefulSet suspension aborted if checkpoint fails.
+Three mandatory labels on all Deployments/StatefulSets. OPA rejects unlabeled workloads. K8s PriorityClass enforces scheduling priority (business-critical > standard > batch). Kill-switch ethics: business-critical and identity/auth services NEVER auto-suspended. Graceful shutdown: SIGTERM → preStop → drain → checkpoint verification. StatefulSet suspension aborted if checkpoint fails.
 
 ## Rejected
 
-## - **No criticality labels:** Kill-switch cannot distinguish payment service from ML training job. Suspending payment processing = revenue loss.
+- **No criticality labels:** Kill-switch cannot distinguish payment service from ML training job. Suspending payment processing = revenue loss.
 - **Binary (critical/non-critical):** Too coarse. Batch workloads should be suspended before standard workloads. Three tiers enable graduated response.
 - **Optional labels:** Unlabeled workloads get default treatment — but default is ambiguous. Mandatory labels + OPA enforcement eliminates ambiguity.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Kill-switch makes informed decisions about what to suspend.
 - Business-critical workloads protected from automated cost controls.
 - Graduated suspension (batch at 120%, standard at 150%) minimizes business impact.
@@ -47,4 +45,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (risk-based access controls). ISO A.5.12 (information classification — applied to workload criticality). NIS2 Art.21 (availability management).
+SOC2 CC6.1 (risk-based access controls). ISO A.5.12 (information classification — applied to workload criticality). NIS2 Art.21 (availability management).

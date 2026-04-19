@@ -8,11 +8,9 @@
 
 **Related ADRs:** 023 (ARC), 028 (Harbor), 032 (cosign), 077 (Sigstore), 101 (SLSA L3), 108 (Supply Chain)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's 27-stage CI/CD pipeline (stages 12-13) needs a container image build tool. Requirements:
+CAVE's 27-stage CI/CD pipeline (stages 12-13) needs a container image build tool. Requirements:
 
 - Rootless execution (CI runners must not require privileged containers)
 - Daemonless (no Docker daemon dependency in CI environment)
@@ -67,7 +65,7 @@ Buildah is ~30% slower than Docker BuildKit on cold builds due to rootless overh
 
 ## Decision
 
-## **Buildah** (rootless, daemonless) for container image building in all CI pipelines.
+**Buildah** (rootless, daemonless) for container image building in all CI pipelines.
 
 ---
 
@@ -141,4 +139,4 @@ Stage 14: cosign signs image (keyless, OIDC from ARC runner SA)
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (build integrity — hermetic, reproducible builds). SLSA Level 3 (hermetic build — no network access, all dependencies pre-cached). ISO A.8.25 (secure development — controlled build environment). NIS2 Art.21 (supply chain security — build isolation prevents dependency injection attacks).
+SOC2 CC8.1 (build integrity — hermetic, reproducible builds). SLSA Level 3 (hermetic build — no network access, all dependencies pre-cached). ISO A.8.25 (secure development — controlled build environment). NIS2 Art.21 (supply chain security — build isolation prevents dependency injection attacks).

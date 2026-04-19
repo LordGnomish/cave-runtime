@@ -8,15 +8,13 @@
 
 **Related ADRs:** 036
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs feature flag management for progressive rollouts, A/B testing, and emergency kill switches. Feature flags decouple deployment from release — code is deployed but features activated gradually.
+CAVE needs feature flag management for progressive rollouts, A/B testing, and emergency kill switches. Feature flags decouple deployment from release — code is deployed but features activated gradually.
 
 ## Candidates
 
-## | Criteria | Unleash | LaunchDarkly | Flagsmith | OpenFeature (spec only) |
+| Criteria | Unleash | LaunchDarkly | Flagsmith | OpenFeature (spec only) |
 |---|---|---|---|---|
 | Self-hosted | ✅ K8s Helm, PostgreSQL backend | ❌ SaaS only | ✅ | N/A (spec) |
 | SDK support | ✅ Java, Python, Go, Node.js, .NET | ✅ Broadest | ✅ | ✅ (provider-agnostic) |
@@ -28,16 +26,16 @@
 
 ## Decision
 
-## **Unleash** (self-hosted, Apache 2.0) for feature flag management. PostgreSQL backend via CNPG. Integrated with Argo Rollouts for feature-gated canary promotions. OpenFeature SDK recommended for tenant applications (provider-agnostic abstraction).
+**Unleash** (self-hosted, Apache 2.0) for feature flag management. PostgreSQL backend via CNPG. Integrated with Argo Rollouts for feature-gated canary promotions. OpenFeature SDK recommended for tenant applications (provider-agnostic abstraction).
 
 ## Rejected
 
-## - **LaunchDarkly:** SaaS-only. Feature flag state stored externally — contradicts sovereign profile. Cost scales with MAU (monthly active users).
+- **LaunchDarkly:** SaaS-only. Feature flag state stored externally — contradicts sovereign profile. Cost scales with MAU (monthly active users).
 - **Flagsmith:** BSD 3-Clause (acceptable). Smaller community than Unleash. Less mature Argo Rollouts integration.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Self-hosted, Apache 2.0 — full control, no external dependency for feature flag state.
 - Argo Rollouts integration enables feature-gated canary: deploy feature behind flag → enable for 5% → analyze → rollout.
 - OpenFeature SDK abstraction prevents Unleash lock-in at application level.
@@ -49,4 +47,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (controlled feature release). ISO A.14.2.9 (system acceptance — progressive release).
+SOC2 CC8.1 (controlled feature release). ISO A.14.2.9 (system acceptance — progressive release).

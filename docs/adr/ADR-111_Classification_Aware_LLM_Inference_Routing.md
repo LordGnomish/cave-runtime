@@ -8,15 +8,13 @@
 
 **Related ADRs:** 009, 013, 102, 103
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## Data classification determines which LLM providers may process tenant data. Routing must be enforced at platform level, not left to application developers.
+Data classification determines which LLM providers may process tenant data. Routing must be enforced at platform level, not left to application developers.
 
 ## Candidates
 
-## | Classification | Allowed Providers | Rationale |
+| Classification | Allowed Providers | Rationale |
 |---|---|---|
 | public | Any approved (Ollama, Azure OpenAI) | No restrictions |
 | internal | Any approved | No restrictions, PII-filtered |
@@ -25,17 +23,17 @@
 
 ## Decision
 
-## LiteLLM routes inference based on classification header. restricted → Ollama only (self-hosted). confidential → Azure OpenAI with DPA or Ollama. public/internal → any approved. System prompts Git-managed + cosign-signed. Langfuse tracks versions. OPA validates routing decision matches policy.
+LiteLLM routes inference based on classification header. restricted → Ollama only (self-hosted). confidential → Azure OpenAI with DPA or Ollama. public/internal → any approved. System prompts Git-managed + cosign-signed. Langfuse tracks versions. OPA validates routing decision matches policy.
 
 ## Rejected
 
-## - **Single provider for all classifications:** Restricted data cannot go to Azure OpenAI. Architectural violation.
+- **Single provider for all classifications:** Restricted data cannot go to Azure OpenAI. Architectural violation.
 - **No routing policy:** Classification is cosmetic — no enforcement. Developer sends restricted data to external LLM.
 - **Application-level routing:** Not enforceable at platform level. Developers can bypass. Must be infrastructure-enforced.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Restricted data never reaches external LLM providers. Full sovereignty.
 - Classification enforcement at infrastructure level, not application trust.
 - System prompt version control + signing prevents unauthorized prompt changes.
@@ -48,4 +46,4 @@
 
 ## Compliance Mapping
 
-## GDPR Art.25 (data protection by design). GDPR Art.44-49 (data transfers — restricted stays EU). ISO A.5.12 (classification applied to AI). NIS2 Art.21 (supply chain — LLM provider risk).
+GDPR Art.25 (data protection by design). GDPR Art.44-49 (data transfers — restricted stays EU). ISO A.5.12 (classification applied to AI). NIS2 Art.21 (supply chain — LLM provider risk).

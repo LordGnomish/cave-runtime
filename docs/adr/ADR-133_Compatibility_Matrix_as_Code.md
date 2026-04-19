@@ -8,11 +8,9 @@
 
 **Related ADRs:** 085 (Rolling Upgrades), 099 (Deprecation Guardrails), 127 (Roadmap Intelligence), 132 (Version Channels)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's ~73 components have interdependencies that constrain which versions can run together. Examples of breaking interactions:
+CAVE's ~73 components have interdependencies that constrain which versions can run together. Examples of breaking interactions:
 
 - Cilium CNI version must be compatible with Kubernetes minor (kernel eBPF requirements)
 - Istio ambient ztunnel version must match Cilium CNI for L4/L7 handoff
@@ -28,7 +26,7 @@ Without a machine-readable matrix, `cave-ctl upgrade check` cannot reliably bloc
 
 ## Candidates
 
-## | Approach | Compatibility matrix (version tuples) — chosen | Latest-of-everything | Component-pinned (no coordination) | Vendor bundles only |
+| Approach | Compatibility matrix (version tuples) — chosen | Latest-of-everything | Component-pinned (no coordination) | Vendor bundles only |
 |---|---|---|---|---|
 | Dependency validation | ✅ Tuple-level (CI-enforced) | ❌ Assumes compatibility | ⚠️ Per-component only | ⚠️ Vendor-determined |
 | Upgrade safety | ✅ Tested combinations before promotion | ❌ Break-on-upgrade | ⚠️ Individual comps tested | ✅ |
@@ -38,7 +36,7 @@ Without a machine-readable matrix, `cave-ctl upgrade check` cannot reliably bloc
 
 ## Decision
 
-## Maintain `docs/compatibility-matrix.yaml` as a **constitutional artifact** (requires multi-sig for changes). `cave-ctl upgrade check --profile <p>` validates all tuples before any promotion.
+Maintain `docs/compatibility-matrix.yaml` as a **constitutional artifact** (requires multi-sig for changes). `cave-ctl upgrade check --profile <p>` validates all tuples before any promotion.
 
 ### Matrix Schema
 
@@ -119,4 +117,4 @@ Upstream projects document their own compatibility but not cross-project interac
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management — compatibility validation before deployment). ISO A.8.9 (configuration management — version tuple tracking). ISO A.14.2 (secure development — dependency compatibility). NIS2 Art.21 (risk management — preventing incompatible deployments).
+SOC2 CC8.1 (change management — compatibility validation before deployment). ISO A.8.9 (configuration management — version tuple tracking). ISO A.14.2 (secure development — dependency compatibility). NIS2 Art.21 (risk management — preventing incompatible deployments).

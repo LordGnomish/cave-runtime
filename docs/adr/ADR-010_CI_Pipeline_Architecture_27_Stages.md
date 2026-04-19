@@ -8,15 +8,13 @@
 
 **Related ADRs:** 005, 026, 032, 077, 101, 115, 116
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs a standardized CI/CD pipeline that enforces security scanning, supply chain provenance, compliance validation, and progressive delivery across all tenant workloads and platform components. The pipeline must be language-agnostic, support multiple build targets (container, Helm, Crossplane), and produce attestable evidence for every build.
+CAVE needs a standardized CI/CD pipeline that enforces security scanning, supply chain provenance, compliance validation, and progressive delivery across all tenant workloads and platform components. The pipeline must be language-agnostic, support multiple build targets (container, Helm, Crossplane), and produce attestable evidence for every build.
 
 ## Candidates
 
-## | Criteria | GitHub Actions + ARC | GitLab CI | Jenkins | Tekton |
+| Criteria | GitHub Actions + ARC | GitLab CI | Jenkins | Tekton |
 |---|---|---|---|---|
 | Self-hosted runners | ✅ ARC (K8s native, ephemeral) | ✅ K8s runner | ✅ K8s agents | ✅ K8s native |
 | OIDC token exchange | ✅ Native (ADR-115) | ✅ | ⚠️ Plugin-based | ⚠️ |
@@ -29,7 +27,7 @@
 
 ## Decision
 
-## **GitHub Actions** with **Actions Runner Controller (ARC)** for K8s-native ephemeral runners. 27-stage pipeline standardized across all workloads. Stages grouped into: pre-build (1-7), build (8-16), validate (17-21), deploy (22-24), promote (25), report (26), cleanup (27).
+**GitHub Actions** with **Actions Runner Controller (ARC)** for K8s-native ephemeral runners. 27-stage pipeline standardized across all workloads. Stages grouped into: pre-build (1-7), build (8-16), validate (17-21), deploy (22-24), promote (25), report (26), cleanup (27).
 
 ### 27-Stage Pipeline
 
@@ -69,13 +67,13 @@ Every pipeline run produces a single `Pipeline Attestation` in Sovereign Ledger 
 
 ## Rejected
 
-## - **GitLab CI:** Would require self-hosting GitLab (heavy infrastructure). GitHub Actions ecosystem is larger. OIDC token exchange and SLSA provenance more mature on GitHub Actions.
+- **GitLab CI:** Would require self-hosting GitLab (heavy infrastructure). GitHub Actions ecosystem is larger. OIDC token exchange and SLSA provenance more mature on GitHub Actions.
 - **Jenkins:** Legacy. Plugin maintenance burden. No native OIDC. No native SLSA. Groovy pipeline syntax less maintainable than YAML.
 - **Tekton:** K8s-native (good) but small ecosystem. No marketplace equivalent. Backstage integration less mature. Building 27 custom Tekton Tasks is more work than leveraging GitHub Actions marketplace.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - Standardized 27-stage pipeline across all workloads. No per-team pipeline customization.
 - SLSA Level 3 provenance for every build (ADR-101).
 - Security scanning at multiple layers: secret (gitleaks), SAST (SonarQube + Semgrep), dependency (DTrack/Grype), container (Trivy), IaC (Conftest + Checkov), compliance (Kubescape), DAST (ZAP).
@@ -91,4 +89,4 @@ Every pipeline run produces a single `Pipeline Attestation` in Sovereign Ledger 
 
 ## Compliance Mapping
 
-## SOC2 CC8.1 (change management — automated pipeline enforces process). SOC2 CC7.1 (vulnerability detection — multi-layer scanning). ISO A.8.25-28 (secure development lifecycle). ISO A.8.8 (vulnerability management). SLSA Level 3 (hermetic build + signed provenance). NIS2 Art.21 (supply chain security, vulnerability management).
+SOC2 CC8.1 (change management — automated pipeline enforces process). SOC2 CC7.1 (vulnerability detection — multi-layer scanning). ISO A.8.25-28 (secure development lifecycle). ISO A.8.8 (vulnerability management). SLSA Level 3 (hermetic build + signed provenance). NIS2 Art.21 (supply chain security, vulnerability management).

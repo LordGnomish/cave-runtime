@@ -8,8 +8,6 @@
 
 **Related ADRs:** 010, 079
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 Accidental secret commits (API keys, passwords, tokens, certificates) to Git repositories are a persistent security risk across all software supply chains. Secrets must be detected before they reach the remote repository (pre-commit defense) and again in CI (defense-in-depth principle). CAVE's distributed architecture requires consistent secret detection across:

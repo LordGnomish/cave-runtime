@@ -8,8 +8,6 @@
 
 **Related ADRs:** 067, 108, 119
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
 CAVE requires Infrastructure-as-Code for Day 0 provisioning (one-time, not reconciled):

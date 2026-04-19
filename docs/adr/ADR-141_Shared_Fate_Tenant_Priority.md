@@ -8,11 +8,9 @@
 
 **Related ADRs:** 012 (vcluster), 084 (Default-Deny), 087 (Quotas), 096 (Unit Economics), 109 (Observability Multi-Tenancy), 110 (Egress), 126 (Workload Criticality)
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE's multi-tenant architecture shares control-plane and platform services across tenant tiers (Soft, Hard, Dedicated). This creates shared-fate scenarios: a noisy Soft tenant could degrade shared Prometheus performance affecting Hard tenant observability. FinOps kill-switch could suspend workloads in ways that create cascading tenant impact.
+CAVE's multi-tenant architecture shares control-plane and platform services across tenant tiers (Soft, Hard, Dedicated). This creates shared-fate scenarios: a noisy Soft tenant could degrade shared Prometheus performance affecting Hard tenant observability. FinOps kill-switch could suspend workloads in ways that create cascading tenant impact.
 
 "Best effort" SLA for Soft tier is undefined — tenants don't know what it means operationally.
 
@@ -20,7 +18,7 @@
 
 ## Candidates
 
-## | Approach | Shared-fate priority model (chosen) | Equal treatment (no priority) | Strict isolation per tenant | Priority by size |
+| Approach | Shared-fate priority model (chosen) | Equal treatment (no priority) | Strict isolation per tenant | Priority by size |
 |---|---|---|---|---|
 | Resource contention handling | ✅ Dedicated > Hard > Soft degradation order | ❌ All degraded equally | ❌ N/A (no sharing) | ⚠️ Size ≠ criticality |
 | Cost efficiency | ✅ Shared infra with priority | ✅ | ❌ Dedicated clusters expensive | ✅ |
@@ -74,7 +72,7 @@ During platform incident or APOL freeze:
 
 ## Rejected
 
-## - **No priority model (equal treatment):** During resource contention, all tenants degraded equally. Dedicated tier paying premium gets same treatment as Soft tier. Unfair and violates SLA commitments.
+- **No priority model (equal treatment):** During resource contention, all tenants degraded equally. Dedicated tier paying premium gets same treatment as Soft tier. Unfair and violates SLA commitments.
 - **Strict isolation only (no shared fate):** Complete isolation for every tenant = dedicated clusters = enormous cost. Shared infrastructure with priority model is the cost-effective middle ground.
 - **Priority by tenant size (largest first):** Size doesn't equal criticality. Priority should be based on tier (SLA commitment) not usage volume.
 
@@ -93,4 +91,4 @@ During platform incident or APOL freeze:
 
 ## Compliance Mapping
 
-## SOC2 CC6.1 (multi-tenant resource governance). SOC2 CC7.5 (availability — tenant priority model). ISO A.5.23 (cloud service — tenant isolation and priority). ISO A.8.22 (resource segregation). NIS2 Art.21 (availability — noisy neighbor prevention). GDPR Art.32 (availability of processing — tenant priority during resource contention).
+SOC2 CC6.1 (multi-tenant resource governance). SOC2 CC7.5 (availability — tenant priority model). ISO A.5.23 (cloud service — tenant isolation and priority). ISO A.8.22 (resource segregation). NIS2 Art.21 (availability — noisy neighbor prevention). GDPR Art.32 (availability of processing — tenant priority during resource contention).

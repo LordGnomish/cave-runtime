@@ -8,15 +8,13 @@
 
 **Related ADRs:** 095
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs a workflow engine for complex multi-step operations: ML training pipelines, Reflex Engine remediation playbooks (ADR-095), data migration sequences, and batch processing. Must be K8s-native with DAG support, retries, and artifact passing.
+CAVE needs a workflow engine for complex multi-step operations: ML training pipelines, Reflex Engine remediation playbooks (ADR-095), data migration sequences, and batch processing. Must be K8s-native with DAG support, retries, and artifact passing.
 
 ## Candidates
 
-## | Criteria | Argo Workflows | Airflow | Temporal | Prefect |
+| Criteria | Argo Workflows | Airflow | Temporal | Prefect |
 |---|---|---|---|---|
 | K8s native | ✅ CRD-based (Workflow, CronWorkflow) | ⚠️ KubernetesExecutor | ❌ Separate server | ❌ Separate server |
 | DAG support | ✅ Steps + DAG | ✅ | ✅ | ✅ |
@@ -28,17 +26,17 @@
 
 ## Decision
 
-## **Argo Workflows** for all workflow orchestration. Used by Reflex Engine (KEDA triggers → Argo Workflows), ML training pipelines, and batch data processing. CronWorkflow for scheduled jobs. Same Argo ecosystem as ArgoCD and Argo Rollouts.
+**Argo Workflows** for all workflow orchestration. Used by Reflex Engine (KEDA triggers → Argo Workflows), ML training pipelines, and batch data processing. CronWorkflow for scheduled jobs. Same Argo ecosystem as ArgoCD and Argo Rollouts.
 
 ## Rejected
 
-## - **Airflow:** Not K8s-native (requires separate scheduler, webserver, DB). KubernetesExecutor exists but Airflow's architecture is more complex than Argo Workflows for CAVE's use cases.
+- **Airflow:** Not K8s-native (requires separate scheduler, webserver, DB). KubernetesExecutor exists but Airflow's architecture is more complex than Argo Workflows for CAVE's use cases.
 - **Temporal:** Powerful but separate server infrastructure. Not K8s-native CRDs. Overkill for CAVE's workflow needs.
 - **Prefect:** Good for data engineering but separate server, less K8s-native integration.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - K8s-native CRDs — GitOps-managed via ArgoCD.
 - KEDA integration for event-driven Reflex Engine.
 - Same Argo ecosystem (CD, Rollouts, Workflows) — consistent.
@@ -51,4 +49,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC7.2 (automated incident response via Reflex Engine). ISO A.5.26 (incident response automation).
+SOC2 CC7.2 (automated incident response via Reflex Engine). ISO A.5.26 (incident response automation).

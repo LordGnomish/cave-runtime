@@ -8,15 +8,13 @@
 
 **Related ADRs:** 010
 
-**Back to Index:** =HYPERLINK("#Index!A1","← Back to Index")
-
 ## Context
 
-## CAVE needs performance validation before production promotion. Load tests must be repeatable, CI-integrated, and produce quantifiable results (latency percentiles, error rates, throughput).
+CAVE needs performance validation before production promotion. Load tests must be repeatable, CI-integrated, and produce quantifiable results (latency percentiles, error rates, throughput).
 
 ## Candidates
 
-## | Criteria | k6 | JMeter | Locust | Gatling |
+| Criteria | k6 | JMeter | Locust | Gatling |
 |---|---|---|---|---|
 | Script language | ✅ JavaScript/TypeScript | ❌ XML/GUI | ✅ Python | ✅ Scala/Java |
 | CI integration | ✅ CLI, exit codes | ⚠️ Heavy JVM | ✅ | ✅ |
@@ -27,17 +25,17 @@
 
 ## Decision
 
-## **k6** for load testing (Phase 4 — on demand). Golden Path templates include k6 test scaffold. k6-operator for distributed load tests. Results exported to Prometheus. SLO thresholds defined per service.
+**k6** for load testing (Phase 4 — on demand). Golden Path templates include k6 test scaffold. k6-operator for distributed load tests. Results exported to Prometheus. SLO thresholds defined per service.
 
 ## Rejected
 
-## - **JMeter:** JVM-heavy. XML config is maintenance nightmare. Poor CI experience.
+- **JMeter:** JVM-heavy. XML config is maintenance nightmare. Poor CI experience.
 - **Locust:** Good but k6 has better K8s operator and Prometheus integration.
 - **Gatling:** JVM-based. Scala scripting is niche.
 
 ## Consequences
 
-## **Positive:**
+**Positive:**
 - JavaScript test scripts — accessible to most developers.
 - K8s operator enables distributed load generation from within cluster.
 - Prometheus export integrates with existing observability stack.
@@ -49,4 +47,4 @@
 
 ## Compliance Mapping
 
-## SOC2 CC7.1 (performance testing). ISO A.14.2.9 (system acceptance — performance validation). NIS2 Art.21 (availability — capacity testing).
+SOC2 CC7.1 (performance testing). ISO A.14.2.9 (system acceptance — performance validation). NIS2 Art.21 (availability — capacity testing).
