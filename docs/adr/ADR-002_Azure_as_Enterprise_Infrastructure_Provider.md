@@ -8,18 +8,6 @@
 
 **Related ADRs:** 001 (Hetzner), 007 (Okta+Entra), 062 (Karpenter AKS), 064 (Identity Split), 066 (Provider Choice)
 
-Status:
-
-Category:
-
-Infrastructure
-
-Related ADRs:
-
-001 (Hetzner), 007 (Okta+Entra), 062 (Karpenter AKS), 064 (Identity Split), 066 (Provider Choice)
-
-Back to Index:
-
 ## Context
 
 CAVE requires an enterprise-grade cloud provider as the second deployment target. While Hetzner (ADR-001) serves the sovereign self-hosted profile, the enterprise target must satisfy:
@@ -80,7 +68,7 @@ Costs are comparable across hyperscalers. Decision is not cost-driven.
 
 | Factor | Azure | AWS | GCP |
 |---|---|---|---|
-| **Knauf ecosystem alignment** | ✅ Knauf uses Microsoft 365 + Entra ID | ⚠️ Would require separate identity | ⚠️ Would require separate identity |
+| **Enterprise ecosystem alignment** | ✅ Target organization uses Microsoft 365 + Entra ID | ⚠️ Would require separate identity | ⚠️ Would require separate identity |
 | **Azure OpenAI exclusivity** | ✅ Only provider with Azure OpenAI (GPT-4, o1 with enterprise DPA) | ❌ Must use Bedrock | ❌ Must use Vertex |
 | **Databricks integration** | ✅ Native Azure Databricks | ⚠️ Databricks on AWS (less integrated) | ⚠️ Databricks on GCP |
 | **German compliance (C5)** | ✅ BSI C5 certified | ⚠️ C5 available but less emphasized | ❌ No C5 |
@@ -102,13 +90,13 @@ Costs are comparable across hyperscalers. Decision is not cost-driven.
 
 ### 4.1 AWS — Rejected
 
-**Primary:** Knauf ecosystem alignment. Knauf's enterprise environment is Microsoft-centric (M365, Entra ID, Teams). Building CAVE's enterprise target on AWS would require bridging two identity ecosystems. Azure's native Entra ID integration eliminates this friction. ADR-064 splits identity cleanly: Okta = apps, Entra ID = Azure RBAC. On AWS, this clean split doesn't exist — AWS IAM is fundamentally different from Entra ID.
+**Primary:** Enterprise ecosystem alignment. The target organization's enterprise environment is Microsoft-centric (M365, Entra ID, Teams). Building CAVE's enterprise target on AWS would require bridging two identity ecosystems. Azure's native Entra ID integration eliminates this friction. ADR-064 splits identity cleanly: Okta = apps, Entra ID = Azure RBAC. On AWS, this clean split doesn't exist — AWS IAM is fundamentally different from Entra ID.
 
 **Secondary:** No Azure OpenAI equivalent. AWS Bedrock provides Claude and Llama access but CAVE's enterprise tenants may require GPT-4/o1 specifically. Azure OpenAI offers enterprise DPA (Data Processing Agreement) with no-training guarantee, which maps directly to ADR-103 (LLM data governance). BSI C5 certification less prominent on AWS than Azure in German enterprise market.
 
 ### 4.2 GCP — Rejected
 
-**Primary:** Weakest enterprise presence in EU market. German enterprise customers (Knauf's natural market) are predominantly Azure or AWS. "Runs on GCP" carries less weight in sales conversations. GCP's identity model (Google Cloud Identity) is the least compatible with corporate Okta + Entra ID patterns.
+**Primary:** Weakest enterprise presence in EU market. German enterprise customers (the target enterprise market) are predominantly Azure or AWS. "Runs on GCP" carries less weight in sales conversations. GCP's identity model (Google Cloud Identity) is the least compatible with corporate Okta + Entra ID patterns.
 
 **Secondary:** No Karpenter support — GKE Autopilot is opinionated and incompatible with CAVE's Cilium + Istio ambient + Talos-parity networking requirements. No BSI C5 certification. Databricks integration less mature on GCP than Azure.
 
