@@ -18,6 +18,7 @@ thiserror = "1"
 dashmap = "6"
 bytes = "1"
 async-trait = "0.1"
+base64 = "0.22"
 tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]

@@ -56,6 +56,7 @@
 //!   GET  /api/etcd/health     — health check
 //! ```
 
+pub mod b64;
 pub mod error;
 pub mod models;
 pub mod store;
