@@ -45,6 +45,15 @@ CAVE tenants need real-time data integration between PostgreSQL and downstream s
 - WAL retention on source database must be configured to prevent WAL overflow during connector outages.
 - Snapshot mode for large tables can be resource-intensive.
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Debezium connector lag under high write load | Medium | Medium | Monitor connector lag via Prometheus. Scale Kafka Connect workers. Tune batch size and poll interval. |
+| Schema evolution breaks CDC pipeline | Medium | High | Schema Registry (ADR-060) validates schema compatibility before deployment. Debezium schema history topic preserves old schemas. |
+| Debezium upgrade breaks connector config | Low | Medium | Pin connector version. Staging validates before prod. Automated connector config backup. |
+| WAL retention fills PostgreSQL disk | Low | High | Monitor replication slots. Alert on WAL growth. Auto-drop stale slots after 24h. |
+
 ## Compliance Mapping
 
 SOC2 CC8.1 (data integration via controlled pipeline). GDPR Art.30 (processing records — CDC events as processing activity).

@@ -50,6 +50,15 @@ CAVE needs static analysis to detect code quality issues, security vulnerabiliti
 - False positives from both tools require triage discipline.
 - SonarQube Community edition lacks some Enterprise features (branch analysis, portfolio management) — acceptable for CAVE.
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| SonarQube Community Edition feature removal | Medium | Medium | Track SonarQube release notes. Semgrep covers OWASP rules independently — SonarQube is complementary. |
+| False positive fatigue from dual SAST | Medium | Medium | Tune rule sets. Suppress known false positives. Weekly triage rotation. |
+| Semgrep rule maintenance (custom rules) | Low | Low | Use Semgrep Registry (community-maintained). Custom rules only for CAVE-specific patterns. |
+| SonarQube resource overhead (~2GB RAM) | Low | Medium | Dedicated node or shared infra node. Monitor via OpenCost. |
+
 ## Compliance Mapping
 
 SOC2 CC8.1 (secure development — static analysis). ISO A.8.25-28 (secure development lifecycle). NIS2 Art.21 (secure development practices). OWASP Top 10 coverage.
