@@ -47,6 +47,16 @@ CAVE needs defense-in-depth at the container runtime level: preventing container
 - PSA Restricted may block legitimate workloads that need specific capabilities (mitigated: per-namespace exemptions with waiver ADR-140).
 - WORM forensic export volume scales with cluster activity — storage cost consideration.
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Tetragon tracing policy false positives (alert fatigue) | Medium | Medium | Start with observe-only mode. Tune tracing policies per workload type. Suppress known-good syscall patterns. Weekly review of alert volume. |
+| eBPF kernel panic (buggy tracing policy) | Very Low | Critical | Pin Tetragon version to tested release. Staging validates all tracing policy changes. Tetragon crash recovery is automatic (DaemonSet restart). |
+| PSA Restricted blocks tenant workload | Medium | Medium | Per-namespace exemption via Waiver Framework (ADR-140). Document common exemptions (init containers needing NET_ADMIN, etc.). |
+| Tetragon community smaller than Falco | Low | Low | Tetragon is backed by Cilium/Isovalent/Cisco ecosystem. If Tetragon stalls, Falco is compatible fallback (different eBPF programs but same forensic output format). |
+| WORM forensic storage cost growth | Medium | Low | Retention policy: 90d hot, 1y cold (S3/ADLS). Sampling for high-volume namespaces. Alert on storage growth rate. |
+
 ## Compliance Mapping
 
 SOC2 CC6.1 (runtime access controls). SOC2 CC7.2 (runtime monitoring). ISO A.8.8 (technical vulnerability management — runtime protection). ISO A.8.16 (monitoring activities). NIS2 Art.21 (security monitoring). GDPR Art.32 (security of processing).
