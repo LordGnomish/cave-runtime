@@ -42,14 +42,14 @@ Maintain `docs/compatibility-matrix.yaml` as a **constitutional artifact** (requ
 
 ```yaml
 # docs/compatibility-matrix.yaml
-version: "2026-03"
+version: "2026-04"
 tuples:
-  - id: "k8s-1.30-talos-1.8"
-    kubernetes: "1.30.x"
-    talos: "1.8.x"
-    aks: "1.30.x"
-    argocd: "3.3.x - 3.5.x"
-    crossplane: "2.0.x - 2.2.x"
+  - id: "k8s-1.36-talos-1.12"
+    kubernetes: "1.36.x"
+    talos: "1.12.x"
+    aks: "1.36.x"
+    argocd: "3.2.x - 3.4.x"
+    crossplane: "2.2.x - 2.4.x"
     cilium: "1.16.x - 1.17.x"
     istio_ambient: "1.24.x - 1.26.x"
     keda: "2.15.x - 2.17.x"
@@ -60,9 +60,9 @@ tuples:
     profiles: ["dev-hetzner", "staging-hetzner", "prod-hetzner"]
     caveats:
       - "ArgoCD 3.4+ requires Crossplane 2.1+ for SSA drift detection fix"
-      - "Cilium 1.17 requires kernel 5.15+ (Talos 1.8 provides 6.x)"
-    rollback_target: "k8s-1.29-talos-1.7"
-    last_verified: "2026-03-01"
+      - "Cilium 1.17 requires kernel 6.x+ (Talos 1.12 provides 6.18; kernel 7.0 pending — ADR-014)"
+    rollback_target: "k8s-1.35-talos-1.11"
+    last_verified: "2026-04-01"
     ledger_hash: "sha256:abc123..."
 ```
 

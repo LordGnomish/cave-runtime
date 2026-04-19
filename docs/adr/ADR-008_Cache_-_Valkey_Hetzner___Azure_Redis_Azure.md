@@ -65,6 +65,8 @@ CAVE tenants need an in-memory cache/data structure store for session management
 | Valkey-Glide client maturity | Low | Low | **Watch:** Linux Foundation's official Valkey client (Glide) is maturing. Current Redis clients (Jedis, Lettuce, ioredis) work fine. Migrate to Glide when GA for better Valkey-specific optimizations. |
 | Data loss on Valkey pod restart (no persistence) | Low | High | RDB + AOF persistence enabled by default. K8s PVC for data volume. Daily backup to MinIO/ADLS (ADR-050). |
 
+**Version State (April 2026):** Valkey 8.1 delivers 37% better write throughput and 20% lower memory consumption vs 8.0. Linux Foundation official Valkey operator under active community development — re-evaluate Spotahome operator dependency in Q3 2026.
+
 Compliance Mapping
 
 SOC2 CC6.1 (access controls — ACL per tenant). ISO A.8.24 (encryption — TLS in transit, encryption at rest for persistent data). GDPR Art.32 (security of processing — tenant data isolation in shared cache).

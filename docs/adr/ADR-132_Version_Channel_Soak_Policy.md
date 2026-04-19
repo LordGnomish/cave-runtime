@@ -14,7 +14,7 @@ CAVE runs ~73 distinct components across 7 profiles. Each component has its own 
 
 Key upstream cadence realities:
 - **Kubernetes:** 3 minor releases/year, N-2 patch support. Skew policy: kubelet within 1 minor of API server. Talos pins to specific K8s minor.
-- **ArgoCD:** Monthly minor releases. v3.3+ introduces server-side apply as default.
+- **ArgoCD:** Monthly minor releases. Current: v3.2.9. v3.3+ introduces server-side apply as default.
 - **Crossplane:** Monthly releases. v2 namespace-first model is current.
 - **Istio:** Quarterly releases. Ambient mode reaching parity with sidecar. Sidecar→ambient migration path active 2025-2026.
 - **Cilium:** Quarterly releases. CNCF Graduated.

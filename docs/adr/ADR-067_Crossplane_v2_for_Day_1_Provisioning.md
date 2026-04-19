@@ -38,7 +38,7 @@ CAVE needs a mechanism for Day 1+ infrastructure provisioning (databases, caches
 ## Consequences
 
 (+) Continuous reconciliation catches drift automatically. Namespace-first provides natural RBAC per tenant. Same XR API across providers. MRAP reduces CRD footprint. Operations handle Day-2 maintenance. ArgoCD manages Crossplane XRs like any other K8s resource.
-(-) Crossplane learning curve (XRDs, Compositions, Functions). Provider version pinning required (ADR-108). Crossplane v2 Operations still alpha — fallback to Reflex Engine (ADR-119). Debugging failed compositions requires understanding provider + Crossplane + ArgoCD layers.
+(-) Crossplane learning curve (XRDs, Compositions, Functions). Provider version pinning required (ADR-108). Crossplane v2.2 GA (Feb 2026) — pipeline inspector in alpha; fallback to Reflex Engine (ADR-119) remains documented for edge cases. Debugging failed compositions requires understanding provider + Crossplane + ArgoCD layers.
 
 ## Compliance Mapping
 

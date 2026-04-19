@@ -52,7 +52,7 @@ CAVE needs a CNI plugin and service mesh for Kubernetes networking across all pr
 | **mTLS** | ✅ Automatic via ztunnel (L4). No app changes. | ✅ Automatic via sidecar. | ✅ Automatic via proxy. | ✅ eBPF encryption (WireGuard/IPsec). | ❌ No mTLS |
 | **L7 policy** | ✅ Waypoint proxies (opt-in per namespace). HTTP routing, retries, timeouts. | ✅ Full Envoy L7 (always-on per pod). | ✅ L7 routing (limited vs Envoy). | ⚠️ Envoy L7 available but less mature than Istio. | ❌ |
 | **Traffic shifting (canary)** | ✅ VirtualService / Gateway API HTTPRoute | ✅ Same | ✅ TrafficSplit (SMI) | ⚠️ Via Gateway API | ❌ |
-| **Multi-cluster** | ⚠️ Alpha for ambient (ADR-121 evaluates for Phase 4) | ✅ Mature multi-cluster | ✅ Multi-cluster (simpler model) | ⚠️ ClusterMesh (L3/L4 only) | ❌ |
+| **Multi-cluster** | ⚠️ Beta since KubeCon EU 2026 (ADR-121 gate remains Stable) | ✅ Mature multi-cluster | ✅ Multi-cluster (simpler model) | ⚠️ ClusterMesh (L3/L4 only) | ❌ |
 | **CNCF status** | ✅ Graduated (same project as sidecar) | ✅ Graduated | ✅ Graduated | Part of Cilium (Graduated) | N/A |
 | **Argo Rollouts integration** | ✅ Native Istio traffic management for canary | ✅ Same | ⚠️ SMI adapter needed | ⚠️ Gateway API adapter | ❌ |
 | **Tetragon compatibility** | ✅ Complementary (Istio = L7 traffic, Tetragon = syscall) | ✅ Same | ✅ Same | ✅ Same project ecosystem | ✅ |
@@ -147,7 +147,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 - Two L7 components (Istio + Kong) increases cognitive load vs single gateway
 - Cilium + Istio ambient overlap at L4 (both can enforce L4 policy) — requires clear boundary documentation
 - Istio ambient relatively new (GA 2024) — fewer production war stories than sidecar mode
-- Ambient multi-cluster is alpha — Phase 4 multi-region requires evaluation (ADR-121)
+- Ambient multi-cluster promoted to Beta at KubeCon EU 2026 — Phase 4 gate condition remains Stable (ADR-121)
 - Cilium agent is critical path — agent crash causes node networking failure
 
 ### Risks

@@ -52,6 +52,8 @@ Secrets must be encrypted at rest, have fine-grained RBAC (tenant A cannot read 
 - **K8s integration:** ServiceAccount token auth for workload pods. RBAC prevents cross-tenant secret access.
 - **Audit:** All secret access logged to Loki (ADR-029) + Sovereign Ledger (immutable audit trail)
 
+**Version State (April 2026):** OpenBao v2.5.0 (February 2026) adds HA read scalability (read replicas without Raft leader bottleneck) and namespace multi-tenancy improvements. All Vault-compatible clients continue to work without changes.
+
 ## Rejected Options
 
 ### Vault (HashiCorp) — BSL Licensing Concern

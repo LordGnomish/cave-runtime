@@ -53,6 +53,8 @@ CAVE needs a GitOps engine to continuously reconcile desired state (Git) with ac
 - **Profiles:** 7 environments (hetzner-dev, hetzner-staging, hetzner-prod, azure-dev, azure-staging, azure-prod, edge). ApplicationSets template per profile.
 - **Helm integration:** Helm charts from Harbor (ADR-028). Chart versions pinned by digest (ADR-108).
 
+**Version State (April 2026):** ArgoCD v3.2.9 (current stable) is the first major v3 release (upgraded from v2.14). v3 delivers improved ApplicationSet webhook support, UI performance improvements for large application sets, and refined server-side apply conflict resolution.
+
 ## Rejected Options
 
 ### Flux — Not Primary
