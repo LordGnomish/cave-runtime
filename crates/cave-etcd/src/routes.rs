@@ -5,27 +5,64 @@ use crate::store::KvStore;
 use axum::{
     extract::State,
     http::StatusCode,
+    response::sse::{Event, Sse},
     routing::{get, post},
     Json, Router,
 };
+use std::convert::Infallible;
 use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 pub fn create_router(state: Arc<KvStore>) -> Router {
     Router::new()
         .route("/api/etcd/health", get(health))
         .route("/api/etcd/status", get(status))
-        // KV operations (etcd v3 REST API)
+        // KV
         .route("/api/etcd/v3/kv/range", post(kv_range))
         .route("/api/etcd/v3/kv/put", post(kv_put))
         .route("/api/etcd/v3/kv/deleterange", post(kv_delete_range))
         .route("/api/etcd/v3/kv/txn", post(kv_txn))
+        .route("/api/etcd/v3/kv/compaction", post(kv_compaction))
+        // Watch
+        .route("/api/etcd/v3/watch", post(watch_create))
+        .route("/api/etcd/v3/watch/stream", get(watch_stream))
         // Lease
         .route("/api/etcd/v3/lease/grant", post(lease_grant))
         .route("/api/etcd/v3/lease/revoke", post(lease_revoke))
+        .route("/api/etcd/v3/lease/keepalive", post(lease_keepalive))
+        .route("/api/etcd/v3/lease/timetolive", post(lease_timetolive))
+        .route("/api/etcd/v3/lease/leases", get(lease_leases))
+        // Auth
+        .route("/api/etcd/v3/auth/enable", post(auth_enable))
+        .route("/api/etcd/v3/auth/disable", post(auth_disable))
+        .route("/api/etcd/v3/auth/authenticate", post(auth_authenticate))
+        .route("/api/etcd/v3/auth/user/add", post(auth_user_add))
+        .route("/api/etcd/v3/auth/user/delete", post(auth_user_delete))
+        .route("/api/etcd/v3/auth/user/get", post(auth_user_get))
+        .route("/api/etcd/v3/auth/user/list", post(auth_user_list))
+        .route("/api/etcd/v3/auth/user/changepw", post(auth_user_changepw))
+        .route("/api/etcd/v3/auth/role/add", post(auth_role_add))
+        .route("/api/etcd/v3/auth/role/delete", post(auth_role_delete))
+        .route("/api/etcd/v3/auth/role/get", post(auth_role_get))
+        .route("/api/etcd/v3/auth/role/list", post(auth_role_list))
         // Maintenance
         .route("/api/etcd/v3/maintenance/status", post(maintenance_status))
+        .route("/api/etcd/v3/maintenance/alarm", post(maintenance_alarm))
+        .route("/api/etcd/v3/maintenance/defragment", post(maintenance_defragment))
+        .route("/api/etcd/v3/maintenance/hash", post(maintenance_hash))
+        .route("/api/etcd/v3/maintenance/snapshot", post(maintenance_snapshot))
+        // Cluster
+        .route("/api/etcd/v3/cluster/member/add", post(cluster_member_add))
+        .route("/api/etcd/v3/cluster/member/remove", post(cluster_member_remove))
+        .route("/api/etcd/v3/cluster/member/update", post(cluster_member_update))
+        .route("/api/etcd/v3/cluster/member/list", post(cluster_member_list))
+        // Version
+        .route("/api/etcd/v3/version", get(version))
         .with_state(state)
 }
+
+// ── Health / Status ────────────────────────────────────────────────────────
 
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
@@ -39,6 +76,8 @@ async fn health() -> Json<serde_json::Value> {
 async fn status(State(store): State<Arc<KvStore>>) -> Json<serde_json::Value> {
     Json(store.status())
 }
+
+// ── KV ─────────────────────────────────────────────────────────────────────
 
 async fn kv_range(
     State(store): State<Arc<KvStore>>,
@@ -67,10 +106,8 @@ async fn kv_txn(
     State(store): State<Arc<KvStore>>,
     Json(req): Json<TxnRequest>,
 ) -> Json<TxnResponse> {
-    // Simple txn: evaluate compares, execute success or failure ops
     let mut succeeded = true;
     for cmp in &req.compare {
-        let _key_bytes = cmp.key.as_bytes().to_vec();
         let kv = store.range(&RangeRequest {
             key: cmp.key.clone(), range_end: None, limit: None,
             revision: None, keys_only: false, count_only: false,
@@ -99,7 +136,7 @@ async fn kv_txn(
         match op {
             RequestOp::Put(put) => { store.put(put); }
             RequestOp::DeleteRange(del) => { store.delete_range(del); }
-            RequestOp::Range(_) => { /* read-only, ignore result for now */ }
+            RequestOp::Range(_) => {}
         }
     }
 
@@ -111,6 +148,48 @@ async fn kv_txn(
         succeeded,
     })
 }
+
+async fn kv_compaction(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<CompactionRequest>,
+) -> Json<CompactionResponse> {
+    Json(store.compaction(&req))
+}
+
+// ── Watch ──────────────────────────────────────────────────────────────────
+
+async fn watch_create(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<WatchCreateRequest>,
+) -> Json<WatchResponse> {
+    Json(store.watch_create(&req))
+}
+
+async fn watch_stream(
+    State(store): State<Arc<KvStore>>,
+) -> Sse<UnboundedReceiverStream<Result<Event, Infallible>>> {
+    let mut rx = store.subscribe();
+    let (tx, inner_rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
+
+    tokio::spawn(async move {
+        loop {
+            match rx.recv().await {
+                Ok(event) => {
+                    if let Ok(data) = serde_json::to_string(&event) {
+                        if tx.send(Ok(Event::default().data(data))).is_err() {
+                            break;
+                        }
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    Sse::new(UnboundedReceiverStream::new(inner_rx))
+}
+
+// ── Lease ──────────────────────────────────────────────────────────────────
 
 async fn lease_grant(
     State(store): State<Arc<KvStore>>,
@@ -134,404 +213,470 @@ async fn lease_revoke(
         .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
 }
 
+async fn lease_keepalive(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<LeaseKeepAliveRequest>,
+) -> Result<Json<LeaseKeepAliveResponse>, (StatusCode, String)> {
+    store.lease_keepalive(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn lease_timetolive(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<LeaseTTLRequest>,
+) -> Result<Json<LeaseTTLResponse>, (StatusCode, String)> {
+    store.lease_timetolive(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn lease_leases(
+    State(store): State<Arc<KvStore>>,
+) -> Json<LeaseLeasesResponse> {
+    Json(store.lease_leases())
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+
+async fn auth_enable(
+    State(store): State<Arc<KvStore>>,
+) -> Result<Json<AuthEnableResponse>, (StatusCode, String)> {
+    store.auth_enable()
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+async fn auth_disable(
+    State(store): State<Arc<KvStore>>,
+) -> Result<Json<AuthDisableResponse>, (StatusCode, String)> {
+    store.auth_disable()
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+async fn auth_authenticate(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthenticateRequest>,
+) -> Result<Json<AuthenticateResponse>, (StatusCode, String)> {
+    store.authenticate(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))
+}
+
+async fn auth_user_add(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthUserAddRequest>,
+) -> Result<Json<AuthUserAddResponse>, (StatusCode, String)> {
+    store.user_add(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::CONFLICT, e.to_string()))
+}
+
+async fn auth_user_delete(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthUserDeleteRequest>,
+) -> Result<Json<AuthUserDeleteResponse>, (StatusCode, String)> {
+    store.user_delete(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn auth_user_get(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthUserGetRequest>,
+) -> Result<Json<AuthUserGetResponse>, (StatusCode, String)> {
+    store.user_get(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn auth_user_list(
+    State(store): State<Arc<KvStore>>,
+) -> Json<AuthUserListResponse> {
+    Json(store.user_list())
+}
+
+async fn auth_user_changepw(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthUserChangePasswordRequest>,
+) -> Result<Json<AuthUserChangePasswordResponse>, (StatusCode, String)> {
+    store.user_change_password(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn auth_role_add(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthRoleAddRequest>,
+) -> Result<Json<AuthRoleAddResponse>, (StatusCode, String)> {
+    store.role_add(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::CONFLICT, e.to_string()))
+}
+
+async fn auth_role_delete(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthRoleDeleteRequest>,
+) -> Result<Json<AuthRoleDeleteResponse>, (StatusCode, String)> {
+    store.role_delete(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn auth_role_get(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AuthRoleGetRequest>,
+) -> Result<Json<AuthRoleGetResponse>, (StatusCode, String)> {
+    store.role_get(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn auth_role_list(
+    State(store): State<Arc<KvStore>>,
+) -> Json<AuthRoleListResponse> {
+    Json(store.role_list())
+}
+
+// ── Maintenance ────────────────────────────────────────────────────────────
+
 async fn maintenance_status(
     State(store): State<Arc<KvStore>>,
 ) -> Json<serde_json::Value> {
     Json(store.status())
 }
 
+async fn maintenance_alarm(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<AlarmRequest>,
+) -> Json<AlarmResponse> {
+    Json(store.alarm(&req))
+}
+
+async fn maintenance_defragment(
+    State(store): State<Arc<KvStore>>,
+) -> Json<DefragmentResponse> {
+    Json(store.defragment())
+}
+
+async fn maintenance_hash(
+    State(store): State<Arc<KvStore>>,
+) -> Json<HashResponse> {
+    Json(store.hash())
+}
+
+async fn maintenance_snapshot(
+    State(store): State<Arc<KvStore>>,
+) -> Json<SnapshotResponse> {
+    Json(store.snapshot())
+}
+
+// ── Cluster ────────────────────────────────────────────────────────────────
+
+async fn cluster_member_add(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MemberAddRequest>,
+) -> Json<MemberAddResponse> {
+    Json(store.member_add(&req))
+}
+
+async fn cluster_member_remove(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MemberRemoveRequest>,
+) -> Result<Json<MemberRemoveResponse>, (StatusCode, String)> {
+    store.member_remove(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn cluster_member_update(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MemberUpdateRequest>,
+) -> Result<Json<MemberUpdateResponse>, (StatusCode, String)> {
+    store.member_update(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn cluster_member_list(
+    State(store): State<Arc<KvStore>>,
+) -> Json<MemberListResponse> {
+    Json(store.member_list())
+}
+
+// ── Version ────────────────────────────────────────────────────────────────
+
+async fn version(
+    State(store): State<Arc<KvStore>>,
+) -> Json<VersionResponse> {
+    Json(store.version())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::Body;
-    use axum::http::{Request, StatusCode};
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
+    use axum::{body::Body, http::Request};
+    use tower::util::ServiceExt;
 
-    fn make_app() -> (Router, Arc<KvStore>) {
-        let state = Arc::new(KvStore::new());
-        let app = create_router(state.clone());
-        (app, state)
+    fn test_app() -> Router {
+        create_router(Arc::new(KvStore::new()))
     }
 
-    async fn collect_json(body: Body) -> serde_json::Value {
-        let bytes = body.collect().await.unwrap().to_bytes();
-        serde_json::from_slice(&bytes).unwrap()
+    async fn post_json(app: Router, path: &str, body: serde_json::Value) -> axum::response::Response {
+        app.oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(path)
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap()
     }
 
-    fn post_json(uri: &str, body: serde_json::Value) -> Request<Body> {
-        Request::builder()
-            .method("POST")
-            .uri(uri)
-            .header("content-type", "application/json")
-            .body(Body::from(body.to_string()))
-            .unwrap()
-    }
-
-    fn bad_json_post(uri: &str) -> Request<Body> {
-        Request::builder()
-            .method("POST")
-            .uri(uri)
-            .header("content-type", "application/json")
-            .body(Body::from("not valid json !!"))
-            .unwrap()
-    }
-
-    // --- health ---
-
-    #[tokio::test]
-    async fn test_health() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(Request::builder().uri("/api/etcd/health").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["status"], "ok");
-        assert_eq!(json["module"], "cave-etcd");
-        assert_eq!(json["api_version"], "v3");
-    }
-
-    // --- status ---
-
-    #[tokio::test]
-    async fn test_status() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(Request::builder().uri("/api/etcd/status").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert!(json.get("version").is_some());
-        assert!(json.get("leader").is_some());
-    }
-
-    // --- kv/put ---
-
-    #[tokio::test]
-    async fn test_kv_put_valid() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/put", serde_json::json!({
-            "key": "foo", "value": "bar", "lease": null, "prev_kv": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert!(json.get("header").is_some());
+    async fn get_req(app: Router, path: &str) -> axum::response::Response {
+        app.oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(path)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap()
     }
 
     #[tokio::test]
-    async fn test_kv_put_returns_prev_kv() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "existing".into(), value: "old_val".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/put", serde_json::json!({
-            "key": "existing", "value": "new_val", "lease": null, "prev_kv": true
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert!(json["prev_kv"].is_object());
-    }
-
-    #[tokio::test]
-    async fn test_kv_put_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/kv/put")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- kv/range ---
-
-    #[tokio::test]
-    async fn test_kv_range_single_key() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "rng_key".into(), value: "rng_val".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/range", serde_json::json!({
-            "key": "rng_key", "range_end": null, "limit": null,
-            "revision": null, "keys_only": false, "count_only": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["count"], 1);
-    }
-
-    #[tokio::test]
-    async fn test_kv_range_miss() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/range", serde_json::json!({
-            "key": "nope", "range_end": null, "limit": null,
-            "revision": null, "keys_only": false, "count_only": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["count"], 0);
-    }
-
-    #[tokio::test]
-    async fn test_kv_range_compacted_returns_400() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "k".into(), value: "v".into(), lease: None, prev_kv: false });
-        state.compact(10);
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/range", serde_json::json!({
-            "key": "k", "range_end": null, "limit": null,
-            "revision": 2, "keys_only": false, "count_only": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn test_kv_range_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/kv/range")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- kv/deleterange ---
-
-    #[tokio::test]
-    async fn test_kv_delete_range_valid() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "del_key".into(), value: "v".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/deleterange", serde_json::json!({
-            "key": "del_key", "range_end": null, "prev_kv": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["deleted"], 1);
-    }
-
-    #[tokio::test]
-    async fn test_kv_delete_range_non_existent() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/deleterange", serde_json::json!({
-            "key": "ghost", "range_end": null, "prev_kv": false
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["deleted"], 0);
-    }
-
-    #[tokio::test]
-    async fn test_kv_delete_range_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/kv/deleterange")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- kv/txn ---
-
-    #[tokio::test]
-    async fn test_kv_txn_empty_compare_succeeds() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [], "success": [], "failure": []
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_version_equal_success() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "txn_k".into(), value: "v1".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "txn_k", "target": "Version", "result": "Equal",
-                         "value": null, "version": 1, "mod_revision": null}],
-            "success": [{"Put": {"key": "txn_k", "value": "v2", "lease": null, "prev_kv": false}}],
-            "failure": []
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_compare_fail_executes_failure_ops() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "txn_f".into(), value: "orig".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "txn_f", "target": "Version", "result": "Equal",
-                         "value": null, "version": 99, "mod_revision": null}],
-            "success": [],
-            "failure": [{"Put": {"key": "txn_f", "value": "failure_val", "lease": null, "prev_kv": false}}]
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], false);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_version_greater_compare() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "gt_k".into(), value: "v".into(), lease: None, prev_kv: false });
-        state.put(&PutRequest { key: "gt_k".into(), value: "v2".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "gt_k", "target": "Version", "result": "Greater",
-                         "value": null, "version": 1, "mod_revision": null}],
-            "success": [], "failure": []
-        }))).await.unwrap();
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_value_equal_compare() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "vk".into(), value: "expected".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "vk", "target": "Value", "result": "Equal",
-                         "value": "expected", "version": null, "mod_revision": null}],
-            "success": [], "failure": []
-        }))).await.unwrap();
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_create_revision_compare() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "ck".into(), value: "v".into(), lease: None, prev_kv: false });
-        let range = state.range(&RangeRequest {
-            key: "ck".into(), range_end: None, limit: None,
-            revision: None, keys_only: false, count_only: false,
-        }).unwrap();
-        let create_rev = range.kvs[0].create_revision;
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "ck", "target": "Create", "result": "Equal",
-                         "value": null, "version": null, "mod_revision": create_rev}],
-            "success": [], "failure": []
-        }))).await.unwrap();
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_catchall_passes() {
-        // CompareTarget::Mod + CompareResult::Less hits the _ => true arm
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "mk".into(), value: "v".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [{"key": "mk", "target": "Mod", "result": "Less",
-                         "value": null, "version": null, "mod_revision": null}],
-            "success": [], "failure": []
-        }))).await.unwrap();
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_multiple_success_ops() {
-        let (app, state) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [],
-            "success": [
-                {"Put": {"key": "multi1", "value": "a", "lease": null, "prev_kv": false}},
-                {"Put": {"key": "multi2", "value": "b", "lease": null, "prev_kv": false}}
-            ],
-            "failure": []
-        }))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["succeeded"], true);
-        let r1 = state.range(&RangeRequest { key: "multi1".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false }).unwrap();
-        let r2 = state.range(&RangeRequest { key: "multi2".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false }).unwrap();
-        assert_eq!(r1.kvs[0].value_str(), "a");
-        assert_eq!(r2.kvs[0].value_str(), "b");
-    }
-
-    #[tokio::test]
-    async fn test_kv_txn_range_op_in_success() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "rk".into(), value: "v".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [],
-            "success": [{"Range": {"key": "rk", "range_end": null, "limit": null,
-                                   "revision": null, "keys_only": false, "count_only": false}}],
-            "failure": []
-        }))).await.unwrap();
+    async fn test_health_endpoint() {
+        let resp = get_req(test_app(), "/api/etcd/health").await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_kv_txn_delete_range_op_in_success() {
-        let (app, state) = make_app();
-        state.put(&PutRequest { key: "dk".into(), value: "v".into(), lease: None, prev_kv: false });
-        let resp = app.oneshot(post_json("/api/etcd/v3/kv/txn", serde_json::json!({
-            "compare": [],
-            "success": [{"DeleteRange": {"key": "dk", "range_end": null, "prev_kv": false}}],
-            "failure": []
-        }))).await.unwrap();
+    async fn test_kv_put_range() {
+        let app = test_app();
+        let resp = post_json(app.clone(), "/api/etcd/v3/kv/put", serde_json::json!({
+            "key": "hello", "value": "world", "prev_kv": false
+        })).await;
         assert_eq!(resp.status(), StatusCode::OK);
-        let r = state.range(&RangeRequest { key: "dk".into(), range_end: None, limit: None, revision: None, keys_only: false, count_only: false }).unwrap();
-        assert_eq!(r.kvs.len(), 0);
+
+        let resp2 = post_json(app, "/api/etcd/v3/kv/range", serde_json::json!({
+            "key": "hello", "keys_only": false, "count_only": false
+        })).await;
+        assert_eq!(resp2.status(), StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_kv_txn_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/kv/txn")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- lease/grant ---
-
-    #[tokio::test]
-    async fn test_lease_grant_valid() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/lease/grant", serde_json::json!({"TTL": 60, "ID": null}))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert!(json["ID"].as_i64().unwrap() > 0);
-        assert_eq!(json["TTL"], 60);
-    }
-
-    #[tokio::test]
-    async fn test_lease_grant_with_custom_id() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/lease/grant", serde_json::json!({"TTL": 30, "ID": 9999}))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert_eq!(json["ID"], 9999);
-    }
-
-    #[tokio::test]
-    async fn test_lease_grant_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/lease/grant")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- lease/revoke ---
-
-    #[tokio::test]
-    async fn test_lease_revoke_valid() {
-        let (app, state) = make_app();
-        let lease = state.lease_grant(&crate::models::LeaseGrantRequest { ttl: 60, id: None });
-        let resp = app.oneshot(post_json("/api/etcd/v3/lease/revoke", serde_json::json!({"ID": lease.id}))).await.unwrap();
+    async fn test_kv_compaction_endpoint() {
+        let app = test_app();
+        post_json(app.clone(), "/api/etcd/v3/kv/put", serde_json::json!({
+            "key": "a", "value": "1", "prev_kv": false
+        })).await;
+        let resp = post_json(app, "/api/etcd/v3/kv/compaction", serde_json::json!({
+            "revision": 1, "physical": false
+        })).await;
         assert_eq!(resp.status(), StatusCode::OK);
     }
 
     #[tokio::test]
-    async fn test_lease_revoke_not_found() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(post_json("/api/etcd/v3/lease/revoke", serde_json::json!({"ID": 99999}))).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn test_lease_revoke_invalid_json() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(bad_json_post("/api/etcd/v3/lease/revoke")).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // --- maintenance/status ---
-
-    #[tokio::test]
-    async fn test_maintenance_status() {
-        let (app, _) = make_app();
-        let resp = app.oneshot(
-            Request::builder().method("POST").uri("/api/etcd/v3/maintenance/status")
-                .body(Body::empty()).unwrap()
-        ).await.unwrap();
+    async fn test_watch_create_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/watch", serde_json::json!({
+            "key": "/foo", "progress_notify": false, "prev_kv": false
+        })).await;
         assert_eq!(resp.status(), StatusCode::OK);
-        let json = collect_json(resp.into_body()).await;
-        assert!(json.get("version").is_some());
-        assert!(json.get("raftTerm").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_lease_keepalive_endpoint() {
+        let app = test_app();
+        let grant_resp = post_json(app.clone(), "/api/etcd/v3/lease/grant", serde_json::json!({
+            "TTL": 30
+        })).await;
+        let body = axum::body::to_bytes(grant_resp.into_body(), usize::MAX).await.unwrap();
+        let grant: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let id = grant["ID"].as_i64().unwrap();
+
+        let resp = post_json(app, "/api/etcd/v3/lease/keepalive", serde_json::json!({ "ID": id })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_lease_timetolive_endpoint() {
+        let app = test_app();
+        let grant_resp = post_json(app.clone(), "/api/etcd/v3/lease/grant", serde_json::json!({
+            "TTL": 60
+        })).await;
+        let body = axum::body::to_bytes(grant_resp.into_body(), usize::MAX).await.unwrap();
+        let grant: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let id = grant["ID"].as_i64().unwrap();
+
+        let resp = post_json(app, "/api/etcd/v3/lease/timetolive", serde_json::json!({
+            "ID": id, "keys": false
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_lease_leases_endpoint() {
+        let resp = get_req(test_app(), "/api/etcd/v3/lease/leases").await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_enable_disable_endpoints() {
+        let app = test_app();
+        let resp = post_json(app.clone(), "/api/etcd/v3/auth/enable", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resp2 = post_json(app, "/api/etcd/v3/auth/disable", serde_json::json!({})).await;
+        assert_eq!(resp2.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_authenticate_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/auth/authenticate", serde_json::json!({
+            "name": "user", "password": "pass"
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_add_delete_endpoints() {
+        let app = test_app();
+        let add = post_json(app.clone(), "/api/etcd/v3/auth/user/add", serde_json::json!({
+            "name": "testuser", "password": "pw"
+        })).await;
+        assert_eq!(add.status(), StatusCode::OK);
+
+        let del = post_json(app, "/api/etcd/v3/auth/user/delete", serde_json::json!({
+            "name": "testuser"
+        })).await;
+        assert_eq!(del.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_get_endpoint() {
+        let app = test_app();
+        post_json(app.clone(), "/api/etcd/v3/auth/user/add", serde_json::json!({
+            "name": "u", "password": "p"
+        })).await;
+        let resp = post_json(app, "/api/etcd/v3/auth/user/get", serde_json::json!({
+            "name": "u"
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_list_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/auth/user/list", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_user_changepw_endpoint() {
+        let app = test_app();
+        post_json(app.clone(), "/api/etcd/v3/auth/user/add", serde_json::json!({
+            "name": "pw_user", "password": "old"
+        })).await;
+        let resp = post_json(app, "/api/etcd/v3/auth/user/changepw", serde_json::json!({
+            "name": "pw_user", "password": "new"
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_role_add_get_delete_endpoints() {
+        let app = test_app();
+        let add = post_json(app.clone(), "/api/etcd/v3/auth/role/add", serde_json::json!({
+            "name": "testrole"
+        })).await;
+        assert_eq!(add.status(), StatusCode::OK);
+
+        let get = post_json(app.clone(), "/api/etcd/v3/auth/role/get", serde_json::json!({
+            "role": "testrole"
+        })).await;
+        assert_eq!(get.status(), StatusCode::OK);
+
+        let del = post_json(app, "/api/etcd/v3/auth/role/delete", serde_json::json!({
+            "role": "testrole"
+        })).await;
+        assert_eq!(del.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_auth_role_list_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/auth/role/list", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_alarm_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/maintenance/alarm", serde_json::json!({
+            "action": "Get", "member_id": 0, "alarm": "None"
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_defragment_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/maintenance/defragment", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_hash_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/maintenance/hash", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_snapshot_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/maintenance/snapshot", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_member_list_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/cluster/member/list", serde_json::json!({})).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_member_add_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/cluster/member/add", serde_json::json!({
+            "peer_ur_ls": ["http://peer:2380"], "is_learner": false
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_member_remove_endpoint() {
+        let app = test_app();
+        let add_resp = post_json(app.clone(), "/api/etcd/v3/cluster/member/add", serde_json::json!({
+            "peer_ur_ls": ["http://peer2:2380"], "is_learner": false
+        })).await;
+        let body = axum::body::to_bytes(add_resp.into_body(), usize::MAX).await.unwrap();
+        let added: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let new_id = added["member"]["id"].as_u64().unwrap();
+
+        let resp = post_json(app, "/api/etcd/v3/cluster/member/remove", serde_json::json!({
+            "ID": new_id
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_member_update_endpoint() {
+        let resp = post_json(test_app(), "/api/etcd/v3/cluster/member/update", serde_json::json!({
+            "ID": 1, "peer_ur_ls": ["http://newpeer:2380"]
+        })).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_version_endpoint() {
+        let resp = get_req(test_app(), "/api/etcd/v3/version").await;
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

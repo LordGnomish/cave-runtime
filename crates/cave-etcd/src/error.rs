@@ -24,6 +24,36 @@ pub enum EtcdError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("auth not enabled")]
+    AuthNotEnabled,
+
+    #[error("auth already enabled")]
+    AuthAlreadyEnabled,
+
+    #[error("user already exists: {0}")]
+    UserAlreadyExists(String),
+
+    #[error("user not found: {0}")]
+    UserNotFound(String),
+
+    #[error("role already exists: {0}")]
+    RoleAlreadyExists(String),
+
+    #[error("role not found: {0}")]
+    RoleNotFound(String),
+
+    #[error("invalid password")]
+    InvalidPassword,
+
+    #[error("permission denied")]
+    PermissionDenied,
+
+    #[error("member not found: {0}")]
+    MemberNotFound(u64),
+
+    #[error("invalid token")]
+    InvalidToken,
 }
 
 pub type EtcdResult<T> = Result<T, EtcdError>;
