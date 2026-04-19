@@ -40,6 +40,7 @@ async fn main() -> anyhow::Result<()> {
     info!(version = env!("CARGO_PKG_VERSION"), config = %cli.config, "Starting CAVE Unified Runtime");
 
     // Phase 1 states
+    let scheduler_state = cave_scheduler::new_state();
     let apiserver_state = cave_apiserver::new_state();
     let etcd_state = cave_etcd::new_state();
     let cri_state = cave_cri::new_state();
@@ -140,6 +141,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/modules", get(api_modules))
         .route("/api/health", get(api_health))
         // Phase 1 module routers
+        .merge(cave_scheduler::router(scheduler_state))
         .merge(cave_apiserver::router(apiserver_state))
         .merge(cave_etcd::router(etcd_state))
         .merge(cave_cri::router(cri_state))
