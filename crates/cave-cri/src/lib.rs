@@ -68,6 +68,10 @@ pub mod rootfs;
 pub mod runtime;
 pub mod store;
 pub mod routes;
+pub mod state_machine;
+pub mod oci_spec;
+pub mod logs;
+pub mod health;
 
 use routes::CriState;
 use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};

@@ -160,6 +160,7 @@ mod tests {
             exit_code: None,
             rootfs_path: "/tmp/test".into(),
             log_path: "/tmp/test.log".into(),
+            health: None,
         }
     }
 
