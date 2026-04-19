@@ -30,6 +30,18 @@ pub enum CriError {
 
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("sandbox error: {0}")]
+    Sandbox(String),
+
+    #[error("snapshot error: {0}")]
+    Snapshot(String),
+
+    #[error("network error: {0}")]
+    Network(String),
+
+    #[error("exec error: {0}")]
+    Exec(String),
 }
 
 pub type CriResult<T> = Result<T, CriError>;

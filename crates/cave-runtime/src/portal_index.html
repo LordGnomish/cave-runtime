@@ -375,9 +375,10 @@ const NAV=[
 
 const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
 
-// 73 tracked OSS projects
+// 66 tracked OSS projects
 const UPSTREAM_PROJECTS=[
   // Infrastructure
+  {name:'containerd / crun',gh:'https://github.com/containerd/containerd',cave:'cri',cat:'Runtime',phase:1,parity:100},
   {name:'Cilium CNI',gh:'https://github.com/cilium/cilium',cave:'(infra)',cat:'Networking',phase:1,parity:25},
   {name:'Istio Ambient Mesh',gh:'https://github.com/istio/istio',cave:'(infra)',cat:'Networking',phase:2,parity:25},
   {name:'ArgoCD',gh:'https://github.com/argoproj/argo-cd',cave:'(infra)',cat:'GitOps',phase:1,parity:30},

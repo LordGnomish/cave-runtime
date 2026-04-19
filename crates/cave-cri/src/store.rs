@@ -68,6 +68,66 @@ impl ImageStore {
     }
 }
 
+/// Thread-safe pod sandbox store.
+#[derive(Debug, Default)]
+pub struct SandboxStore {
+    sandboxes: DashMap<Uuid, crate::models::Sandbox>,
+}
+
+impl SandboxStore {
+    pub fn new() -> Self {
+        Self { sandboxes: DashMap::new() }
+    }
+
+    pub fn insert(&self, sandbox: crate::models::Sandbox) {
+        self.sandboxes.insert(sandbox.id, sandbox);
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<crate::models::Sandbox> {
+        self.sandboxes.get(id).map(|s| s.clone())
+    }
+
+    pub fn list(&self) -> Vec<crate::models::Sandbox> {
+        self.sandboxes.iter().map(|r| r.value().clone()).collect()
+    }
+
+    pub fn remove(&self, id: &Uuid) -> Option<crate::models::Sandbox> {
+        self.sandboxes.remove(id).map(|(_, s)| s)
+    }
+
+    pub fn count(&self) -> usize {
+        self.sandboxes.len()
+    }
+}
+
+/// Thread-safe OCI snapshot store.
+#[derive(Debug, Default)]
+pub struct SnapshotStore {
+    snapshots: DashMap<Uuid, crate::models::Snapshot>,
+}
+
+impl SnapshotStore {
+    pub fn new() -> Self {
+        Self { snapshots: DashMap::new() }
+    }
+
+    pub fn insert(&self, snapshot: crate::models::Snapshot) {
+        self.snapshots.insert(snapshot.id, snapshot);
+    }
+
+    pub fn get(&self, id: &Uuid) -> Option<crate::models::Snapshot> {
+        self.snapshots.get(id).map(|s| s.clone())
+    }
+
+    pub fn list(&self) -> Vec<crate::models::Snapshot> {
+        self.snapshots.iter().map(|r| r.value().clone()).collect()
+    }
+
+    pub fn remove(&self, id: &Uuid) -> Option<crate::models::Snapshot> {
+        self.snapshots.remove(id).map(|(_, s)| s)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,5 +185,56 @@ mod tests {
         store.insert(make_test_container());
         store.insert(make_test_container());
         assert_eq!(store.list().len(), 2);
+    }
+
+    #[test]
+    fn test_sandbox_store_crud() {
+        use crate::models::{Sandbox, SandboxSpec, SandboxState, DnsConfig};
+        let store = SandboxStore::new();
+        let id = Uuid::new_v4();
+        let sandbox = Sandbox {
+            id,
+            spec: SandboxSpec {
+                name: "test-pod".into(),
+                namespace: "default".into(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                hostname: None,
+                dns_config: Some(DnsConfig::default()),
+                port_mappings: vec![],
+                log_directory: None,
+                cgroup_parent: None,
+            },
+            state: SandboxState::Ready,
+            created_at: Utc::now(),
+            network_ip: Some("10.0.0.1".into()),
+        };
+        store.insert(sandbox);
+        assert_eq!(store.count(), 1);
+        let got = store.get(&id).unwrap();
+        assert_eq!(got.spec.name, "test-pod");
+        store.remove(&id);
+        assert_eq!(store.count(), 0);
+    }
+
+    #[test]
+    fn test_snapshot_store_crud() {
+        use crate::models::{Snapshot, SnapshotKind};
+        let store = SnapshotStore::new();
+        let id = Uuid::new_v4();
+        let snap = Snapshot {
+            id,
+            name: "snap-1".into(),
+            parent: None,
+            labels: Default::default(),
+            created_at: Utc::now(),
+            kind: SnapshotKind::Committed,
+        };
+        store.insert(snap);
+        assert_eq!(store.list().len(), 1);
+        let got = store.get(&id).unwrap();
+        assert_eq!(got.name, "snap-1");
+        store.remove(&id);
+        assert_eq!(store.list().len(), 0);
     }
 }

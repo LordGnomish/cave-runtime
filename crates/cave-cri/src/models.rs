@@ -214,6 +214,236 @@ impl ImageReference {
     }
 }
 
+/// Pod sandbox specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxSpec {
+    pub name: String,
+    pub namespace: String,
+    pub labels: HashMap<String, String>,
+    pub annotations: HashMap<String, String>,
+    pub hostname: Option<String>,
+    pub dns_config: Option<DnsConfig>,
+    pub port_mappings: Vec<PortMapping>,
+    pub log_directory: Option<String>,
+    pub cgroup_parent: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsConfig {
+    pub servers: Vec<String>,
+    pub searches: Vec<String>,
+    pub options: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortMapping {
+    pub protocol: String,
+    pub container_port: u16,
+    pub host_port: u16,
+    pub host_ip: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SandboxState {
+    Ready,
+    NotReady,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Sandbox {
+    pub id: Uuid,
+    pub spec: SandboxSpec,
+    pub state: SandboxState,
+    pub created_at: DateTime<Utc>,
+    pub network_ip: Option<String>,
+}
+
+/// Process running inside a container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerProcess {
+    pub pid: u32,
+    pub user: String,
+    pub command: String,
+    pub cpu_percent: f64,
+    pub memory_bytes: u64,
+}
+
+/// Container checkpoint metadata.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointInfo {
+    pub container_id: Uuid,
+    pub path: String,
+    pub created_at: DateTime<Utc>,
+    pub size_bytes: u64,
+}
+
+/// A single log line from a container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerLogEntry {
+    pub timestamp: DateTime<Utc>,
+    pub stream: String,
+    pub message: String,
+}
+
+/// Container resource usage snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerStats {
+    pub container_id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub cgroup: CgroupStats,
+    pub cpu_percent: f64,
+    pub memory_percent: f64,
+}
+
+/// Snapshot kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SnapshotKind {
+    Committed,
+    Active,
+    View,
+}
+
+/// OCI snapshot (overlayfs layer).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Snapshot {
+    pub id: Uuid,
+    pub name: String,
+    pub parent: Option<String>,
+    pub labels: HashMap<String, String>,
+    pub created_at: DateTime<Utc>,
+    pub kind: SnapshotKind,
+}
+
+/// Disk usage for a snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotUsage {
+    pub snapshot_id: Uuid,
+    pub size_bytes: u64,
+    pub inodes: u64,
+}
+
+/// Mount point for a snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotMount {
+    pub kind: String,
+    pub source: String,
+    pub options: Vec<String>,
+}
+
+/// Network attachment status for a container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkStatus {
+    pub container_id: Uuid,
+    pub network_name: String,
+    pub ip_address: Option<String>,
+    pub mac_address: Option<String>,
+    pub gateway: Option<String>,
+    pub interface: Option<String>,
+    pub attached: bool,
+}
+
+/// Runtime version info (mirrors containerd Version RPC).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeVersion {
+    pub version: String,
+    pub api_version: String,
+    pub runtime_name: String,
+    pub runtime_version: String,
+    pub runtime_api_version: String,
+}
+
+/// Single readiness condition in RuntimeStatus.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeCondition {
+    pub kind: String,
+    pub status: bool,
+    pub reason: String,
+    pub message: String,
+}
+
+/// Runtime readiness (mirrors containerd Status RPC).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeStatus {
+    pub conditions: Vec<RuntimeCondition>,
+}
+
+/// Node-wide CPU stats.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CpuStats {
+    pub usage_total_usec: u64,
+    pub usage_percent: f64,
+}
+
+/// Node-wide memory stats.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MemoryStats {
+    pub total_bytes: u64,
+    pub used_bytes: u64,
+    pub available_bytes: u64,
+    pub usage_percent: f64,
+}
+
+/// Aggregate node resource stats across all containers.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeStats {
+    pub timestamp: DateTime<Utc>,
+    pub cpu: CpuStats,
+    pub memory: MemoryStats,
+    pub container_count: usize,
+}
+
+/// Sandbox resource stats.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SandboxStats {
+    pub sandbox_id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub cgroup: CgroupStats,
+    pub container_count: usize,
+}
+
+/// Runtime event (create, start, stop, delete, …).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeEvent {
+    pub id: String,
+    pub kind: String,
+    pub object_type: String,
+    pub object_id: String,
+    pub timestamp: DateTime<Utc>,
+    pub attributes: HashMap<String, String>,
+}
+
+/// Partial update applied to a running container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerUpdate {
+    pub resources: Option<ResourceLimits>,
+    pub labels: Option<HashMap<String, String>>,
+}
+
+/// Result of exec-in-container.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecResult {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+    pub duration_ms: u64,
+}
+
+/// Request to tag an image with a new reference.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageTagRequest {
+    pub target: String,
+}
+
+/// One layer in an image's build history.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageHistoryEntry {
+    pub digest: String,
+    pub created_at: DateTime<Utc>,
+    pub created_by: String,
+    pub size_bytes: u64,
+    pub comment: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
