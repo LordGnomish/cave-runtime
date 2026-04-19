@@ -379,6 +379,10 @@ const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'
 const UPSTREAM_PROJECTS=[
   // Infrastructure
   {name:'containerd / crun',gh:'https://github.com/containerd/containerd',cave:'cri',cat:'Runtime',phase:1,parity:100},
+  {name:'etcd',gh:'https://github.com/etcd-io/etcd',cave:'etcd',cat:'Kubernetes Core',phase:1,parity:100},
+  {name:'kube-apiserver',gh:'https://github.com/kubernetes/kubernetes',cave:'apiserver',cat:'Kubernetes Core',phase:1,parity:7},
+  {name:'kube-scheduler',gh:'https://github.com/kubernetes/kubernetes',cave:'scheduler',cat:'Kubernetes Core',phase:1,parity:40},
+  {name:'kubelet',gh:'https://github.com/kubernetes/kubernetes',cave:'kubelet',cat:'Kubernetes Core',phase:1,parity:23},
   {name:'Cilium CNI',gh:'https://github.com/cilium/cilium',cave:'(infra)',cat:'Networking',phase:1,parity:25},
   {name:'Istio Ambient Mesh',gh:'https://github.com/istio/istio',cave:'(infra)',cat:'Networking',phase:2,parity:25},
   {name:'ArgoCD',gh:'https://github.com/argoproj/argo-cd',cave:'(infra)',cat:'GitOps',phase:1,parity:30},
