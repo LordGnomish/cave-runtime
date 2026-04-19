@@ -48,6 +48,16 @@ CAVE needs automated TLS certificate provisioning and renewal for all external-f
 - Let's Encrypt rate limits (50 certs/week per registered domain). Sufficient for CAVE but requires planning during initial deployment.
 - cert-manager upgrade path must be validated (CRD changes can break existing Certificate resources).
 
+### Risks
+
+| Risk | Probability | Impact | Mitigation |
+|---|---|---|---|
+| Let's Encrypt outage blocks new certificate issuance | Low | Medium | Existing certificates remain valid (90-day lifetime, 30-day rotation). OpenBao PKI as fallback issuer for emergency certificates. |
+| Cloudflare DNS-01 solver fails | Low | Medium | Retry logic in cert-manager. Alternative: switch to HTTP-01 solver temporarily (requires port 80 exposure). |
+| cert-manager CRD upgrade breaks existing Certificates | Low | High | Pin cert-manager version. Staging validates upgrade before prod. Backup Certificate resources in WORM. |
+| Let's Encrypt rate limit hit during initial deploy | Medium | Low | Pre-plan certificate issuance. Use staging ACME server for testing. Wildcard cert reduces individual cert count. |
+| Post-Quantum TLS certificates | Low (2028+) | Low | **Watch:** NIST PQC algorithms finalized. PQ TLS certs are years away from browser/CA adoption. cert-manager will support when available. No action now. |
+
 ## Compliance Mapping
 
 SOC2 CC6.6 (encryption in transit). ISO A.8.24 (cryptographic controls — certificate lifecycle). ISO A.5.14 (information transfer — TLS). NIS2 Art.21 (encryption). GDPR Art.32 (security of processing — encryption).
