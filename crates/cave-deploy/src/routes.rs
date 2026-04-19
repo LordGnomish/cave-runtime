@@ -4,13 +4,12 @@ use crate::{
     appset::ApplicationSet,
     models::*,
     rbac::AppProject,
-    sync::{RollbackRequest, SyncRequest, SyncStrategy},
     DeployState,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{delete, get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -111,6 +110,7 @@ async fn delete_application(
 // ─── Sync operations ─────────────────────────────────────────────────────────
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct SyncReq {
     revision: Option<String>,
     #[serde(default)]
@@ -142,6 +142,7 @@ async fn refresh_application(
 }
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct RollbackReq {
     history_id: u64,
     #[serde(default)]
@@ -305,7 +306,7 @@ async fn update_sso_config(
 
 async fn handle_webhook(
     State(_state): State<Arc<DeployState>>,
-    Json(payload): Json<serde_json::Value>,
+    Json(_payload): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
     tracing::info!("Git webhook received");
     Json(serde_json::json!({ "status": "received", "refresh_triggered": true }))

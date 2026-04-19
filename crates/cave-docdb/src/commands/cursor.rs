@@ -26,7 +26,7 @@ pub async fn get_more(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<D
     cursor.insert("id".to_string(), Value::Number(if has_more { cursor_id } else { 0 }.into()));
     cursor.insert("ns".to_string(), Value::String(ns));
 
-    let nextBatch: Vec<Value> = batch
+    let next_batch: Vec<Value> = batch
         .iter()
         .map(|doc| {
             Value::Object(
@@ -36,7 +36,7 @@ pub async fn get_more(cmd_doc: &Document, cursors: Arc<CursorStore>) -> Result<D
             )
         })
         .collect();
-    cursor.insert("nextBatch".to_string(), Value::Array(nextBatch));
+    cursor.insert("next_batch".to_string(), Value::Array(next_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

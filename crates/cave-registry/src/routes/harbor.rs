@@ -8,7 +8,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json},
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
     Router,
 };
 use chrono::Utc;
@@ -129,6 +129,7 @@ pub fn router(state: Arc<RegistryState>) -> Router {
 // ── Pagination helper ─────────────────────────────────────────────────────────
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct PageQuery {
     page: Option<i64>,
     page_size: Option<i64>,

@@ -260,7 +260,8 @@ impl DevPortalStore {
         self.subscriptions.get(&subscription_id)?;
 
         // Generate random base64 32 bytes
-        let key = format!("sk_{}", base64::encode(rand::random::<[u8; 32]>()));
+        use base64::Engine as _;
+        let key = format!("sk_{}", base64::engine::general_purpose::STANDARD.encode(rand::random::<[u8; 32]>()));
         self.api_keys.insert(key.clone(), subscription_id);
         Some(key)
     }

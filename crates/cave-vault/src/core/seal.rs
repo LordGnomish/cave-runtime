@@ -44,7 +44,7 @@ fn gf_inv(a: u8) -> u8 {
 
 /// Split `secret` bytes into `n` shares of which any `k` can reconstruct.
 pub fn split_secret(secret: &[u8], n: u8, k: u8) -> VaultResult<Vec<Vec<u8>>> {
-    if k < 2 || k > n || n > 255 {
+    if k < 2 || k > n {
         return Err(VaultError::InvalidRequest("invalid share parameters".into()));
     }
     let rng = SystemRandom::new();

@@ -1,6 +1,5 @@
 //! Kafka quota management — produce/fetch byte rate and request rate limits.
 
-use crate::error::{StreamsError, StreamsResult};
 use chrono::Utc;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -107,6 +106,7 @@ impl TokenBucket {
         }
     }
 
+    #[allow(dead_code)]
     fn try_consume(&mut self, amount: f64) -> bool {
         self.refill();
         if self.tokens >= amount {

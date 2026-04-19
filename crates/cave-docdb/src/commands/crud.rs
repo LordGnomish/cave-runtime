@@ -94,7 +94,7 @@ pub async fn find(
         Value::String(format!("{}.{}", db_name, col_name)),
     );
 
-    let firstBatch: Vec<Value> = filtered
+    let first_batch: Vec<Value> = filtered
         .iter()
         .map(|doc| {
             Value::Object(
@@ -104,7 +104,7 @@ pub async fn find(
             )
         })
         .collect();
-    cursor.insert("firstBatch".to_string(), Value::Array(firstBatch));
+    cursor.insert("first_batch".to_string(), Value::Array(first_batch));
 
     let mut resp = Document::new();
     resp.insert("cursor".to_string(), Value::Object(cursor));

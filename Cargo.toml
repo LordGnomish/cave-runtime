@@ -95,6 +95,8 @@ members = [
     "crates/cave-erp",
     "crates/cave-docdb",
     "crates/cave-rdbms",
+    # === Kubernetes Control Plane ===
+    "crates/cave-kamaji",
 ]
 
 [workspace.package]

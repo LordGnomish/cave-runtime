@@ -18,7 +18,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, patch, post, put},
+    routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -399,6 +399,7 @@ impl ScimState {
 
 // ── SCIM handlers ─────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 const SCIM_USER_SCHEMA: &str = "urn:ietf:params:scim:schemas:core:2.0:User";
 const SCIM_LIST_SCHEMA: &str = "urn:ietf:params:scim:api:messages:2.0:ListResponse";
 

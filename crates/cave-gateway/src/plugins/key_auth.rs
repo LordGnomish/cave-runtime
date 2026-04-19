@@ -17,6 +17,7 @@ use serde_json::Value;
 
 pub struct KeyAuthPlugin;
 
+#[allow(dead_code)]
 fn extract_key<'a>(ctx: &'a PluginCtx, key_names: &[&str], in_header: bool, in_query: bool) -> Option<&'a str> {
     if in_header {
         for name in key_names {
@@ -28,7 +29,7 @@ fn extract_key<'a>(ctx: &'a PluginCtx, key_names: &[&str], in_header: bool, in_q
     if in_query {
         for pair in ctx.query.split('&') {
             let mut kv = pair.splitn(2, '=');
-            if let (Some(k), Some(v)) = (kv.next(), kv.next()) {
+            if let (Some(k), Some(_v)) = (kv.next(), kv.next()) {
                 if key_names.contains(&k) {
                     // Return a reference to the owned string — need to find it in headers map
                     // since we can't return a reference to local — just search headers
