@@ -1,19 +1,59 @@
 //! cave-etcd — Distributed key-value store.
 //!
-//! Reimplements etcd's v3 API with MVCC, watch, leases, and transactions.
-//! Uses cave-ha's Raft consensus for replication across nodes.
+//! Reimplements etcd's v3 API with MVCC, watch, leases, transactions, auth,
+//! cluster management, and maintenance endpoints.
 //!
-//! ## API (etcd v3 compatible)
+//! ## API (etcd v3 compatible — 35 endpoints)
 //!
 //! ```text
-//! POST /v3/kv/range         — get key or range
-//! POST /v3/kv/put           — put key-value
-//! POST /v3/kv/deleterange   — delete key or range
-//! POST /v3/kv/txn           — transaction (compare-and-swap)
-//! POST /v3/lease/grant      — create lease
-//! POST /v3/lease/revoke     — revoke lease
-//! POST /v3/maintenance/status — cluster status
-//! GET  /api/etcd/health     — health check
+//! KV:
+//!   POST /v3/kv/range         — get key or range
+//!   POST /v3/kv/put           — put key-value
+//!   POST /v3/kv/deleterange   — delete key or range
+//!   POST /v3/kv/txn           — transaction (compare-and-swap)
+//!   POST /v3/kv/compaction    — compact revision history
+//!
+//! Watch:
+//!   POST /v3/watch            — create watch, returns watch_id
+//!   GET  /v3/watch/stream     — SSE stream of watch events
+//!
+//! Lease:
+//!   POST /v3/lease/grant      — create lease
+//!   POST /v3/lease/revoke     — revoke lease
+//!   POST /v3/lease/keepalive  — refresh lease TTL
+//!   POST /v3/lease/timetolive — get remaining TTL
+//!   GET  /v3/lease/leases     — list all leases
+//!
+//! Auth:
+//!   POST /v3/auth/enable      — enable auth
+//!   POST /v3/auth/disable     — disable auth
+//!   POST /v3/auth/authenticate — get token
+//!   POST /v3/auth/user/add    — add user
+//!   POST /v3/auth/user/delete — delete user
+//!   POST /v3/auth/user/get    — get user info
+//!   POST /v3/auth/user/list   — list users
+//!   POST /v3/auth/user/changepw — change password
+//!   POST /v3/auth/role/add    — add role
+//!   POST /v3/auth/role/delete — delete role
+//!   POST /v3/auth/role/get    — get role + permissions
+//!   POST /v3/auth/role/list   — list roles
+//!
+//! Maintenance:
+//!   POST /v3/maintenance/status     — cluster status
+//!   POST /v3/maintenance/alarm      — get/set alarms
+//!   POST /v3/maintenance/defragment — defragment database
+//!   POST /v3/maintenance/hash       — hash of KV store
+//!   POST /v3/maintenance/snapshot   — create snapshot
+//!
+//! Cluster:
+//!   POST /v3/cluster/member/add    — add member
+//!   POST /v3/cluster/member/remove — remove member
+//!   POST /v3/cluster/member/update — update member URLs
+//!   POST /v3/cluster/member/list   — list members
+//!
+//! Other:
+//!   GET  /v3/version          — etcd version
+//!   GET  /api/etcd/health     — health check
 //! ```
 
 pub mod error;

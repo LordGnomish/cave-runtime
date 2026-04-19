@@ -17,4 +17,7 @@ thiserror = "1"
 dashmap = "6"
 bytes = "1"
 async-trait = "0.1"
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
