@@ -8,9 +8,6 @@
 
 **Related ADRs:** 001 (Hetzner), 004 (Cilium+Istio), 085 (Rolling Upgrades), 088 (Resurrection), 098 (Immutable Infra)
 
-001 (Hetzner), 004 (Cilium+Istio), 085 (Rolling Upgrades), 088 (Resurrection), 098 (Immutable Infra)
-
-Back to Index:
 
 ## Context
 
