@@ -2465,4 +2465,253 @@ mod tests {
         assert!(cr2 > cr1);
         assert_eq!(get(&store, "rec_key")[0].version, 1);
     }
+
+    #[test]
+    fn test_put_with_base64_key_value() {
+        // Simulate etcdctl: put foo bar → key="Zm9v" value="YmFy"
+        let store = KvStore::new();
+        // When using base64 in routes, the route decodes first.
+        // But the store should work with raw bytes correctly.
+        store.put(&PutRequest {
+            key: "foo".into(),
+            value: "bar".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let resp = store.range(&RangeRequest {
+            key: "foo".into(),
+            range_end: None,
+            limit: None,
+            revision: None,
+            keys_only: false,
+            count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs[0].key_str(), "foo");
+        assert_eq!(resp.kvs[0].value_str(), "bar");
+    }
+
+    #[test]
+    fn test_revision_never_decreases() {
+        let store = KvStore::new();
+        let r1 = store.put(&PutRequest { key: "a".into(), value: "1".into(), lease: None, prev_kv: false });
+        let r2 = store.put(&PutRequest { key: "b".into(), value: "2".into(), lease: None, prev_kv: false });
+        let r3 = store.put(&PutRequest { key: "a".into(), value: "3".into(), lease: None, prev_kv: false });
+        assert!(r2.header.revision > r1.header.revision);
+        assert!(r3.header.revision > r2.header.revision);
+
+        // After delete, revision still increases
+        let r4_header = store.delete_range(&DeleteRangeRequest { key: "b".into(), range_end: None, prev_kv: false }).header;
+        assert!(r4_header.revision > r3.header.revision);
+
+        // After compaction, revision still increases
+        store.compact(r3.header.revision);
+        let r5 = store.put(&PutRequest { key: "c".into(), value: "4".into(), lease: None, prev_kv: false });
+        assert!(r5.header.revision > r4_header.revision);
+    }
+
+    #[test]
+    fn test_watch_no_event_loss() {
+        let store = KvStore::new();
+        let mut rx = store.subscribe();
+
+        // Rapid writes
+        for i in 0..100 {
+            store.put(&PutRequest {
+                key: format!("key{}", i),
+                value: format!("val{}", i),
+                lease: None,
+                prev_kv: false,
+            });
+        }
+
+        // All 100 events should be received (broadcast channel is 4096)
+        let mut received = 0;
+        while let Ok(_) = rx.try_recv() {
+            received += 1;
+        }
+        assert_eq!(received, 100, "expected 100 watch events, got {}", received);
+    }
+
+    #[test]
+    fn test_lease_keepalive_resets_ttl() {
+        let store = KvStore::new();
+        let resp = store.lease_grant(&LeaseGrantRequest { ttl: 5, id: None });
+        let lease_id = resp.id;
+
+        // Keepalive should reset TTL
+        let ka = store.lease_keepalive(&LeaseKeepAliveRequest { id: lease_id });
+        assert!(ka.is_ok());
+        let ka_resp = ka.unwrap();
+        assert_eq!(ka_resp.ttl, 5);
+    }
+
+    #[test]
+    fn test_compaction_removes_old_data() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "old".into(), value: "v1".into(), lease: None, prev_kv: false });
+        let r2 = store.put(&PutRequest { key: "old".into(), value: "v2".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "old".into(), value: "v3".into(), lease: None, prev_kv: false });
+
+        // Compact at r2 — revision 1 should be gone
+        store.compact(r2.header.revision);
+
+        // Reading at compacted revision should fail
+        let result = store.range(&RangeRequest {
+            key: "old".into(),
+            range_end: None,
+            limit: None,
+            revision: Some(1), // compacted
+            keys_only: false,
+            count_only: false,
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_delete_returns_correct_count() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "/a/1".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "/a/2".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "/a/3".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "/b/1".into(), value: "v".into(), lease: None, prev_kv: false });
+
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "/a/".into(),
+            range_end: Some("/a0".into()),
+            prev_kv: true,
+        });
+        assert_eq!(resp.deleted, 3);
+        assert_eq!(resp.prev_kvs.len(), 3);
+    }
+
+    #[test]
+    fn test_txn_atomic_all_or_nothing() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "counter".into(), value: "10".into(), lease: None, prev_kv: false });
+
+        // Txn: if counter version == 1 (true), set counter to 20
+        let resp = store.txn(&TxnRequest {
+            compare: vec![Compare {
+                key: "counter".into(),
+                target: CompareTarget::Version,
+                result: CompareResult::Equal,
+                value: None,
+                version: Some(1),
+                mod_revision: None,
+            }],
+            success: vec![RequestOp::Put(PutRequest {
+                key: "counter".into(),
+                value: "20".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+            failure: vec![],
+        });
+        assert!(resp.succeeded);
+
+        // Verify counter is now 20
+        let get = store.range(&RangeRequest {
+            key: "counter".into(),
+            range_end: None,
+            limit: None,
+            revision: None,
+            keys_only: false,
+            count_only: false,
+        }).unwrap();
+        assert_eq!(get.kvs[0].value_str(), "20");
+    }
+
+    #[test]
+    fn test_txn_failure_branch() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "x".into(), value: "1".into(), lease: None, prev_kv: false });
+
+        // Txn: if x version == 99 (false), failure: set x to "fallback"
+        let resp = store.txn(&TxnRequest {
+            compare: vec![Compare {
+                key: "x".into(),
+                target: CompareTarget::Version,
+                result: CompareResult::Equal,
+                value: None,
+                version: Some(99),
+                mod_revision: None,
+            }],
+            success: vec![],
+            failure: vec![RequestOp::Put(PutRequest {
+                key: "x".into(),
+                value: "fallback".into(),
+                lease: None,
+                prev_kv: false,
+            })],
+        });
+        assert!(!resp.succeeded);
+
+        let get = store.range(&RangeRequest {
+            key: "x".into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(get.kvs[0].value_str(), "fallback");
+    }
+
+    #[test]
+    fn test_auth_permission_enforced() {
+        let store = KvStore::new();
+        // Add user with correct API
+        store.user_add(&AuthUserAddRequest { name: "reader".into(), password: "pass123".into() }).unwrap();
+        store.role_add(&AuthRoleAddRequest { name: "readonly".into() }).unwrap();
+        store.role_grant_permission(&AuthRoleGrantPermissionRequest {
+            name: "readonly".into(),
+            perm: Permission { perm_type: PermType::Read, key: "/public/".into(), range_end: Some("/public0".into()) },
+        }).unwrap();
+        store.user_grant_role(&AuthUserGrantRoleRequest { user: "reader".into(), role: "readonly".into() }).unwrap();
+        store.auth_enable().unwrap();
+
+        // Authenticate
+        let resp = store.authenticate(&AuthenticateRequest { name: "reader".into(), password: "pass123".into() }).unwrap();
+        let token = &resp.token;
+
+        // Put data first (as root bypass since no root user — disable auth for this)
+        store.auth_disable().unwrap();
+        store.put(&PutRequest { key: "/public/key".into(), value: "v".into(), lease: None, prev_kv: false });
+        store.auth_enable().unwrap();
+
+        // Read /public/key should work
+        let check = store.check_auth_token(Some(token), b"/public/key", PermType::Read);
+        assert!(check.is_ok(), "read /public/key should succeed");
+
+        // Write /public/key should fail (readonly)
+        let check = store.check_auth_token(Some(token), b"/public/key", PermType::Write);
+        assert!(check.is_err(), "write /public/key should fail for readonly user");
+    }
+
+    #[test]
+    fn test_key_not_found_returns_empty_kvs() {
+        // etcd returns empty kvs array (not error) for missing key
+        let store = KvStore::new();
+        let resp = store.range(&RangeRequest {
+            key: "nonexistent".into(),
+            range_end: None,
+            limit: None,
+            revision: None,
+            keys_only: false,
+            count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs.len(), 0);
+        assert_eq!(resp.count, 0);
+    }
+
+    #[test]
+    fn test_put_version_increments() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "ver".into(), value: "a".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "ver".into(), value: "b".into(), lease: None, prev_kv: false });
+        store.put(&PutRequest { key: "ver".into(), value: "c".into(), lease: None, prev_kv: false });
+
+        let resp = store.range(&RangeRequest {
+            key: "ver".into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs[0].version, 3);
+    }
+
 }

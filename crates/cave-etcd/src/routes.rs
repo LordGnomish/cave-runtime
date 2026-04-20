@@ -130,13 +130,23 @@ async fn kv_range(
     Json(req): Json<RangeRequest>,
 ) -> Result<Json<RangeResponse>, (StatusCode, String)> {
     let token = extract_token(&headers);
+    let req = decode_range_request(req);
     store
         .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Read)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
     store
         .range(&req)
-        .map(Json)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+        .map(|mut resp| {
+            for kv in &mut resp.kvs {
+                encode_kv(kv);
+            }
+            Json(resp)
+        })
+        .map_err(|e| match &e {
+            crate::error::EtcdError::RevisionCompacted { .. } => (StatusCode::BAD_REQUEST, e.to_string()),
+            crate::error::EtcdError::KeyNotFound(_) => (StatusCode::OK, e.to_string()),
+            _ => (StatusCode::BAD_REQUEST, e.to_string()),
+        })
 }
 
 async fn kv_put(
@@ -162,11 +172,15 @@ async fn kv_delete_range(
     Json(req): Json<DeleteRangeRequest>,
 ) -> Result<Json<DeleteRangeResponse>, (StatusCode, String)> {
     let token = extract_token(&headers);
+    let req = decode_delete_request(req);
     store
         .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
         .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
-    let req = decode_delete_request(req);
-    Ok(Json(store.delete_range(&req)))
+    let mut resp = store.delete_range(&req);
+    for kv in &mut resp.prev_kvs {
+        encode_kv(kv);
+    }
+    Ok(Json(resp))
 }
 
 async fn kv_txn(
