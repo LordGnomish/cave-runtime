@@ -1,0 +1,42 @@
+# parity.manifest.toml — cave-cloud-controller-manager
+# Tracks the kube-controller-manager → cloud-controller-manager split, plus
+# two out-of-tree provider implementations (Hetzner, Azure).
+
+[upstream]
+org     = "kubernetes"
+repo    = "kubernetes"
+version = "v1.36.0"
+
+[module]
+name        = "cave-cloud-controller-manager"
+description = "Cloud provider trait + node/service/route controllers + Hetzner & Azure provider scaffolds"
+source_root = "src"
+
+# ── In-tree (kubernetes/kubernetes) file mappings ────────────────────────────
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/cloud.go"
+local    = "src/provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_controller.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/service/controller.go"
+local    = "src/service_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go"
+local    = "src/route_controller.rs"
+
+# ── Hetzner (out-of-tree) provider mappings ──────────────────────────────────
+[[providers.hetzner]]
+upstream = "github.com/hetznercloud/hcloud-cloud-controller-manager"
+version  = "v1.30.1"
+local    = "src/providers/hetzner.rs"
+
+# ── Azure (out-of-tree) provider mappings ────────────────────────────────────
+[[providers.azure]]
+upstream = "github.com/kubernetes-sigs/cloud-provider-azure"
+version  = "v1.35.3"
+local    = "src/providers/azure.rs"
