@@ -74,9 +74,61 @@ pub fn reconcile(
     }
 }
 
-/// Stub: scale-subresource lookup for the PDB target. Not implemented.
-pub fn resolve_scale_target(_spec: &PdbSpec) -> Result<u32, ControllerError> {
-    unimplemented!("PDB scale-subresource — see pkg/controller/disruption/disruption.go::getExpectedScale")
+/// View of a target the PDB applies to (Deployment / RS / StatefulSet etc.).
+/// Mirrors the projection used by upstream `getExpectedScale`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScaleTargetRef {
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    /// Replica count exposed by the target's `/scale` subresource.
+    pub spec_replicas: u32,
+}
+
+/// Resolve the expected pod count for `spec` from the matching ScaleTarget.
+/// Mirrors `pkg/controller/disruption/disruption.go::getExpectedScale`.
+pub fn resolve_scale_target(
+    spec: &PdbSpec,
+    target: &ScaleTargetRef,
+) -> Result<u32, ControllerError> {
+    if target.namespace != spec.namespace {
+        return Err(ControllerError::InvalidSpec {
+            kind: "PodDisruptionBudget",
+            reason: format!(
+                "scale target {}/{} is in namespace `{}`; PDB is in `{}` (cross-namespace not allowed)",
+                target.kind, target.name, target.namespace, spec.namespace,
+            ),
+        });
+    }
+    Ok(target.spec_replicas)
+}
+
+/// Admission decision returned by the eviction handler.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvictionDecision {
+    /// Eviction allowed — PDB has remaining budget.
+    Allow,
+    /// Eviction denied — would breach `disruptionsAllowed`.
+    Deny { reason: &'static str },
+}
+
+/// Eviction admission decision. Mirrors the request side of
+/// `pkg/registry/policy/eviction/storage/storage.go::Eviction.Create`:
+///   * dry_run never consumes budget,
+///   * disruptions_allowed > 0 → Allow,
+///   * otherwise Deny with a fixed reason matching upstream message
+///     `"Cannot evict pod as it would violate the pod's disruption budget."`
+pub fn admit_eviction(status: &PdbStatus, dry_run: bool) -> EvictionDecision {
+    if dry_run {
+        return EvictionDecision::Allow;
+    }
+    if status.disruptions_allowed > 0 {
+        EvictionDecision::Allow
+    } else {
+        EvictionDecision::Deny {
+            reason: "Cannot evict pod as it would violate the pod's disruption budget.",
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -158,5 +210,101 @@ mod tests {
             max_unavailable: None,
         };
         assert!(disruptions_allowed(&spec, &PdbStatus::default()).is_err());
+    }
+
+    // ── Deeper coverage (deeper-001) ─────────────────────────────────────────
+
+    /// Upstream parity: `TestEvictionAdmission_AllowedWhenBudgetRemaining`
+    /// (registry/policy/eviction/storage/storage_test.go::TestEviction —
+    /// disruptions_allowed > 0 admits the eviction call).
+    #[test]
+    fn eviction_admitted_when_budget_remaining() {
+        let (_cite, tenant) = test_ctx!(
+            "staging/src/k8s.io/kubernetes/pkg/registry/policy/eviction/storage/storage.go",
+            "Eviction.Create",
+            "tenant-pdb-evict-allow"
+        );
+        let _ = tenant;
+        let st = PdbStatus { current_healthy: 5, expected_pods: 5, disruptions_allowed: 2 };
+        assert_eq!(admit_eviction(&st, false), EvictionDecision::Allow);
+    }
+
+    /// Upstream parity: `TestEvictionAdmission_DeniedAtZeroBudget`
+    /// (storage_test.go::TestEviction — exhausted budget yields the
+    /// canonical 429 deny message verbatim).
+    #[test]
+    fn eviction_denied_when_budget_exhausted_with_canonical_message() {
+        let (_cite, tenant) = test_ctx!(
+            "staging/src/k8s.io/kubernetes/pkg/registry/policy/eviction/storage/storage.go",
+            "Eviction.Create",
+            "tenant-pdb-evict-deny"
+        );
+        let _ = tenant;
+        let st = PdbStatus { current_healthy: 3, expected_pods: 5, disruptions_allowed: 0 };
+        match admit_eviction(&st, false) {
+            EvictionDecision::Deny { reason } => {
+                assert_eq!(reason,
+                    "Cannot evict pod as it would violate the pod's disruption budget.");
+            }
+            EvictionDecision::Allow => panic!("expected Deny when budget exhausted"),
+        }
+    }
+
+    /// Upstream parity: `TestEvictionAdmission_DryRunNeverConsumes`
+    /// (storage_test.go — dry-run path admits regardless of budget).
+    #[test]
+    fn dry_run_eviction_admits_even_with_zero_budget() {
+        let (_cite, tenant) = test_ctx!(
+            "staging/src/k8s.io/kubernetes/pkg/registry/policy/eviction/storage/storage.go",
+            "Eviction.Create",
+            "tenant-pdb-evict-dryrun"
+        );
+        let _ = tenant;
+        let st = PdbStatus { current_healthy: 1, expected_pods: 5, disruptions_allowed: 0 };
+        assert_eq!(admit_eviction(&st, /*dry_run=*/ true), EvictionDecision::Allow);
+    }
+
+    /// Upstream parity: `TestPDB_ResolveScaleTargetSameNamespace`
+    /// (disruption_test.go::TestGetExpectedScale — the controller resolves
+    /// `target.spec.replicas` via the /scale subresource).
+    #[test]
+    fn resolve_scale_target_returns_target_spec_replicas() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/disruption/disruption.go",
+            "getExpectedScale",
+            "tenant-pdb-scale-target"
+        );
+        let _ = tenant;
+        let spec = pdb_min(Threshold::Percent(50));
+        let target = ScaleTargetRef {
+            kind: "Deployment".into(),
+            name: "web".into(),
+            namespace: "default".into(),
+            spec_replicas: 7,
+        };
+        assert_eq!(resolve_scale_target(&spec, &target).unwrap(), 7);
+    }
+
+    /// Upstream parity: `TestPDB_RejectsCrossNamespaceScaleTarget`
+    /// (disruption.go — PDB and target live in the same namespace).
+    /// In cave-apiserver this is also our tenant_id invariant for PDB.
+    #[test]
+    fn resolve_scale_target_rejects_cross_namespace_target() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/disruption/disruption.go",
+            "getExpectedScale",
+            "tenant-pdb-cross-ns"
+        );
+        let _ = tenant;
+        let spec = pdb_min(Threshold::Percent(50));
+        let target = ScaleTargetRef {
+            kind: "Deployment".into(),
+            name: "web".into(),
+            namespace: "kube-system".into(),
+            spec_replicas: 4,
+        };
+        let err = resolve_scale_target(&spec, &target).unwrap_err();
+        assert!(matches!(err, ControllerError::InvalidSpec { kind: "PodDisruptionBudget", .. }),
+            "tenant_id invariant: cross-namespace target rejected");
     }
 }

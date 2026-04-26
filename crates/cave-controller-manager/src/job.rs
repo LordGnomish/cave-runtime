@@ -63,9 +63,62 @@ pub fn reconcile(
     }
 }
 
-/// Stub: indexed-job per-index status tracking. Not implemented.
-pub fn index_status(_spec: &JobSpec) -> Result<Vec<u32>, ControllerError> {
-    unimplemented!("Indexed Job — see pkg/controller/job/indexed_job_utils.go")
+/// Per-index status for an Indexed-completion Job. Mirrors the
+/// `JobStatus.UncountedTerminatedPods` + `CompletedIndexes` model from
+/// `pkg/controller/job/indexed_job_utils.go`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndexState {
+    Pending,
+    Active,
+    Succeeded,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexedJobStatus {
+    /// 0-based index → state. Length equals `spec.completions`.
+    pub indexes: Vec<IndexState>,
+}
+
+impl IndexedJobStatus {
+    pub fn new_pending(completions: u32) -> Self {
+        Self { indexes: (0..completions).map(|_| IndexState::Pending).collect() }
+    }
+
+    pub fn count(&self, want: &IndexState) -> u32 {
+        self.indexes.iter().filter(|s| std::mem::discriminant(*s) == std::mem::discriminant(want))
+            .count() as u32
+    }
+}
+
+/// Plan one indexed-job step. Mirrors
+/// `pkg/controller/job/indexed_job_utils.go::firstPendingIndexes`:
+///   * never exceed `parallelism` concurrent active indexes,
+///   * pick the lowest pending indexes first,
+///   * skip already-Succeeded/Failed slots.
+pub fn index_status(
+    spec: &JobSpec,
+    status: &IndexedJobStatus,
+) -> Result<Vec<u32>, ControllerError> {
+    if status.indexes.len() != spec.completions as usize {
+        return Err(ControllerError::InvalidSpec {
+            kind: "IndexedJob",
+            reason: format!(
+                "indexed status length {} does not match completions {}",
+                status.indexes.len(),
+                spec.completions),
+        });
+    }
+    let active = status.count(&IndexState::Active);
+    let want = spec.parallelism.saturating_sub(active);
+    let mut out = vec![];
+    for (i, s) in status.indexes.iter().enumerate() {
+        if out.len() as u32 >= want { break; }
+        if matches!(s, IndexState::Pending) {
+            out.push(i as u32);
+        }
+    }
+    Ok(out)
 }
 
 #[allow(dead_code)]
@@ -135,5 +188,120 @@ mod tests {
         let s = job(4, 10, 6, true);
         let st = JobStatus { active: 4, succeeded: 0, failed: 0 };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(4));
+    }
+
+    // ── Deeper coverage (deeper-001) ─────────────────────────────────────────
+
+    /// Upstream parity: `TestManageJob_RespectsParallelismVsRemaining`
+    /// (job_controller_test.go::TestManageJob — when remaining work is
+    /// less than parallelism, only the remaining count is launched).
+    #[test]
+    fn manage_job_caps_at_remaining_when_below_parallelism() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/job_controller.go",
+            "manageJob",
+            "tenant-job-remaining-cap"
+        );
+        let s = job(/*par=*/ 5, /*compl=*/ 8, /*backoff=*/ 6, /*suspend=*/ false);
+        let st = JobStatus { active: 0, succeeded: 7, failed: 0 };
+        // remaining = 8 - 7 = 1, parallelism = 5 → launch 1.
+        assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(1));
+    }
+
+    /// Upstream parity: `TestManageJob_NoOpWhenAtParallelism`
+    /// (job_controller_test.go — no new pods launched while active count
+    /// equals parallelism, even with remaining completions).
+    #[test]
+    fn manage_job_is_noop_when_active_equals_parallelism() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/job_controller.go",
+            "manageJob",
+            "tenant-job-at-parallelism"
+        );
+        let s = job(3, 10, 6, false);
+        let st = JobStatus { active: 3, succeeded: 0, failed: 0 };
+        assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp,
+            "no surge while at parallelism cap");
+    }
+
+    /// Upstream parity: `TestIndexedJob_FirstPendingIndexes`
+    /// (indexed_job_utils_test.go::TestFirstPendingIndexes — picks the
+    /// lowest pending indexes up to `parallelism - active`).
+    #[test]
+    fn indexed_job_picks_lowest_pending_indexes_within_parallelism_budget() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/indexed_job_utils.go",
+            "firstPendingIndexes",
+            "tenant-job-indexed-pick"
+        );
+        let _ = tenant;
+        let s = job(/*par=*/ 3, /*compl=*/ 5, /*backoff=*/ 6, /*suspend=*/ false);
+        let st = IndexedJobStatus {
+            indexes: vec![
+                IndexState::Succeeded, // 0
+                IndexState::Pending,   // 1
+                IndexState::Active,    // 2 (counts toward parallelism)
+                IndexState::Pending,   // 3
+                IndexState::Pending,   // 4
+            ],
+        };
+        // active=1, parallelism=3 → want=2 → pick lowest two pending: 1, 3.
+        let picks = index_status(&s, &st).unwrap();
+        assert_eq!(picks, vec![1, 3]);
+    }
+
+    /// Upstream parity: `TestIndexedJob_AllSucceededYieldsNoMoreWork`
+    /// (indexed_job_utils_test.go — once every index is Succeeded the
+    /// scheduler emits no further work).
+    #[test]
+    fn indexed_job_emits_nothing_when_all_indexes_succeeded() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/indexed_job_utils.go",
+            "firstPendingIndexes",
+            "tenant-job-indexed-done"
+        );
+        let _ = tenant;
+        let s = job(3, 4, 6, false);
+        let st = IndexedJobStatus {
+            indexes: vec![IndexState::Succeeded; 4],
+        };
+        let picks = index_status(&s, &st).unwrap();
+        assert!(picks.is_empty());
+    }
+
+    /// Upstream parity: `TestIndexedJob_RejectsInconsistentStatusLength`
+    /// (indexed_job_utils.go — status indexes length must match
+    /// `spec.completions`).
+    #[test]
+    fn indexed_job_rejects_status_length_mismatch() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/indexed_job_utils.go",
+            "validateIndexedJobStatus",
+            "tenant-job-indexed-inconsistent"
+        );
+        let _ = tenant;
+        let s = job(3, 5, 6, false);
+        let st = IndexedJobStatus { indexes: vec![IndexState::Pending; 3] }; // 3 != 5
+        let err = index_status(&s, &st).unwrap_err();
+        assert!(matches!(err, ControllerError::InvalidSpec { kind: "IndexedJob", .. }));
+    }
+
+    /// Upstream parity: `TestPastBackoffLimit_BoundaryAtEqual`
+    /// (job_controller_test.go::TestPastBackoffLimitOnFailure — exactly
+    /// `failed == backoff_limit` is NOT past the limit yet).
+    #[test]
+    fn past_backoff_is_strictly_greater_than_limit() {
+        let (_cite, tenant) = test_ctx!(
+            "pkg/controller/job/job_controller.go",
+            "pastBackoffLimitOnFailure",
+            "tenant-job-backoff-equal"
+        );
+        let _ = tenant;
+        let s = job(2, 10, /*backoff=*/ 3, false);
+        let on_edge = JobStatus { active: 0, succeeded: 0, failed: 3 };
+        assert!(!past_backoff(&s, &on_edge),
+            "failed == backoff_limit is at the boundary, not past");
+        let over = JobStatus { active: 0, succeeded: 0, failed: 4 };
+        assert!(past_backoff(&s, &over));
     }
 }
