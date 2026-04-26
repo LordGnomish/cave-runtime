@@ -81,6 +81,13 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/runtime/handlers", get(list_runtime_handlers))
         .route("/api/cri/runtime/handlers/{name}", get(get_runtime_handler))
         .route("/api/cri/runtime/handlers/default", get(get_default_runtime_handler))
+        // Stats v2 — cAdvisor / Linux / Windows variants (4)
+        .route("/api/cri/stats/containers", get(list_container_stats_v2))
+        .route("/api/cri/stats/containers/{id}/linux", get(get_container_stats_linux))
+        .route("/api/cri/stats/containers/{id}/windows", get(get_container_stats_windows))
+        .route("/api/cri/stats/imagefs", get(get_image_fs_info))
+        .route("/api/cri/metrics/descriptors", get(get_metric_descriptors))
+        .route("/api/cri/metrics/cadvisor", get(get_cadvisor_metrics))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -162,6 +169,68 @@ async fn get_default_runtime_handler(
         .default_handler()
         .map(Json)
         .ok_or_else(|| (StatusCode::NOT_FOUND, "no default runtime handler configured".to_string()))
+}
+
+// ── Stats v2 / cAdvisor ───────────────────────────────────────────────────────
+
+async fn list_container_stats_v2(
+    State(state): State<Arc<CriState>>,
+    Query(filter): Query<crate::stats::ContainerStatsFilter>,
+) -> Json<Vec<crate::stats::ContainerStatsLinux>> {
+    let containers = state.containers.list();
+    let filtered = crate::stats::filter_containers(&containers, &filter);
+    let mut out = Vec::new();
+    for c in filtered {
+        if let Ok(s) = crate::stats::container_stats_linux(c, None) {
+            out.push(s);
+        }
+    }
+    Json(out)
+}
+
+async fn get_container_stats_linux(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::stats::ContainerStatsLinux>, (StatusCode, String)> {
+    let c = runtime::inspect_container(id, &state.containers)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    crate::stats::container_stats_linux(&c, None)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn get_container_stats_windows(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::stats::WindowsContainerStats>, (StatusCode, String)> {
+    let c = runtime::inspect_container(id, &state.containers)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    crate::stats::container_stats_windows(&c)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn get_image_fs_info(
+    State(state): State<Arc<CriState>>,
+) -> Json<crate::stats::ImageFsInfo> {
+    let images = state.images.list();
+    let root = crate::paths::image_cache_dir().display().to_string();
+    Json(crate::stats::image_fs_info(&root, &images))
+}
+
+async fn get_metric_descriptors() -> Json<Vec<crate::stats::MetricDescriptor>> {
+    Json(crate::stats::cadvisor_descriptors())
+}
+
+async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {
+    let mut all = Vec::new();
+    for c in state.containers.list() {
+        if let Ok(s) = crate::stats::container_stats_linux(&c, None) {
+            all.extend(crate::stats::linux_to_metrics(&s));
+        }
+    }
+    let body = crate::stats::render_prometheus(&all);
+    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")], body).into_response()
 }
 
 async fn get_node_stats(State(state): State<Arc<CriState>>) -> Json<NodeStats> {

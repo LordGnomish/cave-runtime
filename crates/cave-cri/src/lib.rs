@@ -75,6 +75,7 @@ pub mod logs;
 pub mod log_v2;
 pub mod health;
 pub mod runtime_handler;
+pub mod stats;
 
 #[cfg(test)]
 mod upstream_tests;

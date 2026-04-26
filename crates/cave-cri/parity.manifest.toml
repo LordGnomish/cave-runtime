@@ -65,6 +65,22 @@ local    = "src/log_v2.rs"
 upstream = "pkg/cri/server/container_log_reopen.go"
 local    = "src/log_v2.rs"
 
+[[files]]
+upstream = "pkg/cri/server/container_stats.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stats_list.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/imagefs_info.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/metrics.go"
+local    = "src/stats.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -253,6 +269,43 @@ upstream_name = "StitchCRIPartials"
 local_name    = "stitch_partials"
 file          = "src/log_v2.rs"
 
+# Stats v2 — cAdvisor / Linux / Windows variants
+
+[[functions]]
+upstream_name = "ContainerStats"
+local_name    = "container_stats_linux"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "WindowsContainerStats"
+local_name    = "container_stats_windows"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListContainerStats"
+local_name    = "list_container_stats_v2"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ImageFsInfo"
+local_name    = "image_fs_info"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListMetricDescriptors"
+local_name    = "cadvisor_descriptors"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListPodSandboxStats"
+local_name    = "filter_containers"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "RenderPrometheus"
+local_name    = "render_prometheus"
+file          = "src/stats.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -355,6 +408,40 @@ local_test    = "test_cri_log_stitch_partials"
 upstream_test = "TestCRILogRotation"
 local_test    = "test_cri_log_rotation"
 
+# Stats v2
+
+[[tests]]
+upstream_test = "TestContainerStatsLinux"
+local_test    = "test_container_stats_linux"
+
+[[tests]]
+upstream_test = "TestContainerStatsWindows"
+local_test    = "test_container_stats_windows"
+
+[[tests]]
+upstream_test = "TestListContainerStats"
+local_test    = "test_list_container_stats"
+
+[[tests]]
+upstream_test = "TestImageFsInfo"
+local_test    = "test_image_fs_info"
+
+[[tests]]
+upstream_test = "TestListMetricDescriptors"
+local_test    = "test_list_metric_descriptors"
+
+[[tests]]
+upstream_test = "TestRenderPrometheus"
+local_test    = "test_render_prometheus"
+
+[[tests]]
+upstream_test = "TestContainerStatsFilter"
+local_test    = "test_container_stats_filter"
+
+[[tests]]
+upstream_test = "TestNanoCoresFromDelta"
+local_test    = "test_nano_cores_from_delta"
+
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
 [[surfaces]]
@@ -441,3 +528,33 @@ local_path    = "/api/cri/runtime/handlers/{name}"
 kind          = "http"
 upstream_path = "RuntimeService.DefaultRuntimeHandler"
 local_path    = "/api/cri/runtime/handlers/default"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListContainerStats"
+local_path    = "/api/cri/stats/containers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Linux"
+local_path    = "/api/cri/stats/containers/{id}/linux"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Windows"
+local_path    = "/api/cri/stats/containers/{id}/windows"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.ImageFsInfo"
+local_path    = "/api/cri/stats/imagefs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListMetricDescriptors"
+local_path    = "/api/cri/metrics/descriptors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "Metrics.cAdvisor"
+local_path    = "/api/cri/metrics/cadvisor"

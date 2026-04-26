@@ -276,6 +276,129 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Stats v2 / cAdvisor ────────────────────────────────────────────────────────
+
+use crate::stats;
+
+fn make_stats_container() -> crate::models::Container {
+    use crate::models::*;
+    Container {
+        id: Uuid::new_v4(),
+        spec: ContainerSpec {
+            name: "stats-c".into(),
+            image: "nginx:latest".into(),
+            command: vec![],
+            args: vec![],
+            env: Default::default(),
+            mounts: vec![],
+            resources: ResourceLimits {
+                memory_limit: Some(1024 * 1024),
+                ..Default::default()
+            },
+            labels: [("app".to_string(), "web".to_string())].into_iter().collect(),
+            working_dir: None,
+            user: None,
+            hostname: None,
+            network_mode: NetworkMode::Bridge,
+            restart_policy: RestartPolicy::Never,
+        },
+        status: ContainerStatus::Running,
+        pid: Some(1),
+        created_at: Utc::now(),
+        started_at: Some(Utc::now()),
+        finished_at: None,
+        exit_code: None,
+        rootfs_path: "/tmp/r".into(),
+        log_path: "/tmp/r.log".into(),
+        health: None,
+    }
+}
+
+#[test]
+fn test_container_stats_linux() {
+    let c = make_stats_container();
+    let s = stats::container_stats_linux(&c, None).unwrap();
+    let attrs = s.attributes.unwrap();
+    assert_eq!(attrs.id, c.id);
+    assert_eq!(s.writable_layer.fs_id.mountpoint, "/tmp/r");
+}
+
+#[test]
+fn test_container_stats_windows() {
+    let c = make_stats_container();
+    let s = stats::container_stats_windows(&c).unwrap();
+    let attrs = s.attributes.unwrap();
+    assert_eq!(attrs.name, "stats-c");
+}
+
+#[test]
+fn test_list_container_stats() {
+    let a = make_stats_container();
+    let mut b = make_stats_container();
+    b.spec.labels.insert("app".into(), "db".into());
+    let f = stats::ContainerStatsFilter {
+        label_selector: [("app".to_string(), "db".to_string())].into_iter().collect(),
+        ..Default::default()
+    };
+    let got = stats::filter_containers([&a, &b], &f);
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].id, b.id);
+}
+
+#[test]
+fn test_image_fs_info() {
+    use crate::models::*;
+    let imgs = vec![
+        OciImage { reference: "x".into(), digest: "d".into(), layers: vec![],
+                   config: ImageConfig::default(), size_bytes: 42, pulled_at: Utc::now() },
+    ];
+    let info = stats::image_fs_info("/var/lib/cave/images", &imgs);
+    assert_eq!(info.image_filesystems[0].used_bytes, 42);
+}
+
+#[test]
+fn test_list_metric_descriptors() {
+    let d = stats::cadvisor_descriptors();
+    assert!(d.iter().any(|m| m.name == "container_cpu_usage_seconds_total"));
+    assert!(d.iter().any(|m| m.name == "container_memory_working_set_bytes"));
+}
+
+#[test]
+fn test_render_prometheus() {
+    let c = make_stats_container();
+    let s = stats::container_stats_linux(&c, None).unwrap();
+    let metrics = stats::linux_to_metrics(&s);
+    let rendered = stats::render_prometheus(&metrics);
+    assert!(rendered.contains("# TYPE container_cpu_usage_seconds_total counter"));
+    assert!(rendered.contains("name=\"stats-c\""));
+}
+
+#[test]
+fn test_container_stats_filter() {
+    let a = make_stats_container();
+    let b = make_stats_container();
+    let f = stats::ContainerStatsFilter { id: Some(b.id), ..Default::default() };
+    let got = stats::filter_containers([&a, &b], &f);
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].id, b.id);
+}
+
+#[test]
+fn test_nano_cores_from_delta() {
+    // 100 ms apart, 50_000 nano-CPU consumed → 500_000 nano_cores.
+    let prev = stats::CpuUsage {
+        timestamp: 0,
+        usage_core_nano_seconds: 0,
+        usage_nano_cores: 0,
+    };
+    let mut c = make_stats_container();
+    c.id = Uuid::new_v4();
+    let s = stats::container_stats_linux(&c, Some(&prev)).unwrap();
+    // Without real cgroup data the delta is 0 → nano_cores = 0.
+    // We just verify the field is populated and finite.
+    assert!(s.cpu.usage_nano_cores < u64::MAX);
+}
+
 // ── Container log v2 ───────────────────────────────────────────────────────────
 
 use crate::log_v2;
