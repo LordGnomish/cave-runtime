@@ -37,3 +37,4 @@ uuid = { workspace = true }
 serde = { workspace = true }
 hex = "0.4"
 base64 = "0.22"
+tempfile = "3"

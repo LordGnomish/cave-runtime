@@ -53,6 +53,7 @@ fn glob_star_matches_any_suffix() {
     let r = PolicyRule {
         path: "secret/data/*".into(),
         capabilities: vec![Capability::Read],
+        ..Default::default()
     };
     assert!(r.matches("secret/data/foo"));
     assert!(r.matches("secret/data/foo/bar/baz"));
@@ -72,6 +73,7 @@ fn segment_plus_matches_only_single_segment() {
     let r = PolicyRule {
         path: "secret/data/+".into(),
         capabilities: vec![Capability::Read],
+        ..Default::default()
     };
     assert!(r.matches("secret/data/single"));
     assert!(!r.matches("secret/data/nested/deeper"), "+ is single-segment");
@@ -85,8 +87,8 @@ fn longest_prefix_wins_among_overlapping_rules() {
     let p = Policy {
         name: "tiered".into(),
         rules: vec![
-            PolicyRule { path: "secret/*".into(), capabilities: vec![Capability::Read] },
-            PolicyRule { path: "secret/admin/*".into(), capabilities: vec![Capability::Read, Capability::Update] },
+            PolicyRule { path: "secret/*".into(), capabilities: vec![Capability::Read] , ..Default::default() },
+            PolicyRule { path: "secret/admin/*".into(), capabilities: vec![Capability::Read, Capability::Update] , ..Default::default() },
         ],
         raw: String::new(),
     };
@@ -104,6 +106,7 @@ fn deny_capability_blocks_otherwise_allowed_actions() {
         rules: vec![PolicyRule {
             path: "secret/locked".into(),
             capabilities: vec![Capability::Read, Capability::Deny],
+            ..Default::default()
         }],
         raw: String::new(),
     };
