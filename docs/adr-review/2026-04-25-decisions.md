@@ -171,3 +171,42 @@ Workflow doc'a "ADR Review Calendar" section eklenecek.
 - **File:** `docs/adr/ADR-011_Backstage_as_Developer_Portal.md`
 - **Decision (2026-04-25):** **PLATFORM KEEP** (Burak onayladı 2026-04-25). Auto Runtime mirror via cave-portal reimpl. Quality bar OK, Kratix 2027 forward-watch.
 
+## ADR-012 — Tenant Isolation: Tenant Kamaji + Long-term Env Nested Kamaji + Capsule Ephemeral + Suspend/Resume Governance
+
+Status: Accepted (v7) — finalized with Burak 2026-04-26
+Scope: Universal
+Category: Multi-Tenancy + Cost Optimization
+
+### Architecture (3 building blocks)
+1. **Top tenant** — Kamaji TCP per account, hard isolation always
+2. **Long-term env** — Nested Kamaji TCP per env (prod/staging/dev), real CP per env
+3. **Capsule namespace** — Ephemeral, optional parent (within long-term env OR direct under tenant)
+
+### vcluster: dropped — Kamaji recursive + Capsule covers all use cases
+
+### Suspend/Resume (every Kamaji TCP suspendable)
+- Capsule ephemeral: TTL-based, no governance
+- Long-term env dev: single confirmation, 1h cancel window
+- Long-term env staging: double confirmation, 4h cancel window
+- Long-term env production: **two-person rule** (M-of-N=2/2) OR super-admin triple-confirm, 24h hold + 24h cancel
+- Top tenant: two-person rule + super-admin override, 48h hold + 48h cancel
+
+### Implementation
+- `cave-kamaji` — recursive TCP + suspend controller + ApprovalRequest CRD
+- `cave-capsule` — direct-at-tenant + in-env namespace + TTL controller
+- `cave-audit` — immutable signed (PQC ML-DSA) audit log per tenant, 7y retention
+- `cavectl approval list/approve/cancel/show` + `cavectl env|tenant suspend/resume`
+
+### Acceleration
+1. Pre-warm pool top-tenant + long-term env (each level)
+2. Snapshot clone (APFS CoW host, overlayfs Linux equivalent)
+3. Minimal CP profile child TCP'lerde
+4. Tiered etcd (long-term dedicated, ephemeral shared)
+5. Rust impl 2-3x faster than Go upstream
+
+### Rejected
+- vcluster (everywhere) — Kamaji recursive covers ephemeral
+- Capsule-only soft tier — namespace isolation insufficient for compliance
+- Single-person production suspend — too risky, two-person rule
+- No suspend hold window — irreversible mistakes
+
