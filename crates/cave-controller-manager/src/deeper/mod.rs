@@ -38,3 +38,9 @@ pub mod hpa_conditions;
 pub mod hpa_metric_sources;
 pub mod hpa_multi_metric;
 pub mod hpa_target_ref;
+
+// 100-pct PUSH-HARD M12 — workload controllers deepening
+// (CronJob timezone + concurrency, DaemonSet OnDelete, RS revision history).
+pub mod cronjob_advanced;
+pub mod daemonset_strategies;
+pub mod replicaset_revision;
