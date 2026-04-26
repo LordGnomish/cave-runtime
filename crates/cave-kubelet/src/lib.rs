@@ -19,6 +19,16 @@ pub mod models;
 pub mod agent;
 pub mod routes;
 
+// deeper-003 — node-side runtime modules.
+pub mod container_metrics;
+pub mod dra;
+pub mod image_gc;
+pub mod kubelet_config;
+pub mod node_lease;
+pub mod plugin_watcher;
+pub mod topology_manager;
+pub mod volume_reconciler;
+
 use agent::KubeletState;
 use std::sync::Arc;
 
