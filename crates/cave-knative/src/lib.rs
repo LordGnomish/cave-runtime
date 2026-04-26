@@ -1,44 +1,19 @@
-//! CAVE Knative — serverless workloads.
+//! cave-knative: Knative Serverless reimpl (scaffold — impl pending).
 //!
-//! Compatible with: knative/serving, knative/eventing
-//!
-//! Features:
-//! - Knative Serving: Service, Revision, Route, scale-to-zero, traffic splitting
-//! - Knative Eventing: Broker, Trigger, EventSource, Channel, Subscription
-//! - CloudEvents 1.0 spec ingestion and fan-out
-//! - Simulated autoscaler (KPA) — scale-to-zero, scale-up on request
+//! upstream: knative/serving v1.18.x
 
-pub mod error;
+#![allow(non_snake_case)]
+
+pub mod meta;
+pub mod ksvc;
+pub mod revision;
+pub mod configuration;
+pub mod route;
 pub mod eventing;
-pub mod models;
-pub mod routes;
-pub mod serving;
 
-use axum::Router;
-use std::sync::Arc;
-
-pub use error::{KnativeError, KnativeResult};
-pub use eventing::EventingStore;
-pub use serving::ServingStore;
-
-pub const MODULE_NAME: &str = "knative";
-
-/// Shared state for the cave-knative module.
-pub struct KnativeState {
-    pub serving: Arc<ServingStore>,
-    pub eventing: Arc<EventingStore>,
-}
-
-impl Default for KnativeState {
-    fn default() -> Self {
-        Self {
-            serving: Arc::new(ServingStore::new()),
-            eventing: Arc::new(EventingStore::new()),
-        }
-    }
-}
-
-/// Build the Axum router for the Knative API.
-pub fn router(state: Arc<KnativeState>) -> Router {
-    routes::create_router(state)
-}
+pub use ksvc::Ksvc;
+pub use revision::Revision;
+pub use configuration::Configuration;
+pub use route::Route;
+pub use eventing::{EventingSource, EventingSink};
+pub use meta::{ObjectMeta, TrafficTarget, RevisionTemplateSpec, PodSpec, Container, EnvVar};

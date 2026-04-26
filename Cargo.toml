@@ -14,6 +14,8 @@ members = [
     "crates/cave-status",
     "crates/cave-changelog",
     "crates/cave-certs",
+    "crates/cave-acme",
+    "crates/cave-pki",
     # === Phase 2: Security Core ===
     "crates/cave-vulns",
     "crates/cave-sbom",
@@ -55,6 +57,7 @@ members = [
     "crates/cave-cache",
     "crates/cave-store",
     "crates/cave-streams",
+    "crates/cave-cdc",
     # === Observability ===
     "crates/cave-metrics",
     "crates/cave-logs",
@@ -94,6 +97,7 @@ members = [
     "crates/cave-apiserver",
     "crates/cave-cri",
     "crates/cave-kubelet",
+    "crates/cave-kube-proxy",
     "crates/cave-net",
     "crates/cave-scheduler",
     "crates/cave-etcd",
@@ -114,6 +118,16 @@ members = [
     # === Data Lake Foundation ===
     "crates/cave-iceberg",
     "crates/cave-datafusion",
+    # === Kubernetes Controller Manager ===
+    "crates/cave-controller-manager",
+    # === Kubernetes Cloud Controller Manager ===
+    "crates/cave-cloud-controller-manager",
+    # === Search Engine ===
+    "crates/cave-search",
+    # === Serverless (Knative) ===
+    "crates/cave-knative",
+    # === Event-driven Autoscaler (KEDA) ===
+    "crates/cave-keda",
 ]
 
 [workspace.package]

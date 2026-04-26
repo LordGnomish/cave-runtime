@@ -1,37 +1,19 @@
-//! CAVE KEDA — event-driven autoscaling.
+//! cave-keda: KEDA event-driven autoscaler reimpl (scaffold — impl pending).
+//!
+//! upstream: kedacore/keda v2.x
 
-pub mod cooldown;
-pub mod error;
-pub mod models;
-pub mod routes;
 pub mod scaler;
-pub mod trigger;
+pub mod scaledobject;
+pub mod scaledjob;
+pub mod trigger_authentication;
+pub mod http_scaler;
+pub mod cron_scaler;
+pub mod kafka_scaler;
 
-use axum::Router;
-use std::sync::Arc;
-
-pub use error::{KedaError, KedaResult};
-
-pub const MODULE_NAME: &str = "keda";
-
-pub struct KedaState {
-    pub scaled_objects: Arc<scaler::ScaledObjectStore>,
-    pub scaled_jobs: Arc<scaler::ScaledJobStore>,
-    pub trigger_auths: Arc<trigger::TriggerAuthStore>,
-    pub cooldown: Arc<cooldown::CooldownTracker>,
-}
-
-impl Default for KedaState {
-    fn default() -> Self {
-        Self {
-            scaled_objects: Arc::new(scaler::ScaledObjectStore::new()),
-            scaled_jobs: Arc::new(scaler::ScaledJobStore::new()),
-            trigger_auths: Arc::new(trigger::TriggerAuthStore::new()),
-            cooldown: Arc::new(cooldown::CooldownTracker::new()),
-        }
-    }
-}
-
-pub fn router(state: Arc<KedaState>) -> Router {
-    routes::create_router(state)
-}
+pub use scaler::{Scaler, ScalingModifiers};
+pub use scaledobject::ScaledObject;
+pub use scaledjob::ScaledJob;
+pub use trigger_authentication::TriggerAuthentication;
+pub use http_scaler::HttpScaler;
+pub use cron_scaler::CronScaler;
+pub use kafka_scaler::KafkaScaler;
