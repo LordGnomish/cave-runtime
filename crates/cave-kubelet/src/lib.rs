@@ -28,6 +28,7 @@ pub mod podresources;
 pub mod topology;
 pub mod cpumanager;
 pub mod memorymanager;
+pub mod deviceplugin;
 
 // deeper-003 — node-side runtime modules.
 pub mod container_metrics;
