@@ -25,5 +25,6 @@ pub mod hubble;
 pub mod identity;
 pub mod l7policy;
 pub mod l7proxy;
+pub mod policy;
 
 pub use types::{Cite, TenantId, UPSTREAM_VERSION};
