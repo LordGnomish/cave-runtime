@@ -104,6 +104,9 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         // UserNS — KEP-127 (M7)
         .route("/api/cri/userns/allocate", post(allocate_userns))
         .route("/api/cri/userns/allocated", get(allocated_userns))
+        // Cgroup v2 unified hierarchy (M9)
+        .route("/api/cri/cgroup/v2/controllers", get(get_v2_controllers))
+        .route("/api/cri/cgroup/v2/devices/program", post(assemble_v2_devices_program))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -315,6 +318,18 @@ async fn allocate_userns(
 
 async fn allocated_userns(State(state): State<Arc<CriState>>) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "allocated": state.userns_allocator.allocated() }))
+}
+
+async fn get_v2_controllers() -> Result<Json<Vec<String>>, (StatusCode, String)> {
+    crate::cgroup_v2::check_unified_hierarchy(std::path::Path::new("/sys/fs/cgroup"))
+        .map(Json)
+        .map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, e.to_string()))
+}
+
+async fn assemble_v2_devices_program(
+    Json(rules): Json<Vec<crate::cgroup_v2::DeviceRule>>,
+) -> Json<Vec<crate::cgroup_v2::BpfInstruction>> {
+    Json(crate::cgroup_v2::assemble_device_program(&rules))
 }
 
 async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {

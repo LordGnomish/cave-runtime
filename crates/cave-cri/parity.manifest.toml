@@ -1034,3 +1034,97 @@ local_test    = "test_restore_container_rejects_mismatched_manifest"
 [[tests]]
 upstream_test = "TestRestoreContainerSucceedsWithMatchingManifest"
 local_test    = "test_restore_container_succeeds_with_matching_manifest"
+
+# Cgroup v2 unified hierarchy (M9)
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/devices.go"
+local    = "src/cgroup_v2.rs"
+
+[[files]]
+upstream = "libcontainer/cgroups/devices/ebpf.go"
+local    = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "ApplyV2Limits"
+local_name    = "apply_v2"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "AssembleDeviceProgram"
+local_name    = "assemble_device_program"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "CheckUnifiedHierarchy"
+local_name    = "check_unified_hierarchy"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "EnableController"
+local_name    = "enable_controller"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "DefaultDeviceAllowlist"
+local_name    = "default_allowlist"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "RenderIoMaxEntry"
+local_name    = "render"
+file          = "src/cgroup_v2.rs"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyMemoryHigh"
+local_test    = "test_cgroup_v2_apply_memory_high"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyCpuWeight"
+local_test    = "test_cgroup_v2_apply_cpu_weight"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyIoMaxDevice"
+local_test    = "test_cgroup_v2_apply_io_max_device"
+
+[[tests]]
+upstream_test = "TestCgroupV2DevicesBpfProgramEmitsCompares"
+local_test    = "test_cgroup_v2_devices_bpf_program_emits_compares"
+
+[[tests]]
+upstream_test = "TestCgroupV2DefaultDenyAllRule"
+local_test    = "test_cgroup_v2_default_deny_all_rule"
+
+[[tests]]
+upstream_test = "TestCgroupV2CheckUnifiedHierarchyListsControllers"
+local_test    = "test_cgroup_v2_check_unified_hierarchy_lists_controllers"
+
+[[tests]]
+upstream_test = "TestCgroupV2CheckUnifiedHierarchyRejectsV1"
+local_test    = "test_cgroup_v2_check_unified_hierarchy_rejects_v1"
+
+[[tests]]
+upstream_test = "TestCgroupV2EnableController"
+local_test    = "test_cgroup_v2_enable_controller"
+
+[[tests]]
+upstream_test = "TestCgroupV2RejectsOutOfRangeWeight"
+local_test    = "test_cgroup_v2_rejects_out_of_range_weight"
+
+[[tests]]
+upstream_test = "TestCgroupV2IoWeightZeroRejected"
+local_test    = "test_cgroup_v2_io_weight_zero_rejected"
+
+[[tests]]
+upstream_test = "TestCgroupV2DefaultAllowlistHasStandardDevices"
+local_test    = "test_cgroup_v2_default_allowlist_has_standard_devices"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.CgroupV2Controllers"
+local_path    = "/api/cri/cgroup/v2/controllers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.CgroupV2DevicesProgram"
+local_path    = "/api/cri/cgroup/v2/devices/program"
