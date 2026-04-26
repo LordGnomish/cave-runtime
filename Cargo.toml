@@ -35,6 +35,7 @@ members = [
     "crates/cave-scan",
     "crates/cave-portal",
     "crates/cave-portal-api",
+    "crates/cave-portal-web",
     "crates/cave-scaffold",
     "crates/cave-chaos",
     "crates/cave-dast",
