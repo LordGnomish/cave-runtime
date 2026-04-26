@@ -36,6 +36,7 @@ pub mod validating_admission_policy;
 pub mod vap_advanced;
 pub mod mutating_admission_policy;
 pub mod webhook_admission;
+pub mod builtin_admission;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;
