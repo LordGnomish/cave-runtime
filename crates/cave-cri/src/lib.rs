@@ -78,6 +78,7 @@ pub mod runtime_handler;
 pub mod sandbox;
 pub mod stats;
 pub mod streaming;
+pub mod transport;
 
 #[cfg(test)]
 mod upstream_tests;
