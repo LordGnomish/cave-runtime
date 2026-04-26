@@ -57,6 +57,7 @@
 //! ```
 
 pub mod auth_token;
+pub mod auth_v3;
 pub mod b64;
 pub mod balancer;
 pub mod client;
