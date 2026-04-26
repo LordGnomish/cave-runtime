@@ -2,13 +2,13 @@
 
 **Status:** Accepted
 
-**Scope:** Universal (Platform; Runtime override via ADR-RUNTIME-EVENT-SCALER-001 — `cave-keda`)
+**Scope:** Universal (Platform; Runtime sovereign reimpl `cave-keda` covered by the blanket ADR-RUNTIME-UPSTREAM-MIRROR-001 — no separate Runtime override ADR)
 
 **Category:** Platform / Workload Autoscaling
 
 **Date:** 2026-04-26
 
-**Related ADRs:** 021 (Streams Kafka/Pulsar), 032 (Karpenter), 038 (Argo Workflows), 040 (ARC Runner Scaling), 075 (Knative + KEDA Phase 4), 095 (Reflex Engine), 115 (CI Secret Injection)
+**Related ADRs:** 021 (Streams Kafka/Pulsar), 032 (Karpenter), 038 (Argo Workflows), 040 (ARC Runner Scaling), 075 (Knative + KEDA Phase 4), 095 (Reflex Engine), 115 (OIDC Identity Federation)
 
 ## Context
 
@@ -30,7 +30,7 @@ KEDA fills this gap by:
 2. Driving an **internally managed HPA** when the desired replica count is `>= 1`.
 3. Suspending the workload to **zero replicas** when no events are present, bypassing HPA's `minReplicas: 1` floor.
 4. Sourcing triggers from a 40+ scaler ecosystem (Prometheus, Kafka, Redis, RabbitMQ, AWS SQS, Azure Service Bus, NATS, Pulsar, cron, External / gRPC, HTTP add-on).
-5. Binding to sovereign secrets via `TriggerAuthentication` + `ClusterTriggerAuthentication`, which integrate with OpenBao references rather than raw `Secret` objects (ADR-115).
+5. Binding to sovereign secrets via `TriggerAuthentication` + `ClusterTriggerAuthentication`, which integrate with OpenBao references and OIDC-federated workload identity (ADR-115) rather than raw `Secret` objects.
 
 KEDA is CNCF **Graduated** (since 2023), under Apache 2.0, and is the de-facto event-driven autoscaler for Kubernetes.
 
@@ -38,7 +38,7 @@ ADR-095 (Reflex Engine) and ADR-075 (Knative) already reference KEDA implicitly.
 
 - The scaler primitive has a citable, audited home of its own.
 - Other ADRs depend on a stable contract instead of inheriting KEDA via two different upstream documents.
-- The Runtime override (ADR-RUNTIME-EVENT-SCALER-001 → `cave-keda`) has a parent to inherit from.
+- Runtime sovereign reimpl (`cave-keda`) inherits this contract directly under the blanket ADR-RUNTIME-UPSTREAM-MIRROR-001 charter principle, with no need for a per-feature override ADR.
 
 ## Candidates
 
@@ -50,7 +50,7 @@ ADR-095 (Reflex Engine) and ADR-075 (Knative) already reference KEDA implicitly.
 | Prometheus metric triggers | ✅ Prometheus scaler | ⚠️ External Metric (limited) | ❌ | ⚠️ |
 | External / gRPC scaler | ✅ Pluggable | ❌ | ❌ | ⚠️ |
 | K8s native | ✅ CRDs (`ScaledObject`, `ScaledJob`, `TriggerAuthentication`) | ✅ Built-in | ✅ CRDs | ⚠️ Custom CRDs |
-| Sovereign secret binding | ✅ `TriggerAuthentication` → OpenBao via External Secrets / CSI | ⚠️ `Secret` only | ⚠️ | ⚠️ |
+| Sovereign secret / identity binding | ✅ `TriggerAuthentication` → OpenBao via External Secrets / CSI; OIDC workload identity (ADR-115) | ⚠️ `Secret` only | ⚠️ | ⚠️ |
 | HPA coexistence | ✅ Manages an internally created HPA | n/a | n/a | ⚠️ Conflicts likely |
 | License | Apache 2.0 | Apache 2.0 (in-tree) | Apache 2.0 | n/a |
 | Maturity | CNCF Graduated | Stable in-tree | CNCF Incubating | n/a |
@@ -64,7 +64,7 @@ ADR-095 (Reflex Engine) and ADR-075 (Knative) already reference KEDA implicitly.
 
 must use a `ScaledObject` (long-lived workloads) or `ScaledJob` (batch / per-event Job pattern). Manual `HorizontalPodAutoscaler` resources for the same target are **not allowed** and are rejected by admission policy (ADR-030 OPA Gatekeeper).
 
-KEDA runs in the `keda-system` namespace, deployed via Helm chart pinned to a specific upstream release. `TriggerAuthentication` resources reference OpenBao secrets through the existing CI Secret Injection chain (ADR-115). Per-tenant `ClusterTriggerAuthentication` is forbidden by Gatekeeper to keep the secret blast radius scoped to a single tenant namespace.
+KEDA runs in the `keda-system` namespace, deployed via Helm chart pinned to a specific upstream release. `TriggerAuthentication` resources reference OpenBao secrets through the existing OIDC workload-identity chain (ADR-115). Per-tenant `ClusterTriggerAuthentication` is forbidden by Gatekeeper to keep the secret blast radius scoped to a single tenant namespace.
 
 KEDA is **load-bearing**: the Reflex Engine production go-live depends on it, and Knative scale-to-zero across non-HTTP triggers depends on it. Outage of `keda-operator` causes new triggers to stall; existing replicas keep serving.
 
@@ -109,7 +109,7 @@ Writing a controller per event source duplicates the lag-querying, leader electi
 - **Single autoscaler primitive** — one CRD family to learn, one operator to monitor, one set of audit hooks.
 - **Broad scaler ecosystem** — 40+ upstream scalers cover every event source the Platform ships today (Kafka, Pulsar, NATS, Prometheus, Redis, cron) plus likely future ones without writing code.
 - **Knative + Argo Workflows alignment** — Phase 4 Knative stack (ADR-075) and Reflex Engine (ADR-095) both name KEDA explicitly; this ADR gives them a stable, citable parent.
-- **Sovereign secret hygiene** — `TriggerAuthentication` + OpenBao binding (ADR-115) keeps Kafka SASL, Redis ACL, and webhook tokens out of plain `Secret` objects.
+- **Sovereign secret hygiene** — `TriggerAuthentication` + OpenBao binding plus OIDC workload identity (ADR-115) keeps Kafka SASL, Redis ACL, and webhook tokens out of plain `Secret` objects.
 
 ### Negative
 
@@ -139,7 +139,7 @@ Writing a controller per event source duplicates the lag-querying, leader electi
 - **CRDs:** `ScaledObject`, `ScaledJob`, `TriggerAuthentication`, `ClusterTriggerAuthentication`.
 - **Admission policy:** Gatekeeper Constraint forbids manual HPA on `ScaledObject`-managed Deployments and forbids `ClusterTriggerAuthentication` to enforce per-tenant secret scoping.
 - **Telemetry:** `keda_scaler_active`, `keda_scaler_errors`, `keda_metrics_adapter_scaler_*` scraped by Prometheus (ADR-029); dashboard exposes per-`ScaledObject` activation lag.
-- **Secret integration:** `TriggerAuthentication` references External Secrets-managed Secrets backed by OpenBao (ADR-115). Direct `Secret` references are rejected at admission to keep credential rotation in one path.
+- **Identity & secret integration:** `TriggerAuthentication` resolves credentials via External Secrets-managed Secrets backed by OpenBao, with workload identity federated through OIDC (ADR-115). Direct `Secret` references are rejected at admission to keep credential rotation in one path.
 - **Cold-start mitigations:** workloads with strict latency SLOs declare `minReplicaCount: 1` (no scale-to-zero) or pair with KEDA HTTP add-on's interceptor to absorb the first request. Default Cave tenant SaaS pattern uses `minReplicaCount: 0` and the HTTP add-on interceptor.
 
 ## Rollout Phasing
@@ -152,26 +152,6 @@ Writing a controller per event source duplicates the lag-querying, leader electi
 | 4 — Knative + HTTP add-on | Tenant SaaS HTTP scale-to-zero on stock Deployments | Tenant apps that don't run on Knative | HTTP add-on interceptor latency p99 ≤ 200 ms cold start. |
 | 5 — Cron + batch ScaledJobs | `ScaledJob` for time-window batches feeding Argo Workflows (ADR-038) | Reflex playbook batch executors, tenant cron pipelines | ScaledJob completion telemetry stable for 14 days. |
 
-## Out of Scope
-
-To keep the autoscaling surface coherent, KEDA is **not** used for:
-
-- **Cluster (node) autoscaling** — Karpenter (ADR-032) owns node provisioning; KEDA is strictly pod-side.
-- **Vertical pod autoscaling** — VPA / Goldilocks owns request/limit recommendations; KEDA only changes replica count.
-- **In-pod concurrency tuning** — application-internal worker pool sizing remains the workload's responsibility.
-- **Workflow orchestration** — Argo Workflows (ADR-038) remains the DAG / step engine; KEDA only triggers replica-count or `ScaledJob` lifecycle, not workflow steps.
-
-## Notes / Roadmap
-
-- ADR-095 (Reflex Engine) names "KEDA + Argo Workflows" as a paired stack. This ADR is the standalone Platform-side parent for the **KEDA** half; ADR-038 is the standalone parent for the **Argo Workflows** half. Reflex Engine continues to be the umbrella consumer.
-- ADR-075 (Knative + KEDA) currently positions KEDA at **Phase 4**. Reflex Engine production go-live depends on KEDA, so a follow-up proposes pulling KEDA forward to **Phase 2** of the Knative rollout schedule. Tracked separately.
-- ADR-040 (ARC) ships its own `HorizontalRunnerAutoscaler`. KEDA-driven ARC scaling is supported but optional; today the default is ARC HRA, with KEDA as an alternative when scaling on a non-runner signal (e.g., Kafka trigger feeding workflow runners).
-- **Runtime override:** ADR-RUNTIME-EVENT-SCALER-001 (`cave-keda`) will codify the Runtime sovereign reimpl. Karpenter-equivalent node controller plus `cave-keda` together form the single Runtime scale-to-zero chain (pod-side + node-side). This Platform ADR is the upstream parent that override will inherit from. Inheritance contract:
-  - Same CRDs (`ScaledObject`, `ScaledJob`, `TriggerAuthentication`) so workloads are portable Platform ↔ Runtime without re-authoring.
-  - Same scaler matrix (Prometheus, Kafka, Pulsar, NATS, Redis, cron, External, HTTP add-on).
-  - Same admission policies (manual HPA forbidden when `ScaledObject` present; `ClusterTriggerAuthentication` forbidden).
-  - Runtime-only additions documented in the override (PQC-ready secrets, single-binary distribution, mirror-principle source bindings).
-
 ## Definition of Done
 
 The Platform-side rollout is complete when:
@@ -179,7 +159,7 @@ The Platform-side rollout is complete when:
 - `keda-operator` runs in `keda-system` on every Platform cluster (Hetzner sovereign + Azure enterprise) with PDB + 2 replicas + critical `PriorityClass`.
 - Reflex Engine workers (ADR-095) scale on Prometheus + Kafka triggers via `ScaledObject` exclusively; no manual HPA on those workloads.
 - Gatekeeper rejects (a) manual HPA on `ScaledObject`-targeted Deployments and (b) any `ClusterTriggerAuthentication` resource.
-- `TriggerAuthentication` resolution path through External Secrets + OpenBao validated by a synthetic credential rotation in staging.
+- `TriggerAuthentication` resolution path through External Secrets + OpenBao + OIDC workload identity validated by a synthetic credential rotation in staging.
 - Backstage scaffolder template "tenant-app + KEDA HTTP add-on" available for tenant onboarding.
 - Per-`ScaledObject` activation lag and scaler error rate dashboards published in Grafana.
 - Runbook entries for: scaler error spike, operator pod crashloop, secret-rotation desync, manual HPA collision detection.
@@ -195,3 +175,23 @@ KEDA HTTP add-on (`kedacore/http-add-on`): Apache 2.0.
 - **SOC2 CC7.2** — Monitoring and event-driven response: KEDA reacts to Prometheus alerts and queue depth signals as part of the automated remediation surface (with ADR-095).
 - **ISO/IEC 27001 A.12.1.3** — Capacity management: scale-to-zero plus event-driven scale-out enforces tenant-fair capacity allocation.
 - **NIS2 Directive Article 21** — Operational resilience: deterministic, declarative autoscaling reduces human error in incident response.
+
+## Out of Scope
+
+To keep the autoscaling surface coherent, KEDA is **not** used for:
+
+- **Cluster (node) autoscaling** — Karpenter (ADR-032) owns node provisioning; KEDA is strictly pod-side.
+- **Vertical pod autoscaling** — VPA / Goldilocks owns request/limit recommendations; KEDA only changes replica count.
+- **In-pod concurrency tuning** — application-internal worker pool sizing remains the workload's responsibility.
+- **Workflow orchestration** — Argo Workflows (ADR-038) remains the DAG / step engine; KEDA only triggers replica-count or `ScaledJob` lifecycle, not workflow steps.
+
+## Notes / Roadmap
+
+- ADR-095 (Reflex Engine) names "KEDA + Argo Workflows" as a paired stack. This ADR is the standalone Platform-side parent for the **KEDA** half; ADR-038 is the standalone parent for the **Argo Workflows** half. Reflex Engine continues to be the umbrella consumer.
+- ADR-075 (Knative + KEDA) currently positions KEDA at **Phase 4**. Reflex Engine production go-live depends on KEDA, so a follow-up proposes pulling KEDA forward to **Phase 2** of the Knative rollout schedule. Tracked separately.
+- ADR-040 (ARC) ships its own `HorizontalRunnerAutoscaler`. KEDA-driven ARC scaling is supported but optional; today the default is ARC HRA, with KEDA as an alternative when scaling on a non-runner signal (e.g., Kafka trigger feeding workflow runners).
+- **No separate Runtime override ADR.** Runtime sovereign reimpl is the existing `cave-keda` crate scaffold and is governed entirely by the blanket charter rule **ADR-RUNTIME-UPSTREAM-MIRROR-001** — single-upstream reimpl with the same CRDs, scaler matrix, and admission contract documented here. Inheritance contract:
+  - Same CRDs (`ScaledObject`, `ScaledJob`, `TriggerAuthentication`) so workloads are portable Platform ↔ Runtime without re-authoring.
+  - Same scaler matrix (Prometheus, Kafka, Pulsar, NATS, Redis, cron, External, HTTP add-on).
+  - Same admission policies (manual HPA forbidden when `ScaledObject` present; `ClusterTriggerAuthentication` forbidden).
+  - Runtime-only additions (PQC-ready secrets, single-binary distribution, Apache 2.0 mirror-principle source bindings) live in `cave-keda` source comments, not in a separate ADR.
