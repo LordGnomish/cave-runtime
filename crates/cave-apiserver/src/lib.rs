@@ -26,6 +26,11 @@ pub mod audit;
 pub mod rbac;
 pub mod aggregated_apiserver;
 pub mod endpointslice_mirror;
+pub mod etcd_backend;
+pub mod discovery;
+pub mod crd_controller;
+pub mod storage_version;
+pub mod selectors;
 
 use store::ResourceStore;
 use std::sync::Arc;

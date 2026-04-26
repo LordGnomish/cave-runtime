@@ -80,6 +80,64 @@ local    = "src/endpointslice_mirror.rs"
 upstream = "staging/src/k8s.io/api/discovery/v1/types.go"
 local    = "src/endpointslice_mirror.rs"
 
+# etcd storage backend driver
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go"
+local    = "src/etcd_backend.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/etcd3/compact.go"
+local    = "src/etcd_backend.rs"
+
+# Discovery + OpenAPI v3
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/group.go"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/aggregated/aggregated.go"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-openapi/pkg/handler3/handler.go"
+local    = "src/discovery.rs"
+
+# CustomResourceDefinition controller
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1/types.go"
+local    = "src/crd_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish/establishing_controller.go"
+local    = "src/crd_controller.rs"
+
+# Storage versioning
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/runtime/scheme.go"
+local    = "src/storage_version.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storageversion/manager.go"
+local    = "src/storage_version.rs"
+
+# Field + label selectors
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/labels/selector.go"
+local    = "src/selectors.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/labels/parser.go"
+local    = "src/selectors.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/fields/selector.go"
+local    = "src/selectors.rs"
+
+# Webhook conversion (v1beta1 → v1 migration)
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter.go"
+local    = "src/conversion.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Core v1 — namespaces
 

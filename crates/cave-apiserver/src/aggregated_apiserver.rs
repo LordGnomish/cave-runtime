@@ -53,6 +53,14 @@ pub enum RouteDecision {
     Delegated { tenant_id: String, service: ServiceRef },
 }
 
+/// Validation errors raised by `AggregatorRegistry::try_register`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistrationError {
+    EmptyTenantId,
+    EmptyVersion,
+    InvalidServicePort,
+}
+
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 struct RegistryKey {
     tenant_id: String,
@@ -67,6 +75,25 @@ pub struct AggregatorRegistry {
 impl AggregatorRegistry {
     pub fn new() -> Self {
         Self { inner: Mutex::new(HashMap::new()) }
+    }
+
+    /// Validation error for `try_register`. Mirrors upstream
+    /// `kube-aggregator/pkg/registry/apiservice/strategy.go::Validate` checks.
+    /// (Defined inside `impl` block as a free type for ergonomic use.)
+    /// Validate an APIService prior to insertion. Empty `tenant_id`,
+    /// empty `version`, or zero `service.port` are rejected up-front.
+    pub fn try_register(&self, svc: APIService) -> Result<(), RegistrationError> {
+        if svc.tenant_id.trim().is_empty() {
+            return Err(RegistrationError::EmptyTenantId);
+        }
+        if svc.version.trim().is_empty() {
+            return Err(RegistrationError::EmptyVersion);
+        }
+        if svc.service.port == 0 {
+            return Err(RegistrationError::InvalidServicePort);
+        }
+        self.register(svc);
+        Ok(())
     }
 
     /// Register or replace an APIService. Replacement is keyed by
@@ -318,5 +345,122 @@ mod tests {
         // tenant_id invariant: registry still empty for the tenant after delete.
         assert!(reg.list_for_tenant("acme").is_empty(),
             "tenant_id invariant: acme's list is empty post-unregister");
+    }
+
+    // ── Registration validation deeper (deeper-003) ──────────────────────────
+
+    /// Upstream parity: `TestAPIService_TryRegisterRejectsEmptyTenantId`
+    /// (no upstream test — cave-apiserver invariant: an APIService MUST
+    /// be tenant-bound; an empty tenant_id is a rejected registration).
+    #[test]
+    fn test_try_register_rejects_empty_tenant_id() {
+        let reg = AggregatorRegistry::new();
+        let mut bad = svc("", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true);
+        bad.tenant_id = "".into();
+        let err = reg.try_register(bad).expect_err("must reject empty tenant_id");
+        assert_eq!(err, RegistrationError::EmptyTenantId,
+            "tenant_id invariant: empty tenant_id is a registration error");
+        // The good case still works — proves the validator is not over-eager.
+        let ok = reg.try_register(svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true));
+        assert!(ok.is_ok());
+        assert_eq!(reg.list_for_tenant("acme").len(), 1,
+            "tenant_id invariant: acme registration persisted");
+    }
+
+    /// Upstream parity: `TestAPIService_TryRegisterRejectsEmptyVersion`
+    /// (kube-aggregator/pkg/registry/apiservice/strategy.go::Validate —
+    /// `spec.version` is required).
+    #[test]
+    fn test_try_register_rejects_empty_version() {
+        let reg = AggregatorRegistry::new();
+        let bad = svc("acme", "metrics.k8s.io", "",
+            "kube-system", "metrics-server", 100, 100, true);
+        let err = reg.try_register(bad).expect_err("must reject empty version");
+        assert_eq!(err, RegistrationError::EmptyVersion);
+        assert!(reg.list_for_tenant("acme").is_empty(),
+            "tenant_id invariant: rejection leaves acme list empty");
+    }
+
+    /// Upstream parity: `TestAPIService_TryRegisterRejectsZeroPort`
+    /// (strategy.Validate — `spec.service.port` must be a valid port).
+    #[test]
+    fn test_try_register_rejects_zero_service_port() {
+        let reg = AggregatorRegistry::new();
+        let bad = svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true);
+        let mut bad = bad;
+        bad.service.port = 0;
+        let err = reg.try_register(bad).expect_err("must reject port 0");
+        assert_eq!(err, RegistrationError::InvalidServicePort);
+        // tenant_id invariant: nothing persisted, list still empty.
+        assert!(reg.list_for_tenant("acme").is_empty(),
+            "tenant_id invariant: rejected port leaves acme list empty");
+    }
+
+    /// Upstream parity: `TestAPIService_ReregistrationReplacesPriorService`
+    /// (registry/apiservice/storage/storage.go — same `name` overwrites).
+    #[test]
+    fn test_reregistration_replaces_prior_service_ref() {
+        let reg = AggregatorRegistry::new();
+        reg.register(svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-old", 100, 100, true));
+        // Replace with a new backend.
+        reg.register(svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-new", 100, 100, true));
+        let got = reg.lookup_for("acme", "metrics.k8s.io", "v1beta1").unwrap();
+        assert_eq!(got.service.name, "metrics-new",
+            "second register replaces the prior service ref under same key");
+        // Only one entry — no shadow copy from the prior registration.
+        assert_eq!(reg.len(), 1);
+        assert_eq!(got.tenant_id, "acme",
+            "tenant_id invariant: re-registration retains owning tenant_id");
+    }
+
+    /// Upstream parity: `TestAPIService_ToggleAvailabilityFlipsRouting`
+    /// (available_controller — flipping Available re-routes future calls
+    /// without requiring re-registration).
+    #[test]
+    fn test_availability_toggle_flips_routing_back_and_forth() {
+        let reg = AggregatorRegistry::new();
+        reg.register(svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true));
+        // Available → Delegated.
+        assert!(matches!(
+            reg.route_decision("acme", "metrics.k8s.io", "v1beta1"),
+            RouteDecision::Delegated { .. }));
+        reg.mark_available("acme", "metrics.k8s.io", "v1beta1", false);
+        // Unavailable → Local.
+        assert_eq!(
+            reg.route_decision("acme", "metrics.k8s.io", "v1beta1"),
+            RouteDecision::Local);
+        reg.mark_available("acme", "metrics.k8s.io", "v1beta1", true);
+        // Back to Delegated.
+        match reg.route_decision("acme", "metrics.k8s.io", "v1beta1") {
+            RouteDecision::Delegated { tenant_id, .. } => {
+                assert_eq!(tenant_id, "acme",
+                    "tenant_id invariant: re-enabled route still scoped to acme");
+            }
+            _ => panic!("must be delegated again after re-enable"),
+        }
+    }
+
+    /// Upstream parity: `TestAPIService_UnregisterIsTenantScoped`
+    /// (registry storage delete is keyed by (tenant, group, version) —
+    /// unregistering one tenant's entry MUST NOT affect another).
+    #[test]
+    fn test_unregister_does_not_affect_other_tenant_entry() {
+        let reg = AggregatorRegistry::new();
+        reg.register(svc("acme", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true));
+        reg.register(svc("globex", "metrics.k8s.io", "v1beta1",
+            "kube-system", "metrics-server", 100, 100, true));
+        assert!(reg.unregister("acme", "metrics.k8s.io", "v1beta1"));
+        assert!(reg.lookup_for("acme", "metrics.k8s.io", "v1beta1").is_none());
+        let g = reg.lookup_for("globex", "metrics.k8s.io", "v1beta1")
+            .expect("globex entry must survive acme unregister");
+        assert_eq!(g.tenant_id, "globex",
+            "tenant_id invariant: globex registration unaffected by acme delete");
     }
 }

@@ -128,6 +128,74 @@ impl Default for CoreConverter {
     fn default() -> Self { Self::new() }
 }
 
+// ── Webhook conversion (v1beta1 → v1 migration) ──────────────────────────────
+//
+// Upstream: kubernetes/kubernetes v1.36.0
+//   * `staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter.go`
+//
+// `WebhookConverter` posts a `ConversionReview` to a webhook and applies the
+// returned objects. We model the network call as a trait so tests can supply
+// in-process mock backends with no IO.
+
+/// Outcome categories surfaced from a webhook call.
+pub trait ConversionWebhookClient: Send + Sync {
+    /// Issue the conversion call. Implementations may return a synthesised
+    /// `ConversionResponse::Failure` on transport / timeout errors so the
+    /// caller observes one consistent surface.
+    fn convert(&self, req: ConversionRequest) -> ConversionResponse;
+}
+
+pub struct WebhookConverter<C: ConversionWebhookClient> {
+    pub name: String,
+    pub client: C,
+}
+
+impl<C: ConversionWebhookClient> WebhookConverter<C> {
+    pub fn new(name: impl Into<String>, client: C) -> Self {
+        Self { name: name.into(), client }
+    }
+
+    /// Run the webhook conversion. Tenant invariant is enforced by re-checking
+    /// every returned object's `tenant_id` against the corresponding input;
+    /// any divergence flips the outcome to `Failure` and drops the body.
+    pub fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+        // Snapshot per-object tenant_ids, in input order.
+        let expected_tenants: Vec<String> = req.objects.iter()
+            .map(|o| o.tenant_id.clone()).collect();
+        let mut resp = self.client.convert(req);
+        if resp.result_status != "Success" {
+            return resp;
+        }
+        if resp.converted_objects.len() != expected_tenants.len() {
+            return ConversionResponse {
+                uid: resp.uid,
+                converted_objects: vec![],
+                result_status: "Failure".into(),
+                result_message:
+                    "webhook returned object count differs from input".into(),
+            };
+        }
+        for (i, o) in resp.converted_objects.iter().enumerate() {
+            if o.tenant_id != expected_tenants[i] {
+                return ConversionResponse {
+                    uid: resp.uid,
+                    converted_objects: vec![],
+                    result_status: "Failure".into(),
+                    result_message: format!(
+                        "tenant_id invariant: webhook altered tenant_id at index {} \
+                         (expected `{}`, got `{}`)",
+                        i, expected_tenants[i], o.tenant_id),
+                };
+            }
+        }
+        // Re-stamp tenant_ids defensively (no-op if webhook complied).
+        for (i, o) in resp.converted_objects.iter_mut().enumerate() {
+            o.tenant_id = expected_tenants[i].clone();
+        }
+        resp
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -409,6 +477,148 @@ mod tests {
         assert_eq!(widget.tenant_id, "acme", "tenant_id invariant: widget tenant");
         assert_eq!(gadget.tenant_id, "globex",
             "tenant_id invariant: gadget tenant — no cross-object bleed");
+    }
+
+    // ── Webhook conversion (deeper-003) ──────────────────────────────────────
+
+    struct PromoteToV1Webhook;
+    impl ConversionWebhookClient for PromoteToV1Webhook {
+        fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+            let mut converted = vec![];
+            for mut o in req.objects {
+                o.api_version = req.desired_api_version.clone();
+                converted.push(o);
+            }
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: converted,
+                result_status: "Success".into(),
+                result_message: String::new(),
+            }
+        }
+    }
+
+    struct FailingWebhook(&'static str);
+    impl ConversionWebhookClient for FailingWebhook {
+        fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: vec![],
+                result_status: "Failure".into(),
+                result_message: self.0.into(),
+            }
+        }
+    }
+
+    struct EvilWebhookFlipsTenant;
+    impl ConversionWebhookClient for EvilWebhookFlipsTenant {
+        fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+            let mut converted = vec![];
+            for mut o in req.objects {
+                o.api_version = req.desired_api_version.clone();
+                o.tenant_id = "attacker".into();
+                converted.push(o);
+            }
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: converted,
+                result_status: "Success".into(),
+                result_message: String::new(),
+            }
+        }
+    }
+
+    /// Upstream parity: `TestWebhookConverter_HappyPathPromotesV1Beta1ToV1`
+    /// (apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter_test.go
+    /// — the webhook returns objects re-stamped with the desired apiVersion).
+    #[test]
+    fn test_webhook_converter_promotes_v1beta1_to_v1_and_preserves_tenant() {
+        let wh = WebhookConverter::new("crd-webhook", PromoteToV1Webhook);
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![
+                obj("Widget", "v1beta1", "acme"),
+                obj("Widget", "v1beta1", "globex"),
+            ],
+        };
+        let resp = wh.convert(req);
+        assert_eq!(resp.result_status, "Success");
+        assert_eq!(resp.converted_objects[0].api_version, "v1");
+        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant: webhook trip preserves acme tenant");
+        assert_eq!(resp.converted_objects[1].tenant_id, "globex",
+            "tenant_id invariant: per-object tenant preserved through batch");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_FailureBubblesUp`
+    /// (webhook_converter.go — non-Success status surfaces verbatim).
+    #[test]
+    fn test_webhook_failure_status_bubbles_up_to_caller() {
+        let wh = WebhookConverter::new("crd-webhook", FailingWebhook("backend down"));
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        let resp = wh.convert(req);
+        assert_eq!(resp.result_status, "Failure");
+        assert_eq!(resp.result_message, "backend down");
+        assert!(resp.converted_objects.is_empty(),
+            "failure path returns no objects, never partial output");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_RejectsTenantIdMutation`
+    /// (no upstream test — cave-apiserver invariant: a webhook MUST NOT
+    /// rewrite tenant_id; the converter detects and demotes the response
+    /// to Failure rather than trusting the returned objects).
+    #[test]
+    fn test_webhook_response_with_altered_tenant_id_is_demoted_to_failure() {
+        let wh = WebhookConverter::new("crd-webhook", EvilWebhookFlipsTenant);
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        let resp = wh.convert(req);
+        assert_eq!(resp.result_status, "Failure",
+            "tenant_id invariant: tenant flip MUST demote webhook response");
+        assert!(resp.result_message.contains("tenant_id invariant"));
+        assert!(resp.converted_objects.is_empty(),
+            "tenant_id invariant: poisoned objects MUST NOT be exposed to caller");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_ObjectCountMismatchRejected`
+    /// (webhook_converter.go — number of converted objects must equal input).
+    #[test]
+    fn test_webhook_object_count_mismatch_is_rejected() {
+        struct CountSkewWebhook;
+        impl ConversionWebhookClient for CountSkewWebhook {
+            fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+                ConversionResponse {
+                    uid: req.uid,
+                    // Returns one object regardless of input count.
+                    converted_objects: vec![obj("Widget", "v1", "acme")],
+                    result_status: "Success".into(),
+                    result_message: String::new(),
+                }
+            }
+        }
+        let wh = WebhookConverter::new("crd-webhook", CountSkewWebhook);
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![
+                obj("Widget", "v1beta1", "acme"),
+                obj("Widget", "v1beta1", "globex"),
+            ],
+        };
+        let resp = wh.convert(req);
+        assert_eq!(resp.result_status, "Failure",
+            "count mismatch demoted to Failure, never silently accepted");
+        assert!(resp.result_message.contains("object count"));
+        // tenant_id invariant: empty body ensures no acme leak via the count-skew payload.
+        assert!(resp.converted_objects.is_empty());
     }
 
     /// Upstream parity: `TestConverter_NoRuleMutationOfTenantId`
