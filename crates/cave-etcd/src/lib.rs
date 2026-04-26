@@ -57,10 +57,19 @@
 //! ```
 
 pub mod b64;
+pub mod client;
 pub mod error;
+pub mod grpc_api;
+pub mod kms;
+pub mod lease_id_gen;
+pub mod maintenance;
+pub mod membership_audit;
 pub mod models;
-pub mod store;
+pub mod rbac_deeper;
 pub mod routes;
+pub mod snapshot_wire;
+pub mod store;
+pub mod watch_filters;
 
 use store::KvStore;
 use std::sync::Arc;
