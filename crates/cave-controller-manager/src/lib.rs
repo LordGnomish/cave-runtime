@@ -55,6 +55,13 @@ pub mod csr_signer;
 /// 100-pct sprint M4: RBAC controllers (ClusterRole aggregation).
 pub mod rbac;
 
+/// 100-pct sprint M5: EndpointSlice topology-aware hints
+/// (PreferClose / topology-mode Auto algorithm).
+pub mod endpointslice_topology;
+
+/// 100-pct sprint M5: PV/PVC binder + volume expansion state machine.
+pub mod pv;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP
