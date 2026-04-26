@@ -1,0 +1,363 @@
+# Cave Runtime night-pump — batch dispatch queue
+#
+# Schema per batch:
+#   id            unique batch identifier (also used as state.json key)
+#   scope         one of: backend | ux | obs | adr-review
+#   target_tests  expected new test count after batch lands
+#   upstream      upstream project the batch ports / extends
+#   pin_check     whether the upstream pin must be re-validated for this batch
+#   dependency    list of batch IDs that must be Completed before this dispatches
+#   priority      1 (low) … 10 (high). Higher dispatched first.
+#   retry_max     how many retries before the batch stays Failed permanently (default 3)
+
+backend_v01:
+  - id: cave-etcd-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: etcd
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-apiserver-deeper-005
+    scope: backend
+    target_tests: 50
+    upstream: kube-apiserver
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-cri-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: containerd
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-net-cilium-deeper-004
+    scope: backend
+    target_tests: 50
+    upstream: cilium
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-mesh-istio-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: istio-ambient
+    pin_check: true
+    dependency: []
+    priority: 8
+    retry_max: 3
+  - id: cave-streams-deeper-002
+    scope: backend
+    target_tests: 50
+    upstream: kafka+pulsar
+    pin_check: true
+    dependency: []
+    priority: 7
+    retry_max: 3
+  - id: cave-pg-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: postgres
+    pin_check: true
+    dependency: []
+    priority: 8
+    retry_max: 3
+  - id: cave-docdb-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: mongodb
+    pin_check: true
+    dependency: []
+    priority: 7
+    retry_max: 3
+  - id: cave-vault-deeper-002
+    scope: backend
+    target_tests: 50
+    upstream: openbao
+    pin_check: true
+    dependency: []
+    priority: 8
+    retry_max: 3
+  - id: cave-controller-manager-deeper-002
+    scope: backend
+    target_tests: 50
+    upstream: kube-controller-manager
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-kube-proxy-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: kube-proxy
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+  - id: cave-cloud-controller-manager-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: cloud-controller-manager
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+  - id: cave-kubelet-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: kubelet
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-scheduler-deeper-003
+    scope: backend
+    target_tests: 50
+    upstream: kube-scheduler
+    pin_check: true
+    dependency: []
+    priority: 9
+    retry_max: 3
+  - id: cave-cache-deeper-001
+    scope: backend
+    target_tests: 50
+    upstream: valkey
+    pin_check: true
+    dependency: []
+    priority: 7
+    retry_max: 3
+  - id: cave-iceberg-deeper-001
+    scope: backend
+    target_tests: 50
+    upstream: apache-iceberg
+    pin_check: true
+    dependency: []
+    priority: 7
+    retry_max: 3
+  - id: cave-datafusion-deeper-001
+    scope: backend
+    target_tests: 50
+    upstream: apache-datafusion
+    pin_check: true
+    dependency: []
+    priority: 7
+    retry_max: 3
+  - id: cave-search-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: opensearch
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+  - id: cave-knative-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: knative
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+  - id: cave-keda-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: keda
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+  - id: cave-gateway-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: kong+envoy
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+
+ux_v01:
+  - id: cave-portal-etcd-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-etcd-deeper-003]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-cri-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-cri-deeper-003]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-apiserver-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-apiserver-deeper-005]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-auth-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: []
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-mesh-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-mesh-istio-deeper-003]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-pg-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-pg-deeper-003]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-vault-view
+    scope: ux
+    target_tests: 10
+    upstream: backstage
+    pin_check: false
+    dependency: [cave-vault-deeper-002]
+    priority: 4
+    retry_max: 3
+  - id: cave-portal-tenant-dashboard
+    scope: ux
+    target_tests: 15
+    upstream: backstage
+    pin_check: false
+    dependency: []
+    priority: 5
+    retry_max: 3
+  - id: cave-cli-tenant-suspend
+    scope: ux
+    target_tests: 8
+    upstream: kubectl
+    pin_check: false
+    dependency: []
+    priority: 4
+    retry_max: 3
+  - id: cave-cli-approval-flow
+    scope: ux
+    target_tests: 8
+    upstream: kubectl
+    pin_check: false
+    dependency: []
+    priority: 4
+    retry_max: 3
+  - id: cave-cli-audit-query
+    scope: ux
+    target_tests: 8
+    upstream: kubectl
+    pin_check: false
+    dependency: []
+    priority: 4
+    retry_max: 3
+
+obs_v01:
+  - id: cave-metrics-prometheus-exposition
+    scope: obs
+    target_tests: 12
+    upstream: prometheus
+    pin_check: false
+    dependency: []
+    priority: 3
+    retry_max: 3
+  - id: cave-metrics-grafana-dashboards
+    scope: obs
+    target_tests: 8
+    upstream: grafana
+    pin_check: false
+    dependency: []
+    priority: 3
+    retry_max: 3
+  - id: cave-metrics-alert-rules
+    scope: obs
+    target_tests: 8
+    upstream: alertmanager
+    pin_check: false
+    dependency: []
+    priority: 3
+    retry_max: 3
+  - id: cave-tetragon-scaffold
+    scope: obs
+    target_tests: 20
+    upstream: tetragon
+    pin_check: true
+    dependency: []
+    priority: 5
+    retry_max: 3
+  - id: cave-secrets-gitleaks-trufflehog
+    scope: obs
+    target_tests: 12
+    upstream: gitleaks+trufflehog
+    pin_check: true
+    dependency: []
+    priority: 4
+    retry_max: 3
+
+adr_review_runtime_overrides:
+  - id: adr-runtime-streaming
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
+  - id: adr-runtime-persistence
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
+  - id: adr-runtime-cache
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
+  - id: adr-runtime-search
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
+  - id: adr-runtime-vault
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
+  - id: adr-runtime-mesh
+    scope: adr-review
+    target_tests: 0
+    upstream: n/a
+    pin_check: false
+    dependency: []
+    priority: 2
+    retry_max: 3
