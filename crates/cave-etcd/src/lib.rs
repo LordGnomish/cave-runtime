@@ -58,6 +58,7 @@
 
 pub mod b64;
 pub mod client;
+pub mod concurrency;
 pub mod error;
 pub mod grpc_api;
 pub mod kms;
