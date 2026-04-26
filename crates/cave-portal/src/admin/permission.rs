@@ -44,6 +44,9 @@ pub enum Permission {
 
     /// Read-only metadata + audit log (NOT secret values).
     VaultRead,
+
+    /// Read worker contributions (night-pump batch outcomes per worker_id).
+    ContributionsRead,
 }
 
 impl Permission {
@@ -62,6 +65,7 @@ impl Permission {
             Permission::PgRead => "pg.table.read",
             Permission::PgQuery => "pg.query.exec",
             Permission::VaultRead => "vault.metadata.read",
+            Permission::ContributionsRead => "cluster.contributions.read",
         }
     }
 }
