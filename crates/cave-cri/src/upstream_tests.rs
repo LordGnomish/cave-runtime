@@ -276,6 +276,126 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Container log v2 ───────────────────────────────────────────────────────────
+
+use crate::log_v2;
+
+#[test]
+fn test_parse_cri_log() {
+    let line = "2024-04-26T12:34:56.123456789Z stdout F hello";
+    let entry = log_v2::parse_line(line).unwrap();
+    assert_eq!(entry.stream, log_v2::Stream::Stdout);
+    assert_eq!(entry.tag, log_v2::LogTag::Full);
+    assert_eq!(entry.message, "hello");
+}
+
+#[test]
+fn test_encode_cri_log() {
+    let when = chrono::Utc::now();
+    let line = log_v2::encode_line(when, log_v2::Stream::Stderr, log_v2::LogTag::Full, "boom");
+    let parsed = log_v2::parse_line(&line).unwrap();
+    assert_eq!(parsed.message, "boom");
+    assert_eq!(parsed.stream, log_v2::Stream::Stderr);
+}
+
+#[test]
+fn test_cri_log_tail_lines() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("c.log");
+    for i in 0..10 {
+        log_v2::write_log_line(
+            &path,
+            log_v2::Stream::Stdout,
+            &format!("L{}", i),
+            chrono::Utc::now(),
+            u64::MAX,
+            5,
+        )
+        .unwrap();
+    }
+    let entries = log_v2::read_logs(
+        &path,
+        &log_v2::LogOptions { tail_lines: Some(2), ..Default::default() },
+    )
+    .unwrap();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[1].message, "L9");
+}
+
+#[test]
+fn test_cri_log_since_time() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("c.log");
+    use chrono::TimeZone;
+    for i in 0..5 {
+        log_v2::write_log_line(
+            &path,
+            log_v2::Stream::Stdout,
+            &format!("L{}", i),
+            chrono::Utc.timestamp_opt(1_700_000_000 + i, 0).unwrap(),
+            u64::MAX,
+            5,
+        )
+        .unwrap();
+    }
+    let entries = log_v2::read_logs(
+        &path,
+        &log_v2::LogOptions {
+            since_time: Some(chrono::Utc.timestamp_opt(1_700_000_003, 0).unwrap()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].message, "L3");
+}
+
+#[test]
+fn test_cri_log_limit_bytes() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("c.log");
+    for i in 0..10 {
+        log_v2::write_log_line(
+            &path,
+            log_v2::Stream::Stdout,
+            &format!("LINE-{}", i),
+            chrono::Utc::now(),
+            u64::MAX,
+            5,
+        )
+        .unwrap();
+    }
+    let entries = log_v2::read_logs(
+        &path,
+        &log_v2::LogOptions { limit_bytes: Some(15), ..Default::default() },
+    )
+    .unwrap();
+    let total: usize = entries.iter().map(|e| e.message.len()).sum();
+    assert!(total <= 15);
+}
+
+#[test]
+fn test_cri_log_stitch_partials() {
+    let big = "z".repeat(log_v2::MAX_LINE_BYTES + 50);
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("c.log");
+    log_v2::write_log_line(&path, log_v2::Stream::Stdout, &big, chrono::Utc::now(), u64::MAX, 5).unwrap();
+    let raw = log_v2::read_file(&path).unwrap();
+    assert!(raw.len() >= 2);
+    let stitched = log_v2::stitch_partials(raw);
+    assert_eq!(stitched.len(), 1);
+    assert_eq!(stitched[0].message.len(), big.len());
+}
+
+#[test]
+fn test_cri_log_rotation() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("c.log");
+    std::fs::write(&path, vec![b'x'; 200]).unwrap();
+    log_v2::write_log_line(&path, log_v2::Stream::Stdout, "after", chrono::Utc::now(), 100, 3).unwrap();
+    assert!(dir.path().join("c.log.1").exists());
+}
+
 // ── KEP-585: RuntimeHandler / RuntimeClass ─────────────────────────────────────
 
 use crate::runtime_handler::{RuntimeHandler, RuntimeHandlerFeatures};

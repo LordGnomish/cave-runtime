@@ -57,6 +57,14 @@ local    = "src/store.rs"
 upstream = "pkg/cri/server/runtime_handler.go"
 local    = "src/runtime_handler.rs"
 
+[[files]]
+upstream = "pkg/cri/streaming/logs.go"
+local    = "src/log_v2.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_log_reopen.go"
+local    = "src/log_v2.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -218,6 +226,33 @@ upstream_name = "RuntimeHandlerRegistry.SelectForSandbox"
 local_name    = "select_for_sandbox"
 file          = "src/runtime_handler.rs"
 
+# Container log v2 — kubelet tagged-line format
+
+[[functions]]
+upstream_name = "ParseCRILog"
+local_name    = "parse_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "EncodeCRILog"
+local_name    = "encode_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "WriteCRILog"
+local_name    = "write_log_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "ReadCRILogs"
+local_name    = "read_logs"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "StitchCRIPartials"
+local_name    = "stitch_partials"
+file          = "src/log_v2.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -289,6 +324,36 @@ local_test    = "test_runtime_handler_select_for_sandbox"
 [[tests]]
 upstream_test = "TestRuntimeHandlerFeatures"
 local_test    = "test_runtime_handler_features"
+
+# Container log v2
+
+[[tests]]
+upstream_test = "TestParseCRILog"
+local_test    = "test_parse_cri_log"
+
+[[tests]]
+upstream_test = "TestEncodeCRILog"
+local_test    = "test_encode_cri_log"
+
+[[tests]]
+upstream_test = "TestCRILogTailLines"
+local_test    = "test_cri_log_tail_lines"
+
+[[tests]]
+upstream_test = "TestCRILogSinceTime"
+local_test    = "test_cri_log_since_time"
+
+[[tests]]
+upstream_test = "TestCRILogLimitBytes"
+local_test    = "test_cri_log_limit_bytes"
+
+[[tests]]
+upstream_test = "TestCRILogStitchPartials"
+local_test    = "test_cri_log_stitch_partials"
+
+[[tests]]
+upstream_test = "TestCRILogRotation"
+local_test    = "test_cri_log_rotation"
 
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 

@@ -72,6 +72,7 @@ pub mod routes;
 pub mod state_machine;
 pub mod oci_spec;
 pub mod logs;
+pub mod log_v2;
 pub mod health;
 pub mod runtime_handler;
 

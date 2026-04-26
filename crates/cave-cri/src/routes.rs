@@ -400,15 +400,40 @@ async fn restore_container(
 #[derive(Deserialize)]
 struct LogsQuery {
     tail: Option<usize>,
+    /// `cri` — return CRI tagged-line entries (with stream + tag) by reading
+    /// the container's log_path with the v2 reader. Default → JSON-line v1.
+    format: Option<String>,
+    since_time: Option<chrono::DateTime<chrono::Utc>>,
+    until_time: Option<chrono::DateTime<chrono::Utc>>,
+    limit_bytes: Option<usize>,
 }
 
 async fn get_container_logs(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
     Query(q): Query<LogsQuery>,
-) -> Result<Json<Vec<ContainerLogEntry>>, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
+    if q.format.as_deref() == Some("cri") {
+        let container = runtime::inspect_container(id, &state.containers)
+            .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+        let opts = crate::log_v2::LogOptions {
+            tail_lines: q.tail,
+            since_time: q.since_time,
+            until_time: q.until_time,
+            limit_bytes: q.limit_bytes,
+            follow: false,
+        };
+        let entries = crate::log_v2::read_logs(&container.log_path, &opts)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        return Ok(Json(entries.into_iter().map(|e| serde_json::json!({
+            "timestamp": e.timestamp,
+            "stream": e.stream.as_str(),
+            "tag": e.tag.as_str(),
+            "message": e.message,
+        })).collect::<Vec<_>>()).into_response());
+    }
     runtime::get_container_logs(id, q.tail, &state.containers)
-        .map(Json)
+        .map(|entries| Json(entries).into_response())
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
