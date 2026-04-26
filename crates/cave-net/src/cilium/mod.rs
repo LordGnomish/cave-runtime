@@ -24,6 +24,7 @@ pub mod clustermesh;
 pub mod conntrack;
 pub mod hubble;
 pub mod identity;
+pub mod ipam;
 pub mod l7policy;
 pub mod l7proxy;
 pub mod lb;
