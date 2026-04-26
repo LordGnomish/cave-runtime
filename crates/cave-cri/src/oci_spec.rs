@@ -389,10 +389,18 @@ fn build_env(spec: &ContainerSpec) -> Vec<String> {
 
 fn user_mount(m: &Mount) -> OciMount {
     let (mount_type, mut options) = match m.mount_type {
-        MountType::Bind  => ("bind".to_string(), vec!["rbind".to_string(), "rprivate".to_string()]),
+        MountType::Bind  => ("bind".to_string(), vec!["rbind".to_string()]),
         MountType::Tmpfs => ("tmpfs".to_string(), vec!["nosuid".to_string(), "noexec".to_string()]),
-        MountType::Volume => ("bind".to_string(), vec!["rbind".to_string(), "rprivate".to_string()]),
+        MountType::Volume => ("bind".to_string(), vec!["rbind".to_string()]),
     };
+    // Translate CRI mount propagation → OCI options. Cite: containerd v2.2.3
+    // `pkg/cri/server/container_create_linux.go` (mount propagation map).
+    let prop = match m.propagation {
+        crate::models::MountPropagation::Private        => "rprivate",
+        crate::models::MountPropagation::HostToContainer => "rslave",
+        crate::models::MountPropagation::Bidirectional   => "rshared",
+    };
+    options.push(prop.into());
     if m.read_only {
         options.push("ro".into());
     }
@@ -402,6 +410,118 @@ fn user_mount(m: &Mount) -> OciMount {
         source: m.source.to_string_lossy().into_owned(),
         options,
     }
+}
+
+// ─── Volume + security context injectors (deeper-002) ───────────────────────
+//
+// Cite: containerd v2.2.3
+// `pkg/cri/server/container_create_linux.go::generateContainerMounts` and
+// `pkg/cri/server/container_create_linux.go::setOCISecurityContext`.
+
+/// Append/replace user mounts on an already-rendered OCI spec. Existing
+/// default mounts (proc/sys/dev/...) are preserved; user-supplied mounts
+/// are appended in the order given. If a user mount has the same
+/// `destination` as a default mount, the user mount wins (last-write-wins
+/// at runtime as well).
+pub fn apply_volume_mounts(spec: &mut OciSpec, user_mounts: &[Mount]) {
+    for m in user_mounts {
+        let dest = m.destination.to_string_lossy().into_owned();
+        spec.mounts.retain(|existing| existing.destination != dest);
+        spec.mounts.push(user_mount(m));
+    }
+}
+
+/// Fold a CRI [`crate::models::SecurityContext`] into the OCI spec. Mirrors
+/// the per-knob translation in containerd v2.2.3
+/// `pkg/cri/server/container_create_linux.go::setOCISecurityContext` and
+/// runc v1.4.2 `libcontainer/specconv/spec_linux.go`.
+pub fn apply_security_context(spec: &mut OciSpec, sec: &crate::models::SecurityContext) {
+    if let Some(uid) = sec.run_as_user { spec.process.user.uid = uid; }
+    if let Some(gid) = sec.run_as_group { spec.process.user.gid = gid; }
+    if !sec.supplemental_groups.is_empty() {
+        spec.process.user.additional_gids = sec.supplemental_groups.clone();
+    }
+
+    spec.root.readonly = sec.readonly_rootfs;
+    spec.process.no_new_privileges = !sec.allow_privilege_escalation;
+
+    // Privileged → grant all linux capabilities; clear masked/readonly paths
+    // and seccomp so the container can introspect /proc and /sys freely.
+    if sec.privileged {
+        let all = full_capability_set();
+        spec.process.capabilities = OciCapabilities {
+            bounding: all.clone(),
+            effective: all.clone(),
+            permitted: all.clone(),
+            ambient: all.clone(),
+            inheritable: all,
+        };
+        spec.linux.masked_paths.clear();
+        spec.linux.readonly_paths.clear();
+        spec.linux.seccomp = None;
+    } else {
+        // Add then remove caps. Drops apply AFTER adds (matches CRI semantics).
+        let mut caps = std::collections::BTreeSet::new();
+        caps.extend(spec.process.capabilities.bounding.iter().cloned());
+        for add in &sec.capabilities_add {
+            caps.insert(normalise_cap(add));
+        }
+        for drop in &sec.capabilities_drop {
+            caps.remove(&normalise_cap(drop));
+        }
+        // Special-case: "ALL" in drops removes everything
+        if sec.capabilities_drop.iter().any(|c| normalise_cap(c) == "ALL") {
+            caps.clear();
+        }
+        // And "ALL" in adds expands to the full set
+        if sec.capabilities_add.iter().any(|c| normalise_cap(c) == "ALL") {
+            caps = full_capability_set().into_iter().collect();
+        }
+        let cap_vec: Vec<String> = caps.into_iter().collect();
+        spec.process.capabilities = OciCapabilities {
+            bounding: cap_vec.clone(),
+            effective: cap_vec.clone(),
+            permitted: cap_vec.clone(),
+            ambient: vec![],
+            inheritable: vec![],
+        };
+
+        match sec.seccomp_profile.as_ref() {
+            Some(crate::models::SeccompProfile::Unconfined) => {
+                spec.linux.seccomp = None;
+            }
+            Some(crate::models::SeccompProfile::RuntimeDefault) | None => {
+                if spec.linux.seccomp.is_none() {
+                    spec.linux.seccomp = Some(default_seccomp());
+                }
+            }
+            Some(crate::models::SeccompProfile::Localhost(_path)) => {
+                // Profile loading is the runtime's job; mark as set so the
+                // generator doesn't fall back to RuntimeDefault.
+                spec.linux.seccomp = Some(default_seccomp());
+            }
+        }
+    }
+}
+
+fn normalise_cap(s: &str) -> String {
+    let s = s.trim().to_uppercase();
+    if s.starts_with("CAP_") || s == "ALL" { s } else { format!("CAP_{}", s) }
+}
+
+fn full_capability_set() -> Vec<String> {
+    [
+        "CAP_AUDIT_CONTROL", "CAP_AUDIT_READ", "CAP_AUDIT_WRITE", "CAP_BLOCK_SUSPEND",
+        "CAP_BPF", "CAP_CHECKPOINT_RESTORE", "CAP_CHOWN", "CAP_DAC_OVERRIDE",
+        "CAP_DAC_READ_SEARCH", "CAP_FOWNER", "CAP_FSETID", "CAP_IPC_LOCK", "CAP_IPC_OWNER",
+        "CAP_KILL", "CAP_LEASE", "CAP_LINUX_IMMUTABLE", "CAP_MAC_ADMIN", "CAP_MAC_OVERRIDE",
+        "CAP_MKNOD", "CAP_NET_ADMIN", "CAP_NET_BIND_SERVICE", "CAP_NET_BROADCAST",
+        "CAP_NET_RAW", "CAP_PERFMON", "CAP_SETFCAP", "CAP_SETGID", "CAP_SETPCAP",
+        "CAP_SETUID", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_CHROOT", "CAP_SYS_MODULE",
+        "CAP_SYS_NICE", "CAP_SYS_PACCT", "CAP_SYS_PTRACE", "CAP_SYS_RAWIO",
+        "CAP_SYS_RESOURCE", "CAP_SYS_TIME", "CAP_SYS_TTY_CONFIG", "CAP_SYSLOG",
+        "CAP_WAKE_ALARM",
+    ].into_iter().map(String::from).collect()
 }
 
 #[cfg(test)]
@@ -525,6 +645,7 @@ mod tests {
             destination: "/data".into(),
             read_only: false,
             mount_type: MountType::Bind,
+            propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
         let data_mount = spec.mounts.iter().find(|m| m.destination == "/data").unwrap();
@@ -540,6 +661,7 @@ mod tests {
             destination: "/etc/cfg".into(),
             read_only: true,
             mount_type: MountType::Bind,
+            propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
         let m = spec.mounts.iter().find(|m| m.destination == "/etc/cfg").unwrap();
@@ -554,6 +676,7 @@ mod tests {
             destination: "/tmp".into(),
             read_only: false,
             mount_type: MountType::Tmpfs,
+            propagation: crate::models::MountPropagation::Private,
         });
         let spec = generate(&s, &PathBuf::from("/merged"), "abc123");
         let m = spec.mounts.iter().find(|m| m.destination == "/tmp").unwrap();

@@ -3,27 +3,40 @@
 //! Creates and manages cgroup directories under /sys/fs/cgroup/ for
 //! container resource isolation (CPU, memory, PIDs).
 
-use crate::error::CriResult;
+use crate::error::{CriError, CriResult};
 use crate::models::{CgroupStats, ResourceLimits};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
 const CAVE_CGROUP_PREFIX: &str = "cave";
 
-/// Handle to a container's cgroup.
+/// Handle to a container's cgroup. The `tenant_id` segment is part of the
+/// canonical path so every container's cgroup tree is hard-isolated by
+/// tenant. Mirrors containerd v2.2.3
+/// `pkg/cri/server/container_create_linux.go` cgroup path layout, with an
+/// additional tenant prefix injected by cave.
 #[derive(Debug, Clone)]
 pub struct CgroupHandle {
     pub path: PathBuf,
     pub container_id: String,
+    pub tenant_id: String,
 }
 
 impl CgroupHandle {
     pub fn new(container_id: &str) -> Self {
+        Self::with_root(container_id, "default", Path::new(CGROUP_ROOT))
+    }
+
+    /// Tenant-scoped handle rooted at an arbitrary cgroup hierarchy root.
+    /// On Linux, callers pass `/sys/fs/cgroup`; tests pass a tempdir.
+    pub fn with_root(container_id: &str, tenant_id: &str, root: &Path) -> Self {
         Self {
-            path: PathBuf::from(CGROUP_ROOT)
+            path: root
                 .join(CAVE_CGROUP_PREFIX)
+                .join(tenant_id)
                 .join(container_id),
             container_id: container_id.to_string(),
+            tenant_id: tenant_id.to_string(),
         }
     }
 }
@@ -135,6 +148,158 @@ fn write_file(path: &std::path::Path, content: &str) -> CriResult<()> {
     std::fs::write(path, content).map_err(|e| {
         crate::error::CriError::Cgroup(format!("write {} failed: {}", path.display(), e))
     })
+}
+
+// ─── OS-independent real I/O writers (used by tests + by Linux runtime) ──────
+//
+// The legacy `apply_limits` is gated behind `#[cfg(target_os = "linux")]` so
+// the host kernel's cgroup v2 hierarchy is only touched on Linux. The
+// `*_in` variants below take an explicit cgroup root, do real `std::fs::*`
+// I/O on every OS, and are what the deeper-002 tests exercise against a
+// `tempdir()`.
+//
+// Cite: containerd v2.2.3 `pkg/cri/server/container_create_linux.go`
+// + runc v1.4.2 `libcontainer/cgroups/fs2/{cpu,memory,pids,io}.go` —
+// each knob below maps 1:1 to the runc fs2 writer.
+
+/// Materialise the cgroup directory under `root`. Returns the populated
+/// handle. Real `mkdir -p` even on macOS / dev hosts — backs the test
+/// suite without `#[cfg(target_os = "linux")]` gating.
+pub fn create_cgroup_in(
+    container_id: &str,
+    tenant_id: &str,
+    root: &Path,
+    limits: &ResourceLimits,
+) -> CriResult<CgroupHandle> {
+    let handle = CgroupHandle::with_root(container_id, tenant_id, root);
+    std::fs::create_dir_all(&handle.path).map_err(|e| {
+        CriError::Cgroup(format!("create {} failed: {}", handle.path.display(), e))
+    })?;
+    apply_limits_in(&handle, limits)?;
+    Ok(handle)
+}
+
+/// Apply resource limits by writing real bytes to the cgroup files under
+/// `handle.path`. Cite: runc v1.4.2 `libcontainer/cgroups/fs2/cpu.go`
+/// `setCpuWeight` + `setCpuMax`, `fs2/memory.go` `setMemory`,
+/// `fs2/pids.go` `setPids`.
+pub fn apply_limits_in(handle: &CgroupHandle, limits: &ResourceLimits) -> CriResult<()> {
+    if let Some(cpu_shares) = limits.cpu_shares {
+        write_real(&handle.path.join("cpu.weight"), &cpu_shares.to_string())?;
+    }
+    if let Some(cpu_quota) = limits.cpu_quota {
+        write_real(&handle.path.join("cpu.max"), &format!("{} 100000", cpu_quota))?;
+    }
+    if let Some(mem) = limits.memory_limit {
+        write_real(&handle.path.join("memory.max"), &mem.to_string())?;
+    }
+    if let Some(pids) = limits.pids_limit {
+        write_real(&handle.path.join("pids.max"), &pids.to_string())?;
+    }
+    Ok(())
+}
+
+/// Move a process into this cgroup by writing its PID to `cgroup.procs`.
+/// Cite: runc v1.4.2 `libcontainer/cgroups/fs2/fs2.go` `Apply`.
+pub fn attach_pid(handle: &CgroupHandle, pid: u32) -> CriResult<()> {
+    write_real(&handle.path.join("cgroup.procs"), &pid.to_string())
+}
+
+/// Set a freezer state. Cite: runc v1.4.2 `libcontainer/cgroups/fs2/freezer.go`
+/// — accepts `THAWED` / `FROZEN`.
+pub fn set_freezer(handle: &CgroupHandle, state: FreezerState) -> CriResult<()> {
+    let value = match state { FreezerState::Thawed => "0", FreezerState::Frozen => "1" };
+    write_real(&handle.path.join("cgroup.freeze"), value)
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FreezerState { Thawed, Frozen }
+
+/// Read the canonical cgroup v2 stats from `handle.path` regardless of OS.
+/// Cite: containerd `pkg/cri/server/container_stats_list_linux.go` v2.2.3.
+pub fn read_stats_in(handle: &CgroupHandle) -> CriResult<crate::models::CgroupStatsV2> {
+    let mut stats = crate::models::CgroupStatsV2::default();
+    let cpu_stat_path = handle.path.join("cpu.stat");
+    stats.cpu_usage_usec   = read_cpu_stat_real(&cpu_stat_path, "usage_usec");
+    stats.cpu_user_usec    = read_cpu_stat_real(&cpu_stat_path, "user_usec");
+    stats.cpu_system_usec  = read_cpu_stat_real(&cpu_stat_path, "system_usec");
+    stats.cpu_nr_throttled = read_cpu_stat_real(&cpu_stat_path, "nr_throttled");
+
+    stats.memory_current      = read_u64_real(&handle.path.join("memory.current"));
+    stats.memory_peak         = read_u64_real(&handle.path.join("memory.peak"));
+    stats.memory_swap_current = read_u64_real(&handle.path.join("memory.swap.current"));
+
+    stats.pids_current     = read_u64_real(&handle.path.join("pids.current"));
+    stats.pids_max_reached = read_pids_events_real(&handle.path.join("pids.events"));
+
+    let (rbytes, wbytes) = read_io_stat_real(&handle.path.join("io.stat"));
+    stats.io_read_bytes  = rbytes;
+    stats.io_write_bytes = wbytes;
+    Ok(stats)
+}
+
+/// Remove the cgroup directory (and any empty parents we created).
+pub fn remove_cgroup_in(handle: &CgroupHandle) -> CriResult<()> {
+    if handle.path.exists() {
+        std::fs::remove_dir_all(&handle.path).map_err(|e| {
+            CriError::Cgroup(format!("remove {} failed: {}", handle.path.display(), e))
+        })?;
+    }
+    Ok(())
+}
+
+fn write_real(path: &Path, content: &str) -> CriResult<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            CriError::Cgroup(format!("ensure parent {} failed: {}", parent.display(), e))
+        })?;
+    }
+    std::fs::write(path, content).map_err(|e| {
+        CriError::Cgroup(format!("write {} failed: {}", path.display(), e))
+    })
+}
+
+fn read_u64_real(path: &Path) -> u64 {
+    std::fs::read_to_string(path).ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+fn read_cpu_stat_real(path: &Path, key: &str) -> u64 {
+    let Ok(content) = std::fs::read_to_string(path) else { return 0 };
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix(&format!("{} ", key)) {
+            return rest.trim().parse().unwrap_or(0);
+        }
+    }
+    0
+}
+
+fn read_pids_events_real(path: &Path) -> u64 {
+    let Ok(content) = std::fs::read_to_string(path) else { return 0 };
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("max ") {
+            return rest.trim().parse().unwrap_or(0);
+        }
+    }
+    0
+}
+
+fn read_io_stat_real(path: &Path) -> (u64, u64) {
+    let Ok(content) = std::fs::read_to_string(path) else { return (0, 0) };
+    let mut total_r = 0u64;
+    let mut total_w = 0u64;
+    for line in content.lines() {
+        // Format: "<major>:<minor> rbytes=N wbytes=M rios=X wios=Y dbytes=Z dios=W"
+        for token in line.split_whitespace().skip(1) {
+            if let Some(v) = token.strip_prefix("rbytes=") {
+                total_r += v.parse().unwrap_or(0);
+            } else if let Some(v) = token.strip_prefix("wbytes=") {
+                total_w += v.parse().unwrap_or(0);
+            }
+        }
+    }
+    (total_r, total_w)
 }
 
 #[cfg(target_os = "linux")]

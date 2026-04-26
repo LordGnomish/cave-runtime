@@ -84,6 +84,11 @@ pub struct Mount {
     pub destination: PathBuf,
     pub read_only: bool,
     pub mount_type: MountType,
+    /// CRI-side propagation mode (private / rslave / rshared). Mirrors
+    /// containerd `pkg/cri/server/container_create_linux.go` mount propagation
+    /// translation in v2.2.3.
+    #[serde(default)]
+    pub propagation: MountPropagation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +96,56 @@ pub enum MountType {
     Bind,
     Volume,
     Tmpfs,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MountPropagation {
+    #[default]
+    Private,
+    HostToContainer,
+    Bidirectional,
+}
+
+/// Cite: containerd `pkg/cri/server/container_create_linux.go`
+/// (setOCISecurityContext) v2.2.3 + runc `libcontainer/specconv/spec_linux.go`
+/// v1.4.2. Full per-container security knobs that get folded into the OCI
+/// runtime spec.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SecurityContext {
+    pub run_as_user: Option<u32>,
+    pub run_as_group: Option<u32>,
+    #[serde(default)]
+    pub supplemental_groups: Vec<u32>,
+    pub run_as_non_root: bool,
+    pub readonly_rootfs: bool,
+    pub allow_privilege_escalation: bool,
+    pub privileged: bool,
+    #[serde(default)]
+    pub capabilities_add: Vec<String>,
+    #[serde(default)]
+    pub capabilities_drop: Vec<String>,
+    pub seccomp_profile: Option<SeccompProfile>,
+    pub apparmor_profile: Option<String>,
+    pub selinux_label: Option<SelinuxLabel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SeccompProfile {
+    /// `RuntimeDefault` — apply the runtime's built-in seccomp filter.
+    RuntimeDefault,
+    /// `Unconfined` — disable seccomp entirely.
+    Unconfined,
+    /// `Localhost` — load the JSON profile at the given path.
+    Localhost(String),
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SelinuxLabel {
+    pub user: Option<String>,
+    pub role: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    pub level: Option<String>,
 }
 
 /// OCI image metadata.
@@ -750,6 +805,7 @@ mod tests {
             destination: "/container/path".into(),
             read_only: true,
             mount_type: MountType::Bind,
+            propagation: crate::models::MountPropagation::Private,
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains("host/path"));
