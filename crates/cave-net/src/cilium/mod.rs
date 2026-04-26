@@ -28,6 +28,7 @@ pub mod endpoint;
 pub mod envoy;
 pub mod fqdn;
 pub mod hubble;
+pub mod hubble_ext;
 pub mod identity;
 pub mod ingress;
 pub mod ipam;
