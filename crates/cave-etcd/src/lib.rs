@@ -61,6 +61,7 @@ pub mod auth_v3;
 pub mod b64;
 pub mod balancer;
 pub mod client;
+pub mod client_v2;
 pub mod cluster_status;
 pub mod concurrency;
 pub mod concurrency_extras;
