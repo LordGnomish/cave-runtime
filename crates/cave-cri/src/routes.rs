@@ -351,7 +351,7 @@ async fn restore_container(
     Json(req): Json<RestoreReq>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let path = if req.checkpoint_path.is_empty() {
-        format!("/var/lib/cave/checkpoints/{}", id)
+        crate::paths::checkpoint_dir(&id.to_string()).display().to_string()
     } else {
         req.checkpoint_path
     };

@@ -2,15 +2,14 @@
 
 use crate::error::{CriError, CriResult};
 use crate::models::OciImage;
+use crate::paths;
 use std::path::{Path, PathBuf};
-
-const CONTAINER_ROOT: &str = "/var/lib/cave/containers";
 
 /// Assemble a rootfs from OCI image layers.
 ///
 /// Uses overlayfs to stack layers (lower=layer1:layer2:..., upper=writable, work=workdir).
 pub fn assemble_rootfs(image: &OciImage, container_id: &str) -> CriResult<PathBuf> {
-    let container_dir = PathBuf::from(CONTAINER_ROOT).join(container_id);
+    let container_dir = paths::container_dir(container_id);
     let rootfs = container_dir.join("rootfs");
     let upper = container_dir.join("upper");
     let work = container_dir.join("work");
@@ -132,7 +131,7 @@ pub(crate) fn extract_layer(archive_path: &Path, target_dir: &Path) -> CriResult
 
 /// Cleanup rootfs and all container data.
 pub fn cleanup_rootfs(container_id: &str) -> CriResult<()> {
-    let container_dir = PathBuf::from(CONTAINER_ROOT).join(container_id);
+    let container_dir = paths::container_dir(container_id);
     let _merged = container_dir.join("merged");
 
     // Unmount overlayfs first
@@ -170,14 +169,18 @@ mod tests {
 
     #[test]
     fn test_container_root_path() {
-        let path = PathBuf::from(CONTAINER_ROOT).join("test123").join("merged");
+        let path = paths::container_dir("test123").join("merged");
         assert!(path.to_string_lossy().contains("test123"));
     }
 
     #[test]
     fn test_container_root_path_structure() {
-        let path = PathBuf::from(CONTAINER_ROOT).join("abc");
+        // Default root is /var/lib/cave when no override is set.
+        let prev = std::env::var("CAVE_ROOT_DIR").ok();
+        std::env::remove_var("CAVE_ROOT_DIR");
+        let path = paths::container_dir("abc");
         assert!(path.starts_with("/var/lib/cave/containers"));
+        if let Some(v) = prev { std::env::set_var("CAVE_ROOT_DIR", v); }
     }
 
     #[test]
@@ -332,7 +335,7 @@ mod tests {
     #[test]
     fn test_cleanup_rootfs_removes_created_dir() {
         let container_id = "cleanup-test-container";
-        let container_dir = PathBuf::from(CONTAINER_ROOT).join(container_id);
+        let container_dir = paths::container_dir(container_id);
 
         if std::fs::create_dir_all(&container_dir).is_ok() {
             let result = cleanup_rootfs(container_id);

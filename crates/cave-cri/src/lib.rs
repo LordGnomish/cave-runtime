@@ -61,6 +61,7 @@
 
 pub mod models;
 pub mod error;
+pub mod paths;
 pub mod namespace;
 pub mod cgroup;
 pub mod registry;
@@ -73,17 +74,19 @@ pub mod oci_spec;
 pub mod logs;
 pub mod health;
 
+#[cfg(test)]
+mod upstream_tests;
+
 use routes::CriState;
 use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use registry::RegistryClient;
 use dashmap::DashMap;
 use std::sync::Arc;
-use std::path::PathBuf;
 use tokio::sync::Mutex;
 
 /// Initialize cave-cri state.
 pub fn new_state() -> Arc<CriState> {
-    let cache_dir = PathBuf::from("/var/lib/cave/images");
+    let cache_dir = paths::image_cache_dir();
     Arc::new(CriState {
         containers: ContainerStore::new(),
         images: ImageStore::new(),

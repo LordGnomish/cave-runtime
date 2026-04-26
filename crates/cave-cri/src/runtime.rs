@@ -4,6 +4,7 @@ use crate::cgroup;
 use crate::error::{CriError, CriResult};
 use crate::models::*;
 use crate::namespace;
+use crate::paths;
 use crate::rootfs;
 use crate::state_machine as sm;
 use crate::store::ContainerStore;
@@ -33,7 +34,7 @@ pub async fn create_container(
         finished_at: None,
         exit_code: None,
         rootfs_path,
-        log_path: std::path::PathBuf::from(format!("/var/log/cave/containers/{}.log", id_str)),
+        log_path: paths::container_log_path(&id_str),
         health: None,
     };
 
@@ -447,7 +448,7 @@ pub async fn checkpoint_container(id: Uuid, store: &ContainerStore) -> CriResult
 
     sm::check_checkpoint(&container.status)?;
 
-    let checkpoint_path = format!("/var/lib/cave/checkpoints/{}", id);
+    let checkpoint_path = paths::checkpoint_dir(&id.to_string()).display().to_string();
 
     #[cfg(target_os = "linux")]
     std::fs::create_dir_all(&checkpoint_path)?;
