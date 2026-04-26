@@ -56,6 +56,7 @@
 //!   GET  /api/etcd/health     — health check
 //! ```
 
+pub mod auth_token;
 pub mod b64;
 pub mod client;
 pub mod concurrency;
