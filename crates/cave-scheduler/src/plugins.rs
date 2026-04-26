@@ -424,7 +424,7 @@ mod tests {
     fn resources_filter_rejects_when_insufficient() {
         let mut node = n("a"); node.allocated.cpu_millicores = 3900;
         let mut p = Pod::new("t", "ns", "p");
-        p.spec.resources = ResourceRequest { cpu_millicores: 500, memory_bytes: 0 };
+        p.spec.resources = ResourceRequest { cpu_millicores: 500, memory_bytes: 0, ..Default::default() };
         assert_eq!(Resources.filter(&p, &node, &empty_snap(vec![])).code, Code::Unschedulable);
     }
     #[test]
