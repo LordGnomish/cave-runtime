@@ -24,6 +24,8 @@ pub mod conversion;
 pub mod server_side_apply;
 pub mod audit;
 pub mod rbac;
+pub mod aggregated_apiserver;
+pub mod endpointslice_mirror;
 
 use store::ResourceStore;
 use std::sync::Arc;

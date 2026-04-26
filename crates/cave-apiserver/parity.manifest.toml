@@ -1,10 +1,11 @@
 # parity.manifest.toml — cave-apiserver
-# Upstream: kubernetes/kubernetes v1.30.0  https://github.com/kubernetes/kubernetes
+# Upstream: kubernetes/kubernetes v1.36.0  https://github.com/kubernetes/kubernetes
+# (verified at https://github.com/kubernetes/kubernetes/releases/latest)
 
 [upstream]
 org     = "kubernetes"
 repo    = "kubernetes"
-version = "v1.30.0"
+version = "v1.36.0"
 
 [module]
 name        = "cave-apiserver"
@@ -52,6 +53,32 @@ local    = "src/resources.rs"
 [[files]]
 upstream = "pkg/printers/internalversion/printers.go"
 local    = "src/store.rs"
+
+# kube-aggregator (AggregatedAPIServer)
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/types.go"
+local    = "src/aggregated_apiserver.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/apiserver/handler_proxy.go"
+local    = "src/aggregated_apiserver.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/controllers/status/available_controller.go"
+local    = "src/aggregated_apiserver.rs"
+
+# EndpointSlice mirror controller
+[[files]]
+upstream = "pkg/controller/endpointslicemirroring/endpointslicemirroring_controller.go"
+local    = "src/endpointslice_mirror.rs"
+
+[[files]]
+upstream = "pkg/controller/endpointslicemirroring/reconciler.go"
+local    = "src/endpointslice_mirror.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/discovery/v1/types.go"
+local    = "src/endpointslice_mirror.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 # Core v1 — namespaces

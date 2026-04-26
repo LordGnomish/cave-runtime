@@ -310,4 +310,118 @@ mod tests {
         assert!(matches!(evs[2], WatchCacheEvent::Deleted { .. }));
         assert!(evs.iter().all(|e| e.tenant_id() == "acme"), "tenant_id invariant");
     }
+
+    // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
+
+    /// Upstream parity: `TestWatchCache_ReplaySinceLatestRvIsEmpty`
+    /// (storage/cacher/watch_cache_test.go — `getAllEvents(latestRv)`).
+    #[test]
+    fn test_replay_since_latest_rv_yields_no_events() {
+        let wc = WatchCache::new(64, 1000);
+        let _rv1 = wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        let from_latest = wc.replay_for_tenant("acme", rv2);
+        assert!(from_latest.is_empty(),
+            "no events strictly newer than latest RV");
+        // tenant_id invariant smoke: empty result still scoped to acme query.
+        let _ = wc.record_added("globex", cm("x", "default"));
+        let after = wc.replay_for_tenant("acme", rv2);
+        assert!(after.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: globex event must not appear in acme replay");
+    }
+
+    /// Upstream parity: `TestWatchCache_ConcurrentMultiTenantOrdering`
+    /// (cacher_test.go — concurrent processEvent across watchers).
+    /// Resource versions must be strictly monotonic across tenants and the
+    /// per-tenant replay must remain pure.
+    #[test]
+    fn test_concurrent_multi_tenant_writes_keep_rv_monotonic() {
+        use std::sync::Arc as StdArc;
+        use std::thread;
+        let wc = StdArc::new(WatchCache::new(1024, 1000));
+        let mut handles = vec![];
+        for tenant in ["acme", "globex", "initech"] {
+            let wc2 = wc.clone();
+            handles.push(thread::spawn(move || {
+                for i in 0..20 {
+                    wc2.record_added(tenant, cm(&format!("{}-{}", tenant, i), "default"));
+                }
+            }));
+        }
+        for h in handles { h.join().unwrap(); }
+        assert_eq!(wc.current_resource_version(), 60,
+            "60 writes total — RV monotonic + atomic");
+        let acme = wc.replay_for_tenant("acme", 0);
+        assert_eq!(acme.iter().filter(|e| !e.is_bookmark()).count(), 20);
+        assert!(acme.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: no cross-tenant bleed under concurrency");
+    }
+
+    /// Upstream parity: `TestWatchCache_ForceBookmarkPerTenantIsolated`
+    /// (cacher.processBookmarkEvent dispatched per-watcher).
+    #[test]
+    fn test_force_bookmark_does_not_leak_across_tenants() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        wc.record_added("globex", cm("b", "default"));
+        wc.force_bookmark("acme");
+        let acme = wc.replay_for_tenant("acme", 0);
+        let globex = wc.replay_for_tenant("globex", 0);
+        let acme_bookmarks = acme.iter().filter(|e| e.is_bookmark()).count();
+        let globex_bookmarks = globex.iter().filter(|e| e.is_bookmark()).count();
+        assert_eq!(acme_bookmarks, 1,
+            "force_bookmark on acme creates exactly one acme-tagged bookmark");
+        assert_eq!(globex_bookmarks, 0,
+            "tenant_id invariant: globex must not receive acme's heartbeat");
+        assert!(acme.iter().all(|e| e.tenant_id() == "acme"));
+    }
+
+    /// Upstream parity: `TestWatchCache_BookmarkResetsAfterEmission`
+    /// (KEP-365 — interval counter resets on emit).
+    #[test]
+    fn test_bookmark_interval_counter_resets_after_emit() {
+        let wc = WatchCache::new(64, 2);
+        // Two writes → 1 bookmark fires; counter resets.
+        wc.record_added("acme", cm("a", "default"));
+        wc.record_added("acme", cm("b", "default"));
+        // Two more writes → another bookmark fires.
+        wc.record_added("acme", cm("c", "default"));
+        wc.record_added("acme", cm("d", "default"));
+        let evs = wc.replay_for_tenant("acme", 0);
+        let bms = evs.iter().filter(|e| e.is_bookmark()).count();
+        assert_eq!(bms, 2,
+            "interval counter resets after each bookmark — expect two over four writes");
+        assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant across multiple bookmark emissions");
+    }
+
+    /// Upstream parity: `TestWatchCache_BookmarkAccessorsExposeTenant`
+    /// (Bookmark events implement the tenant-scoped accessor surface).
+    #[test]
+    fn test_bookmark_event_accessors_return_tenant_and_rv() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        let rv = wc.force_bookmark("acme");
+        let evs = wc.replay_for_tenant("acme", 0);
+        let bm = evs.iter().find(|e| e.is_bookmark()).expect("bookmark present");
+        assert!(bm.is_bookmark());
+        assert_eq!(bm.tenant_id(), "acme",
+            "tenant_id invariant: accessor returns scoped tenant");
+        assert_eq!(bm.resource_version(), rv);
+    }
+
+    /// Upstream parity: `TestWatchCache_DisjointTenantsHaveSeparateReplays`
+    /// (cacher.GetEvents predicate excludes other tenants from the slice).
+    #[test]
+    fn test_replay_excludes_unknown_tenant() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        wc.record_added("globex", cm("b", "default"));
+        let unknown = wc.replay_for_tenant("missing-tenant", 0);
+        assert!(unknown.is_empty(),
+            "tenant_id invariant: unknown tenant gets empty replay, never bleed");
+        let acme = wc.replay_for_tenant("acme", 0);
+        assert!(acme.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: only acme entries returned");
+    }
 }

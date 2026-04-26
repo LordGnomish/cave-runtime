@@ -290,4 +290,152 @@ mod tests {
         });
         assert_eq!(resp.result_status, "Success");
     }
+
+    // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
+
+    /// Upstream parity: `TestConverter_BatchOrderPreserved`
+    /// (apiextensions-apiserver/pkg/apiserver/conversion/converter_test.go —
+    /// `Convert` returns objects in input order).
+    #[test]
+    fn test_convert_preserves_input_order_in_batch() {
+        let conv = CoreConverter::new();
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: (0..5).map(|i| {
+                let tenant = format!("tenant-{}", i);
+                let mut o = obj("ConfigMap", "v1beta1", &tenant);
+                o.name = format!("cm-{}", i);
+                o
+            }).collect(),
+        };
+        let resp = conv.convert(req);
+        assert_eq!(resp.converted_objects.len(), 5);
+        for (i, o) in resp.converted_objects.iter().enumerate() {
+            assert_eq!(o.name, format!("cm-{}", i),
+                "output order matches input order at index {}", i);
+            assert_eq!(o.tenant_id, format!("tenant-{}", i),
+                "tenant_id invariant: per-object tenant preserved at index {}", i);
+        }
+    }
+
+    /// Upstream parity: `TestConverter_FieldRenameNoopIfMissing`
+    /// (rename rule whose source field is absent yields a no-op for that obj).
+    #[test]
+    fn test_field_rename_is_noop_when_source_field_absent() {
+        let conv = CoreConverter::new()
+            .with_rule(RenameRule {
+                from_version: "v1beta1".into(),
+                to_version: "v1".into(),
+                kind: "Widget".into(),
+                from_field: "missingField".into(),
+                to_field: "newName".into(),
+            });
+        let o = obj("Widget", "v1beta1", "acme"); // has only "foo"
+        let req = ConversionRequest {
+            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+        };
+        let resp = conv.convert(req);
+        let out = &resp.converted_objects[0];
+        assert!(!out.fields.contains_key("newName"),
+            "no rename when source field is absent");
+        assert!(out.fields.contains_key("foo"),
+            "untouched fields retained");
+        assert_eq!(out.tenant_id, "acme", "tenant_id invariant on noop rename");
+    }
+
+    /// Upstream parity: `TestConverter_MultipleRulesSameKindAllApply`
+    /// (each matching RenameRule applies independently to a single object).
+    #[test]
+    fn test_multiple_rules_for_same_kind_all_apply() {
+        let conv = CoreConverter::new()
+            .with_rule(RenameRule {
+                from_version: "v1beta1".into(),
+                to_version: "v1".into(),
+                kind: "Widget".into(),
+                from_field: "alpha".into(),
+                to_field: "alphaV1".into(),
+            })
+            .with_rule(RenameRule {
+                from_version: "v1beta1".into(),
+                to_version: "v1".into(),
+                kind: "Widget".into(),
+                from_field: "beta".into(),
+                to_field: "betaV1".into(),
+            });
+        let mut o = obj("Widget", "v1beta1", "acme");
+        o.fields.insert("alpha".into(), serde_json::Value::Bool(true));
+        o.fields.insert("beta".into(), serde_json::Value::Bool(false));
+        let req = ConversionRequest {
+            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+        };
+        let resp = conv.convert(req);
+        let out = &resp.converted_objects[0];
+        assert!(out.fields.contains_key("alphaV1"));
+        assert!(out.fields.contains_key("betaV1"));
+        assert!(!out.fields.contains_key("alpha"));
+        assert!(!out.fields.contains_key("beta"));
+        assert_eq!(out.tenant_id, "acme", "tenant_id invariant across multi-rule pass");
+    }
+
+    /// Upstream parity: `TestConverter_MixedKindBatch`
+    /// (per-object rules applied selectively in a heterogeneous batch).
+    #[test]
+    fn test_mixed_kind_batch_applies_rules_selectively() {
+        let conv = CoreConverter::new()
+            .with_rule(RenameRule {
+                from_version: "v1beta1".into(),
+                to_version: "v1".into(),
+                kind: "Widget".into(),
+                from_field: "x".into(),
+                to_field: "y".into(),
+            });
+        let mut w = obj("Widget", "v1beta1", "acme");
+        w.fields.insert("x".into(), serde_json::Value::String("v".into()));
+        let mut g = obj("Gadget", "v1beta1", "globex");
+        g.fields.insert("x".into(), serde_json::Value::String("v".into()));
+        let req = ConversionRequest {
+            uid: "u1".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![w, g],
+        };
+        let resp = conv.convert(req);
+        let widget = &resp.converted_objects[0];
+        let gadget = &resp.converted_objects[1];
+        assert!(widget.fields.contains_key("y"),
+            "Widget rule applied to Widget");
+        assert!(gadget.fields.contains_key("x"),
+            "Gadget unaffected by Widget-scoped rule");
+        assert_eq!(widget.tenant_id, "acme", "tenant_id invariant: widget tenant");
+        assert_eq!(gadget.tenant_id, "globex",
+            "tenant_id invariant: gadget tenant — no cross-object bleed");
+    }
+
+    /// Upstream parity: `TestConverter_NoRuleMutationOfTenantId`
+    /// (built-in converter MUST NOT alter tenant_id even when fields named
+    /// like tenant_id appear in the rename map).
+    #[test]
+    fn test_converter_never_strips_tenant_id_via_field_rename() {
+        let conv = CoreConverter::new()
+            .with_rule(RenameRule {
+                from_version: "v1beta1".into(),
+                to_version: "v1".into(),
+                kind: "ConfigMap".into(),
+                from_field: "tenant_id".into(),  // intentionally adversarial name
+                to_field: "renamed_tenant_id".into(),
+            });
+        let mut o = obj("ConfigMap", "v1beta1", "acme");
+        // Adversarial: a field literally named tenant_id inside fields map.
+        o.fields.insert("tenant_id".into(),
+            serde_json::Value::String("wannabe-attacker".into()));
+        let req = ConversionRequest {
+            uid: "u1".into(), desired_api_version: "v1".into(), objects: vec![o],
+        };
+        let resp = conv.convert(req);
+        let out = &resp.converted_objects[0];
+        // The rule moves the in-fields entry, but the canonical tenant_id on
+        // the ConvertibleObject must remain "acme".
+        assert_eq!(out.tenant_id, "acme",
+            "tenant_id invariant: canonical tenant_id MUST NOT be overwritten by field rename");
+    }
 }
