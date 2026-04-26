@@ -22,6 +22,7 @@ pub mod types;
 
 pub mod bpfmaps;
 pub mod clustermesh;
+pub mod clustermesh_ext;
 pub mod conntrack;
 pub mod egress;
 pub mod endpoint;
