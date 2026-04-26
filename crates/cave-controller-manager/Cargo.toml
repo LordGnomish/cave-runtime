@@ -1,0 +1,16 @@
+[package]
+name = "cave-controller-manager"
+description = "Kubernetes controller-manager parity scaffold (Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

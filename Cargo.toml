@@ -114,6 +114,8 @@ members = [
     # === Data Lake Foundation ===
     "crates/cave-iceberg",
     "crates/cave-datafusion",
+    # === Kubernetes Controller Manager ===
+    "crates/cave-controller-manager",
 ]
 
 [workspace.package]
