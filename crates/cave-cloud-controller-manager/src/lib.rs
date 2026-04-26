@@ -17,6 +17,7 @@
 
 pub mod types;
 pub mod provider;
+pub mod provider_runtime;
 
 pub mod node_controller;
 pub mod node_lifecycle;
