@@ -19,6 +19,7 @@ pub mod models;
 pub mod agent;
 pub mod routes;
 pub mod csi;
+pub mod probe;
 
 use agent::KubeletState;
 use std::sync::Arc;
