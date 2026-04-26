@@ -65,6 +65,7 @@ pub mod concurrency;
 pub mod error;
 pub mod grpc_api;
 pub mod kms;
+pub mod kms_chain;
 pub mod kms_v2;
 pub mod lease_id_gen;
 pub mod maintenance;
