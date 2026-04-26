@@ -42,6 +42,10 @@ pub mod gc_lite;
 /// transition + taint-based eviction trigger.
 pub mod node_lease;
 
+/// 100-pct PUSH-HARD M8: Node lifecycle deeper — taints + zone-state
+/// classifier + per-zone rate-limited eviction queue.
+pub mod node_lifecycle;
+
 /// 100-pct sprint M3: Root CA publisher — kube-root-ca.crt ConfigMap
 /// propagation across active namespaces.
 pub mod root_ca_publisher;
