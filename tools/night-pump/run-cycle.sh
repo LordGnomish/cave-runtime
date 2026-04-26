@@ -16,18 +16,31 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Resolve REPO_ROOT to the parent repo (not a feature worktree). All
-# worktrees share .git via the common-dir; dirname of that is the parent.
-REPO_ROOT="$(dirname "$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir)")"
-QUEUE="$REPO_ROOT/tools/night-pump/queue.txt"
-LOG_DIR="$REPO_ROOT/tools/night-pump/log"
+# State (queue, logs, contributions, lock) lives next to the script — that
+# way the script can be checked into the repo and still work from any
+# worktree that happens to be the current home of feat/qwen-pump-cron.
+QUEUE="$SCRIPT_DIR/queue.txt"
+LOG_DIR="$SCRIPT_DIR/log"
 CYCLE_LOG="$LOG_DIR/run-cycle.log"
-CONTRIB="$REPO_ROOT/tools/night-pump/contributions.jsonl"
-LOCK="$REPO_ROOT/tools/night-pump/run-cycle.lock"
-SHARED_TARGET="$REPO_ROOT/.claude/qwen-pump-target"
-# Find whichever worktree currently has main checked out (do not hard-code).
+CONTRIB="$SCRIPT_DIR/contributions.jsonl"
+LOCK_DIR="$SCRIPT_DIR/run-cycle.lockdir"
+# Git ops run against the canonical Cave Runtime repo. Override with
+# QWEN_PUMP_REPO_ROOT for local testing or alternate installs.
+REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+if [ ! -d "$REPO_ROOT/.git" ] && [ ! -f "$REPO_ROOT/.git" ]; then
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] FATAL: REPO_ROOT '$REPO_ROOT' is not a git repo" >&2
+  exit 1
+fi
+# Filesystem checks (does crates/$crate exist?) run against whichever
+# worktree currently has main checked out, because the parent repo's
+# working tree may be on an unrelated branch.
 MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain \
             | awk '/^worktree /{wt=$2} /^branch refs\/heads\/main$/{print wt; exit}')"
+if [ -z "$MAIN_WT" ]; then
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] FATAL: no worktree currently has main checked out" >&2
+  exit 1
+fi
+SHARED_TARGET="$REPO_ROOT/.claude/qwen-pump-target"
 
 OLLAMA_HOST="${OLLAMA_HOST:-http://127.0.0.1:11434}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3-coder-next:Q4_K_M}"
@@ -38,12 +51,19 @@ mkdir -p "$LOG_DIR" "$SHARED_TARGET"
 ts() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 log() { echo "[$(ts)] $*" | tee -a "$CYCLE_LOG" >&2; }
 
-# Single-flight lock (non-blocking).
-exec 9>"$LOCK"
-if ! flock -n 9; then
-  log "skip: another cycle already running"
+# Single-flight lock — portable atomic mkdir. Stale locks (older than
+# 60 minutes) are reclaimed automatically.
+if [ -d "$LOCK_DIR" ]; then
+  if [ -n "$(find "$LOCK_DIR" -maxdepth 0 -mmin +60 2>/dev/null)" ]; then
+    log "reclaim: stale lock dir older than 60m"
+    rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"
+  fi
+fi
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  log "skip: another cycle already running (lock dir exists)"
   exit 0
 fi
+trap 'rmdir "$LOCK_DIR" 2>/dev/null || rm -rf "$LOCK_DIR"' EXIT
 
 # Sanity: queue file present + non-empty.
 if [ ! -s "$QUEUE" ]; then
@@ -61,20 +81,20 @@ fi
 awk -v target="$crate" 'BEGIN{dropped=0} { if (!dropped && $0==target) {dropped=1; next} print }' "$QUEUE" > "$QUEUE.tmp" && mv "$QUEUE.tmp" "$QUEUE"
 log "picked: $crate"
 
-# Crate must exist.
-if [ ! -d "$REPO_ROOT/crates/$crate" ]; then
-  log "drop: crates/$crate dir missing"
+# Crate must exist on main.
+if [ ! -d "$MAIN_WT/crates/$crate" ]; then
+  log "drop: crates/$crate dir missing on main"
   exit 0
 fi
 
 # Skip if already pumped.
-if [ -f "$REPO_ROOT/crates/$crate/tests/qwen_drafted.rs" ]; then
+if [ -f "$MAIN_WT/crates/$crate/tests/qwen_drafted.rs" ]; then
   log "drop: $crate already has tests/qwen_drafted.rs"
   exit 0
 fi
 
 # Discover module surface.
-modules="$(ls "$REPO_ROOT/crates/$crate/src/" 2>/dev/null | awk -F. '/\.rs$/ && $1!="lib"{print $1}' | tr '\n' ',' | sed 's/,$//')"
+modules="$(ls "$MAIN_WT/crates/$crate/src/" 2>/dev/null | awk -F. '/\.rs$/ && $1!="lib"{print $1}' | tr '\n' ',' | sed 's/,$//')"
 if [ -z "$modules" ]; then
   log "drop: $crate has no src/*.rs modules to test"
   exit 0
@@ -96,38 +116,37 @@ cleanup_failure() {
   git -C "$REPO_ROOT" branch -D "$WT_BR" 2>/dev/null || true
 }
 
-# Build prompt.
+# Build prompt by concatenation — avoids heredoc-inside-$(...) parser
+# issues with apostrophes / backticks / dollar signs in the body.
 crate_underscore="$(echo "$crate" | tr - _)"
-PROMPT="$(cat <<EOF
-You are writing Rust integration tests for the cave-runtime crate \`$crate\`.
+TODAY="$(date -u +%Y-%m-%d)"
+PROMPT="Write Rust integration tests for the cave-runtime crate ${crate}.
 
-Available modules (relative to the crate root): $modules
+Available modules (relative to the crate root): ${modules}
 
 Hard requirements:
 1. Output a SINGLE Rust source file. No prose. No markdown fences. No backticks.
-2. The very first lines of the file must be:
-   //! Qwen drafted tests for $crate.
-   //! Generated $(date -u +%Y-%m-%d) via local Ollama.
-   //! All tests are #[ignore = "impl pending"].
+2. The first four lines of the file must be exactly:
+   //! Qwen drafted tests for ${crate}.
+   //! Generated ${TODAY} via local Ollama.
+   //! All tests are #[ignore = \"impl pending\"].
    #![allow(unused, unused_imports, unused_variables, unused_mut, dead_code)]
 3. Wrap every test in: #[cfg(test)] mod tests { ... }
 4. Each test:
-   - is annotated #[test] AND #[ignore = "impl pending"]
-   - has a one-line "// upstream: <product> v<ver>/<path>" comment immediately before the #[test] attribute
-   - exercises a plausible function/struct from the listed modules using the path \`$crate_underscore::module::Item\`
+   - is annotated #[test] AND #[ignore = \"impl pending\"]
+   - has a one-line // upstream: <product> v<ver>/<path> comment immediately before the #[test] attribute
+   - exercises a plausible function or struct from the listed modules, using the path ${crate_underscore}::module::Item
    - threads a tenant_id String through the assertion (multi-tenant invariant)
 5. Generate between 25 and 50 tests covering: happy path, edge cases, invariants, error paths, tenant isolation.
-6. Imports go inside the mod block. Do not import items you don't use.
-7. Use only \`unimplemented!()\` for any value you cannot compute deterministically.
+6. Imports go inside the mod block. Do not import items you do not use.
+7. Use unimplemented!() for any value you cannot compute deterministically.
 
-Begin writing the file now.
-EOF
-)"
+Begin writing the file now."
 
 RESPONSE_FILE="$LOG_DIR/${crate}-response.json"
 log "calling ollama model=$OLLAMA_MODEL"
 HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
-  --max-time 600 \
+  --max-time 240 \
   -X POST "$OLLAMA_HOST/api/generate" \
   -H 'Content-Type: application/json' \
   -d "$(jq -nc --arg m "$OLLAMA_MODEL" --arg p "$PROMPT" --arg ka "$OLLAMA_KEEP_ALIVE" \
@@ -144,8 +163,12 @@ fi
 # Extract Rust source. Strip any leading/trailing markdown fences.
 RUST_OUT="$WT_DIR/crates/$crate/tests/qwen_drafted.rs"
 mkdir -p "$(dirname "$RUST_OUT")"
+# ANSI-C quoting builds the regex without putting literal backticks in
+# the source — defends against shell parsers that get confused by
+# triple-backtick sequences inside other quoted contexts.
+FENCE_RE=$'^[[:space:]]*\x60\x60\x60[a-zA-Z]*[[:space:]]*$'
 jq -r .response "$RESPONSE_FILE" \
-  | sed -E '/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$/d' \
+  | sed -E "/${FENCE_RE}/d" \
   > "$RUST_OUT"
 
 if [ ! -s "$RUST_OUT" ]; then
