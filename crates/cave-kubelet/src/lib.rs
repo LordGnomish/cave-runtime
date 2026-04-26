@@ -24,6 +24,7 @@ pub mod eviction;
 pub mod streaming;
 pub mod security;
 pub mod apparmor;
+pub mod podresources;
 
 use agent::KubeletState;
 use std::sync::Arc;
