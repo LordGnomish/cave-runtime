@@ -27,6 +27,7 @@ pub mod hubble;
 pub mod identity;
 pub mod ingress;
 pub mod ipam;
+pub mod ipsec;
 pub mod l7policy;
 pub mod l7proxy;
 pub mod lb;
@@ -34,5 +35,6 @@ pub mod maglev;
 pub mod nat;
 pub mod policy;
 pub mod services;
+pub mod wireguard;
 
 pub use types::{Cite, TenantId, UPSTREAM_VERSION};
