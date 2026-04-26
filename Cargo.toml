@@ -126,6 +126,8 @@ members = [
     "crates/cave-search",
     # === Serverless (Knative) ===
     "crates/cave-knative",
+    # === Event-driven Autoscaler (KEDA) ===
+    "crates/cave-keda",
 ]
 
 [workspace.package]
