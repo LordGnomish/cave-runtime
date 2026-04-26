@@ -1,1 +1,10 @@
 pub mod attribution;
+pub mod deployments;
+pub mod events;
+pub mod jobs;
+pub mod logs;
+pub mod metrics;
+pub mod rbac;
+pub mod secrets;
+pub mod settings;
+pub mod tenants;
