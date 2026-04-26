@@ -1,0 +1,19 @@
+[package]
+name = "cave-pki"
+description = "Sovereign PKI — root CA + platform/tenant intermediates + chain validation + CRL/OCSP responder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
