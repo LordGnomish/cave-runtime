@@ -63,6 +63,18 @@ The **cave-portal** is the single pane of glass for every operational surface in
 
 Backstage is **not** wrapped — cave-portal already reimplements the Backstage developer-portal surface (catalog, software templates, scorecards, tech docs); see ADR-031.
 
+### Critical separation rule (backend vs. UI)
+
+**Critical separation rule:** When Cave Runtime reimplements an upstream product (e.g., Argo CD → cave-argocd, Grafana → cave-grafana, OpenBao → cave-vault, Cilium → cave-net, Hubble → cave-hubble), only the **backend/API/data layer** is reimplemented in the upstream-mirror crate. The **UI/UX layer is NEVER ported into the upstream-mirror crate** — instead, the equivalent UX is implemented natively inside cave-portal, consuming the upstream-mirror crate's API. This means:
+
+- cave-argocd crate = sync engine, repo poller, app reconciler, RBAC. **No UI code.**
+- cave-portal = native React deployment timeline view, sync status panel, rollback button — talking to cave-argocd's API
+- cave-grafana crate = dashboard storage + query engine + alert rule evaluator. **No UI code.**
+- cave-portal = native React panel renderer + dashboard browser
+- Same separation for cave-vault, cave-net, cave-hubble, cave-defectdojo, cave-renovate, cave-reflex
+
+Implication: Mirror principle (ADR-RUNTIME-UPSTREAM-MIRROR-001) applies only to backend/API parity. Upstream UI codebases are not line-by-line ported; they are reimagined natively in cave-portal under persona-aware, single-pane-of-glass UX.
+
 ## Rationale
 
 1. **UX integrity.** One design language, one auth flow, one persona model. The mental load of switching between five upstream UIs is replaced by the ordinary cost of learning one product.
