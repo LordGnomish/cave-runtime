@@ -11,6 +11,13 @@
 pub mod models;
 pub mod scheduler;
 pub mod routes;
+pub mod framework;
+pub mod plugins;
+pub mod preempt;
+pub mod priority_queue;
+pub mod topology;
+pub mod profiles;
+pub mod dra;
 
 use scheduler::SchedulerState;
 use std::sync::Arc;
