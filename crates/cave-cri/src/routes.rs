@@ -5,6 +5,7 @@
 use crate::models::*;
 use crate::registry::RegistryClient;
 use crate::runtime;
+use crate::runtime_handler::{RuntimeHandler, RuntimeHandlerRegistry};
 use crate::store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use axum::{
     extract::{Path, Query, State},
@@ -27,6 +28,7 @@ pub struct CriState {
     pub snapshots: SnapshotStore,
     pub events: Mutex<Vec<RuntimeEvent>>,
     pub network: DashMap<Uuid, NetworkStatus>,
+    pub runtime_handlers: RuntimeHandlerRegistry,
 }
 
 pub fn create_router(state: Arc<CriState>) -> Router {
@@ -52,6 +54,9 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/containers/{id}/attach", post(attach_container))
         .route("/api/cri/containers/{id}/checkpoint", post(checkpoint_container))
         .route("/api/cri/containers/{id}/restore", post(restore_container))
+        // Streaming endpoints (kubelet WebSocket / SPDY upgrade URLs)
+        .route("/api/cri/containers/{id}/exec/stream", post(exec_streaming_url))
+        .route("/api/cri/sandboxes/{id}/portforward", post(portforward_sandbox))
         // Container info (3)
         .route("/api/cri/containers/{id}/logs", get(get_container_logs))
         .route("/api/cri/containers/{id}/stats", get(get_container_stats))
@@ -62,10 +67,11 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/images/{reference}", get(inspect_image).delete(delete_image))
         .route("/api/cri/images/{reference}/tag", post(tag_image))
         .route("/api/cri/images/{reference}/history", get(get_image_history))
-        // Sandboxes (5)
+        // Sandboxes (6)
         .route("/api/cri/sandboxes", get(list_sandboxes).post(create_sandbox))
         .route("/api/cri/sandboxes/{id}", get(get_sandbox).delete(delete_sandbox))
         .route("/api/cri/sandboxes/{id}/stats", get(get_sandbox_stats))
+        .route("/api/cri/sandboxes/{id}/stop", post(stop_sandbox))
         // Snapshots (5)
         .route("/api/cri/snapshots", get(list_snapshots).post(create_snapshot))
         .route("/api/cri/snapshots/{id}", delete(delete_snapshot))
@@ -75,6 +81,17 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/network/attach", post(attach_network))
         .route("/api/cri/network/detach", post(detach_network))
         .route("/api/cri/network/status", get(get_network_status))
+        // Runtime handlers (3) — KEP-585 / RuntimeClass
+        .route("/api/cri/runtime/handlers", get(list_runtime_handlers))
+        .route("/api/cri/runtime/handlers/{name}", get(get_runtime_handler))
+        .route("/api/cri/runtime/handlers/default", get(get_default_runtime_handler))
+        // Stats v2 — cAdvisor / Linux / Windows variants (4)
+        .route("/api/cri/stats/containers", get(list_container_stats_v2))
+        .route("/api/cri/stats/containers/{id}/linux", get(get_container_stats_linux))
+        .route("/api/cri/stats/containers/{id}/windows", get(get_container_stats_windows))
+        .route("/api/cri/stats/imagefs", get(get_image_fs_info))
+        .route("/api/cri/metrics/descriptors", get(get_metric_descriptors))
+        .route("/api/cri/metrics/cadvisor", get(get_cadvisor_metrics))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -125,7 +142,99 @@ async fn get_runtime_status(State(state): State<Arc<CriState>>) -> Json<RuntimeS
         reason: "CaveNetReady".into(),
         message: "cave-net eBPF network is ready".into(),
     };
-    Json(RuntimeStatus { conditions: vec![runtime_ready, network_ready] })
+    Json(RuntimeStatus {
+        conditions: vec![runtime_ready, network_ready],
+        runtime_handlers: state.runtime_handlers.list(),
+    })
+}
+
+async fn list_runtime_handlers(
+    State(state): State<Arc<CriState>>,
+) -> Json<Vec<RuntimeHandler>> {
+    Json(state.runtime_handlers.list())
+}
+
+async fn get_runtime_handler(
+    State(state): State<Arc<CriState>>,
+    Path(name): Path<String>,
+) -> Result<Json<RuntimeHandler>, (StatusCode, String)> {
+    state
+        .runtime_handlers
+        .lookup(&name)
+        .map(Json)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("runtime handler not found: {}", name)))
+}
+
+async fn get_default_runtime_handler(
+    State(state): State<Arc<CriState>>,
+) -> Result<Json<RuntimeHandler>, (StatusCode, String)> {
+    state
+        .runtime_handlers
+        .default_handler()
+        .map(Json)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "no default runtime handler configured".to_string()))
+}
+
+// ── Stats v2 / cAdvisor ───────────────────────────────────────────────────────
+
+async fn list_container_stats_v2(
+    State(state): State<Arc<CriState>>,
+    Query(filter): Query<crate::stats::ContainerStatsFilter>,
+) -> Json<Vec<crate::stats::ContainerStatsLinux>> {
+    let containers = state.containers.list();
+    let filtered = crate::stats::filter_containers(&containers, &filter);
+    let mut out = Vec::new();
+    for c in filtered {
+        if let Ok(s) = crate::stats::container_stats_linux(c, None) {
+            out.push(s);
+        }
+    }
+    Json(out)
+}
+
+async fn get_container_stats_linux(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::stats::ContainerStatsLinux>, (StatusCode, String)> {
+    let c = runtime::inspect_container(id, &state.containers)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    crate::stats::container_stats_linux(&c, None)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn get_container_stats_windows(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::stats::WindowsContainerStats>, (StatusCode, String)> {
+    let c = runtime::inspect_container(id, &state.containers)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+    crate::stats::container_stats_windows(&c)
+        .map(Json)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn get_image_fs_info(
+    State(state): State<Arc<CriState>>,
+) -> Json<crate::stats::ImageFsInfo> {
+    let images = state.images.list();
+    let root = crate::paths::image_cache_dir().display().to_string();
+    Json(crate::stats::image_fs_info(&root, &images))
+}
+
+async fn get_metric_descriptors() -> Json<Vec<crate::stats::MetricDescriptor>> {
+    Json(crate::stats::cadvisor_descriptors())
+}
+
+async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {
+    let mut all = Vec::new();
+    for c in state.containers.list() {
+        if let Ok(s) = crate::stats::container_stats_linux(&c, None) {
+            all.extend(crate::stats::linux_to_metrics(&s));
+        }
+    }
+    let body = crate::stats::render_prometheus(&all);
+    ([(header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")], body).into_response()
 }
 
 async fn get_node_stats(State(state): State<Arc<CriState>>) -> Json<NodeStats> {
@@ -316,14 +425,48 @@ async fn exec_in_container(
 async fn attach_container(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<crate::streaming::StreamingURL>, (StatusCode, String)> {
     runtime::inspect_container(id, &state.containers)
-        .map(|c| Json(serde_json::json!({
-            "container_id": c.id,
-            "status": format!("{:?}", c.status),
-            "attach_url": format!("/api/cri/containers/{}/attach/ws", id),
-        })))
+        .map(|c| Json(crate::streaming::StreamingURL::for_attach(c.id)))
         .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn exec_streaming_url(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::streaming::StreamingURL>, (StatusCode, String)> {
+    runtime::inspect_container(id, &state.containers)
+        .map(|c| Json(crate::streaming::StreamingURL::for_exec(c.id)))
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+#[derive(Deserialize)]
+struct PortForwardReq {
+    ports: Vec<u16>,
+}
+
+async fn portforward_sandbox(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<PortForwardReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state
+        .sandboxes
+        .get(&id)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))?;
+    let channels: Vec<crate::streaming::PortForwardChannel> = req
+        .ports
+        .iter()
+        .enumerate()
+        .map(|(i, p)| crate::streaming::PortForwardChannel::allocate(*p, i))
+        .collect();
+    let url = crate::streaming::StreamingURL::for_portforward(id);
+    Ok(Json(serde_json::json!({
+        "url": url.url,
+        "protocols": url.protocols,
+        "timeout_seconds": url.timeout_seconds,
+        "channels": channels,
+    })))
 }
 
 async fn checkpoint_container(
@@ -351,7 +494,7 @@ async fn restore_container(
     Json(req): Json<RestoreReq>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let path = if req.checkpoint_path.is_empty() {
-        format!("/var/lib/cave/checkpoints/{}", id)
+        crate::paths::checkpoint_dir(&id.to_string()).display().to_string()
     } else {
         req.checkpoint_path
     };
@@ -364,15 +507,40 @@ async fn restore_container(
 #[derive(Deserialize)]
 struct LogsQuery {
     tail: Option<usize>,
+    /// `cri` — return CRI tagged-line entries (with stream + tag) by reading
+    /// the container's log_path with the v2 reader. Default → JSON-line v1.
+    format: Option<String>,
+    since_time: Option<chrono::DateTime<chrono::Utc>>,
+    until_time: Option<chrono::DateTime<chrono::Utc>>,
+    limit_bytes: Option<usize>,
 }
 
 async fn get_container_logs(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
     Query(q): Query<LogsQuery>,
-) -> Result<Json<Vec<ContainerLogEntry>>, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
+    if q.format.as_deref() == Some("cri") {
+        let container = runtime::inspect_container(id, &state.containers)
+            .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))?;
+        let opts = crate::log_v2::LogOptions {
+            tail_lines: q.tail,
+            since_time: q.since_time,
+            until_time: q.until_time,
+            limit_bytes: q.limit_bytes,
+            follow: false,
+        };
+        let entries = crate::log_v2::read_logs(&container.log_path, &opts)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        return Ok(Json(entries.into_iter().map(|e| serde_json::json!({
+            "timestamp": e.timestamp,
+            "stream": e.stream.as_str(),
+            "tag": e.tag.as_str(),
+            "message": e.message,
+        })).collect::<Vec<_>>()).into_response());
+    }
     runtime::get_container_logs(id, q.tail, &state.containers)
-        .map(Json)
+        .map(|entries| Json(entries).into_response())
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
 }
 
@@ -485,17 +653,36 @@ struct CreateSandboxReq {
 async fn create_sandbox(
     State(state): State<Arc<CriState>>,
     Json(req): Json<CreateSandboxReq>,
-) -> (StatusCode, Json<Sandbox>) {
-    let sandbox = Sandbox {
-        id: Uuid::new_v4(),
-        spec: req.spec,
-        state: SandboxState::Ready,
-        created_at: chrono::Utc::now(),
-        network_ip: Some("10.244.0.1".into()),
-    };
-    state.sandboxes.insert(sandbox.clone());
-    tracing::info!(sandbox_id = %sandbox.id, "sandbox created");
-    (StatusCode::CREATED, Json(sandbox))
+) -> Result<(StatusCode, Json<crate::sandbox::RunSandboxResult>), (StatusCode, String)> {
+    // Validate the requested runtime handler name (if any) against the registry.
+    if let Some(name) = req.spec.runtime_handler.as_deref() {
+        if !name.is_empty() {
+            state
+                .runtime_handlers
+                .lookup(name)
+                .ok_or_else(|| (StatusCode::BAD_REQUEST, format!("runtime handler not found: {}", name)))?;
+        }
+    }
+    let result = crate::sandbox::run_pod_sandbox(req.spec)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    state.sandboxes.insert(result.sandbox.clone());
+    tracing::info!(sandbox_id = %result.sandbox.id, "sandbox created");
+    Ok((StatusCode::CREATED, Json(result)))
+}
+
+async fn stop_sandbox(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut sandbox = state
+        .sandboxes
+        .get(&id)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))?;
+    crate::sandbox::stop_pod_sandbox(id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    sandbox.state = SandboxState::NotReady;
+    state.sandboxes.insert(sandbox);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_sandbox(
@@ -694,6 +881,7 @@ mod tests {
             snapshots: SnapshotStore::new(),
             events: Mutex::new(vec![]),
             network: DashMap::new(),
+            runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
         })
     }
 
@@ -722,6 +910,7 @@ mod tests {
                 port_mappings: vec![],
                 log_directory: None,
                 cgroup_parent: None,
+                runtime_handler: None,
             },
             state: SandboxState::Ready,
             created_at: chrono::Utc::now(),
@@ -796,5 +985,51 @@ mod tests {
         let events = state.events.lock().await;
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind, "container.created");
+    }
+
+    // ── runtime handlers ──────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn list_runtime_handlers_returns_defaults() {
+        let state = make_state();
+        let Json(handlers) = list_runtime_handlers(State(state)).await;
+        let names: Vec<_> = handlers.iter().map(|h| h.name.as_str()).collect();
+        assert!(names.contains(&"runc"));
+        assert!(names.contains(&"runsc"));
+        assert!(names.contains(&"kata"));
+    }
+
+    #[tokio::test]
+    async fn get_runtime_handler_known_returns_handler() {
+        let state = make_state();
+        let res = get_runtime_handler(State(state), Path("runc".into())).await;
+        let Json(h) = res.unwrap();
+        assert_eq!(h.name, "runc");
+        assert!(h.features.user_namespaces);
+    }
+
+    #[tokio::test]
+    async fn get_runtime_handler_unknown_returns_404() {
+        let state = make_state();
+        let res = get_runtime_handler(State(state), Path("ghost".into())).await;
+        let (code, msg) = res.unwrap_err();
+        assert_eq!(code, StatusCode::NOT_FOUND);
+        assert!(msg.contains("ghost"));
+    }
+
+    #[tokio::test]
+    async fn get_default_runtime_handler_returns_runc() {
+        let state = make_state();
+        let res = get_default_runtime_handler(State(state)).await;
+        let Json(h) = res.unwrap();
+        assert_eq!(h.name, "runc");
+    }
+
+    #[tokio::test]
+    async fn runtime_status_includes_runtime_handlers() {
+        let state = make_state();
+        let Json(status) = get_runtime_status(State(state)).await;
+        assert_eq!(status.runtime_handlers.len(), 3);
+        assert!(status.conditions.iter().any(|c| c.kind == "RuntimeReady"));
     }
 }

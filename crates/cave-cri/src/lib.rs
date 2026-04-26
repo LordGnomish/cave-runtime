@@ -61,6 +61,7 @@
 
 pub mod models;
 pub mod error;
+pub mod paths;
 pub mod namespace;
 pub mod cgroup;
 pub mod registry;
@@ -71,20 +72,26 @@ pub mod routes;
 pub mod state_machine;
 pub mod oci_spec;
 pub mod logs;
+pub mod log_v2;
 pub mod health;
-pub mod transport;
+pub mod runtime_handler;
+pub mod sandbox;
+pub mod stats;
+pub mod streaming;
+
+#[cfg(test)]
+mod upstream_tests;
 
 use routes::CriState;
 use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use registry::RegistryClient;
 use dashmap::DashMap;
 use std::sync::Arc;
-use std::path::PathBuf;
 use tokio::sync::Mutex;
 
 /// Initialize cave-cri state.
 pub fn new_state() -> Arc<CriState> {
-    let cache_dir = PathBuf::from("/var/lib/cave/images");
+    let cache_dir = paths::image_cache_dir();
     Arc::new(CriState {
         containers: ContainerStore::new(),
         images: ImageStore::new(),
@@ -93,6 +100,7 @@ pub fn new_state() -> Arc<CriState> {
         snapshots: SnapshotStore::new(),
         events: Mutex::new(Vec::new()),
         network: DashMap::new(),
+        runtime_handlers: runtime_handler::RuntimeHandlerRegistry::with_defaults(),
     })
 }
 

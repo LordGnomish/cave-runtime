@@ -64,6 +64,58 @@ local    = "src/oci_spec.rs"
 upstream = "pkg/cri/server/container_list.go"
 local    = "src/store.rs"
 
+[[files]]
+upstream = "pkg/cri/server/runtime_handler.go"
+local    = "src/runtime_handler.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/logs.go"
+local    = "src/log_v2.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_log_reopen.go"
+local    = "src/log_v2.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stats.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stats_list.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/imagefs_info.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/metrics.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/remotecommand/exec.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/portforward/portforward.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/streaming.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_run.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_stop.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_portforward.go"
+local    = "src/sandbox.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -193,6 +245,176 @@ upstream_name = "Remove"
 local_name    = "delete_snapshot"
 file          = "src/routes.rs"
 
+# Runtime handlers (KEP-585)
+
+[[functions]]
+upstream_name = "ListRuntimeHandlers"
+local_name    = "list_runtime_handlers"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetRuntimeHandler"
+local_name    = "get_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DefaultRuntimeHandler"
+local_name    = "get_default_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Register"
+local_name    = "register"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Lookup"
+local_name    = "lookup"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.SelectForSandbox"
+local_name    = "select_for_sandbox"
+file          = "src/runtime_handler.rs"
+
+# Container log v2 — kubelet tagged-line format
+
+[[functions]]
+upstream_name = "ParseCRILog"
+local_name    = "parse_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "EncodeCRILog"
+local_name    = "encode_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "WriteCRILog"
+local_name    = "write_log_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "ReadCRILogs"
+local_name    = "read_logs"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "StitchCRIPartials"
+local_name    = "stitch_partials"
+file          = "src/log_v2.rs"
+
+# Stats v2 — cAdvisor / Linux / Windows variants
+
+[[functions]]
+upstream_name = "ContainerStats"
+local_name    = "container_stats_linux"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "WindowsContainerStats"
+local_name    = "container_stats_windows"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListContainerStats"
+local_name    = "list_container_stats_v2"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ImageFsInfo"
+local_name    = "image_fs_info"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListMetricDescriptors"
+local_name    = "cadvisor_descriptors"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListPodSandboxStats"
+local_name    = "filter_containers"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "RenderPrometheus"
+local_name    = "render_prometheus"
+file          = "src/stats.rs"
+
+# Streaming protocol (exec / attach / port-forward)
+
+[[functions]]
+upstream_name = "Frame.Encode"
+local_name    = "encode"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "Frame.Decode"
+local_name    = "decode"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "StreamProtocol.Negotiate"
+local_name    = "negotiate"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "PortForwardChannel.Allocate"
+local_name    = "allocate"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "ExecStreamingURL"
+local_name    = "exec_streaming_url"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "PortForward"
+local_name    = "portforward_sandbox"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "TtyResize"
+local_name    = "from_byte"
+file          = "src/streaming.rs"
+
+# Sandbox lifecycle (RunPodSandbox / StopPodSandbox)
+
+[[functions]]
+upstream_name = "RunPodSandbox"
+local_name    = "run_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "StopPodSandbox"
+local_name    = "stop_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "ValidatePortMapping"
+local_name    = "validate_port_mapping"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "RenderIPTablesRule"
+local_name    = "render_iptables_rule"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Create"
+local_name    = "create"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Teardown"
+local_name    = "teardown"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "PauseContainer.New"
+local_name    = "new"
+file          = "src/sandbox.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -242,6 +464,156 @@ local_test    = "test_container_stats"
 [[tests]]
 upstream_test = "TestNetworkAttach"
 local_test    = "test_network_attach"
+
+# Runtime handler tests (KEP-585)
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerList"
+local_test    = "test_runtime_handler_list"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerLookup"
+local_test    = "test_runtime_handler_lookup"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerDefault"
+local_test    = "test_runtime_handler_default"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerSelectForSandbox"
+local_test    = "test_runtime_handler_select_for_sandbox"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerFeatures"
+local_test    = "test_runtime_handler_features"
+
+# Container log v2
+
+[[tests]]
+upstream_test = "TestParseCRILog"
+local_test    = "test_parse_cri_log"
+
+[[tests]]
+upstream_test = "TestEncodeCRILog"
+local_test    = "test_encode_cri_log"
+
+[[tests]]
+upstream_test = "TestCRILogTailLines"
+local_test    = "test_cri_log_tail_lines"
+
+[[tests]]
+upstream_test = "TestCRILogSinceTime"
+local_test    = "test_cri_log_since_time"
+
+[[tests]]
+upstream_test = "TestCRILogLimitBytes"
+local_test    = "test_cri_log_limit_bytes"
+
+[[tests]]
+upstream_test = "TestCRILogStitchPartials"
+local_test    = "test_cri_log_stitch_partials"
+
+[[tests]]
+upstream_test = "TestCRILogRotation"
+local_test    = "test_cri_log_rotation"
+
+# Stats v2
+
+[[tests]]
+upstream_test = "TestContainerStatsLinux"
+local_test    = "test_container_stats_linux"
+
+[[tests]]
+upstream_test = "TestContainerStatsWindows"
+local_test    = "test_container_stats_windows"
+
+[[tests]]
+upstream_test = "TestListContainerStats"
+local_test    = "test_list_container_stats"
+
+[[tests]]
+upstream_test = "TestImageFsInfo"
+local_test    = "test_image_fs_info"
+
+[[tests]]
+upstream_test = "TestListMetricDescriptors"
+local_test    = "test_list_metric_descriptors"
+
+[[tests]]
+upstream_test = "TestRenderPrometheus"
+local_test    = "test_render_prometheus"
+
+[[tests]]
+upstream_test = "TestContainerStatsFilter"
+local_test    = "test_container_stats_filter"
+
+[[tests]]
+upstream_test = "TestNanoCoresFromDelta"
+local_test    = "test_nano_cores_from_delta"
+
+# Streaming protocol
+
+[[tests]]
+upstream_test = "TestStreamFrameRoundtrip"
+local_test    = "test_stream_frame_roundtrip"
+
+[[tests]]
+upstream_test = "TestStreamProtocolNegotiation"
+local_test    = "test_stream_protocol_negotiation"
+
+[[tests]]
+upstream_test = "TestExecStreamingURL"
+local_test    = "test_exec_streaming_url"
+
+[[tests]]
+upstream_test = "TestAttachStreamingURL"
+local_test    = "test_attach_streaming_url"
+
+[[tests]]
+upstream_test = "TestPortForwardChannelAllocation"
+local_test    = "test_port_forward_channel_allocation"
+
+[[tests]]
+upstream_test = "TestTtyResize"
+local_test    = "test_tty_resize"
+
+[[tests]]
+upstream_test = "TestStreamChannelDirections"
+local_test    = "test_stream_channel_directions"
+
+# Sandbox lifecycle
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAllocatesNamespaces"
+local_test    = "test_run_pod_sandbox_allocates_namespaces"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPause"
+local_test    = "test_run_pod_sandbox_assigns_pause"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPodIP"
+local_test    = "test_run_pod_sandbox_assigns_pod_ip"
+
+[[tests]]
+upstream_test = "TestStopPodSandboxClearsNamespaces"
+local_test    = "test_stop_pod_sandbox_clears_namespaces"
+
+[[tests]]
+upstream_test = "TestPortMappingValidation"
+local_test    = "test_port_mapping_validation"
+
+[[tests]]
+upstream_test = "TestPortMappingProtocols"
+local_test    = "test_port_mapping_protocols"
+
+[[tests]]
+upstream_test = "TestRenderIPTablesRule"
+local_test    = "test_render_iptables_rule"
+
+[[tests]]
+upstream_test = "TestSandboxRuntimeHandlerSelection"
+local_test    = "test_sandbox_runtime_handler_selection"
 
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
@@ -314,3 +686,63 @@ local_path    = "/api/cri/snapshots/{id}/mounts"
 kind          = "http"
 upstream_path = "NetworkAttach"
 local_path    = "/api/cri/network/attach"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListRuntimeHandlers"
+local_path    = "/api/cri/runtime/handlers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.GetRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.DefaultRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/default"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListContainerStats"
+local_path    = "/api/cri/stats/containers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Linux"
+local_path    = "/api/cri/stats/containers/{id}/linux"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Windows"
+local_path    = "/api/cri/stats/containers/{id}/windows"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.ImageFsInfo"
+local_path    = "/api/cri/stats/imagefs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListMetricDescriptors"
+local_path    = "/api/cri/metrics/descriptors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "Metrics.cAdvisor"
+local_path    = "/api/cri/metrics/cadvisor"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.Exec"
+local_path    = "/api/cri/containers/{id}/exec/stream"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.PortForward"
+local_path    = "/api/cri/sandboxes/{id}/portforward"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.StopPodSandbox"
+local_path    = "/api/cri/sandboxes/{id}/stop"
