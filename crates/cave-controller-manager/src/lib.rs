@@ -31,6 +31,10 @@ pub mod replicaset;
 pub mod service;
 pub mod statefulset;
 
+/// 100-pct sprint M2: GarbageCollector — owner-reference graph + cascade
+/// planning for foreground / background / orphan deletion modes.
+pub mod gc;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP
