@@ -179,6 +179,16 @@ backend_v01:
     dependency: []
     priority: 6
     retry_max: 3
+  - id: cave-self-improver-scaffold-001
+    scope: backend
+    target_tests: 30
+    upstream: renovate
+    pin_check: true
+    dependency: []
+    priority: 6
+    retry_max: 3
+    # ADR-041 runtime mirror — in-runtime version tracking + safe-upgrade loop;
+    # sister to Reflex Engine (ADR-095). Mirror-001 blanket scope, no override ADR.
 
 ux_v01:
   - id: cave-portal-etcd-view
