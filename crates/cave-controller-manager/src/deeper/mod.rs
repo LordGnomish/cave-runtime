@@ -23,3 +23,11 @@ pub mod job_indexed;
 pub mod manager;
 pub mod service_ip;
 pub mod statefulset_pvc;
+
+// 100-pct sprint, milestone 1 — HPA deeper coverage
+// (tolerance band, stabilization window, metrics ingest with missing/unready
+// pod handling, advanced behavior helpers).
+pub mod hpa_behavior_advanced;
+pub mod hpa_metrics;
+pub mod hpa_stabilization;
+pub mod hpa_tolerance;
