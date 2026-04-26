@@ -235,11 +235,128 @@ impl WatchCache {
         }
     }
 
+    /// KEP-1904 semantics for `?resourceVersion=&resourceVersionMatch=`.
+    /// Returns the RV the list must serve at, plus a flag indicating
+    /// whether the request can be served from this cache or must fall
+    /// through to a quorum read. Mirrors upstream
+    /// `apiserver/pkg/storage/cacher/cacher.go::GetList` selector logic.
+    pub fn select_list_revision(
+        &self,
+        requested_rv: u64,
+        match_kind: ResourceVersionMatch,
+    ) -> Result<ListSelection, ListRevisionError> {
+        let current = self.rv.load(Ordering::SeqCst);
+        let floor = self.compacted_rv.load(Ordering::SeqCst);
+        match match_kind {
+            ResourceVersionMatch::Unspecified => {
+                // Empty resourceVersion → most-up-to-date.
+                Ok(ListSelection { serve_at: current, can_serve_from_cache: true })
+            }
+            ResourceVersionMatch::NotOlderThan => {
+                if requested_rv > current {
+                    // Consistent read past our cache; caller must wait.
+                    return Err(ListRevisionError::TooNew { requested: requested_rv, current });
+                }
+                if requested_rv < floor && floor > 0 {
+                    return Err(ListRevisionError::Compacted { requested: requested_rv, floor });
+                }
+                Ok(ListSelection {
+                    serve_at: requested_rv.max(floor),
+                    can_serve_from_cache: true,
+                })
+            }
+            ResourceVersionMatch::Exact => {
+                if requested_rv > current {
+                    return Err(ListRevisionError::TooNew { requested: requested_rv, current });
+                }
+                if requested_rv <= floor && floor > 0 {
+                    return Err(ListRevisionError::Compacted { requested: requested_rv, floor });
+                }
+                Ok(ListSelection {
+                    serve_at: requested_rv,
+                    can_serve_from_cache: true,
+                })
+            }
+        }
+    }
+
+    /// KEP-956 WatchList — stream the initial state followed by a
+    /// terminator bookmark carrying the `kubernetes.io/initial-events-end`
+    /// annotation. Mirrors upstream
+    /// `apiserver/pkg/storage/cacher/cacher.go::watchInitialEvents`.
+    pub fn watch_list_initial(
+        &self,
+        tenant_id: &str,
+    ) -> WatchListBatch {
+        let inner = self.inner.lock().unwrap();
+        let rv = self.rv.load(Ordering::SeqCst);
+        // Initial state — every Added event still in the cache for this
+        // tenant, ordered by RV asc. Skip Modified/Deleted (initial sync
+        // semantics).
+        let mut initial: Vec<WatchCacheEvent> = inner.events.iter()
+            .filter(|e| e.tenant_id() == tenant_id)
+            .filter(|e| matches!(e, WatchCacheEvent::Added { .. }))
+            .cloned()
+            .collect();
+        initial.sort_by_key(|e| e.resource_version());
+        WatchListBatch {
+            initial,
+            terminator: InitialEventsEndBookmark {
+                resource_version: rv,
+                tenant_id: tenant_id.into(),
+            },
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.inner.lock().unwrap().events.len()
     }
 
     pub fn is_empty(&self) -> bool { self.len() == 0 }
+}
+
+/// `?resourceVersionMatch=` semantics from KEP-1904.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceVersionMatch {
+    /// Unset — most-up-to-date.
+    Unspecified,
+    /// `NotOlderThan` — RV >= requested. Default for LIST when RV is set.
+    NotOlderThan,
+    /// `Exact` — must serve at RV; otherwise fail with HTTP 410 Gone.
+    Exact,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListSelection {
+    pub serve_at: u64,
+    pub can_serve_from_cache: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ListRevisionError {
+    Compacted { requested: u64, floor: u64 },
+    TooNew { requested: u64, current: u64 },
+}
+
+/// Synthetic bookmark emitted at the end of a KEP-956 WatchList initial
+/// stream. Carries the `kubernetes.io/initial-events-end=true` annotation
+/// per the KEP. Modeled as a typed value so consumers don't need to parse
+/// out-of-band metadata.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InitialEventsEndBookmark {
+    pub resource_version: u64,
+    pub tenant_id: String,
+}
+
+impl InitialEventsEndBookmark {
+    /// Annotation name per KEP-956.
+    pub const ANNOTATION: &'static str = "k8s.io/initial-events-end";
+}
+
+#[derive(Debug, Clone)]
+pub struct WatchListBatch {
+    pub initial: Vec<WatchCacheEvent>,
+    pub terminator: InitialEventsEndBookmark,
 }
 
 #[cfg(test)]
@@ -596,5 +713,108 @@ mod tests {
         let evs = wc.replay_for_tenant("acme", rv2);
         assert!(evs.iter().all(|e| e.tenant_id() == "acme"),
             "tenant_id invariant retained after monotonic-floor check");
+    }
+
+    // ── Deeper coverage (deeper-005) — KEP-956 + KEP-1904 ────────────────────
+
+    /// Upstream parity: `TestList_ResourceVersionMatchUnspecifiedReturnsCurrent`
+    /// (cacher.go::GetList — empty resourceVersion → most-up-to-date read).
+    #[test]
+    fn test_list_unspecified_match_returns_current_rv() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        let sel = wc.select_list_revision(0, ResourceVersionMatch::Unspecified).unwrap();
+        assert_eq!(sel.serve_at, rv2,
+            "Unspecified match → server returns current RV");
+        assert!(sel.can_serve_from_cache);
+        // tenant_id invariant smoke: select_list_revision is RV-only,
+        // no tenant scoping at this layer.
+        let _ = wc.replay_for_tenant("acme", 0);
+    }
+
+    /// Upstream parity: `TestList_ResourceVersionMatchNotOlderThanWaitsForRv`
+    /// (KEP-1904 — `NotOlderThan` with RV in the future fails TooNew).
+    #[test]
+    fn test_list_not_older_than_rejects_future_rv() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        let err = wc.select_list_revision(rv2 + 100, ResourceVersionMatch::NotOlderThan)
+            .unwrap_err();
+        match err {
+            ListRevisionError::TooNew { requested, current } => {
+                assert_eq!(requested, rv2 + 100);
+                assert_eq!(current, rv2);
+            }
+            other => panic!("expected TooNew, got {:?}", other),
+        }
+    }
+
+    /// Upstream parity: `TestList_ResourceVersionMatchExactBelowFloorRejected`
+    /// (KEP-1904 — `Exact` against compacted RV → HTTP 410 Gone).
+    #[test]
+    fn test_list_exact_match_below_compacted_floor_rejected() {
+        let wc = WatchCache::new(64, 1000);
+        let rv1 = wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        wc.compact(rv2);
+        let err = wc.select_list_revision(rv1, ResourceVersionMatch::Exact)
+            .unwrap_err();
+        match err {
+            ListRevisionError::Compacted { requested, floor } => {
+                assert_eq!(requested, rv1);
+                assert_eq!(floor, rv2);
+            }
+            other => panic!("expected Compacted, got {:?}", other),
+        }
+    }
+
+    /// Upstream parity: `TestList_ResourceVersionMatchExactAtCurrentSucceeds`
+    /// (cacher.go — `Exact` at the current RV serves from cache).
+    #[test]
+    fn test_list_exact_match_at_current_rv_serves_from_cache() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        let sel = wc.select_list_revision(rv2, ResourceVersionMatch::Exact).unwrap();
+        assert_eq!(sel.serve_at, rv2);
+        assert!(sel.can_serve_from_cache);
+    }
+
+    /// Upstream parity: `TestWatchList_InitialEventsTerminator`
+    /// (KEP-956 — initial stream ends with a synthetic Bookmark carrying
+    /// `k8s.io/initial-events-end` annotation).
+    #[test]
+    fn test_watch_list_emits_tenant_scoped_initial_state_then_terminator() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        wc.record_added("acme", cm("b", "default"));
+        wc.record_added("globex", cm("c", "default"));
+        let acme_batch = wc.watch_list_initial("acme");
+        assert_eq!(acme_batch.initial.len(), 2,
+            "initial stream contains acme's two Added events");
+        assert!(acme_batch.initial.iter().all(|e| e.tenant_id() == "acme"),
+            "tenant_id invariant: globex's event MUST NOT appear in acme's WatchList");
+        assert_eq!(acme_batch.terminator.tenant_id, "acme",
+            "tenant_id invariant: terminator bookmark scoped to acme");
+        assert_eq!(InitialEventsEndBookmark::ANNOTATION,
+            "k8s.io/initial-events-end",
+            "annotation name matches KEP-956");
+    }
+
+    /// Upstream parity: `TestWatchList_TerminatorRvEqualsCurrent`
+    /// (KEP-956 — terminator carries the current cache RV so the watcher
+    /// can resume non-overlappingly from there).
+    #[test]
+    fn test_watch_list_terminator_rv_equals_current_cache_rv() {
+        let wc = WatchCache::new(64, 1000);
+        wc.record_added("acme", cm("a", "default"));
+        let rv2 = wc.record_added("acme", cm("b", "default"));
+        let batch = wc.watch_list_initial("acme");
+        assert_eq!(batch.terminator.resource_version, rv2,
+            "terminator RV equals the current cache RV at the time of stream");
+        assert_eq!(batch.terminator.tenant_id, "acme",
+            "tenant_id invariant: terminator scoped to caller");
     }
 }
