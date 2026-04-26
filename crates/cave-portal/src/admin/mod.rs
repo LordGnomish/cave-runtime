@@ -19,6 +19,7 @@ pub mod render;
 pub mod state;
 
 pub mod apiserver;
+pub mod contributions;
 pub mod cri;
 pub mod etcd;
 pub mod iam;
@@ -69,8 +70,16 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::PgRead,
         Permission::PgQuery,
         Permission::VaultRead,
+        Permission::ContributionsRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
+}
+
+fn load_contributions() -> Vec<contributions::Contribution> {
+    let path = std::env::var("CAVE_CONTRIBUTIONS_JSONL")
+        .unwrap_or_else(|_| "tools/night-pump/contributions.jsonl".into());
+    let raw = std::fs::read_to_string(&path).unwrap_or_default();
+    contributions::parse_jsonl(&raw).unwrap_or_default()
 }
 
 fn err_to_response(e: impl ToString) -> (StatusCode, Html<String>) {
@@ -148,6 +157,47 @@ async fn tenant_dashboard_handler(
         .map_err(err_to_response)
 }
 
+async fn contributions_overview_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let recs = load_contributions();
+    contributions::render_overview(&recs, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn contributions_worker_handler(
+    Path(worker_id): Path<String>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let recs = load_contributions();
+    contributions::render_worker_detail(&recs, &worker_id, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn contributions_timeline_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let recs = load_contributions();
+    contributions::render_timeline(&recs, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn contributions_leaderboard_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let recs = load_contributions();
+    contributions::render_leaderboard(&recs, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
 /// Build the admin router. Mount as `app.merge(admin::router(state))`.
 pub fn router(state: Arc<AdminState>) -> Router {
     Router::new()
@@ -158,6 +208,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/mesh", get(mesh_handler))
         .route("/admin/pg", get(pg_handler))
         .route("/admin/vault", get(vault_handler))
+        .route("/admin/contributions", get(contributions_overview_handler))
+        .route("/admin/contributions/timeline", get(contributions_timeline_handler))
+        .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
+        .route("/admin/contributions/{worker_id}", get(contributions_worker_handler))
         .route("/t/{tenant}/dashboard", get(tenant_dashboard_handler))
         .with_state(state)
 }
