@@ -1,32 +1,42 @@
-//! Alert routing & management — compatible with Alertmanager
+//! Alert routing & management — Alertmanager parity.
 //!
-//! Compatible with: Alertmanager
-//! Upstream tracking: see cave-upstream for monitored features.
+//! Compatible with: Alertmanager v0.26+ (route tree, group_by, inhibits,
+//! silences, receivers, multi-tenant via `X-Scope-OrgID`).
+//!
+//! Module layout:
+//! - `models`     — Alert, Matcher, Silence, InhibitRule, Route (hierarchical), Receiver
+//! - `matcher`    — anchored-regex matcher evaluation, fingerprinting
+//! - `routing`    — hierarchical route tree walker
+//! - `silence`    — silence application + tenant scoping
+//! - `inhibit`    — inhibit rule application
+//! - `grouping`   — alert grouping, dedup, throttle (group_wait/_interval/repeat_interval)
+//! - `receivers`  — payload renderers (Slack, webhook, email, PagerDuty, OpsGenie, GrafanaOnCall)
+//! - `engine`     — top-level pipeline + legacy compat
+//! - `tenant`     — `X-Scope-OrgID` header parsing + label injection
+//! - `store`      — in-memory store
+//! - `routes`     — Alertmanager v2 HTTP API
 
-pub mod models;
 pub mod engine;
+pub mod grouping;
+pub mod inhibit;
+pub mod matcher;
+pub mod models;
+pub mod receivers;
 pub mod routes;
+pub mod routing;
+pub mod silence;
+pub mod store;
+pub mod tenant;
 
-use axum::Router;
-use cave_db::Storage;
-use std::sync::Arc;
+pub use models::{
+    Alert, AlertSeverity, AlertState, EmailConfig, GrafanaOnCallConfig, InhibitRule, MatchType,
+    Matcher, OpsGenieConfig, PagerDutyConfig, Receiver, ReceiverConfig, Route, Silence,
+    SlackConfig, WebhookConfig, DEFAULT_TENANT, TENANT_LABEL,
+};
+pub use routes::{create_router as router, AppState};
+pub use store::AlertStore;
 
-/// Module state.
-pub struct State {
-    pub storage: Arc<dyn Storage>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self {
-            storage: Arc::new(cave_db::MemoryStorage::default()),
-        }
-    }
-}
-
-/// Create the axum router for this module.
-pub fn router(state: Arc<State>) -> Router {
-    routes::create_router(state)
-}
+/// Backwards-compatible legacy alias.
+pub type State = AppState;
 
 pub const MODULE_NAME: &str = "alerts";
