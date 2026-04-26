@@ -276,6 +276,68 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Streaming protocol (exec / attach / port-forward) ─────────────────────────
+
+use crate::streaming;
+
+#[test]
+fn test_stream_frame_roundtrip() {
+    let f = streaming::Frame::new(streaming::Channel::Stdout, b"abc".to_vec());
+    let back = streaming::Frame::decode(&f.encode()).unwrap();
+    assert_eq!(back, f);
+}
+
+#[test]
+fn test_stream_protocol_negotiation() {
+    let p = streaming::StreamProtocol::negotiate(
+        "v5.channel.k8s.io,v4.streamprotocol.k8s.io",
+    );
+    assert_eq!(p, Some(streaming::StreamProtocol::WebSocketV5));
+    let p2 = streaming::StreamProtocol::negotiate("nothing");
+    assert!(p2.is_none());
+}
+
+#[test]
+fn test_exec_streaming_url() {
+    let id = Uuid::new_v4();
+    let u = streaming::StreamingURL::for_exec(id);
+    assert!(u.url.contains(&id.to_string()));
+    assert!(u.protocols.contains(&"v5.channel.k8s.io".to_string()));
+}
+
+#[test]
+fn test_attach_streaming_url() {
+    let id = Uuid::new_v4();
+    let u = streaming::StreamingURL::for_attach(id);
+    assert!(u.url.ends_with("/attach/ws"));
+}
+
+#[test]
+fn test_port_forward_channel_allocation() {
+    let p0 = streaming::PortForwardChannel::allocate(8080, 0);
+    let p1 = streaming::PortForwardChannel::allocate(443, 1);
+    assert_eq!(p0.data_channel, 0);
+    assert_eq!(p0.error_channel, 1);
+    assert_eq!(p1.data_channel, 2);
+    assert_eq!(p1.error_channel, 3);
+}
+
+#[test]
+fn test_tty_resize() {
+    let size = streaming::TtyWindowSize { width: 200, height: 60 };
+    let bytes = size.encode();
+    let back = streaming::TtyWindowSize::decode(&bytes).unwrap();
+    assert_eq!(size, back);
+}
+
+#[test]
+fn test_stream_channel_directions() {
+    assert!(streaming::Channel::Stdin.is_client_to_server());
+    assert!(streaming::Channel::Resize.is_client_to_server());
+    assert!(!streaming::Channel::Stdout.is_client_to_server());
+    assert!(!streaming::Channel::Error.is_client_to_server());
+}
+
 // ── Stats v2 / cAdvisor ────────────────────────────────────────────────────────
 
 use crate::stats;

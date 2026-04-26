@@ -54,6 +54,9 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/containers/{id}/attach", post(attach_container))
         .route("/api/cri/containers/{id}/checkpoint", post(checkpoint_container))
         .route("/api/cri/containers/{id}/restore", post(restore_container))
+        // Streaming endpoints (kubelet WebSocket / SPDY upgrade URLs)
+        .route("/api/cri/containers/{id}/exec/stream", post(exec_streaming_url))
+        .route("/api/cri/sandboxes/{id}/portforward", post(portforward_sandbox))
         // Container info (3)
         .route("/api/cri/containers/{id}/logs", get(get_container_logs))
         .route("/api/cri/containers/{id}/stats", get(get_container_stats))
@@ -421,14 +424,48 @@ async fn exec_in_container(
 async fn attach_container(
     State(state): State<Arc<CriState>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<crate::streaming::StreamingURL>, (StatusCode, String)> {
     runtime::inspect_container(id, &state.containers)
-        .map(|c| Json(serde_json::json!({
-            "container_id": c.id,
-            "status": format!("{:?}", c.status),
-            "attach_url": format!("/api/cri/containers/{}/attach/ws", id),
-        })))
+        .map(|c| Json(crate::streaming::StreamingURL::for_attach(c.id)))
         .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn exec_streaming_url(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::streaming::StreamingURL>, (StatusCode, String)> {
+    runtime::inspect_container(id, &state.containers)
+        .map(|c| Json(crate::streaming::StreamingURL::for_exec(c.id)))
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+#[derive(Deserialize)]
+struct PortForwardReq {
+    ports: Vec<u16>,
+}
+
+async fn portforward_sandbox(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+    Json(req): Json<PortForwardReq>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    state
+        .sandboxes
+        .get(&id)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))?;
+    let channels: Vec<crate::streaming::PortForwardChannel> = req
+        .ports
+        .iter()
+        .enumerate()
+        .map(|(i, p)| crate::streaming::PortForwardChannel::allocate(*p, i))
+        .collect();
+    let url = crate::streaming::StreamingURL::for_portforward(id);
+    Ok(Json(serde_json::json!({
+        "url": url.url,
+        "protocols": url.protocols,
+        "timeout_seconds": url.timeout_seconds,
+        "channels": channels,
+    })))
 }
 
 async fn checkpoint_container(
