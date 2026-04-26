@@ -56,6 +56,11 @@ pub mod sa;
 /// 100-pct sprint M4: CertificateSigningRequest signer.
 pub mod csr_signer;
 
+/// 100-pct PUSH-HARD M9: CSR signer deeper — expirationSeconds clamping,
+/// denied-wins resolution, kubelet-serving + apiserver-client-kubelet
+/// subject validation.
+pub mod csr_signer_deeper;
+
 /// 100-pct sprint M4: RBAC controllers (ClusterRole aggregation).
 pub mod rbac;
 
