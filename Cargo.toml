@@ -57,6 +57,7 @@ members = [
     "crates/cave-cache",
     "crates/cave-store",
     "crates/cave-streams",
+    "crates/cave-cdc",
     # === Observability ===
     "crates/cave-metrics",
     "crates/cave-logs",
