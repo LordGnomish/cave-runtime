@@ -29,6 +29,7 @@ pub mod topology;
 pub mod cpumanager;
 pub mod memorymanager;
 pub mod deviceplugin;
+pub mod dra;
 
 use agent::KubeletState;
 use std::sync::Arc;
