@@ -569,6 +569,99 @@ pub struct AuthRoleRevokePermissionResponse {
     pub header: ResponseHeader,
 }
 
+// ── v3.6: Raft membership / joint consensus ────────────────────────────────
+
+/// `MemberPromote` request — promotes a learner to a voting member.
+/// Mirrors etcd v3.6 `etcdserverpb.MemberPromoteRequest`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberPromoteRequest {
+    #[serde(rename = "ID")]
+    pub id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberPromoteResponse {
+    pub header: ResponseHeader,
+    pub members: Vec<Member>,
+}
+
+/// Snapshot of a joint consensus configuration (Cold ∪ Cnew).
+/// Mirrors etcd's `raftpb.ConfState` joint fields.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct JointConfig {
+    /// Voters in the *outgoing* (current) configuration (Cold).
+    pub outgoing: Vec<u64>,
+    /// Voters in the *incoming* (next) configuration (Cnew).
+    pub incoming: Vec<u64>,
+    /// Learners (non-voting) in either configuration.
+    pub learners: Vec<u64>,
+}
+
+impl JointConfig {
+    pub fn is_empty(&self) -> bool {
+        self.outgoing.is_empty() && self.incoming.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnterJointRequest {
+    /// Members to add (transition to learner first if `is_learner=true`).
+    pub adds: Vec<MemberAddRequest>,
+    /// Member IDs to remove on commit.
+    pub removes: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnterJointResponse {
+    pub header: ResponseHeader,
+    pub joint: JointConfig,
+    pub members: Vec<Member>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaveJointResponse {
+    pub header: ResponseHeader,
+    pub members: Vec<Member>,
+}
+
+// ── v3.6: Snapshot stream ─────────────────────────────────────────────────
+
+/// A single chunk of a snapshot stream.
+/// Mirrors etcd v3.6 `etcdserverpb.SnapshotResponse` (which is a stream).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotChunk {
+    pub header: ResponseHeader,
+    /// Bytes still to be sent after this chunk (0 on the last chunk).
+    pub remaining_bytes: u64,
+    /// Chunk payload bytes.
+    pub blob: Vec<u8>,
+    /// Hex-encoded sha256 of the *complete* snapshot. Same on every chunk
+    /// so the receiver can verify after assembly.
+    pub checksum: String,
+}
+
+/// Aggregate metadata about a snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnapshotMeta {
+    pub revision: u64,
+    pub compact_revision: u64,
+    pub size_bytes: u64,
+    pub checksum: String,
+    pub member_count: usize,
+    pub lease_count: usize,
+}
+
+// ── v3.6: Watch progress / cancel ─────────────────────────────────────────
+
+/// A non-data event sent to a watch with `progress_notify=true`.
+/// Mirrors `WatchResponse` with `Created=false, Canceled=false, Events=nil`
+/// in etcd v3.6 — only the header advances.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchProgressEvent {
+    pub header: ResponseHeader,
+    pub watch_id: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

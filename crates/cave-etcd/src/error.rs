@@ -60,6 +60,44 @@ pub enum EtcdError {
 
     #[error("role not granted to user")]
     RoleNotGranted,
+
+    // ── v3.6: raft membership / joint consensus ──────────────────────────────
+    #[error("member is not a learner: {0}")]
+    MemberNotLearner(u64),
+
+    #[error("learner not ready for promotion: {0}")]
+    LearnerNotReady(u64),
+
+    #[error("joint consensus already in progress")]
+    JointConfigInProgress,
+
+    #[error("no joint consensus in progress")]
+    NoJointConfig,
+
+    #[error("would break voting quorum")]
+    WouldBreakQuorum,
+
+    // ── v3.6: lease ──────────────────────────────────────────────────────────
+    #[error("invalid lease ttl: {0}")]
+    InvalidLeaseTtl(i64),
+
+    #[error("lease already exists: {0}")]
+    LeaseAlreadyExists(i64),
+
+    // ── v3.6: compaction ─────────────────────────────────────────────────────
+    #[error("compaction revision {requested} exceeds current revision {current}")]
+    CompactionFutureRevision { requested: u64, current: u64 },
+
+    // ── v3.6: snapshot ───────────────────────────────────────────────────────
+    #[error("snapshot checksum mismatch: expected {expected}, got {actual}")]
+    SnapshotChecksumMismatch { expected: String, actual: String },
+
+    #[error("snapshot decode error: {0}")]
+    SnapshotDecode(String),
+
+    // ── v3.6: watch ─────────────────────────────────────────────────────────
+    #[error("watch not found: {0}")]
+    WatchNotFound(i64),
 }
 
 pub type EtcdResult<T> = Result<T, EtcdError>;
