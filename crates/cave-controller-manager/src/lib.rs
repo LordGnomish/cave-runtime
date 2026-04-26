@@ -68,6 +68,10 @@ pub mod rbac;
 /// (PreferClose / topology-mode Auto algorithm).
 pub mod endpointslice_topology;
 
+/// 100-pct PUSH-HARD M10: EndpointSlice multi-port slice allocator
+/// + per-slice MaxEndpointsPerSlice cap.
+pub mod endpointslice_multiport;
+
 /// 100-pct sprint M5: PV/PVC binder + volume expansion state machine.
 pub mod pv;
 
