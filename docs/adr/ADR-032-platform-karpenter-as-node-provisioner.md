@@ -23,6 +23,16 @@ CAVE clusters run a heterogeneous mix of always-on platform components (73 servi
 
 This must hold across both supported provider profiles: Azure (AKS) and Hetzner (K3s + Talos, ADR-003 / ADR-098). Karpenter has previously been referenced as a *dependency* in ADR-002 and ADR-062, but never given its own decision record. This ADR formalises that choice and unifies the multi-profile story.
 
+The shape of the workload mix matters here. CAVE clusters host:
+
+- **Always-on platform components** (control plane, ArgoCD, observability, gateway, secrets) — steady CPU, low burst, must never be evicted.
+- **CI / build workloads** (ADR-040 ARC runners) — bursty by 10–100×, indifferent to spot interruption, idle most nights and weekends.
+- **Event-driven jobs** (ADR-095 Reflex Engine, ADR-075 Knative + KEDA) — driven by external triggers; queue depth can grow faster than a node group can resize.
+- **Tenant pods** — heterogeneous shapes, mixed criticality, occasional GPU asks (ADR-009).
+- **One-shot platform jobs** — backups (ADR-046), schema migrations (ADR-043), security scans (ADR-018, ADR-023). Short-lived, capacity-spiky.
+
+A static node pool sized for the worst case wastes 60–80% of compute during the long tails. A node pool sized for the median throws pending pods on the floor during bursts. The platform needs the in-between: capacity that follows demand within the minute, drops to zero on the long tail, and stays out of the tenant's way.
+
 ## Candidates
 
 | Criteria | Karpenter | Cluster Autoscaler | Manual Node Pools | HPA / VPA only |
@@ -47,6 +57,76 @@ This must hold across both supported provider profiles: Azure (AKS) and Hetzner 
 - **NodePool taxonomy (per profile):** at minimum `system` (always-on platform critical), `general` (tenant default, mixed shapes, spot-preferred), `bursty` (CI / Reflex / Knative — scale-to-zero, short TTL), and `gpu` (LLM inference, ADR-009). Tenants do **not** create or edit NodePools; they request capacity via labels/taints and let Karpenter pick.
 - **Consolidation:** `consolidationPolicy: WhenUnderutilized` (Azure) and equivalent (Hetzner). Disruption budgets aligned with PodDisruptionBudgets per ADR-141 (Shared-Fate & Tenant Priority).
 - **Spot:** spot is the default for `general` and `bursty`; on-demand fallback after configurable interruption count. `system` is on-demand only.
+
+### NodePool reference (excerpt)
+
+The shapes below are illustrative; concrete instance lists live in `cave-gitops-config` and are pinned by digest (ADR-108). The point is the *shape* of the contract: NodePools never name a single instance type, and tenant-facing labels are stable across providers.
+
+```yaml
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: general
+spec:
+  template:
+    metadata:
+      labels:
+        cave.io/pool: general
+        cave.io/lifecycle: spot-preferred
+    spec:
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: [amd64, arm64]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: [spot, on-demand]
+        - key: cave.io/instance-class
+          operator: In
+          values: [standard, compute, memory]
+      taints: []
+      expireAfter: 720h
+  disruption:
+    consolidationPolicy: WhenUnderutilized
+    consolidateAfter: 5m
+  limits:
+    cpu: "2000"
+    memory: 8000Gi
+```
+
+`bursty` differs in three places: `consolidateAfter: 30s`, `expireAfter: 6h`, and a stricter `limits` block. `system` drops `spot` from the capacity-type list. `gpu` adds an `nvidia.com/gpu` requirement and an `gpu-only=true:NoSchedule` taint.
+
+## Migration Plan
+
+Because Karpenter has been an *implicit* dependency in ADR-002 and ADR-062 since their respective acceptances, several profiles already run a Karpenter installation that pre-dates this ADR. Migration is therefore mostly normalisation, not green-field rollout.
+
+1. **Inventory.** Record the current Karpenter version, provider version, and NodePool CRDs on every profile. Reconcile against the v1.x baseline this ADR pins.
+2. **NodePool consolidation.** Existing ad-hoc NodePools (per-team, per-experiment) are merged into the four canonical pools (`system`, `general`, `bursty`, `gpu`). Tenant labels migrate via Crossplane MRAP (ADR-124) so that tenant pods continue to schedule without manual edits.
+3. **RBAC tightening.** Remove any tenant-namespace ClusterRoleBindings that grant access to NodePool / NodeClass CRDs. Cluster-wide capacity decisions are platform-only; this is enforced by Gatekeeper (ADR-030).
+4. **Hetzner bridge cut-over.** The custom Cluster-API-bridge crate is shipped as `cave-node-provisioner-hetzner`. Existing Hetzner clusters that previously ran a hand-rolled scaler shim are migrated profile-by-profile during a maintenance window, with rollback to the shim available for one soak window per ADR-132.
+5. **Soak.** Each profile soaks per ADR-132 (Version Channel & Soak Policy) before being declared production-eligible. Soak success criteria: (a) zero unscheduled pending pods exceeding 5 minutes for 7 consecutive days; (b) consolidation churn within budget; (c) no spot-interruption-driven SLA breach.
+6. **Documentation.** Tenant-facing docs are updated to describe the four NodePools, the labels tenants set to opt in/out, and the spot semantics. Self-service troubleshooting added to the runbook.
+
+## Multi-Tenancy & Isolation
+
+Karpenter sits *under* tenants in the stack: tenants describe pods, the platform decides nodes. The tenancy model that surrounds it has three rules:
+
+1. **Tenants do not author NodePools.** NodePool / NodeClass CRDs live in the platform's GitOps repo (`cave-gitops-config`, ADR-026) and are reconciled by ArgoCD. Tenant access to those CRDs is denied by Gatekeeper (ADR-030) and verified by Kubescape (ADR-058) on every cluster.
+2. **Tenants steer via labels and tolerations.** A pod expresses "I want spot" or "I need GPU" through node selectors and tolerations defined in the tenant-facing catalog. The catalog is small (≈10 well-known labels) so tenants do not learn cloud-specific instance jargon.
+3. **Capacity envelopes are enforced at NodePool limits**, not per-tenant. Per-tenant capacity is enforced by ResourceQuota + LimitRange (ADR-087); Karpenter sees those quotas as the upper bound on schedulable demand and never tries to provision beyond them.
+
+The combination guarantees that a runaway tenant cannot exhaust cluster capacity by spamming pending pods (ResourceQuota stops them) and cannot widen the cluster's compute envelope on its own (NodePool RBAC stops them).
+
+## Operational Playbook
+
+Day-2 operations follow a small set of named procedures so that on-call engineers do not improvise during incidents.
+
+- **PB-KARP-01 — Pending pods despite spare cluster headroom.** Check Karpenter logs for provider quota errors first; then verify NodePool requirement intersection (a pod with conflicting requirements will never schedule, regardless of capacity).
+- **PB-KARP-02 — Consolidation oscillation.** Inspect `karpenter_consolidation_actions_total`. If churn exceeds budget, raise `consolidateAfter` and PDB minimums for the affected workload class.
+- **PB-KARP-03 — Spot interruption storm.** When `karpenter_interruption_actions_total` spikes for a region, automatically widen the on-demand fallback fraction for `general` and `bursty` for the next provisioning window.
+- **PB-KARP-04 — Hetzner provider lag.** If the Hetzner bridge falls behind Karpenter's intent for more than 10 minutes, page the platform team and fall back to the manual node-pool break-glass — without disabling Karpenter (which would compound the lag).
+
+These are referenced from the Reflex Engine playbook catalog (ADR-095) and surfaced in the Backstage scorecard.
 
 ## Rejected Options
 
@@ -98,6 +178,16 @@ AKS's bundled autoscaler is Cluster Autoscaler under the hood, with the same lim
 - **NodePools shipped at v0.1:** `system`, `general`, `bursty`. `gpu` follows once ADR-009 GPU runtime story stabilises.
 - **Observability:** Karpenter metrics scraped into Prometheus (ADR-029); dashboards for provisioning latency, consolidation churn, and spot interruption rate.
 - **Disruption controls:** PodDisruptionBudgets enforced via OPA Gatekeeper (ADR-030); tenant priority per ADR-141.
+
+## Cost Economics
+
+Karpenter's value is proportional to workload variance. The economics model behind this decision rests on three numbers, each of which is independently observable in production:
+
+- **Idle ratio.** With static node pools, off-peak utilisation on `bursty` workloads (ARC, Reflex, scheduled jobs) is typically 5–15% of provisioned capacity. Scale-to-zero takes that floor to 0, so all `bursty` cost becomes proportional to actual work.
+- **Spot premium.** On both Azure and Hetzner the spot/on-demand price gap is large enough that even a 20–30% interruption rate yields material savings on `general` workloads. Workloads that cannot tolerate interruption opt out via a single label.
+- **Bin-packing tax.** Static node pools trap fragments — half-full nodes that no single workload fills. Continuous consolidation recovers that tax. The exact recovery is workload-dependent, but is reliably non-zero on shared multi-tenant clusters.
+
+These numbers are tracked under FinOps attribution (ADR-096) and reported back to tenants on the cost dashboard.
 
 ## Notes
 
