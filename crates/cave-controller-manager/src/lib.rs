@@ -35,6 +35,17 @@ pub mod statefulset;
 /// planning for foreground / background / orphan deletion modes.
 pub mod gc;
 
+/// 100-pct sprint M3: light-weight GC controllers — PodGC + TTLAfterFinished.
+pub mod gc_lite;
+
+/// 100-pct sprint M3: NodeLifecycle / NodeLease — node heartbeat + Ready
+/// transition + taint-based eviction trigger.
+pub mod node_lease;
+
+/// 100-pct sprint M3: Root CA publisher — kube-root-ca.crt ConfigMap
+/// propagation across active namespaces.
+pub mod root_ca_publisher;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP
