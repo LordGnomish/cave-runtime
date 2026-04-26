@@ -8,6 +8,7 @@
 
 pub mod bind;
 pub mod cycle_state;
+pub mod default_preemption;
 pub mod dra;
 pub mod dra_scheduler;
 pub mod extension_points;
