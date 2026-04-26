@@ -22,6 +22,7 @@ pub mod types;
 
 pub mod clustermesh;
 pub mod conntrack;
+pub mod egress;
 pub mod hubble;
 pub mod identity;
 pub mod ipam;
