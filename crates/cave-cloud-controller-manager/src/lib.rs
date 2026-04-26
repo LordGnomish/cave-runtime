@@ -21,6 +21,7 @@ pub mod provider;
 pub mod node_controller;
 pub mod node_lifecycle;
 pub mod route_controller;
+pub mod route_ipam;
 pub mod service_controller;
 pub mod service_extras;
 
