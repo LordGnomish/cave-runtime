@@ -28,6 +28,7 @@ pub mod podresources;
 pub mod topology;
 pub mod cpumanager;
 pub mod memorymanager;
+pub mod deviceplugin;
 
 use agent::KubeletState;
 use std::sync::Arc;
