@@ -31,4 +31,10 @@ pub mod replicaset;
 pub mod service;
 pub mod statefulset;
 
+/// deeper-002 batch — manager loop wiring + per-controller deepening
+/// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
+/// indexed Job, real cron parser, EndpointSlice keying, clusterIP
+/// allocator + LoadBalancer reconciler).
+pub mod deeper;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
