@@ -29,6 +29,8 @@ pub struct CriState {
     pub events: Mutex<Vec<RuntimeEvent>>,
     pub network: DashMap<Uuid, NetworkStatus>,
     pub runtime_handlers: RuntimeHandlerRegistry,
+    pub credentials: crate::auth::CredentialStore,
+    pub pull_progress: crate::pull_progress::PullProgressTracker,
 }
 
 pub fn create_router(state: Arc<CriState>) -> Router {
@@ -92,6 +94,12 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/stats/imagefs", get(get_image_fs_info))
         .route("/api/cri/metrics/descriptors", get(get_metric_descriptors))
         .route("/api/cri/metrics/cadvisor", get(get_cadvisor_metrics))
+        // Image pull auth + progress (M6)
+        .route("/api/cri/auth/credentials", get(list_credentials).post(set_credential))
+        .route("/api/cri/auth/credentials/{registry}", get(get_credential).delete(delete_credential))
+        .route("/api/cri/images/pulls", get(list_pull_progress))
+        .route("/api/cri/images/pulls/{id}", get(get_pull_progress))
+        .route("/api/cri/images/pulls/{id}/events", get(get_pull_events))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -224,6 +232,71 @@ async fn get_image_fs_info(
 
 async fn get_metric_descriptors() -> Json<Vec<crate::stats::MetricDescriptor>> {
     Json(crate::stats::cadvisor_descriptors())
+}
+
+// ── Image pull auth + progress ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct SetCredentialReq {
+    registry: String,
+    #[serde(flatten)]
+    scheme: crate::auth::AuthScheme,
+}
+
+async fn set_credential(
+    State(state): State<Arc<CriState>>,
+    Json(req): Json<SetCredentialReq>,
+) -> StatusCode {
+    state.credentials.set(&req.registry, req.scheme);
+    StatusCode::NO_CONTENT
+}
+
+async fn get_credential(
+    State(state): State<Arc<CriState>>,
+    Path(registry): Path<String>,
+) -> Json<crate::auth::AuthScheme> {
+    Json(state.credentials.get(&registry))
+}
+
+async fn delete_credential(
+    State(state): State<Arc<CriState>>,
+    Path(registry): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    state
+        .credentials
+        .remove(&registry)
+        .map(|_| StatusCode::NO_CONTENT)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("no credentials for {}", registry)))
+}
+
+async fn list_credentials(
+    State(state): State<Arc<CriState>>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "count": state.credentials.len() }))
+}
+
+async fn list_pull_progress(
+    State(state): State<Arc<CriState>>,
+) -> Json<Vec<crate::pull_progress::PullState>> {
+    Json(state.pull_progress.list())
+}
+
+async fn get_pull_progress(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<crate::pull_progress::PullState>, (StatusCode, String)> {
+    state
+        .pull_progress
+        .state(id)
+        .map(Json)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("pull not found: {}", id)))
+}
+
+async fn get_pull_events(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Json<Vec<crate::pull_progress::PullEvent>> {
+    Json(state.pull_progress.events(id))
 }
 
 async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {
@@ -882,6 +955,8 @@ mod tests {
             events: Mutex::new(vec![]),
             network: DashMap::new(),
             runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
+            credentials: crate::auth::CredentialStore::new(),
+            pull_progress: crate::pull_progress::PullProgressTracker::new(),
         })
     }
 

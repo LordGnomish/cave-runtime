@@ -68,6 +68,8 @@ fn make_state() -> Arc<CriState> {
         events: Mutex::new(vec![]),
         network: DashMap::new(),
         runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
+        credentials: crate::auth::CredentialStore::new(),
+        pull_progress: crate::pull_progress::PullProgressTracker::new(),
     })
 }
 
@@ -274,6 +276,125 @@ async fn test_container_stats() {
     let stats = runtime::get_container_stats(c.id, &state.containers).unwrap();
     assert_eq!(stats.container_id, c.id);
     assert!(stats.memory_percent.is_finite());
+}
+
+// ── Image pull auth + progress + multi-arch ────────────────────────────────────
+
+use crate::{auth, manifest_list, pull_progress as pp};
+
+#[test]
+fn test_auth_resolver_docker_hub() {
+    let s = auth::AuthScheme::default_for_registry("docker.io");
+    assert!(matches!(s, auth::AuthScheme::Oauth2 { .. }));
+}
+
+#[test]
+fn test_auth_resolver_aws_ecr() {
+    let s = auth::AuthScheme::default_for_registry("123.dkr.ecr.eu-central-1.amazonaws.com");
+    match s {
+        auth::AuthScheme::AwsEcr { region, .. } => assert_eq!(region, "eu-central-1"),
+        _ => panic!("expected AwsEcr"),
+    }
+}
+
+#[test]
+fn test_auth_resolver_gcp_gcr() {
+    assert!(matches!(
+        auth::AuthScheme::default_for_registry("us.gcr.io"),
+        auth::AuthScheme::GcpGcr { .. }
+    ));
+}
+
+#[test]
+fn test_auth_resolver_azure_acr() {
+    let s = auth::AuthScheme::default_for_registry("myorg.azurecr.io");
+    match s {
+        auth::AuthScheme::AzureAcr { tenant, .. } => assert_eq!(tenant, "myorg"),
+        _ => panic!("expected AzureAcr"),
+    }
+}
+
+#[test]
+fn test_auth_basic_authorization_header() {
+    let s = auth::AuthScheme::Basic { username: "alice".into(), password: "secret".into() };
+    assert_eq!(s.authorization_header(), Some("Basic YWxpY2U6c2VjcmV0".into()));
+}
+
+#[test]
+fn test_auth_bearer_token_header() {
+    let s = auth::AuthScheme::Bearer { token: "abc".into() };
+    assert_eq!(s.authorization_header(), Some("Bearer abc".into()));
+}
+
+#[test]
+fn test_pull_progress_full_lifecycle() {
+    let t = pp::PullProgressTracker::new();
+    let id = t.start("nginx:latest");
+    t.manifest_fetched(id, 2, 1000);
+    t.layer_started(id, "d1", 500);
+    t.layer_progress(id, "d1", 250);
+    t.layer_progress(id, "d1", 500);
+    t.layer_complete(id, "d1");
+    t.layer_started(id, "d2", 500);
+    t.layer_progress(id, "d2", 500);
+    t.layer_complete(id, "d2");
+    t.completed(id, "nginx:latest");
+
+    let s = t.state(id).unwrap();
+    assert_eq!(s.status, pp::PullStatus::Completed);
+    assert_eq!(s.layers_complete, 2);
+    assert_eq!(s.downloaded_bytes, 1000);
+}
+
+#[test]
+fn test_pull_progress_failure_marks_state() {
+    let t = pp::PullProgressTracker::new();
+    let id = t.start("bad:latest");
+    t.failed(id, "bad:latest", "401 Unauthorized");
+    assert_eq!(t.state(id).unwrap().status, pp::PullStatus::Failed);
+}
+
+#[test]
+fn test_manifest_list_select_amd64() {
+    use manifest_list::*;
+    let list = ManifestList {
+        schema_version: 2,
+        media_type: OCI_INDEX_MEDIA_TYPE.into(),
+        manifests: vec![
+            ManifestListEntry {
+                digest: "sha256:amd".into(),
+                size: 100,
+                media_type: "application/vnd.oci.image.manifest.v1+json".into(),
+                platform: Platform::linux_amd64(),
+            },
+            ManifestListEntry {
+                digest: "sha256:arm".into(),
+                size: 100,
+                media_type: "application/vnd.oci.image.manifest.v1+json".into(),
+                platform: Platform::linux_arm64(),
+            },
+        ],
+    };
+    let m = list.select(&Platform::linux_amd64()).unwrap();
+    assert_eq!(m.digest, "sha256:amd");
+}
+
+#[test]
+fn test_manifest_list_is_index_media_type() {
+    assert!(manifest_list::is_index_media_type(manifest_list::OCI_INDEX_MEDIA_TYPE));
+    assert!(manifest_list::is_index_media_type(manifest_list::DOCKER_MANIFEST_LIST_MEDIA_TYPE));
+}
+
+#[test]
+fn test_credential_store_set_get_remove() {
+    let s = auth::CredentialStore::new();
+    s.set("ghcr.io", auth::AuthScheme::Bearer { token: "tk".into() });
+    let got = s.get("ghcr.io");
+    assert!(matches!(got, auth::AuthScheme::Bearer { .. }));
+    s.remove("ghcr.io").unwrap();
+    // Falls back to default for ghcr.io which is Bearer with empty token.
+    let fallback = s.get("ghcr.io");
+    assert!(matches!(fallback, auth::AuthScheme::Bearer { .. }));
 }
 
 // ── Sandbox lifecycle ──────────────────────────────────────────────────────────
