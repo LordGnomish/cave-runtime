@@ -62,6 +62,12 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
         .route("/api/etcd/v3/cluster/member/remove", post(cluster_member_remove))
         .route("/api/etcd/v3/cluster/member/update", post(cluster_member_update))
         .route("/api/etcd/v3/cluster/member/list", post(cluster_member_list))
+        // Cluster v3.6: promotion + joint consensus
+        .route("/api/etcd/v3/cluster/member/promote", post(cluster_member_promote))
+        .route("/api/etcd/v3/cluster/joint/enter", post(cluster_joint_enter))
+        .route("/api/etcd/v3/cluster/joint/leave", post(cluster_joint_leave))
+        // Maintenance v3.6: streamed snapshot
+        .route("/api/etcd/v3/maintenance/snapshot/stream", post(maintenance_snapshot_stream))
         // Version
         .route("/api/etcd/v3/version", get(version))
         // Parity
@@ -547,6 +553,49 @@ async fn cluster_member_list(State(store): State<Arc<KvStore>>) -> Json<MemberLi
     Json(store.member_list())
 }
 
+// ── Cluster v3.6: promotion + joint consensus ─────────────────────────────
+
+async fn cluster_member_promote(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MemberPromoteRequest>,
+) -> Result<Json<MemberPromoteResponse>, (StatusCode, String)> {
+    store
+        .member_promote(&req)
+        .map(Json)
+        .map_err(|e| match &e {
+            crate::error::EtcdError::MemberNotFound(_) => (StatusCode::NOT_FOUND, e.to_string()),
+            crate::error::EtcdError::MemberNotLearner(_) => (StatusCode::BAD_REQUEST, e.to_string()),
+            _ => (StatusCode::BAD_REQUEST, e.to_string()),
+        })
+}
+
+async fn cluster_joint_enter(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<EnterJointRequest>,
+) -> Result<Json<EnterJointResponse>, (StatusCode, String)> {
+    store
+        .enter_joint(&req)
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+async fn cluster_joint_leave(
+    State(store): State<Arc<KvStore>>,
+) -> Result<Json<LeaveJointResponse>, (StatusCode, String)> {
+    store
+        .leave_joint()
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+// ── Maintenance v3.6: streamed snapshot ───────────────────────────────────
+
+async fn maintenance_snapshot_stream(
+    State(store): State<Arc<KvStore>>,
+) -> Json<Vec<SnapshotChunk>> {
+    Json(store.snapshot_stream())
+}
+
 // ── Version ────────────────────────────────────────────────────────────────
 
 async fn version(State(store): State<Arc<KvStore>>) -> Json<VersionResponse> {
@@ -989,5 +1038,105 @@ mod tests {
     async fn test_version_endpoint() {
         let resp = get_req(test_app(), "/api/etcd/v3/version").await;
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // ── v3.6 routes — feat/cave-etcd-raft-lease-001 ─────────────────────
+
+    #[tokio::test]
+    async fn test_cluster_member_promote_route_404_for_unknown() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/cluster.go MemberPromote
+        // tenant_id: route-001 (route-level smoke test, no kv data)
+        let resp = post_json(
+            test_app(),
+            "/api/etcd/v3/cluster/member/promote",
+            serde_json::json!({"ID": 9_999}),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_member_promote_route_promotes_learner() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/cluster.go MemberPromote(OK)
+        // tenant_id: route-002
+        let app = test_app();
+        let add = post_json(
+            app.clone(),
+            "/api/etcd/v3/cluster/member/add",
+            serde_json::json!({"peer_ur_ls": ["http://learner:2380"], "is_learner": true}),
+        )
+        .await;
+        let body = axum::body::to_bytes(add.into_body(), usize::MAX).await.unwrap();
+        let added: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let id = added["member"]["id"].as_u64().unwrap();
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/cluster/member/promote",
+            serde_json::json!({"ID": id}),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_joint_enter_and_leave_routes() {
+        // cite: etcd v3.6 raft/confchange/confchange.go EnterJoint+LeaveJoint
+        // tenant_id: route-003
+        let app = test_app();
+        let enter = post_json(
+            app.clone(),
+            "/api/etcd/v3/cluster/joint/enter",
+            serde_json::json!({
+                "adds": [{"peer_ur_ls": ["http://new:2380"], "is_learner": false}],
+                "removes": []
+            }),
+        )
+        .await;
+        assert_eq!(enter.status(), StatusCode::OK);
+
+        let leave = post_json(
+            app,
+            "/api/etcd/v3/cluster/joint/leave",
+            serde_json::json!({}),
+        )
+        .await;
+        assert_eq!(leave.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_cluster_joint_leave_without_enter_400() {
+        // cite: etcd v3.6 raft/confchange/confchange.go ErrNoJoint
+        // tenant_id: route-004
+        let resp = post_json(
+            test_app(),
+            "/api/etcd/v3/cluster/joint/leave",
+            serde_json::json!({}),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_maintenance_snapshot_stream_route() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/maintenance.go Snapshot
+        // tenant_id: route-005
+        let app = test_app();
+        post_json(
+            app.clone(),
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({"key": "Zm9v", "value": "YmFy", "prev_kv": false}),
+        )
+        .await;
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/maintenance/snapshot/stream",
+            serde_json::json!({}),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let chunks: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+        assert!(!chunks.is_empty());
+        assert_eq!(chunks[0]["checksum"].as_str().unwrap().len(), 64);
     }
 }

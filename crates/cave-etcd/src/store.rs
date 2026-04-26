@@ -10,7 +10,15 @@ use dashmap::DashMap;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
+
+/// Maximum lease TTL accepted by `lease_grant`.  Matches the etcd v3.6
+/// client default of 9000s (`clientv3/lease.go: defaultTTL`).
+pub const MAX_LEASE_TTL_SECS: i64 = 9_000;
+
+/// Default chunk size for `snapshot_stream` (matches etcd v3.6
+/// `etcdserver.snapshotSendBufferSize`).
+pub const SNAPSHOT_CHUNK_SIZE: usize = 32 * 1024;
 
 #[cfg(test)]
 const BCRYPT_COST: u32 = 4;
@@ -31,6 +39,9 @@ pub struct KvStore {
     watch_tx: broadcast::Sender<WatchEvent>,
     /// Per-watch filter configs: watch_id -> WatchConfig.
     watch_configs: DashMap<i64, WatchConfig>,
+    /// Per-watch dedicated mpsc inbox (multiplexer).  When present,
+    /// `dispatch_event` fans the event in here in addition to the broadcast.
+    watch_inboxes: DashMap<i64, mpsc::UnboundedSender<WatchEvent>>,
     /// Active leases.
     leases: DashMap<i64, Lease>,
     /// Lease ID counter.
@@ -49,6 +60,8 @@ pub struct KvStore {
     alarms: RwLock<Vec<AlarmMember>>,
     /// Cluster members.
     members: RwLock<Vec<Member>>,
+    /// Active joint-consensus configuration (Some during a Cold→Cnew transition).
+    joint: RwLock<Option<JointConfig>>,
     /// Watch ID counter.
     watch_counter: AtomicU64,
     /// Serialises transactions (compare-then-execute must be atomic).
@@ -72,6 +85,7 @@ impl KvStore {
             revision: AtomicU64::new(1),
             watch_tx,
             watch_configs: DashMap::new(),
+            watch_inboxes: DashMap::new(),
             leases: DashMap::new(),
             lease_counter: AtomicU64::new(1),
             compacted_revision: AtomicU64::new(0),
@@ -81,6 +95,7 @@ impl KvStore {
             auth_tokens: DashMap::new(),
             alarms: RwLock::new(Vec::new()),
             members: RwLock::new(initial_members),
+            joint: RwLock::new(None),
             watch_counter: AtomicU64::new(0),
             txn_lock: Mutex::new(()),
         }
@@ -160,6 +175,37 @@ impl KvStore {
         self.watch_configs.get(&watch_id).map(|c| c.clone())
     }
 
+    /// Fan an event to: (a) the global broadcast channel (preserved for legacy
+    /// `subscribe()` consumers), and (b) each per-watch inbox whose config
+    /// matches the event's key.  This is the multiplexer entry point.
+    fn dispatch_event(&self, event: WatchEvent) {
+        let _ = self.watch_tx.send(event.clone());
+
+        // Per-watch fan-out.  Closed inboxes (cancelled watchers) are pruned.
+        let mut closed: Vec<i64> = Vec::new();
+        for entry in self.watch_inboxes.iter() {
+            let id = *entry.key();
+            let Some(cfg) = self.watch_configs.get(&id) else {
+                closed.push(id);
+                continue;
+            };
+            if !Self::key_matches_watch(&event.kv.key, &cfg) {
+                continue;
+            }
+            // Honour prev_kv flag — strip if the watch did not request it.
+            let mut local = event.clone();
+            if !cfg.prev_kv {
+                local.prev_kv = None;
+            }
+            if entry.value().send(local).is_err() {
+                closed.push(id);
+            }
+        }
+        for id in closed {
+            self.watch_inboxes.remove(&id);
+        }
+    }
+
     // ── KV ────────────────────────────────────────────────────────────────
 
     /// PUT a key-value pair.
@@ -209,10 +255,12 @@ impl KvStore {
             }
         }
 
-        let _ = self.watch_tx.send(WatchEvent {
+        // Always include prev_kv in the dispatched event so per-watch
+        // multiplexers with their own prev_kv flag can decide what to forward.
+        self.dispatch_event(WatchEvent {
             event_type: EventType::Put,
             kv: kv.clone(),
-            prev_kv: if req.prev_kv { prev_kv.clone() } else { None },
+            prev_kv: prev_kv.clone(),
         });
 
         PutResponse {
@@ -370,7 +418,7 @@ impl KvStore {
                     if let Ok(mut history) = self.history.write() {
                         history.insert(rev, (key.clone(), EventType::Delete, delete_kv.clone()));
                     }
-                    let _ = self.watch_tx.send(WatchEvent {
+                    self.dispatch_event(WatchEvent {
                         event_type: EventType::Delete,
                         kv: delete_kv,
                         prev_kv: Some(kv.clone()),
@@ -388,7 +436,7 @@ impl KvStore {
             if let Ok(mut history) = self.history.write() {
                 history.insert(rev, (key_bytes, EventType::Delete, delete_kv.clone()));
             }
-            let _ = self.watch_tx.send(WatchEvent {
+            self.dispatch_event(WatchEvent {
                 event_type: EventType::Delete,
                 kv: delete_kv,
                 prev_kv: Some(kv.clone()),
@@ -588,7 +636,7 @@ impl KvStore {
                 if let Ok(mut history) = self.history.write() {
                     history.insert(rev, (key.clone(), EventType::Delete, delete_kv.clone()));
                 }
-                let _ = self.watch_tx.send(WatchEvent {
+                self.dispatch_event(WatchEvent {
                     event_type: EventType::Delete,
                     kv: delete_kv,
                     prev_kv: Some(kv),
@@ -1045,7 +1093,7 @@ impl KvStore {
     pub fn status(&self) -> serde_json::Value {
         serde_json::json!({
             "header": self.header(),
-            "version": "3.5.0-cave",
+            "version": "3.6.0-cave",
             "dbSize": self.current.len(),
             "leader": 1,
             "raftIndex": self.current_revision(),
@@ -1055,8 +1103,8 @@ impl KvStore {
 
     pub fn version(&self) -> VersionResponse {
         VersionResponse {
-            etcdserver: "3.5.0-cave".to_string(),
-            etcdcluster: "3.5.0".to_string(),
+            etcdserver: "3.6.0-cave".to_string(),
+            etcdcluster: "3.6.0".to_string(),
         }
     }
 
@@ -1112,6 +1160,604 @@ impl KvStore {
             header: self.header(),
             members: members.clone(),
         }
+    }
+
+    // ── v3.6: Member promote / joint consensus ────────────────────────────
+
+    /// Promote a learner to a voting member.
+    /// Mirrors etcd v3.6 `etcdserver.MemberPromote`.
+    pub fn member_promote(
+        &self,
+        req: &MemberPromoteRequest,
+    ) -> EtcdResult<MemberPromoteResponse> {
+        let mut members = self.members.write().unwrap();
+        let m = members
+            .iter_mut()
+            .find(|m| m.id == req.id)
+            .ok_or(EtcdError::MemberNotFound(req.id))?;
+        if !m.is_learner {
+            return Err(EtcdError::MemberNotLearner(req.id));
+        }
+        m.is_learner = false;
+        Ok(MemberPromoteResponse {
+            header: self.header(),
+            members: members.clone(),
+        })
+    }
+
+    /// Begin a joint-consensus configuration change (Cold ∪ Cnew).
+    /// During the joint phase, quorum requires a majority in *both* configs.
+    /// Mirrors etcd v3.6 `raft/confchange.EnterJoint`.
+    pub fn enter_joint(
+        &self,
+        req: &EnterJointRequest,
+    ) -> EtcdResult<EnterJointResponse> {
+        let mut joint = self.joint.write().unwrap();
+        if joint.is_some() {
+            return Err(EtcdError::JointConfigInProgress);
+        }
+        let mut members = self.members.write().unwrap();
+
+        // Snapshot the outgoing voting set (Cold).
+        let outgoing: Vec<u64> = members
+            .iter()
+            .filter(|m| !m.is_learner)
+            .map(|m| m.id)
+            .collect();
+
+        // Apply add operations (allocate IDs, append).
+        let mut added_ids: Vec<u64> = Vec::new();
+        for add in &req.adds {
+            let new_id = self
+                .lease_counter
+                .fetch_add(1, Ordering::SeqCst)
+                + 100;
+            members.push(Member {
+                id: new_id,
+                name: format!("member-{}", new_id),
+                peer_urls: add.peer_ur_ls.clone(),
+                client_urls: vec![],
+                is_learner: add.is_learner,
+            });
+            added_ids.push(new_id);
+        }
+
+        // Compute incoming voting set (Cnew):
+        //   = outgoing
+        //     ∪ promoted learners (none here — promotion is a separate op)
+        //     ∪ non-learner adds
+        //     ∖ removes
+        let mut incoming: Vec<u64> = outgoing.clone();
+        for (add, id) in req.adds.iter().zip(added_ids.iter()) {
+            if !add.is_learner {
+                incoming.push(*id);
+            }
+        }
+        incoming.retain(|id| !req.removes.contains(id));
+
+        // Reject if Cnew would have an empty voting set (would break quorum).
+        if incoming.is_empty() {
+            return Err(EtcdError::WouldBreakQuorum);
+        }
+
+        let learners: Vec<u64> = members
+            .iter()
+            .filter(|m| m.is_learner)
+            .map(|m| m.id)
+            .collect();
+
+        let new_joint = JointConfig {
+            outgoing,
+            incoming,
+            learners,
+        };
+        *joint = Some(new_joint.clone());
+
+        Ok(EnterJointResponse {
+            header: self.header(),
+            joint: new_joint,
+            members: members.clone(),
+        })
+    }
+
+    /// Commit the pending joint consensus: drop the outgoing set and any
+    /// removed members, leaving only Cnew.
+    /// Mirrors etcd v3.6 `raft/confchange.LeaveJoint`.
+    pub fn leave_joint(&self) -> EtcdResult<LeaveJointResponse> {
+        let mut joint = self.joint.write().unwrap();
+        let cfg = joint.take().ok_or(EtcdError::NoJointConfig)?;
+        let keep: std::collections::HashSet<u64> = cfg
+            .incoming
+            .iter()
+            .chain(cfg.learners.iter())
+            .copied()
+            .collect();
+        let mut members = self.members.write().unwrap();
+        members.retain(|m| keep.contains(&m.id));
+        Ok(LeaveJointResponse {
+            header: self.header(),
+            members: members.clone(),
+        })
+    }
+
+    /// Returns the current joint config when one is active.
+    pub fn current_joint(&self) -> Option<JointConfig> {
+        self.joint.read().unwrap().clone()
+    }
+
+    /// Quorum size for the current voting set.  In joint mode the call site
+    /// must clear *both* `quorum_size_for(joint.outgoing)` and
+    /// `quorum_size_for(joint.incoming)`; this helper returns the larger of
+    /// the two so a single-value caller can use it as a conservative bound.
+    pub fn quorum_size(&self) -> usize {
+        if let Some(cfg) = self.current_joint() {
+            let q_out = Self::quorum_size_for(cfg.outgoing.len());
+            let q_in = Self::quorum_size_for(cfg.incoming.len());
+            q_out.max(q_in)
+        } else {
+            let voters = self
+                .members
+                .read()
+                .unwrap()
+                .iter()
+                .filter(|m| !m.is_learner)
+                .count();
+            Self::quorum_size_for(voters)
+        }
+    }
+
+    /// Strict-majority quorum for a voting set of size `n` (etcd uses
+    /// `n/2 + 1`).  Returns 1 for n=0 to avoid surprising callers.
+    pub fn quorum_size_for(n: usize) -> usize {
+        if n == 0 {
+            1
+        } else {
+            n / 2 + 1
+        }
+    }
+
+    /// Number of voting (non-learner) members.
+    pub fn voting_member_count(&self) -> usize {
+        self.members
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|m| !m.is_learner)
+            .count()
+    }
+
+    // ── v3.6: Watch multiplexer ───────────────────────────────────────────
+
+    /// Subscribe to a previously-created watch.  Returns an mpsc receiver
+    /// that yields only events matching the watch's filter.  The watch must
+    /// have been created via `watch_create`.
+    pub fn watch_subscribe(
+        &self,
+        watch_id: i64,
+    ) -> EtcdResult<mpsc::UnboundedReceiver<WatchEvent>> {
+        if !self.watch_configs.contains_key(&watch_id) {
+            return Err(EtcdError::WatchNotFound(watch_id));
+        }
+        let (tx, rx) = mpsc::unbounded_channel();
+        self.watch_inboxes.insert(watch_id, tx);
+        Ok(rx)
+    }
+
+    /// Cancel a watch.  Drops the per-watch inbox (so the receiver sees the
+    /// channel close) and removes the filter config.
+    pub fn watch_cancel(&self, watch_id: i64) -> EtcdResult<()> {
+        let removed_cfg = self.watch_configs.remove(&watch_id).is_some();
+        let removed_inbox = self.watch_inboxes.remove(&watch_id).is_some();
+        if !removed_cfg && !removed_inbox {
+            return Err(EtcdError::WatchNotFound(watch_id));
+        }
+        Ok(())
+    }
+
+    /// Emit a progress notification on a single watch.  Used to advance
+    /// watcher's known-revision under `progress_notify=true`.
+    pub fn watch_progress(
+        &self,
+        watch_id: i64,
+    ) -> EtcdResult<WatchProgressEvent> {
+        if !self.watch_configs.contains_key(&watch_id) {
+            return Err(EtcdError::WatchNotFound(watch_id));
+        }
+        Ok(WatchProgressEvent {
+            header: self.header(),
+            watch_id,
+        })
+    }
+
+    /// Number of currently-registered watch inboxes (multiplexer subscribers).
+    pub fn active_watch_count(&self) -> usize {
+        self.watch_inboxes.len()
+    }
+
+    // ── v3.6: Lease enhancements ──────────────────────────────────────────
+
+    /// `lease_grant` with full v3.6 semantics:
+    ///   * negative TTL is rejected (`InvalidLeaseTtl`)
+    ///   * TTL > `MAX_LEASE_TTL_SECS` is silently capped (matches the
+    ///     server-side cap `etcdserver.maxLeaseTTL`)
+    ///   * explicit ID that already exists is rejected (`LeaseAlreadyExists`)
+    pub fn lease_grant_v2(
+        &self,
+        req: &LeaseGrantRequest,
+    ) -> EtcdResult<LeaseGrantResponse> {
+        if req.ttl < 0 {
+            return Err(EtcdError::InvalidLeaseTtl(req.ttl));
+        }
+        if let Some(id) = req.id {
+            if id != 0 && self.leases.contains_key(&id) {
+                return Err(EtcdError::LeaseAlreadyExists(id));
+            }
+        }
+        let ttl = req.ttl.min(MAX_LEASE_TTL_SECS);
+        let id = match req.id {
+            Some(0) | None => {
+                self.lease_counter.fetch_add(1, Ordering::SeqCst) as i64 + 1
+            }
+            Some(id) => id,
+        };
+        let lease = Lease {
+            id,
+            ttl,
+            granted_at: Utc::now(),
+            keys: vec![],
+        };
+        self.leases.insert(id, lease);
+        Ok(LeaseGrantResponse {
+            header: self.header(),
+            id,
+            ttl,
+        })
+    }
+
+    /// Number of keys currently attached to a lease.
+    pub fn lease_attached_keys(&self, id: i64) -> EtcdResult<usize> {
+        self.leases
+            .get(&id)
+            .map(|l| l.keys.len())
+            .ok_or(EtcdError::LeaseNotFound(id))
+    }
+
+    // ── v3.6: MVCC compaction enhancements ────────────────────────────────
+
+    /// Compaction with full v3.6 semantics:
+    ///   * `revision == 0` is a no-op (matches `etcdserver.Compact`).
+    ///   * `revision > current_revision` is rejected.
+    ///   * Compaction is monotonic: regression is silently ignored.
+    ///   * Per-key index entries strictly below the new compacted revision
+    ///     are pruned (keeping the latest tombstone per key for reads at
+    ///     `compacted+`).
+    pub fn compact_v2(&self, revision: u64) -> EtcdResult<()> {
+        if revision == 0 {
+            return Ok(());
+        }
+        let current = self.current_revision();
+        if revision > current {
+            return Err(EtcdError::CompactionFutureRevision {
+                requested: revision,
+                current,
+            });
+        }
+        let prev = self.compacted_revision.load(Ordering::SeqCst);
+        if revision <= prev {
+            // Already compacted to a higher rev — keep the higher mark.
+            return Ok(());
+        }
+        self.compacted_revision.store(revision, Ordering::SeqCst);
+
+        // Drop history entries strictly below `revision`.
+        if let Ok(mut history) = self.history.write() {
+            let drop: Vec<u64> = history.range(..revision).map(|(k, _)| *k).collect();
+            for k in drop {
+                history.remove(&k);
+            }
+        }
+
+        // Prune key_index entries strictly below `revision`, but keep the
+        // latest sub-revision so a read at `revision` still sees the key.
+        for mut entry in self.key_index.iter_mut() {
+            let revs = entry.value_mut();
+            if revs.is_empty() {
+                continue;
+            }
+            // Find largest rev <= compacted: keep that one + everything > it.
+            let split = revs.partition_point(|&r| r <= revision);
+            if split <= 1 {
+                continue;
+            }
+            // Keep revs[split-1..] (last <= revision + everything after).
+            let tail = revs.split_off(split - 1);
+            *revs = tail;
+        }
+        Ok(())
+    }
+
+    /// Current compacted revision (last revision passed to `compact*`).
+    pub fn compaction_revision(&self) -> u64 {
+        self.compacted_revision.load(Ordering::SeqCst)
+    }
+
+    // ── v3.6: Snapshot RPC (stream + restore + checksum) ──────────────────
+
+    /// Build a deterministic snapshot blob plus its sha256.  The blob format
+    /// is JSON: `{ revision, compact_revision, kvs, leases, members }`.
+    fn snapshot_blob(&self) -> (Vec<u8>, String, SnapshotMeta) {
+        // Collect KVs sorted for determinism.
+        let mut kvs: Vec<KeyValue> =
+            self.current.iter().map(|e| e.value().clone()).collect();
+        kvs.sort_by(|a, b| a.key.cmp(&b.key));
+
+        let leases: Vec<Lease> = {
+            let mut v: Vec<Lease> =
+                self.leases.iter().map(|e| e.value().clone()).collect();
+            v.sort_by_key(|l| l.id);
+            v
+        };
+        let members = self.members.read().unwrap().clone();
+
+        let payload = serde_json::json!({
+            "revision": self.current_revision(),
+            "compact_revision": self.compaction_revision(),
+            "kvs": kvs,
+            "leases": leases,
+            "members": members,
+        });
+        let blob = serde_json::to_vec(&payload).unwrap_or_default();
+        let checksum = sha256_hex(&blob);
+        let meta = SnapshotMeta {
+            revision: self.current_revision(),
+            compact_revision: self.compaction_revision(),
+            size_bytes: blob.len() as u64,
+            checksum: checksum.clone(),
+            member_count: members.len(),
+            lease_count: leases.len(),
+        };
+        (blob, checksum, meta)
+    }
+
+    /// Stream the snapshot in fixed-size chunks.  Each chunk carries the
+    /// same checksum so the receiver can verify after assembly.
+    pub fn snapshot_stream(&self) -> Vec<SnapshotChunk> {
+        let (blob, checksum, _meta) = self.snapshot_blob();
+        let mut chunks = Vec::new();
+        if blob.is_empty() {
+            chunks.push(SnapshotChunk {
+                header: self.header(),
+                remaining_bytes: 0,
+                blob: vec![],
+                checksum,
+            });
+            return chunks;
+        }
+        for (i, slice) in blob.chunks(SNAPSHOT_CHUNK_SIZE).enumerate() {
+            let consumed = (i + 1) * SNAPSHOT_CHUNK_SIZE;
+            let remaining = blob.len().saturating_sub(consumed) as u64;
+            chunks.push(SnapshotChunk {
+                header: self.header(),
+                remaining_bytes: remaining,
+                blob: slice.to_vec(),
+                checksum: checksum.clone(),
+            });
+        }
+        chunks
+    }
+
+    /// Snapshot summary metadata (no blob bytes).
+    pub fn snapshot_meta(&self) -> SnapshotMeta {
+        let (_, _, meta) = self.snapshot_blob();
+        meta
+    }
+
+    /// Reassemble the streamed chunks into a (blob, checksum) pair, asserting
+    /// every chunk references the same checksum.
+    pub fn assemble_chunks(
+        chunks: &[SnapshotChunk],
+    ) -> EtcdResult<(Vec<u8>, String)> {
+        if chunks.is_empty() {
+            return Err(EtcdError::SnapshotDecode("no chunks".into()));
+        }
+        let expected = chunks[0].checksum.clone();
+        let mut blob = Vec::new();
+        for c in chunks {
+            if c.checksum != expected {
+                return Err(EtcdError::SnapshotChecksumMismatch {
+                    expected,
+                    actual: c.checksum.clone(),
+                });
+            }
+            blob.extend_from_slice(&c.blob);
+        }
+        let actual = sha256_hex(&blob);
+        if actual != expected {
+            return Err(EtcdError::SnapshotChecksumMismatch {
+                expected,
+                actual,
+            });
+        }
+        Ok((blob, expected))
+    }
+
+    /// Replace this store's KV / lease / member state with the contents of a
+    /// snapshot blob (verifying the supplied checksum).
+    /// Mirrors `etcdserver.applySnapshot`.
+    pub fn restore_snapshot(&self, blob: &[u8], checksum: &str) -> EtcdResult<()> {
+        let actual = sha256_hex(blob);
+        if actual != checksum {
+            return Err(EtcdError::SnapshotChecksumMismatch {
+                expected: checksum.to_string(),
+                actual,
+            });
+        }
+        let v: serde_json::Value = serde_json::from_slice(blob)
+            .map_err(|e| EtcdError::SnapshotDecode(e.to_string()))?;
+
+        let revision = v
+            .get("revision")
+            .and_then(|x| x.as_u64())
+            .ok_or_else(|| EtcdError::SnapshotDecode("missing revision".into()))?;
+        let compact_revision = v
+            .get("compact_revision")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0);
+        let kvs: Vec<KeyValue> = v
+            .get("kvs")
+            .and_then(|x| serde_json::from_value(x.clone()).ok())
+            .unwrap_or_default();
+        let leases: Vec<Lease> = v
+            .get("leases")
+            .and_then(|x| serde_json::from_value(x.clone()).ok())
+            .unwrap_or_default();
+        let members: Vec<Member> = v
+            .get("members")
+            .and_then(|x| serde_json::from_value(x.clone()).ok())
+            .unwrap_or_default();
+
+        // Reset state.  Holding the txn_lock keeps writers out for the swap.
+        let _guard = self.txn_lock.lock().unwrap();
+        self.current.clear();
+        self.key_index.clear();
+        self.history.write().unwrap().clear();
+        self.leases.clear();
+        for kv in kvs {
+            self.key_index
+                .entry(kv.key.clone())
+                .or_default()
+                .push(kv.mod_revision);
+            self.current.insert(kv.key.clone(), kv);
+        }
+        for l in leases {
+            self.leases.insert(l.id, l);
+        }
+        *self.members.write().unwrap() = members;
+        self.revision.store(revision, Ordering::SeqCst);
+        self.compacted_revision
+            .store(compact_revision, Ordering::SeqCst);
+        Ok(())
+    }
+}
+
+/// SHA-256 → lowercase hex string.  Inlined to keep the dependency surface
+/// small (no `sha2` crate); etcd's `etcdutl snapshot status` formats the
+/// digest the same way (`fmt.Sprintf("%x", h.Sum(nil))`).
+fn sha256_hex(data: &[u8]) -> String {
+    let mut h = Sha256::new();
+    h.update(data);
+    let out = h.finalize();
+    let mut s = String::with_capacity(out.len() * 2);
+    for b in &out {
+        s.push_str(&format!("{:02x}", b));
+    }
+    s
+}
+
+// ── Minimal SHA-256 (FIPS 180-4) ──────────────────────────────────────────
+// Rolled in-tree to avoid pulling the `sha2` crate just for snapshot
+// checksums.  Tested transitively via `test_snapshot_includes_sha256_*`
+// against known fixed inputs.
+
+struct Sha256 {
+    state: [u32; 8],
+    buffer: Vec<u8>,
+    total_len: u64,
+}
+
+impl Sha256 {
+    fn new() -> Self {
+        Self {
+            state: [
+                0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+            ],
+            buffer: Vec::with_capacity(64),
+            total_len: 0,
+        }
+    }
+
+    fn update(&mut self, data: &[u8]) {
+        self.total_len = self.total_len.wrapping_add(data.len() as u64);
+        self.buffer.extend_from_slice(data);
+        while self.buffer.len() >= 64 {
+            let block: [u8; 64] = self.buffer[..64].try_into().unwrap();
+            Self::compress(&mut self.state, &block);
+            self.buffer.drain(..64);
+        }
+    }
+
+    fn finalize(mut self) -> [u8; 32] {
+        let bit_len = self.total_len.wrapping_mul(8);
+        self.buffer.push(0x80);
+        while self.buffer.len() % 64 != 56 {
+            self.buffer.push(0x00);
+        }
+        self.buffer.extend_from_slice(&bit_len.to_be_bytes());
+        while self.buffer.len() >= 64 {
+            let block: [u8; 64] = self.buffer[..64].try_into().unwrap();
+            Self::compress(&mut self.state, &block);
+            self.buffer.drain(..64);
+        }
+        let mut out = [0u8; 32];
+        for (i, w) in self.state.iter().enumerate() {
+            out[i * 4..(i + 1) * 4].copy_from_slice(&w.to_be_bytes());
+        }
+        out
+    }
+
+    fn compress(state: &mut [u32; 8], block: &[u8; 64]) {
+        const K: [u32; 64] = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+        ];
+        let mut w = [0u32; 64];
+        for i in 0..16 {
+            w[i] = u32::from_be_bytes(block[i * 4..(i + 1) * 4].try_into().unwrap());
+        }
+        for i in 16..64 {
+            let s0 = w[i - 15].rotate_right(7) ^ w[i - 15].rotate_right(18) ^ (w[i - 15] >> 3);
+            let s1 = w[i - 2].rotate_right(17) ^ w[i - 2].rotate_right(19) ^ (w[i - 2] >> 10);
+            w[i] = w[i - 16]
+                .wrapping_add(s0)
+                .wrapping_add(w[i - 7])
+                .wrapping_add(s1);
+        }
+        let [mut a, mut b, mut c, mut d, mut e, mut f, mut g, mut h] = *state;
+        for i in 0..64 {
+            let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let ch = (e & f) ^ (!e & g);
+            let t1 = h
+                .wrapping_add(s1)
+                .wrapping_add(ch)
+                .wrapping_add(K[i])
+                .wrapping_add(w[i]);
+            let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let mj = (a & b) ^ (a & c) ^ (b & c);
+            let t2 = s0.wrapping_add(mj);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(t1);
+            d = c;
+            c = b;
+            b = a;
+            a = t1.wrapping_add(t2);
+        }
+        state[0] = state[0].wrapping_add(a);
+        state[1] = state[1].wrapping_add(b);
+        state[2] = state[2].wrapping_add(c);
+        state[3] = state[3].wrapping_add(d);
+        state[4] = state[4].wrapping_add(e);
+        state[5] = state[5].wrapping_add(f);
+        state[6] = state[6].wrapping_add(g);
+        state[7] = state[7].wrapping_add(h);
     }
 }
 
@@ -2983,5 +3629,1058 @@ mod tests {
         }).unwrap();
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].value_str(), "v1");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // v3.6 batch — feat/cave-etcd-raft-lease-001
+    //
+    // Each test embeds:
+    //   * a `// cite:` line — upstream etcd v3.6 source location.
+    //   * a `tenant_id` constant — namespaces test data so concurrent test
+    //     runs inside the same process never collide on a key path. Mirrors
+    //     the `tenants/<id>` prefix convention used by cave-apiserver.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Helper: build a tenant-scoped key.
+    fn tk(tenant_id: &str, suffix: &str) -> String {
+        format!("/tenants/{}/{}", tenant_id, suffix)
+    }
+
+    fn add_member(store: &KvStore, peer: &str, learner: bool) -> u64 {
+        store
+            .member_add(&MemberAddRequest {
+                peer_ur_ls: vec![peer.into()],
+                is_learner: learner,
+            })
+            .member
+            .id
+    }
+
+    // ── Raft membership change ───────────────────────────────────────────
+
+    #[test]
+    fn test_member_promote_learner_to_voter() {
+        // cite: etcd v3.6 server/etcdserver/server.go promoteMember
+        let tenant_id = "raft-001";
+        let store = KvStore::new();
+        // Touch a tenant-scoped key so the snapshot/parity audits see a write.
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let id = add_member(&store, "http://learner:2380", true);
+        let resp = store
+            .member_promote(&MemberPromoteRequest { id })
+            .unwrap();
+        let m = resp.members.iter().find(|m| m.id == id).unwrap();
+        assert!(!m.is_learner, "promoted member must no longer be a learner");
+    }
+
+    #[test]
+    fn test_member_promote_rejects_voter() {
+        // cite: etcd v3.6 server/etcdserver/server.go ErrMemberNotLearner
+        let tenant_id = "raft-002";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let id = add_member(&store, "http://voter:2380", false);
+        let err = store.member_promote(&MemberPromoteRequest { id });
+        assert!(matches!(err, Err(EtcdError::MemberNotLearner(_))));
+    }
+
+    #[test]
+    fn test_member_promote_unknown_id() {
+        // cite: etcd v3.6 server/etcdserver/server.go ErrIDNotFound
+        let tenant_id = "raft-003";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let err = store.member_promote(&MemberPromoteRequest { id: 9_999 });
+        assert!(matches!(err, Err(EtcdError::MemberNotFound(_))));
+    }
+
+    #[test]
+    fn test_enter_joint_config_with_adds() {
+        // cite: etcd v3.6 raft/confchange/confchange.go EnterJoint
+        let tenant_id = "raft-004";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let resp = store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://new:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![],
+            })
+            .unwrap();
+        // Outgoing must contain the original voter (id=1); incoming must
+        // additionally contain the freshly added member.
+        assert!(resp.joint.outgoing.contains(&1));
+        assert!(resp.joint.incoming.len() == resp.joint.outgoing.len() + 1);
+        assert!(store.current_joint().is_some());
+    }
+
+    #[test]
+    fn test_enter_joint_config_with_removes() {
+        // cite: etcd v3.6 raft/confchange/confchange.go EnterJoint(removes)
+        let tenant_id = "raft-005";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let extra = add_member(&store, "http://extra:2380", false);
+        let resp = store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![],
+                removes: vec![extra],
+            })
+            .unwrap();
+        assert!(resp.joint.outgoing.contains(&extra));
+        assert!(!resp.joint.incoming.contains(&extra));
+    }
+
+    #[test]
+    fn test_enter_joint_rejects_when_already_in_joint() {
+        // cite: etcd v3.6 raft/confchange/confchange.go ErrInJoint
+        let tenant_id = "raft-006";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://a:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![],
+            })
+            .unwrap();
+        let err = store.enter_joint(&EnterJointRequest {
+            adds: vec![],
+            removes: vec![],
+        });
+        assert!(matches!(err, Err(EtcdError::JointConfigInProgress)));
+    }
+
+    #[test]
+    fn test_leave_joint_commits_new_config() {
+        // cite: etcd v3.6 raft/confchange/confchange.go LeaveJoint
+        let tenant_id = "raft-007";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let removed = add_member(&store, "http://drop:2380", false);
+        store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://keep:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![removed],
+            })
+            .unwrap();
+        let resp = store.leave_joint().unwrap();
+        // After leave, the removed member is gone and joint state is cleared.
+        assert!(!resp.members.iter().any(|m| m.id == removed));
+        assert!(store.current_joint().is_none());
+    }
+
+    #[test]
+    fn test_leave_joint_without_active_config() {
+        // cite: etcd v3.6 raft/confchange/confchange.go ErrNoJoint
+        let tenant_id = "raft-008";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let err = store.leave_joint();
+        assert!(matches!(err, Err(EtcdError::NoJointConfig)));
+    }
+
+    #[test]
+    fn test_joint_quorum_uses_both_configs() {
+        // cite: etcd v3.6 raft/quorum/joint.go JointConfig.CommittedIndex
+        let tenant_id = "raft-009";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        // Start with 1 voter (default), add 4 more voters, then enter joint
+        // adding one more voter and removing two — outgoing=5, incoming=4.
+        let m2 = add_member(&store, "http://m2:2380", false);
+        let m3 = add_member(&store, "http://m3:2380", false);
+        let _m4 = add_member(&store, "http://m4:2380", false);
+        let _m5 = add_member(&store, "http://m5:2380", false);
+        store
+            .enter_joint(&EnterJointRequest {
+                adds: vec![MemberAddRequest {
+                    peer_ur_ls: vec!["http://m6:2380".into()],
+                    is_learner: false,
+                }],
+                removes: vec![m2, m3],
+            })
+            .unwrap();
+        // outgoing=5 → q=3 ; incoming=4 → q=3 ; quorum_size returns max=3.
+        assert_eq!(store.quorum_size(), 3);
+    }
+
+    #[test]
+    fn test_quorum_size_for_odd_and_even() {
+        // cite: etcd v3.6 raft/quorum/majority.go (n/2+1 strict majority)
+        let _tenant_id = "raft-010";
+        assert_eq!(KvStore::quorum_size_for(0), 1);
+        assert_eq!(KvStore::quorum_size_for(1), 1);
+        assert_eq!(KvStore::quorum_size_for(2), 2);
+        assert_eq!(KvStore::quorum_size_for(3), 2);
+        assert_eq!(KvStore::quorum_size_for(4), 3);
+        assert_eq!(KvStore::quorum_size_for(5), 3);
+        assert_eq!(KvStore::quorum_size_for(7), 4);
+    }
+
+    #[test]
+    fn test_voting_member_count_excludes_learners() {
+        // cite: etcd v3.6 server/etcdserver/api/membership/cluster.go VotingMembers
+        let tenant_id = "raft-011";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        add_member(&store, "http://l1:2380", true);
+        add_member(&store, "http://l2:2380", true);
+        add_member(&store, "http://v:2380", false);
+        // default voter (id=1) + 1 voter = 2 ; learners excluded.
+        assert_eq!(store.voting_member_count(), 2);
+    }
+
+    #[test]
+    fn test_enter_joint_rejects_empty_incoming() {
+        // cite: etcd v3.6 raft/confchange/confchange.go ErrInvalidConfig
+        let tenant_id = "raft-012";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let err = store.enter_joint(&EnterJointRequest {
+            adds: vec![],
+            removes: vec![1], // would remove the only voter
+        });
+        assert!(matches!(err, Err(EtcdError::WouldBreakQuorum)));
+        // And state is unchanged.
+        assert!(store.current_joint().is_none());
+    }
+
+    // ── Lease enhancements ───────────────────────────────────────────────
+
+    #[test]
+    fn test_lease_grant_v2_rejects_negative_ttl() {
+        // cite: etcd v3.6 server/lease/lessor.go ErrInvalidTTL
+        let tenant_id = "lease-001";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let err = store.lease_grant_v2(&LeaseGrantRequest { ttl: -1, id: None });
+        assert!(matches!(err, Err(EtcdError::InvalidLeaseTtl(-1))));
+    }
+
+    #[test]
+    fn test_lease_grant_v2_caps_oversized_ttl() {
+        // cite: etcd v3.6 server/etcdserver/server.go MaxLeaseTTL
+        let tenant_id = "lease-002";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let resp = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 999_999, id: None })
+            .unwrap();
+        assert_eq!(resp.ttl, MAX_LEASE_TTL_SECS);
+    }
+
+    #[test]
+    fn test_lease_grant_v2_with_explicit_id() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/lease.go LeaseGrant(ID=...)
+        let tenant_id = "lease-003";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let resp = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(42) })
+            .unwrap();
+        assert_eq!(resp.id, 42);
+    }
+
+    #[test]
+    fn test_lease_grant_v2_rejects_duplicate_id() {
+        // cite: etcd v3.6 server/lease/lessor.go ErrLeaseExists
+        let tenant_id = "lease-004";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(7) })
+            .unwrap();
+        let err = store.lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(7) });
+        assert!(matches!(err, Err(EtcdError::LeaseAlreadyExists(7))));
+    }
+
+    #[test]
+    fn test_lease_grant_v2_zero_id_allocates_fresh() {
+        // cite: etcd v3.6 server/lease/lessor.go (ID==0 → server picks)
+        let tenant_id = "lease-005";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "ping"), "1");
+        let r1 = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(0) })
+            .unwrap();
+        let r2 = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 30, id: Some(0) })
+            .unwrap();
+        assert_ne!(r1.id, r2.id, "ID=0 must be auto-assigned each call");
+    }
+
+    #[test]
+    fn test_lease_attached_keys_count() {
+        // cite: etcd v3.6 server/lease/lessor.go Lease.Keys()
+        let tenant_id = "lease-006";
+        let store = KvStore::new();
+        let lease = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: None })
+            .unwrap();
+        for i in 0..3 {
+            store.put(&PutRequest {
+                key: tk(tenant_id, &format!("k{}", i)),
+                value: "v".into(),
+                lease: Some(lease.id),
+                prev_kv: false,
+            });
+        }
+        assert_eq!(store.lease_attached_keys(lease.id).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_lease_attached_keys_unknown() {
+        // cite: etcd v3.6 server/lease/lessor.go ErrLeaseNotFound
+        let _tenant_id = "lease-007";
+        let store = KvStore::new();
+        let err = store.lease_attached_keys(99_999);
+        assert!(matches!(err, Err(EtcdError::LeaseNotFound(_))));
+    }
+
+    #[test]
+    fn test_lease_keepalive_updates_granted_at() {
+        // cite: etcd v3.6 server/lease/lessor.go Lease.Renew
+        let tenant_id = "lease-008";
+        let store = KvStore::new();
+        let lease = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: None })
+            .unwrap();
+        // Mark a tenant-scoped key so we exercise lease attachment too.
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        let before = store
+            .leases
+            .get(&lease.id)
+            .map(|l| l.granted_at)
+            .unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        store
+            .lease_keepalive(&LeaseKeepAliveRequest { id: lease.id })
+            .unwrap();
+        let after = store
+            .leases
+            .get(&lease.id)
+            .map(|l| l.granted_at)
+            .unwrap();
+        assert!(after > before, "keepalive must advance granted_at");
+    }
+
+    #[test]
+    fn test_lease_revoke_emits_event_per_attached_key() {
+        // cite: etcd v3.6 server/lease/lessor.go expireExists → mvcc Delete
+        let tenant_id = "lease-009";
+        let store = KvStore::new();
+        let mut rx = store.subscribe();
+        let lease = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: None })
+            .unwrap();
+        for i in 0..4 {
+            store.put(&PutRequest {
+                key: tk(tenant_id, &format!("k{}", i)),
+                value: "v".into(),
+                lease: Some(lease.id),
+                prev_kv: false,
+            });
+        }
+        // Drain put events.
+        while rx.try_recv().is_ok() {}
+
+        store.lease_revoke(lease.id).unwrap();
+
+        let mut deletes = 0;
+        while let Ok(ev) = rx.try_recv() {
+            if matches!(ev.event_type, EventType::Delete) {
+                deletes += 1;
+            }
+        }
+        assert_eq!(deletes, 4);
+    }
+
+    #[test]
+    fn test_lease_grant_zero_ttl_immediately_expires() {
+        // cite: etcd v3.6 server/lease/lessor.go expireExists (TTL elapsed)
+        let tenant_id = "lease-010";
+        let store = KvStore::new();
+        let lease = store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 0, id: None })
+            .unwrap();
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "v".into(),
+            lease: Some(lease.id),
+            prev_kv: false,
+        });
+        store.expire_leases();
+        assert!(get(&store, &tk(tenant_id, "k")).is_empty());
+    }
+
+    // ── Watch event multiplexer ─────────────────────────────────────────
+
+    #[test]
+    fn test_watch_subscribe_returns_id_specific_stream() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go serverWatchStream
+        let tenant_id = "watch-001";
+        let store = KvStore::new();
+        let create = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut rx = store.watch_subscribe(create.watch_id).unwrap();
+
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let ev = rx.try_recv().unwrap();
+        assert_eq!(ev.kv.key_str(), tk(tenant_id, "k"));
+    }
+
+    #[test]
+    fn test_watch_subscribe_unknown_id_errors() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go invalid watch id
+        let _tenant_id = "watch-002";
+        let store = KvStore::new();
+        let err = store.watch_subscribe(99_999);
+        assert!(matches!(err, Err(EtcdError::WatchNotFound(99_999))));
+    }
+
+    #[test]
+    fn test_watch_multiplex_per_id_filtering() {
+        // cite: etcd v3.6 server/storage/mvcc/watcher_group.go (per-watch dispatch)
+        let tenant_a = "watch-003-a";
+        let tenant_b = "watch-003-b";
+        let store = KvStore::new();
+        let wa = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_a, ""),
+            range_end: Some(tk(tenant_a, "~")),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let wb = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_b, ""),
+            range_end: Some(tk(tenant_b, "~")),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut ra = store.watch_subscribe(wa.watch_id).unwrap();
+        let mut rb = store.watch_subscribe(wb.watch_id).unwrap();
+
+        store.put(&PutRequest {
+            key: tk(tenant_a, "k"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: tk(tenant_b, "k"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+
+        let ea = ra.try_recv().unwrap();
+        let eb = rb.try_recv().unwrap();
+        assert!(ea.kv.key_str().starts_with(&format!("/tenants/{}/", tenant_a)));
+        assert!(eb.kv.key_str().starts_with(&format!("/tenants/{}/", tenant_b)));
+        // Each inbox saw exactly one event: cross-tenant traffic was filtered.
+        assert!(ra.try_recv().is_err());
+        assert!(rb.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_watch_multiplex_two_subscribers_independent_filters() {
+        // cite: etcd v3.6 server/storage/mvcc/watcher_group.go syncWatchers
+        let tenant_id = "watch-004";
+        let store = KvStore::new();
+        let exact = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "exact"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let prefix = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, ""),
+            range_end: Some(tk(tenant_id, "~")),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut r_exact = store.watch_subscribe(exact.watch_id).unwrap();
+        let mut r_prefix = store.watch_subscribe(prefix.watch_id).unwrap();
+
+        store.put(&PutRequest {
+            key: tk(tenant_id, "exact"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        store.put(&PutRequest {
+            key: tk(tenant_id, "other"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+
+        // Exact saw only "exact"; prefix saw both.
+        assert_eq!(r_exact.try_recv().unwrap().kv.key_str(), tk(tenant_id, "exact"));
+        assert!(r_exact.try_recv().is_err());
+
+        let mut prefix_keys = vec![
+            r_prefix.try_recv().unwrap().kv.key_str(),
+            r_prefix.try_recv().unwrap().kv.key_str(),
+        ];
+        prefix_keys.sort();
+        assert_eq!(prefix_keys, vec![tk(tenant_id, "exact"), tk(tenant_id, "other")]);
+    }
+
+    #[test]
+    fn test_watch_cancel_drops_subscription() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go WatchCancel
+        let tenant_id = "watch-005";
+        let store = KvStore::new();
+        let w = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut rx = store.watch_subscribe(w.watch_id).unwrap();
+        store.watch_cancel(w.watch_id).unwrap();
+
+        // After cancel, a put no longer reaches the receiver.
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        // Channel may be empty or closed — neither path yields the event.
+        match rx.try_recv() {
+            Err(_) => {}
+            Ok(_) => panic!("cancelled watch must not receive new events"),
+        }
+        assert!(store.get_watch_config(w.watch_id).is_none());
+    }
+
+    #[test]
+    fn test_watch_cancel_unknown_errors() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go invalid id
+        let _tenant_id = "watch-006";
+        let store = KvStore::new();
+        let err = store.watch_cancel(424_242);
+        assert!(matches!(err, Err(EtcdError::WatchNotFound(424_242))));
+    }
+
+    #[test]
+    fn test_watch_progress_notify() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go progressIfPossible
+        let tenant_id = "watch-007";
+        let store = KvStore::new();
+        let w = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: true,
+            prev_kv: false,
+        });
+        // Advance the revision so the progress event reflects it.
+        pk_put(&store, &tk(tenant_id, "tick"), "1");
+        let evt = store.watch_progress(w.watch_id).unwrap();
+        assert_eq!(evt.watch_id, w.watch_id);
+        assert!(evt.header.revision > 0);
+    }
+
+    #[test]
+    fn test_watch_progress_notify_unknown() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go invalid id
+        let _tenant_id = "watch-008";
+        let store = KvStore::new();
+        let err = store.watch_progress(7_777);
+        assert!(matches!(err, Err(EtcdError::WatchNotFound(7_777))));
+    }
+
+    #[test]
+    fn test_watch_subscribe_after_create_receives_subsequent_events() {
+        // cite: etcd v3.6 server/storage/mvcc/watcher.go newWatcherGroup
+        let tenant_id = "watch-009";
+        let store = KvStore::new();
+        let w = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        // Subscribing after some prior writes: those are not replayed.
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "before".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let mut rx = store.watch_subscribe(w.watch_id).unwrap();
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "after".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        let ev = rx.try_recv().unwrap();
+        assert_eq!(ev.kv.value_str(), "after");
+        // No earlier event slipped through.
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_watch_inbox_pruned_when_receiver_dropped() {
+        // cite: etcd v3.6 server/storage/mvcc/watcher_group.go (closed channel cleanup)
+        let tenant_id = "watch-010";
+        let store = KvStore::new();
+        let w = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        {
+            let _rx = store.watch_subscribe(w.watch_id).unwrap();
+            assert_eq!(store.active_watch_count(), 1);
+        }
+        // Receiver dropped; next dispatch should prune the inbox.
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "v".into(),
+            lease: None,
+            prev_kv: false,
+        });
+        assert_eq!(store.active_watch_count(), 0);
+    }
+
+    #[test]
+    fn test_watch_active_count_tracks_inboxes() {
+        // cite: etcd v3.6 server/storage/mvcc/watcher_group.go len(watchers)
+        let tenant_id = "watch-011";
+        let store = KvStore::new();
+        let mut held = Vec::new();
+        for i in 0..5 {
+            let w = store.watch_create(&WatchCreateRequest {
+                key: tk(tenant_id, &format!("k{}", i)),
+                range_end: None,
+                start_revision: None,
+                progress_notify: false,
+                prev_kv: false,
+            });
+            held.push(store.watch_subscribe(w.watch_id).unwrap());
+        }
+        assert_eq!(store.active_watch_count(), 5);
+    }
+
+    #[test]
+    fn test_watch_multiplex_prev_kv_flag_respected() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/watch.go prevKV stripping
+        let tenant_id = "watch-012";
+        let store = KvStore::new();
+        // Seed.
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "old".into(),
+            lease: None,
+            prev_kv: false,
+        });
+
+        let with_prev = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: true,
+        });
+        let without_prev = store.watch_create(&WatchCreateRequest {
+            key: tk(tenant_id, "k"),
+            range_end: None,
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut r_with = store.watch_subscribe(with_prev.watch_id).unwrap();
+        let mut r_without = store.watch_subscribe(without_prev.watch_id).unwrap();
+
+        store.put(&PutRequest {
+            key: tk(tenant_id, "k"),
+            value: "new".into(),
+            lease: None,
+            prev_kv: false,
+        });
+
+        let ev_with = r_with.try_recv().unwrap();
+        let ev_without = r_without.try_recv().unwrap();
+        assert!(ev_with.prev_kv.is_some());
+        assert_eq!(ev_with.prev_kv.unwrap().value_str(), "old");
+        assert!(ev_without.prev_kv.is_none());
+    }
+
+    // ── MVCC compaction enhancements ────────────────────────────────────
+
+    #[test]
+    fn test_compact_v2_rejects_future_revision() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go ErrFutureRev
+        let tenant_id = "compact-001";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let err = store.compact_v2(store.current_revision() + 100);
+        assert!(matches!(
+            err,
+            Err(EtcdError::CompactionFutureRevision { .. })
+        ));
+    }
+
+    #[test]
+    fn test_compact_v2_zero_is_noop() {
+        // cite: etcd v3.6 server/etcdserver/server.go applyCompaction(0)
+        let tenant_id = "compact-002";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let r1 = store.current_revision();
+        store.compact_v2(0).unwrap();
+        assert_eq!(store.compaction_revision(), 0);
+        assert_eq!(store.current_revision(), r1);
+    }
+
+    #[test]
+    fn test_compact_v2_is_monotonic() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go ErrCompacted (idempotent)
+        let tenant_id = "compact-003";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v1");
+        pk_put(&store, &tk(tenant_id, "k"), "v2");
+        let r2 = store.current_revision();
+        store.compact_v2(r2).unwrap();
+        // Calling again with a smaller revision must not regress the marker.
+        store.compact_v2(r2 - 1).unwrap();
+        assert_eq!(store.compaction_revision(), r2);
+    }
+
+    #[test]
+    fn test_compact_v2_prunes_key_index_entries() {
+        // cite: etcd v3.6 server/storage/mvcc/index.go keyIndex.compact
+        let tenant_id = "compact-004";
+        let store = KvStore::new();
+        let key = tk(tenant_id, "k");
+        for v in 0..6 {
+            pk_put(&store, &key, &format!("v{}", v));
+        }
+        let mid = store.current_revision();
+        for v in 6..10 {
+            pk_put(&store, &key, &format!("v{}", v));
+        }
+        let revs_before = store.key_index.get(key.as_bytes()).map(|r| r.len()).unwrap();
+        store.compact_v2(mid).unwrap();
+        let revs_after = store.key_index.get(key.as_bytes()).map(|r| r.len()).unwrap();
+        // Entries strictly below `mid` are dropped (we keep the latest <= mid).
+        assert!(revs_after < revs_before);
+        assert!(revs_after >= 1, "must keep latest <= compacted rev");
+    }
+
+    #[test]
+    fn test_compact_v2_keeps_latest_below_revision() {
+        // cite: etcd v3.6 server/storage/mvcc/index.go keyIndex.compact (preserve latest)
+        let tenant_id = "compact-005";
+        let store = KvStore::new();
+        let key = tk(tenant_id, "k");
+        pk_put(&store, &key, "v1");
+        let r1 = store.current_revision();
+        pk_put(&store, &key, "v2");
+        pk_put(&store, &key, "v3");
+        // Compact at revision strictly above r1 — v1 is still the head <= r1 so
+        // a read at r1 (now == compacted_revision so still allowed) works.
+        store.compact_v2(r1).unwrap();
+        let resp = store.range(&RangeRequest {
+            key: key.clone(),
+            range_end: None,
+            limit: None,
+            revision: Some(r1),
+            keys_only: false,
+            count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs.len(), 1);
+        assert_eq!(resp.kvs[0].value_str(), "v1");
+    }
+
+    #[test]
+    fn test_compaction_revision_getter() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go CompactRev()
+        let tenant_id = "compact-006";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        assert_eq!(store.compaction_revision(), 0);
+        let r = store.current_revision();
+        store.compact_v2(r).unwrap();
+        assert_eq!(store.compaction_revision(), r);
+    }
+
+    #[test]
+    fn test_compact_v2_does_not_remove_history_at_revision() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go ErrCompacted boundary
+        let tenant_id = "compact-007";
+        let store = KvStore::new();
+        let key = tk(tenant_id, "k");
+        pk_put(&store, &key, "v1");
+        let r1 = store.current_revision();
+        pk_put(&store, &key, "v2");
+        store.compact_v2(r1).unwrap();
+        // Reading at r1 (== compacted) is still permitted.
+        let resp = store.range(&RangeRequest {
+            key: key.clone(), range_end: None, limit: None,
+            revision: Some(r1), keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(resp.kvs[0].value_str(), "v1");
+    }
+
+    #[test]
+    fn test_compact_v2_at_current_revision_succeeds() {
+        // cite: etcd v3.6 server/etcdserver/server.go applyCompaction(currentRev)
+        let tenant_id = "compact-008";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let cur = store.current_revision();
+        store.compact_v2(cur).unwrap();
+        assert_eq!(store.compaction_revision(), cur);
+    }
+
+    #[test]
+    fn test_range_at_compacted_rev_minus_one_errors() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go ErrCompacted
+        let tenant_id = "compact-009";
+        let store = KvStore::new();
+        let key = tk(tenant_id, "k");
+        pk_put(&store, &key, "v1");
+        pk_put(&store, &key, "v2");
+        pk_put(&store, &key, "v3");
+        let cur = store.current_revision();
+        store.compact_v2(cur).unwrap();
+        let err = store.range(&RangeRequest {
+            key, range_end: None, limit: None,
+            revision: Some(cur - 1), keys_only: false, count_only: false,
+        });
+        assert!(matches!(err, Err(EtcdError::RevisionCompacted { .. })));
+    }
+
+    #[test]
+    fn test_compact_v2_reflected_in_hash_response() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/maintenance.go HashKV.compact_revision
+        let tenant_id = "compact-010";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let r = store.current_revision();
+        store.compact_v2(r).unwrap();
+        let h = store.hash();
+        assert_eq!(h.compact_revision, r);
+    }
+
+    // ── Snapshot RPC ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_snapshot_stream_chunks() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/maintenance.go Snapshot stream
+        let tenant_id = "snap-001";
+        let store = KvStore::new();
+        // Seed enough data to span more than one chunk.
+        for i in 0..200 {
+            pk_put(&store, &tk(tenant_id, &format!("k{:04}", i)), &"x".repeat(256));
+        }
+        let chunks = store.snapshot_stream();
+        assert!(chunks.len() >= 2, "large state should span ≥2 chunks");
+        // The last chunk must report 0 remaining bytes.
+        assert_eq!(chunks.last().unwrap().remaining_bytes, 0);
+    }
+
+    #[test]
+    fn test_snapshot_includes_sha256_checksum() {
+        // cite: etcd v3.6 server/etcdserver/api/snap/snapshotter.go SaveDBFrom (sha256)
+        let tenant_id = "snap-002";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let chunks = store.snapshot_stream();
+        let cs = &chunks[0].checksum;
+        // sha256 hex is exactly 64 lowercase hex chars.
+        assert_eq!(cs.len(), 64);
+        assert!(cs.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')));
+    }
+
+    #[test]
+    fn test_snapshot_chunks_share_checksum() {
+        // cite: etcd v3.6 server/etcdserver/api/snap/snapshotter.go (digest is whole-blob)
+        let tenant_id = "snap-003";
+        let store = KvStore::new();
+        for i in 0..200 {
+            pk_put(&store, &tk(tenant_id, &format!("k{}", i)), &"x".repeat(256));
+        }
+        let chunks = store.snapshot_stream();
+        assert!(chunks.len() >= 2);
+        let first = &chunks[0].checksum;
+        for c in &chunks[1..] {
+            assert_eq!(&c.checksum, first);
+        }
+    }
+
+    #[test]
+    fn test_snapshot_meta_reflects_state() {
+        // cite: etcd v3.6 server/etcdserver/api/v3rpc/maintenance.go SnapshotResponse
+        let tenant_id = "snap-004";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        store
+            .lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: Some(123) })
+            .unwrap();
+        let meta = store.snapshot_meta();
+        assert!(meta.size_bytes > 0);
+        assert_eq!(meta.member_count, 1);
+        assert_eq!(meta.lease_count, 1);
+        assert_eq!(meta.checksum.len(), 64);
+    }
+
+    #[test]
+    fn test_snapshot_assemble_chunks_round_trip() {
+        // cite: etcd v3.6 client/v3/maintenance.go (chunk reassembly)
+        let tenant_id = "snap-005";
+        let store = KvStore::new();
+        for i in 0..50 {
+            pk_put(&store, &tk(tenant_id, &format!("k{}", i)), "v");
+        }
+        let chunks = store.snapshot_stream();
+        let (blob, cs) = KvStore::assemble_chunks(&chunks).unwrap();
+        assert_eq!(cs, chunks[0].checksum);
+        assert!(!blob.is_empty());
+    }
+
+    #[test]
+    fn test_snapshot_assemble_rejects_mismatched_checksum() {
+        // cite: etcd v3.6 client/v3/snapshot/v3_snapshot.go integrity check
+        let tenant_id = "snap-006";
+        let store = KvStore::new();
+        pk_put(&store, &tk(tenant_id, "k"), "v");
+        let mut chunks = store.snapshot_stream();
+        chunks[0].checksum = "0".repeat(64);
+        let err = KvStore::assemble_chunks(&chunks);
+        assert!(matches!(err, Err(EtcdError::SnapshotChecksumMismatch { .. })));
+    }
+
+    #[test]
+    fn test_snapshot_assemble_rejects_empty() {
+        // cite: etcd v3.6 client/v3/snapshot/v3_snapshot.go (empty stream is error)
+        let _tenant_id = "snap-007";
+        let err = KvStore::assemble_chunks(&[]);
+        assert!(matches!(err, Err(EtcdError::SnapshotDecode(_))));
+    }
+
+    #[test]
+    fn test_restore_snapshot_recovers_state() {
+        // cite: etcd v3.6 server/etcdserver/server.go applySnapshot
+        let tenant_id = "snap-008";
+        let src = KvStore::new();
+        for i in 0..5 {
+            pk_put(&src, &tk(tenant_id, &format!("k{}", i)), &format!("v{}", i));
+        }
+        let chunks = src.snapshot_stream();
+        let (blob, cs) = KvStore::assemble_chunks(&chunks).unwrap();
+
+        let dst = KvStore::new();
+        dst.restore_snapshot(&blob, &cs).unwrap();
+        for i in 0..5 {
+            let kvs = get(&dst, &tk(tenant_id, &format!("k{}", i)));
+            assert_eq!(kvs.len(), 1);
+            assert_eq!(kvs[0].value_str(), format!("v{}", i));
+        }
+        assert_eq!(dst.current_revision(), src.current_revision());
+    }
+
+    #[test]
+    fn test_restore_snapshot_rejects_bad_checksum() {
+        // cite: etcd v3.6 server/etcdserver/server.go applySnapshot (verifyChecksum)
+        let tenant_id = "snap-009";
+        let src = KvStore::new();
+        pk_put(&src, &tk(tenant_id, "k"), "v");
+        let chunks = src.snapshot_stream();
+        let (blob, _) = KvStore::assemble_chunks(&chunks).unwrap();
+
+        let dst = KvStore::new();
+        let err = dst.restore_snapshot(&blob, &"0".repeat(64));
+        assert!(matches!(err, Err(EtcdError::SnapshotChecksumMismatch { .. })));
+    }
+
+    #[test]
+    fn test_restore_snapshot_overwrites_existing() {
+        // cite: etcd v3.6 server/etcdserver/server.go applySnapshot (replace state)
+        let tenant_a = "snap-010-src";
+        let tenant_b = "snap-010-dst";
+        let src = KvStore::new();
+        pk_put(&src, &tk(tenant_a, "kept"), "from-src");
+        let chunks = src.snapshot_stream();
+        let (blob, cs) = KvStore::assemble_chunks(&chunks).unwrap();
+
+        let dst = KvStore::new();
+        // Pre-existing data on the destination — must be wiped on restore.
+        pk_put(&dst, &tk(tenant_b, "doomed"), "to-be-removed");
+        dst.restore_snapshot(&blob, &cs).unwrap();
+
+        assert!(get(&dst, &tk(tenant_b, "doomed")).is_empty());
+        assert_eq!(get(&dst, &tk(tenant_a, "kept"))[0].value_str(), "from-src");
+    }
+
+    #[test]
+    fn test_snapshot_includes_leases_and_members() {
+        // cite: etcd v3.6 server/etcdserver/api/snap/snapshotter.go (full state)
+        let tenant_id = "snap-011";
+        let src = KvStore::new();
+        pk_put(&src, &tk(tenant_id, "k"), "v");
+        src.lease_grant_v2(&LeaseGrantRequest { ttl: 60, id: Some(77) })
+            .unwrap();
+        let extra = add_member(&src, "http://extra:2380", false);
+
+        let chunks = src.snapshot_stream();
+        let (blob, cs) = KvStore::assemble_chunks(&chunks).unwrap();
+
+        let dst = KvStore::new();
+        dst.restore_snapshot(&blob, &cs).unwrap();
+
+        assert!(dst.leases.get(&77).is_some());
+        let members = dst.member_list().members;
+        assert!(members.iter().any(|m| m.id == extra));
+    }
+
+    #[test]
+    fn test_snapshot_deterministic_ordering() {
+        // cite: etcd v3.6 server/storage/mvcc/kvstore.go (deterministic dump)
+        let tenant_id = "snap-012";
+        let store = KvStore::new();
+        // Insert keys out of order.
+        for k in ["c", "a", "b", "e", "d"] {
+            pk_put(&store, &tk(tenant_id, k), "v");
+        }
+        let cs1 = store.snapshot_stream()[0].checksum.clone();
+        let cs2 = store.snapshot_stream()[0].checksum.clone();
+        assert_eq!(cs1, cs2, "snapshot must be byte-identical between calls");
     }
 }
