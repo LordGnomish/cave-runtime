@@ -621,6 +621,205 @@ mod tests {
         assert!(resp.converted_objects.is_empty());
     }
 
+    // ── Webhook HTTP roundtrip (deeper-004) ──────────────────────────────────
+
+    /// Real HTTP-backed implementation of `ConversionWebhookClient`.
+    /// Spawns a blocking `reqwest::blocking` call (test-only) — no async
+    /// surface needed for the WebhookConverter contract. Mirrors upstream
+    /// `apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter.go`
+    /// which posts a `ConversionReview` to a configured URL.
+    struct HttpWebhookClient {
+        endpoint: String,
+        runtime_handle: tokio::runtime::Handle,
+    }
+
+    impl HttpWebhookClient {
+        fn new(endpoint: String, runtime_handle: tokio::runtime::Handle) -> Self {
+            Self { endpoint, runtime_handle }
+        }
+    }
+
+    impl ConversionWebhookClient for HttpWebhookClient {
+        fn convert(&self, req: ConversionRequest) -> ConversionResponse {
+            let endpoint = self.endpoint.clone();
+            let req_clone = req.clone();
+            // Run an async POST inside the supplied tokio runtime.
+            let resp_result: Result<ConversionResponse, String> =
+                self.runtime_handle.block_on(async move {
+                    let client = reqwest::Client::new();
+                    let resp = client.post(&endpoint).json(&req_clone).send().await
+                        .map_err(|e| format!("transport: {}", e))?;
+                    if !resp.status().is_success() {
+                        return Err(format!("non-2xx: {}", resp.status()));
+                    }
+                    resp.json::<ConversionResponse>().await
+                        .map_err(|e| format!("decode: {}", e))
+                });
+            match resp_result {
+                Ok(r) => r,
+                Err(reason) => ConversionResponse {
+                    uid: req.uid,
+                    converted_objects: vec![],
+                    result_status: "Failure".into(),
+                    result_message: reason,
+                },
+            }
+        }
+    }
+
+    async fn spawn_mock_webhook(
+        handler: impl Fn(ConversionRequest) -> ConversionResponse + Send + Sync + 'static,
+    ) -> String {
+        use axum::{routing::post, Router, Json, extract::State};
+        use std::sync::Arc;
+        let state = Arc::new(handler);
+        async fn handle(
+            State(h): State<Arc<dyn Fn(ConversionRequest) -> ConversionResponse + Send + Sync>>,
+            Json(req): Json<ConversionRequest>,
+        ) -> Json<ConversionResponse> {
+            Json((h)(req))
+        }
+        let app: Router = Router::new()
+            .route("/convert", post(handle))
+            .with_state(state as Arc<dyn Fn(ConversionRequest) -> ConversionResponse + Send + Sync>);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            axum::serve(listener, app.into_make_service()).await.unwrap();
+        });
+        format!("http://{}/convert", addr)
+    }
+
+    /// Upstream parity: `TestWebhookConverter_HttpRoundTripPromotesV1Beta1`
+    /// (apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter_test.go
+    /// — POST a ConversionReview, receive Success with promoted apiVersion).
+    #[tokio::test]
+    async fn test_webhook_converter_real_http_roundtrip_promotes_apiversion() {
+        let endpoint = spawn_mock_webhook(|req: ConversionRequest| {
+            let mut converted = vec![];
+            for mut o in req.objects {
+                o.api_version = req.desired_api_version.clone();
+                converted.push(o);
+            }
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: converted,
+                result_status: "Success".into(),
+                result_message: String::new(),
+            }
+        }).await;
+        let handle = tokio::runtime::Handle::current();
+        let wh = WebhookConverter::new("http-webhook",
+            HttpWebhookClient::new(endpoint, handle));
+        let req = ConversionRequest {
+            uid: "u-http".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        // Run the convert call on a blocking task so the inner block_on
+        // can actually execute (current_thread runtime in #[tokio::test]
+        // would otherwise deadlock).
+        let resp = tokio::task::spawn_blocking(move || wh.convert(req))
+            .await.unwrap();
+        assert_eq!(resp.result_status, "Success");
+        assert_eq!(resp.converted_objects.len(), 1);
+        assert_eq!(resp.converted_objects[0].api_version, "v1");
+        assert_eq!(resp.converted_objects[0].tenant_id, "acme",
+            "tenant_id invariant: HTTP roundtrip preserves tenant");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_HttpFailureBubblesUp`
+    /// (webhook_converter_test.go — webhook returning Failure surfaces a
+    /// Failure response without invented objects).
+    #[tokio::test]
+    async fn test_webhook_converter_real_http_failure_status_bubbles_up() {
+        let endpoint = spawn_mock_webhook(|req: ConversionRequest| {
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: vec![],
+                result_status: "Failure".into(),
+                result_message: "schema invalid".into(),
+            }
+        }).await;
+        let handle = tokio::runtime::Handle::current();
+        let wh = WebhookConverter::new("http-webhook",
+            HttpWebhookClient::new(endpoint, handle));
+        let req = ConversionRequest {
+            uid: "u-fail".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        let resp = tokio::task::spawn_blocking(move || wh.convert(req))
+            .await.unwrap();
+        assert_eq!(resp.result_status, "Failure");
+        assert_eq!(resp.result_message, "schema invalid");
+        assert!(resp.converted_objects.is_empty(),
+            "tenant_id invariant: failure path returns no objects, never partial");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_HttpRejectsTenantFlip`
+    /// (cave-apiserver invariant: even a "Success" body that flips
+    /// tenant_id must be demoted to Failure by the converter).
+    #[tokio::test]
+    async fn test_webhook_converter_real_http_demotes_tenant_id_flip() {
+        let endpoint = spawn_mock_webhook(|req: ConversionRequest| {
+            let mut converted = vec![];
+            for mut o in req.objects {
+                o.api_version = req.desired_api_version.clone();
+                o.tenant_id = "attacker".into();
+                converted.push(o);
+            }
+            ConversionResponse {
+                uid: req.uid,
+                converted_objects: converted,
+                result_status: "Success".into(),
+                result_message: String::new(),
+            }
+        }).await;
+        let handle = tokio::runtime::Handle::current();
+        let wh = WebhookConverter::new("http-webhook",
+            HttpWebhookClient::new(endpoint, handle));
+        let req = ConversionRequest {
+            uid: "u-flip".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        let resp = tokio::task::spawn_blocking(move || wh.convert(req))
+            .await.unwrap();
+        assert_eq!(resp.result_status, "Failure",
+            "tenant_id invariant: HTTP success with tenant flip is demoted");
+        assert!(resp.result_message.contains("tenant_id invariant"));
+        assert!(resp.converted_objects.is_empty(),
+            "tenant_id invariant: poisoned body never exposed to caller");
+    }
+
+    /// Upstream parity: `TestWebhookConverter_HttpTransportErrorIsFailure`
+    /// (webhook_converter.go — connection error to a non-listening endpoint
+    /// surfaces as Failure with a transport reason).
+    #[tokio::test]
+    async fn test_webhook_converter_unreachable_endpoint_returns_failure() {
+        // 127.0.0.1:1 is reserved as a closed port by every modern OS.
+        let endpoint = "http://127.0.0.1:1/convert".to_string();
+        let handle = tokio::runtime::Handle::current();
+        let wh = WebhookConverter::new("http-webhook",
+            HttpWebhookClient::new(endpoint, handle));
+        let req = ConversionRequest {
+            uid: "u-unreach".into(),
+            desired_api_version: "v1".into(),
+            objects: vec![obj("Widget", "v1beta1", "acme")],
+        };
+        let resp = tokio::task::spawn_blocking(move || wh.convert(req))
+            .await.unwrap();
+        assert_eq!(resp.result_status, "Failure");
+        assert!(
+            resp.result_message.starts_with("transport:")
+                || resp.result_message.contains("error"),
+            "transport error reason surfaced verbatim: {}", resp.result_message
+        );
+        assert!(resp.converted_objects.is_empty(),
+            "tenant_id invariant: transport failure never invents acme objects");
+    }
+
     /// Upstream parity: `TestConverter_NoRuleMutationOfTenantId`
     /// (built-in converter MUST NOT alter tenant_id even when fields named
     /// like tenant_id appear in the rename map).

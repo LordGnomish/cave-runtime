@@ -138,6 +138,47 @@ local    = "src/selectors.rs"
 upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter.go"
 local    = "src/conversion.rs"
 
+# API Priority and Fairness (KEP-1040)
+[[files]]
+upstream = "staging/src/k8s.io/api/flowcontrol/v1/types.go"
+local    = "src/priority_fairness.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/util/flowcontrol/apf_filter.go"
+local    = "src/priority_fairness.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request_digest.go"
+local    = "src/priority_fairness.rs"
+
+# ValidatingAdmissionPolicy (KEP-3488)
+[[files]]
+upstream = "staging/src/k8s.io/api/admissionregistration/v1/types.go"
+local    = "src/validating_admission_policy.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher.go"
+local    = "src/validating_admission_policy.rs"
+
+# MutatingAdmissionPolicy (KEP-3962)
+[[files]]
+upstream = "staging/src/k8s.io/api/admissionregistration/v1alpha1/types.go"
+local    = "src/mutating_admission_policy.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/mutating/dispatcher.go"
+local    = "src/mutating_admission_policy.rs"
+
+# Beta APIs disabled-by-default (KEP-3136)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/server/options/api_enablement.go"
+local    = "src/beta_apis.rs"
+
+# Storage migration (KEP-3247)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storageversion/manager.go"
+local    = "src/storage_migration.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Core v1 — namespaces
 
