@@ -46,6 +46,15 @@ pub mod node_lease;
 /// propagation across active namespaces.
 pub mod root_ca_publisher;
 
+/// 100-pct sprint M4: ServiceAccount controller + token controller.
+pub mod sa;
+
+/// 100-pct sprint M4: CertificateSigningRequest signer.
+pub mod csr_signer;
+
+/// 100-pct sprint M4: RBAC controllers (ClusterRole aggregation).
+pub mod rbac;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP
