@@ -1,0 +1,1 @@
+{"ts":"2026-04-26T12:36:07Z","worker_id":"qwen-3-coder-next","batch_id":"cave-search-tests","test_delta":32,"commit_sha":"04b0c7b0387bd5a7380ea6acb461ea270e195bd5","model":"qwen3-coder-next:Q4_K_M","crate":"cave-search","eval_seconds":247,"branch":"qwen/tests-cave-search-20260426","merged_to":"main"}
