@@ -40,6 +40,7 @@ pub mod builtin_admission;
 pub mod audit_policy_v2;
 pub mod discovery_v2;
 pub mod conversion_v1;
+pub mod aggregator_v2;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;
