@@ -44,6 +44,7 @@ pub mod aggregator_v2;
 pub mod node_restriction;
 pub mod pod_security;
 pub mod storage_registry;
+pub mod kep_v1_34;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;
