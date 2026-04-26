@@ -72,6 +72,7 @@ pub mod kms_chain;
 pub mod kms_v2;
 pub mod lease_id_gen;
 pub mod maintenance;
+pub mod maintenance_v2;
 pub mod membership_audit;
 pub mod membership_v2;
 pub mod models;
