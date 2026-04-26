@@ -58,6 +58,7 @@
 
 pub mod auth_token;
 pub mod b64;
+pub mod balancer;
 pub mod client;
 pub mod cluster_status;
 pub mod concurrency;
