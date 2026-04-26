@@ -13,8 +13,9 @@
 //! 4. Tear all of the above down on stop.
 
 use crate::error::{CriError, CriResult};
-use crate::models::{PortMapping, Sandbox, SandboxSpec, SandboxState};
+use crate::models::{PortMapping, Sandbox, SandboxSpec, SandboxState, UserNamespaceMode};
 use crate::paths;
+use crate::userns::{UserNamespace, UserNsAllocator};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -97,18 +98,24 @@ impl SandboxNamespaces {
 }
 
 /// Outcome of running a sandbox: the sandbox object plus the per-sandbox
-/// resources (pause container, namespaces, validated port mappings).
+/// resources (pause container, namespaces, validated port mappings,
+/// optional KEP-127 user namespace).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunSandboxResult {
     pub sandbox: Sandbox,
     pub pause: PauseContainer,
     pub namespaces: SandboxNamespaces,
     pub port_mappings: Vec<PortMapping>,
+    pub user_namespace: UserNamespace,
 }
 
-/// Allocate a sandbox: create namespaces, the pause container, and apply
-/// validated port mappings.
-pub fn run_pod_sandbox(spec: SandboxSpec) -> CriResult<RunSandboxResult> {
+/// Allocate a sandbox: create namespaces, the pause container, apply
+/// validated port mappings, and (optionally) reserve a KEP-127 user
+/// namespace from `userns_allocator`.
+pub fn run_pod_sandbox(
+    spec: SandboxSpec,
+    userns_allocator: Option<&UserNsAllocator>,
+) -> CriResult<RunSandboxResult> {
     let sandbox_id = Uuid::new_v4();
 
     // Validate port mappings before doing any side effects.
@@ -118,6 +125,18 @@ pub fn run_pod_sandbox(spec: SandboxSpec) -> CriResult<RunSandboxResult> {
 
     let namespaces = SandboxNamespaces::for_sandbox(sandbox_id);
     namespaces.create()?;
+
+    let user_namespace = match (spec.user_namespace_mode.clone(), userns_allocator) {
+        (UserNamespaceMode::Pod, Some(alloc)) => alloc
+            .allocate_namespace()
+            .map_err(CriError::Sandbox)?,
+        (UserNamespaceMode::Pod, None) => {
+            return Err(CriError::Sandbox(
+                "user_namespace_mode=Pod but no UserNsAllocator configured".into(),
+            ));
+        }
+        (UserNamespaceMode::Host, _) => UserNamespace::host_passthrough(),
+    };
 
     let pause = PauseContainer::new(sandbox_id);
     let sandbox = Sandbox {
@@ -135,6 +154,7 @@ pub fn run_pod_sandbox(spec: SandboxSpec) -> CriResult<RunSandboxResult> {
         pause,
         namespaces,
         port_mappings: spec.port_mappings,
+        user_namespace,
     })
 }
 
@@ -219,6 +239,7 @@ mod tests {
             log_directory: None,
             cgroup_parent: None,
             runtime_handler: None,
+            user_namespace_mode: crate::models::UserNamespaceMode::Host,
         }
     }
 
@@ -278,7 +299,7 @@ mod tests {
     #[test]
     fn run_pod_sandbox_marks_ready_and_allocates_ip() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p1", vec![])).unwrap();
+        let r = run_pod_sandbox(spec("p1", vec![]), None).unwrap();
         assert_eq!(r.sandbox.state, SandboxState::Ready);
         assert!(r.sandbox.network_ip.as_deref().unwrap().starts_with("10.244."));
     }
@@ -286,7 +307,7 @@ mod tests {
     #[test]
     fn run_pod_sandbox_creates_namespace_files() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p2", vec![])).unwrap();
+        let r = run_pod_sandbox(spec("p2", vec![]), None).unwrap();
         assert!(r.namespaces.network.exists());
         assert!(r.namespaces.ipc.exists());
     }
@@ -294,7 +315,7 @@ mod tests {
     #[test]
     fn run_pod_sandbox_assigns_pause_container() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p3", vec![])).unwrap();
+        let r = run_pod_sandbox(spec("p3", vec![]), None).unwrap();
         assert_eq!(r.pause.sandbox_id, r.sandbox.id);
         assert_eq!(r.pause.image, DEFAULT_PAUSE_IMAGE);
     }
@@ -302,34 +323,34 @@ mod tests {
     #[test]
     fn run_pod_sandbox_keeps_port_mappings() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p4", vec![pm(8080, 80, "TCP")])).unwrap();
+        let r = run_pod_sandbox(spec("p4", vec![pm(8080, 80, "TCP")]), None).unwrap();
         assert_eq!(r.port_mappings.len(), 1);
         assert_eq!(r.port_mappings[0].host_port, 8080);
     }
 
     #[test]
     fn run_pod_sandbox_rejects_invalid_port() {
-        let r = run_pod_sandbox(spec("p5", vec![pm(8080, 0, "TCP")]));
+        let r = run_pod_sandbox(spec("p5", vec![pm(8080, 0, "TCP")]), None);
         assert!(r.is_err());
     }
 
     #[test]
     fn run_pod_sandbox_rejects_unsupported_proto() {
-        let r = run_pod_sandbox(spec("p6", vec![pm(8080, 80, "ICMP")]));
+        let r = run_pod_sandbox(spec("p6", vec![pm(8080, 80, "ICMP")]), None);
         assert!(r.is_err());
     }
 
     #[test]
     fn run_pod_sandbox_accepts_udp() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p7", vec![pm(53, 53, "UDP")])).unwrap();
+        let r = run_pod_sandbox(spec("p7", vec![pm(53, 53, "UDP")]), None).unwrap();
         assert_eq!(r.port_mappings[0].protocol, "UDP");
     }
 
     #[test]
     fn run_pod_sandbox_accepts_sctp() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("p8", vec![pm(36412, 36412, "SCTP")])).unwrap();
+        let r = run_pod_sandbox(spec("p8", vec![pm(36412, 36412, "SCTP")]), None).unwrap();
         assert_eq!(r.port_mappings[0].protocol, "SCTP");
     }
 
@@ -338,7 +359,7 @@ mod tests {
     #[test]
     fn stop_pod_sandbox_removes_namespace_files() {
         ensure_test_root();
-        let r = run_pod_sandbox(spec("stop", vec![])).unwrap();
+        let r = run_pod_sandbox(spec("stop", vec![]), None).unwrap();
         let ns_path = r.namespaces.network.clone();
         assert!(ns_path.exists());
         stop_pod_sandbox(r.sandbox.id).unwrap();

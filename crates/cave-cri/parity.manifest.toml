@@ -128,6 +128,10 @@ local    = "src/pull_progress.rs"
 upstream = "images/converter/multi-arch.go"
 local    = "src/manifest_list.rs"
 
+[[files]]
+upstream = "pkg/cri/server/podsandbox/userns_linux.go"
+local    = "src/userns.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -876,3 +880,81 @@ local_path    = "/api/cri/images/pulls/{id}"
 kind          = "http"
 upstream_path = "ImageService.PullProgress.Events"
 local_path    = "/api/cri/images/pulls/{id}/events"
+
+# UserNS / KEP-127
+
+[[functions]]
+upstream_name = "AllocateUserNs"
+local_name    = "allocate_namespace"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "RenderProcUidMap"
+local_name    = "render_uid_map_file"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "ParseSubidFile"
+local_name    = "parse_subid_file"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "TranslateUidToHost"
+local_name    = "translate_to_host"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "TranslateUidToContainer"
+local_name    = "translate_to_container"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "HostUserNamespace"
+local_name    = "host_passthrough"
+file          = "src/userns.rs"
+
+[[tests]]
+upstream_test = "TestUserNSIdMappingTranslatesBothDirections"
+local_test    = "test_userns_id_mapping_translates_both_directions"
+
+[[tests]]
+upstream_test = "TestUserNSRenderProcUidMap"
+local_test    = "test_userns_render_proc_uid_map"
+
+[[tests]]
+upstream_test = "TestUserNSHostPassthroughIsIdentity"
+local_test    = "test_userns_host_passthrough_is_identity"
+
+[[tests]]
+upstream_test = "TestUserNSAllocatorUniqueRanges"
+local_test    = "test_userns_allocator_unique_ranges"
+
+[[tests]]
+upstream_test = "TestUserNSAllocatorReleaseAndReuse"
+local_test    = "test_userns_allocator_release_and_reuse"
+
+[[tests]]
+upstream_test = "TestUserNSParseSubidFile"
+local_test    = "test_userns_parse_subid_file"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSPodUsesAllocator"
+local_test    = "test_run_pod_sandbox_userns_pod_uses_allocator"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSPodWithoutAllocatorErrors"
+local_test    = "test_run_pod_sandbox_userns_pod_without_allocator_errors"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSHostDoesNotConsumeAllocator"
+local_test    = "test_run_pod_sandbox_userns_host_does_not_consume_allocator"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.UserNamespaceAllocate"
+local_path    = "/api/cri/userns/allocate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.UserNamespaceAllocated"
+local_path    = "/api/cri/userns/allocated"

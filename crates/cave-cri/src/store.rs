@@ -206,6 +206,7 @@ mod tests {
                 log_directory: None,
                 cgroup_parent: None,
                 runtime_handler: None,
+                user_namespace_mode: crate::models::UserNamespaceMode::Host,
             },
             state: SandboxState::Ready,
             created_at: Utc::now(),

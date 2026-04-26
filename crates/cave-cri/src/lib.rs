@@ -82,6 +82,7 @@ pub mod sandbox;
 pub mod stats;
 pub mod streaming;
 pub mod transport;
+pub mod userns;
 
 #[cfg(test)]
 mod upstream_tests;
@@ -107,6 +108,7 @@ pub fn new_state() -> Arc<CriState> {
         runtime_handlers: runtime_handler::RuntimeHandlerRegistry::with_defaults(),
         credentials: auth::CredentialStore::new(),
         pull_progress: pull_progress::PullProgressTracker::new(),
+        userns_allocator: userns::UserNsAllocator::defaults(),
     })
 }
 
