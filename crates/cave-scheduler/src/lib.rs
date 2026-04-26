@@ -21,6 +21,7 @@ pub mod profiles;
 pub mod routes;
 pub mod scheduler;
 pub mod topology;
+pub mod volume;
 
 use scheduler::SchedulerState;
 use std::sync::Arc;
