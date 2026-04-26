@@ -253,7 +253,7 @@ pub struct LeaseLeasesResponse {
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PermType {
     Read,
     Write,
