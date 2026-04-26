@@ -1,7 +1,8 @@
 # parity.manifest.toml — cave-net
 # Upstream: cilium/cilium  https://github.com/cilium/cilium
-# Tracks the Cilium identity model, L7 policy enforcement, ClusterMesh,
-# Hubble observability, and the L7 envoy proxy redirect surface.
+# Cilium-parity port — control plane + policy + LB + IPAM + ClusterMesh +
+# Hubble + Envoy redirect + WireGuard/IPsec + BPF map model. Datapath is
+# modelled in pure Rust; behavioural parity, no real eBPF.
 
 [upstream]
 org     = "cilium"
@@ -10,13 +11,21 @@ version = "v1.19.3"
 
 [module]
 name        = "cave-net"
-description = "eBPF pod networking + Cilium-parity identity / L7 policy / ClusterMesh / Hubble / L7 proxy"
+description = "eBPF-style pod networking — Cilium parity port (CNI, policy, LB, IPAM, ClusterMesh, Hubble, encryption)"
 source_root = "src"
 
-# ── Cilium-parity file mappings (this batch) ─────────────────────────────────
+# ── Cilium-parity file mappings ──────────────────────────────────────────────
 [[files]]
 upstream = "pkg/identity/cache/local.go"
 local    = "src/cilium/identity.rs"
+
+[[files]]
+upstream = "pkg/identity/numericidentity.go"
+local    = "src/cilium/identity_ext.rs"
+
+[[files]]
+upstream = "pkg/policy/api/rule.go"
+local    = "src/cilium/policy.rs"
 
 [[files]]
 upstream = "pkg/policy/api/l7.go"
@@ -33,3 +42,55 @@ local    = "src/cilium/hubble.rs"
 [[files]]
 upstream = "pkg/proxy/proxy.go"
 local    = "src/cilium/l7proxy.rs"
+
+[[files]]
+upstream = "bpf/lib/conntrack.h"
+local    = "src/cilium/conntrack.rs"
+
+[[files]]
+upstream = "pkg/datapath/linux/nat/nat.go"
+local    = "src/cilium/nat.rs"
+
+[[files]]
+upstream = "pkg/loadbalancer/loadbalancer.go"
+local    = "src/cilium/lb.rs"
+
+[[files]]
+upstream = "pkg/maglev/maglev.go"
+local    = "src/cilium/maglev.rs"
+
+[[files]]
+upstream = "pkg/service/service.go"
+local    = "src/cilium/services.rs"
+
+[[files]]
+upstream = "pkg/ipam/ipam.go"
+local    = "src/cilium/ipam.rs"
+
+[[files]]
+upstream = "pkg/egressgateway/manager.go"
+local    = "src/cilium/egress.rs"
+
+[[files]]
+upstream = "pkg/ingress/ingress.go"
+local    = "src/cilium/ingress.rs"
+
+[[files]]
+upstream = "pkg/wireguard/agent.go"
+local    = "src/cilium/wireguard.rs"
+
+[[files]]
+upstream = "pkg/ipsec/ipsec_linux.go"
+local    = "src/cilium/ipsec.rs"
+
+[[files]]
+upstream = "pkg/datapath/maps/maps.go"
+local    = "src/cilium/bpfmaps.rs"
+
+[[files]]
+upstream = "pkg/endpoint/endpoint.go"
+local    = "src/cilium/endpoint.rs"
+
+[[files]]
+upstream = "pkg/fqdn/fqdn.go"
+local    = "src/cilium/fqdn.rs"
