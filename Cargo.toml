@@ -123,6 +123,8 @@ members = [
     "crates/cave-cloud-controller-manager",
     # === Search Engine ===
     "crates/cave-search",
+    # === Serverless (Knative) ===
+    "crates/cave-knative",
 ]
 
 [workspace.package]
