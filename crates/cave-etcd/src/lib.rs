@@ -59,6 +59,7 @@
 pub mod auth_token;
 pub mod b64;
 pub mod client;
+pub mod cluster_status;
 pub mod concurrency;
 pub mod error;
 pub mod grpc_api;
