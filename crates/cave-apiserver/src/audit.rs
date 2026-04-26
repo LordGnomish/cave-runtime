@@ -51,6 +51,12 @@ pub struct AuditEvent {
     pub response_code: u16,
     pub request_object: Option<serde_json::Value>,
     pub response_object: Option<serde_json::Value>,
+    /// Subresource (e.g. "status", "scale", "exec"); empty for the main
+    /// resource. Mirrors `audit.Event.RequestObject.Subresource`.
+    pub subresource: String,
+    /// Structured annotations attached by admission/auth chains.
+    /// Mirrors `audit.Event.Annotations` from KEP-1314.
+    pub annotations: std::collections::BTreeMap<String, String>,
 }
 
 impl AuditEvent {
@@ -82,7 +88,26 @@ impl AuditEvent {
             response_code,
             request_object: None,
             response_object: None,
+            subresource: String::new(),
+            annotations: std::collections::BTreeMap::new(),
         }
+    }
+
+    /// Convenience builder: tag a subresource path segment.
+    pub fn with_subresource(mut self, sub: impl Into<String>) -> Self {
+        self.subresource = sub.into();
+        self
+    }
+
+    /// Convenience builder: attach an audit annotation. Mirrors
+    /// `audit.Event.Annotations` map updates from upstream filters.
+    pub fn with_annotation(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.annotations.insert(key.into(), value.into());
+        self
     }
 
     /// Apply level-based redaction. Mirrors upstream `event.LogRequestObject`
@@ -129,16 +154,86 @@ impl AuditPolicy {
     }
 }
 
+/// Filter chain — composes a sequence of stage/level decisions atop a
+/// policy. Each filter inspects the (stage, event-shape) pair and returns
+/// `true` to keep, `false` to drop. Mirrors upstream
+/// `apiserver/pkg/audit/policy/checker.go::Checker` rule chaining.
+pub trait AuditFilter: Send + Sync {
+    fn name(&self) -> &str;
+    fn keep(&self, ev: &AuditEvent) -> bool;
+}
+
+pub struct AuditFilterChain {
+    filters: Vec<std::sync::Arc<dyn AuditFilter>>,
+}
+
+impl AuditFilterChain {
+    pub fn new() -> Self { Self { filters: vec![] } }
+
+    pub fn with(mut self, f: std::sync::Arc<dyn AuditFilter>) -> Self {
+        self.filters.push(f);
+        self
+    }
+
+    pub fn keep(&self, ev: &AuditEvent) -> bool {
+        self.filters.iter().all(|f| f.keep(ev))
+    }
+
+    pub fn len(&self) -> usize { self.filters.len() }
+    pub fn is_empty(&self) -> bool { self.filters.is_empty() }
+}
+
+impl Default for AuditFilterChain {
+    fn default() -> Self { Self::new() }
+}
+
+/// Built-in filter — drop events whose stage is in the supplied set.
+pub struct DropStageFilter {
+    pub stages: Vec<AuditStage>,
+}
+
+impl AuditFilter for DropStageFilter {
+    fn name(&self) -> &str { "drop-stage" }
+    fn keep(&self, ev: &AuditEvent) -> bool {
+        !self.stages.contains(&ev.stage)
+    }
+}
+
+/// Built-in filter — drop events whose verb is in the supplied set.
+/// Mirrors upstream `policy.PolicyRule.Verbs` exclude semantics.
+pub struct DropVerbFilter {
+    pub verbs: Vec<String>,
+}
+
+impl AuditFilter for DropVerbFilter {
+    fn name(&self) -> &str { "drop-verb" }
+    fn keep(&self, ev: &AuditEvent) -> bool {
+        !self.verbs.iter().any(|v| v == &ev.verb)
+    }
+}
+
 pub struct AuditLogger {
     capacity: usize,
     policy: AuditPolicy,
     sink: Mutex<VecDeque<AuditEvent>>,
+    filter_chain: AuditFilterChain,
 }
 
 impl AuditLogger {
     pub fn new(capacity: usize, policy: AuditPolicy) -> Self {
         assert!(capacity > 0);
-        Self { capacity, policy, sink: Mutex::new(VecDeque::with_capacity(capacity)) }
+        Self {
+            capacity, policy,
+            sink: Mutex::new(VecDeque::with_capacity(capacity)),
+            filter_chain: AuditFilterChain::new(),
+        }
+    }
+
+    /// Replace the filter chain. Mirrors `Backend.Run`-time chain config in
+    /// upstream `apiserver/pkg/audit`.
+    pub fn with_filter_chain(mut self, chain: AuditFilterChain) -> Self {
+        self.filter_chain = chain;
+        self
     }
 
     pub fn emit(&self, mut ev: AuditEvent) -> bool {
@@ -151,6 +246,11 @@ impl AuditLogger {
         // Apply default level if event came in unset (Level::None placeholder).
         if ev.level == AuditLevel::None {
             ev.level = self.policy.default_level;
+        }
+        // Filter chain runs after stage/level promotion so filters can
+        // reason about the final event shape.
+        if !self.filter_chain.keep(&ev) {
+            return false;
         }
         ev.redact_for_level();
         let mut sink = self.sink.lock().unwrap();
@@ -401,5 +501,113 @@ mod tests {
         logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         assert_eq!(logger.events()[0].tenant_id, "acme",
             "tenant_id invariant on filtered emission");
+    }
+
+    // ── Deeper coverage (deeper-004) — KEP-1314 ──────────────────────────────
+
+    /// Upstream parity: `TestStructuredAudit_AnnotationsAreCarried`
+    /// (apiserver/pkg/audit/event_test.go::TestEventBuilder — annotations
+    /// added via `audit.Annotate` are present on the emitted event).
+    #[test]
+    fn test_structured_audit_annotations_round_trip_through_emit() {
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
+        let e = ev(AuditStage::ResponseComplete, "acme", "alice", 200)
+            .with_annotation("authorization.k8s.io/decision", "allow")
+            .with_annotation("admission.cave.io/mutator", "tenant-id-injector");
+        assert!(logger.emit(e));
+        let stored = &logger.events()[0];
+        assert_eq!(stored.annotations.get("authorization.k8s.io/decision"),
+            Some(&"allow".to_string()));
+        assert_eq!(stored.annotations.get("admission.cave.io/mutator"),
+            Some(&"tenant-id-injector".to_string()));
+        assert_eq!(stored.tenant_id, "acme",
+            "tenant_id invariant: annotations never displace tenant_id");
+    }
+
+    /// Upstream parity: `TestStructuredAudit_SubresourceCarriedInEvent`
+    /// (apiserver/pkg/audit/event_test.go — `pods/exec` produces an event
+    /// with `subresource: "exec"`).
+    #[test]
+    fn test_structured_audit_records_subresource_path_segment() {
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
+        let e = ev(AuditStage::ResponseComplete, "acme", "alice", 200)
+            .with_subresource("exec");
+        assert!(logger.emit(e));
+        let stored = &logger.events()[0];
+        assert_eq!(stored.subresource, "exec");
+        assert_eq!(stored.tenant_id, "acme",
+            "tenant_id invariant: subresource never replaces tenant scoping");
+    }
+
+    /// Upstream parity: `TestPolicyChecker_DropStageFilter`
+    /// (apiserver/pkg/audit/policy/checker_test.go — chained DropStage filter
+    /// removes events at the listed stage even when policy default would
+    /// record them).
+    #[test]
+    fn test_filter_chain_drops_events_for_stage_in_drop_filter() {
+        let chain = AuditFilterChain::new()
+            .with(std::sync::Arc::new(DropStageFilter {
+                stages: vec![AuditStage::RequestReceived],
+            }));
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
+            .with_filter_chain(chain);
+        // RequestReceived dropped by filter, even though policy would record.
+        let dropped = !logger.emit(ev(AuditStage::RequestReceived, "acme", "alice", 0));
+        let kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        assert!(dropped, "filter chain drops RequestReceived");
+        assert!(kept, "filter chain preserves ResponseComplete");
+        assert_eq!(logger.len(), 1);
+        assert_eq!(logger.events()[0].tenant_id, "acme",
+            "tenant_id invariant: surviving event still scoped to acme");
+    }
+
+    /// Upstream parity: `TestPolicyChecker_VerbFilter`
+    /// (checker_test.go — verb-based filter drops e.g. `watch` events to
+    /// keep audit volume manageable).
+    #[test]
+    fn test_filter_chain_drops_events_for_excluded_verb() {
+        let chain = AuditFilterChain::new()
+            .with(std::sync::Arc::new(DropVerbFilter {
+                verbs: vec!["watch".into()],
+            }));
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
+            .with_filter_chain(chain);
+        let mut watch_ev = ev(AuditStage::ResponseComplete, "acme", "alice", 200);
+        watch_ev.verb = "watch".into();
+        let kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "bob", 200));
+        let dropped = !logger.emit(watch_ev);
+        assert!(kept);
+        assert!(dropped, "verb filter drops watch even at ResponseComplete stage");
+        assert_eq!(logger.len(), 1);
+        assert_eq!(logger.events()[0].verb, "create");
+        assert!(logger.events().iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: verb filter never crosses tenants");
+    }
+
+    /// Upstream parity: `TestPolicyChecker_ChainConjunction`
+    /// (checker_test.go — every filter in the chain must agree to keep).
+    #[test]
+    fn test_filter_chain_is_an_and_conjunction_of_keep_decisions() {
+        let chain = AuditFilterChain::new()
+            .with(std::sync::Arc::new(DropStageFilter {
+                stages: vec![AuditStage::Panic],
+            }))
+            .with(std::sync::Arc::new(DropVerbFilter {
+                verbs: vec!["delete".into()],
+            }));
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata))
+            .with_filter_chain(chain);
+        let panic_ev = ev(AuditStage::Panic, "acme", "alice", 500);
+        let mut delete_ev = ev(AuditStage::ResponseComplete, "acme", "alice", 200);
+        delete_ev.verb = "delete".into();
+        let panic_kept = logger.emit(panic_ev);
+        let delete_kept = logger.emit(delete_ev);
+        let normal_kept = logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        assert!(!panic_kept, "Panic stage is dropped by stage filter");
+        assert!(!delete_kept, "delete verb is dropped by verb filter");
+        assert!(normal_kept);
+        assert_eq!(logger.len(), 1);
+        // tenant_id invariant smoke: surviving event still acme.
+        assert_eq!(logger.events()[0].tenant_id, "acme");
     }
 }

@@ -31,6 +31,11 @@ pub mod discovery;
 pub mod crd_controller;
 pub mod storage_version;
 pub mod selectors;
+pub mod priority_fairness;
+pub mod validating_admission_policy;
+pub mod mutating_admission_policy;
+pub mod beta_apis;
+pub mod storage_migration;
 
 use store::ResourceStore;
 use std::sync::Arc;
