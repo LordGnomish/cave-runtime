@@ -179,6 +179,56 @@ local    = "src/beta_apis.rs"
 upstream = "staging/src/k8s.io/apiserver/pkg/storageversion/manager.go"
 local    = "src/storage_migration.rs"
 
+# Service Account Token (TokenRequest API + KEP-1205 + KEP-2799)
+[[files]]
+upstream = "staging/src/k8s.io/api/authentication/v1/types.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/serviceaccount/jwt.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/serviceaccount/claims.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/registry/core/serviceaccount/storage/token.go"
+local    = "src/service_account_token.rs"
+
+# Encryption-at-rest provider (etcd KMS)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes.go"
+local    = "src/encryption_provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/envelope.go"
+local    = "src/encryption_provider.rs"
+
+# Audit log WORM streaming (chain-of-custody)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/audit/audit.go"
+local    = "src/audit_worm.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/plugin/pkg/audit/log/backend.go"
+local    = "src/audit_worm.rs"
+
+# Field-level RBAC (KEP-3633)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher.go"
+local    = "src/field_rbac.rs"
+
+# OpenAPI v3 generation (kube-openapi builder3)
+[[files]]
+upstream = "staging/src/k8s.io/kube-openapi/pkg/builder3/openapi.go"
+local    = "src/discovery.rs"
+
+# Discovery v2 group listing
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/group.go"
+local    = "src/discovery.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Core v1 — namespaces
 

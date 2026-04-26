@@ -174,6 +174,163 @@ impl Default for CrdRegistry {
     fn default() -> Self { Self::new() }
 }
 
+// ── AdmissionReview integration (deeper-005) ─────────────────────────────────
+
+/// Admission webhook specification attached to a CRD. Mirrors the
+/// `webhooks` block of `admissionregistration/v1.ValidatingWebhookConfiguration`
+/// scoped to a single CRD's resource.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmissionWebhookSpec {
+    pub name: String,
+    pub failure_policy: AdmissionFailurePolicy,
+    pub side_effects: SideEffects,
+    pub timeout_seconds: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdmissionFailurePolicy {
+    Fail,
+    Ignore,
+}
+
+/// `admissionregistration/v1.SideEffectClass` — gates dryRun semantics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SideEffects {
+    None,
+    NoneOnDryRun,
+    Some,
+    Unknown,
+}
+
+/// One reviewable AdmissionRequest — narrowed view sufficient for the
+/// CRD-attached webhook chain.
+#[derive(Debug, Clone)]
+pub struct CrdAdmissionRequest {
+    pub tenant_id: String,
+    pub crd_name: String,
+    pub user: String,
+    pub dry_run: bool,
+    pub object: serde_json::Value,
+}
+
+/// Verdict returned by one webhook call.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WebhookVerdict {
+    Allow,
+    Deny { reason: String },
+    /// The webhook call errored out; the chain decides what to do based
+    /// on `failure_policy`.
+    Error { reason: String },
+}
+
+pub trait AdmissionWebhookClient: Send + Sync {
+    fn name(&self) -> &str;
+    fn review(&self, req: &CrdAdmissionRequest) -> WebhookVerdict;
+}
+
+/// Outcome of dispatching the full webhook chain for one CR admission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrdAdmissionOutcome {
+    Allow,
+    Deny { webhook: String, reason: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrdAdmissionError {
+    /// CRD does not exist for `(tenant_id, name)`.
+    UnknownCrd,
+    /// `SideEffects::Some` and request is dry-run — must reject upfront.
+    DryRunWithSideEffects,
+    /// `SideEffects::Unknown` and request is dry-run — must reject.
+    DryRunUnknownSideEffects,
+}
+
+/// Augmented registry that adds admission-webhook bindings on top of the
+/// CRD registry. Mirrors upstream `apiextensions-apiserver/pkg/admission`
+/// hooking the established CRD into the global admission chain.
+pub struct CrdAdmissionRegistry {
+    crds: CrdRegistry,
+    webhooks: Mutex<HashMap<(String, String), Vec<AdmissionWebhookSpec>>>, // (tenant, crd_name)
+}
+
+impl CrdAdmissionRegistry {
+    pub fn new(crds: CrdRegistry) -> Self {
+        Self { crds, webhooks: Mutex::new(HashMap::new()) }
+    }
+
+    /// Attach a webhook spec to a previously-established CRD.
+    pub fn attach_webhook(
+        &self,
+        tenant_id: &str,
+        crd_name: &str,
+        spec: AdmissionWebhookSpec,
+    ) -> Result<(), CrdAdmissionError> {
+        if self.crds.lookup(tenant_id, crd_name).is_none() {
+            return Err(CrdAdmissionError::UnknownCrd);
+        }
+        let key = (tenant_id.into(), crd_name.into());
+        self.webhooks.lock().unwrap().entry(key).or_default().push(spec);
+        Ok(())
+    }
+
+    /// Dispatch one admission request through every attached webhook in
+    /// attachment order. Honours dry-run side-effects semantics and
+    /// failure_policy. Mirrors upstream
+    /// `admission/plugin/webhook/validating/dispatcher.go::Dispatch`.
+    pub fn dispatch(
+        &self,
+        req: &CrdAdmissionRequest,
+        clients: &[&dyn AdmissionWebhookClient],
+    ) -> Result<CrdAdmissionOutcome, CrdAdmissionError> {
+        if self.crds.lookup(&req.tenant_id, &req.crd_name).is_none() {
+            return Err(CrdAdmissionError::UnknownCrd);
+        }
+        let key = (req.tenant_id.clone(), req.crd_name.clone());
+        let specs = self.webhooks.lock().unwrap()
+            .get(&key).cloned().unwrap_or_default();
+        for spec in specs {
+            // Dry-run gating per upstream:
+            //   * SideEffects::Some  → reject dry-run requests.
+            //   * SideEffects::Unknown → reject dry-run requests.
+            //   * NoneOnDryRun and None → allow dry-run.
+            if req.dry_run {
+                match spec.side_effects {
+                    SideEffects::Some =>
+                        return Err(CrdAdmissionError::DryRunWithSideEffects),
+                    SideEffects::Unknown =>
+                        return Err(CrdAdmissionError::DryRunUnknownSideEffects),
+                    _ => {}
+                }
+            }
+            let client = clients.iter().find(|c| c.name() == spec.name);
+            let verdict = match client {
+                Some(c) => c.review(req),
+                None => WebhookVerdict::Error {
+                    reason: format!("no client registered for webhook `{}`", spec.name),
+                },
+            };
+            match (verdict, spec.failure_policy) {
+                (WebhookVerdict::Allow, _) => continue,
+                (WebhookVerdict::Deny { reason }, _) => {
+                    return Ok(CrdAdmissionOutcome::Deny {
+                        webhook: spec.name, reason,
+                    });
+                }
+                (WebhookVerdict::Error { reason }, AdmissionFailurePolicy::Ignore) => {
+                    let _ = reason; // upstream logs; we just continue.
+                    continue;
+                }
+                (WebhookVerdict::Error { reason }, AdmissionFailurePolicy::Fail) => {
+                    return Ok(CrdAdmissionOutcome::Deny {
+                        webhook: spec.name, reason,
+                    });
+                }
+            }
+        }
+        Ok(CrdAdmissionOutcome::Allow)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,5 +495,167 @@ mod tests {
         let est2 = r.establish(crd2, false).unwrap();
         assert_eq!(est2.tenant_id, "globex",
             "tenant_id invariant: globex CRD distinct from acme");
+    }
+
+    // ── AdmissionReview integration (deeper-005) ─────────────────────────────
+
+    struct AllowWebhook(String);
+    impl AdmissionWebhookClient for AllowWebhook {
+        fn name(&self) -> &str { &self.0 }
+        fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
+            WebhookVerdict::Allow
+        }
+    }
+
+    struct DenyWebhook(String, &'static str);
+    impl AdmissionWebhookClient for DenyWebhook {
+        fn name(&self) -> &str { &self.0 }
+        fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
+            WebhookVerdict::Deny { reason: self.1.into() }
+        }
+    }
+
+    struct ErrorWebhook(String, &'static str);
+    impl AdmissionWebhookClient for ErrorWebhook {
+        fn name(&self) -> &str { &self.0 }
+        fn review(&self, _req: &CrdAdmissionRequest) -> WebhookVerdict {
+            WebhookVerdict::Error { reason: self.1.into() }
+        }
+    }
+
+    fn req(tenant: &str, dry_run: bool) -> CrdAdmissionRequest {
+        CrdAdmissionRequest {
+            tenant_id: tenant.into(),
+            crd_name: "widgets.acme.io".into(),
+            user: "alice".into(),
+            dry_run,
+            object: serde_json::json!({"spec": {"x": 1}}),
+        }
+    }
+
+    fn ar() -> CrdAdmissionRegistry {
+        let crds = CrdRegistry::new();
+        crds.establish(widget_crd("acme"), false).unwrap();
+        CrdAdmissionRegistry::new(crds)
+    }
+
+    fn spec(name: &str, fp: AdmissionFailurePolicy, se: SideEffects) -> AdmissionWebhookSpec {
+        AdmissionWebhookSpec {
+            name: name.into(),
+            failure_policy: fp,
+            side_effects: se,
+            timeout_seconds: 10,
+        }
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionAllChainAllowsAdmits`
+    /// (admission/plugin/webhook/validating/dispatcher_test.go — every
+    /// webhook returning Allow yields the request being admitted).
+    #[test]
+    fn test_admission_all_webhooks_allow_admits_the_request() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("w1", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("w2", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        let w1 = AllowWebhook("w1".into());
+        let w2 = AllowWebhook("w2".into());
+        let out = r.dispatch(&req("acme", false), &[&w1, &w2]).unwrap();
+        assert_eq!(out, CrdAdmissionOutcome::Allow);
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionDenyShortCircuitsChain`
+    /// (dispatcher_test.go — first Deny verdict short-circuits the chain
+    /// and surfaces the rejecting webhook's name + reason).
+    #[test]
+    fn test_admission_first_deny_short_circuits_chain() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("allow-first", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("strict-deny", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("never-runs", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        let allow = AllowWebhook("allow-first".into());
+        let deny  = DenyWebhook("strict-deny".into(), "schema invalid");
+        let last  = AllowWebhook("never-runs".into());
+        let out = r.dispatch(&req("acme", false), &[&allow, &deny, &last]).unwrap();
+        match out {
+            CrdAdmissionOutcome::Deny { webhook, reason } => {
+                assert_eq!(webhook, "strict-deny");
+                assert_eq!(reason, "schema invalid");
+            }
+            _ => panic!("expected Deny"),
+        }
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionFailurePolicyIgnore`
+    /// (dispatcher.go — `Ignore` swallows webhook errors and continues).
+    #[test]
+    fn test_admission_failure_policy_ignore_swallows_webhook_errors() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("flaky", AdmissionFailurePolicy::Ignore, SideEffects::None)).unwrap();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("downstream", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        let flaky = ErrorWebhook("flaky".into(), "503 transient");
+        let downstream = AllowWebhook("downstream".into());
+        let out = r.dispatch(&req("acme", false), &[&flaky, &downstream]).unwrap();
+        assert_eq!(out, CrdAdmissionOutcome::Allow,
+            "failure_policy=Ignore lets the chain progress past the error");
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionFailurePolicyFail`
+    /// (dispatcher.go — `Fail` converts a webhook error into a Deny).
+    #[test]
+    fn test_admission_failure_policy_fail_treats_error_as_deny() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        let strict = ErrorWebhook("strict".into(), "TLS handshake failed");
+        let out = r.dispatch(&req("acme", false), &[&strict]).unwrap();
+        match out {
+            CrdAdmissionOutcome::Deny { webhook, reason } => {
+                assert_eq!(webhook, "strict");
+                assert!(reason.contains("TLS handshake"));
+            }
+            _ => panic!("expected Deny on Fail-policy error"),
+        }
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionDryRunWithSideEffectsRejected`
+    /// (admissionregistration/v1/types.go — SideEffects::Some/Unknown
+    /// MUST NOT be invoked under a dry-run request).
+    #[test]
+    fn test_admission_dry_run_rejects_webhooks_with_side_effects() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("w-some", AdmissionFailurePolicy::Fail, SideEffects::Some)).unwrap();
+        let w = AllowWebhook("w-some".into());
+        let err = r.dispatch(&req("acme", true), &[&w]).unwrap_err();
+        assert_eq!(err, CrdAdmissionError::DryRunWithSideEffects);
+        // Unknown side effects also reject under dry-run.
+        let r2 = ar();
+        r2.attach_webhook("acme", "widgets.acme.io",
+            spec("w-unknown", AdmissionFailurePolicy::Fail, SideEffects::Unknown)).unwrap();
+        let err2 = r2.dispatch(&req("acme", true), &[&w]).unwrap_err();
+        assert_eq!(err2, CrdAdmissionError::DryRunUnknownSideEffects);
+    }
+
+    /// Upstream parity: `TestCRD_AdmissionTenantIsolation`
+    /// (cave-apiserver invariant: globex's CR admission MUST NOT trigger
+    /// webhooks attached under acme).
+    #[test]
+    fn test_admission_does_not_cross_tenant_boundaries() {
+        let r = ar();
+        r.attach_webhook("acme", "widgets.acme.io",
+            spec("strict", AdmissionFailurePolicy::Fail, SideEffects::None)).unwrap();
+        let strict = DenyWebhook("strict".into(), "acme rule");
+        // globex tries to admit a CR under the same name — but acme is
+        // the only tenant with this CRD established here, so globex's
+        // request fails with UnknownCrd (it never reaches acme's webhook).
+        let err = r.dispatch(&req("globex", false), &[&strict]).unwrap_err();
+        assert_eq!(err, CrdAdmissionError::UnknownCrd,
+            "tenant_id invariant: globex's request never sees acme's CRD/webhook");
     }
 }

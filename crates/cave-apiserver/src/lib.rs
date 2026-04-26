@@ -36,6 +36,10 @@ pub mod validating_admission_policy;
 pub mod mutating_admission_policy;
 pub mod beta_apis;
 pub mod storage_migration;
+pub mod service_account_token;
+pub mod encryption_provider;
+pub mod audit_worm;
+pub mod field_rbac;
 
 use store::ResourceStore;
 use std::sync::Arc;

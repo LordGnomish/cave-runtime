@@ -19,6 +19,10 @@ thiserror = "1"
 dashmap = "6"
 tokio-stream = "0.1"
 async-trait = "0.1"
+ring = { workspace = true }
+jsonwebtoken = { workspace = true }
+sha2 = "0.10"
+base64 = "0.22"
 
 [dev-dependencies]
 reqwest = { workspace = true }
