@@ -67,10 +67,11 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/images/{reference}", get(inspect_image).delete(delete_image))
         .route("/api/cri/images/{reference}/tag", post(tag_image))
         .route("/api/cri/images/{reference}/history", get(get_image_history))
-        // Sandboxes (5)
+        // Sandboxes (6)
         .route("/api/cri/sandboxes", get(list_sandboxes).post(create_sandbox))
         .route("/api/cri/sandboxes/{id}", get(get_sandbox).delete(delete_sandbox))
         .route("/api/cri/sandboxes/{id}/stats", get(get_sandbox_stats))
+        .route("/api/cri/sandboxes/{id}/stop", post(stop_sandbox))
         // Snapshots (5)
         .route("/api/cri/snapshots", get(list_snapshots).post(create_snapshot))
         .route("/api/cri/snapshots/{id}", delete(delete_snapshot))
@@ -652,17 +653,36 @@ struct CreateSandboxReq {
 async fn create_sandbox(
     State(state): State<Arc<CriState>>,
     Json(req): Json<CreateSandboxReq>,
-) -> (StatusCode, Json<Sandbox>) {
-    let sandbox = Sandbox {
-        id: Uuid::new_v4(),
-        spec: req.spec,
-        state: SandboxState::Ready,
-        created_at: chrono::Utc::now(),
-        network_ip: Some("10.244.0.1".into()),
-    };
-    state.sandboxes.insert(sandbox.clone());
-    tracing::info!(sandbox_id = %sandbox.id, "sandbox created");
-    (StatusCode::CREATED, Json(sandbox))
+) -> Result<(StatusCode, Json<crate::sandbox::RunSandboxResult>), (StatusCode, String)> {
+    // Validate the requested runtime handler name (if any) against the registry.
+    if let Some(name) = req.spec.runtime_handler.as_deref() {
+        if !name.is_empty() {
+            state
+                .runtime_handlers
+                .lookup(name)
+                .ok_or_else(|| (StatusCode::BAD_REQUEST, format!("runtime handler not found: {}", name)))?;
+        }
+    }
+    let result = crate::sandbox::run_pod_sandbox(req.spec)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    state.sandboxes.insert(result.sandbox.clone());
+    tracing::info!(sandbox_id = %result.sandbox.id, "sandbox created");
+    Ok((StatusCode::CREATED, Json(result)))
+}
+
+async fn stop_sandbox(
+    State(state): State<Arc<CriState>>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut sandbox = state
+        .sandboxes
+        .get(&id)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("sandbox not found: {}", id)))?;
+    crate::sandbox::stop_pod_sandbox(id)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    sandbox.state = SandboxState::NotReady;
+    state.sandboxes.insert(sandbox);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_sandbox(

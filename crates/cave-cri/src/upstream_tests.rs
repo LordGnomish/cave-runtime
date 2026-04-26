@@ -276,6 +276,98 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Sandbox lifecycle ──────────────────────────────────────────────────────────
+
+use crate::sandbox as sb;
+
+fn sandbox_spec_with_ports(name: &str, ports: Vec<PortMapping>) -> SandboxSpec {
+    SandboxSpec {
+        name: name.into(),
+        namespace: "default".into(),
+        labels: Default::default(),
+        annotations: Default::default(),
+        hostname: Some(name.into()),
+        dns_config: None,
+        port_mappings: ports,
+        log_directory: None,
+        cgroup_parent: None,
+        runtime_handler: None,
+    }
+}
+
+#[test]
+fn test_run_pod_sandbox_allocates_namespaces() {
+    ensure_test_root();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ns-test", vec![])).unwrap();
+    assert!(r.namespaces.network.exists());
+    assert!(r.namespaces.ipc.exists());
+    assert!(r.namespaces.uts.exists());
+    assert!(r.namespaces.mount.exists());
+}
+
+#[test]
+fn test_run_pod_sandbox_assigns_pause() {
+    ensure_test_root();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("p", vec![])).unwrap();
+    assert_eq!(r.pause.image, sb::DEFAULT_PAUSE_IMAGE);
+    assert_eq!(r.pause.sandbox_id, r.sandbox.id);
+}
+
+#[test]
+fn test_run_pod_sandbox_assigns_pod_ip() {
+    ensure_test_root();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ipc", vec![])).unwrap();
+    let ip = r.sandbox.network_ip.unwrap();
+    assert!(ip.starts_with("10.244."));
+}
+
+#[test]
+fn test_stop_pod_sandbox_clears_namespaces() {
+    ensure_test_root();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("stop", vec![])).unwrap();
+    let net = r.namespaces.network.clone();
+    sb::stop_pod_sandbox(r.sandbox.id).unwrap();
+    assert!(!net.exists());
+}
+
+#[test]
+fn test_port_mapping_validation() {
+    let bad = PortMapping { protocol: "TCP".into(), container_port: 0, host_port: 80, host_ip: None };
+    assert!(sb::validate_port_mapping(&bad).is_err());
+    let good = PortMapping { protocol: "TCP".into(), container_port: 80, host_port: 8080, host_ip: None };
+    assert!(sb::validate_port_mapping(&good).is_ok());
+}
+
+#[test]
+fn test_port_mapping_protocols() {
+    for proto in ["TCP", "UDP", "SCTP", "tcp", "udp"] {
+        let p = PortMapping { protocol: proto.into(), container_port: 80, host_port: 80, host_ip: None };
+        assert!(sb::validate_port_mapping(&p).is_ok(), "{} should be ok", proto);
+    }
+    let p = PortMapping { protocol: "QUIC".into(), container_port: 80, host_port: 80, host_ip: None };
+    assert!(sb::validate_port_mapping(&p).is_err());
+}
+
+#[test]
+fn test_render_iptables_rule() {
+    let p = PortMapping { protocol: "TCP".into(), container_port: 80, host_port: 8080, host_ip: None };
+    let rule = sb::render_iptables_rule("10.244.0.5", &p);
+    assert!(rule.contains("-p tcp"));
+    assert!(rule.contains("--dport 8080"));
+    assert!(rule.contains("--to-destination 10.244.0.5:80"));
+}
+
+#[test]
+fn test_sandbox_runtime_handler_selection() {
+    let registry = RuntimeHandlerRegistry::with_defaults();
+    // Empty selector → default (runc).
+    let h = registry.select_for_sandbox("").unwrap();
+    assert_eq!(h.name, "runc");
+    // Named selector → that handler.
+    let h2 = registry.select_for_sandbox("kata").unwrap();
+    assert_eq!(h2.name, "kata");
+}
+
 // ── Streaming protocol (exec / attach / port-forward) ─────────────────────────
 
 use crate::streaming;

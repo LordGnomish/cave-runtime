@@ -93,6 +93,18 @@ local    = "src/streaming.rs"
 upstream = "pkg/cri/streaming/streaming.go"
 local    = "src/streaming.rs"
 
+[[files]]
+upstream = "pkg/cri/server/sandbox_run.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_stop.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_portforward.go"
+local    = "src/sandbox.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -355,6 +367,43 @@ upstream_name = "TtyResize"
 local_name    = "from_byte"
 file          = "src/streaming.rs"
 
+# Sandbox lifecycle (RunPodSandbox / StopPodSandbox)
+
+[[functions]]
+upstream_name = "RunPodSandbox"
+local_name    = "run_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "StopPodSandbox"
+local_name    = "stop_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "ValidatePortMapping"
+local_name    = "validate_port_mapping"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "RenderIPTablesRule"
+local_name    = "render_iptables_rule"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Create"
+local_name    = "create"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Teardown"
+local_name    = "teardown"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "PauseContainer.New"
+local_name    = "new"
+file          = "src/sandbox.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -521,6 +570,40 @@ local_test    = "test_tty_resize"
 upstream_test = "TestStreamChannelDirections"
 local_test    = "test_stream_channel_directions"
 
+# Sandbox lifecycle
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAllocatesNamespaces"
+local_test    = "test_run_pod_sandbox_allocates_namespaces"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPause"
+local_test    = "test_run_pod_sandbox_assigns_pause"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPodIP"
+local_test    = "test_run_pod_sandbox_assigns_pod_ip"
+
+[[tests]]
+upstream_test = "TestStopPodSandboxClearsNamespaces"
+local_test    = "test_stop_pod_sandbox_clears_namespaces"
+
+[[tests]]
+upstream_test = "TestPortMappingValidation"
+local_test    = "test_port_mapping_validation"
+
+[[tests]]
+upstream_test = "TestPortMappingProtocols"
+local_test    = "test_port_mapping_protocols"
+
+[[tests]]
+upstream_test = "TestRenderIPTablesRule"
+local_test    = "test_render_iptables_rule"
+
+[[tests]]
+upstream_test = "TestSandboxRuntimeHandlerSelection"
+local_test    = "test_sandbox_runtime_handler_selection"
+
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
 [[surfaces]]
@@ -647,3 +730,8 @@ local_path    = "/api/cri/containers/{id}/exec/stream"
 kind          = "http"
 upstream_path = "RuntimeService.PortForward"
 local_path    = "/api/cri/sandboxes/{id}/portforward"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.StopPodSandbox"
+local_path    = "/api/cri/sandboxes/{id}/stop"
