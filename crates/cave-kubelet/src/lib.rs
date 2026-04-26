@@ -20,6 +20,7 @@ pub mod agent;
 pub mod routes;
 pub mod csi;
 pub mod probe;
+pub mod eviction;
 
 use agent::KubeletState;
 use std::sync::Arc;
