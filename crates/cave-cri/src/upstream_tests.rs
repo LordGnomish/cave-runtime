@@ -281,6 +281,157 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── CRIU / Checkpoint (KEP-2008) ────────────────────────────────────────────────
+
+use crate::criu;
+use std::path::Path;
+
+#[test]
+fn test_criu_dump_argv_minimal() {
+    let argv = criu::build_dump_argv(123, Path::new("/i"), &criu::CheckpointOptions::default());
+    assert!(argv.contains(&"criu".to_string()));
+    assert!(argv.contains(&"dump".to_string()));
+    assert!(argv.contains(&"--tree".to_string()));
+    assert!(argv.contains(&"123".to_string()));
+}
+
+#[test]
+fn test_criu_dump_argv_with_all_options() {
+    let opts = criu::CheckpointOptions {
+        leave_running: true,
+        tcp_established: true,
+        shell_job: true,
+        external_mounts: true,
+        images_dir: None,
+    };
+    let argv = criu::build_dump_argv(1, Path::new("/i"), &opts);
+    assert!(argv.iter().any(|a| a == "--leave-running"));
+    assert!(argv.iter().any(|a| a == "--tcp-established"));
+    assert!(argv.iter().any(|a| a == "--shell-job"));
+    assert!(argv.iter().any(|a| a == "--ext-mount-map"));
+}
+
+#[test]
+fn test_criu_restore_argv_includes_restore_detached() {
+    let argv = criu::build_restore_argv(Path::new("/i"), &criu::CheckpointOptions::default());
+    assert!(argv.iter().any(|a| a == "--restore-detached"));
+}
+
+#[test]
+fn test_criu_manifest_roundtrip() {
+    let id = Uuid::new_v4();
+    let m = criu::CheckpointManifest {
+        container_id: id,
+        container_name: "redis".into(),
+        image_reference: "redis:7".into(),
+        runtime_handler: Some("runc".into()),
+        created_at: chrono::Utc::now(),
+        criu_version: "3.19".into(),
+        options: criu::CheckpointOptions::default(),
+    };
+    let dir = tempfile::tempdir().unwrap();
+    criu::write_manifest(dir.path(), &m).unwrap();
+    let back = criu::read_manifest(dir.path()).unwrap();
+    assert_eq!(back, m);
+}
+
+#[test]
+fn test_criu_verify_checkpoint_requires_manifest() {
+    let dir = tempfile::tempdir().unwrap();
+    assert!(criu::verify_checkpoint(dir.path()).is_err());
+    let m = criu::CheckpointManifest {
+        container_id: Uuid::new_v4(),
+        container_name: "x".into(),
+        image_reference: "x:1".into(),
+        runtime_handler: None,
+        created_at: chrono::Utc::now(),
+        criu_version: "3.19".into(),
+        options: criu::CheckpointOptions::default(),
+    };
+    criu::write_manifest(dir.path(), &m).unwrap();
+    assert!(criu::verify_checkpoint(dir.path()).is_ok());
+}
+
+#[test]
+fn test_criu_dir_size_bytes_sums_files() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("a"), vec![0u8; 200]).unwrap();
+    std::fs::write(dir.path().join("b"), vec![0u8; 50]).unwrap();
+    assert_eq!(criu::dir_size_bytes(dir.path()), 250);
+}
+
+#[tokio::test]
+async fn test_checkpoint_container_writes_manifest() {
+    ensure_test_root();
+    let state = make_state();
+    state.images.insert(dummy_image("redis:7"));
+    let c = runtime::create_container(
+        dummy_spec("ckpt-1", "redis:7"),
+        &state.images.get("redis:7").unwrap(),
+        &state.containers,
+    ).await.unwrap();
+    runtime::start_container(c.id, &state.containers).await.unwrap();
+
+    let info = runtime::checkpoint_container(c.id, &state.containers).await.unwrap();
+    let dir = std::path::Path::new(&info.path);
+    assert!(dir.join(criu::MANIFEST_FILENAME).exists());
+    let m = criu::read_manifest(dir).unwrap();
+    assert_eq!(m.container_id, c.id);
+    assert_eq!(m.container_name, "ckpt-1");
+}
+
+#[tokio::test]
+async fn test_restore_container_rejects_mismatched_manifest() {
+    ensure_test_root();
+    let state = make_state();
+    state.images.insert(dummy_image("nginx:latest"));
+    let c = runtime::create_container(
+        dummy_spec("rstr", "nginx:latest"),
+        &state.images.get("nginx:latest").unwrap(),
+        &state.containers,
+    ).await.unwrap();
+    // Write a manifest belonging to a *different* container.
+    let dir = tempfile::tempdir().unwrap();
+    let other_id = Uuid::new_v4();
+    let m = criu::CheckpointManifest {
+        container_id: other_id,
+        container_name: "other".into(),
+        image_reference: "x".into(),
+        runtime_handler: None,
+        created_at: chrono::Utc::now(),
+        criu_version: "3.19".into(),
+        options: criu::CheckpointOptions::default(),
+    };
+    criu::write_manifest(dir.path(), &m).unwrap();
+    let err = runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers).await.unwrap_err();
+    assert!(err.to_string().contains("does not match"));
+}
+
+#[tokio::test]
+async fn test_restore_container_succeeds_with_matching_manifest() {
+    ensure_test_root();
+    let state = make_state();
+    state.images.insert(dummy_image("nginx:latest"));
+    let c = runtime::create_container(
+        dummy_spec("rok", "nginx:latest"),
+        &state.images.get("nginx:latest").unwrap(),
+        &state.containers,
+    ).await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let m = criu::CheckpointManifest {
+        container_id: c.id,
+        container_name: "rok".into(),
+        image_reference: "nginx:latest".into(),
+        runtime_handler: None,
+        created_at: chrono::Utc::now(),
+        criu_version: "3.19".into(),
+        options: criu::CheckpointOptions::default(),
+    };
+    criu::write_manifest(dir.path(), &m).unwrap();
+    runtime::restore_container(c.id, dir.path().to_str().unwrap(), &state.containers).await.unwrap();
+    assert_eq!(state.containers.get(&c.id).unwrap().status, ContainerStatus::Running);
+}
+
 // ── UserNS / KEP-127 ───────────────────────────────────────────────────────────
 
 use crate::userns;

@@ -958,3 +958,79 @@ local_path    = "/api/cri/userns/allocate"
 kind          = "http"
 upstream_path = "RuntimeService.UserNamespaceAllocated"
 local_path    = "/api/cri/userns/allocated"
+
+# CheckpointContainer / CRIU (KEP-2008)
+
+[[files]]
+upstream = "pkg/cri/server/container_checkpoint.go"
+local    = "src/criu.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_restore.go"
+local    = "src/criu.rs"
+
+[[functions]]
+upstream_name = "BuildCRIUDumpArgv"
+local_name    = "build_dump_argv"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "BuildCRIURestoreArgv"
+local_name    = "build_restore_argv"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "WriteCheckpointManifest"
+local_name    = "write_manifest"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "ReadCheckpointManifest"
+local_name    = "read_manifest"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "VerifyCheckpoint"
+local_name    = "verify_checkpoint"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "CheckpointDirSize"
+local_name    = "dir_size_bytes"
+file          = "src/criu.rs"
+
+[[tests]]
+upstream_test = "TestCRIUDumpArgvMinimal"
+local_test    = "test_criu_dump_argv_minimal"
+
+[[tests]]
+upstream_test = "TestCRIUDumpArgvWithAllOptions"
+local_test    = "test_criu_dump_argv_with_all_options"
+
+[[tests]]
+upstream_test = "TestCRIURestoreArgvIncludesRestoreDetached"
+local_test    = "test_criu_restore_argv_includes_restore_detached"
+
+[[tests]]
+upstream_test = "TestCRIUManifestRoundtrip"
+local_test    = "test_criu_manifest_roundtrip"
+
+[[tests]]
+upstream_test = "TestCRIUVerifyCheckpointRequiresManifest"
+local_test    = "test_criu_verify_checkpoint_requires_manifest"
+
+[[tests]]
+upstream_test = "TestCRIUDirSizeBytesSumsFiles"
+local_test    = "test_criu_dir_size_bytes_sums_files"
+
+[[tests]]
+upstream_test = "TestCheckpointContainerWritesManifest"
+local_test    = "test_checkpoint_container_writes_manifest"
+
+[[tests]]
+upstream_test = "TestRestoreContainerRejectsMismatchedManifest"
+local_test    = "test_restore_container_rejects_mismatched_manifest"
+
+[[tests]]
+upstream_test = "TestRestoreContainerSucceedsWithMatchingManifest"
+local_test    = "test_restore_container_succeeds_with_matching_manifest"
