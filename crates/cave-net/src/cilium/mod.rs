@@ -20,9 +20,12 @@
 
 pub mod types;
 
+pub mod bpfmaps;
 pub mod clustermesh;
 pub mod conntrack;
 pub mod egress;
+pub mod endpoint;
+pub mod fqdn;
 pub mod hubble;
 pub mod identity;
 pub mod ingress;
