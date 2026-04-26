@@ -11,6 +11,7 @@ pub mod cycle_state;
 pub mod default_preemption;
 pub mod dra;
 pub mod dra_scheduler;
+pub mod extender;
 pub mod extension_points;
 pub mod framework;
 pub mod gates;
