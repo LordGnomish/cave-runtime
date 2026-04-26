@@ -72,6 +72,7 @@ pub mod state_machine;
 pub mod oci_spec;
 pub mod logs;
 pub mod health;
+pub mod transport;
 
 use routes::CriState;
 use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
