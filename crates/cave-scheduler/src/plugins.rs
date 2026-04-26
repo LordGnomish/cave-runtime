@@ -19,7 +19,7 @@ impl FilterPlugin for NodeName {
     fn name(&self) -> &str { "NodeName" }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         match &pod.spec.node_name {
-            None => Status { code: Code::Skip, reasons: vec![], plugin: "NodeName".into() },
+            None => Status::skip("NodeName"),
             Some(n) if n == &node.name => Status::success("NodeName"),
             Some(_) => Status::unresolvable("NodeName", "pod nodeName does not match"),
         }
