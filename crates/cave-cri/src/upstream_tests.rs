@@ -281,6 +281,112 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Cgroup v2 unified hierarchy (M9) ───────────────────────────────────────────
+
+use crate::cgroup_v2;
+
+#[test]
+fn test_cgroup_v2_apply_memory_high() {
+    let dir = tempfile::tempdir().unwrap();
+    let cg = dir.path().join("cg");
+    let limits = cgroup_v2::CgroupV2Limits { memory_high: Some(1024), ..Default::default() };
+    cgroup_v2::apply_v2(&cg, &limits).unwrap();
+    assert_eq!(std::fs::read_to_string(cg.join("memory.high")).unwrap().trim(), "1024");
+}
+
+#[test]
+fn test_cgroup_v2_apply_cpu_weight() {
+    let dir = tempfile::tempdir().unwrap();
+    let cg = dir.path().join("cg");
+    let limits = cgroup_v2::CgroupV2Limits { cpu_weight: Some(750), ..Default::default() };
+    cgroup_v2::apply_v2(&cg, &limits).unwrap();
+    assert_eq!(std::fs::read_to_string(cg.join("cpu.weight")).unwrap().trim(), "750");
+}
+
+#[test]
+fn test_cgroup_v2_apply_io_max_device() {
+    let dir = tempfile::tempdir().unwrap();
+    let cg = dir.path().join("cg");
+    let limits = cgroup_v2::CgroupV2Limits {
+        io_max: vec![cgroup_v2::IoMaxEntry {
+            major: 8, minor: 0, rbps: Some(2_000_000), wbps: None, riops: None, wiops: None,
+        }],
+        ..Default::default()
+    };
+    cgroup_v2::apply_v2(&cg, &limits).unwrap();
+    let content = std::fs::read_to_string(cg.join("io.max")).unwrap();
+    assert!(content.contains("8:0"));
+    assert!(content.contains("rbps=2000000"));
+}
+
+#[test]
+fn test_cgroup_v2_devices_bpf_program_emits_compares() {
+    let rules = cgroup_v2::DeviceRule::default_allowlist();
+    let prog = cgroup_v2::assemble_device_program(&rules);
+    let cmps = prog.iter().filter(|i| i.op.starts_with("CMP")).count();
+    assert_eq!(cmps, rules.len());
+    assert_eq!(prog.last().unwrap().op, "BPF_EXIT_INSN()");
+}
+
+#[test]
+fn test_cgroup_v2_default_deny_all_rule() {
+    let r = cgroup_v2::DeviceRule::default_deny_all();
+    assert!(!r.allow);
+    assert_eq!(r.access, "rwm");
+}
+
+#[test]
+fn test_cgroup_v2_check_unified_hierarchy_lists_controllers() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cgroup.controllers"), "cpu memory pids io").unwrap();
+    let controllers = cgroup_v2::check_unified_hierarchy(dir.path()).unwrap();
+    assert!(controllers.contains(&"cpu".to_string()));
+    assert!(controllers.contains(&"memory".to_string()));
+}
+
+#[test]
+fn test_cgroup_v2_check_unified_hierarchy_rejects_v1() {
+    let dir = tempfile::tempdir().unwrap();
+    // No cgroup.controllers file → v1 hybrid mount.
+    assert!(cgroup_v2::check_unified_hierarchy(dir.path()).is_err());
+}
+
+#[test]
+fn test_cgroup_v2_enable_controller() {
+    let dir = tempfile::tempdir().unwrap();
+    cgroup_v2::enable_controller(dir.path(), "cpu").unwrap();
+    let content = std::fs::read_to_string(dir.path().join("cgroup.subtree_control")).unwrap();
+    assert_eq!(content, "+cpu");
+}
+
+#[test]
+fn test_cgroup_v2_rejects_out_of_range_weight() {
+    let dir = tempfile::tempdir().unwrap();
+    let cg = dir.path().join("cg");
+    let limits = cgroup_v2::CgroupV2Limits { cpu_weight: Some(15_000), ..Default::default() };
+    assert!(cgroup_v2::apply_v2(&cg, &limits).is_err());
+}
+
+#[test]
+fn test_cgroup_v2_io_weight_zero_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let cg = dir.path().join("cg");
+    let limits = cgroup_v2::CgroupV2Limits { io_weight: Some(0), ..Default::default() };
+    assert!(cgroup_v2::apply_v2(&cg, &limits).is_err());
+}
+
+#[test]
+fn test_cgroup_v2_default_allowlist_has_standard_devices() {
+    let list = cgroup_v2::DeviceRule::default_allowlist();
+    let pairs: Vec<_> = list.iter().filter_map(|r| {
+        match (r.major, r.minor) { (Some(a), Some(b)) => Some((a, b)), _ => None }
+    }).collect();
+    assert!(pairs.contains(&(1, 3)));
+    assert!(pairs.contains(&(1, 5)));
+    assert!(pairs.contains(&(1, 8)));
+    assert!(pairs.contains(&(1, 9)));
+}
+
 // ── CRIU / Checkpoint (KEP-2008) ────────────────────────────────────────────────
 
 use crate::criu;
