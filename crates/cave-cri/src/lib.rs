@@ -74,10 +74,14 @@ pub mod oci_spec;
 pub mod logs;
 pub mod log_v2;
 pub mod health;
+pub mod auth;
+pub mod manifest_list;
+pub mod pull_progress;
 pub mod runtime_handler;
 pub mod sandbox;
 pub mod stats;
 pub mod streaming;
+pub mod transport;
 
 #[cfg(test)]
 mod upstream_tests;
@@ -101,6 +105,8 @@ pub fn new_state() -> Arc<CriState> {
         events: Mutex::new(Vec::new()),
         network: DashMap::new(),
         runtime_handlers: runtime_handler::RuntimeHandlerRegistry::with_defaults(),
+        credentials: auth::CredentialStore::new(),
+        pull_progress: pull_progress::PullProgressTracker::new(),
     })
 }
 

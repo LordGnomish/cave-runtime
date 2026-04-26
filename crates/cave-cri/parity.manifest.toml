@@ -116,6 +116,18 @@ local    = "src/sandbox.rs"
 upstream = "pkg/cri/server/sandbox_portforward.go"
 local    = "src/sandbox.rs"
 
+[[files]]
+upstream = "remotes/docker/authorizer.go"
+local    = "src/auth.rs"
+
+[[files]]
+upstream = "pkg/cri/server/image_pull.go"
+local    = "src/pull_progress.rs"
+
+[[files]]
+upstream = "images/converter/multi-arch.go"
+local    = "src/manifest_list.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -415,6 +427,53 @@ upstream_name = "PauseContainer.New"
 local_name    = "new"
 file          = "src/sandbox.rs"
 
+# Image pull auth + progress + multi-arch (M6)
+
+[[functions]]
+upstream_name = "ResolveAuth"
+local_name    = "default_for_registry"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "AuthorizationHeader"
+local_name    = "authorization_header"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "TokenExchangeURL"
+local_name    = "token_exchange_url"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "ClassifyVendor"
+local_name    = "from_host"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.Start"
+local_name    = "start"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.LayerProgress"
+local_name    = "layer_progress"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.Completed"
+local_name    = "completed"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "ManifestList.Select"
+local_name    = "select"
+file          = "src/manifest_list.rs"
+
+[[functions]]
+upstream_name = "IsIndexMediaType"
+local_name    = "is_index_media_type"
+file          = "src/manifest_list.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -615,6 +674,52 @@ local_test    = "test_render_iptables_rule"
 upstream_test = "TestSandboxRuntimeHandlerSelection"
 local_test    = "test_sandbox_runtime_handler_selection"
 
+# Image pull auth + progress + multi-arch
+
+[[tests]]
+upstream_test = "TestAuthResolverDockerHub"
+local_test    = "test_auth_resolver_docker_hub"
+
+[[tests]]
+upstream_test = "TestAuthResolverAwsEcr"
+local_test    = "test_auth_resolver_aws_ecr"
+
+[[tests]]
+upstream_test = "TestAuthResolverGcpGcr"
+local_test    = "test_auth_resolver_gcp_gcr"
+
+[[tests]]
+upstream_test = "TestAuthResolverAzureAcr"
+local_test    = "test_auth_resolver_azure_acr"
+
+[[tests]]
+upstream_test = "TestAuthBasicAuthorizationHeader"
+local_test    = "test_auth_basic_authorization_header"
+
+[[tests]]
+upstream_test = "TestAuthBearerTokenHeader"
+local_test    = "test_auth_bearer_token_header"
+
+[[tests]]
+upstream_test = "TestPullProgressFullLifecycle"
+local_test    = "test_pull_progress_full_lifecycle"
+
+[[tests]]
+upstream_test = "TestPullProgressFailureMarksState"
+local_test    = "test_pull_progress_failure_marks_state"
+
+[[tests]]
+upstream_test = "TestManifestListSelectAmd64"
+local_test    = "test_manifest_list_select_amd64"
+
+[[tests]]
+upstream_test = "TestManifestListIsIndexMediaType"
+local_test    = "test_manifest_list_is_index_media_type"
+
+[[tests]]
+upstream_test = "TestCredentialStoreSetGetRemove"
+local_test    = "test_credential_store_set_get_remove"
+
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
 [[surfaces]]
@@ -746,3 +851,28 @@ local_path    = "/api/cri/sandboxes/{id}/portforward"
 kind          = "http"
 upstream_path = "RuntimeService.StopPodSandbox"
 local_path    = "/api/cri/sandboxes/{id}/stop"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.AuthCredentials"
+local_path    = "/api/cri/auth/credentials"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.AuthCredentialByRegistry"
+local_path    = "/api/cri/auth/credentials/{registry}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.List"
+local_path    = "/api/cri/images/pulls"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.Get"
+local_path    = "/api/cri/images/pulls/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.Events"
+local_path    = "/api/cri/images/pulls/{id}/events"
