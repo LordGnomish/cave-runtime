@@ -31,6 +31,7 @@ pub mod dependency;
 pub mod error;
 pub mod ingestion;
 pub mod multi_tenant;
+pub mod propagation;
 pub mod query;
 pub mod routes;
 pub mod sampling;
