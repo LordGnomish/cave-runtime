@@ -37,6 +37,10 @@ pub mod telemetry;
 pub mod traffic;
 pub mod xds;
 
+/// Ambient-mode parity batch (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
+/// SPIFFE SVID, telemetry). Pinned to istio/istio v1.29.2.
+pub mod ambient;
+
 // Public re-exports most frequently needed by callers.
 pub use auth::AuthEngine;
 pub use circuit::{BreakerConfig, CircuitBreaker};

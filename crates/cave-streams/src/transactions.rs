@@ -196,21 +196,16 @@ impl TransactionCoordinator {
         next_id_fn: impl Fn() -> i64,
     ) -> StreamsResult<(i64, i16)> {
         if let Some(ref txn_id) = transactional_id {
-            // Transactional producer: bump epoch on re-init
-            let entry = self.transactions.entry(txn_id.clone());
-            let producer_id;
-            let epoch;
-            match self.transactions.get(txn_id) {
-                Some(txn) => {
-                    producer_id = txn.producer_id;
-                    epoch = txn.producer_epoch + 1;
-                }
-                None => {
-                    producer_id = next_id_fn();
-                    epoch = 0;
-                }
-            }
-            drop(entry);
+            // Transactional producer: bump epoch on re-init.
+            //
+            // NOTE: a previous version held a `DashMap::entry` write-guard
+            // and then called `DashMap::get` on the same key — that
+            // deadlocks on the same shard.  We now look up the prior txn
+            // first (releasing the read guard before the insert below).
+            let (producer_id, epoch) = match self.transactions.get(txn_id) {
+                Some(txn) => (txn.producer_id, txn.producer_epoch + 1),
+                None => (next_id_fn(), 0),
+            };
             self.transactions.insert(
                 txn_id.clone(),
                 Transaction::new(txn_id.clone(), producer_id, epoch, transaction_timeout_ms),

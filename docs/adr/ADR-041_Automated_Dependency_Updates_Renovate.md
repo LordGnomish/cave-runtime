@@ -68,6 +68,12 @@ CAVE has 73 components, each with upstream dependencies (container images, Helm 
 
 **Renovate:** AGPL-3.0 for self-hosted (https://github.com/renovatebot/renovate/blob/main/LICENSE). AGPL copyleft applies only to distributed SaaS versions.
 
+## Notes
+
+**Universal scope** — Renovate is used by both Platform deployment repos AND Cave Runtime monorepo build pipelines. Platform CI tracks 73 upstream component versions (Cilium Helm, Argo Helm, OpenBao Helm, Kafka chart, etc.); Runtime CI tracks Rust crate dependencies (tokio, tonic, axum, sqlx, etc.). Same Renovate instance services both.
+
+**Runtime mirror REQUIRED**: a `cave-self-improver` runtime crate (Mirror-001 blanket scope, single upstream → no override ADR) reimplements Renovate behavior INSIDE Cave Runtime binary as the self-improving sister to Reflex Engine (ADR-095). Charter alignment: "sovereign self-improving Cloud OS" demands version tracking + safe-upgrade loop runs in-runtime, not just CI-time, so disconnected/sovereign deployments can self-improve without external CI. Earlier "Mirror exception: build-time tooling" framing is rejected — every upstream gets a runtime mirror.
+
 ## Compliance Mapping
 
 **SOC2 CC7.1:** Vulnerability management — automated patching ensures timely security updates.

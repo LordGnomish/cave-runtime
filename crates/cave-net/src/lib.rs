@@ -13,6 +13,11 @@ pub mod models;
 pub mod dataplane;
 pub mod routes;
 
+/// Cilium-parity batch (numeric identity allocator, L7 policy,
+/// ClusterMesh, Hubble flow log + topology, L7 proxy redirect).
+/// Pinned to cilium/cilium v1.19.3.
+pub mod cilium;
+
 use dataplane::NetState;
 use std::sync::Arc;
 

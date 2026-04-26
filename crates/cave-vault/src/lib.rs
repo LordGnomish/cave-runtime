@@ -63,6 +63,60 @@ pub struct MountEntry {
     pub seal_wrap: bool,
     pub uuid: String,
     pub accessor: String,
+    /// Multi-tenant scoping: which namespace this mount belongs to. Empty = root.
+    /// See openbao `helper/namespace/namespace.go:40` (Namespace) and
+    /// `vault/mount.go:506` (MountEntry.Namespace).
+    #[serde(default)]
+    pub namespace_id: String,
+}
+
+impl MountTable {
+    /// Insert a mount entry. Mirrors `vault/mount.go:1705` (persistMounts) write path.
+    pub fn register(&mut self, entry: MountEntry) {
+        self.mounts.insert(entry.path.clone(), entry);
+    }
+
+    /// Look up a mount entry by exact path. Mirrors openbao
+    /// `vault/mount.go:320` (MountTable.findByPath).
+    pub fn lookup(&self, path: &str) -> Option<&MountEntry> {
+        self.mounts.get(path)
+    }
+
+    /// Walk every mount whose path is a prefix of the given request path,
+    /// returning the longest match. Mirrors openbao
+    /// `vault/mount.go:344` (MountTable.find) — predicate-based linear scan.
+    pub fn longest_prefix(&self, req_path: &str) -> Option<&MountEntry> {
+        let mut best: Option<&MountEntry> = None;
+        for entry in self.mounts.values() {
+            if req_path.starts_with(&entry.path) {
+                let len = entry.path.len();
+                if best.map_or(true, |b| b.path.len() < len) {
+                    best = Some(entry);
+                }
+            }
+        }
+        best
+    }
+
+    /// Remove a mount entry by exact path. Mirrors openbao
+    /// `vault/mount.go:302` (MountTable.remove).
+    pub fn unregister(&mut self, path: &str) -> Option<MountEntry> {
+        self.mounts.remove(path)
+    }
+
+    /// Sorted list of mount paths. Mirrors openbao
+    /// `vault/mount.go:361` (MountTable.sortEntriesByPath).
+    pub fn list(&self) -> Vec<String> {
+        let mut paths: Vec<String> = self.mounts.keys().cloned().collect();
+        paths.sort();
+        paths
+    }
+
+    /// All mounts within a single namespace (tenant). Mirrors openbao
+    /// `vault/mount.go:328` (MountTable.findAllNamespaceMounts).
+    pub fn for_namespace(&self, ns_id: &str) -> Vec<&MountEntry> {
+        self.mounts.values().filter(|e| e.namespace_id == ns_id).collect()
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
@@ -100,6 +154,90 @@ pub struct Namespace {
     pub id: String,
     pub path: String,
     pub metadata: HashMap<String, String>,
+    /// Cave extension: external tenant identifier. A single tenant may own
+    /// multiple namespaces (e.g. prod / staging) and a namespace belongs to
+    /// exactly one tenant.  See openbao `helper/namespace/namespace.go:40`
+    /// (Namespace) which exposes ID/Path/CustomMetadata; `tenant_id` is the
+    /// cave-runtime multi-tenancy correlation key.
+    #[serde(default)]
+    pub tenant_id: String,
+}
+
+impl Namespace {
+    /// Build a namespace bound to a tenant. Path is canonicalised the same way
+    /// as openbao `helper/namespace/namespace.go:259` (Canonicalize) — a
+    /// trailing `/` is enforced for non-empty paths.
+    pub fn new(id: impl Into<String>, path: impl Into<String>, tenant_id: impl Into<String>) -> Self {
+        let mut p: String = path.into();
+        if !p.is_empty() && !p.ends_with('/') {
+            p.push('/');
+        }
+        Self {
+            id: id.into(),
+            path: p,
+            metadata: HashMap::new(),
+            tenant_id: tenant_id.into(),
+        }
+    }
+
+    /// Validate the namespace path. Mirrors openbao
+    /// `helper/namespace/namespace.go:54` (Namespace.Validate) — reject
+    /// reserved prefixes and forbid the literal `root` name.
+    pub fn validate(&self) -> Result<(), String> {
+        const RESERVED: &[&str] = &["sys/", "audit/", "auth/", "cubbyhole/", "identity/"];
+        if self.path == "root" || self.path == "root/" {
+            return Err("namespace path cannot be 'root'".into());
+        }
+        for r in RESERVED {
+            if self.path == *r {
+                return Err(format!("namespace path '{}' is reserved", r));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl NamespaceStore {
+    /// Insert/update a namespace. Mirrors openbao
+    /// `helper/namespace/namespace.go` mutation site — the store is keyed by
+    /// the namespace ID, not the path.
+    pub fn create(&mut self, ns: Namespace) -> Result<(), String> {
+        ns.validate()?;
+        self.namespaces.insert(ns.id.clone(), ns);
+        Ok(())
+    }
+
+    /// Lookup by ID. Mirrors openbao `helper/namespace/namespace.go:220`
+    /// (FromContext) which resolves the active namespace from a context tag.
+    pub fn get(&self, id: &str) -> Option<&Namespace> {
+        self.namespaces.get(id)
+    }
+
+    /// Lookup by canonical path. Mirrors openbao
+    /// `helper/namespace/namespace.go:259` (Canonicalize) — callers are
+    /// expected to canonicalise before lookup.
+    pub fn get_by_path(&self, path: &str) -> Option<&Namespace> {
+        let mut needle: String = path.to_string();
+        if !needle.is_empty() && !needle.ends_with('/') {
+            needle.push('/');
+        }
+        self.namespaces.values().find(|n| n.path == needle)
+    }
+
+    /// All namespaces owned by a tenant. Cave extension on top of openbao
+    /// `helper/namespace/namespace.go:40` (Namespace).
+    pub fn for_tenant(&self, tenant_id: &str) -> Vec<&Namespace> {
+        let mut out: Vec<&Namespace> = self.namespaces.values()
+            .filter(|n| n.tenant_id == tenant_id)
+            .collect();
+        out.sort_by(|a, b| a.path.cmp(&b.path));
+        out
+    }
+
+    /// Delete a namespace by ID. Returns whether it existed.
+    pub fn delete(&mut self, id: &str) -> bool {
+        self.namespaces.remove(id).is_some()
+    }
 }
 
 impl VaultState {
@@ -125,6 +263,7 @@ impl VaultState {
                 seal_wrap: false,
                 uuid: uuid::Uuid::new_v4().to_string(),
                 accessor: uuid::Uuid::new_v4().to_string(),
+                namespace_id: String::new(),
             });
         }
 

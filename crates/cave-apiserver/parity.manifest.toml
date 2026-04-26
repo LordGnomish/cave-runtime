@@ -1,10 +1,11 @@
 # parity.manifest.toml — cave-apiserver
-# Upstream: kubernetes/kubernetes v1.30.0  https://github.com/kubernetes/kubernetes
+# Upstream: kubernetes/kubernetes v1.36.0  https://github.com/kubernetes/kubernetes
+# (verified at https://github.com/kubernetes/kubernetes/releases/latest)
 
 [upstream]
 org     = "kubernetes"
 repo    = "kubernetes"
-version = "v1.30.0"
+version = "v1.36.0"
 
 [module]
 name        = "cave-apiserver"
@@ -52,6 +53,181 @@ local    = "src/resources.rs"
 [[files]]
 upstream = "pkg/printers/internalversion/printers.go"
 local    = "src/store.rs"
+
+# kube-aggregator (AggregatedAPIServer)
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/types.go"
+local    = "src/aggregated_apiserver.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/apiserver/handler_proxy.go"
+local    = "src/aggregated_apiserver.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-aggregator/pkg/controllers/status/available_controller.go"
+local    = "src/aggregated_apiserver.rs"
+
+# EndpointSlice mirror controller
+[[files]]
+upstream = "pkg/controller/endpointslicemirroring/endpointslicemirroring_controller.go"
+local    = "src/endpointslice_mirror.rs"
+
+[[files]]
+upstream = "pkg/controller/endpointslicemirroring/reconciler.go"
+local    = "src/endpointslice_mirror.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/discovery/v1/types.go"
+local    = "src/endpointslice_mirror.rs"
+
+# etcd storage backend driver
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go"
+local    = "src/etcd_backend.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/etcd3/compact.go"
+local    = "src/etcd_backend.rs"
+
+# Discovery + OpenAPI v3
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/group.go"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/aggregated/aggregated.go"
+local    = "src/discovery.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/kube-openapi/pkg/handler3/handler.go"
+local    = "src/discovery.rs"
+
+# CustomResourceDefinition controller
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1/types.go"
+local    = "src/crd_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/controller/establish/establishing_controller.go"
+local    = "src/crd_controller.rs"
+
+# Storage versioning
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/runtime/scheme.go"
+local    = "src/storage_version.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storageversion/manager.go"
+local    = "src/storage_version.rs"
+
+# Field + label selectors
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/labels/selector.go"
+local    = "src/selectors.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/labels/parser.go"
+local    = "src/selectors.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apimachinery/pkg/fields/selector.go"
+local    = "src/selectors.rs"
+
+# Webhook conversion (v1beta1 → v1 migration)
+[[files]]
+upstream = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/webhook_converter.go"
+local    = "src/conversion.rs"
+
+# API Priority and Fairness (KEP-1040)
+[[files]]
+upstream = "staging/src/k8s.io/api/flowcontrol/v1/types.go"
+local    = "src/priority_fairness.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/util/flowcontrol/apf_filter.go"
+local    = "src/priority_fairness.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request_digest.go"
+local    = "src/priority_fairness.rs"
+
+# ValidatingAdmissionPolicy (KEP-3488)
+[[files]]
+upstream = "staging/src/k8s.io/api/admissionregistration/v1/types.go"
+local    = "src/validating_admission_policy.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher.go"
+local    = "src/validating_admission_policy.rs"
+
+# MutatingAdmissionPolicy (KEP-3962)
+[[files]]
+upstream = "staging/src/k8s.io/api/admissionregistration/v1alpha1/types.go"
+local    = "src/mutating_admission_policy.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/mutating/dispatcher.go"
+local    = "src/mutating_admission_policy.rs"
+
+# Beta APIs disabled-by-default (KEP-3136)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/server/options/api_enablement.go"
+local    = "src/beta_apis.rs"
+
+# Storage migration (KEP-3247)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storageversion/manager.go"
+local    = "src/storage_migration.rs"
+
+# Service Account Token (TokenRequest API + KEP-1205 + KEP-2799)
+[[files]]
+upstream = "staging/src/k8s.io/api/authentication/v1/types.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/serviceaccount/jwt.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/serviceaccount/claims.go"
+local    = "src/service_account_token.rs"
+
+[[files]]
+upstream = "pkg/registry/core/serviceaccount/storage/token.go"
+local    = "src/service_account_token.rs"
+
+# Encryption-at-rest provider (etcd KMS)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes/aes.go"
+local    = "src/encryption_provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/envelope.go"
+local    = "src/encryption_provider.rs"
+
+# Audit log WORM streaming (chain-of-custody)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/audit/audit.go"
+local    = "src/audit_worm.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/plugin/pkg/audit/log/backend.go"
+local    = "src/audit_worm.rs"
+
+# Field-level RBAC (KEP-3633)
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher.go"
+local    = "src/field_rbac.rs"
+
+# OpenAPI v3 generation (kube-openapi builder3)
+[[files]]
+upstream = "staging/src/k8s.io/kube-openapi/pkg/builder3/openapi.go"
+local    = "src/discovery.rs"
+
+# Discovery v2 group listing
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/group.go"
+local    = "src/discovery.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 # Core v1 — namespaces

@@ -7,9 +7,19 @@ license.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+cave-acme = { path = "../cave-acme" }
+cave-pki  = { path = "../cave-pki" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+ed25519-dalek = { workspace = true }
+thiserror = { workspace = true }
+rand = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
