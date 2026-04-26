@@ -287,6 +287,21 @@ pub struct SandboxSpec {
     /// default. See KEP-585.
     #[serde(default)]
     pub runtime_handler: Option<String>,
+    /// User-namespace mode for the pod (KEP-127). `Host` (default) skips
+    /// remapping; `Pod` remaps container UID/GID 0 to a per-pod host
+    /// range allocated by `UserNsAllocator`.
+    #[serde(default)]
+    pub user_namespace_mode: UserNamespaceMode,
+}
+
+/// `pod.spec.hostUsers` translation. KEP-127.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserNamespaceMode {
+    /// `hostUsers: true` — share the host user namespace.
+    #[default]
+    Host,
+    /// `hostUsers: false` — allocate a private user namespace per pod.
+    Pod,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

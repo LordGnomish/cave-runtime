@@ -31,6 +31,7 @@ pub struct CriState {
     pub runtime_handlers: RuntimeHandlerRegistry,
     pub credentials: crate::auth::CredentialStore,
     pub pull_progress: crate::pull_progress::PullProgressTracker,
+    pub userns_allocator: crate::userns::UserNsAllocator,
 }
 
 pub fn create_router(state: Arc<CriState>) -> Router {
@@ -100,6 +101,9 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/images/pulls", get(list_pull_progress))
         .route("/api/cri/images/pulls/{id}", get(get_pull_progress))
         .route("/api/cri/images/pulls/{id}/events", get(get_pull_events))
+        // UserNS — KEP-127 (M7)
+        .route("/api/cri/userns/allocate", post(allocate_userns))
+        .route("/api/cri/userns/allocated", get(allocated_userns))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -297,6 +301,20 @@ async fn get_pull_events(
     Path(id): Path<Uuid>,
 ) -> Json<Vec<crate::pull_progress::PullEvent>> {
     Json(state.pull_progress.events(id))
+}
+
+async fn allocate_userns(
+    State(state): State<Arc<CriState>>,
+) -> Result<Json<crate::userns::UserNamespace>, (StatusCode, String)> {
+    state
+        .userns_allocator
+        .allocate_namespace()
+        .map(Json)
+        .map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, e))
+}
+
+async fn allocated_userns(State(state): State<Arc<CriState>>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "allocated": state.userns_allocator.allocated() }))
 }
 
 async fn get_cadvisor_metrics(State(state): State<Arc<CriState>>) -> Response {
@@ -736,7 +754,7 @@ async fn create_sandbox(
                 .ok_or_else(|| (StatusCode::BAD_REQUEST, format!("runtime handler not found: {}", name)))?;
         }
     }
-    let result = crate::sandbox::run_pod_sandbox(req.spec)
+    let result = crate::sandbox::run_pod_sandbox(req.spec, Some(&state.userns_allocator))
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
     state.sandboxes.insert(result.sandbox.clone());
     tracing::info!(sandbox_id = %result.sandbox.id, "sandbox created");
@@ -957,6 +975,7 @@ mod tests {
             runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
             credentials: crate::auth::CredentialStore::new(),
             pull_progress: crate::pull_progress::PullProgressTracker::new(),
+            userns_allocator: crate::userns::UserNsAllocator::defaults(),
         })
     }
 
@@ -986,6 +1005,7 @@ mod tests {
                 log_directory: None,
                 cgroup_parent: None,
                 runtime_handler: None,
+                user_namespace_mode: crate::models::UserNamespaceMode::Host,
             },
             state: SandboxState::Ready,
             created_at: chrono::Utc::now(),

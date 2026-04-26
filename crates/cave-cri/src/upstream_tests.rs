@@ -70,6 +70,7 @@ fn make_state() -> Arc<CriState> {
         runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
         credentials: crate::auth::CredentialStore::new(),
         pull_progress: crate::pull_progress::PullProgressTracker::new(),
+        userns_allocator: crate::userns::UserNsAllocator::defaults(),
     })
 }
 
@@ -211,6 +212,7 @@ fn test_sandbox_run() {
             log_directory: None,
             cgroup_parent: None,
             runtime_handler: None,
+                user_namespace_mode: crate::models::UserNamespaceMode::Host,
         },
         state: SandboxState::Ready,
         created_at: Utc::now(),
@@ -238,6 +240,7 @@ fn test_sandbox_status() {
             log_directory: None,
             cgroup_parent: None,
             runtime_handler: None,
+                user_namespace_mode: crate::models::UserNamespaceMode::Host,
         },
         state: SandboxState::NotReady,
         created_at: Utc::now(),
@@ -276,6 +279,86 @@ async fn test_container_stats() {
     let stats = runtime::get_container_stats(c.id, &state.containers).unwrap();
     assert_eq!(stats.container_id, c.id);
     assert!(stats.memory_percent.is_finite());
+}
+
+// ── UserNS / KEP-127 ───────────────────────────────────────────────────────────
+
+use crate::userns;
+
+#[test]
+fn test_userns_id_mapping_translates_both_directions() {
+    let m = userns::IdMapping { container_id: 0, host_id: 1_000_000, size: 65_536 };
+    assert_eq!(m.translate_to_host(1234), Some(1_001_234));
+    assert_eq!(m.translate_to_container(1_001_234), Some(1234));
+}
+
+#[test]
+fn test_userns_render_proc_uid_map() {
+    let ns = userns::UserNamespace::for_pod(1_000_000, 65_536);
+    let line = ns.render_uid_map_file();
+    assert!(line.contains("0 1000000 65536"));
+    assert!(line.ends_with('\n'));
+}
+
+#[test]
+fn test_userns_host_passthrough_is_identity() {
+    let ns = userns::UserNamespace::host_passthrough();
+    assert!(ns.is_host());
+    assert_eq!(ns.uid_mappings[0].translate_to_host(42), Some(42));
+}
+
+#[test]
+fn test_userns_allocator_unique_ranges() {
+    let a = userns::UserNsAllocator::new(0, 65_536 * 4, 65_536);
+    let mut bases = vec![a.allocate().unwrap(), a.allocate().unwrap(), a.allocate().unwrap()];
+    bases.sort();
+    bases.dedup();
+    assert_eq!(bases.len(), 3);
+}
+
+#[test]
+fn test_userns_allocator_release_and_reuse() {
+    let a = userns::UserNsAllocator::new(0, 65_536 * 2, 65_536);
+    let r1 = a.allocate().unwrap();
+    a.release(r1);
+    let r2 = a.allocate().unwrap();
+    assert_eq!(r1, r2);
+}
+
+#[test]
+fn test_userns_parse_subid_file() {
+    let content = "alice:100000:65536\nbob:200000:65536\n";
+    let m = userns::parse_subid_file(content, "alice");
+    assert_eq!(m.len(), 1);
+    assert_eq!(m[0].host_id, 100_000);
+    assert_eq!(m[0].size, 65_536);
+}
+
+#[test]
+fn test_run_pod_sandbox_userns_pod_uses_allocator() {
+    ensure_test_root();
+    let alloc = userns::UserNsAllocator::new(500_000, 500_000 + 65_536, 65_536);
+    let mut spec = sandbox_spec_with_ports("ns-pod", vec![]);
+    spec.user_namespace_mode = UserNamespaceMode::Pod;
+    let r = sb::run_pod_sandbox(spec, Some(&alloc)).unwrap();
+    assert_eq!(r.user_namespace.uid_mappings[0].host_id, 500_000);
+}
+
+#[test]
+fn test_run_pod_sandbox_userns_pod_without_allocator_errors() {
+    ensure_test_root();
+    let mut spec = sandbox_spec_with_ports("ns-fail", vec![]);
+    spec.user_namespace_mode = UserNamespaceMode::Pod;
+    assert!(sb::run_pod_sandbox(spec, None).is_err());
+}
+
+#[test]
+fn test_run_pod_sandbox_userns_host_does_not_consume_allocator() {
+    ensure_test_root();
+    let alloc = userns::UserNsAllocator::new(700_000, 700_000 + 65_536 * 2, 65_536);
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("host-mode", vec![]), Some(&alloc)).unwrap();
+    assert!(r.user_namespace.is_host());
+    assert_eq!(alloc.allocated(), 0);
 }
 
 // ── Image pull auth + progress + multi-arch ────────────────────────────────────
@@ -413,13 +496,14 @@ fn sandbox_spec_with_ports(name: &str, ports: Vec<PortMapping>) -> SandboxSpec {
         log_directory: None,
         cgroup_parent: None,
         runtime_handler: None,
+                user_namespace_mode: crate::models::UserNamespaceMode::Host,
     }
 }
 
 #[test]
 fn test_run_pod_sandbox_allocates_namespaces() {
     ensure_test_root();
-    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ns-test", vec![])).unwrap();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ns-test", vec![]), None).unwrap();
     assert!(r.namespaces.network.exists());
     assert!(r.namespaces.ipc.exists());
     assert!(r.namespaces.uts.exists());
@@ -429,7 +513,7 @@ fn test_run_pod_sandbox_allocates_namespaces() {
 #[test]
 fn test_run_pod_sandbox_assigns_pause() {
     ensure_test_root();
-    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("p", vec![])).unwrap();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("p", vec![]), None).unwrap();
     assert_eq!(r.pause.image, sb::DEFAULT_PAUSE_IMAGE);
     assert_eq!(r.pause.sandbox_id, r.sandbox.id);
 }
@@ -437,7 +521,7 @@ fn test_run_pod_sandbox_assigns_pause() {
 #[test]
 fn test_run_pod_sandbox_assigns_pod_ip() {
     ensure_test_root();
-    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ipc", vec![])).unwrap();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("ipc", vec![]), None).unwrap();
     let ip = r.sandbox.network_ip.unwrap();
     assert!(ip.starts_with("10.244."));
 }
@@ -445,7 +529,7 @@ fn test_run_pod_sandbox_assigns_pod_ip() {
 #[test]
 fn test_stop_pod_sandbox_clears_namespaces() {
     ensure_test_root();
-    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("stop", vec![])).unwrap();
+    let r = sb::run_pod_sandbox(sandbox_spec_with_ports("stop", vec![]), None).unwrap();
     let net = r.namespaces.network.clone();
     sb::stop_pod_sandbox(r.sandbox.id).unwrap();
     assert!(!net.exists());
