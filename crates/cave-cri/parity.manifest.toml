@@ -53,6 +53,10 @@ local    = "src/oci_spec.rs"
 upstream = "pkg/cri/server/container_list.go"
 local    = "src/store.rs"
 
+[[files]]
+upstream = "pkg/cri/server/runtime_handler.go"
+local    = "src/runtime_handler.rs"
+
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
 
@@ -182,6 +186,38 @@ upstream_name = "Remove"
 local_name    = "delete_snapshot"
 file          = "src/routes.rs"
 
+# Runtime handlers (KEP-585)
+
+[[functions]]
+upstream_name = "ListRuntimeHandlers"
+local_name    = "list_runtime_handlers"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetRuntimeHandler"
+local_name    = "get_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DefaultRuntimeHandler"
+local_name    = "get_default_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Register"
+local_name    = "register"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Lookup"
+local_name    = "lookup"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.SelectForSandbox"
+local_name    = "select_for_sandbox"
+file          = "src/runtime_handler.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -231,6 +267,28 @@ local_test    = "test_container_stats"
 [[tests]]
 upstream_test = "TestNetworkAttach"
 local_test    = "test_network_attach"
+
+# Runtime handler tests (KEP-585)
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerList"
+local_test    = "test_runtime_handler_list"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerLookup"
+local_test    = "test_runtime_handler_lookup"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerDefault"
+local_test    = "test_runtime_handler_default"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerSelectForSandbox"
+local_test    = "test_runtime_handler_select_for_sandbox"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerFeatures"
+local_test    = "test_runtime_handler_features"
 
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
@@ -303,3 +361,18 @@ local_path    = "/api/cri/snapshots/{id}/mounts"
 kind          = "http"
 upstream_path = "NetworkAttach"
 local_path    = "/api/cri/network/attach"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListRuntimeHandlers"
+local_path    = "/api/cri/runtime/handlers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.GetRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.DefaultRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/default"

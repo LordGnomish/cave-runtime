@@ -5,6 +5,7 @@
 use crate::models::*;
 use crate::registry::RegistryClient;
 use crate::runtime;
+use crate::runtime_handler::{RuntimeHandler, RuntimeHandlerRegistry};
 use crate::store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use axum::{
     extract::{Path, Query, State},
@@ -27,6 +28,7 @@ pub struct CriState {
     pub snapshots: SnapshotStore,
     pub events: Mutex<Vec<RuntimeEvent>>,
     pub network: DashMap<Uuid, NetworkStatus>,
+    pub runtime_handlers: RuntimeHandlerRegistry,
 }
 
 pub fn create_router(state: Arc<CriState>) -> Router {
@@ -75,6 +77,10 @@ pub fn create_router(state: Arc<CriState>) -> Router {
         .route("/api/cri/network/attach", post(attach_network))
         .route("/api/cri/network/detach", post(detach_network))
         .route("/api/cri/network/status", get(get_network_status))
+        // Runtime handlers (3) — KEP-585 / RuntimeClass
+        .route("/api/cri/runtime/handlers", get(list_runtime_handlers))
+        .route("/api/cri/runtime/handlers/{name}", get(get_runtime_handler))
+        .route("/api/cri/runtime/handlers/default", get(get_default_runtime_handler))
         // Parity
         .route("/api/cri/parity", get(parity))
         .with_state(state)
@@ -125,7 +131,37 @@ async fn get_runtime_status(State(state): State<Arc<CriState>>) -> Json<RuntimeS
         reason: "CaveNetReady".into(),
         message: "cave-net eBPF network is ready".into(),
     };
-    Json(RuntimeStatus { conditions: vec![runtime_ready, network_ready] })
+    Json(RuntimeStatus {
+        conditions: vec![runtime_ready, network_ready],
+        runtime_handlers: state.runtime_handlers.list(),
+    })
+}
+
+async fn list_runtime_handlers(
+    State(state): State<Arc<CriState>>,
+) -> Json<Vec<RuntimeHandler>> {
+    Json(state.runtime_handlers.list())
+}
+
+async fn get_runtime_handler(
+    State(state): State<Arc<CriState>>,
+    Path(name): Path<String>,
+) -> Result<Json<RuntimeHandler>, (StatusCode, String)> {
+    state
+        .runtime_handlers
+        .lookup(&name)
+        .map(Json)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, format!("runtime handler not found: {}", name)))
+}
+
+async fn get_default_runtime_handler(
+    State(state): State<Arc<CriState>>,
+) -> Result<Json<RuntimeHandler>, (StatusCode, String)> {
+    state
+        .runtime_handlers
+        .default_handler()
+        .map(Json)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "no default runtime handler configured".to_string()))
 }
 
 async fn get_node_stats(State(state): State<Arc<CriState>>) -> Json<NodeStats> {
@@ -694,6 +730,7 @@ mod tests {
             snapshots: SnapshotStore::new(),
             events: Mutex::new(vec![]),
             network: DashMap::new(),
+            runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
         })
     }
 
@@ -722,6 +759,7 @@ mod tests {
                 port_mappings: vec![],
                 log_directory: None,
                 cgroup_parent: None,
+                runtime_handler: None,
             },
             state: SandboxState::Ready,
             created_at: chrono::Utc::now(),
@@ -796,5 +834,51 @@ mod tests {
         let events = state.events.lock().await;
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].kind, "container.created");
+    }
+
+    // ── runtime handlers ──────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn list_runtime_handlers_returns_defaults() {
+        let state = make_state();
+        let Json(handlers) = list_runtime_handlers(State(state)).await;
+        let names: Vec<_> = handlers.iter().map(|h| h.name.as_str()).collect();
+        assert!(names.contains(&"runc"));
+        assert!(names.contains(&"runsc"));
+        assert!(names.contains(&"kata"));
+    }
+
+    #[tokio::test]
+    async fn get_runtime_handler_known_returns_handler() {
+        let state = make_state();
+        let res = get_runtime_handler(State(state), Path("runc".into())).await;
+        let Json(h) = res.unwrap();
+        assert_eq!(h.name, "runc");
+        assert!(h.features.user_namespaces);
+    }
+
+    #[tokio::test]
+    async fn get_runtime_handler_unknown_returns_404() {
+        let state = make_state();
+        let res = get_runtime_handler(State(state), Path("ghost".into())).await;
+        let (code, msg) = res.unwrap_err();
+        assert_eq!(code, StatusCode::NOT_FOUND);
+        assert!(msg.contains("ghost"));
+    }
+
+    #[tokio::test]
+    async fn get_default_runtime_handler_returns_runc() {
+        let state = make_state();
+        let res = get_default_runtime_handler(State(state)).await;
+        let Json(h) = res.unwrap();
+        assert_eq!(h.name, "runc");
+    }
+
+    #[tokio::test]
+    async fn runtime_status_includes_runtime_handlers() {
+        let state = make_state();
+        let Json(status) = get_runtime_status(State(state)).await;
+        assert_eq!(status.runtime_handlers.len(), 3);
+        assert!(status.conditions.iter().any(|c| c.kind == "RuntimeReady"));
     }
 }

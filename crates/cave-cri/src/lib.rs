@@ -73,6 +73,7 @@ pub mod state_machine;
 pub mod oci_spec;
 pub mod logs;
 pub mod health;
+pub mod runtime_handler;
 
 #[cfg(test)]
 mod upstream_tests;
@@ -95,6 +96,7 @@ pub fn new_state() -> Arc<CriState> {
         snapshots: SnapshotStore::new(),
         events: Mutex::new(Vec::new()),
         network: DashMap::new(),
+        runtime_handlers: runtime_handler::RuntimeHandlerRegistry::with_defaults(),
     })
 }
 

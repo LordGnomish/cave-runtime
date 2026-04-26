@@ -227,6 +227,11 @@ pub struct SandboxSpec {
     pub port_mappings: Vec<PortMapping>,
     pub log_directory: Option<String>,
     pub cgroup_parent: Option<String>,
+    /// Runtime handler name from `PodSandboxConfig.runtime_handler`
+    /// (Kubernetes `RuntimeClass.handler`). Empty/None → use the registry
+    /// default. See KEP-585.
+    #[serde(default)]
+    pub runtime_handler: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -366,6 +371,10 @@ pub struct RuntimeCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeStatus {
     pub conditions: Vec<RuntimeCondition>,
+    /// Runtime handlers advertised to the kubelet (KEP-585). Empty when
+    /// no handlers are registered.
+    #[serde(default)]
+    pub runtime_handlers: Vec<crate::runtime_handler::RuntimeHandler>,
 }
 
 /// Node-wide CPU stats.

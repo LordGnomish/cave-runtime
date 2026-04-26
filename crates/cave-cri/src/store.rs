@@ -205,6 +205,7 @@ mod tests {
                 port_mappings: vec![],
                 log_directory: None,
                 cgroup_parent: None,
+                runtime_handler: None,
             },
             state: SandboxState::Ready,
             created_at: Utc::now(),

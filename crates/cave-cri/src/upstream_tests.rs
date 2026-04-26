@@ -9,6 +9,7 @@
 use crate::models::*;
 use crate::registry::RegistryClient;
 use crate::routes::CriState;
+use crate::runtime_handler::RuntimeHandlerRegistry;
 use crate::store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use crate::{paths, runtime};
 use chrono::Utc;
@@ -66,6 +67,7 @@ fn make_state() -> Arc<CriState> {
         snapshots: SnapshotStore::new(),
         events: Mutex::new(vec![]),
         network: DashMap::new(),
+        runtime_handlers: RuntimeHandlerRegistry::with_defaults(),
     })
 }
 
@@ -206,6 +208,7 @@ fn test_sandbox_run() {
             }],
             log_directory: None,
             cgroup_parent: None,
+            runtime_handler: None,
         },
         state: SandboxState::Ready,
         created_at: Utc::now(),
@@ -232,6 +235,7 @@ fn test_sandbox_status() {
             port_mappings: vec![],
             log_directory: None,
             cgroup_parent: None,
+            runtime_handler: None,
         },
         state: SandboxState::NotReady,
         created_at: Utc::now(),
@@ -270,6 +274,57 @@ async fn test_container_stats() {
     let stats = runtime::get_container_stats(c.id, &state.containers).unwrap();
     assert_eq!(stats.container_id, c.id);
     assert!(stats.memory_percent.is_finite());
+}
+
+// ── KEP-585: RuntimeHandler / RuntimeClass ─────────────────────────────────────
+
+use crate::runtime_handler::{RuntimeHandler, RuntimeHandlerFeatures};
+
+#[test]
+fn test_runtime_handler_list() {
+    let r = RuntimeHandlerRegistry::with_defaults();
+    let list = r.list();
+    assert_eq!(list.len(), 3);
+    assert_eq!(list[0].name, "kata"); // sorted
+    assert_eq!(list[1].name, "runc");
+    assert_eq!(list[2].name, "runsc");
+}
+
+#[test]
+fn test_runtime_handler_lookup() {
+    let r = RuntimeHandlerRegistry::with_defaults();
+    assert!(r.lookup("runc").is_some());
+    assert!(r.lookup("nope").is_none());
+}
+
+#[test]
+fn test_runtime_handler_default() {
+    let r = RuntimeHandlerRegistry::with_defaults();
+    assert_eq!(r.default_handler().unwrap().name, "runc");
+    r.set_default("kata").unwrap();
+    assert_eq!(r.default_handler().unwrap().name, "kata");
+}
+
+#[test]
+fn test_runtime_handler_select_for_sandbox() {
+    let r = RuntimeHandlerRegistry::with_defaults();
+    // Empty selector → default
+    assert_eq!(r.select_for_sandbox("").unwrap().name, "runc");
+    // Named selector → that one
+    assert_eq!(r.select_for_sandbox("kata").unwrap().name, "kata");
+    // Unknown → error
+    assert!(r.select_for_sandbox("ghost").is_err());
+}
+
+#[test]
+fn test_runtime_handler_features() {
+    let runc = RuntimeHandler::runc();
+    assert_eq!(runc.features, RuntimeHandlerFeatures {
+        recursive_read_only_mounts: true,
+        user_namespaces: true,
+    });
+    let runsc = RuntimeHandler::runsc();
+    assert!(!runsc.features.user_namespaces);
 }
 
 #[tokio::test]
