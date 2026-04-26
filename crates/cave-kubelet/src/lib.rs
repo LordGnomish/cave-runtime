@@ -25,6 +25,7 @@ pub mod streaming;
 pub mod security;
 pub mod apparmor;
 pub mod podresources;
+pub mod topology;
 
 use agent::KubeletState;
 use std::sync::Arc;
