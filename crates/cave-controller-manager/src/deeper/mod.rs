@@ -31,3 +31,10 @@ pub mod hpa_behavior_advanced;
 pub mod hpa_metrics;
 pub mod hpa_stabilization;
 pub mod hpa_tolerance;
+
+// 100-pct PUSH-HARD M6 — HPA conditions + multi-metric + scale subresource
+// + per-MetricSource desired-replica formulas.
+pub mod hpa_conditions;
+pub mod hpa_metric_sources;
+pub mod hpa_multi_metric;
+pub mod hpa_target_ref;
