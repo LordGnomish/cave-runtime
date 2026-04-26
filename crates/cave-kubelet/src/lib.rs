@@ -26,6 +26,8 @@ pub mod security;
 pub mod apparmor;
 pub mod podresources;
 pub mod topology;
+pub mod cpumanager;
+pub mod memorymanager;
 
 use agent::KubeletState;
 use std::sync::Arc;
