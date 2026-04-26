@@ -25,6 +25,7 @@ pub mod conntrack;
 pub mod egress;
 pub mod hubble;
 pub mod identity;
+pub mod ingress;
 pub mod ipam;
 pub mod l7policy;
 pub mod l7proxy;
