@@ -33,6 +33,7 @@ pub mod storage_version;
 pub mod selectors;
 pub mod priority_fairness;
 pub mod validating_admission_policy;
+pub mod vap_advanced;
 pub mod mutating_admission_policy;
 pub mod beta_apis;
 pub mod storage_migration;
