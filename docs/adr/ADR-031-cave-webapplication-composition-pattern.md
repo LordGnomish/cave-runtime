@@ -145,6 +145,10 @@ WebApplication XR reconciler (Crossplane Composition):
    - Backstage entity registered (Component kind + dependsOn relationships)
    - Dependency graph viz: app → DB + Kafka + Cache (cave-portal `/admin/code-intel` ile, ADR-144 entegrasyon)
 
+## Example: Tenant Workloads
+
+> **Example: Tenant-deployed Apache Airflow.** A tenant team running data engineering workloads can deploy Airflow as a tenant application via the same composition pattern: Cave Runtime provisions PostgreSQL (cave-pg) for Airflow metadata DB, an object store bucket (cave-s3 / cave-blob) for DAG/log/artifact storage, scheduler+webserver+worker pods, gateway routing, mTLS certs, monitoring, and tenant-scoped RBAC. The platform workflow engine remains Argo Workflows (ADR-038); Airflow lives here as a tenant workload, not as platform infrastructure. This illustrates how the composition pattern absorbs heavy multi-component upstream products without compromising the platform's sovereign single-binary runtime.
+
 ## CI/CD integration
 
 Pipeline (ADR-010 27-stage CI):
