@@ -116,6 +116,8 @@ members = [
     "crates/cave-datafusion",
     # === Kubernetes Controller Manager ===
     "crates/cave-controller-manager",
+    # === Kubernetes Cloud Controller Manager ===
+    "crates/cave-cloud-controller-manager",
 ]
 
 [workspace.package]
