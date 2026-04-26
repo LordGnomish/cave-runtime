@@ -13,6 +13,7 @@ pub mod extension_points;
 pub mod framework;
 pub mod gates;
 pub mod models;
+pub mod noderesources;
 pub mod plugins;
 pub mod preempt;
 pub mod priority_queue;
