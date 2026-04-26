@@ -62,6 +62,7 @@ pub mod balancer;
 pub mod client;
 pub mod cluster_status;
 pub mod concurrency;
+pub mod concurrency_extras;
 pub mod error;
 pub mod grpc_api;
 pub mod kms;
