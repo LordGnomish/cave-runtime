@@ -98,6 +98,22 @@ pub enum EtcdError {
     // ── v3.6: watch ─────────────────────────────────────────────────────────
     #[error("watch not found: {0}")]
     WatchNotFound(i64),
+
+    // ── v3.6 deeper-002: raft / read consistency ───────────────────────────
+    #[error("not leader: current_term={term}, leader={leader:?}")]
+    NotLeader { term: u64, leader: Option<u64> },
+
+    #[error("leader lease expired: granted_at={granted_at}, ttl_ms={ttl_ms}")]
+    LeaderLeaseExpired { granted_at: i64, ttl_ms: u64 },
+
+    #[error("read index timeout: index={index}, applied={applied}")]
+    ReadIndexTimeout { index: u64, applied: u64 },
+
+    #[error("quorum lost: required={required}, healthy={healthy}")]
+    QuorumLost { required: usize, healthy: usize },
+
+    #[error("pre-vote rejected: reason={0}")]
+    PreVoteRejected(String),
 }
 
 pub type EtcdResult<T> = Result<T, EtcdError>;

@@ -662,6 +662,73 @@ pub struct WatchProgressEvent {
     pub watch_id: i64,
 }
 
+// ── v3.6 deeper-002: Raft / read-consistency types ────────────────────────
+
+/// Raft node role.  Mirrors etcd's `raft.StateType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RaftRole {
+    Leader,
+    Follower,
+    Candidate,
+    /// Pre-candidate state introduced by Ongaro §9.6 to avoid disruptive
+    /// elections from partitioned nodes.
+    PreCandidate,
+    Learner,
+}
+
+/// Result of a single pre-vote round (RaftElection §9.6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PreVoteResult {
+    pub granted: bool,
+    pub term: u64,
+    pub reason: String,
+}
+
+/// Outcome of `read_index`: the committed-index the leader observed at
+/// request time, plus the `applied_index` the local apply loop must reach
+/// before the read can return.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadIndexResult {
+    pub read_index: u64,
+    pub applied_index: u64,
+    pub via_leader_lease: bool,
+}
+
+/// Snapshot stream sender state.  Lives across multiple `next_chunk()`
+/// calls so callers can pull chunks lazily.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnapshotSenderState {
+    pub revision: u64,
+    pub total_bytes: u64,
+    pub sent_bytes: u64,
+    pub checksum: String,
+    /// Number of chunks emitted so far.
+    pub chunks_sent: u64,
+    pub completed: bool,
+}
+
+/// Result of a learner-promotion check.  When `ready_lag` is below a
+/// configurable threshold (`LEARNER_READY_LAG_THRESHOLD`) the learner is
+/// considered caught-up and eligible for promotion.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LearnerReadiness {
+    pub member_id: u64,
+    pub leader_index: u64,
+    pub learner_index: u64,
+    pub ready_lag: u64,
+    pub ready: bool,
+}
+
+/// Defragment-status snapshot returned alongside the existing
+/// `DefragmentResponse`.  Mirrors etcd v3.6 `etcdctl defrag --status`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DefragmentStatus {
+    pub bytes_before: u64,
+    pub bytes_after: u64,
+    pub bytes_freed: u64,
+    pub fragmented_pages: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
