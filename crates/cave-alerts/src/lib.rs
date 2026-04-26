@@ -23,6 +23,7 @@ pub mod matcher;
 pub mod models;
 pub mod receivers;
 pub mod routes;
+pub mod rules;
 pub mod routing;
 pub mod silence;
 pub mod store;

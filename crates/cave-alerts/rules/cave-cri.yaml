@@ -1,0 +1,80 @@
+crate: cave-cri
+group: cave-cri-slo
+
+alerts:
+  - alert: CriSloBurnRateFast
+    expr: |
+      (
+        sum(rate(cri_operations_errors_total[1h]))
+        /
+        sum(rate(cri_operations_total[1h]))
+      ) > (14.4 * 0.001)
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "CRI fast burn rate"
+      description: "Error fraction over 1h = {{ $value | humanizePercentage }}."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/slo-burn-fast.md"
+
+  - alert: CriSloBurnRateSlow
+    expr: |
+      (
+        sum(rate(cri_operations_errors_total[6h]))
+        /
+        sum(rate(cri_operations_total[6h]))
+      ) > (6 * 0.001)
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "CRI slow burn rate (6h)"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/slo-burn-slow.md"
+
+  - alert: CriErrorBudgetLow
+    expr: '1 - (sum(rate(cri_operations_errors_total[7d])) / sum(rate(cri_operations_total[7d]))) < 0.999'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "CRI 7-day error budget below 99.9%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/error-budget.md"
+
+  - alert: CriContainerCountSaturation
+    expr: 'sum(cri_running_containers) by (node) > 240'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "Node holding > 240 containers"
+      description: "{{ $labels.node }} = {{ $value }} containers (cap is 250)."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/saturation.md"
+
+  - alert: CriCardinalityExplosion
+    expr: 'count(count by (image) (cri_image_pull_errors_total)) > 1000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "CRI image cardinality high"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/cardinality.md"
+
+  - alert: CriImagePullSlow
+    expr: 'histogram_quantile(0.95, sum(rate(cri_image_pull_duration_seconds_bucket[5m])) by (le)) > 30'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "Image pull p95 > 30s"
+      description: "p95 = {{ $value }}s."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/image-pull-slow.md"
+
+  - alert: CriOomKillSpike
+    expr: 'sum(increase(cri_container_oom_kills_total[10m])) > 5'
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "5+ OOMKills in 10m"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/oomkill.md"
+
+  - alert: CriHealthProbeFailing
+    expr: 'min(up{job="cave-cri"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "CRI health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-cri/health.md"

@@ -1,0 +1,86 @@
+crate: cave-scheduler
+title: "Cave Scheduler — Pod placement"
+uid: cave-scheduler
+tags: [observability, cave, kubernetes, scheduling]
+
+variables:
+  - name: profile
+    type: query
+    query: 'label_values(scheduler_pending_pods, profile)'
+    default: ".*"
+
+panels:
+  - id: 1
+    title: "Schedule attempts / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(scheduler_schedule_attempts_total{profile=~"$profile"}[5m])) by (result)'
+    legend: '{{result}}'
+
+  - id: 2
+    title: "Unschedulable rate"
+    type: timeseries
+    unit: percentunit
+    query: 'sum(rate(scheduler_schedule_attempts_total{result="unschedulable"}[5m])) / sum(rate(scheduler_schedule_attempts_total[5m]))'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 0.05, color: yellow}
+      - {value: 0.20, color: red}
+
+  - id: 3
+    title: "Scheduling latency p50/p95/p99"
+    type: timeseries
+    unit: s
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket[5m])) by (le))'
+      - 'histogram_quantile(0.95, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket[5m])) by (le))'
+      - 'histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket[5m])) by (le))'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "Pending pods (saturation)"
+    type: gauge
+    unit: short
+    query: 'sum(scheduler_pending_pods{profile=~"$profile"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 50, color: yellow}
+      - {value: 200, color: red}
+
+  - id: 5
+    title: "Plugin extension point latency p99"
+    type: timeseries
+    unit: s
+    query: 'histogram_quantile(0.99, sum(rate(scheduler_plugin_execution_duration_seconds_bucket[5m])) by (le, extension_point))'
+    legend: '{{extension_point}}'
+
+  - id: 6
+    title: "Preemption attempts / 5m"
+    type: timeseries
+    unit: short
+    query: 'sum(rate(scheduler_preemption_attempts_total[5m]))'
+
+  - id: 7
+    title: "Top-10 pods by retries"
+    type: table
+    unit: short
+    query: 'topk(10, sum(increase(scheduler_pod_scheduling_attempts[1h])) by (namespace, pod))'
+
+  - id: 8
+    title: "Goroutines (saturation)"
+    type: timeseries
+    unit: short
+    query: 'go_goroutines{job="cave-scheduler"}'
+    legend: '{{instance}}'
+
+  - id: 9
+    title: "Tenant breakdown"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (scheduler_pending_pods))'
+
+  - id: 10
+    title: "Pod scheduler queue heatmap"
+    type: heatmap
+    unit: s
+    query: 'sum(rate(scheduler_queue_incoming_pods_total[5m])) by (queue)'
