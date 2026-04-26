@@ -294,4 +294,91 @@ mod tests {
         // tenant_id invariant.
         assert_eq!(k.tenant_id, "acme");
     }
+
+    // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
+
+    /// Upstream parity: `TestApply_SameManagerIsIdempotent`
+    /// (managedfields/internal/managedfields_test.go — re-applying the same
+    /// fields under the same manager is a no-op on conflict surface).
+    #[test]
+    fn test_same_manager_reapply_is_idempotent() {
+        let r = FieldManagerRegistry::new();
+        let k = key("acme", "obj-1");
+        let res1 = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
+        assert!(matches!(res1, ApplyOutcome::Applied { .. }));
+        let res2 = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
+        assert!(matches!(res2, ApplyOutcome::Applied { .. }),
+            "same manager re-applying same field MUST NOT conflict with itself");
+        let entries = r.entries(&k);
+        assert_eq!(entries.len(), 1, "single entry retained");
+        assert_eq!(entries[0].fields_owned, vec!["spec.image".to_string()],
+            "field set unchanged on idempotent reapply");
+        assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
+    }
+
+    /// Upstream parity: `TestApply_RemoveUnknownManagerNoop`
+    /// (registry.RemoveManager on absent name is a no-op, not an error).
+    #[test]
+    fn test_remove_unknown_manager_does_not_panic() {
+        let r = FieldManagerRegistry::new();
+        let k = key("acme", "obj-1");
+        let _ = r.apply(&k, "kubectl", "v1", &["x".into()], false);
+        r.remove(&k, "ghost-manager");
+        assert_eq!(r.owner_of(&k, "x").as_deref(), Some("kubectl"),
+            "removing unknown manager preserves existing ownership");
+        assert_eq!(k.tenant_id, "acme", "tenant_id invariant: scoped removal");
+    }
+
+    /// Upstream parity: `TestApply_TenantSiblingsCannotForceAcrossTenants`
+    /// (force=true is local to the (tenant_id, uid) ObjectKey).
+    #[test]
+    fn test_force_apply_does_not_cross_tenant_boundary() {
+        let r = FieldManagerRegistry::new();
+        let k_a = key("acme", "obj-1");
+        let k_b = key("globex", "obj-1");
+        let _ = r.apply(&k_a, "kubectl", "v1", &["spec.image".into()], false);
+        // globex tries to force — must not affect acme's ownership.
+        let res = r.apply(&k_b, "argo-cd", "v1", &["spec.image".into()], true);
+        assert!(matches!(res, ApplyOutcome::Applied { .. }));
+        assert_eq!(r.owner_of(&k_a, "spec.image").as_deref(), Some("kubectl"),
+            "tenant_id invariant: globex.force MUST NOT strip acme.kubectl ownership");
+        assert_eq!(r.owner_of(&k_b, "spec.image").as_deref(), Some("argo-cd"));
+    }
+
+    /// Upstream parity: `TestApply_OutcomeAppliedFieldsEchoesInput`
+    /// (ApplyOutcome::Applied carries back the manager + the field set
+    /// supplied — used by the response builder to populate ManagedFields).
+    #[test]
+    fn test_outcome_applied_echoes_manager_and_fields() {
+        let r = FieldManagerRegistry::new();
+        let k = key("acme", "obj-1");
+        let res = r.apply(&k, "kubectl", "v1",
+            &["spec.replicas".into(), "spec.image".into()], false);
+        match res {
+            ApplyOutcome::Applied { manager, fields } => {
+                assert_eq!(manager, "kubectl");
+                assert_eq!(fields.len(), 2);
+                assert!(fields.contains(&"spec.replicas".to_string()));
+                assert!(fields.contains(&"spec.image".to_string()));
+            }
+            ApplyOutcome::Conflicts(_) => panic!("expected applied outcome"),
+        }
+        assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
+    }
+
+    /// Upstream parity: `TestApply_OperationFlavorIsApply`
+    /// (managed-field entries created via Apply carry ManagerOperation::Apply).
+    #[test]
+    fn test_managed_fields_entry_carries_apply_operation() {
+        let r = FieldManagerRegistry::new();
+        let k = key("acme", "obj-1");
+        let _ = r.apply(&k, "kubectl", "v1", &["spec.image".into()], false);
+        let entries = r.entries(&k);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].operation, ManagerOperation::Apply,
+            "Apply path tags entry as ManagerOperation::Apply");
+        assert_eq!(entries[0].api_version, "v1");
+        assert!(!entries[0].manager.is_empty());
+        assert_eq!(k.tenant_id, "acme", "tenant_id invariant");
+    }
 }

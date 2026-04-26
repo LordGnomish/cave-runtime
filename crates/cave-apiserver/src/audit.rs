@@ -307,4 +307,99 @@ mod tests {
         logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
         assert_eq!(logger.events()[0].tenant_id, "acme");
     }
+
+    // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
+
+    /// Upstream parity: `TestAudit_DefaultLevelPromotedFromUnsetEvent`
+    /// (audit/event.go — `event.Level == LevelNone` is treated as "use policy
+    /// default" when emission is otherwise allowed).
+    #[test]
+    fn test_unset_event_level_is_promoted_to_policy_default() {
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Request));
+        let mut e = ev(AuditStage::ResponseComplete, "acme", "alice", 200);
+        // Event arrives with level=None; policy default=Request promotes it.
+        e.level = AuditLevel::None;
+        e.request_object = Some(serde_json::json!({"hello": "world"}));
+        e.response_object = Some(serde_json::json!({"out": 1}));
+        assert!(logger.emit(e));
+        let stored = &logger.events()[0];
+        assert_eq!(stored.level, AuditLevel::Request,
+            "default level promoted onto unset event");
+        assert!(stored.request_object.is_some());
+        assert!(stored.response_object.is_none(),
+            "Request level strips response after promotion");
+        assert_eq!(stored.tenant_id, "acme",
+            "tenant_id invariant: promotion never strips tenant");
+    }
+
+    /// Upstream parity: `TestAudit_OmitMultipleStages`
+    /// (Policy.OmitStages with multiple entries — only listed stages drop).
+    #[test]
+    fn test_omit_multiple_stages_independently() {
+        let policy = AuditPolicy::new(AuditLevel::Metadata)
+            .omit(AuditStage::RequestReceived)
+            .omit(AuditStage::Panic);
+        let logger = AuditLogger::new(64, policy);
+        let dropped_a = !logger.emit(ev(AuditStage::RequestReceived, "acme", "alice", 0));
+        let dropped_b = !logger.emit(ev(AuditStage::Panic, "acme", "alice", 500));
+        let kept_a   =  logger.emit(ev(AuditStage::ResponseStarted, "acme", "alice", 0));
+        let kept_b   =  logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        assert!(dropped_a && dropped_b);
+        assert!(kept_a && kept_b);
+        assert_eq!(logger.len(), 2);
+        assert!(logger.events().iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: stage-omit policy never crosses tenant lines");
+    }
+
+    /// Upstream parity: `TestAudit_LifecycleAllStagesShareAuditId`
+    /// (event.go — every stage of one request reuses the same audit_id).
+    #[test]
+    fn test_lifecycle_emits_one_audit_id_per_stage_for_one_request() {
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
+        for s in [AuditStage::RequestReceived, AuditStage::ResponseStarted,
+                  AuditStage::ResponseComplete] {
+            let mut e = ev(s, "acme", "alice", 200);
+            e.audit_id = "lifecycle-uid-1".into();
+            logger.emit(e);
+        }
+        let stored = logger.events();
+        assert_eq!(stored.len(), 3);
+        assert!(stored.iter().all(|e| e.audit_id == "lifecycle-uid-1"),
+            "all lifecycle stages share one audit_id");
+        assert!(stored.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: lifecycle stages stay scoped");
+    }
+
+    /// Upstream parity: `TestAudit_TenantQueryEmptyForUnknown`
+    /// (Backend.List filtered by tenant returns empty for unknown tenant).
+    #[test]
+    fn test_events_for_unknown_tenant_returns_empty_set() {
+        let logger = AuditLogger::new(64, AuditPolicy::new(AuditLevel::Metadata));
+        logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        logger.emit(ev(AuditStage::ResponseComplete, "globex", "bob", 200));
+        let nobody = logger.events_for_tenant("nobody-tenant");
+        assert!(nobody.is_empty(),
+            "tenant_id invariant: unknown tenant query is empty, never bleed");
+        let acme = logger.events_for_tenant("acme");
+        assert!(acme.iter().all(|e| e.tenant_id == "acme"),
+            "tenant_id invariant: matching tenant returns only matching events");
+    }
+
+    /// Upstream parity: `TestAudit_PolicyShouldRecordHonorsExplicitOmit`
+    /// (Policy.should_record returns true for stages NOT in OmitStages).
+    #[test]
+    fn test_policy_should_record_returns_true_for_non_omitted_stages() {
+        let p = AuditPolicy::new(AuditLevel::Metadata)
+            .omit(AuditStage::RequestReceived);
+        assert!(!p.should_record(AuditStage::RequestReceived));
+        assert!(p.should_record(AuditStage::ResponseStarted));
+        assert!(p.should_record(AuditStage::ResponseComplete));
+        assert!(p.should_record(AuditStage::Panic));
+        // tenant_id invariant smoke: a logger built from this policy still
+        // tags emitted events with their tenant.
+        let logger = AuditLogger::new(4, p);
+        logger.emit(ev(AuditStage::ResponseComplete, "acme", "alice", 200));
+        assert_eq!(logger.events()[0].tenant_id, "acme",
+            "tenant_id invariant on filtered emission");
+    }
 }

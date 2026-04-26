@@ -418,4 +418,148 @@ mod tests {
         assert_eq!(r.spec.tenant_id, "acme",
             "tenant_id invariant: SAR returned with original tenant");
     }
+
+    // ── Deeper coverage (v1.36.0) ─────────────────────────────────────────────
+
+    /// Upstream parity: `TestRBAC_ResourceNameMatchAllowsOnlyNamedResource`
+    /// (rbac/rbac_test.go — PolicyRule.ResourceNames restricts the verb to
+    /// the listed names only).
+    #[test]
+    fn test_resource_name_restricts_match_to_named_object() {
+        let auth = RbacAuthorizer::new();
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "named".into(),
+            rules: vec![PolicyRule {
+                api_groups: vec!["".into()],
+                resources: vec!["configmaps".into()],
+                verbs: vec!["get".into()],
+                resource_names: vec!["allowed-cm".into()],
+            }],
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "named-bind".into(),
+            subjects: vec![user_sub("alice")],
+            role_kind: "Role".into(), role_name: "named".into(),
+        });
+        let mut sar_ok = sar_for("alice", "acme", "default", "get", "configmaps");
+        sar_ok.spec.resource_attributes.as_mut().unwrap().name = "allowed-cm".into();
+        let mut sar_no = sar_for("alice", "acme", "default", "get", "configmaps");
+        sar_no.spec.resource_attributes.as_mut().unwrap().name = "other-cm".into();
+        let r_ok = auth.review(sar_ok);
+        let r_no = auth.review(sar_no);
+        assert!(r_ok.status.allowed,
+            "named resource matches the resource_names restriction");
+        assert!(!r_no.status.allowed,
+            "non-listed resource is denied even though verb+resource match");
+        assert_eq!(r_ok.spec.tenant_id, "acme", "tenant_id invariant");
+        assert_eq!(r_no.spec.tenant_id, "acme", "tenant_id invariant on deny path");
+    }
+
+    /// Upstream parity: `TestRBAC_MultipleBindingsUnion`
+    /// (multiple bindings for the same subject form a union of permissions).
+    #[test]
+    fn test_multiple_bindings_form_a_union_of_permissions() {
+        let auth = RbacAuthorizer::new();
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "get-cm".into(),
+            rules: vec![rule("", "configmaps", &["get"])],
+        });
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "del-cm".into(),
+            rules: vec![rule("", "configmaps", &["delete"])],
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "alice-get".into(),
+            subjects: vec![user_sub("alice")],
+            role_kind: "Role".into(), role_name: "get-cm".into(),
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "alice-del".into(),
+            subjects: vec![user_sub("alice")],
+            role_kind: "Role".into(), role_name: "del-cm".into(),
+        });
+        let r_get = auth.review(sar_for("alice", "acme", "default", "get", "configmaps"));
+        let r_del = auth.review(sar_for("alice", "acme", "default", "delete", "configmaps"));
+        let r_create = auth.review(sar_for("alice", "acme", "default", "create", "configmaps"));
+        assert!(r_get.status.allowed);
+        assert!(r_del.status.allowed);
+        assert!(!r_create.status.allowed,
+            "verbs not in any rule are still denied — union, not wildcard");
+        assert_eq!(r_get.spec.tenant_id, "acme", "tenant_id invariant");
+    }
+
+    /// Upstream parity: `TestRBAC_ServiceAccountCrossTenantDenied`
+    /// (system:serviceaccount:* identity must not authorize across tenants).
+    #[test]
+    fn test_service_account_cannot_authorize_across_tenants() {
+        let auth = RbacAuthorizer::new();
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "viewer".into(),
+            rules: vec![rule("", "configmaps", &["get"])],
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "sa-bind".into(),
+            subjects: vec![Subject {
+                kind: "ServiceAccount".into(),
+                name: "default".into(),
+                namespace: "default".into(),
+            }],
+            role_kind: "Role".into(), role_name: "viewer".into(),
+        });
+        // Same SA identity, but the SAR comes in tagged with a different tenant.
+        let r = auth.review(sar_for(
+            "system:serviceaccount:default:default", "globex", "default", "get", "configmaps"));
+        assert!(!r.status.allowed,
+            "tenant_id invariant: cross-tenant ServiceAccount MUST NOT inherit acme binding");
+        assert_eq!(r.spec.tenant_id, "globex", "tenant_id invariant: SAR tenant retained");
+    }
+
+    /// Upstream parity: `TestRBAC_ClusterRoleViaRoleBindingScopedToNamespace`
+    /// (a RoleBinding referencing a ClusterRole still confines effect to the
+    /// binding's namespace — only ClusterRoleBinding makes it cluster-wide).
+    #[test]
+    fn test_role_binding_to_cluster_role_is_scoped_to_namespace() {
+        let auth = RbacAuthorizer::new();
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "".into(), name: "edit".into(),
+            rules: vec![rule("*", "*", &["*"])],
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "alice-edit".into(),
+            subjects: vec![user_sub("alice")],
+            role_kind: "ClusterRole".into(), role_name: "edit".into(),
+        });
+        let r_in   = auth.review(sar_for("alice", "acme", "default", "create", "secrets"));
+        let r_out  = auth.review(sar_for("alice", "acme", "kube-system", "create", "secrets"));
+        assert!(r_in.status.allowed,
+            "RoleBinding -> ClusterRole grants in the binding namespace");
+        assert!(!r_out.status.allowed,
+            "RoleBinding -> ClusterRole MUST NOT escape the binding namespace");
+        assert_eq!(r_in.spec.tenant_id, "acme", "tenant_id invariant");
+    }
+
+    /// Upstream parity: `TestRBAC_GroupSubjectCrossTenantDenied`
+    /// (Group membership in tenant A's binding does not authorize a SAR
+    /// stamped with tenant B even with identical group name).
+    #[test]
+    fn test_group_subject_does_not_cross_tenants() {
+        let auth = RbacAuthorizer::new();
+        auth.upsert_role(Role {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "ops-reader".into(),
+            rules: vec![rule("", "configmaps", &["get"])],
+        });
+        auth.upsert_binding(Binding {
+            tenant_id: "acme".into(), namespace: "default".into(), name: "ops-bind".into(),
+            subjects: vec![Subject {
+                kind: "Group".into(), name: "ops".into(), namespace: "".into(),
+            }],
+            role_kind: "Role".into(), role_name: "ops-reader".into(),
+        });
+        let mut sar = sar_for("alice", "globex", "default", "get", "configmaps");
+        sar.spec.groups = vec!["ops".into()];
+        let r = auth.review(sar);
+        assert!(!r.status.allowed,
+            "tenant_id invariant: group binding scoped to tenant — globex.ops MUST NOT inherit acme.ops");
+        assert_eq!(r.spec.tenant_id, "globex", "tenant_id invariant retained");
+    }
 }
