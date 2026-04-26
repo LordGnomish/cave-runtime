@@ -21,10 +21,15 @@
 pub mod types;
 
 pub mod clustermesh;
+pub mod conntrack;
 pub mod hubble;
 pub mod identity;
 pub mod l7policy;
 pub mod l7proxy;
+pub mod lb;
+pub mod maglev;
+pub mod nat;
 pub mod policy;
+pub mod services;
 
 pub use types::{Cite, TenantId, UPSTREAM_VERSION};
