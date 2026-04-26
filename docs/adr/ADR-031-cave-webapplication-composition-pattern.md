@@ -1,4 +1,11 @@
-# ADR-145 — Cave WebApplication Composition Pattern
+# ADR-031 — Cave WebApplication Composition Pattern
+
+> **Renumber note (2026-04-26):** originally drafted as ADR-145 in this
+> repository; renumbered to ADR-031 to resolve a collision with the
+> Platform catalog's ADR-145 ("Cave Runtime — Async Runtime
+> tokio + io_uring").  Final semantic renumbering is deferred to a
+> separate pass; for now, slot 031 (previously empty in the catalog) is
+> used.
 
 Status: Proposed (2026-04-26 — Burak finalize edecek)
 Scope: Universal (Platform; Pipeline inherits; Runtime via mirror principle ADR-RUNTIME-UPSTREAM-MIRROR-001)
@@ -162,7 +169,7 @@ Cave bu desenleri sovereign Rust reimpl + multi-tenant first-class + PQC-ready z
 
 ## Pipeline + Runtime Inheritance
 
-- **Pipeline-platform-starter:** ADR-145'i inherits eder. Pipeline'ın kendisi Cave WebApplication pattern'iyle yaratılan + maintained app (CI/CD pipeline'ın self-hosting'ı bu compose pattern'inin instance'ı).
+- **Pipeline-platform-starter:** ADR-031'i inherits eder. Pipeline'ın kendisi Cave WebApplication pattern'iyle yaratılan + maintained app (CI/CD pipeline'ın self-hosting'ı bu compose pattern'inin instance'ı).
 - **Runtime:** `cave-app` (XR reconciler) + `cave-app-templates/*` (Java/Python/Go/Node skeletons) + `cavectl create webapp` wizard + `cave-portal` Software Templates integration. ADR-RUNTIME-UPSTREAM-MIRROR-001 charter principle altında otomatik. Multi-tenant + PQC charter-default. **Yeni Runtime override ADR YOK.**
 
 `cave-app` crates plan:
@@ -231,4 +238,4 @@ Cave bu desenleri sovereign Rust reimpl + multi-tenant first-class + PQC-ready z
 
 ## Status update plan
 
-ADR-145 v0.1 implement: Crossplane Composition + cave-app crate scaffold + Backstage template + cavectl basic. Sonraki Sonnet sprint'lerinde wave by wave.
+ADR-031 v0.1 implement: Crossplane Composition + cave-app crate scaffold + Backstage template + cavectl basic. Sonraki Sonnet sprint'lerinde wave by wave.
