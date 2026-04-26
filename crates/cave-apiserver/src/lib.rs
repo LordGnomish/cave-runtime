@@ -43,6 +43,7 @@ pub mod conversion_v1;
 pub mod aggregator_v2;
 pub mod node_restriction;
 pub mod pod_security;
+pub mod storage_registry;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;
