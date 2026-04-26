@@ -22,6 +22,7 @@ pub mod csi;
 pub mod probe;
 pub mod eviction;
 pub mod streaming;
+pub mod security;
 
 use agent::KubeletState;
 use std::sync::Arc;
