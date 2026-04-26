@@ -1,0 +1,52 @@
+# parity.manifest.toml — cave-local-llm
+# Upstream: ollama/ollama  https://github.com/ollama/ollama
+
+[upstream]
+org     = "ollama"
+repo    = "ollama"
+version = "v0.3.0"
+
+[module]
+name        = "cave-local-llm"
+description = "Cave offline draft-generation daemon — Ollama client + parity-driven code generation"
+source_root = "src"
+
+[[functions]]
+upstream_name = "Tags"
+local_name    = "list_models"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "Generate"
+local_name    = "generate"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "GenerateStream"
+local_name    = "generate_stream"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "Chat"
+local_name    = "chat"
+file          = "src/ollama.rs"
+
+[[functions]]
+upstream_name = "ChatStream"
+local_name    = "chat_stream"
+file          = "src/ollama.rs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/tags"
+local_path    = "GET /api/tags"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /api/generate"
+local_path    = "POST /api/generate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /api/chat"
+local_path    = "POST /api/chat"

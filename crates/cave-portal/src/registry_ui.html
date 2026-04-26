@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CAVE — Registry (Paranoid Artifact Proxy)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0b0f17;--panel:#141a24;--border:#1f2937;--muted:#6b7280;--text:#e5e7eb;--accent:#6366f1;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+*{box-sizing:border-box}html,body{margin:0;padding:0;min-height:100%;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+.shell{display:grid;grid-template-rows:48px 1fr;min-height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+header h1{font-size:14px;margin:0;font-weight:600}
+header .crumb{color:var(--muted);font-size:12px}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
+button,input,select{background:#0f1622;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+main{padding:16px;display:grid;grid-template-columns:minmax(320px,1fr) minmax(420px,2fr);gap:16px;align-items:start}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.kv{display:grid;grid-template-columns:160px 1fr;gap:6px 10px;font-size:13px}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text);word-break:break-all}
+.pill{padding:1px 8px;border-radius:999px;border:1px solid var(--border);font-size:11px;display:inline-block}
+.pill.mode-off{border-color:#4b5563;color:#9ca3af}
+.pill.mode-observe_only{border-color:#b45309;color:#fcd34d;background:#1f1406}
+.pill.mode-enforce{border-color:#065f46;color:#a7f3d0;background:#06160f}
+.pill.ok{border-color:#065f46;color:#a7f3d0}
+.pill.err{border-color:#7f1d1d;color:#fecaca;background:#1f0808}
+.eco-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px}
+.eco{background:#0f1622;border:1px solid var(--border);border-radius:6px;padding:8px 10px}
+.eco .name{font-weight:600;font-size:12.5px}
+.eco .url{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);font-size:11px;word-break:break-all;margin-top:2px}
+.row{display:flex;gap:8px;align-items:center;margin:8px 0}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}
+pre{background:#0a0e15;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11.5px;white-space:pre-wrap;word-break:break-word;color:#9ca3af;max-height:420px;overflow:auto}
+a{color:#93c5fd;text-decoration:none}a:hover{text-decoration:underline}
+.notice{padding:10px;background:#1a2028;border:1px solid var(--border);border-radius:8px;color:var(--muted);margin-bottom:12px;grid-column:1 / -1}
+.notice b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+  <h1>🛡️ CAVE Registry — Paranoid Artifact Proxy</h1>
+  <span class="crumb">/ portal / registry</span>
+  <div class="right">
+    <button id="refresh">↻ Refresh status</button>
+    <a href="/" style="color:var(--muted);font-size:12px">← Portal overview</a>
+  </div>
+</header>
+<main>
+  <div class="notice">
+    <b>ADR-133</b> · All pip / uv / npm / maven / docker pulls resolve through cave-registry → upstream (PyPI / npm / Maven / Docker Hub / …) → scan pipeline (SBOM + container-scan + policy) → cache. Failed verdicts return <code>HTTP 451</code> with a <a href="#" id="showBody">structured body</a> pointing at the DefectDojo finding URL.
+  </div>
+
+  <section class="card">
+    <h2>Proxy status</h2>
+    <div id="statusBody">
+      <div class="kv">
+        <span class="k">Mode</span><span class="v"><span id="modePill" class="pill">…</span></span>
+        <span class="k">Enforce</span><span class="v" id="enforce">…</span>
+        <span class="k">Upstream count</span><span class="v" id="count">…</span>
+        <span class="k">Blocklist size</span><span class="v" id="block">…</span>
+      </div>
+      <div class="row hint">
+        <code>cave registry proxy status</code> — same data via CLI
+      </div>
+    </div>
+    <h2 style="margin-top:18px">Upstreams</h2>
+    <div id="upstreams" class="eco-grid"></div>
+  </section>
+
+  <section class="card">
+    <h2>Try it</h2>
+    <div class="row">
+      <select id="ecoSelect">
+        <option value="pypi">PyPI Simple — /api/registry/pypi/simple/&lt;pkg&gt;/</option>
+        <option value="npm">npm — /api/registry/npm/&lt;pkg&gt;</option>
+        <option value="maven-blob">Maven blob — /api/registry/maven/blob/&lt;path…&gt;</option>
+      </select>
+    </div>
+    <div class="row">
+      <input id="pkgInput" placeholder="package name (e.g. requests)" style="flex:1">
+      <button class="primary" id="go">Fetch through proxy</button>
+    </div>
+    <div class="hint">The first fetch triggers upstream pull → scan → cache. Subsequent fetches serve from cache instantly. On policy failure the response is a JSON 451 body.</div>
+    <h2 style="margin-top:18px">Response</h2>
+    <pre id="out">(nothing yet)</pre>
+  </section>
+</main>
+</div>
+<script>
+const el=id=>document.getElementById(id);
+const esc=s=>(s??'').toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function loadStatus(){
+  try{
+    const r=await fetch('/api/registry/proxy/status'); const j=await r.json();
+    const mode=j.mode||'observe_only';
+    const pill=el('modePill'); pill.textContent=mode; pill.className='pill mode-'+mode;
+    el('enforce').innerHTML=j.enforce?'<span class="pill ok">on</span>':'<span class="pill">off</span>';
+    el('count').textContent=j.upstream_count;
+    el('block').textContent=j.blocklist_size;
+    const grid=el('upstreams'); grid.innerHTML='';
+    (j.upstreams||[]).forEach(u=>{
+      const card=document.createElement('div');card.className='eco';
+      card.innerHTML=`<div class="name">${esc(u.ecosystem)}</div><div class="url">${esc(u.base_url)}</div><div class="hint">${u.disabled?'<span class="pill err">disabled</span>':'<span class="pill ok">active</span>'}</div>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    el('out').textContent='Status load failed: '+e;
+  }
+}
+el('refresh').onclick=loadStatus;
+el('go').onclick=async()=>{
+  const eco=el('ecoSelect').value, pkg=el('pkgInput').value.trim();
+  if(!pkg){alert('Enter a package name');return;}
+  let url;
+  if(eco==='pypi') url=`/api/registry/pypi/simple/${encodeURIComponent(pkg)}/`;
+  else if(eco==='npm') url=`/api/registry/npm/${encodeURIComponent(pkg)}`;
+  else url=`/api/registry/maven/blob/${encodeURIComponent(pkg)}`;
+  el('out').textContent='fetching '+url+' …';
+  try{
+    const r=await fetch(url);
+    const body=await r.text();
+    el('out').textContent=`HTTP ${r.status} ${r.statusText}\ncontent-type: ${r.headers.get('content-type')||'-'}\nx-cave-cache-key: ${r.headers.get('x-cave-cache-key')||'-'}\nx-cave-registry-verdict: ${r.headers.get('x-cave-registry-verdict')||'-'}\n\n`+body.slice(0,4000)+(body.length>4000?'\n...(truncated)':'');
+  }catch(e){ el('out').textContent='fetch error: '+e; }
+};
+el('showBody').onclick=ev=>{ev.preventDefault();el('out').textContent=JSON.stringify({
+  error:'policy_violation', error_code:'cave.registry.blocked',
+  ecosystem:'pypi', package:'pwned-lib', version:'1.0.0', verdict:'fail',
+  reasons:[{rule:'cve-critical',scanner:'container-scan',severity:'critical',cves:['CVE-2024-12345','CVE-2024-67890'],summary:'3 critical CVEs'}],
+  finding_url:'/portal/vulns/findings/<uuid>', ledger_entry:'sl://artifacts/<date>/pypi/pwned-lib/blocked',
+  appeal:{contact:'platform-security@caveplatform.dev',override_policy:'time-boxed allowlist via cave-policy',docs:'https://portal.caveplatform.dev/docs/registry/blocked-packages'}
+},null,2);};
+loadStatus();
+</script>
+</body></html>

@@ -1,0 +1,305 @@
+# parity.manifest.toml — cave-cri
+# Upstream: containerd v1.7.0  https://github.com/containerd/containerd
+
+[upstream]
+org     = "containerd"
+repo    = "containerd"
+version = "v1.7.0"
+
+[module]
+name        = "cave-cri"
+description = "containerd CRI reimplementation — 42 endpoints covering container lifecycle, images, sandboxes, snapshots"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "pkg/cri/server/service.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_create.go"
+local    = "src/runtime.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_start.go"
+local    = "src/runtime.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stop.go"
+local    = "src/runtime.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_exec.go"
+local    = "src/runtime.rs"
+
+[[files]]
+upstream = "pkg/cri/server/image_pull.go"
+local    = "src/registry.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_run.go"
+local    = "src/runtime.rs"
+
+[[files]]
+upstream = "pkg/snapshots/snapshotter.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "pkg/oci/spec.go"
+local    = "src/oci_spec.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_list.go"
+local    = "src/store.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# Container lifecycle
+
+[[functions]]
+upstream_name = "CreateContainer"
+local_name    = "create_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "StartContainer"
+local_name    = "start_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "StopContainer"
+local_name    = "stop_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RemoveContainer"
+local_name    = "delete_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListContainers"
+local_name    = "list_containers"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ContainerStatus"
+local_name    = "inspect_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UpdateContainerResources"
+local_name    = "update_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ExecSync"
+local_name    = "exec_in_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Exec"
+local_name    = "attach_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Kill"
+local_name    = "kill_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Pause"
+local_name    = "pause_container"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Resume"
+local_name    = "unpause_container"
+file          = "src/routes.rs"
+
+# Image management
+
+[[functions]]
+upstream_name = "PullImage"
+local_name    = "pull_image"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListImages"
+local_name    = "list_images"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ImageStatus"
+local_name    = "inspect_image"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RemoveImage"
+local_name    = "delete_image"
+file          = "src/routes.rs"
+
+# Sandbox management
+
+[[functions]]
+upstream_name = "RunPodSandbox"
+local_name    = "create_sandbox"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "StopPodSandbox"
+local_name    = "delete_sandbox"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListPodSandbox"
+local_name    = "list_sandboxes"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "PodSandboxStatus"
+local_name    = "get_sandbox"
+file          = "src/routes.rs"
+
+# Snapshots
+
+[[functions]]
+upstream_name = "Prepare"
+local_name    = "create_snapshot"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Mounts"
+local_name    = "get_snapshot_mounts"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Usage"
+local_name    = "get_snapshot_usage"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Remove"
+local_name    = "delete_snapshot"
+file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestContainerCreate"
+local_test    = "test_container_create"
+
+[[tests]]
+upstream_test = "TestContainerStart"
+local_test    = "test_container_start"
+
+[[tests]]
+upstream_test = "TestContainerStop"
+local_test    = "test_container_stop"
+
+[[tests]]
+upstream_test = "TestContainerExec"
+local_test    = "test_container_exec"
+
+[[tests]]
+upstream_test = "TestContainerLifecycle"
+local_test    = "test_container_lifecycle"
+
+[[tests]]
+upstream_test = "TestImagePull"
+local_test    = "test_image_pull"
+
+[[tests]]
+upstream_test = "TestImageList"
+local_test    = "test_image_list"
+
+[[tests]]
+upstream_test = "TestSandboxRun"
+local_test    = "test_sandbox_run"
+
+[[tests]]
+upstream_test = "TestSandboxStatus"
+local_test    = "test_sandbox_status"
+
+[[tests]]
+upstream_test = "TestSnapshotPrepare"
+local_test    = "test_snapshot_prepare"
+
+[[tests]]
+upstream_test = "TestContainerStats"
+local_test    = "test_container_stats"
+
+[[tests]]
+upstream_test = "TestNetworkAttach"
+local_test    = "test_network_attach"
+
+# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.CreateContainer"
+local_path    = "/api/cri/containers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.StartContainer"
+local_path    = "/api/cri/containers/{id}/start"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.StopContainer"
+local_path    = "/api/cri/containers/{id}/stop"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.RemoveContainer"
+local_path    = "/api/cri/containers/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListContainers"
+local_path    = "/api/cri/containers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStatus"
+local_path    = "/api/cri/containers/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ExecSync"
+local_path    = "/api/cri/containers/{id}/exec"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullImage"
+local_path    = "/api/cri/images/pull"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.ListImages"
+local_path    = "/api/cri/images"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.RunPodSandbox"
+local_path    = "/api/cri/sandboxes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListPodSandbox"
+local_path    = "/api/cri/sandboxes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "SnapshotterService.Prepare"
+local_path    = "/api/cri/snapshots"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "SnapshotterService.Mounts"
+local_path    = "/api/cri/snapshots/{id}/mounts"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "NetworkAttach"
+local_path    = "/api/cri/network/attach"

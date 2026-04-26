@@ -1,0 +1,127 @@
+[package]
+name = "cave-runtime"
+description = "CAVE Unified Runtime — single binary hosting all platform modules"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-runtime"
+path = "src/main.rs"
+
+[dependencies]
+# Shared infrastructure
+cave-etcd = { path = "../cave-etcd" }
+cave-apiserver = { path = "../cave-apiserver" }
+cave-net = { path = "../cave-net" }
+cave-kubelet = { path = "../cave-kubelet" }
+cave-scheduler = { path = "../cave-scheduler" }
+cave-cri = { path = "../cave-cri" }
+cave-core = { path = "../cave-core" }
+cave-auth = { path = "../cave-auth" }
+cave-db = { path = "../cave-db" }
+cave-upstream = { path = "../cave-upstream" }
+# GitOps
+cave-deploy = { path = "../cave-deploy" }
+# Platform modules
+cave-cluster = { path = "../cave-cluster" }
+# Vault / Secrets Management
+cave-vault = { path = "../cave-vault" }
+# Infrastructure-as-Code
+cave-infra = { path = "../cave-infra" }
+# Data services
+cave-cache = { path = "../cave-cache" }
+cave-store = { path = "../cave-store" }
+# Platform API
+cave-gitops-config = { path = "../cave-gitops-config" }
+# Phase 4 modules
+cave-tracker = { path = "../cave-tracker" }
+# Service mesh
+cave-mesh = { path = "../cave-mesh" }
+# Metrics
+cave-metrics = { path = "../cave-metrics" }
+# FinOps
+cave-cost-alloc = { path = "../cave-cost-alloc" }
+# Phase 5 modules
+# HA & DR
+cave-ha = { path = "../cave-ha" }
+# Phase 1 modules
+cave-trace = { path = "../cave-trace" }
+cave-compliance = { path = "../cave-compliance" }
+cave-flags = { path = "../cave-flags" }
+# Phase 5 modules
+cave-docs-site = { path = "../cave-docs-site" }
+cave-dns = { path = "../cave-dns" }
+# Observability stack (Prometheus / Loki / OTLP compat)
+cave-logs    = { path = "../cave-logs" }
+cave-registry = { path = "../cave-registry" }
+# Phase 3 modules
+cave-llm-gateway = { path = "../cave-llm-gateway" }
+cave-secrets = { path = "../cave-secrets" }
+cave-lint = { path = "../cave-lint" }
+cave-docs = { path = "../cave-docs" }
+cave-status = { path = "../cave-status" }
+cave-changelog = { path = "../cave-changelog" }
+cave-certs = { path = "../cave-certs" }
+# Phase 2 modules
+cave-vulns = { path = "../cave-vulns" }
+cave-sbom = { path = "../cave-sbom" }
+cave-uptime = { path = "../cave-uptime" }
+cave-cost = { path = "../cave-cost" }
+cave-sign = { path = "../cave-sign" }
+cave-forensics = { path = "../cave-forensics" }
+# Phase 3 modules
+cave-devlake = { path = "../cave-devlake" }
+cave-ai-obs = { path = "../cave-ai-obs" }
+cave-pii = { path = "../cave-pii" }
+cave-incidents = { path = "../cave-incidents" }
+cave-chat = { path = "../cave-chat" }
+cave-slo = { path = "../cave-slo" }
+cave-alerts = { path = "../cave-alerts" }
+cave-profiler = { path = "../cave-profiler" }
+# Phase 4 modules
+cave-workflows = { path = "../cave-workflows" }
+cave-scan = { path = "../cave-scan" }
+cave-portal = { path = "../cave-portal" }
+cave-scaffold = { path = "../cave-scaffold" }
+cave-chaos = { path = "../cave-chaos" }
+cave-policy = { path = "../cave-policy" }
+cave-dast = { path = "../cave-dast" }
+cave-backup = { path = "../cave-backup" }
+cave-pam = { path = "../cave-pam" }
+# LLM Gateway
+# Infrastructure & Networking
+cave-gateway = { path = "../cave-gateway" }
+# Data & Storage
+cave-pg = { path = "../cave-pg" }
+cave-streams = { path = "../cave-streams" }
+# Observability
+# Security & Admission
+cave-admission = { path = "../cave-admission" }
+cave-security = { path = "../cave-security" }
+# Developer Experience
+cave-dashboard = { path = "../cave-dashboard" }
+cave-pipelines = { path = "../cave-pipelines" }
+cave-rollouts = { path = "../cave-rollouts" }
+# Asset Management
+cave-artifacts = { path = "../cave-artifacts" }
+# Governance
+cave-runbook = { path = "../cave-runbook" }
+# New crates (this session)
+cave-oncall = { path = "../cave-oncall" }
+cave-container-scan = { path = "../cave-container-scan" }
+cave-erp = { path = "../cave-erp" }
+cave-docdb = { path = "../cave-docdb" }
+cave-rdbms = { path = "../cave-rdbms" }
+cave-kamaji = { path = "../cave-kamaji" }
+# Framework
+axum = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+anyhow = { workspace = true }

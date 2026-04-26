@@ -1,0 +1,199 @@
+[workspace]
+resolver = "2"
+members = [
+    # === Shared Infrastructure ===
+    "crates/cave-core",
+    "crates/cave-auth",
+    "crates/cave-db",
+    "crates/cave-ebpf-common",
+    # === Phase 1: Quick Wins ===
+    "crates/cave-flags",
+    "crates/cave-secrets",
+    "crates/cave-lint",
+    "crates/cave-docs",
+    "crates/cave-status",
+    "crates/cave-changelog",
+    "crates/cave-certs",
+    # === Phase 2: Security Core ===
+    "crates/cave-vulns",
+    "crates/cave-sbom",
+    "crates/cave-uptime",
+    "crates/cave-cost",
+    "crates/cave-sign",
+    "crates/cave-forensics",
+    # === Phase 3: Platform Intelligence ===
+    "crates/cave-devlake",
+    "crates/cave-ai-obs",
+    "crates/cave-pii",
+    "crates/cave-incidents",
+    "crates/cave-chat",
+    "crates/cave-slo",
+    "crates/cave-alerts",
+    "crates/cave-profiler",
+    # === Phase 4: Heavy Hitters ===
+    "crates/cave-workflows",
+    "crates/cave-scan",
+    "crates/cave-portal",
+    "crates/cave-portal-api",
+    "crates/cave-scaffold",
+    "crates/cave-chaos",
+    "crates/cave-dast",
+    "crates/cave-pam",
+    # === LLM Gateway ===
+    "crates/cave-llm-gateway",
+    # === Local LLM ===
+    "crates/cave-local-llm",
+    # === Infrastructure & Networking ===
+    "crates/cave-gateway",
+    "crates/cave-dns",
+    "crates/cave-mesh",
+    "crates/cave-cluster",
+    "crates/cave-ha",
+    "crates/cave-infra",
+    # === Data & Storage ===
+    "crates/cave-pg",
+    "crates/cave-cache",
+    "crates/cave-store",
+    "crates/cave-streams",
+    # === Observability ===
+    "crates/cave-metrics",
+    "crates/cave-logs",
+    "crates/cave-trace",
+    # === Security & Admission ===
+    "crates/cave-admission",
+    "crates/cave-security",
+    "crates/cave-vault",
+    # === Developer Experience ===
+    "crates/cave-cli",
+    "crates/cave-dashboard",
+    "crates/cave-docs-site",
+    "crates/cave-deploy",
+    "crates/cave-pipelines",
+    "crates/cave-rollouts",
+    # === Asset & Artifact Management ===
+    "crates/cave-artifacts",
+    # === Registry & Feature Flags ===
+    "crates/cave-registry",
+    # === Platform Governance ===
+    "crates/cave-runbook",
+    "crates/cave-gitops-config",
+    "crates/cave-compliance",
+    "crates/cave-cost-alloc",
+    "crates/cave-backup",
+    # === Issue Tracking ===
+    "crates/cave-tracker",
+    # === Policy ===
+    "crates/cave-policy",
+    # === Runtime Binary ===
+    "crates/cave-runtime",
+    # === Upstream Tracker ===
+    "crates/cave-upstream",
+    # === Sovereign Ledger ===
+    "crates/cave-ledger",
+    # === Crossplane ===
+    "crates/cave-apiserver",
+    "crates/cave-cri",
+    "crates/cave-kubelet",
+    "crates/cave-net",
+    "crates/cave-scheduler",
+    "crates/cave-etcd",
+    "crates/cave-crossplane",
+    # === New crates (this session) ===
+    "crates/cave-oncall",
+    "crates/cave-container-scan",
+    "crates/cave-erp",
+    "crates/cave-docdb",
+    "crates/cave-rdbms",
+    # === Kubernetes Control Plane ===
+    "crates/cave-kamaji",
+    # === Shared Kernel ===
+    "crates/cave-kernel",
+    # === Portal Backstage Parity ===
+    "crates/cave-techdocs",
+    "crates/cave-permission",
+    # === Data Lake Foundation ===
+    "crates/cave-iceberg",
+    "crates/cave-datafusion",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/cave-runtime/cave-runtime"
+rust-version = "1.85"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+# Web framework
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+# Database
+deadpool-postgres = "0.14"
+tokio-postgres = { version = "0.7", features = ["with-serde_json-1", "with-uuid-1", "with-chrono-0_4"] }
+# Auth / JWT
+jsonwebtoken = "9"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = "0.27"
+opentelemetry-otlp = "0.27"
+prometheus-client = "0.23"
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+config = "0.14"
+clap = { version = "4", features = ["derive"] }
+# Cryptography
+sha2 = "0.10"
+hex = "0.4"
+# Security scanning
+aho-corasick = "1"
+regex = "1"
+tree-sitter = "0.24"
+# Kubernetes
+kube = { version = "0.97", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.23", features = ["latest"] }
+# Crypto / Signing
+ring = "0.17"
+ed25519-dalek = "2"
+# HTTP client (for upstream tracking, uptime probes)
+reqwest-middleware = "0.4"
+# Persistence
+rusqlite = { version = "0.32", features = ["bundled"] }
+async-trait = "0.1"
+# Testing — container-backed integration tests
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+# Markdown rendering
+pulldown-cmark = "0.12"
+# Encoding
+base64 = "0.22"
+# Random number generation
+rand = { version = "0.8", features = ["std"] }
+# Additional deps used by platform modules
+bytes = "1"
+parking_lot = "0.12"
+dashmap = "6"
+flate2 = "1"
+futures = "0.3"
+lz4_flex = "0.11"
+petgraph = "0.6"
+snap = "1"
+tokio-util = { version = "0.7", features = ["full"] }
+zstd = "0.13"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

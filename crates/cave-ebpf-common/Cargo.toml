@@ -1,0 +1,12 @@
+[package]
+name = "cave-ebpf-common"
+description = "Shared eBPF types and BPF map definitions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,86 @@
+# Rust build artifacts
+/target
+**/target/
+**/*.rs.bk
+Cargo.lock
+*.rlib
+*.rmeta
+
+# Secrets and credentials (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.keystore
+secrets/
+.secrets/
+
+# Local LLM runtime artifacts
+docs/drafts/ready/
+docs/drafts/failed/
+docs/drafts/pending/
+target/cave-local-llm-drafts/
+
+# Editor + IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Agent worktree debris
+.claude/worktrees/
+.claude/memory/
+.claire/
+.claire-memory/
+
+# macOS duplicate files (Finder "File 2.ext" pattern)
+* 2.*
+* 2
+*\ 2.*
+
+# Node (for any JS tooling in portal-ui)
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnp.js
+
+# Python (local scripts)
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+.venv/
+venv/
+
+# Logs + runtime state
+*.log
+*.log.*
+logs/
+tmp/
+*.pid
+*.sock
+
+# Backup files
+*.bak
+*.orig
+*.rej
+
+# OS-specific
+._*
+.fseventsd
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+
+# Local daemon queue state
+queue/*.lock
+queue/*.bak
+**/runtime-tasks.yaml.lock

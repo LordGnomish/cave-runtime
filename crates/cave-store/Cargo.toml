@@ -1,0 +1,52 @@
+[package]
+name = "cave-store"
+description = "Unified storage engine — etcd v3 KV + MinIO/S3 object store with WAL and MVCC"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+
+# Async runtime & streams
+tokio = { workspace = true }
+tokio-stream = "0.1"
+futures = "0.3"
+async-stream = "0.3"
+
+# Web framework
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# XML (S3 responses)
+quick-xml = { version = "0.37", features = ["serialize"] }
+
+# Encoding
+base64 = "0.22"
+hex = "0.4"
+
+# Crypto (presigned URLs, SSE-C, SigV4)
+ring = { workspace = true }
+hmac = "0.12"
+sha2 = "0.10"
+
+# IDs & time
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Utilities
+thiserror = { workspace = true }
+tracing = { workspace = true }
+bytes = "1"
+rand = "0.8"
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+axum-test = "20"
+tempfile = "3"

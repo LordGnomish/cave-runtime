@@ -1,0 +1,40 @@
+[package]
+name = "cave-trace"
+description = "Distributed tracing engine — full Jaeger/Tempo parity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cave-core = { path = "../cave-core" }
+
+# Web
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+
+# Metrics for SPM
+prometheus-client = { workspace = true }
+
+# HTTP client for remote sampler config
+reqwest = { workspace = true }
+
+# Base64 for OTLP JSON encoding (protobuf bytes → base64)
+base64 = "0.22"
+
+[dev-dependencies]
+tokio = { workspace = true }

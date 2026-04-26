@@ -1,0 +1,53 @@
+# CAVE Unified Runtime — Configuration
+# Profile: local (dev)
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  metrics_port: 9090
+
+auth:
+  provider: keycloak  # or "okta" for Azure profiles
+  issuer_url: "http://localhost:8180/realms/cave"
+  audience: "cave-runtime"
+
+database:
+  url: "postgres://cave:cave@localhost:5432/cave_runtime"
+  max_pool_size: 10
+
+modules:
+  # Phase 1 — enabled by default
+  flags: true
+  secrets: true
+  lint: true
+  docs: true
+  status: true
+  changelog: true
+  certs: true
+  # Phase 2 — enable when ready
+  vulns: false
+  sbom: false
+  uptime: false
+  cost: false
+  sign: false
+  forensics: false
+  # Phase 3
+  devlake: false
+  ai_obs: false
+  pii: false
+  incidents: false
+  chat: false
+  slo: false
+  alerts: false
+  profiler: false
+  # Phase 4
+  registry: false
+  workflows: false
+  scan: false
+  portal: false
+  scaffold: false
+  chaos: false
+  policy: false
+  dast: false
+  backup: false
+  pam: false

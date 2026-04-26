@@ -1,0 +1,17 @@
+//! HTTP routes for cave-certs.
+
+use axum::{routing::get, Json, Router};
+
+pub fn create_router() -> Router {
+    Router::new()
+        .route("/api/certs/health", get(health))
+}
+
+async fn health() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "module": "cave-certs",
+        "status": "ok",
+        "upstream": "cert-manager",
+        "features": "ACME/Lets Encrypt, cert issuance, auto-renewal, expiry alerting, K8s CRDs"
+    }))
+}

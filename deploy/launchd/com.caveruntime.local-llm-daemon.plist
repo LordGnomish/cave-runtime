@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- ── Identity ─────────────────────────────────────────────────── -->
+  <key>Label</key>
+  <string>com.caveruntime.local-llm-daemon</string>
+
+  <!-- ── Binary ───────────────────────────────────────────────────── -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/gnomish/Documents/claude/platform/cave-runtime/target/release/cave-local-llm-daemon</string>
+    <string>--workspace-root</string>
+    <string>/Users/gnomish/Documents/claude/platform/cave-runtime</string>
+    <string>start</string>
+  </array>
+
+  <!-- ── Auto-start ────────────────────────────────────────────────── -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- ── Environment ───────────────────────────────────────────────── -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Keep Ollama loaded in GPU VRAM indefinitely. -->
+    <key>OLLAMA_KEEP_ALIVE</key>
+    <string>24h</string>
+    <!-- Weekly branch for Qwen amele commits. -->
+    <key>CAVE_DAEMON_BRANCH</key>
+    <string>qwen/auto-2026-W17</string>
+    <!-- Qwen3-Coder-Next Q4_K_M (80B MoE, 52GB, 3B active). Override with OLLAMA_MODEL. -->
+    <key>OLLAMA_MODEL</key>
+    <string>qwen3-coder-next:Q4_K_M</string>
+    <!-- Rust structured logging level. -->
+    <key>RUST_LOG</key>
+    <string>cave_local_llm=info</string>
+    <!-- Explicit PATH so launchd finds cargo and git. -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- Workspace root (also passed as CLI arg above for explicitness). -->
+    <key>CAVE_WORKSPACE_ROOT</key>
+    <string>/Users/gnomish/Documents/claude/platform/cave-runtime</string>
+    <!-- Secondary repo: pipeline-platform-starter (weight 0.2). -->
+    <key>CAVE_SECONDARY_REPO_PATH</key>
+    <string>/Users/gnomish/Documents/claude/pipeline-platform-starter</string>
+    <key>CAVE_SECONDARY_REPO_WEIGHT</key>
+    <string>0.2</string>
+    <!-- Tertiary repo: muleforge (weight 0.2). -->
+    <key>CAVE_TERTIARY_REPO_PATH</key>
+    <string>/Users/gnomish/Documents/claude/platform/muleforge</string>
+    <key>CAVE_TERTIARY_REPO_WEIGHT</key>
+    <string>0.2</string>
+  </dict>
+
+  <!-- ── Logging ────────────────────────────────────────────────────── -->
+  <key>StandardOutPath</key>
+  <string>/Users/gnomish/Library/Logs/cave-local-llm-daemon.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/gnomish/Library/Logs/cave-local-llm-daemon.error.log</string>
+
+  <!-- ── Throttle rapid restart cycles ─────────────────────────────── -->
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+</dict>
+</plist>

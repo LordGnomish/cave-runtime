@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>CAVE Platform</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-sidebar:#161b22;--bg-card:#21262d;--bg-hover:#30363d;
+  --border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
+  --accent:#58a6ff;--accent-dim:#1f6feb;
+  --green:#3fb950;--yellow:#d29922;--red:#f85149;
+  --radius:6px;--sidebar-w:240px;--transition:0.18s ease;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+#app{display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform var(--transition);z-index:100}
+.sidebar-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.logo{width:28px;height:28px;background:linear-gradient(135deg,var(--accent-dim),var(--accent));border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff;flex-shrink:0;letter-spacing:-0.5px}
+.logo-text{font-weight:700;font-size:15px}
+.sidebar-search{padding:9px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.search-btn{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-muted);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color var(--transition),color var(--transition)}
+.search-btn:hover{border-color:var(--accent);color:var(--text)}
+.search-btn-kbd{margin-left:auto;font-size:10px;background:var(--bg-card);padding:2px 5px;border-radius:3px;border:1px solid var(--border)}
+.sidebar-nav{flex:1;overflow-y:auto;padding:6px 0}
+.sidebar-nav::-webkit-scrollbar{width:3px}
+.sidebar-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 16px;color:var(--text-muted);cursor:pointer;transition:background var(--transition),color var(--transition);user-select:none}
+.nav-item:hover{background:var(--bg-hover);color:var(--text)}
+.nav-item.active{background:rgba(31,111,235,0.25);color:var(--accent);font-weight:500}
+.nav-item .sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.nav-sec{display:flex;align-items:center;gap:6px;padding:7px 16px 4px;color:var(--text-muted);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;cursor:pointer;user-select:none;margin-top:2px}
+.nav-sec:hover{color:var(--text)}
+.nav-sec .chev{margin-left:auto;font-size:9px;transition:transform var(--transition);display:inline-block}
+.nav-sec.closed .chev{transform:rotate(-90deg)}
+.nav-sub{overflow:hidden}
+.nav-sub .nav-item{padding-left:30px;font-size:13px}
+.sidebar-footer{padding:8px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);flex-shrink:0}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#topbar{height:50px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0;background:var(--bg)}
+#hamburger{display:none;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:4px;line-height:1}
+#breadcrumb{color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:6px;min-width:0}
+#breadcrumb .bc-active{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hbadge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);background:var(--bg-card);border:1px solid var(--border);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.btn-topbar{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-family:inherit;transition:all var(--transition)}
+.btn-topbar:hover{border-color:var(--accent);color:var(--accent)}
+#content{flex:1;overflow-y:auto;padding:24px}
+#content::-webkit-scrollbar{width:5px}
+#content::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── Cards & Stats ── */
+.page-hdr{margin-bottom:24px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:4px}
+.page-sub{color:var(--text-muted);font-size:13px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:28px}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+.stat-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px}
+.stat-val{font-size:24px;font-weight:700;line-height:1}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:3px}
+.c-green{color:var(--green)}.c-yellow{color:var(--yellow)}.c-red{color:var(--red)}.c-accent{color:var(--accent)}
+.sec-title{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.module-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;margin-bottom:28px}
+.mcard{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:13px;cursor:pointer;transition:border-color var(--transition),box-shadow var(--transition),transform var(--transition)}
+.mcard:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,0.4);transform:translateY(-1px)}
+.mcard-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.mcard-name{font-weight:600;font-size:13px}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mcard-desc{font-size:11px;color:var(--text-muted);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mcard-foot{margin-top:9px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.pbadge{font-size:10px;padding:2px 6px;border-radius:10px;font-weight:600;white-space:nowrap}
+.p1{background:#1f6feb22;color:var(--accent);border:1px solid #1f6feb55}
+.p2{background:#3fb95022;color:var(--green);border:1px solid #3fb95055}
+.p3{background:#d2992222;color:var(--yellow);border:1px solid #d2992255}
+.p4{background:#f8514922;color:var(--red);border:1px solid #f8514955}
+.utag{font-size:10px;color:var(--text-muted);background:var(--bg);border:1px solid var(--border);padding:2px 6px;border-radius:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+
+/* ── Status dots ── */
+.dg{background:var(--green);box-shadow:0 0 5px var(--green)}
+.dy{background:var(--yellow);box-shadow:0 0 5px var(--yellow)}
+.dr{background:var(--red);box-shadow:0 0 5px var(--red)}
+.dm{background:var(--text-muted)}
+
+/* ── Module detail ── */
+.mod-hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.mod-icon{width:50px;height:50px;border-radius:10px;background:linear-gradient(135deg,var(--accent-dim),var(--accent));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.mod-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.mod-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.spill{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600}
+.sp-healthy{background:#3fb95018;color:var(--green);border:1px solid #3fb95044}
+.sp-warning{background:#d2992218;color:var(--yellow);border:1px solid #d2992244}
+.sp-error{background:#f8514918;color:var(--red);border:1px solid #f8514944}
+.sp-pending{background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border)}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px}
+.dcrd{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.dcrd-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:12px}
+.feat-list{list-style:none;display:flex;flex-direction:column;gap:7px}
+.feat-list li{display:flex;align-items:center;gap:8px;font-size:13px}
+.feat-list li::before{content:'✓';color:var(--green);font-weight:700;font-size:11px;flex-shrink:0}
+.qactions{display:flex;flex-wrap:wrap;gap:7px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all var(--transition);background:none;font-family:inherit}
+.btn-p{background:var(--accent-dim);color:#fff;border-color:var(--accent-dim)}
+.btn-p:hover{background:var(--accent)}
+.btn-s{background:var(--bg-card);color:var(--text);border-color:var(--border)}
+.btn-s:hover{border-color:var(--accent);color:var(--accent)}
+.cfg-ph{background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);padding:18px;text-align:center;color:var(--text-muted);font-size:12px;line-height:1.6}
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-k{font-size:12px;color:var(--text-muted)}
+.info-v{font-size:12px;font-weight:500}
+.adr-tag{display:inline-flex;align-items:center;font-size:10px;padding:2px 7px;border-radius:10px;background:#1f6feb18;color:var(--accent);border:1px solid #1f6feb44;cursor:pointer;transition:background var(--transition);margin:2px}
+.adr-tag:hover{background:#1f6feb33}
+.ep-code{font-size:11px;color:var(--accent);background:var(--bg);padding:3px 8px;border-radius:4px;border:1px solid var(--border);font-family:monospace}
+
+/* ── Search palette ── */
+#soverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px)}
+#soverlay.open{display:flex;align-items:flex-start;justify-content:center;padding-top:14vh}
+#spalette{background:var(--bg-sidebar);border:1px solid var(--border);border-radius:10px;width:540px;max-width:92vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.6)}
+#sinput{width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);padding:13px 16px;color:var(--text);font-size:15px;outline:none;font-family:inherit}
+#sinput::placeholder{color:var(--text-muted)}
+#sresults{max-height:340px;overflow-y:auto}
+#sresults::-webkit-scrollbar{width:3px}
+#sresults::-webkit-scrollbar-thumb{background:var(--border)}
+.sresult{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background var(--transition)}
+.sresult:hover,.sresult.focused{background:var(--bg-hover)}
+.sr-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.sr-name{font-weight:600;font-size:13px}
+.sr-desc{font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.sr-cat{font-size:10px;color:var(--text-muted);margin-left:auto;background:var(--bg-card);padding:2px 7px;border-radius:10px;border:1px solid var(--border);white-space:nowrap;flex-shrink:0}
+.sempty{padding:20px;text-align:center;color:var(--text-muted);font-size:13px}
+
+/* ── Scaffold modal ── */
+#scaffoverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;backdrop-filter:blur(3px);align-items:center;justify-content:center}
+#scaffoverlay.open{display:flex}
+#scaffmodal{background:var(--bg-sidebar);border:1px solid var(--border);border-radius:10px;width:480px;max-width:94vw;box-shadow:0 20px 60px rgba(0,0,0,0.6);overflow:hidden}
+.scaff-hdr{padding:18px 20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.scaff-hdr h2{font-size:16px;font-weight:700}
+.scaff-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px}
+.scaff-close:hover{color:var(--text)}
+.scaff-body{padding:20px;display:flex;flex-direction:column;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px}
+.form-input,.form-select{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-size:13px;font-family:inherit;width:100%;outline:none;transition:border-color var(--transition)}
+.form-input:focus,.form-select:focus{border-color:var(--accent)}
+.form-select option{background:var(--bg-card)}
+.scaff-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+#scaffresult{padding:10px 12px;border-radius:var(--radius);font-size:12px;font-family:monospace;background:var(--bg);border:1px solid var(--border);color:var(--green);display:none;word-break:break-all}
+
+/* ── ADR Browser ── */
+.adr-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.adr-filter-inp{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-size:12px;font-family:inherit;outline:none;flex:1;min-width:160px;transition:border-color var(--transition)}
+.adr-filter-inp:focus{border-color:var(--accent)}
+.scope-btn{font-size:11px;padding:4px 10px;border-radius:10px;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);font-family:inherit;transition:all var(--transition)}
+.scope-btn.active,.scope-btn:hover{border-color:var(--accent);color:var(--accent);background:#1f6feb18}
+.adr-list-grid{display:flex;flex-direction:column;gap:4px}
+.adr-row{display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color var(--transition),background var(--transition)}
+.adr-row:hover{border-color:var(--accent);background:var(--bg-hover)}
+.adr-num{font-size:11px;font-weight:700;color:var(--accent);font-family:monospace;min-width:48px}
+.adr-title{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adr-scope{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text-muted);white-space:nowrap;flex-shrink:0}
+.adr-cat{font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;min-width:80px;text-align:right}
+/* Markdown rendering */
+.md-body{font-size:13px;line-height:1.7;color:var(--text);max-width:760px}
+.md-body h1{font-size:20px;font-weight:700;margin:0 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.md-body h2{font-size:15px;font-weight:700;margin:20px 0 8px;color:var(--accent)}
+.md-body h3{font-size:13px;font-weight:700;margin:16px 0 6px}
+.md-body p{margin:0 0 10px;color:var(--text-muted)}
+.md-body strong{color:var(--text);font-weight:600}
+.md-body code{font-family:monospace;font-size:11px;background:var(--bg-card);padding:1px 5px;border-radius:3px;border:1px solid var(--border)}
+.md-body pre{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;overflow-x:auto;margin:10px 0;font-size:11px;font-family:monospace;white-space:pre-wrap}
+.md-body ul,.md-body ol{margin:0 0 10px 20px;color:var(--text-muted)}
+.md-body li{margin-bottom:3px}
+.md-body table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+.md-body th{background:var(--bg-card);padding:7px 10px;text-align:left;font-weight:600;border:1px solid var(--border)}
+.md-body td{padding:6px 10px;border:1px solid var(--border)}
+.md-body tr:nth-child(even) td{background:#ffffff05}
+.md-body blockquote{border-left:3px solid var(--accent);padding:6px 12px;margin:10px 0;color:var(--text-muted);background:#1f6feb08}
+.md-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* ── Upstream Tracker ── */
+.upstream-table{width:100%;border-collapse:collapse;font-size:12px}
+.upstream-table th{background:var(--bg-card);padding:9px 12px;text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:var(--text-muted);border:1px solid var(--border);white-space:nowrap}
+.upstream-table td{padding:8px 12px;border:1px solid var(--border);vertical-align:middle}
+.upstream-table tr:hover td{background:var(--bg-hover)}
+.parity-bar{display:flex;align-items:center;gap:6px}
+.parity-track{flex:1;height:5px;background:var(--bg-hover);border-radius:3px;overflow:hidden;min-width:60px}
+.parity-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.parity-pct{font-size:11px;font-family:monospace;color:var(--text-muted);min-width:30px;text-align:right}
+.gh-link{color:var(--accent);text-decoration:none;font-size:11px}
+.gh-link:hover{text-decoration:underline}
+.cave-mod-tag{font-size:10px;padding:2px 6px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted)}
+.upstream-search{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:7px 12px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:280px;transition:border-color var(--transition)}
+.upstream-search:focus{border-color:var(--accent)}
+.cat-filter{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── Mobile overlay ── */
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:90}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  #sidebar{position:fixed;top:0;left:0;bottom:0;transform:translateX(-100%);box-shadow:none}
+  #sidebar.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,0.5)}
+  #sidebar-overlay.show{display:block}
+  #hamburger{display:flex}
+  #content{padding:14px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .module-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .detail-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .module-grid{grid-template-columns:1fr 1fr}
+}
+
+/* ── Animations ── */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.pulse{animation:pulse 2s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar-overlay" onclick="closeSidebar()"></div>
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">CV</div>
+      <span class="logo-text">CAVE Platform</span>
+    </div>
+    <div class="sidebar-search">
+      <button class="search-btn" onclick="openSearch()">
+        <span>⌕</span><span>Search modules…</span>
+        <span class="search-btn-kbd">⌘K</span>
+      </button>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav"></div>
+    <div class="sidebar-footer">
+      v<span id="rv">…</span> · <span id="ru">—</span>
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="topbar">
+      <button id="hamburger" onclick="toggleSidebar()">☰</button>
+      <div id="breadcrumb">
+        <span style="color:var(--text-muted)">CAVE</span>
+        <span style="color:var(--border)">›</span>
+        <span class="bc-active" id="bc">Overview</span>
+      </div>
+      <div class="topbar-right">
+        <button class="btn-topbar" onclick="openScaffold()">＋ New Project</button>
+        <div class="hbadge">
+          <span class="sdot dm" id="gsdot"></span>
+          <span id="gstext">Connecting…</span>
+        </div>
+      </div>
+    </div>
+    <div id="content"></div>
+  </div>
+</div>
+
+<!-- Search Palette -->
+<div id="soverlay" onclick="handleSOverlay(event)">
+  <div id="spalette">
+    <input id="sinput" type="text" placeholder="Jump to module…"
+      oninput="onSInput()" onkeydown="onSKey(event)" autocomplete="off" spellcheck="false">
+    <div id="sresults"></div>
+  </div>
+</div>
+
+<!-- Scaffold Modal -->
+<div id="scaffoverlay" onclick="handleScaffOverlay(event)">
+  <div id="scaffmodal">
+    <div class="scaff-hdr">
+      <h2>🏗 New Project</h2>
+      <button class="scaff-close" onclick="closeScaffold()">✕</button>
+    </div>
+    <div class="scaff-body">
+      <div class="form-group">
+        <label class="form-label">Project Name</label>
+        <input id="sf-name" class="form-input" type="text" placeholder="my-service" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Language</label>
+        <select id="sf-lang" class="form-select">
+          <option value="rust">Rust</option>
+          <option value="go">Go</option>
+          <option value="typescript">TypeScript</option>
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Template</label>
+        <select id="sf-tmpl" class="form-select">
+          <option value="rest-api">REST API</option>
+          <option value="event-consumer">Event Consumer</option>
+          <option value="batch-job">Batch Job</option>
+          <option value="library">Library</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Target Namespace</label>
+        <input id="sf-ns" class="form-input" type="text" placeholder="team-name" autocomplete="off">
+      </div>
+      <div id="scaffresult"></div>
+    </div>
+    <div class="scaff-footer">
+      <button class="btn btn-s" onclick="closeScaffold()">Cancel</button>
+      <button class="btn btn-p" onclick="submitScaffold()" id="scaffsubmit">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Module Registry ──────────────────────────────────────────────────────────
+
+const MODS = {
+  // Core
+  db:{id:'db',name:'Database',cat:'core',desc:'Shared PostgreSQL cluster with PgBouncer connection pooling',up:null,phase:2,status:'pending',icon:'🗄',features:['Connection pooling','Read replicas','Schema migrations','Automated backups'],ep:null,loc:820,relatedAdrs:[47,43],github:null},
+  auth:{id:'auth',name:'Auth',cat:'core',desc:'Native Okta/Keycloak SSO — OIDC, SAML 2.0, RBAC',up:null,phase:2,status:'pending',icon:'🔑',features:['OIDC / OAuth2','SAML 2.0','Token refresh','MFA enforcement'],ep:null,loc:1240,relatedAdrs:[6,7,64,104,129,142],github:null},
+  upstream:{id:'upstream',name:'Upstream Tracker',cat:'core',desc:'Monitors 66 reimplemented OSS projects for releases, RFCs, and breaking changes',up:null,phase:1,status:'healthy',icon:'📡',features:['GitHub release tracking','AI-assisted triage','ADOPT / WATCH / SKIP','Auto-issue creation'],ep:null,loc:640,relatedAdrs:[127],github:null},
+  // Security
+  secrets:{id:'secrets',name:'Secrets',cat:'security',desc:'Credential and token scanning — prevents secrets from reaching git',up:'Trufflehog',phase:1,status:'healthy',icon:'🔍',features:['Regex-based detection','Custom detector patterns','Verification API','Git history scanning'],ep:'/api/secrets/health',loc:960,relatedAdrs:[17,20,79,83,115],github:'https://github.com/trufflesecurity/trufflehog'},
+  certs:{id:'certs',name:'Certs',cat:'security',desc:'Certificate lifecycle — ACME, mTLS provisioning, auto-rotation',up:'cert-manager',phase:1,status:'healthy',icon:'📜',features:['ACME protocol','mTLS provisioning','Auto-rotation','CRD-driven issuers'],ep:'/api/certs/health',loc:760,relatedAdrs:[15,56,105],github:'https://github.com/cert-manager/cert-manager'},
+  sign:{id:'sign',name:'Code Signing',cat:'security',desc:'Container and artifact signing via Sigstore / Cosign',up:'Sigstore',phase:2,status:'pending',icon:'✍️',features:['Container signing','SLSA attestations','Keyless signing','Rekor transparency log'],ep:null,loc:420,relatedAdrs:[77,101],github:'https://github.com/sigstore/cosign'},
+  policy:{id:'policy',name:'Policy',cat:'security',desc:'OPA-based admission control and audit policies for Kubernetes',up:'OPA Gatekeeper',phase:2,status:'pending',icon:'📋',features:['Rego policies','Admission webhooks','Audit mode','Constraint templates'],ep:null,loc:560,relatedAdrs:[30,78,89,131],github:'https://github.com/open-policy-agent/gatekeeper'},
+  vulns:{id:'vulns',name:'Vulnerabilities',cat:'security',desc:'Vulnerability management and tracking across all findings',up:'DefectDojo',phase:2,status:'pending',icon:'🐛',features:['Importer formats','JIRA integration','Deduplication','SLA tracking'],ep:null,loc:660,relatedAdrs:[35],github:'https://github.com/DefectDojo/django-DefectDojo'},
+  sbom:{id:'sbom',name:'SBOM',cat:'security',desc:'Software Bill of Materials — CycloneDX, SPDX, dependency analysis',up:'DependencyTrack',phase:2,status:'pending',icon:'📦',features:['CycloneDX support','NVD/OSV integration','Policy engine','Component analysis'],ep:null,loc:510,relatedAdrs:[101],github:'https://github.com/DependencyTrack/dependency-track'},
+  scan:{id:'scan',name:'Code Scan',cat:'security',desc:'Static analysis with quality gates across all languages',up:'SonarQube',phase:3,status:'pending',icon:'🔬',features:['Multi-language rules','Quality profiles','Coverage gates','PR decoration'],ep:null,loc:490,relatedAdrs:[18,19,58],github:'https://github.com/SonarSource/sonarqube'},
+  pii:{id:'pii',name:'PII Detection',cat:'security',desc:'PII and sensitive data detection with anonymization',up:'Microsoft Presidio',phase:3,status:'pending',icon:'🕵️',features:['Named entity recognition','Custom recognizers','Anonymization','Multi-language'],ep:null,loc:390,relatedAdrs:[102,111],github:'https://github.com/microsoft/presidio'},
+  dast:{id:'dast',name:'DAST',cat:'security',desc:'Dynamic application security testing — API and web scanning',up:'OWASP ZAP',phase:3,status:'pending',icon:'⚡',features:['API scanning','Auth testing','Passive scanning','Active attack rules'],ep:null,loc:430,relatedAdrs:[23,57],github:'https://github.com/zaproxy/zaproxy'},
+  pam:{id:'pam',name:'PAM',cat:'security',desc:'Privileged access management — session recording, zero-trust',up:'Teleport',phase:3,status:'pending',icon:'🚪',features:['Session recording','RBAC','Kubernetes access','Audit trail'],ep:null,loc:390,relatedAdrs:[130],github:'https://github.com/gravitational/teleport'},
+  // Observability
+  status:{id:'status',name:'Status',cat:'observability',desc:'Platform status page and component health dashboard',up:null,phase:1,status:'healthy',icon:'📊',features:['Component status','Incident history','Uptime metrics','Subscriber notifications'],ep:'/api/status/health',loc:730,relatedAdrs:[29,72],github:null},
+  uptime:{id:'uptime',name:'Uptime',cat:'observability',desc:'HTTP, TCP, DNS uptime monitoring with alerting',up:'Uptime Kuma',phase:2,status:'pending',icon:'💓',features:['HTTP monitoring','TCP checks','DNS checks','Notification channels'],ep:null,loc:570,relatedAdrs:[29],github:'https://github.com/louislam/uptime-kuma'},
+  incidents:{id:'incidents',name:'Incidents',cat:'observability',desc:'On-call scheduling and incident management',up:'Grafana OnCall',phase:2,status:'pending',icon:'🚨',features:['On-call schedules','Escalation policies','Alert routing','Postmortem tracking'],ep:null,loc:630,relatedAdrs:[29],github:'https://github.com/grafana/oncall'},
+  'ai-obs':{id:'ai-obs',name:'AI Observability',cat:'observability',desc:'LLM trace and evaluation framework for AI workloads',up:'Langfuse',phase:2,status:'pending',icon:'🤖',features:['Trace capture','Prompt versioning','Evaluation scoring','Cost tracking'],ep:null,loc:490,relatedAdrs:[51,103],github:'https://github.com/langfuse/langfuse'},
+  profiler:{id:'profiler',name:'Profiler',cat:'observability',desc:'Continuous profiling with eBPF and language-native integrations',up:'Pyroscope',phase:3,status:'pending',icon:'📈',features:['eBPF profiling','CPU / memory profiles','Multi-language SDK','Flame graphs'],ep:null,loc:350,relatedAdrs:[29],github:'https://github.com/grafana/pyroscope'},
+  forensics:{id:'forensics',name:'Forensics',cat:'observability',desc:'eBPF-based runtime security monitoring and forensics',up:'Tetragon',phase:3,status:'pending',icon:'🔭',features:['eBPF hooks','Process tracking','Network events','Policy enforcement'],ep:null,loc:400,relatedAdrs:[16,90,106],github:'https://github.com/cilium/tetragon'},
+  // CI/CD
+  lint:{id:'lint',name:'Lint',cat:'cicd',desc:'Dockerfile and IaC linting with best-practice enforcement',up:'Hadolint',phase:1,status:'healthy',icon:'✅',features:['Dockerfile rules','Shell linting','Custom ignore rules','CI integration'],ep:'/api/lint/health',loc:690,relatedAdrs:[10,40],github:'https://github.com/hadolint/hadolint'},
+  changelog:{id:'changelog',name:'Changelog',cat:'cicd',desc:'Automated changelog generation and release notes management',up:null,phase:1,status:'healthy',icon:'📝',features:['Conventional commits','Auto-generation','Version bumping','Release notes'],ep:'/api/changelog/health',loc:590,relatedAdrs:[10],github:null},
+  docs:{id:'docs',name:'Docs / Schemas',cat:'cicd',desc:'Schema registry and API documentation — replaces Apicurio',up:'Apicurio Registry',phase:1,status:'healthy',icon:'📚',features:['OpenAPI / AsyncAPI','Schema versioning','Compatibility rules','JSON Schema'],ep:'/api/docs/health',loc:840,relatedAdrs:[59,60],github:'https://github.com/Apicurio/apicurio-registry'},
+  registry:{id:'registry',name:'Artifact Registry',cat:'cicd',desc:'Container image and package registry with remote sync',up:'Pulp',phase:2,status:'pending',icon:'🏗️',features:['OCI registry','Helm charts','PyPI / npm mirrors','Remote sync'],ep:null,loc:450,relatedAdrs:[28,108,120],github:'https://github.com/pulp/pulpcore'},
+  chaos:{id:'chaos',name:'Chaos',cat:'cicd',desc:'Fault injection for resilience and chaos engineering',up:'Chaos Mesh',phase:3,status:'pending',icon:'🌪️',features:['Pod failures','Network partitions','I/O chaos','Schedule model'],ep:null,loc:330,relatedAdrs:[39,100],github:'https://github.com/chaos-mesh/chaos-mesh'},
+  // Platform
+  flags:{id:'flags',name:'Feature Flags',cat:'platform',desc:'Feature flag management with strategies, targeting and metrics',up:'Unleash',phase:2,status:'pending',icon:'🚩',features:['Toggle strategies','Client SDKs','A/B testing','Kill switch'],ep:null,loc:600,relatedAdrs:[37],github:'https://github.com/Unleash/unleash'},
+  portal:{id:'portal',name:'Dev Portal',cat:'platform',desc:'Developer portal — service catalog, scaffolding, tech radar',up:'Backstage',phase:1,status:'healthy',icon:'🏠',features:['Service catalog','Scaffolding templates','Plugin system','Tech radar'],ep:'/api/portal/health',loc:1870,relatedAdrs:[11,25,76],github:'https://github.com/backstage/backstage'},
+  chat:{id:'chat',name:'AI Chat',cat:'platform',desc:'Multi-provider AI chat interface with conversation history',up:'LibreChat',phase:3,status:'pending',icon:'💬',features:['Multi-provider','Conversation history','Plugin system','Role-based access'],ep:null,loc:390,relatedAdrs:[52,103],github:'https://github.com/danny-avila/LibreChat'},
+  workflows:{id:'workflows',name:'Workflows',cat:'platform',desc:'Visual workflow automation with 300+ integrations',up:'n8n',phase:3,status:'pending',icon:'🔄',features:['Visual editor','300+ integrations','Code nodes','Schedule triggers'],ep:null,loc:420,relatedAdrs:[38,95],github:'https://github.com/n8n-io/n8n'},
+  devlake:{id:'devlake',name:'DevLake',cat:'platform',desc:'DORA metrics and engineering analytics across all tools',up:'Apache DevLake',phase:3,status:'pending',icon:'📉',features:['DORA metrics','PR analytics','Issue tracking','Custom dashboards'],ep:null,loc:360,relatedAdrs:[42],github:'https://github.com/apache/incubator-devlake'},
+  // Operations
+  backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null,loc:440,relatedAdrs:[46,80],github:'https://github.com/vmware-tanzu/velero'},
+  cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null,loc:400,relatedAdrs:[96],github:'https://github.com/opencost/opencost'},
+};
+
+const NAV=[
+  {type:'link',id:'overview',label:'Overview',icon:'⊞'},
+  {type:'link',id:'progress',label:'Runtime Progress',icon:'📈'},
+  {type:'link',id:'upstream',label:'Upstream',icon:'📡'},
+  {type:'link',id:'adrs',label:'Decisions',icon:'📋'},
+  {type:'sec',id:'core',label:'Core Infrastructure',mods:['db','auth','upstream']},
+  {type:'sec',id:'security',label:'Security',mods:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
+  {type:'sec',id:'observability',label:'Observability',mods:['status','uptime','incidents','ai-obs','profiler','forensics']},
+  {type:'sec',id:'cicd',label:'CI / CD',mods:['lint','changelog','docs','registry','chaos']},
+  {type:'sec',id:'platform',label:'Platform',mods:['flags','portal','chat','workflows','devlake']},
+  {type:'sec',id:'operations',label:'Operations',mods:['backup','cost']},
+];
+
+const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
+
+// 66 tracked OSS projects
+const UPSTREAM_PROJECTS=[
+  // Infrastructure
+  {name:'containerd / crun',gh:'https://github.com/containerd/containerd',cave:'cri',cat:'Runtime',phase:1,parity:29},
+  {name:'etcd',gh:'https://github.com/etcd-io/etcd',cave:'etcd',cat:'Kubernetes Core',phase:1,parity:33},
+  {name:'kube-apiserver',gh:'https://github.com/kubernetes/kubernetes',cave:'apiserver',cat:'Kubernetes Core',phase:1,parity:24},
+  {name:'kube-scheduler',gh:'https://github.com/kubernetes/kubernetes',cave:'scheduler',cat:'Kubernetes Core',phase:1,parity:7},
+  {name:'kubelet',gh:'https://github.com/kubernetes/kubernetes',cave:'kubelet',cat:'Kubernetes Core',phase:1,parity:6},
+  {name:'Cilium CNI',gh:'https://github.com/cilium/cilium',cave:'(infra)',cat:'Networking',phase:1,parity:25},
+  {name:'Istio Ambient Mesh',gh:'https://github.com/istio/istio',cave:'(infra)',cat:'Networking',phase:2,parity:25},
+  {name:'ArgoCD',gh:'https://github.com/argoproj/argo-cd',cave:'(infra)',cat:'GitOps',phase:1,parity:30},
+  {name:'Crossplane',gh:'https://github.com/crossplane/crossplane',cave:'(infra)',cat:'Infrastructure',phase:2,parity:25},
+  {name:'vcluster',gh:'https://github.com/loft-sh/vcluster',cave:'(infra)',cat:'Infrastructure',phase:1,parity:25},
+  {name:'Kong API Gateway',gh:'https://github.com/Kong/kong',cave:'(infra)',cat:'Networking',phase:2,parity:20},
+  // Security
+  {name:'Gitleaks',gh:'https://github.com/gitleaks/gitleaks',cave:'secrets',cat:'Security',phase:1,parity:30},
+  {name:'cert-manager',gh:'https://github.com/cert-manager/cert-manager',cave:'certs',cat:'Security',phase:1,parity:30},
+  {name:'Sigstore / Cosign',gh:'https://github.com/sigstore/cosign',cave:'sign',cat:'Security',phase:2,parity:20},
+  {name:'Sigstore Policy Controller',gh:'https://github.com/sigstore/policy-controller',cave:'sign',cat:'Security',phase:2,parity:20},
+  {name:'OPA Gatekeeper',gh:'https://github.com/open-policy-agent/gatekeeper',cave:'policy',cat:'Security',phase:2,parity:20},
+  {name:'OPAL',gh:'https://github.com/permitio/opal',cave:'policy',cat:'Security',phase:2,parity:20},
+  {name:'Keycloak',gh:'https://github.com/keycloak/keycloak',cave:'auth',cat:'Security',phase:2,parity:25},
+  {name:'Okta SDK',gh:'https://github.com/okta/okta-sdk-golang',cave:'auth',cat:'Security',phase:2,parity:25},
+  {name:'OpenBao',gh:'https://github.com/openbao/openbao',cave:'(infra)',cat:'Security',phase:1,parity:25},
+  {name:'External Secrets Operator',gh:'https://github.com/external-secrets/external-secrets',cave:'secrets',cat:'Security',phase:1,parity:25},
+  {name:'Falco',gh:'https://github.com/falcosecurity/falco',cave:'forensics',cat:'Security',phase:3,parity:15},
+  {name:'Tetragon',gh:'https://github.com/cilium/tetragon',cave:'forensics',cat:'Security',phase:3,parity:15},
+  {name:'Kubescape',gh:'https://github.com/kubescape/kubescape',cave:'scan',cat:'Security',phase:3,parity:15},
+  {name:'Cilium Network Policy',gh:'https://github.com/cilium/cilium',cave:'policy',cat:'Security',phase:1,parity:25},
+  // Security Scanning
+  {name:'OWASP ZAP',gh:'https://github.com/zaproxy/zaproxy',cave:'dast',cat:'Security Scanning',phase:3,parity:15},
+  {name:'SonarQube',gh:'https://github.com/SonarSource/sonarqube',cave:'scan',cat:'Security Scanning',phase:3,parity:15},
+  {name:'Semgrep',gh:'https://github.com/returntocorp/semgrep',cave:'scan',cat:'Security Scanning',phase:3,parity:15},
+  {name:'DefectDojo',gh:'https://github.com/DefectDojo/django-DefectDojo',cave:'vulns',cat:'Security Scanning',phase:2,parity:20},
+  {name:'DependencyTrack',gh:'https://github.com/DependencyTrack/dependency-track',cave:'sbom',cat:'Security Scanning',phase:2,parity:20},
+  {name:'Trivy',gh:'https://github.com/aquasecurity/trivy',cave:'scan',cat:'Security Scanning',phase:3,parity:15},
+  {name:'Microsoft Presidio',gh:'https://github.com/microsoft/presidio',cave:'pii',cat:'Security Scanning',phase:3,parity:15},
+  {name:'Syft / Grype',gh:'https://github.com/anchore/syft',cave:'sbom',cat:'Security Scanning',phase:2,parity:20},
+  // Observability
+  {name:'Prometheus',gh:'https://github.com/prometheus/prometheus',cave:'status',cat:'Observability',phase:1,parity:30},
+  {name:'Grafana',gh:'https://github.com/grafana/grafana',cave:'status',cat:'Observability',phase:1,parity:30},
+  {name:'Loki',gh:'https://github.com/grafana/loki',cave:'status',cat:'Observability',phase:1,parity:25},
+  {name:'Tempo',gh:'https://github.com/grafana/tempo',cave:'status',cat:'Observability',phase:2,parity:25},
+  {name:'Thanos',gh:'https://github.com/thanos-io/thanos',cave:'status',cat:'Observability',phase:2,parity:20},
+  {name:'Pyroscope',gh:'https://github.com/grafana/pyroscope',cave:'profiler',cat:'Observability',phase:3,parity:15},
+  {name:'Langfuse',gh:'https://github.com/langfuse/langfuse',cave:'ai-obs',cat:'Observability',phase:2,parity:20},
+  {name:'Uptime Kuma',gh:'https://github.com/louislam/uptime-kuma',cave:'uptime',cat:'Observability',phase:2,parity:20},
+  {name:'Grafana OnCall',gh:'https://github.com/grafana/oncall',cave:'incidents',cat:'Observability',phase:2,parity:20},
+  {name:'Alertmanager',gh:'https://github.com/prometheus/alertmanager',cave:'status',cat:'Observability',phase:1,parity:30},
+  // Data
+  {name:'CloudNativePG',gh:'https://github.com/cloudnative-pg/cloudnative-pg',cave:'db',cat:'Data',phase:1,parity:30},
+  {name:'Valkey',gh:'https://github.com/valkey-io/valkey',cave:'(infra)',cat:'Data',phase:1,parity:30},
+  {name:'MinIO',gh:'https://github.com/minio/minio',cave:'(infra)',cat:'Data',phase:1,parity:25},
+  {name:'OpenSearch',gh:'https://github.com/opensearch-project/OpenSearch',cave:'(infra)',cat:'Data',phase:2,parity:25},
+  {name:'Strimzi (Kafka)',gh:'https://github.com/strimzi/strimzi-kafka-operator',cave:'(infra)',cat:'Data',phase:2,parity:25},
+  {name:'Debezium CDC',gh:'https://github.com/debezium/debezium',cave:'(infra)',cat:'Data',phase:2,parity:20},
+  {name:'Qdrant Vector DB',gh:'https://github.com/qdrant/qdrant',cave:'(infra)',cat:'Data',phase:2,parity:25},
+  {name:'MLflow',gh:'https://github.com/mlflow/mlflow',cave:'(infra)',cat:'Data',phase:3,parity:15},
+  // Dev Tools
+  {name:'Backstage',gh:'https://github.com/backstage/backstage',cave:'portal',cat:'Dev Tools',phase:1,parity:25},
+  {name:'Harbor OCI Registry',gh:'https://github.com/goharbor/harbor',cave:'registry',cat:'Dev Tools',phase:2,parity:20},
+  {name:'Buildah',gh:'https://github.com/containers/buildah',cave:'(infra)',cat:'Dev Tools',phase:1,parity:30},
+  {name:'k6 Load Testing',gh:'https://github.com/grafana/k6',cave:'(infra)',cat:'Dev Tools',phase:2,parity:20},
+  {name:'Apicurio Registry',gh:'https://github.com/Apicurio/apicurio-registry',cave:'docs',cat:'Dev Tools',phase:1,parity:25},
+  {name:'Apache DevLake',gh:'https://github.com/apache/incubator-devlake',cave:'devlake',cat:'Dev Tools',phase:3,parity:15},
+  {name:'Flyway / Alembic',gh:'https://github.com/flyway/flyway',cave:'db',cat:'Dev Tools',phase:1,parity:25},
+  // Platform
+  {name:'Unleash Feature Flags',gh:'https://github.com/Unleash/unleash',cave:'flags',cat:'Platform',phase:2,parity:20},
+  {name:'Argo Rollouts',gh:'https://github.com/argoproj/argo-rollouts',cave:'(infra)',cat:'Platform',phase:2,parity:25},
+  {name:'Argo Workflows',gh:'https://github.com/argoproj/argo-workflows',cave:'workflows',cat:'Platform',phase:3,parity:15},
+  {name:'KEDA',gh:'https://github.com/kedacore/keda',cave:'(infra)',cat:'Platform',phase:2,parity:25},
+  {name:'Knative',gh:'https://github.com/knative/serving',cave:'(infra)',cat:'Platform',phase:4,parity:10},
+  {name:'LibreChat',gh:'https://github.com/danny-avila/LibreChat',cave:'chat',cat:'Platform',phase:3,parity:15},
+  {name:'Pulp',gh:'https://github.com/pulp/pulpcore',cave:'registry',cat:'Platform',phase:2,parity:20},
+  // Operations
+  {name:'OpenCost',gh:'https://github.com/opencost/opencost',cave:'cost',cat:'Operations',phase:2,parity:20},
+  {name:'Velero',gh:'https://github.com/vmware-tanzu/velero',cave:'backup',cat:'Operations',phase:2,parity:20},
+  {name:'Chaos Mesh',gh:'https://github.com/chaos-mesh/chaos-mesh',cave:'chaos',cat:'Platform',phase:3,parity:15},
+  // AI
+  {name:'Ollama',gh:'https://github.com/ollama/ollama',cave:'(infra)',cat:'AI',phase:1,parity:30},
+  {name:'LiteLLM',gh:'https://github.com/BerriAI/litellm',cave:'(infra)',cat:'AI',phase:1,parity:25},
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+const S={
+  page:'overview',
+  expanded:new Set(['security','cicd','observability']),
+  health:null,
+  ver:'…',
+  searchOpen:false,
+  sfocus:-1,
+  sresults:[],
+  adrList:[],
+  adrScope:'All',
+  adrQuery:'',
+  moduleHealth:{},
+  upstreamCat:'All',
+  upstreamQuery:'',
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function dot(status){
+  return {healthy:'dg',warning:'dy',error:'dr',pending:'dm',unknown:'dm'}[status]||'dm';
+}
+function statusLabel(s){
+  return {healthy:'Healthy',warning:'Degraded',error:'Error',pending:'Planned',unknown:'Unknown'}[s]||s;
+}
+function pillClass(s){
+  return {healthy:'sp-healthy',warning:'sp-warning',error:'sp-error',pending:'sp-pending',unknown:'sp-pending'}[s]||'sp-pending';
+}
+function parityColor(p){
+  if(p>=80)return'var(--green)';
+  if(p>=50)return'var(--yellow)';
+  return'var(--red)';
+}
+function esc(s){
+  const d=document.createElement('div');d.textContent=s;return d.innerHTML;
+}
+
+// ── Health Polling ────────────────────────────────────────────────────────────
+
+async function fetchHealth(){
+  try{
+    const r=await fetch('/health');
+    if(!r.ok)throw 0;
+    const d=await r.json();
+    S.health=d;
+    S.ver=d.version||'?';
+    document.getElementById('rv').textContent=d.version||'?';
+    const gsd=document.getElementById('gsdot');
+    const gst=document.getElementById('gstext');
+    gsd.className='sdot dg';
+    gst.textContent='Runtime OK';
+    ['secrets','lint','docs','status','changelog','certs','portal','upstream'].forEach(id=>{
+      if(MODS[id])MODS[id].status='healthy';
+    });
+    if(S.page==='overview')renderPage();
+    renderNav();
+  }catch{
+    document.getElementById('gsdot').className='sdot dr';
+    document.getElementById('gstext').textContent='Unreachable';
+  }
+}
+
+async function fetchModuleHealth(){
+  try{
+    const r=await fetch('/api/portal/health/all');
+    if(!r.ok)return;
+    const d=await r.json();
+    S.moduleHealth=d.modules||{};
+    // Update MODS statuses
+    for(const[id,status]of Object.entries(S.moduleHealth)){
+      if(MODS[id])MODS[id].status=status==='healthy'?'healthy':status==='unknown'?'pending':'error';
+    }
+    // Update dots in current overview if visible
+    if(S.page==='overview'){
+      for(const[id,status]of Object.entries(S.moduleHealth)){
+        const dots=document.querySelectorAll(`.sdot[data-mod="${id}"]`);
+        dots.forEach(el=>{
+          el.className='sdot '+dot(status==='healthy'?'healthy':status==='unknown'?'pending':'error');
+        });
+      }
+    }
+  }catch{/* silently ignore */}
+}
+
+fetchHealth();
+fetchModuleHealth();
+setInterval(fetchHealth,30000);
+setInterval(fetchModuleHealth,10000);
+
+// ── Router ───────────────────────────────────────────────────────────────────
+
+function go(page){
+  S.page=page;
+  if(page==='overview') window.location.hash='#/';
+  else if(page==='progress') window.location.hash='#/progress';
+  else if(page==='upstream') window.location.hash='#/upstream';
+  else if(page==='adrs') window.location.hash='#/adrs';
+  else if(page.startsWith('adr:')) window.location.hash='#/adr/'+page.slice(4);
+  else window.location.hash='#/m/'+page;
+  renderPage();
+  renderNav();
+  if(window.innerWidth<=768)closeSidebar();
+}
+
+window.addEventListener('hashchange',()=>{
+  const h=window.location.hash;
+  if(!h||h==='#/'||h==='#'){S.page='overview';}
+  else if(h==='#/progress'){S.page='progress';}
+  else if(h==='#/upstream'){S.page='upstream';}
+  else if(h==='#/adrs'){S.page='adrs';}
+  else{
+    const ma=h.match(/^#\/adr\/(.+)$/);
+    if(ma){S.page='adr:'+ma[1];}
+    else{const mm=h.match(/^#\/m\/(.+)$/);S.page=(mm&&MODS[mm[1]])?mm[1]:'overview';}
+  }
+  renderPage();renderNav();
+});
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+
+function toggleSec(id){
+  S.expanded.has(id)?S.expanded.delete(id):S.expanded.add(id);
+  renderNav();
+}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+
+function renderNav(){
+  let h='';
+  const specialPages=['overview','upstream','adrs'];
+  for(const item of NAV){
+    if(item.type==='link'){
+      const a=S.page===item.id;
+      h+=`<div class="nav-item${a?' active':''}" onclick="go('${item.id}')">${item.icon} ${item.label}</div>`;
+    } else {
+      const exp=S.expanded.has(item.id);
+      h+=`<div class="nav-sec${exp?'':' closed'}" onclick="toggleSec('${item.id}')">
+        <span>${item.label}</span><span class="chev">▾</span>
+      </div>`;
+      if(exp){
+        h+=`<div class="nav-sub">`;
+        for(const mid of item.mods){
+          const m=MODS[mid];if(!m)continue;
+          const a=S.page===mid;
+          h+=`<div class="nav-item${a?' active':''}" onclick="go('${mid}')">
+            <span class="sdot ${dot(m.status)}"></span><span style="flex:1">${m.name}</span>
+          </div>`;
+        }
+        h+=`</div>`;
+      }
+    }
+  }
+  const bcMap={overview:'Overview',progress:'Runtime Progress',upstream:'Upstream',adrs:'Decisions'};
+  const label=S.page.startsWith('adr:')?'ADR-'+S.page.slice(4):(bcMap[S.page]||MODS[S.page]?.name||S.page);
+  document.getElementById('sidebar-nav').innerHTML=h;
+  document.getElementById('bc').textContent=label;
+}
+
+// ── Page Renderers ────────────────────────────────────────────────────────────
+
+function renderPage(){
+  const c=document.getElementById('content');
+  if(S.page==='overview') c.innerHTML=renderOverview();
+  else if(S.page==='progress') loadProgress(c);
+  else if(S.page==='upstream') c.innerHTML=renderUpstream();
+  else if(S.page==='adrs') loadAdrs(c);
+  else if(S.page.startsWith('adr:')) loadAdrDetail(S.page.slice(4),c);
+  else c.innerHTML=renderMod(MODS[S.page]);
+}
+
+// ── Feature: Runtime Progress ───────────────────────────────────────────────
+// Polls /api/portal/runtime/progress every 60 s while the page is visible.
+
+let _progressTimer=null;
+
+function loadProgress(c){
+  c.innerHTML=`
+    <div class="page-hdr">
+      <div class="page-title">Runtime Progress <span id="prog-refresh-ind" style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:10px">loading…</span></div>
+      <div class="page-sub">Per-module completion against upstream-parity targets — backend tests / portal endpoints / cavectl commands / grafana panels.</div>
+    </div>
+    <div id="prog-body"><div style="padding:40px;text-align:center;color:var(--text-muted)">Fetching /api/portal/runtime/progress…</div></div>
+  `;
+  fetchProgress();
+  if(_progressTimer) clearInterval(_progressTimer);
+  _progressTimer=setInterval(()=>{
+    if(S.page==='progress') fetchProgress();
+    else { clearInterval(_progressTimer); _progressTimer=null; }
+  },60000);
+}
+
+async function fetchProgress(){
+  const ind=document.getElementById('prog-refresh-ind');
+  if(ind) ind.textContent='refreshing…';
+  try{
+    const r=await fetch('/api/portal/runtime/progress');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const body=document.getElementById('prog-body');
+    if(!body) return;
+    body.innerHTML=renderProgressBody(d);
+    if(ind) ind.textContent='updated '+new Date().toLocaleTimeString();
+  }catch(e){
+    const body=document.getElementById('prog-body');
+    if(body) body.innerHTML=`<div style="padding:40px;text-align:center;color:var(--red)">Fetch failed: ${esc(String(e.message||e))}</div>`;
+    if(ind) ind.textContent='error';
+  }
+}
+
+function progColor(pct){
+  if(pct>=100) return 'var(--green)';
+  if(pct>=80)  return '#d4d942';
+  if(pct>=50)  return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function progBar(have,target,color,height){
+  const pct=target===0?100:Math.min(100,Math.round((have/target)*100));
+  const h=height||6;
+  return `<div style="background:var(--bg);border-radius:${h}px;height:${h}px;overflow:hidden;border:1px solid var(--border)">
+    <div style="width:${pct}%;height:100%;background:${color||progColor(pct)};transition:width .3s ease"></div>
+  </div>`;
+}
+
+function renderProgressBody(d){
+  const t=d.totals||{};
+  const overall=t.overall_pct||0;
+  const mods=d.modules||[];
+  const hdrStats=`
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-lbl">Overall Completion</div>
+        <div class="stat-val" style="color:${progColor(overall)}">${overall}%</div>
+        <div class="stat-sub">weighted across ${mods.length} modules</div>
+        <div style="margin-top:10px">${progBar(overall,100,progColor(overall),10)}</div>
+      </div>
+      <div class="stat-card"><div class="stat-lbl">Complete</div><div class="stat-val c-green">${t.modules_complete||0}</div><div class="stat-sub">100%</div></div>
+      <div class="stat-card"><div class="stat-lbl">In Progress</div><div class="stat-val c-yellow">${t.modules_in_progress||0}</div><div class="stat-sub">1–99%</div></div>
+      <div class="stat-card"><div class="stat-lbl">Not Started</div><div class="stat-val c-red">${t.modules_todo||0}</div><div class="stat-sub">0%</div></div>
+      <div class="stat-card"><div class="stat-lbl">Computed</div><div class="stat-val" style="font-size:13px">${esc(d.computed_at||'')}</div><div class="stat-sub">cached 60s</div></div>
+    </div>`;
+
+  let cards='';
+  for(const m of mods){
+    const pct=m.completion_pct||0;
+    const clr=progColor(pct);
+    const commit=m.last_commit?new Date(m.last_commit).toLocaleString():'—';
+    const sha=m.last_commit_sha?`<code style="font-family:monospace;font-size:11px;color:var(--accent)">${esc(m.last_commit_sha)}</code>`:'';
+    const subj=m.last_commit_subject?esc(m.last_commit_subject.slice(0,64)):'';
+    cards+=`
+      <div class="stat-card" style="padding:14px;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+          <div style="font-weight:600;font-size:13px">${esc(m.label||m.name)}</div>
+          <div style="font-size:18px;font-weight:700;color:${clr}">${pct}%</div>
+        </div>
+        <div style="margin-bottom:10px">${progBar(pct,100,clr,6)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:11px">
+          <div><div style="color:var(--text-muted);margin-bottom:2px">Tests <b style="color:var(--text)">${m.backend_tests}/${m.backend_tests_target}</b></div>${progBar(m.backend_tests,m.backend_tests_target)}</div>
+          <div><div style="color:var(--text-muted);margin-bottom:2px">Endpoints <b style="color:var(--text)">${m.portal_endpoints}/${m.portal_endpoints_target}</b></div>${progBar(m.portal_endpoints,m.portal_endpoints_target)}</div>
+          <div><div style="color:var(--text-muted);margin-bottom:2px">cavectl <b style="color:var(--text)">${m.cavectl_commands}/${m.cavectl_commands_target}</b></div>${progBar(m.cavectl_commands,m.cavectl_commands_target)}</div>
+          <div><div style="color:var(--text-muted);margin-bottom:2px">Metrics <b style="color:var(--text)">${m.grafana_panels}/${m.grafana_panels_target}</b></div>${progBar(m.grafana_panels,m.grafana_panels_target)}</div>
+        </div>
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <span>${commit}</span>${sha}
+          </div>
+          ${subj?`<div style="margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(m.last_commit_subject||'')}">${subj}</div>`:''}
+        </div>
+      </div>`;
+  }
+
+  return `${hdrStats}
+    <div class="sec-title">Modules (${mods.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:28px">${cards}</div>`;
+}
+
+function renderOverview(){
+  const all=Object.values(MODS);
+  const healthy=all.filter(m=>m.status==='healthy').length;
+  const sections=[
+    {label:'Core Infrastructure',ids:['db','auth','upstream']},
+    {label:'Security',ids:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
+    {label:'Observability',ids:['status','uptime','incidents','ai-obs','profiler','forensics']},
+    {label:'CI / CD',ids:['lint','changelog','docs','registry','chaos']},
+    {label:'Platform',ids:['flags','portal','chat','workflows','devlake']},
+    {label:'Operations',ids:['backup','cost']},
+  ];
+  let grids='';
+  for(const sec of sections){
+    grids+=`<div class="sec-title">${sec.label}</div><div class="module-grid">`;
+    for(const id of sec.ids){
+      const m=MODS[id];if(!m)continue;
+      grids+=`<div class="mcard" onclick="go('${m.id}')">
+        <div class="mcard-hdr">
+          <span class="mcard-name">${m.icon} ${m.name}</span>
+          <span class="sdot ${dot(m.status)}" data-mod="${m.id}" title="${statusLabel(m.status)}"></span>
+        </div>
+        <div class="mcard-desc">${m.desc}</div>
+        <div class="mcard-foot">
+          <span class="pbadge p${m.phase}">Phase ${m.phase}</span>
+          ${m.up?`<span class="utag">${m.up}</span>`:''}
+        </div>
+      </div>`;
+    }
+    grids+=`</div>`;
+  }
+
+  const hstate=S.health?'<span class="c-green">OK</span>':'<span class="c-red">ERR</span>';
+  return `
+    <div class="page-hdr">
+      <div class="page-title">Platform Overview</div>
+      <div class="page-sub">CAVE Unified Runtime — all modules in a single binary · health updates every 10s</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-lbl">Total Modules</div><div class="stat-val c-accent">${all.length}</div><div class="stat-sub">across all phases</div></div>
+      <div class="stat-card"><div class="stat-lbl">Healthy</div><div class="stat-val c-green">${healthy}</div><div class="stat-sub">Phase 1 live</div></div>
+      <div class="stat-card"><div class="stat-lbl">Phase 1</div><div class="stat-val">${all.filter(m=>m.phase===1).length}</div><div class="stat-sub">implemented</div></div>
+      <div class="stat-card"><div class="stat-lbl">Upstream OSS</div><div class="stat-val c-accent">66</div><div class="stat-sub">reimplemented</div></div>
+      <div class="stat-card"><div class="stat-lbl">ADRs</div><div class="stat-val c-accent">142</div><div class="stat-sub">decisions recorded</div></div>
+      <div class="stat-card"><div class="stat-lbl">Runtime</div><div class="stat-val" style="font-size:18px">${hstate}</div><div class="stat-sub">v${S.ver}</div></div>
+    </div>
+    ${grids}`;
+}
+
+// ── Feature 1: Module Detail ─────────────────────────────────────────────────
+
+function renderMod(m){
+  if(!m)return`<div style="padding:40px;text-align:center;color:var(--text-muted)">Module not found</div>`;
+  const feats=m.features.map(f=>`<li>${esc(f)}</li>`).join('');
+  const adrTags=(m.relatedAdrs||[]).map(n=>{
+    const num=String(n).padStart(3,'0');
+    return`<span class="adr-tag" onclick="go('adr:${num}')" title="Open ADR-${num}">ADR-${num}</span>`;
+  }).join('');
+  let actions=`<button class="btn btn-s" onclick="go('overview')">← Overview</button>`;
+  if(m.ep)actions+=` <button class="btn btn-p" onclick="chkHealth('${m.ep}')">⟳ Health</button>`;
+  actions+=` <button class="btn btn-s" onclick="showCfg('${m.id}')">⚙ Configure</button>`;
+  if(m.github)actions+=` <a class="btn btn-s" href="${m.github}" target="_blank" rel="noopener">↗ GitHub</a>`;
+
+  return `
+    <div style="margin-bottom:16px">
+      <button class="btn btn-s" onclick="go('overview')" style="font-size:12px">← Back to Overview</button>
+    </div>
+    <div class="mod-hdr">
+      <div class="mod-icon">${m.icon}</div>
+      <div>
+        <div class="mod-title">${esc(m.name)}</div>
+        <div class="mod-meta">
+          <span class="spill ${pillClass(m.status)}">
+            <span class="sdot ${dot(m.status)}" style="width:6px;height:6px" data-mod="${m.id}"></span>
+            ${statusLabel(m.status)}
+          </span>
+          <span class="pbadge p${m.phase}">Phase ${m.phase}</span>
+          ${m.up?`<span class="utag">↳ ${esc(m.up)}</span>`:''}
+        </div>
+      </div>
+    </div>
+    <p style="color:var(--text-muted);margin-bottom:22px;font-size:13px;max-width:580px;line-height:1.6">${esc(m.desc)}</p>
+    <div class="detail-grid">
+      <div class="dcrd">
+        <div class="dcrd-title">Features</div>
+        <ul class="feat-list">${feats}</ul>
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Quick Actions</div>
+        <div class="qactions">${actions}</div>
+        ${m.ep?`<div style="margin-top:14px">
+          <div class="dcrd-title" style="margin-bottom:6px">API Endpoints</div>
+          <code class="ep-code">${esc(m.ep)}</code>
+        </div>`:''}
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Module Info</div>
+        <div class="info-row"><span class="info-k">Status</span><span class="info-v" style="color:${m.status==='healthy'?'var(--green)':'var(--text-muted)'}">${statusLabel(m.status)}</span></div>
+        <div class="info-row"><span class="info-k">Phase</span><span class="info-v">${m.phase}</span></div>
+        <div class="info-row"><span class="info-k">Crate</span><span class="info-v" style="font-family:monospace;font-size:12px">cave-${m.id}</span></div>
+        <div class="info-row"><span class="info-k">Lines of Code</span><span class="info-v c-accent">${m.loc.toLocaleString()}</span></div>
+        ${m.up?`<div class="info-row"><span class="info-k">Upstream</span><span class="info-v">${esc(m.up)}</span></div>`:''}
+        <div class="info-row"><span class="info-k">Category</span><span class="info-v" style="text-transform:capitalize">${CAT_LABELS[m.cat]||m.cat}</span></div>
+        ${m.github?`<div class="info-row"><span class="info-k">GitHub</span><span class="info-v"><a href="${m.github}" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;word-break:break-all">${m.github.replace('https://','')}</a></span></div>`:''}
+      </div>
+      <div class="dcrd">
+        <div class="dcrd-title">Related Decisions (ADRs)</div>
+        ${adrTags||`<div style="color:var(--text-muted);font-size:12px">No ADRs linked</div>`}
+        <div style="margin-top:12px">
+          <div class="dcrd-title">Configuration</div>
+          <div class="cfg-ph">Configuration panel coming in Phase ${m.phase}<br><span style="font-size:11px">Edit <code>cave-runtime.yaml</code> for now</span></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function chkHealth(ep){
+  try{
+    const r=await fetch(ep);
+    const d=await r.json();
+    alert(JSON.stringify(d,null,2));
+  }catch(e){alert('Health check failed: '+e.message);}
+}
+function showCfg(id){
+  alert(`Configure ${id}:\n\nEdit cave-runtime.yaml and restart.\nFull UI config coming in Phase 2.`);
+}
+
+// ── Feature 2: Scaffolder ────────────────────────────────────────────────────
+
+function openScaffold(){
+  document.getElementById('scaffoverlay').classList.add('open');
+  document.getElementById('scaffresult').style.display='none';
+  document.getElementById('sf-name').focus();
+}
+function closeScaffold(){
+  document.getElementById('scaffoverlay').classList.remove('open');
+}
+function handleScaffOverlay(e){
+  if(e.target===document.getElementById('scaffoverlay'))closeScaffold();
+}
+async function submitScaffold(){
+  const name=document.getElementById('sf-name').value.trim();
+  const lang=document.getElementById('sf-lang').value;
+  const tmpl=document.getElementById('sf-tmpl').value;
+  const ns=document.getElementById('sf-ns').value.trim();
+  if(!name){document.getElementById('sf-name').focus();return;}
+  const btn=document.getElementById('scaffsubmit');
+  btn.disabled=true;btn.textContent='Creating…';
+  const res=document.getElementById('scaffresult');
+  res.style.display='none';
+  try{
+    const r=await fetch('/api/portal/scaffold',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name,language:lang,template:tmpl,namespace:ns||'default'})
+    });
+    const d=await r.json();
+    res.textContent=d.message||JSON.stringify(d,null,2);
+    res.style.display='block';
+    res.style.color='var(--green)';
+  }catch(e){
+    res.textContent='Error: '+e.message;
+    res.style.display='block';
+    res.style.color='var(--red)';
+  }finally{
+    btn.disabled=false;btn.textContent='Create Project';
+  }
+}
+
+// ── Feature 3: Upstream Tracker ──────────────────────────────────────────────
+
+function renderUpstream(){
+  const cats=['All',...new Set(UPSTREAM_PROJECTS.map(p=>p.cat))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
+  const q=S.upstreamQuery.toLowerCase();
+  const cat=S.upstreamCat;
+  const filtered=UPSTREAM_PROJECTS.filter(p=>{
+    const matchCat=cat==='All'||p.cat===cat;
+    const matchQ=!q||p.name.toLowerCase().includes(q)||p.cave.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q);
+    return matchCat&&matchQ;
+  });
+
+  const catBtns=cats.map(c=>`<button class="scope-btn${c===cat?' active':''}" onclick="setUpstreamCat('${c}')">${c}</button>`).join('');
+  const rows=filtered.map(p=>{
+    const pc=parityColor(p.parity);
+    return`<tr>
+      <td><a class="gh-link" href="${p.gh}" target="_blank" rel="noopener">${esc(p.name)}</a></td>
+      <td><span class="cave-mod-tag">${esc(p.cave)}</span></td>
+      <td>${esc(p.cat)}</td>
+      <td><span class="pbadge p${Math.min(p.phase,4)}">Phase ${p.phase}</span></td>
+      <td><div class="parity-bar"><div class="parity-track"><div class="parity-fill" style="width:${p.parity}%;background:${pc}"></div></div><span class="parity-pct" style="color:${pc}">${p.parity}%</span></div></td>
+    </tr>`;
+  }).join('');
+
+  return`<div class="page-hdr">
+    <div class="page-title">Upstream Tracker</div>
+    <div class="page-sub">73 OSS projects monitored for releases, CVEs, and breaking changes</div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+    <input class="upstream-search" type="text" placeholder="Search projects…"
+      value="${esc(S.upstreamQuery)}" oninput="setUpstreamQuery(this.value)">
+    <div class="cat-filter">${catBtns}</div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="upstream-table">
+      <thead><tr>
+        <th>Project</th><th>CAVE Module</th><th>Category</th><th>Phase</th><th style="min-width:140px">Parity</th>
+      </tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">No results</td></tr>'}</tbody>
+    </table>
+  </div>`;
+}
+
+function setUpstreamCat(cat){S.upstreamCat=cat;renderPage();}
+function setUpstreamQuery(q){S.upstreamQuery=q;renderPage();}
+
+// ── Feature 4: ADR Browser ───────────────────────────────────────────────────
+
+async function loadAdrs(container){
+  container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div><div class="page-sub">Architecture Decision Records — the full reasoning behind every platform choice</div></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
+  try{
+    const r=await fetch('/api/portal/adrs');
+    const d=await r.json();
+    S.adrList=d.adrs||[];
+    container.innerHTML=renderAdrList();
+  }catch{
+    container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div></div><div style="padding:40px;text-align:center;color:var(--red)">Failed to load ADRs — ensure the server is running from the workspace root.</div>`;
+  }
+}
+
+function renderAdrList(){
+  const q=S.adrQuery.toLowerCase();
+  const scope=S.adrScope;
+  const filtered=S.adrList.filter(a=>{
+    const mScope=scope==='All'||a.scope===scope;
+    const mQ=!q||a.title.toLowerCase().includes(q)||String(a.id).includes(q)||a.category.toLowerCase().includes(q)||a.scope.toLowerCase().includes(q);
+    return mScope&&mQ;
+  });
+
+  const scopes=['All',...new Set(S.adrList.map(a=>a.scope).filter(Boolean))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
+  const scopeBtns=scopes.map(s=>`<button class="scope-btn${s===scope?' active':''}" onclick="setAdrScope('${esc(s)}')">${esc(s)}</button>`).join('');
+
+  const rows=filtered.map(a=>{
+    const num=String(a.id).padStart(3,'0');
+    return`<div class="adr-row" onclick="go('adr:${num}')">
+      <span class="adr-num">ADR-${num}</span>
+      <span class="adr-title">${esc(a.title)}</span>
+      <span class="adr-scope">${esc(a.scope||'Universal')}</span>
+      <span class="adr-cat">${esc(a.category||'General')}</span>
+    </div>`;
+  }).join('');
+
+  return`<div class="page-hdr">
+    <div class="page-title">Decisions (ADRs)</div>
+    <div class="page-sub">Architecture Decision Records — ${S.adrList.length} decisions recorded · ${filtered.length} shown</div>
+  </div>
+  <div class="adr-filters">
+    <input class="adr-filter-inp" type="text" placeholder="Search title, category…" value="${esc(S.adrQuery)}" oninput="setAdrQuery(this.value)">
+    <div style="display:flex;gap:5px;flex-wrap:wrap">${scopeBtns}</div>
+  </div>
+  <div class="adr-list-grid">${rows||'<div style="padding:20px;text-align:center;color:var(--text-muted)">No ADRs match filters</div>'}</div>`;
+}
+
+function setAdrScope(s){S.adrScope=s;document.getElementById('content').innerHTML=renderAdrList();}
+function setAdrQuery(q){S.adrQuery=q;document.getElementById('content').innerHTML=renderAdrList();}
+
+async function loadAdrDetail(id,container){
+  const num=String(parseInt(id,10)).padStart(3,'0');
+  container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
+  try{
+    const r=await fetch('/api/portal/adrs/'+num);
+    if(!r.ok)throw new Error('Not found');
+    const text=await r.text();
+    container.innerHTML=`
+      <div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div>
+      <div class="md-body">${mdToHtml(text)}</div>`;
+  }catch(e){
+    container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center;color:var(--red)">ADR-${num} not found — ${e.message}</div>`;
+  }
+}
+
+// Minimal markdown → HTML converter
+function mdToHtml(md){
+  const lines=md.split('\n');
+  const out=[];
+  let inUl=false,inOl=false,inPre=false,preBuf=[];
+
+  function flushList(){
+    if(inUl){out.push('</ul>');inUl=false;}
+    if(inOl){out.push('</ol>');inOl=false;}
+  }
+
+  for(let i=0;i<lines.length;i++){
+    const raw=lines[i];
+    const line=raw;
+
+    if(inPre){
+      if(line.startsWith('```')){inPre=false;out.push('<pre>'+esc(preBuf.join('\n'))+'</pre>');preBuf=[];}
+      else preBuf.push(raw);
+      continue;
+    }
+    if(line.startsWith('```')){flushList();inPre=true;continue;}
+
+    if(/^\s*$/.test(line)){flushList();continue;}
+
+    if(line.startsWith('#### ')){flushList();out.push('<h4>'+inl(line.slice(5))+'</h4>');continue;}
+    if(line.startsWith('### ')){flushList();out.push('<h3>'+inl(line.slice(4))+'</h3>');continue;}
+    if(line.startsWith('## ')){flushList();out.push('<h2>'+inl(line.slice(3))+'</h2>');continue;}
+    if(line.startsWith('# ')){flushList();out.push('<h1>'+inl(line.slice(2))+'</h1>');continue;}
+    if(/^---+$/.test(line.trim())){flushList();out.push('<hr>');continue;}
+
+    if(line.startsWith('> ')){
+      flushList();
+      out.push('<blockquote>'+inl(line.slice(2))+'</blockquote>');
+      continue;
+    }
+
+    // Table rows
+    if(line.includes('|')&&line.trimStart().startsWith('|')){
+      flushList();
+      if(/^\|[-| :]+\|/.test(line))continue; // separator row
+      const cells=line.split('|').slice(1,-1);
+      const tag=out.length>0&&out[out.length-1].startsWith('<tr')?'td':'th';
+      const cellHtml=cells.map(c=>`<${tag}>${inl(c.trim())}</${tag}>`).join('');
+      if(tag==='th'){
+        // Start table if not already
+        if(!out[out.length-1]?.startsWith('<table')){out.push('<table><thead>');}
+        out.push('<tr>'+cellHtml+'</tr></thead><tbody>');
+      } else {
+        out.push('<tr>'+cellHtml+'</tr>');
+      }
+      continue;
+    }
+    // Close open table
+    if(out.length>0&&out[out.length-1].startsWith('<tr')&&!line.includes('|')){
+      out.push('</tbody></table>');
+    }
+
+    if(line.match(/^[-*] /)){
+      if(!inUl){if(inOl){out.push('</ol>');inOl=false;}out.push('<ul>');inUl=true;}
+      out.push('<li>'+inl(line.slice(2))+'</li>');
+      continue;
+    }
+    if(line.match(/^\d+\. /)){
+      if(!inOl){if(inUl){out.push('</ul>');inUl=false;}out.push('<ol>');inOl=true;}
+      out.push('<li>'+inl(line.replace(/^\d+\. /,''))+'</li>');
+      continue;
+    }
+
+    flushList();
+    out.push('<p>'+inl(line)+'</p>');
+  }
+  if(inUl)out.push('</ul>');
+  if(inOl)out.push('</ol>');
+  return out.join('\n');
+}
+
+// Inline markdown (bold, italic, code, links)
+function inl(s){
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--accent)">$1</a>');
+}
+
+// ── Search ───────────────────────────────────────────────────────────────────
+
+function openSearch(){
+  S.searchOpen=true;S.sfocus=-1;
+  document.getElementById('soverlay').classList.add('open');
+  const inp=document.getElementById('sinput');
+  inp.value='';
+  setTimeout(()=>inp.focus(),30);
+  renderSearch('');
+}
+function closeSearch(){
+  S.searchOpen=false;
+  document.getElementById('soverlay').classList.remove('open');
+}
+function handleSOverlay(e){if(e.target===document.getElementById('soverlay'))closeSearch();}
+function onSInput(){S.sfocus=-1;renderSearch(document.getElementById('sinput').value);}
+function onSKey(e){
+  const res=document.querySelectorAll('.sresult');
+  if(e.key==='Escape'){closeSearch();return;}
+  if(e.key==='ArrowDown'){e.preventDefault();S.sfocus=Math.min(S.sfocus+1,res.length-1);updSFocus();return;}
+  if(e.key==='ArrowUp'){e.preventDefault();S.sfocus=Math.max(S.sfocus-1,-1);updSFocus();return;}
+  if(e.key==='Enter'){
+    if(S.sfocus>=0&&S.sresults[S.sfocus]){go(S.sresults[S.sfocus].id);closeSearch();}
+    return;
+  }
+}
+function updSFocus(){
+  document.querySelectorAll('.sresult').forEach((el,i)=>el.classList.toggle('focused',i===S.sfocus));
+}
+function renderSearch(q){
+  const lq=q.toLowerCase().trim();
+  const all=Object.values(MODS);
+  S.sresults=lq?all.filter(m=>m.name.toLowerCase().includes(lq)||m.desc.toLowerCase().includes(lq)||m.id.includes(lq)||(m.up&&m.up.toLowerCase().includes(lq))):all;
+  const el=document.getElementById('sresults');
+  if(!S.sresults.length){el.innerHTML=`<div class="sempty">No results for "${esc(q)}"</div>`;return;}
+  el.innerHTML=S.sresults.map(m=>`
+    <div class="sresult" onclick="go('${m.id}');closeSearch()">
+      <span class="sr-icon">${m.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div class="sr-name">${esc(m.name)}</div>
+        <div class="sr-desc">${esc(m.desc)}</div>
+      </div>
+      <span class="sr-cat">${CAT_LABELS[m.cat]||m.cat}</span>
+    </div>`).join('');
+}
+
+// ── Keyboard Shortcuts ────────────────────────────────────────────────────────
+
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){
+    e.preventDefault();
+    S.searchOpen?closeSearch():openSearch();
+  }
+  if(e.key==='Escape'){
+    if(S.searchOpen)closeSearch();
+    if(document.getElementById('scaffoverlay').classList.contains('open'))closeScaffold();
+  }
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+(()=>{
+  const h=window.location.hash;
+  if(h&&h!=='#/'&&h!=='#'){
+    if(h==='#/upstream'){S.page='upstream';}
+    else if(h==='#/adrs'){S.page='adrs';}
+    else{
+      const ma=h.match(/^#\/adr\/(.+)$/);
+      if(ma){S.page='adr:'+ma[1];}
+      else{const mm=h.match(/^#\/m\/(.+)$/);if(mm&&MODS[mm[1]])S.page=mm[1];}
+    }
+  }
+  renderNav();
+  renderPage();
+})();
+</script>
+</body>
+</html>

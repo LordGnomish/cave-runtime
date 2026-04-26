@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CAVE — Tracker (Scrum / Kanban)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0b0f17;--panel:#141a24;--border:#1f2937;--muted:#6b7280;--text:#e5e7eb;--accent:#6366f1;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+*{box-sizing:border-box}html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+.shell{display:grid;grid-template-rows:48px 1fr;height:100%}
+header{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+header h1{font-size:14px;margin:0;font-weight:600;letter-spacing:.02em}
+header .crumb{color:var(--muted);font-size:12px}
+header .right{margin-left:auto;display:flex;gap:8px;align-items:center}
+select,button,input{background:#0f1622;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+main{padding:12px;overflow:auto}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(260px,1fr));gap:12px;min-height:70vh}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.col h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 4px;display:flex;align-items:center;justify-content:space-between}
+.col h3 .count{background:#0f1622;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:11px;color:var(--text)}
+.card{background:#0f1622;border:1px solid var(--border);border-radius:6px;padding:10px;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:#374151}
+.card .k{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);font-size:11px}
+.card .t{margin-top:4px;font-size:13px;color:var(--text);line-height:1.35}
+.card .meta{margin-top:8px;display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+.pill{padding:1px 7px;border-radius:999px;border:1px solid var(--border);font-size:11px}
+.pill.sev-critical{border-color:#7f1d1d;color:#fecaca;background:#1f0808}
+.pill.sev-high{border-color:#854d0e;color:#fde68a;background:#1e1608}
+.pill.sev-medium{border-color:#1e3a8a;color:#bfdbfe;background:#0a1028}
+.pill.sev-low{border-color:#064e3b;color:#a7f3d0;background:#06160f}
+.pill.kind-bug{border-color:#991b1b;color:#fecaca}
+.pill.kind-story{border-color:#065f46;color:#a7f3d0}
+.pill.kind-task{border-color:#1e40af;color:#bfdbfe}
+.pill.kind-epic{border-color:#6d28d9;color:#ddd6fe}
+.empty{color:var(--muted);text-align:center;padding:18px 0;font-size:12px}
+.notice{padding:10px;background:#1a2028;border:1px solid var(--border);border-radius:8px;color:var(--muted);margin-bottom:12px}
+.notice b{color:var(--text)}
+#modal{display:none;position:fixed;inset:0;background:#000a;align-items:center;justify-content:center;padding:20px}
+#modal.open{display:flex}
+#modal .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;max-width:560px;width:100%;padding:16px;max-height:90vh;overflow:auto}
+#modal h2{font-size:15px;margin:0 0 10px}
+#modal pre{background:#0a0e15;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11.5px;white-space:pre-wrap;word-break:break-word;color:#9ca3af}
+.row{display:flex;gap:8px;align-items:center;margin:6px 0}
+label{color:var(--muted);font-size:12px;min-width:110px}
+.note{color:var(--muted);font-size:11.5px;margin-top:8px}
+a{color:#93c5fd;text-decoration:none}a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+  <h1>🗂️ CAVE Tracker</h1>
+  <span class="crumb">/ portal / tracker</span>
+  <div class="right">
+    <label for="proj">Project</label>
+    <select id="proj"><option value="">(loading…)</option></select>
+    <button id="refresh">↻ Refresh</button>
+    <button class="primary" id="new-issue">+ Issue</button>
+    <a href="/" style="color:var(--muted);font-size:12px;margin-left:8px">← Portal overview</a>
+  </div>
+</header>
+<main>
+  <div class="notice">
+    <b>Kanban / Scrum board</b> — backed by <code>/api/tracker</code>. Workflows (Scrum &amp; Kanban) and stages seed automatically. Click a card for details; use CLI <code>cave tracker</code> for full workflow actions. <span id="apinote"></span>
+  </div>
+  <div id="board" class="grid">
+    <div class="col"><h3>To Do <span class="count" id="c-todo">0</span></h3><div id="col-todo"></div></div>
+    <div class="col"><h3>In Progress <span class="count" id="c-inprogress">0</span></h3><div id="col-inprogress"></div></div>
+    <div class="col"><h3>Review <span class="count" id="c-review">0</span></h3><div id="col-review"></div></div>
+    <div class="col"><h3>Done <span class="count" id="c-done">0</span></h3><div id="col-done"></div></div>
+  </div>
+</main>
+</div>
+
+<div id="modal" onclick="if(event.target.id==='modal')closeModal()">
+  <div class="panel">
+    <h2 id="modal-title">Issue</h2>
+    <div id="modal-body"></div>
+    <div style="text-align:right;margin-top:10px"><button onclick="closeModal()">Close</button></div>
+  </div>
+</div>
+
+<script>
+const api = (p, o={}) => fetch(p, {headers:{'content-type':'application/json'}, ...o}).then(r=>r.ok?r.json():Promise.reject(r.status));
+const el  = id => document.getElementById(id);
+const esc = s => (s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function severityOf(issue){
+  const p = (issue.priority||'medium').toLowerCase();
+  if(p==='critical') return 'critical';
+  if(p==='high') return 'high';
+  if(p==='low'||p==='trivial') return 'low';
+  return 'medium';
+}
+
+function categoryOf(status){
+  const s = (status||'').toLowerCase();
+  if(/(to ?do|backlog|open|new|reopen)/.test(s)) return 'todo';
+  if(/(progress|develop|doing)/.test(s)) return 'inprogress';
+  if(/(review|test|qa|verify)/.test(s)) return 'review';
+  if(/(done|closed|resolved|complete)/.test(s)) return 'done';
+  return 'todo';
+}
+
+function renderCard(issue){
+  const sev = severityOf(issue);
+  const type = (issue.issue_type||'task').toString().toLowerCase();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="k">${esc(issue.key || issue.id.slice(0,8))}</div>
+    <div class="t">${esc(issue.summary || '(no summary)')}</div>
+    <div class="meta">
+      <span class="pill kind-${type}">${esc(type)}</span>
+      <span class="pill sev-${sev}">${esc(issue.priority||'medium')}</span>
+      ${issue.story_points!=null?`<span class="pill">${issue.story_points} SP</span>`:''}
+      ${issue.assignee?`<span>· ${esc(issue.assignee)}</span>`:''}
+    </div>`;
+  card.onclick = () => openModal(issue);
+  return card;
+}
+
+function openModal(issue){
+  el('modal-title').textContent = `${issue.key || issue.id.slice(0,8)} — ${issue.summary||''}`;
+  el('modal-body').innerHTML = `
+    <div class="row"><label>Status</label><span>${esc(issue.status||'—')}</span></div>
+    <div class="row"><label>Type</label><span>${esc(issue.issue_type||'—')}</span></div>
+    <div class="row"><label>Priority</label><span>${esc(issue.priority||'—')}</span></div>
+    <div class="row"><label>Assignee</label><span>${esc(issue.assignee||'(unassigned)')}</span></div>
+    <div class="row"><label>Reporter</label><span>${esc(issue.reporter||'—')}</span></div>
+    <div class="row"><label>Story points</label><span>${issue.story_points ?? '—'}</span></div>
+    <div class="row"><label>Labels</label><span>${esc((issue.labels||[]).join(', '))||'—'}</span></div>
+    <div class="row"><label>Sprint</label><span>${esc(issue.sprint_id||'—')}</span></div>
+    <p class="note">${esc(issue.description||'(no description)')}</p>
+    <div class="note">CLI: <code>cave tracker issue show ${esc(issue.id)}</code></div>
+    <div class="note">API: <a href="/api/tracker/issues/${esc(issue.id)}" target="_blank">/api/tracker/issues/${esc(issue.id)}</a></div>`;
+  el('modal').classList.add('open');
+}
+function closeModal(){ el('modal').classList.remove('open'); }
+
+async function loadProjects(){
+  try{
+    const projects = await api('/api/tracker/projects');
+    const sel = el('proj');
+    sel.innerHTML = '';
+    if(!Array.isArray(projects) || !projects.length){
+      sel.innerHTML = '<option value="">(no projects yet)</option>';
+      el('apinote').innerHTML = ` · <a href="/api/tracker/health" target="_blank">check api</a>`;
+      showCreateProject();
+      return;
+    }
+    projects.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = `${p.key} · ${p.name}`;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => loadBoard(sel.value);
+    loadBoard(sel.value);
+  }catch(e){
+    el('apinote').innerHTML = ` · api error (${e}) — run runtime first`;
+    el('proj').innerHTML = '<option>(api offline)</option>';
+  }
+}
+
+async function loadBoard(projectId){
+  const cols = {todo:el('col-todo'), inprogress:el('col-inprogress'), review:el('col-review'), done:el('col-done')};
+  Object.values(cols).forEach(c=>c.innerHTML='<div class="empty">loading…</div>');
+  try{
+    const issues = await api(`/api/tracker/issues?project_id=${encodeURIComponent(projectId)}`);
+    const buckets = {todo:[],inprogress:[],review:[],done:[]};
+    issues.forEach(i => buckets[categoryOf(i.status)].push(i));
+    ['todo','inprogress','review','done'].forEach(k=>{
+      cols[k].innerHTML = '';
+      if(!buckets[k].length) cols[k].innerHTML = '<div class="empty">— empty —</div>';
+      else buckets[k].forEach(i=>cols[k].appendChild(renderCard(i)));
+      el(`c-${k}`).textContent = buckets[k].length;
+    });
+  }catch(e){
+    Object.values(cols).forEach(c=>c.innerHTML=`<div class="empty">api error: ${e}</div>`);
+  }
+}
+
+el('refresh').onclick = () => { const s = el('proj'); if(s.value) loadBoard(s.value); else loadProjects(); };
+el('new-issue').onclick = () => {
+  const project_id = el('proj').value;
+  if(!project_id){ showCreateProject(); return; }
+  // Show issue creation form in modal
+  el('modal-title').textContent = 'New Issue';
+  el('modal-body').innerHTML = `
+    <div class="row"><label>Type</label><select id="ni-type"><option value="task">Task</option><option value="story">Story</option><option value="bug">Bug</option><option value="epic">Epic</option></select></div>
+    <div class="row"><label>Summary *</label><input id="ni-summary" style="flex:1" placeholder="What needs to be done?"></div>
+    <div class="row"><label>Description</label><input id="ni-desc" style="flex:1" placeholder="Details (optional)"></div>
+    <div class="row"><label>Priority</label><select id="ni-priority"><option value="medium">Medium</option><option value="critical">Critical</option><option value="high">High</option><option value="low">Low</option><option value="trivial">Trivial</option></select></div>
+    <div class="row"><label>Assignee</label><input id="ni-assignee" style="flex:1" placeholder="Username (optional)"></div>
+    <div class="row"><label>Story Points</label><input id="ni-points" type="number" style="width:80px" placeholder="0"></div>
+    <div class="row"><label>Labels</label><input id="ni-labels" style="flex:1" placeholder="Comma-separated (optional)"></div>
+    <div style="text-align:right;margin-top:14px"><button class="primary" id="ni-submit">Create Issue</button></div>`;
+  el('modal').classList.add('open');
+  setTimeout(()=>{
+    el('ni-submit').onclick = async () => {
+      const summary = el('ni-summary').value.trim();
+      if(!summary){ alert('Summary is required'); return; }
+      const body = {
+        project_id,
+        issue_type: el('ni-type').value,
+        summary,
+        description: el('ni-desc').value || undefined,
+        priority: el('ni-priority').value,
+        reporter: 'portal-user',
+        assignee: el('ni-assignee').value || undefined,
+        story_points: el('ni-points').value ? parseFloat(el('ni-points').value) : undefined,
+        labels: el('ni-labels').value ? el('ni-labels').value.split(',').map(s=>s.trim()).filter(Boolean) : undefined,
+      };
+      try {
+        await api('/api/tracker/issues', {method:'POST', body: JSON.stringify(body)});
+        closeModal();
+        loadBoard(project_id);
+      } catch(e) { alert('Create failed: '+e); }
+    };
+  }, 50);
+};
+
+function showCreateProject(){
+  el('modal-title').textContent = 'Create Project';
+  el('modal-body').innerHTML = `
+    <div class="row"><label>Key *</label><input id="np-key" style="width:120px" placeholder="CAVE" maxlength="10"></div>
+    <div class="row"><label>Name *</label><input id="np-name" style="flex:1" placeholder="CAVE Platform"></div>
+    <div class="row"><label>Type</label><select id="np-type"><option value="scrum">Scrum</option><option value="kanban">Kanban</option><option value="business">Business</option></select></div>
+    <div class="row"><label>Lead *</label><input id="np-lead" style="flex:1" placeholder="btartan"></div>
+    <div class="row"><label>Description</label><input id="np-desc" style="flex:1" placeholder="Optional"></div>
+    <div style="text-align:right;margin-top:14px"><button class="primary" id="np-submit">Create Project</button></div>`;
+  el('modal').classList.add('open');
+  setTimeout(()=>{
+    el('np-submit').onclick = async () => {
+      const key = el('np-key').value.trim().toUpperCase();
+      const name = el('np-name').value.trim();
+      const lead = el('np-lead').value.trim();
+      if(!key||!name||!lead){ alert('Key, Name, and Lead are required'); return; }
+      try {
+        const proj = await api('/api/tracker/projects', {method:'POST', body: JSON.stringify({
+          key, name, project_type: el('np-type').value, lead, description: el('np-desc').value || undefined
+        })});
+        // Auto-create a board for the new project
+        const projectId = proj.id || proj.Id;
+        if(projectId){
+          await api('/api/tracker/boards', {method:'POST', body: JSON.stringify({
+            project_id: projectId, name: name+' Board', board_type: el('np-type').value === 'business' ? 'kanban' : el('np-type').value
+          })}).catch(()=>{}); // board creation is best-effort
+        }
+        closeModal();
+        loadProjects();
+      } catch(e) { alert('Create failed: '+e); }
+    };
+  }, 50);
+}
+
+// Add "+ Project" button handler
+document.addEventListener('DOMContentLoaded', () => {
+  // Insert "+ Project" button next to "+ Issue"
+  const issueBtn = el('new-issue');
+  if(issueBtn && !document.getElementById('new-project')){
+    const projBtn = document.createElement('button');
+    projBtn.id = 'new-project';
+    projBtn.textContent = '+ Project';
+    projBtn.onclick = showCreateProject;
+    issueBtn.parentNode.insertBefore(projBtn, issueBtn);
+  }
+});
+
+loadProjects();
+</script>
+</body>
+</html>

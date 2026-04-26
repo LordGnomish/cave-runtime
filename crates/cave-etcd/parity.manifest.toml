@@ -1,0 +1,464 @@
+# parity.manifest.toml — cave-etcd
+# Upstream: etcd v3.5.13  https://github.com/etcd-io/etcd
+
+[upstream]
+org     = "etcd-io"
+repo    = "etcd"
+version = "v3.5.13"
+
+[module]
+name        = "cave-etcd"
+description = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# upstream path (relative to etcd repo root) → local path (relative to this crate root)
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/kv.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/watch.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/lease.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/auth.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/maintenance.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/etcdserver/api/v3rpc/cluster.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "server/mvcc/kvstore.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "server/mvcc/backend/backend.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "server/auth/store.go"
+local    = "src/store.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# KV
+
+[[functions]]
+upstream_name = "Range"
+local_name    = "kv_range"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Put"
+local_name    = "kv_put"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteRange"
+local_name    = "kv_delete_range"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Txn"
+local_name    = "kv_txn"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Compact"
+local_name    = "kv_compaction"
+file          = "src/routes.rs"
+
+# Watch
+
+[[functions]]
+upstream_name = "Watch"
+local_name    = "watch_create"
+file          = "src/routes.rs"
+
+# Lease
+
+[[functions]]
+upstream_name = "LeaseGrant"
+local_name    = "lease_grant"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseRevoke"
+local_name    = "lease_revoke"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseKeepAlive"
+local_name    = "lease_keepalive"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseTimeToLive"
+local_name    = "lease_timetolive"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "LeaseLeases"
+local_name    = "lease_leases"
+file          = "src/routes.rs"
+
+# Auth
+
+[[functions]]
+upstream_name = "AuthEnable"
+local_name    = "auth_enable"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "AuthDisable"
+local_name    = "auth_disable"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Authenticate"
+local_name    = "auth_authenticate"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserAdd"
+local_name    = "auth_user_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserDelete"
+local_name    = "auth_user_delete"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserGet"
+local_name    = "auth_user_get"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserList"
+local_name    = "auth_user_list"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserChangePassword"
+local_name    = "auth_user_changepw"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserGrantRole"
+local_name    = "auth_user_grant_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UserRevokeRole"
+local_name    = "auth_user_revoke_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleAdd"
+local_name    = "auth_role_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleDelete"
+local_name    = "auth_role_delete"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleGet"
+local_name    = "auth_role_get"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleList"
+local_name    = "auth_role_list"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleGrantPermission"
+local_name    = "auth_role_grant_permission"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RoleRevokePermission"
+local_name    = "auth_role_revoke_permission"
+file          = "src/routes.rs"
+
+# Maintenance
+
+[[functions]]
+upstream_name = "Status"
+local_name    = "maintenance_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Alarm"
+local_name    = "maintenance_alarm"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Defragment"
+local_name    = "maintenance_defragment"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Hash"
+local_name    = "maintenance_hash"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Snapshot"
+local_name    = "maintenance_snapshot"
+file          = "src/routes.rs"
+
+# Cluster
+
+[[functions]]
+upstream_name = "MemberAdd"
+local_name    = "cluster_member_add"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberRemove"
+local_name    = "cluster_member_remove"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberUpdate"
+local_name    = "cluster_member_update"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MemberList"
+local_name    = "cluster_member_list"
+file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# Tests yet to be ported from upstream (test_parity = 0 until added)
+
+[[tests]]
+upstream_test = "TestV3PutOverwrite"
+local_test    = "test_kv_put_overwrite"
+
+[[tests]]
+upstream_test = "TestV3RangeWithRev"
+local_test    = "test_kv_range_with_rev"
+
+[[tests]]
+upstream_test = "TestV3DeleteRange"
+local_test    = "test_kv_delete_range"
+
+[[tests]]
+upstream_test = "TestV3TxnTooManyOps"
+local_test    = "test_kv_txn_too_many_ops"
+
+[[tests]]
+upstream_test = "TestV3TxnAtomicity"
+local_test    = "test_txn_atomicity"
+
+[[tests]]
+upstream_test = "TestV3WatchFromCurrentRevision"
+local_test    = "test_watch_from_current_revision"
+
+[[tests]]
+upstream_test = "TestV3WatchCancelSynced"
+local_test    = "test_watch_cancel_synced"
+
+[[tests]]
+upstream_test = "TestV3LeaseGrant"
+local_test    = "test_lease_grant"
+
+[[tests]]
+upstream_test = "TestV3LeaseRevoke"
+local_test    = "test_lease_revoke"
+
+[[tests]]
+upstream_test = "TestV3LeaseKeepAlive"
+local_test    = "test_lease_keepalive"
+
+[[tests]]
+upstream_test = "TestV3AuthEnable"
+local_test    = "test_auth_enable"
+
+[[tests]]
+upstream_test = "TestV3AuthUserAdd"
+local_test    = "test_auth_user_add"
+
+[[tests]]
+upstream_test = "TestV3AuthRoleAdd"
+local_test    = "test_auth_role_add"
+
+[[tests]]
+upstream_test = "TestV3AuthPermission"
+local_test    = "test_auth_permission"
+
+[[tests]]
+upstream_test = "TestV3RevisionMonotonicity"
+local_test    = "test_revision_monotonicity"
+
+# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/range"
+local_path    = "/api/etcd/v3/kv/range"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/put"
+local_path    = "/api/etcd/v3/kv/put"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/deleterange"
+local_path    = "/api/etcd/v3/kv/deleterange"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/txn"
+local_path    = "/api/etcd/v3/kv/txn"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/kv/compaction"
+local_path    = "/api/etcd/v3/kv/compaction"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/watch"
+local_path    = "/api/etcd/v3/watch"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/grant"
+local_path    = "/api/etcd/v3/lease/grant"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/revoke"
+local_path    = "/api/etcd/v3/lease/revoke"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/keepalive"
+local_path    = "/api/etcd/v3/lease/keepalive"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/lease/timetolive"
+local_path    = "/api/etcd/v3/lease/timetolive"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/enable"
+local_path    = "/api/etcd/v3/auth/enable"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/disable"
+local_path    = "/api/etcd/v3/auth/disable"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/authenticate"
+local_path    = "/api/etcd/v3/auth/authenticate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/add"
+local_path    = "/api/etcd/v3/auth/user/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/delete"
+local_path    = "/api/etcd/v3/auth/user/delete"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/get"
+local_path    = "/api/etcd/v3/auth/user/get"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/list"
+local_path    = "/api/etcd/v3/auth/user/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/user/changepw"
+local_path    = "/api/etcd/v3/auth/user/changepw"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/add"
+local_path    = "/api/etcd/v3/auth/role/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/delete"
+local_path    = "/api/etcd/v3/auth/role/delete"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/get"
+local_path    = "/api/etcd/v3/auth/role/get"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/role/list"
+local_path    = "/api/etcd/v3/auth/role/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/status"
+local_path    = "/api/etcd/v3/maintenance/status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/alarm"
+local_path    = "/api/etcd/v3/maintenance/alarm"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/defragment"
+local_path    = "/api/etcd/v3/maintenance/defragment"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/hash"
+local_path    = "/api/etcd/v3/maintenance/hash"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/snapshot"
+local_path    = "/api/etcd/v3/maintenance/snapshot"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/add"
+local_path    = "/api/etcd/v3/cluster/member/add"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/remove"
+local_path    = "/api/etcd/v3/cluster/member/remove"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/update"
+local_path    = "/api/etcd/v3/cluster/member/update"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/list"
+local_path    = "/api/etcd/v3/cluster/member/list"
