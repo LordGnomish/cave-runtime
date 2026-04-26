@@ -13,8 +13,11 @@
 //! Pinned to k8s v1.36.0 ([`crate::types::UPSTREAM_VERSION`]).
 
 pub mod cascade;
+pub mod finalizer;
 pub mod graph;
+pub mod orphan;
 pub mod owner_ref;
+pub mod resync;
 
 pub use cascade::{CascadePlan, DeletionPropagation, compute_cascade_plan};
 pub use graph::{DependencyGraph, ObjectId};

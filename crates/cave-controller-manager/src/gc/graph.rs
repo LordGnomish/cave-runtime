@@ -58,6 +58,13 @@ impl DependencyGraph {
         self.nodes.contains_key(id)
     }
 
+    /// All node IDs currently in the graph (sorted for determinism).
+    pub fn all_node_ids(&self) -> Vec<ObjectId> {
+        let mut v: Vec<_> = self.nodes.keys().cloned().collect();
+        v.sort();
+        v
+    }
+
     /// Insert (or overwrite) a node with its owner references. Updates the
     /// derived `dependents` index on the owner nodes — owner nodes that don't
     /// yet exist in the graph are auto-created (they may show up later via
