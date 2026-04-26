@@ -19,6 +19,7 @@ pub mod noderesources;
 pub mod plugins;
 pub mod preempt;
 pub mod priority_queue;
+pub mod priority_sort;
 pub mod profiles;
 pub mod routes;
 pub mod scheduler;
