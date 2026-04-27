@@ -1,0 +1,22 @@
+[package]
+name = "cave-blob"
+description = "Object storage — S3 + Azure Blob hybrid endpoint with multipart, signed URLs, lifecycle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+chrono        = { workspace = true }
+uuid          = { workspace = true }
+thiserror     = { workspace = true }
+tracing       = { workspace = true }
+sha2          = { workspace = true }
+hex           = { workspace = true }
+base64        = { workspace = true }
+bytes         = { workspace = true }
+rand          = { workspace = true }
+parking_lot   = { workspace = true }
+
+[dev-dependencies]

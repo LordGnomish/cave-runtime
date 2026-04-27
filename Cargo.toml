@@ -114,6 +114,8 @@ members = [
     # === Data Lake Foundation ===
     "crates/cave-iceberg",
     "crates/cave-datafusion",
+    # === Object Storage (S3 + Azure Blob hybrid) ===
+    "crates/cave-blob",
 ]
 
 [workspace.package]
