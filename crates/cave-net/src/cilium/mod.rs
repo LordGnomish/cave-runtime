@@ -32,6 +32,7 @@ pub mod egress;
 pub mod endpoint;
 pub mod endpoint_regen;
 pub mod envoy;
+pub mod external_workload;
 pub mod fqdn;
 pub mod gateway_filters;
 pub mod health;
