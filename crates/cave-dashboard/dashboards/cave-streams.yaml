@@ -1,0 +1,94 @@
+crate: cave-streams
+title: "Cave Streams — Kafka-parity event log"
+uid: cave-streams
+tags: [observability, cave, streams, kafka]
+
+variables:
+  - name: cluster
+    type: query
+    query: 'label_values(kafka_server_brokertopicmetrics_messagesin_total, cluster)'
+    default: ".*"
+  - name: topic
+    type: query
+    query: 'label_values(kafka_server_brokertopicmetrics_messagesin_total{cluster=~"$cluster"}, topic)'
+    default: ".*"
+    multi: true
+
+panels:
+  - id: 1
+    title: "Messages in / sec"
+    type: timeseries
+    unit: msgs
+    query: 'sum(rate(kafka_server_brokertopicmetrics_messagesin_total{cluster=~"$cluster",topic=~"$topic"}[5m])) by (topic)'
+    legend: '{{topic}}'
+
+  - id: 2
+    title: "Failed produce requests / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(kafka_server_brokertopicmetrics_failed_produce_requests_total{cluster=~"$cluster",topic=~"$topic"}[5m])) by (topic)'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 10, color: red}
+
+  - id: 3
+    title: "Produce latency p50/p95/p99"
+    type: timeseries
+    unit: ms
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(kafka_network_produce_request_duration_ms_bucket{cluster=~"$cluster"}[5m])) by (le))'
+      - 'histogram_quantile(0.95, sum(rate(kafka_network_produce_request_duration_ms_bucket{cluster=~"$cluster"}[5m])) by (le))'
+      - 'histogram_quantile(0.99, sum(rate(kafka_network_produce_request_duration_ms_bucket{cluster=~"$cluster"}[5m])) by (le))'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "Under-replicated partitions"
+    type: gauge
+    unit: short
+    query: 'sum(kafka_server_replicamanager_underreplicatedpartitions{cluster=~"$cluster"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 10, color: red}
+
+  - id: 5
+    title: "Consumer lag (max)"
+    type: timeseries
+    unit: short
+    query: 'max(kafka_consumergroup_lag{cluster=~"$cluster"}) by (consumergroup, topic)'
+    legend: '{{consumergroup}}/{{topic}}'
+
+  - id: 6
+    title: "Disk used per broker"
+    type: timeseries
+    unit: bytes
+    query: 'kafka_log_log_size{cluster=~"$cluster"}'
+    legend: '{{broker}}'
+
+  - id: 7
+    title: "Top-10 partitions by ingest"
+    type: table
+    unit: msgs
+    query: 'topk(10, sum(rate(kafka_partition_messages_in_total{cluster=~"$cluster"}[5m])) by (topic, partition))'
+
+  - id: 8
+    title: "ISR shrink/expand events / hour"
+    type: timeseries
+    unit: short
+    queries:
+      - 'sum(increase(kafka_server_replicamanager_isrshrinks_total{cluster=~"$cluster"}[1h]))'
+      - 'sum(increase(kafka_server_replicamanager_isrexpands_total{cluster=~"$cluster"}[1h]))'
+    legend: ['shrinks', 'expands']
+
+  - id: 9
+    title: "Tenant topic cardinality"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (kafka_topic_partitions))'
+
+  - id: 10
+    title: "Network bytes in/out heatmap"
+    type: heatmap
+    unit: Bps
+    query: 'sum(rate(kafka_server_brokertopicmetrics_bytesin_total{cluster=~"$cluster"}[5m])) by (broker)'

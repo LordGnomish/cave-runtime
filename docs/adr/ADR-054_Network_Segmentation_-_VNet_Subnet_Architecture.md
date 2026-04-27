@@ -49,7 +49,11 @@ CAVE runs on two providers with fundamentally different networking models. IP ad
 - Azure subnet pre-sizing required for AKS (node count × max-pods-per-node).
 - Hetzner private networking has limitations compared to Azure VNet (no native subnet RBAC — compensated by Cilium NetworkPolicy).
 
-Compliance Mapping
+## Notes
+
+**Universal scope.** **Runtime mirror EXISTS**: `cave-net` crate (Mirror-001 blanket; Cilium CNI + eBPF mirror, ADR-004). VNet/subnet topology cave-net'in provider abstraction katmanında configurable — Hetzner/Azure/on-prem KubeVirt için ortak schema. Non-overlapping invariant cave-net'in built-in validator'unda enforce (10.10.x.x ↔ 10.20.x.x ayrılığı tenant deployment'larında otomatik kontrol). Cross-provider VPN peering (WireGuard/IPsec) cave-net M6 Encryption track'inde indi (+30 test main'de). Multi-tenant: per-tenant namespace IP allocation cave-net policy engine'inde, cross-tenant default-deny.
+
+## Compliance Mapping
 
 SOC2 CC6.1 (network segmentation — non-overlapping ranges prevent cross-provider leakage). ISO A.8.22 (segregation in networks — subnet isolation per workload type). NIS2 Art.21 (network architecture — documented topology). GDPR Art.32 (security of processing — network isolation). Architecture diagram: CAVE_Azure_Network_Architecture.drawio.
 

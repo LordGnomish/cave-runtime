@@ -1,38 +1,32 @@
-use crate::models::{Alert, Matcher, Route, Silence};
-use chrono::Utc;
+//! Top-level pipeline that ties matchers + routing + inhibit + silences +
+//! grouping + receivers together. Also keeps the legacy convenience
+//! functions used by older callers (`route_alert`, `is_silenced`,
+//! `deduplicate`, `compute_fingerprint`, `matcher_matches`) so existing
+//! integrations continue to compile.
 
-/// Compute a stable fingerprint for an alert based on its name + sorted labels
-pub fn compute_fingerprint(name: &str, labels: &std::collections::HashMap<String, String>) -> String {
-    let mut parts: Vec<String> = labels.iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect();
-    parts.sort();
-    format!("{name}:{}", parts.join(","))
+use crate::matcher;
+use crate::models::{Alert, AlertState, InhibitRule, Matcher, Receiver, Route, Silence};
+use crate::receivers::{render_all, RenderedNotification};
+use crate::routing::{route_alert_tree, RoutingDecision};
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
+
+// ─── Legacy compat surface (kept for back-compat with older tests) ─────────
+
+pub fn compute_fingerprint(name: &str, labels: &HashMap<String, String>) -> String {
+    matcher::compute_fingerprint(name, labels)
 }
 
-/// Check if a matcher matches a label map
-pub fn matcher_matches(matcher: &Matcher, labels: &std::collections::HashMap<String, String>) -> bool {
-    match labels.get(&matcher.label) {
-        Some(value) => {
-            if matcher.is_regex {
-                // Simple contains check as a lightweight regex substitute
-                value.contains(&matcher.value)
-            } else {
-                value == &matcher.value
-            }
-        }
-        None => false,
-    }
+pub fn matcher_matches(m: &Matcher, labels: &HashMap<String, String>) -> bool {
+    matcher::matcher_matches(m, labels)
 }
 
-/// Check if ALL matchers in a route match the alert labels
 pub fn route_matches(route: &Route, alert: &Alert) -> bool {
-    route.matchers.iter().all(|m| matcher_matches(m, &alert.labels))
+    matcher::all_match(&route.matchers, &alert.labels)
 }
 
-/// Find all receivers for an alert given a list of routes
 pub fn route_alert(alert: &Alert, routes: &[Route]) -> Vec<String> {
-    let mut receivers = vec![];
+    let mut receivers = Vec::new();
     for route in routes {
         if route_matches(route, alert) {
             receivers.extend(route.receivers.iter().cloned());
@@ -44,229 +38,312 @@ pub fn route_alert(alert: &Alert, routes: &[Route]) -> Vec<String> {
     receivers
 }
 
-/// Check if an alert is currently silenced
 pub fn is_silenced(alert: &Alert, silences: &[Silence]) -> bool {
-    let now = Utc::now();
-    silences.iter().any(|s| {
-        s.starts_at <= now && now <= s.ends_at
-            && s.matchers.iter().all(|m| matcher_matches(m, &alert.labels))
-    })
+    crate::silence::is_silenced(alert, silences, Utc::now())
 }
 
-/// Deduplicate alerts by fingerprint, keeping the most recent starts_at
 pub fn deduplicate(alerts: Vec<Alert>) -> Vec<Alert> {
-    let mut seen: std::collections::HashMap<String, Alert> = std::collections::HashMap::new();
-    for alert in alerts {
-        seen.entry(alert.fingerprint.clone())
-            .and_modify(|existing| {
-                if alert.starts_at > existing.starts_at {
-                    *existing = alert.clone();
-                }
-            })
-            .or_insert(alert);
-    }
-    seen.into_values().collect()
+    crate::grouping::deduplicate(alerts)
 }
+
+// ─── Pipeline ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct PipelineInput<'a> {
+    pub root_route: &'a Route,
+    pub silences: &'a [Silence],
+    pub inhibit_rules: &'a [InhibitRule],
+    pub receivers: &'a HashMap<String, Receiver>,
+    pub now: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PipelineGroupOutput {
+    pub group_key: String,
+    pub decision: RoutingDecision,
+    pub firing: Vec<Alert>,
+    pub resolved: Vec<Alert>,
+    pub notifications: Vec<RenderedNotification>,
+}
+
+/// Run a full alert pipeline:
+/// 1. Deduplicate alerts.
+/// 2. Apply silences (mutates state).
+/// 3. Apply inhibit rules.
+/// 4. Route each alert through the route tree.
+/// 5. Group by `group_key` from the routing decision.
+/// 6. Render notifications for each receiver in each group.
+pub fn run_pipeline(input: PipelineInput, alerts: Vec<Alert>) -> Vec<PipelineGroupOutput> {
+    let alerts = crate::grouping::deduplicate(alerts);
+    let mut alerts = alerts;
+    crate::silence::apply_silences(&mut alerts, input.silences, input.now);
+
+    let active: Vec<Alert> = alerts.iter().filter(|a| a.state == AlertState::Firing).cloned().collect();
+    let post_inhibit = crate::inhibit::filter_inhibited(&active, input.inhibit_rules);
+
+    let mut groups: HashMap<String, PipelineGroupOutput> = HashMap::new();
+
+    for alert in alerts.iter() {
+        let decision = route_alert_tree(input.root_route, alert);
+        let key = crate::routing::group_key(&decision, alert);
+        let inhibited = !post_inhibit.iter().any(|a| a.fingerprint == alert.fingerprint);
+        let entry = groups.entry(key.clone()).or_insert_with(|| PipelineGroupOutput {
+            group_key: key,
+            decision: decision.clone(),
+            firing: vec![],
+            resolved: vec![],
+            notifications: vec![],
+        });
+        match alert.state {
+            AlertState::Firing if !inhibited => entry.firing.push(alert.clone()),
+            AlertState::Resolved => entry.resolved.push(alert.clone()),
+            _ => {} // silenced or inhibited → don't notify
+        }
+    }
+
+    for output in groups.values_mut() {
+        for receiver_name in &output.decision.receivers {
+            if let Some(receiver) = input.receivers.get(receiver_name) {
+                let mut rendered = render_all(receiver, &output.firing, &output.resolved);
+                output.notifications.append(&mut rendered);
+            }
+        }
+    }
+
+    groups.into_values().collect()
+}
+
+// ─── Tests ─────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{AlertSeverity, AlertState, Route};
+    use crate::models::{
+        AlertSeverity, AlertState, Matcher, Receiver, ReceiverConfig, Route, Silence, WebhookConfig,
+    };
+    use chrono::Duration;
     use std::collections::HashMap;
     use uuid::Uuid;
-    use chrono::Duration;
 
-    fn base_labels() -> HashMap<String, String> {
-        let mut m = HashMap::new();
-        m.insert("env".to_string(), "prod".to_string());
-        m.insert("team".to_string(), "platform".to_string());
-        m
-    }
-
-    fn make_alert(name: &str, labels: HashMap<String, String>, fingerprint: &str) -> Alert {
+    fn alert_with(name: &str, labels: Vec<(&str, &str)>, state: AlertState, fp: &str) -> Alert {
+        let labels: HashMap<String, String> = labels.into_iter().map(|(k, v)| (k.into(), v.into())).collect();
         Alert {
             id: Uuid::new_v4(),
-            name: name.to_string(),
+            name: name.into(),
             labels,
             annotations: HashMap::new(),
             severity: AlertSeverity::Warning,
-            state: AlertState::Firing,
+            state,
             starts_at: Utc::now(),
             ends_at: None,
-            fingerprint: fingerprint.to_string(),
+            fingerprint: fp.into(),
+            tenant_id: "anonymous".into(),
+            generator_url: None,
         }
     }
 
-    fn make_route(matchers: Vec<Matcher>, receivers: Vec<&str>, cont: bool) -> Route {
-        Route {
-            id: Uuid::new_v4(),
-            name: "route".to_string(),
-            matchers,
-            receivers: receivers.iter().map(|s| s.to_string()).collect(),
-            continue_matching: cont,
-        }
+    fn webhook_receiver(name: &str, url: &str) -> Receiver {
+        Receiver::new(name).with_config(ReceiverConfig::Webhook(WebhookConfig {
+            url: url.into(),
+            send_resolved: true,
+        }))
     }
 
-    fn exact_matcher(label: &str, value: &str) -> Matcher {
-        Matcher { label: label.to_string(), value: value.to_string(), is_regex: false }
-    }
-
-    fn regex_matcher(label: &str, value: &str) -> Matcher {
-        Matcher { label: label.to_string(), value: value.to_string(), is_regex: true }
-    }
+    // ─── Legacy compat tests ─────────────────────────────────────────────
 
     #[test]
-    fn test_compute_fingerprint_deterministic() {
-        let labels = base_labels();
-        let fp1 = compute_fingerprint("HighCPU", &labels);
-        let fp2 = compute_fingerprint("HighCPU", &labels);
-        assert_eq!(fp1, fp2);
-    }
-
-    #[test]
-    fn test_compute_fingerprint_label_order_independent() {
-        let mut labels_a = HashMap::new();
-        labels_a.insert("env".to_string(), "prod".to_string());
-        labels_a.insert("team".to_string(), "platform".to_string());
-
-        // Insert in different order
-        let mut labels_b = HashMap::new();
-        labels_b.insert("team".to_string(), "platform".to_string());
-        labels_b.insert("env".to_string(), "prod".to_string());
-
-        let fp_a = compute_fingerprint("HighCPU", &labels_a);
-        let fp_b = compute_fingerprint("HighCPU", &labels_b);
-        assert_eq!(fp_a, fp_b);
-    }
-
-    #[test]
-    fn test_matcher_exact_match() {
-        let labels = base_labels();
-        let m = exact_matcher("env", "prod");
-        assert!(matcher_matches(&m, &labels));
-    }
-
-    #[test]
-    fn test_matcher_no_match() {
-        let labels = base_labels();
-        let m = exact_matcher("env", "staging");
-        assert!(!matcher_matches(&m, &labels));
-    }
-
-    #[test]
-    fn test_matcher_missing_label() {
-        let labels = base_labels();
-        let m = exact_matcher("datacenter", "us-east-1");
-        assert!(!matcher_matches(&m, &labels));
-    }
-
-    #[test]
-    fn test_matcher_regex_contains() {
+    fn test_legacy_compute_fingerprint_stable() {
         let mut labels = HashMap::new();
-        labels.insert("namespace".to_string(), "production-api".to_string());
-        let m = regex_matcher("namespace", "prod");
-        assert!(matcher_matches(&m, &labels));
+        labels.insert("a".into(), "1".into());
+        let f1 = compute_fingerprint("X", &labels);
+        let f2 = compute_fingerprint("X", &labels);
+        assert_eq!(f1, f2);
     }
 
     #[test]
-    fn test_route_matches_all_matchers() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let route = make_route(
-            vec![exact_matcher("env", "prod"), exact_matcher("team", "platform")],
-            vec!["slack"],
-            false,
+    fn test_legacy_route_alert_first_wins() {
+        let a = alert_with("X", vec![("env", "prod")], AlertState::Firing, "fp1");
+        let r1 = Route::child("r1", vec![Matcher::equal("env", "prod")], vec!["pd".into()]);
+        let r2 = Route::child("r2", vec![Matcher::equal("env", "prod")], vec!["slack".into()]);
+        assert_eq!(route_alert(&a, &[r1, r2]), vec!["pd".to_string()]);
+    }
+
+    #[test]
+    fn test_legacy_route_alert_continue_collects_all() {
+        let a = alert_with("X", vec![("env", "prod")], AlertState::Firing, "fp1");
+        let r1 = Route::child("r1", vec![Matcher::equal("env", "prod")], vec!["pd".into()]).with_continue(true);
+        let r2 = Route::child("r2", vec![Matcher::equal("env", "prod")], vec!["slack".into()]);
+        let recv = route_alert(&a, &[r1, r2]);
+        assert!(recv.contains(&"pd".to_string()));
+        assert!(recv.contains(&"slack".to_string()));
+    }
+
+    #[test]
+    fn test_legacy_is_silenced() {
+        let a = alert_with("X", vec![("env", "prod")], AlertState::Firing, "fp1");
+        let s = Silence::new(
+            vec![Matcher::equal("env", "prod")],
+            Utc::now() - Duration::minutes(1),
+            Utc::now() + Duration::hours(1),
+            "alice",
+            "x",
         );
-        assert!(route_matches(&route, &alert));
+        assert!(is_silenced(&a, &[s]));
     }
 
     #[test]
-    fn test_route_no_match() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let route = make_route(
-            vec![exact_matcher("env", "prod"), exact_matcher("team", "security")],
-            vec!["slack"],
-            false,
-        );
-        assert!(!route_matches(&route, &alert));
-    }
-
-    #[test]
-    fn test_route_alert_stops_at_first() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let route1 = make_route(vec![exact_matcher("env", "prod")], vec!["pagerduty"], false);
-        let route2 = make_route(vec![exact_matcher("env", "prod")], vec!["slack"], false);
-        let receivers = route_alert(&alert, &[route1, route2]);
-        // Should stop after route1 since continue_matching = false
-        assert_eq!(receivers, vec!["pagerduty"]);
-    }
-
-    #[test]
-    fn test_route_alert_continues() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let route1 = make_route(vec![exact_matcher("env", "prod")], vec!["pagerduty"], true);
-        let route2 = make_route(vec![exact_matcher("env", "prod")], vec!["slack"], false);
-        let receivers = route_alert(&alert, &[route1, route2]);
-        assert!(receivers.contains(&"pagerduty".to_string()));
-        assert!(receivers.contains(&"slack".to_string()));
-    }
-
-    #[test]
-    fn test_deduplicate_removes_duplicates() {
-        let labels = base_labels();
-        let a1 = make_alert("CPU", labels.clone(), "fp-cpu");
-        let a2 = make_alert("CPU", labels.clone(), "fp-cpu");
-        let a3 = make_alert("Memory", labels.clone(), "fp-mem");
-        let result = deduplicate(vec![a1, a2, a3]);
-        assert_eq!(result.len(), 2);
-    }
-
-    #[test]
-    fn test_deduplicate_keeps_most_recent() {
-        let labels = base_labels();
-        let mut older = make_alert("CPU", labels.clone(), "fp-cpu");
-        older.starts_at = Utc::now() - Duration::minutes(10);
-
-        let mut newer = make_alert("CPU", labels.clone(), "fp-cpu");
-        newer.starts_at = Utc::now();
-        // Give different IDs so we can identify which one was kept
-        let newer_id = newer.id;
-
-        let result = deduplicate(vec![older, newer]);
+    fn test_legacy_deduplicate_passthrough() {
+        let a1 = alert_with("X", vec![], AlertState::Firing, "fp1");
+        let a2 = alert_with("X", vec![], AlertState::Firing, "fp1");
+        let result = deduplicate(vec![a1, a2]);
         assert_eq!(result.len(), 1);
-        assert_eq!(result[0].id, newer_id);
+    }
+
+    // ─── Pipeline tests ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_pipeline_routes_to_root_default() {
+        let root = Route::root("default");
+        let receivers = std::iter::once(("default".to_string(), webhook_receiver("default", "http://x"))).collect();
+        let firing = alert_with("X", vec![], AlertState::Firing, "fp1");
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[],
+                inhibit_rules: &[],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![firing],
+        );
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].notifications.len(), 1);
+        assert_eq!(out[0].notifications[0].kind, "webhook");
     }
 
     #[test]
-    fn test_is_silenced_active_silence() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let silence = Silence {
-            id: Uuid::new_v4(),
-            matchers: vec![exact_matcher("env", "prod")],
-            starts_at: Utc::now() - Duration::minutes(5),
-            ends_at: Utc::now() + Duration::hours(1),
-            created_by: "alice".to_string(),
-            comment: "maintenance".to_string(),
-        };
-        assert!(is_silenced(&alert, &[silence]));
+    fn test_pipeline_silenced_alert_no_notification() {
+        let root = Route::root("default");
+        let receivers = std::iter::once(("default".to_string(), webhook_receiver("default", "http://x"))).collect();
+        let firing = alert_with("X", vec![("env", "prod")], AlertState::Firing, "fp1");
+        let silence = Silence::new(
+            vec![Matcher::equal("env", "prod")],
+            Utc::now() - Duration::minutes(1),
+            Utc::now() + Duration::hours(1),
+            "alice",
+            "deploy",
+        );
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[silence],
+                inhibit_rules: &[],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![firing],
+        );
+        assert_eq!(out[0].firing.len(), 0);
+        // Notifications array still empty because firing is empty and resolved is empty.
+        assert_eq!(out[0].notifications.len(), 0);
     }
 
     #[test]
-    fn test_is_silenced_expired_silence() {
-        let labels = base_labels();
-        let alert = make_alert("Test", labels, "fp1");
-        let silence = Silence {
-            id: Uuid::new_v4(),
-            matchers: vec![exact_matcher("env", "prod")],
-            starts_at: Utc::now() - Duration::hours(2),
-            ends_at: Utc::now() - Duration::hours(1),
-            created_by: "alice".to_string(),
-            comment: "expired maintenance".to_string(),
-        };
-        assert!(!is_silenced(&alert, &[silence]));
+    fn test_pipeline_inhibited_alert_excluded() {
+        let root = Route::root("default");
+        let receivers: HashMap<_, _> = std::iter::once(("default".to_string(), webhook_receiver("default", "http://x"))).collect();
+        let cluster_down = alert_with(
+            "ClusterDown",
+            vec![("cluster", "c1"), ("severity", "critical"), ("alertname", "ClusterDown")],
+            AlertState::Firing,
+            "fp-cd",
+        );
+        let pod_high = alert_with(
+            "PodHigh",
+            vec![("cluster", "c1"), ("severity", "warning")],
+            AlertState::Firing,
+            "fp-pod",
+        );
+        let rule = InhibitRule::new(
+            "rule",
+            vec![Matcher::equal("alertname", "ClusterDown")],
+            vec![Matcher::equal("severity", "warning")],
+            vec!["cluster".into()],
+        );
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[],
+                inhibit_rules: &[rule],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![cluster_down, pod_high],
+        );
+        // PodHigh should have been suppressed by inhibit; only ClusterDown notifies.
+        let total_firing: usize = out.iter().map(|g| g.firing.len()).sum();
+        assert_eq!(total_firing, 1);
+    }
+
+    #[test]
+    fn test_pipeline_resolved_routed_separately() {
+        let root = Route::root("default");
+        let receivers: HashMap<_, _> = std::iter::once(("default".to_string(), webhook_receiver("default", "http://x"))).collect();
+        let mut a = alert_with("X", vec![], AlertState::Firing, "fp1");
+        a.state = AlertState::Resolved;
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[],
+                inhibit_rules: &[],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![a],
+        );
+        assert_eq!(out[0].resolved.len(), 1);
+        assert_eq!(out[0].firing.len(), 0);
+    }
+
+    #[test]
+    fn test_pipeline_groups_by_alertname() {
+        let root = Route::root("default");
+        let receivers: HashMap<_, _> = std::iter::once(("default".to_string(), webhook_receiver("default", "http://x"))).collect();
+        let a1 = alert_with("HighCPU", vec![("alertname", "HighCPU"), ("instance", "a")], AlertState::Firing, "fp1");
+        let a2 = alert_with("HighCPU", vec![("alertname", "HighCPU"), ("instance", "b")], AlertState::Firing, "fp2");
+        let a3 = alert_with("HighMem", vec![("alertname", "HighMem"), ("instance", "a")], AlertState::Firing, "fp3");
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[],
+                inhibit_rules: &[],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![a1, a2, a3],
+        );
+        // Two groups: HighCPU (2 alerts) and HighMem (1 alert)
+        assert_eq!(out.len(), 2);
+        let cpu_group = out.iter().find(|g| g.firing.iter().any(|a| a.name == "HighCPU")).unwrap();
+        assert_eq!(cpu_group.firing.len(), 2);
+    }
+
+    #[test]
+    fn test_pipeline_unknown_receiver_skipped() {
+        let mut root = Route::root("default");
+        root.receivers = vec!["does-not-exist".into()];
+        let receivers: HashMap<String, Receiver> = HashMap::new();
+        let firing = alert_with("X", vec![], AlertState::Firing, "fp1");
+        let out = run_pipeline(
+            PipelineInput {
+                root_route: &root,
+                silences: &[],
+                inhibit_rules: &[],
+                receivers: &receivers,
+                now: Utc::now(),
+            },
+            vec![firing],
+        );
+        assert_eq!(out[0].notifications.len(), 0);
     }
 }

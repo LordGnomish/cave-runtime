@@ -46,6 +46,10 @@ CAVE needs to measure software delivery performance across all tenants: deployme
 - Data source connectors (GitHub, ArgoCD) need API token configuration per profile.
 - DORA metric accuracy depends on CI event reporting discipline (stage 26).
 
+## Notes
+
+**Universal scope** — DevLake metrics consumer hem Platform CI artifact'leri hem Cave Runtime tenant deployment events için. **Runtime mirror REQUIRED**: cave-delivery-metrics crate (Mirror-001 blanket scope, single upstream, no override ADR) DevLake davranışını runtime içinde reimpl eder; sovereign/disconnected deployment'larda CI-time webhook kırılırsa runtime kendi DORA telemetry'sini üretmeli — Reflex Engine self-improvement loop'u için load-bearing.
+
 ## Compliance Mapping
 
 SOC2 CC7.1 (operational monitoring — delivery performance). ISO A.14.2 (secure development — delivery performance measurement).

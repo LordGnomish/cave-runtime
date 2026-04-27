@@ -44,6 +44,10 @@ Database schema changes are a top cause of production incidents. CAVE's CI pipel
 - Developers must write rollback migrations for every forward migration (discipline required).
 - Ephemeral DB provisioning adds ~30s to CI stage 6.
 
+## Notes
+
+**Universal scope** — Platform tenant DB'leri + Cave Runtime cave-pg/cave-docdb migration validation. **Runtime mirror REQUIRED**: cave-schema-migrate crate (Mirror-001 blanket scope, dual upstream Flyway+Alembic semantics tek crate'te) sovereign/disconnected deployment'larda CI-time validation kırılırsa runtime kendi migration gate'ini koşar — cave-self-improver + Reflex Engine zinciri için schema drift detection load-bearing. Atlas (Go-native + declarative HCL, 2026 olgun) gelecekte üçüncü upstream olarak değerlendirilebilir.
+
 ## Compliance Mapping
 
 SOC2 CC8.1 (change management — schema changes validated). ISO A.14.2.9 (system acceptance testing — DB migration testing).

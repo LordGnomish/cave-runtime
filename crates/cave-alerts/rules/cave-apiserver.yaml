@@ -1,0 +1,91 @@
+crate: cave-apiserver
+group: cave-apiserver-slo
+
+alerts:
+  - alert: ApiserverSloBurnRateFast
+    expr: |
+      (
+        sum(rate(apiserver_request_total{code=~"5.."}[1h]))
+        /
+        sum(rate(apiserver_request_total[1h]))
+      ) > (14.4 * 0.001)
+    for: 2m
+    severity: critical
+    labels:
+      tenant_scoped: "true"
+    annotations:
+      summary: "API Server fast burn rate (1h)"
+      description: "5xx error fraction is {{ $value | humanizePercentage }} — burning the 99.9% error budget 14.4x faster than allowed."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/slo-burn-fast.md"
+
+  - alert: ApiserverSloBurnRateSlow
+    expr: |
+      (
+        sum(rate(apiserver_request_total{code=~"5.."}[6h]))
+        /
+        sum(rate(apiserver_request_total[6h]))
+      ) > (6 * 0.001)
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "API Server slow burn rate (6h)"
+      description: "5xx error fraction is {{ $value | humanizePercentage }} over 6h — sustained budget burn."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/slo-burn-slow.md"
+
+  - alert: ApiserverErrorBudgetLow
+    expr: |
+      (
+        1 -
+        (sum(rate(apiserver_request_total{code=~"5.."}[7d])) / sum(rate(apiserver_request_total[7d])))
+      ) < 0.999
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "API Server 7-day error budget below 99.9%"
+      description: "Availability over the trailing 7 days is {{ $value | humanizePercentage }}."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/error-budget.md"
+
+  - alert: ApiserverInflightSaturation
+    expr: 'sum(apiserver_current_inflight_requests) > 400'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "API Server inflight requests above 400"
+      description: "{{ $value }} concurrent requests inflight — close to the 600 ceiling."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/inflight.md"
+
+  - alert: ApiserverCardinalityExplosion
+    expr: 'count(count by (resource) (apiserver_request_total)) > 5000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "API Server resource cardinality > 5000"
+      description: "{{ $value }} distinct resource series — investigate CRD churn or label explosions."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/cardinality.md"
+
+  - alert: ApiserverWatchEventBacklog
+    expr: 'max(apiserver_watch_event_lag_seconds) > 60'
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "Watch event lag exceeds 60s"
+      description: "Watch consumers are {{ $value }}s behind."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/watch-lag.md"
+
+  - alert: ApiserverEtcdLatencyHigh
+    expr: 'histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{client="apiserver"}[5m])) by (le, operation)) > 1'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "etcd p99 from apiserver > 1s"
+      description: "{{ $labels.operation }} p99 = {{ $value }}s."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/etcd-latency.md"
+
+  - alert: ApiserverHealthProbeFailing
+    expr: 'min(up{job="cave-apiserver"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "API Server health probe failing"
+      description: "At least one cave-apiserver instance is reporting `up == 0`."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/health.md"

@@ -147,11 +147,22 @@ impl Pod {
     }
 }
 
-/// Subset of NodeAffinity: required nodeSelectorTerms (DNF). Each term is a list of
-/// matchExpressions ANDed; terms are ORed. (Cite: api/core/v1/types.go NodeSelectorTerm.)
+/// Subset of NodeAffinity: required nodeSelectorTerms (DNF) plus preferred
+/// (weighted) terms. Required: each term is a list of matchExpressions ANDed;
+/// terms are ORed. Preferred: each term is weighted [1..=100] and contributes
+/// to the score when matched. (Cite: api/core/v1/types.go NodeSelectorTerm.)
 #[derive(Debug, Clone, Default)]
 pub struct NodeAffinitySpec {
     pub required: Vec<NodeSelectorTerm>,
+    /// Preferred (soft) terms — weighted, used by the Score plugin only.
+    #[allow(dead_code)]
+    pub preferred: Vec<PreferredSchedulingTerm>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PreferredSchedulingTerm {
+    pub weight: i32,
+    pub preference: NodeSelectorTerm,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -176,28 +187,125 @@ pub enum NodeSelectorOp {
     Lt,
 }
 
-/// Inter-pod affinity term — selects pods on a topology key.
+/// LabelSelector — matchLabels (AND) plus matchExpressions (AND). All entries
+/// are ANDed across both halves. Empty selector matches everything (upstream
+/// invariant: nil selector → match all; we encode that as `Default::default()`).
+#[derive(Debug, Clone, Default)]
+pub struct LabelSelector {
+    pub match_labels: HashMap<String, String>,
+    pub match_expressions: Vec<LabelSelectorRequirement>,
+}
+
 #[derive(Debug, Clone)]
+pub struct LabelSelectorRequirement {
+    pub key: String,
+    pub operator: LabelSelectorOp,
+    pub values: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LabelSelectorOp {
+    In,
+    NotIn,
+    Exists,
+    DoesNotExist,
+}
+
+impl LabelSelector {
+    /// True when every match_label and match_expression is satisfied by `labels`.
+    pub fn matches(&self, labels: &HashMap<String, String>) -> bool {
+        for (k, v) in &self.match_labels {
+            if labels.get(k) != Some(v) { return false; }
+        }
+        for req in &self.match_expressions {
+            let v = labels.get(&req.key);
+            let ok = match req.operator {
+                LabelSelectorOp::In => v.map_or(false, |x| req.values.iter().any(|w| w == x)),
+                LabelSelectorOp::NotIn => v.map_or(true, |x| !req.values.iter().any(|w| w == x)),
+                LabelSelectorOp::Exists => v.is_some(),
+                LabelSelectorOp::DoesNotExist => v.is_none(),
+            };
+            if !ok { return false; }
+        }
+        true
+    }
+
+    pub fn from_match_labels(m: HashMap<String, String>) -> Self {
+        Self { match_labels: m, match_expressions: Vec::new() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.match_labels.is_empty() && self.match_expressions.is_empty()
+    }
+}
+
+/// Inter-pod affinity term — selects pods on a topology key.
+///
+/// Backwards-compatible: legacy `label_selector: HashMap` is preserved and
+/// AND-merged with the optional richer `selector_v2` (which supports
+/// matchExpressions). New optional fields default to "no constraint":
+///
+/// - `namespace_selector`: when `Some`, matches namespaces by label (in
+///   addition to the literal `namespaces` list); `None` → only the literal list.
+/// - `match_label_keys`: each name lifts the value from the *scheduling* pod's
+///   labels into an additional matchLabels entry (KEP-3243).
+/// - `mismatch_label_keys`: same but adds a `NotIn [value]` exclusion.
+#[derive(Debug, Clone, Default)]
 pub struct PodAffinityTerm {
     pub label_selector: HashMap<String, String>,
     pub topology_key: String,
     pub namespaces: Vec<String>,
+    pub selector_v2: Option<LabelSelector>,
+    pub namespace_selector: Option<LabelSelector>,
+    pub match_label_keys: Vec<String>,
+    pub mismatch_label_keys: Vec<String>,
 }
 
-/// Pod topology spread constraint (KEP-3094 minDomains GA v1.30).
+/// Weighted soft pod-affinity term — used by the Score plugin only.
 #[derive(Debug, Clone)]
+pub struct WeightedPodAffinityTerm {
+    pub weight: i32,
+    pub term: PodAffinityTerm,
+}
+
+/// Pod topology spread constraint (KEP-3094 minDomains GA v1.30,
+/// KEP-3243 matchLabelKeys GA v1.31, KEP-3094 nodeAffinity/TaintsPolicy GA v1.30).
+#[derive(Debug, Clone, Default)]
 pub struct TopologySpreadConstraint {
     pub max_skew: i32,
     pub topology_key: String,
     pub when_unsatisfiable: UnsatisfiableAction,
     pub label_selector: HashMap<String, String>,
     pub min_domains: Option<i32>,
+    /// Each name lifts the value from the *scheduling* pod's labels into the
+    /// effective selector when matching pre-existing pods (KEP-3243).
+    pub match_label_keys: Vec<String>,
+    /// `Honor` (default) — only nodes that satisfy nodeAffinity / nodeSelector
+    /// participate in skew calc. `Ignore` — every node is considered.
+    pub node_affinity_policy: NodeInclusionPolicy,
+    /// `Ignore` (default) — tainted nodes still count. `Honor` — tainted nodes
+    /// are excluded unless tolerated.
+    pub node_taints_policy: NodeInclusionPolicy,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeInclusionPolicy {
+    Honor,
+    Ignore,
+}
+
+impl Default for NodeInclusionPolicy {
+    fn default() -> Self { Self::Honor }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnsatisfiableAction {
     DoNotSchedule,
     ScheduleAnyway,
+}
+
+impl Default for UnsatisfiableAction {
+    fn default() -> Self { Self::DoNotSchedule }
 }
 
 #[derive(Debug, Clone)]

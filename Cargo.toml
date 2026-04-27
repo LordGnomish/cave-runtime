@@ -37,6 +37,7 @@ members = [
     "crates/cave-scan",
     "crates/cave-portal",
     "crates/cave-portal-api",
+    "crates/cave-portal-web",
     "crates/cave-scaffold",
     "crates/cave-chaos",
     "crates/cave-dast",
@@ -62,6 +63,7 @@ members = [
     "crates/cave-metrics",
     "crates/cave-logs",
     "crates/cave-trace",
+    "crates/cave-tracing",
     # === Security & Admission ===
     "crates/cave-admission",
     "crates/cave-security",

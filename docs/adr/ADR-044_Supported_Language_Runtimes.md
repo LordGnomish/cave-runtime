@@ -24,7 +24,7 @@ CAVE's CI pipeline must support multiple programming languages. Golden Path temp
 
 ## Decision
 
-**Phase 1 languages:** Java (Spring Boot) + Python (FastAPI). **Phase 2:** Go, Node.js/TypeScript. **Phase 3+:** Rust, .NET (on demand).
+**Phase 1 languages:** Java (Spring Boot) + Python (FastAPI) + Node.js/TypeScript (Backstage runtime mandatory — ADR-011, ADR-RUNTIME-UI-CONSOLIDATION-001; Jest/Vitest, Prisma, NestJS/Express). **Phase 2:** Go (cloud-native ecosystem, kubectl/helm/argocd dili) + Rust (Cave Runtime native dil; sovereign performance + memory safety isteyen tenant workload'ları için). **Phase 3+:** .NET, Kotlin/Scala, Erlang/Elixir (on-demand).
 
 | Language | Build Tool | Test Runner | Schema Migration | Framework |
 |---|---|---|---|---|
@@ -75,6 +75,16 @@ Each language gets a Backstage scaffolder template that produces: Dockerfile (mu
 ## License
 
 Build tools: Maven (Apache 2.0), Python (PSF), Go (BSD), Node.js (MIT)
+
+## Notes
+
+**Universal scope** — Platform tenant Golden Path templates + Cave Runtime crate development.
+
+**Phase 1 rationale:** Java + Python = mainstream backend tenant adoption. **Node.js/TypeScript Phase 1 zorunlu** — Backstage (ADR-011) ve cave-portal (ADR-RUNTIME-UI-CONSOLIDATION-001) bu stack üzerine kurulu, Cave operasyona giremez Node.js olmadan.
+
+**Phase 2 rationale:** Go (cloud-native) + Rust (Cave Runtime native dil; cave-self-improver / cave-delivery-metrics / cave-schema-migrate runtime mirror'ları Rust'ta yazılır).
+
+Language ecosystems are **hosted, not mirrored** — tenant uygulamaları kendi dillerinde yazılır, Cave Runtime onları barındıran sovereign katmandır. Mirror prensibi (ADR-RUNTIME-UPSTREAM-MIRROR-001) language-runtime'lara uygulanmaz.
 
 ## Compliance Mapping
 

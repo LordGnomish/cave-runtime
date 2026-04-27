@@ -1,0 +1,69 @@
+crate: cave-etcd
+group: cave-etcd-slo
+
+alerts:
+  - alert: EtcdSloBurnRateFast
+    expr: '(sum(rate(etcd_server_proposals_failed_total[1h])) / sum(rate(etcd_server_proposals_committed_total[1h]))) > (14.4 * 0.001)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "etcd proposal failure fast burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/slo-burn-fast.md"
+
+  - alert: EtcdSloBurnRateSlow
+    expr: '(sum(rate(etcd_server_proposals_failed_total[6h])) / sum(rate(etcd_server_proposals_committed_total[6h]))) > (6 * 0.001)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "etcd proposal failure slow burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/slo-burn-slow.md"
+
+  - alert: EtcdErrorBudgetLow
+    expr: '1 - (sum(rate(etcd_server_proposals_failed_total[7d])) / sum(rate(etcd_server_proposals_committed_total[7d]))) < 0.999'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "etcd 7-day budget below 99.9%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/error-budget.md"
+
+  - alert: EtcdDbSizeNearQuota
+    expr: 'max(etcd_mvcc_db_total_size_in_bytes) > 6442450944'   # 6 GiB
+    for: 10m
+    severity: critical
+    annotations:
+      summary: "etcd DB > 6 GiB (8 GiB quota)"
+      description: "Compaction + defrag required soon."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/db-quota.md"
+
+  - alert: EtcdLeaderChurn
+    expr: 'sum(increase(etcd_server_leader_changes_seen_total[1h])) > 3'
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "More than 3 leader changes in 1h"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/leader-churn.md"
+
+  - alert: EtcdFsyncSlow
+    expr: 'histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) by (le)) > 0.5'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "WAL fsync p99 > 500ms"
+      description: "Underlying disk is the bottleneck."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/fsync.md"
+
+  - alert: EtcdCardinalityExplosion
+    expr: 'count(count by (prefix) (etcd_kv_keys_count)) > 50000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "etcd key prefix cardinality high"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/cardinality.md"
+
+  - alert: EtcdHealthProbeFailing
+    expr: 'min(etcd_server_has_leader) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "etcd member without leader"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-etcd/health.md"

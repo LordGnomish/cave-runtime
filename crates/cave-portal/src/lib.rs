@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod dashboard;
 pub mod engine;
 pub mod models;
+pub mod plugins;
 pub mod routes;
 pub mod ui;
 

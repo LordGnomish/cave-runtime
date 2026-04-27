@@ -1,0 +1,85 @@
+crate: cave-pg
+title: "Cave PG — Postgres-parity OLTP"
+uid: cave-pg
+tags: [observability, cave, postgres, database]
+
+variables:
+  - name: db
+    type: query
+    query: 'label_values(pg_stat_database_xact_commit, datname)'
+    default: ".*"
+
+panels:
+  - id: 1
+    title: "Transactions committed / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(pg_stat_database_xact_commit{datname=~"$db"}[5m])) by (datname)'
+    legend: '{{datname}}'
+
+  - id: 2
+    title: "Rollbacks / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(pg_stat_database_xact_rollback{datname=~"$db"}[5m])) by (datname)'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 10, color: red}
+
+  - id: 3
+    title: "Query latency p50/p95/p99 (pg_stat_statements)"
+    type: timeseries
+    unit: ms
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(pg_stat_statements_query_duration_seconds_bucket{datname=~"$db"}[5m])) by (le)) * 1000'
+      - 'histogram_quantile(0.95, sum(rate(pg_stat_statements_query_duration_seconds_bucket{datname=~"$db"}[5m])) by (le)) * 1000'
+      - 'histogram_quantile(0.99, sum(rate(pg_stat_statements_query_duration_seconds_bucket{datname=~"$db"}[5m])) by (le)) * 1000'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "Connection pool utilization"
+    type: gauge
+    unit: percentunit
+    query: 'sum(pg_stat_activity_count{state="active",datname=~"$db"}) / max(pg_settings_max_connections)'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 0.7, color: yellow}
+      - {value: 0.9, color: red}
+
+  - id: 5
+    title: "Cache hit ratio"
+    type: timeseries
+    unit: percentunit
+    query: 'sum(rate(pg_stat_database_blks_hit{datname=~"$db"}[5m])) / (sum(rate(pg_stat_database_blks_hit{datname=~"$db"}[5m])) + sum(rate(pg_stat_database_blks_read{datname=~"$db"}[5m])))'
+
+  - id: 6
+    title: "Replication lag (bytes)"
+    type: timeseries
+    unit: bytes
+    query: 'pg_replication_lag_bytes'
+    legend: '{{client_addr}}'
+
+  - id: 7
+    title: "Top-10 longest-running queries"
+    type: table
+    unit: s
+    query: 'topk(10, max by (query) (pg_stat_activity_max_tx_duration{datname=~"$db"}))'
+
+  - id: 8
+    title: "Deadlocks / hour"
+    type: timeseries
+    unit: short
+    query: 'sum(increase(pg_stat_database_deadlocks{datname=~"$db"}[1h]))'
+
+  - id: 9
+    title: "Tenant DB cardinality"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (pg_database_size_bytes))'
+
+  - id: 10
+    title: "WAL bytes per second heatmap"
+    type: heatmap
+    unit: Bps
+    query: 'sum(rate(pg_stat_wal_records[5m])) by (instance)'

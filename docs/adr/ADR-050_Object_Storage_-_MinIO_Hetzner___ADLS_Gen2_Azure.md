@@ -50,7 +50,11 @@ CAVE needs object storage for: Loki log chunks, Tempo traces, Velero backups, ML
 - S3 ↔ ADLS API differences handled by Crossplane Compositions but some edge cases may need provider-specific handling.
 - TB-scale migration between MinIO and ADLS requires rclone (ADR-066 migration state machine).
 
-Compliance Mapping
+## Notes
+
+**Universal scope.** **Runtime mirror REQUIRED**: cave-blob crate (Mirror-001 blanket; Persistence-Consolidation-001 candidate, MinIO+ADLS dual wire — S3 + Azure Blob hibrit endpoint). WORM (Object Lock + immutable blob) cave-blob'ta baştan içeride; cave-backup (ADR-046) ve cave-ledger (ADR-093) bunu kullanır. Cross-provider TB-scale migration cave-blob built-in, rclone runtime-side bağımlılık değil.
+
+## Compliance Mapping
 
 SOC2 CC7.5 (data retention — WORM). SOC2 CC6.7 (encryption at rest). ISO A.8.13 (backup storage). ISO A.5.33 (protection of records — WORM). NIS2 Art.21 (data protection). GDPR Art.32 (encryption, availability).
 

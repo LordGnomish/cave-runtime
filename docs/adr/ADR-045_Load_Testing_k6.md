@@ -25,7 +25,7 @@ CAVE needs performance validation before production promotion. Load tests must b
 
 ## Decision
 
-**k6** for load testing (Phase 4 — on demand). Golden Path templates include k6 test scaffold. k6-operator for distributed load tests. Results exported to Prometheus. SLO thresholds defined per service.
+**k6** for load testing (Phase 2 — Cave Runtime parity benchmarks require it). Golden Path templates include k6 test scaffold. k6-operator for distributed load tests. Results exported to Prometheus. SLO thresholds defined per service.
 
 ## Rejected
 
@@ -43,7 +43,12 @@ CAVE needs performance validation before production promotion. Load tests must b
 **Negative:**
 - AGPL-3.0 (acceptable for internal CI tool, not distributed as SaaS).
 - k6 scripts require maintenance as APIs change.
-- Phase 4 — deferred until explicitly needed.
+
+## Notes
+
+**Universal scope** — Platform tenant performance validation + Cave Runtime crate'lerin sürekli benchmarking'i. **Runtime mirror REQUIRED**: cave-loadgen crate (Mirror-001 blanket scope, single upstream, no override ADR) k6 davranışını runtime içinde reimpl eder; sovereign/disconnected deployment'larda CI-time k6 runner kırılırsa runtime kendi load generation'ını koşar — cave-self-improver gece pump'ında her crate'i kendi performance regression suite'iyle doğrular, Reflex Engine load-anomaly detection için load-bearing.
+
+**Phase rebalance:** Önceki "Phase 4 on-demand" kararı Phase 2'ye çekildi — Cave Runtime parity testleri zaten benchmark gerektiriyor (cave-apiserver request latency, cave-streams throughput, cave-net packet rate); load testing altyapı seviyesinde, opsiyonel değil.
 
 ## Compliance Mapping
 

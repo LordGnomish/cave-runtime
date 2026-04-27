@@ -35,6 +35,7 @@ pub mod alerting;
 pub mod auth;
 pub mod datasource;
 pub mod models;
+pub mod panels;
 pub mod provisioning;
 pub mod query;
 pub mod renderer;

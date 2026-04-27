@@ -1,0 +1,85 @@
+crate: cave-kubelet
+title: "Cave Kubelet — Node agent"
+uid: cave-kubelet
+tags: [observability, cave, kubernetes, node]
+
+variables:
+  - name: node
+    type: query
+    query: 'label_values(kubelet_running_pods, node)'
+    default: ".*"
+
+panels:
+  - id: 1
+    title: "Pod lifecycle ops / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(kubelet_pod_worker_duration_seconds_count{node=~"$node"}[5m])) by (operation_type)'
+    legend: '{{operation_type}}'
+
+  - id: 2
+    title: "Pod start failures / 5m"
+    type: timeseries
+    unit: short
+    query: 'sum(rate(kubelet_pod_start_errors_total{node=~"$node"}[5m]))'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 5, color: red}
+
+  - id: 3
+    title: "PLEG relist latency p50/p95/p99"
+    type: timeseries
+    unit: s
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{node=~"$node"}[5m])) by (le))'
+      - 'histogram_quantile(0.95, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{node=~"$node"}[5m])) by (le))'
+      - 'histogram_quantile(0.99, sum(rate(kubelet_pleg_relist_duration_seconds_bucket{node=~"$node"}[5m])) by (le))'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "Running pods (saturation)"
+    type: gauge
+    unit: short
+    query: 'sum(kubelet_running_pods{node=~"$node"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 100, color: yellow}
+      - {value: 110, color: red}
+
+  - id: 5
+    title: "Node CPU utilization"
+    type: timeseries
+    unit: percentunit
+    query: '1 - rate(node_cpu_seconds_total{mode="idle",node=~"$node"}[5m])'
+    legend: '{{cpu}}'
+
+  - id: 6
+    title: "Node memory utilization"
+    type: timeseries
+    unit: percentunit
+    query: '1 - (node_memory_MemAvailable_bytes{node=~"$node"} / node_memory_MemTotal_bytes{node=~"$node"})'
+
+  - id: 7
+    title: "Eviction events (top-10 reasons)"
+    type: table
+    unit: short
+    query: 'topk(10, sum(increase(kubelet_evictions_total{node=~"$node"}[1h])) by (reason))'
+
+  - id: 8
+    title: "Pod sync queue depth"
+    type: timeseries
+    unit: short
+    query: 'sum(kubelet_pod_sync_queue_depth{node=~"$node"})'
+
+  - id: 9
+    title: "Tenant breakdown (cardinality guard)"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (kubelet_running_pods))'
+
+  - id: 10
+    title: "Volume mount latency heatmap"
+    type: heatmap
+    unit: s
+    query: 'sum(rate(kubelet_volume_mount_duration_seconds_bucket{node=~"$node"}[5m])) by (le)'

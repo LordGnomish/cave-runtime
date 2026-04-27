@@ -1,0 +1,68 @@
+crate: cave-net
+group: cave-net-slo
+
+alerts:
+  - alert: NetSloBurnRateFast
+    expr: '(sum(rate(cilium_drop_count_total[1h])) / sum(rate(cilium_forward_count_total[1h]))) > (14.4 * 0.001)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "Net drop ratio fast burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/slo-burn-fast.md"
+
+  - alert: NetSloBurnRateSlow
+    expr: '(sum(rate(cilium_drop_count_total[6h])) / sum(rate(cilium_forward_count_total[6h]))) > (6 * 0.001)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Net drop ratio slow burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/slo-burn-slow.md"
+
+  - alert: NetErrorBudgetLow
+    expr: '1 - (sum(rate(cilium_drop_count_total[7d])) / sum(rate(cilium_forward_count_total[7d]))) < 0.999'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Net 7-day forward success below 99.9%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/error-budget.md"
+
+  - alert: NetBpfMapPressureHigh
+    expr: 'max(cilium_bpf_map_pressure) > 0.85'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "BPF map > 85% full"
+      description: "Map: {{ $labels.map_name }} = {{ $value | humanizePercentage }}"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/bpf-map.md"
+
+  - alert: NetIdentityCapacityHigh
+    expr: '(sum(cilium_identity_count) / sum(cilium_identity_capacity)) > 0.8'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "Identity allocator > 80% used"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/identities.md"
+
+  - alert: NetCardinalityExplosion
+    expr: 'count(count by (service) (cilium_lb_request_total)) > 10000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Network service cardinality > 10k"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/cardinality.md"
+
+  - alert: NetDnsLatencyHigh
+    expr: 'histogram_quantile(0.99, sum(rate(cilium_proxy_dns_response_seconds_bucket[5m])) by (le)) > 0.5'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "DNS p99 latency > 500ms"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/dns-latency.md"
+
+  - alert: NetHealthProbeFailing
+    expr: 'min(up{job="cave-net"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "Net agent health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-net/health.md"

@@ -1,0 +1,91 @@
+crate: cave-etcd
+title: "Cave etcd — KV store"
+uid: cave-etcd
+tags: [observability, cave, etcd, storage]
+
+variables:
+  - name: cluster
+    type: query
+    query: 'label_values(etcd_server_has_leader, cluster)'
+    default: ".*"
+
+panels:
+  - id: 1
+    title: "Read/write ops / sec"
+    type: timeseries
+    unit: ops
+    queries:
+      - 'sum(rate(etcd_server_proposals_committed_total{cluster=~"$cluster"}[5m]))'
+      - 'sum(rate(etcd_mvcc_range_total{cluster=~"$cluster"}[5m]))'
+    legend: ['writes', 'reads']
+
+  - id: 2
+    title: "Failed proposals / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(etcd_server_proposals_failed_total{cluster=~"$cluster"}[5m]))'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 5, color: red}
+
+  - id: 3
+    title: "WAL fsync p50/p95/p99"
+    type: timeseries
+    unit: s
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{cluster=~"$cluster"}[5m])) by (le))'
+      - 'histogram_quantile(0.95, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{cluster=~"$cluster"}[5m])) by (le))'
+      - 'histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{cluster=~"$cluster"}[5m])) by (le))'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "DB size (saturation)"
+    type: gauge
+    unit: bytes
+    query: 'max(etcd_mvcc_db_total_size_in_bytes{cluster=~"$cluster"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 4294967296, color: yellow}   # 4 GiB
+      - {value: 8589934592, color: red}      # 8 GiB
+
+  - id: 5
+    title: "Open watch streams"
+    type: timeseries
+    unit: short
+    query: 'sum(etcd_debugging_mvcc_watcher_total{cluster=~"$cluster"})'
+
+  - id: 6
+    title: "Leader changes / hour"
+    type: timeseries
+    unit: short
+    query: 'sum(increase(etcd_server_leader_changes_seen_total{cluster=~"$cluster"}[1h]))'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 3, color: red}
+
+  - id: 7
+    title: "Slowest watchers (top-10)"
+    type: table
+    unit: s
+    query: 'topk(10, etcd_debugging_mvcc_pending_events_total{cluster=~"$cluster"})'
+
+  - id: 8
+    title: "Network peer round-trip p99"
+    type: timeseries
+    unit: s
+    query: 'histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{cluster=~"$cluster"}[5m])) by (le, To))'
+    legend: 'to {{To}}'
+
+  - id: 9
+    title: "Tenant key cardinality (top-10 prefixes)"
+    type: table
+    unit: short
+    query: 'topk(10, sum by (prefix, tenant_id) (etcd_kv_keys_count))'
+
+  - id: 10
+    title: "Snapshot save heatmap"
+    type: heatmap
+    unit: s
+    query: 'sum(rate(etcd_debugging_snap_save_total_duration_seconds_bucket{cluster=~"$cluster"}[10m])) by (le)'

@@ -1,0 +1,84 @@
+crate: cave-net
+title: "Cave Net — Cilium-parity CNI / eBPF data-plane"
+uid: cave-net
+tags: [observability, cave, network, cilium]
+
+variables:
+  - name: node
+    type: query
+    query: 'label_values(cilium_endpoint_state, node)'
+    default: ".*"
+
+panels:
+  - id: 1
+    title: "Forwarded packets / sec by direction"
+    type: timeseries
+    unit: pps
+    query: 'sum(rate(cilium_forward_count_total{node=~"$node"}[5m])) by (direction)'
+    legend: '{{direction}}'
+
+  - id: 2
+    title: "Drops / sec by reason"
+    type: timeseries
+    unit: pps
+    query: 'sum(rate(cilium_drop_count_total{node=~"$node"}[5m])) by (reason)'
+    legend: '{{reason}}'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 100, color: yellow}
+      - {value: 1000, color: red}
+
+  - id: 3
+    title: "Policy verdicts / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(cilium_policy_verdict_total{node=~"$node"}[5m])) by (action)'
+    legend: '{{action}}'
+
+  - id: 4
+    title: "BPF map pressure (saturation)"
+    type: gauge
+    unit: percentunit
+    query: 'max(cilium_bpf_map_pressure{node=~"$node"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 0.7, color: yellow}
+      - {value: 0.9, color: red}
+
+  - id: 5
+    title: "Endpoints by state"
+    type: timeseries
+    unit: short
+    query: 'sum(cilium_endpoint_state{node=~"$node"}) by (state)'
+    legend: '{{state}}'
+
+  - id: 6
+    title: "Identity allocator capacity"
+    type: timeseries
+    unit: percentunit
+    query: 'cilium_identity_count{node=~"$node"} / cilium_identity_capacity{node=~"$node"}'
+
+  - id: 7
+    title: "Top-10 services by RPS"
+    type: table
+    unit: ops
+    query: 'topk(10, sum(rate(cilium_lb_request_total{node=~"$node"}[5m])) by (service))'
+
+  - id: 8
+    title: "DNS resolution latency p99"
+    type: timeseries
+    unit: s
+    query: 'histogram_quantile(0.99, sum(rate(cilium_proxy_dns_response_seconds_bucket{node=~"$node"}[5m])) by (le, query_type))'
+    legend: '{{query_type}}'
+
+  - id: 9
+    title: "Tenant network policy cardinality"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (cilium_policy_count))'
+
+  - id: 10
+    title: "Per-node tx/rx heatmap"
+    type: heatmap
+    unit: Bps
+    query: 'sum(rate(node_network_transmit_bytes_total{node=~"$node"}[5m])) by (node)'

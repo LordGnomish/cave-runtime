@@ -43,6 +43,7 @@ pub mod ingest;
 pub mod limits;
 pub mod logql;
 pub mod models;
+pub mod multitenant;
 pub mod routes;
 pub mod store;
 pub mod tail;

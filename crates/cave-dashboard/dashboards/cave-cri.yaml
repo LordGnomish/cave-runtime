@@ -1,0 +1,89 @@
+crate: cave-cri
+title: "Cave CRI — Container Runtime"
+uid: cave-cri
+tags: [observability, cave, runtime, containers]
+
+variables:
+  - name: node
+    type: query
+    query: 'label_values(cri_container_create_total, node)'
+    default: ".*"
+    multi: true
+
+panels:
+  - id: 1
+    title: "Container ops / sec by op"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(cri_operations_total{node=~"$node"}[5m])) by (operation_type)'
+    legend: '{{operation_type}}'
+
+  - id: 2
+    title: "Operation error rate"
+    type: timeseries
+    unit: percentunit
+    query: 'sum(rate(cri_operations_errors_total{node=~"$node"}[5m])) / sum(rate(cri_operations_total{node=~"$node"}[5m]))'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 0.01, color: yellow}
+      - {value: 0.05, color: red}
+
+  - id: 3
+    title: "Operation latency (p50/p95/p99)"
+    type: timeseries
+    unit: s
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(cri_operations_duration_seconds_bucket{node=~"$node"}[5m])) by (le, operation_type))'
+      - 'histogram_quantile(0.95, sum(rate(cri_operations_duration_seconds_bucket{node=~"$node"}[5m])) by (le, operation_type))'
+      - 'histogram_quantile(0.99, sum(rate(cri_operations_duration_seconds_bucket{node=~"$node"}[5m])) by (le, operation_type))'
+    legend: ['{{operation_type}} p50', '{{operation_type}} p95', '{{operation_type}} p99']
+
+  - id: 4
+    title: "Containers running (saturation)"
+    type: gauge
+    unit: short
+    query: 'sum(cri_running_containers{node=~"$node"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 200, color: yellow}
+      - {value: 250, color: red}
+
+  - id: 5
+    title: "Image pull time p95"
+    type: timeseries
+    unit: s
+    query: 'histogram_quantile(0.95, sum(rate(cri_image_pull_duration_seconds_bucket{node=~"$node"}[5m])) by (le, image))'
+    legend: '{{image}}'
+
+  - id: 6
+    title: "Image pull errors / sec"
+    type: timeseries
+    unit: ops
+    query: 'sum(rate(cri_image_pull_errors_total{node=~"$node"}[5m])) by (image)'
+    legend: '{{image}}'
+
+  - id: 7
+    title: "OOMKills (top-10 namespaces)"
+    type: table
+    unit: short
+    query: 'topk(10, sum(increase(cri_container_oom_kills_total{node=~"$node"}[1h])) by (namespace, pod))'
+
+  - id: 8
+    title: "cgroup memory utilization"
+    type: timeseries
+    unit: percentunit
+    query: 'sum(container_memory_working_set_bytes{node=~"$node"}) by (pod) / sum(container_spec_memory_limit_bytes{node=~"$node"}) by (pod)'
+    legend: '{{pod}}'
+
+  - id: 9
+    title: "Sandbox count by tenant"
+    type: stat
+    unit: short
+    query: 'sum(cri_sandbox_count) by (tenant_id)'
+
+  - id: 10
+    title: "Snapshotter disk usage heatmap"
+    type: heatmap
+    unit: bytes
+    query: 'cri_snapshotter_disk_bytes{node=~"$node"}'
+    legend: '{{node}} {{snapshotter}}'

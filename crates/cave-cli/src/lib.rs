@@ -1,14 +1,21 @@
-//! cave-cli library — testable surface for chat REPL, tenant/env lifecycle,
-//! approval workflow, audit query, and watch/stream output.
+//! cavectl library — testable surface for chat REPL, tenant/env lifecycle,
+//! approval workflow, audit query, watch/stream output, and the native +
+//! compatibility command surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001).
 //!
-//! The `cave` binary uses these modules; testers consume them directly with
+//! The `cavectl` binary uses these modules; testers consume them directly with
 //! the in-memory backend implementations to avoid wire-level mocks.
 
 pub mod approval;
 pub mod audit;
 pub mod chat;
+pub mod compat;
 pub mod env;
+pub mod native;
+pub mod shell;
+pub mod telemetry;
 pub mod tenant;
+pub mod tenant_scope;
+pub mod tui;
 pub mod watch;
 
 pub use approval::{ApprovalBackend, ApprovalRecord, ApprovalState, InMemoryApprovals};

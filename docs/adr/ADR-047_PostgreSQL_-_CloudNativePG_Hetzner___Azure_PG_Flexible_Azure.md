@@ -51,7 +51,11 @@ PostgreSQL is CAVE's primary relational database for tenant workloads, Backstage
 - CNPG operator updates must be validated against running clusters (in-place operator upgrade).
 - Azure PG Flexible provider-side changes (SKU deprecation, default changes) require monitoring.
 
-Compliance Mapping
+## Notes
+
+**Universal scope** — Platform tenant DB + Cave Runtime cave-pg upstream parity. **Runtime mirror EXISTS**: `cave-pg` crate (Mirror-001 blanket; ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001'de detaylı multi-upstream case). Hibrit deployment'da CNPG ve Azure PG Flexible parity test corpus'ı (ADR-135) cave-pg behavioral parity hedefine de besleme yapar — sovereign deployment'da cave-pg ikisinin de wire'ını servis eder. Barman Cloud backup → cave-backup (ADR-046 mirror) entegrasyonu.
+
+## Compliance Mapping
 
 SOC2 CC6.7 (credential management — dynamic DB secrets). SOC2 CC7.5 (backup — automated PITR). ISO A.8.13 (information backup). ISO A.8.24 (encryption — TLS in transit, encryption at rest). GDPR Art.32 (security of processing — HA, encryption).
 

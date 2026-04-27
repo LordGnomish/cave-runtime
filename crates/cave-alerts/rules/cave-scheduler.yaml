@@ -1,0 +1,69 @@
+crate: cave-scheduler
+group: cave-scheduler-slo
+
+alerts:
+  - alert: SchedulerSloBurnRateFast
+    expr: '(sum(rate(scheduler_schedule_attempts_total{result="error"}[1h])) / sum(rate(scheduler_schedule_attempts_total[1h]))) > (14.4 * 0.005)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "Scheduler error rate fast burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/slo-burn-fast.md"
+
+  - alert: SchedulerSloBurnRateSlow
+    expr: '(sum(rate(scheduler_schedule_attempts_total{result="error"}[6h])) / sum(rate(scheduler_schedule_attempts_total[6h]))) > (6 * 0.005)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Scheduler error rate slow burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/slo-burn-slow.md"
+
+  - alert: SchedulerErrorBudgetLow
+    expr: '1 - (sum(rate(scheduler_schedule_attempts_total{result="error"}[7d])) / sum(rate(scheduler_schedule_attempts_total[7d]))) < 0.995'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Scheduler 7-day success rate below 99.5%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/error-budget.md"
+
+  - alert: SchedulerPendingPodsHigh
+    expr: 'sum(scheduler_pending_pods) > 200'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "Pending pods > 200"
+      description: "{{ $value }} pods unable to schedule."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/pending-pods.md"
+
+  - alert: SchedulerLatencyHigh
+    expr: 'histogram_quantile(0.99, sum(rate(scheduler_e2e_scheduling_duration_seconds_bucket[5m])) by (le)) > 1'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "Scheduling p99 > 1s"
+      description: "p99 = {{ $value }}s"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/latency.md"
+
+  - alert: SchedulerCardinalityExplosion
+    expr: 'count(count by (pod) (scheduler_pending_pods)) > 5000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Scheduler pod label cardinality high"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/cardinality.md"
+
+  - alert: SchedulerPreemptionStorm
+    expr: 'sum(rate(scheduler_preemption_attempts_total[5m])) > 10'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "Preemption rate > 10 / sec"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/preemption.md"
+
+  - alert: SchedulerHealthProbeFailing
+    expr: 'min(up{job="cave-scheduler"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "Scheduler health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-scheduler/health.md"
