@@ -32,6 +32,7 @@
 
 pub mod admin;
 pub mod circuit_breaker;
+pub mod eds;
 pub mod gravitee;
 pub mod handler;
 pub mod health;
@@ -39,6 +40,7 @@ pub mod lb;
 pub mod listener;
 pub mod matcher;
 pub mod models;
+pub mod outlier;
 pub mod plugins;
 pub mod proxy;
 pub mod route_action;
