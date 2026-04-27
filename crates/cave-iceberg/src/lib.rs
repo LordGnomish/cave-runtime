@@ -20,3 +20,4 @@ pub mod snapshot;
 pub mod table_metadata;
 pub mod tenant;
 pub mod error;
+pub mod deep;

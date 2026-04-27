@@ -18,3 +18,5 @@ pub mod expr;
 pub mod batch;
 pub mod logical_plan;
 pub mod execution_plan;
+pub mod optimizer;
+pub mod statistics;
