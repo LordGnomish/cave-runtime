@@ -33,6 +33,7 @@ pub mod endpoint;
 pub mod endpoint_regen;
 pub mod envoy;
 pub mod fqdn;
+pub mod gateway_filters;
 pub mod health;
 pub mod hubble;
 pub mod hubble_ext;
