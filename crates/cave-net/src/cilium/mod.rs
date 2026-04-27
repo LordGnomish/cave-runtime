@@ -37,6 +37,7 @@ pub mod hubble_metrics;
 pub mod identity;
 pub mod ingress;
 pub mod ipam;
+pub mod ipcache;
 pub mod ipsec;
 pub mod kafka;
 pub mod l7policy;
