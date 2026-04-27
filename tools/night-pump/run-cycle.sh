@@ -96,6 +96,19 @@ fi
 # Discover module surface.
 modules="$(ls "$MAIN_WT/crates/$crate/src/" 2>/dev/null | awk -F. '/\.rs$/ && $1!="lib"{print $1}' | tr '\n' ',' | sed 's/,$//')"
 modules_short="$(echo "$modules" | tr ',' '\n' | head -5 | tr '\n' ',' | sed 's/,$//')"
+
+# Ground-truth symbol extraction — qwen retries kept inventing module paths
+# (E0432 every cycle). Feed the actual `pub` surface as a hard allowlist.
+SYMBOLS="$(find "$MAIN_WT/crates/$crate/src" -name '*.rs' 2>/dev/null \
+  | xargs grep -hE "^pub (fn|struct|enum|trait|use|mod|const|static|type)" 2>/dev/null \
+  | head -80 \
+  | sed -E 's/[[:space:]]*\{.*$//; s/[[:space:]]*\(.*$//; s/^pub //' \
+  | sort -u \
+  | head -50)"
+GROUND_TRUTH_BLOCK="GROUND TRUTH — only these symbols exist in ${crate}. DO NOT invent imports.
+${SYMBOLS}
+
+Use ONLY these symbols. Any other path is a hallucination."
 if [ -z "$modules" ]; then
   log "drop: $crate has no src/*.rs modules to test"
   exit 0
@@ -121,7 +134,9 @@ cleanup_failure() {
 # issues with apostrophes / backticks / dollar signs in the body.
 crate_underscore="$(echo "$crate" | tr - _)"
 TODAY="$(date -u +%Y-%m-%d)"
-PROMPT="Write Rust integration tests for the cave-runtime crate ${crate}.
+PROMPT="${GROUND_TRUTH_BLOCK}
+
+Write Rust integration tests for the cave-runtime crate ${crate}.
 
 Available modules (relative to the crate root, first few only): ${modules_short}
 (Use only these — do not invent module names.)
@@ -221,11 +236,13 @@ for ATTEMPT in 1 2 3; do
 
   # Build feedback prompt for the next attempt.
   ERROR_EXCERPT=$(grep -E "^error" "$ERR_FILE" | head -8 | head -c 500)
-  CURRENT_PROMPT="Your previous test draft for ${crate} had compile errors:
+  CURRENT_PROMPT="${GROUND_TRUTH_BLOCK}
+
+Your previous test draft for ${crate} had compile errors:
 ${ERROR_EXCERPT}
 
-Fix these. Use only types/functions that exist in the listed modules: ${modules_short}.
-Do NOT invent module names. Do NOT use items you have not verified exist in those modules.
+Fix these. Use ONLY symbols from the GROUND TRUTH list above — every other path is a hallucination.
+Do NOT invent module names. Do NOT use items you have not verified exist in the GROUND TRUTH.
 Output ONLY the corrected Rust test file. Same format rules:
 - 4 mandatory header lines
 - Wrap tests in: #[cfg(test)] mod tests { ... }
