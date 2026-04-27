@@ -56,6 +56,7 @@
 //!   GET  /api/etcd/health     — health check
 //! ```
 
+pub mod auth_full;
 pub mod auth_token;
 pub mod auth_v3;
 pub mod b64;
