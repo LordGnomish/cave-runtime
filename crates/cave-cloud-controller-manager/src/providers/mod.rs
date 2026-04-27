@@ -8,6 +8,7 @@
 pub mod azure;
 pub mod azure_advanced;
 pub mod azure_extras;
+pub mod azure_networking;
 pub mod azure_resources;
 pub mod hetzner;
 pub mod hetzner_failover;

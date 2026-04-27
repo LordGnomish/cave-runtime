@@ -9,7 +9,12 @@
 pub mod app;
 pub mod filter;
 pub mod keymap;
+pub mod render;
 
 pub use app::{AppState, Action, View, reduce};
 pub use filter::{fuzzy_match, fuzzy_score};
 pub use keymap::{Key, KeyAction, default_keymap};
+pub use render::{
+    format_header, format_help, format_item_row, format_search_bar, format_status_line,
+    format_tab_bar, paginate,
+};
