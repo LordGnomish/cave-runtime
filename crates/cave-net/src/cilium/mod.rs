@@ -42,6 +42,7 @@ pub mod ipcache;
 pub mod ipsec;
 pub mod ipv6;
 pub mod kafka;
+pub mod l2_announce;
 pub mod l7policy;
 pub mod l7proxy;
 pub mod lb;
