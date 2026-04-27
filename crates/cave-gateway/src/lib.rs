@@ -41,6 +41,7 @@ pub mod matcher;
 pub mod models;
 pub mod plugins;
 pub mod proxy;
+pub mod route_action;
 pub mod store;
 pub mod tls;
 pub mod xds;
