@@ -39,6 +39,7 @@ pub mod ingress;
 pub mod ipam;
 pub mod ipcache;
 pub mod ipsec;
+pub mod ipv6;
 pub mod kafka;
 pub mod l7policy;
 pub mod l7proxy;
