@@ -85,6 +85,7 @@ async fn test_generate_returns_response() {
         prompt: "write a function".into(),
         stream: Some(false),
         options: None,
+        keep_alive: None,
     };
 
     let resp = client.generate(req).await.expect("generate should succeed");
@@ -120,6 +121,7 @@ async fn test_generate_stream_collects_all_chunks() {
         prompt: "write a function".into(),
         stream: Some(true),
         options: None,
+        keep_alive: None,
     };
 
     let mut stream = client.generate_stream(req).await.expect("stream should open");
@@ -161,6 +163,7 @@ async fn test_generate_stream_skips_empty_lines() {
             prompt: "p".into(),
             stream: Some(true),
             options: None,
+            keep_alive: None,
         })
         .await
         .unwrap();
