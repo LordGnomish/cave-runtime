@@ -42,6 +42,7 @@ pub mod kafka;
 pub mod l7policy;
 pub mod l7proxy;
 pub mod lb;
+pub mod lrp;
 pub mod lb_ext;
 pub mod maglev;
 pub mod nat;
