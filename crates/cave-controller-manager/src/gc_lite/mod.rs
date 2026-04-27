@@ -6,4 +6,6 @@
 //!   (`pkg/controller/ttlafterfinished`).
 
 pub mod podgc;
+pub mod podgc_deeper;
 pub mod ttl_after_finished;
+pub mod ttl_jitter;
