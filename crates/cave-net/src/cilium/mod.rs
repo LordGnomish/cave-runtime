@@ -61,6 +61,7 @@ pub mod nat;
 pub mod operator;
 pub mod policy;
 pub mod recorder;
+pub mod selector_cache;
 pub mod services;
 pub mod sock_lb;
 pub mod srv6;
