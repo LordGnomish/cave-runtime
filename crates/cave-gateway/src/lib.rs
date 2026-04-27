@@ -50,6 +50,7 @@ pub mod route_action;
 pub mod spiffe;
 pub mod stats_sink;
 pub mod store;
+pub mod tenant;
 pub mod tls;
 pub mod trace;
 pub mod xds;
