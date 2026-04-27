@@ -47,6 +47,7 @@ pub mod ipam;
 pub mod ipcache;
 pub mod ipsec;
 pub mod ipv6;
+pub mod k8s_handlers;
 pub mod kafka;
 pub mod key_rotation;
 pub mod kv_identity;
