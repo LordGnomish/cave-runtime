@@ -16,6 +16,7 @@ pub mod api;
 pub mod error;
 pub mod ingestion;
 pub mod model;
+pub mod multitenant;
 pub mod promql;
 pub mod rules;
 pub mod scrape;

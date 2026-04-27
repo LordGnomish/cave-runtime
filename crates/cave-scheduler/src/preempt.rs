@@ -129,7 +129,7 @@ mod tests {
     fn pod_at(tenant: &str, name: &str, prio: i32, cpu: u64, mem: u64) -> Pod {
         let mut p = Pod::new(tenant, "ns", name);
         p.spec.priority = prio;
-        p.spec.resources = ResourceRequest { cpu_millicores: cpu, memory_bytes: mem };
+        p.spec.resources = ResourceRequest { cpu_millicores: cpu, memory_bytes: mem, ..Default::default() };
         p
     }
 

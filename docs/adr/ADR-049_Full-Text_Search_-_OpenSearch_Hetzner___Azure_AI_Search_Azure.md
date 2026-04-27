@@ -48,7 +48,11 @@ CAVE tenants need full-text search for application data, log analytics (via Loki
 - OpenSearch operator is community-maintained (not official AWS project).
 - Index rebuild required during cross-provider migration (search indices not synced).
 
-Compliance Mapping
+## Notes
+
+**Universal scope.** **Runtime mirror REQUIRED**: cave-search crate (Mirror-001 blanket; ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 candidate, OpenSearch wire + Azure AI Search wire dual hedef). Cross-provider index rebuild risk → cave-search built-in dual-write/migration loop. Vector search cave-vector (ADR-114 mirror) ile entegre, hybrid full-text + semantic single endpoint.
+
+## Compliance Mapping
 
 SOC2 CC6.1 (search result access controls — index-per-tenant). ISO A.8.22 (data segregation in search indices). GDPR Art.32 (tenant data isolation).
 

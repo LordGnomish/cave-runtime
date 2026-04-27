@@ -31,6 +31,59 @@ pub mod replicaset;
 pub mod service;
 pub mod statefulset;
 
+/// 100-pct sprint M2: GarbageCollector — owner-reference graph + cascade
+/// planning for foreground / background / orphan deletion modes.
+pub mod gc;
+
+/// 100-pct sprint M3: light-weight GC controllers — PodGC + TTLAfterFinished.
+pub mod gc_lite;
+
+/// 100-pct sprint M3: NodeLifecycle / NodeLease — node heartbeat + Ready
+/// transition + taint-based eviction trigger.
+pub mod node_lease;
+
+/// 100-pct PUSH-HARD M8: Node lifecycle deeper — taints + zone-state
+/// classifier + per-zone rate-limited eviction queue.
+pub mod node_lifecycle;
+
+/// 100-pct sprint M3: Root CA publisher — kube-root-ca.crt ConfigMap
+/// propagation across active namespaces.
+pub mod root_ca_publisher;
+
+/// 100-pct sprint M4: ServiceAccount controller + token controller.
+pub mod sa;
+
+/// 100-pct sprint M4: CertificateSigningRequest signer.
+pub mod csr_signer;
+
+/// 100-pct PUSH-HARD M9: CSR signer deeper — expirationSeconds clamping,
+/// denied-wins resolution, kubelet-serving + apiserver-client-kubelet
+/// subject validation.
+pub mod csr_signer_deeper;
+
+/// 100-pct sprint M4: RBAC controllers (ClusterRole aggregation).
+pub mod rbac;
+
+/// 100-pct sprint M5: EndpointSlice topology-aware hints
+/// (PreferClose / topology-mode Auto algorithm).
+pub mod endpointslice_topology;
+
+/// 100-pct PUSH-HARD M10: EndpointSlice multi-port slice allocator
+/// + per-slice MaxEndpointsPerSlice cap.
+pub mod endpointslice_multiport;
+
+/// 100-pct sprint M5: PV/PVC binder + volume expansion state machine.
+pub mod pv;
+
+/// 100-pct PUSH-HARD M11: ResourceQuota controller (used-tracker + admission gate).
+pub mod resource_quota;
+
+/// 100-pct PUSH-HARD M11: NamespaceController finalizer state machine.
+pub mod namespace_controller;
+
+/// 100-pct PUSH-HARD M11: Bootstrap-token signer for the cluster-info ConfigMap.
+pub mod bootstrap_signer;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP

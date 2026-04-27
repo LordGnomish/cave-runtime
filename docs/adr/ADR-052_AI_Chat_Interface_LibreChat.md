@@ -51,6 +51,10 @@ CAVE users (developers, platform engineers, tenants) need a web-based AI chat in
 - Conversation data requires residency management (MongoDB must be in same region as tenant data classification requires).
 - Plugin system security — untrusted plugins could bypass classification routing (mitigated: admin-only plugin management, OPA validates plugin allowlist).
 
+## Notes
+
+**Universal scope.** **Runtime mirror REQUIRED**: cave-chat crate (Mirror-001 blanket; single upstream LibreChat, multi-backend cave-docdb conversation store + cave-llm-gateway routing + cave-auth OIDC). Plugin allowlist runtime-level enforce — OPA gate'i (ADR-030) cave-chat'in built-in policy engine'inde. Classification-aware preset cave-llm-obs (ADR-051 mirror) ile zincir: tenant'ın preset'i model-allowlist + prompt-allowlist + retention-level üçlüsünü tek noktada belirler. cave-self-improver chat trace'lerini prompt regression için tüketir.
+
 ## Compliance Mapping
 
 SOC2 CC6.1 (AI access controls — OIDC authentication, classification-aware presets). GDPR Art.25 (data protection by design — classification enforcement at UI level). GDPR Art.32 (security of processing — authenticated AI access). ISO A.5.15 (access control — OIDC integration). NIS2 Art.21 (AI system access controls).

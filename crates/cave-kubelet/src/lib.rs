@@ -18,10 +18,23 @@
 pub mod models;
 pub mod agent;
 pub mod routes;
+pub mod csi;
+pub mod probe;
+pub mod eviction;
+pub mod streaming;
+pub mod security;
+pub mod apparmor;
+pub mod podresources;
+pub mod topology;
+pub mod cpumanager;
+pub mod memorymanager;
+pub mod deviceplugin;
+pub mod dra;
+pub mod dra_v1alpha2;
+pub mod sidecar;
 
 // deeper-003 — node-side runtime modules.
 pub mod container_metrics;
-pub mod dra;
 pub mod image_gc;
 pub mod kubelet_config;
 pub mod node_lease;

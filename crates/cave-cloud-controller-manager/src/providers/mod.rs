@@ -6,6 +6,13 @@
 //! the parity work progresses.
 
 pub mod azure;
+pub mod azure_advanced;
+pub mod azure_extras;
+pub mod azure_networking;
 pub mod azure_resources;
 pub mod hetzner;
+pub mod hetzner_failover;
+pub mod hetzner_lb;
+pub mod hetzner_lb_advanced;
 pub mod hetzner_resources;
+pub mod hetzner_targets;

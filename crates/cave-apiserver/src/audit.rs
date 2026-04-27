@@ -19,8 +19,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum AuditLevel {
+    /// Default — equivalent to upstream `LevelNone` (the empty string).
+    #[default]
     None = 0,
     Metadata = 1,
     Request = 2,

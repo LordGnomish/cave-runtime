@@ -52,6 +52,14 @@ impl ResourceCapacity {
 pub struct ResourceRequest {
     pub cpu_millicores: u64,
     pub memory_bytes: u64,
+    /// Ephemeral storage requested by the pod (KEP-130).
+    #[serde(default)]
+    pub ephemeral_storage_bytes: u64,
+    /// Extended / native resources keyed by name — e.g. `nvidia.com/gpu: 2`,
+    /// `hugepages-2Mi: 4`, `smarter-devices/fuse: 1`. Empty when no extended
+    /// resources are requested.
+    #[serde(default)]
+    pub extended: std::collections::HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -133,21 +141,21 @@ mod tests {
     #[test]
     fn test_resource_capacity_has_room() {
         let cap = ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8_000_000_000, pods: 110, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000 };
+        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() };
         assert!(cap.has_room_for(&req));
     }
 
     #[test]
     fn test_resource_capacity_no_room() {
         let cap = ResourceCapacity { cpu_millicores: 100, memory_bytes: 500, pods: 1, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1000 };
+        let req = ResourceRequest { cpu_millicores: 500, memory_bytes: 1000, ..Default::default() };
         assert!(!cap.has_room_for(&req));
     }
 
     #[test]
     fn test_subtract_and_add() {
         let mut cap = ResourceCapacity { cpu_millicores: 4000, memory_bytes: 8000, pods: 10, ephemeral_storage_bytes: 0 };
-        let req = ResourceRequest { cpu_millicores: 1000, memory_bytes: 2000 };
+        let req = ResourceRequest { cpu_millicores: 1000, memory_bytes: 2000, ..Default::default() };
         cap.subtract(&req);
         assert_eq!(cap.cpu_millicores, 3000);
         assert_eq!(cap.pods, 9);

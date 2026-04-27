@@ -101,7 +101,7 @@ impl<'a> FilterPlugin for DynamicResources<'a> {
     fn name(&self) -> &str { "DynamicResources" }
     fn filter(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> Status {
         if pod.spec.resource_claims.is_empty() {
-            return Status { code: Code::Skip, reasons: vec![], plugin: "DynamicResources".into() };
+            return Status::skip("DynamicResources");
         }
         for r in &pod.spec.resource_claims {
             let Some(claim) = self.state.claims.get(&r.claim_name) else {

@@ -1,0 +1,97 @@
+crate: cave-apiserver
+title: "Cave API Server — Kubernetes API parity"
+uid: cave-apiserver
+tags: [observability, cave, kubernetes, control-plane]
+
+variables:
+  - name: tenant
+    type: query
+    query: 'label_values(apiserver_request_total, tenant_id)'
+    default: anonymous
+  - name: verb
+    type: query
+    query: 'label_values(apiserver_request_total{tenant_id="$tenant"}, verb)'
+    default: ".*"
+    multi: true
+
+panels:
+  - id: 1
+    title: "Request rate by verb"
+    type: timeseries
+    unit: reqps
+    query: 'sum(rate(apiserver_request_total{tenant_id="$tenant",verb=~"$verb"}[5m])) by (verb)'
+    legend: '{{verb}}'
+    description: "Total API requests broken down by verb (GET/LIST/POST/...)"
+
+  - id: 2
+    title: "Error rate (4xx + 5xx)"
+    type: timeseries
+    unit: reqps
+    query: 'sum(rate(apiserver_request_total{tenant_id="$tenant",code=~"4..|5.."}[5m])) by (code)'
+    legend: '{{code}}'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 1, color: yellow}
+      - {value: 10, color: red}
+
+  - id: 3
+    title: "Latency p50 / p95 / p99"
+    type: timeseries
+    unit: s
+    queries:
+      - 'histogram_quantile(0.50, sum(rate(apiserver_request_duration_seconds_bucket{tenant_id="$tenant"}[5m])) by (le))'
+      - 'histogram_quantile(0.95, sum(rate(apiserver_request_duration_seconds_bucket{tenant_id="$tenant"}[5m])) by (le))'
+      - 'histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{tenant_id="$tenant"}[5m])) by (le))'
+    legend: ['p50', 'p95', 'p99']
+
+  - id: 4
+    title: "Inflight requests (saturation)"
+    type: gauge
+    unit: short
+    query: 'sum(apiserver_current_inflight_requests{tenant_id="$tenant"})'
+    thresholds:
+      - {value: 0, color: green}
+      - {value: 200, color: yellow}
+      - {value: 400, color: red}
+
+  - id: 5
+    title: "CPU utilization"
+    type: timeseries
+    unit: percentunit
+    query: 'rate(process_cpu_seconds_total{job="cave-apiserver"}[5m])'
+    legend: '{{instance}}'
+
+  - id: 6
+    title: "5xx by route (top-10)"
+    type: table
+    unit: reqps
+    query: 'topk(10, sum(rate(apiserver_request_total{tenant_id="$tenant",code=~"5.."}[5m])) by (resource, verb))'
+    description: "Hot routes returning server errors"
+
+  - id: 7
+    title: "Watch event throughput"
+    type: timeseries
+    unit: eps
+    query: 'sum(rate(apiserver_watch_events_total{tenant_id="$tenant"}[5m])) by (kind)'
+    legend: '{{kind}}'
+
+  - id: 8
+    title: "etcd request latency from apiserver"
+    type: timeseries
+    unit: s
+    query: 'histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{client="apiserver"}[5m])) by (le, operation))'
+    legend: '{{operation}} p99'
+
+  - id: 9
+    title: "Tenant breakdown (cardinality guard)"
+    type: stat
+    unit: short
+    query: 'count(count by (tenant_id) (apiserver_request_total))'
+    description: "Number of distinct tenants currently emitting requests"
+
+  - id: 10
+    title: "Workqueue depth heatmap"
+    type: heatmap
+    unit: short
+    query: 'sum(workqueue_depth{job="cave-apiserver"}) by (name)'
+    legend: '{{name}}'
