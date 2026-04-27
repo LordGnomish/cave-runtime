@@ -56,11 +56,13 @@
 //!   GET  /api/etcd/health     — health check
 //! ```
 
+pub mod auth_full;
 pub mod auth_token;
 pub mod auth_v3;
 pub mod b64;
 pub mod balancer;
 pub mod client;
+pub mod client_full;
 pub mod client_v2;
 pub mod cluster_admin;
 pub mod cluster_status;
@@ -75,6 +77,7 @@ pub mod kms_v2;
 pub mod lease_id_gen;
 pub mod lock_manager;
 pub mod maintenance;
+pub mod maintenance_full;
 pub mod maintenance_v2;
 pub mod membership_audit;
 pub mod membership_v2;
