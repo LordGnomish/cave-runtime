@@ -22,19 +22,39 @@ CAVE's security testing must span the entire software lifecycle — from pre-com
 
 ## Decision
 
-**Seven-layer defense-in-depth security testing integrated into 27-stage CI pipeline (ADR-010):**
+## Decision (revised — split)
 
-| Layer | Tool | CI Stage | Gate | Finding Destination |
-|---|---|---|---|---|
-| Secrets | gitleaks (ADR-017) | Pre-commit + Stage 2 | BLOCK | DefectDojo |
-| SAST | SonarQube + Semgrep (ADR-019) | Stages 3-4 | BLOCK critical/high | DefectDojo |
-| SCA/SBOM | CycloneDX + DTrack | Stages 9-10 | BLOCK critical unfixed | DTrack + DefectDojo |
-| Container | Trivy (ADR-018) | Stage 16 | BLOCK critical unfixed | DefectDojo |
-| IaC | Conftest + Checkov | Stages 17-18 | BLOCK policy violations | DefectDojo |
-| Compliance | Kubescape (ADR-058) | Stage 19 | WARN → BLOCK (Phase 3+) | DefectDojo |
-| DAST | OWASP ZAP (ADR-023) | Stages 23-24 | BLOCK high findings | DefectDojo |
+CAVE'in software security testing **iki ayrı pipeline** ile koşar:
 
-All findings aggregated in DefectDojo (ADR-035) for unified lifecycle management. Per-severity SLA: Critical 7d, High 30d, Medium 90d, Low 180d.
+### Platform Security Pipeline
+Cave team'in kendi kodu (Cave Runtime, Cave Platform repo'ları, ADR'lar, tooling). Trusted internal contributors. Strict policy:
+- 7-layer aynı: gitleaks → SonarQube+Semgrep → CycloneDX+DTrack → Trivy → Conftest+Checkov → Kubescape → ZAP
+- **Tüm BLOCK threshold'ları HIGH+** (Critical+High mandatory fix; Medium 30d SLA)
+- Sovereign supply chain: cosign signing zorunlu, Trufflehog CI-time + gitleaks pre-commit
+- Cave-specific tools: cave-self-improver dependency drift, internal package mirror
+
+### Tenant Security Pipeline
+Tenant'ın Cave'e push ettiği kendi uygulaması (ADR-031 WebApplication composition). Less-trusted contributor base. **Tenant-customizable policy with platform floor:**
+- Aynı 7-layer toolchain (toolchain consistency, finding fan-in DefectDojo'ya)
+- **Platform floor:** Critical secrets/SAST/SCA → tenant override edemez (zorunlu BLOCK)
+- **Tenant-tunable:** High/Medium thresholds tenant'ın phase + classification level'ına göre (ADR-102) tenant tarafından konfigüre edilebilir
+- Tenant **kendi scanner extension**'larını ekleyebilir (örn. tenant'ın license'lı Snyk veya kendi SonarQube projesi) — additive olarak çalışır, replace etmez
+- **Waiver flow:** ADR-140 (Waiver Framework) tenant exception'ları için resmi süreç; security-team approval + expiration
+- Tenant DefectDojo product-per-tenant scope, finding access RBAC tenant'a sınırlı
+
+Both pipelines feed unified DefectDojo (ADR-035) but with strict tenant scoping. SLA tracking same toolchain, different per-tier targets.
+
+### Tool layer matrix (ortak iki pipeline'da)
+
+| Layer | Tool | CI Stage | Platform Gate | Tenant Gate (default) | Finding Destination |
+|---|---|---|---|---|---|
+| Secrets | gitleaks (ADR-017) | Pre-commit + Stage 2 | BLOCK any | BLOCK any (floor) | DefectDojo |
+| SAST | SonarQube + Semgrep (ADR-019) | Stages 3-4 | BLOCK High+ | BLOCK Critical (floor) + tenant-tunable High | DefectDojo |
+| SCA/SBOM | CycloneDX + DTrack | Stages 9-10 | BLOCK High+ | BLOCK Critical (floor) | DTrack + DefectDojo |
+| Container | Trivy (ADR-018) | Stage 16 | BLOCK High+ | BLOCK Critical (floor) | DefectDojo |
+| IaC | Conftest + Checkov | Stages 17-18 | BLOCK policy violations | Tenant-tunable | DefectDojo |
+| Compliance | Kubescape (ADR-058) | Stage 19 | BLOCK Phase 3+ | WARN → BLOCK Phase 3+ | DefectDojo |
+| DAST | OWASP ZAP (ADR-023) | Stages 23-24 | BLOCK High+ | Tenant-tunable | DefectDojo |
 
 ## Rejected
 
@@ -55,6 +75,14 @@ All findings aggregated in DefectDojo (ADR-035) for unified lifecycle management
 - CI pipeline duration increases (~5-15 min from security stages).
 - Finding volume can be high — triage discipline required.
 - DefectDojo deduplication is good but not perfect — some cross-tool duplicates need manual triage.
+
+## Notes
+
+**Universal scope.** Bu ADR meta-orchestrator — runtime mirror her alt ADR'de (cave-secrets ADR-017, cave-sast ADR-019, cave-sbom, cave-container-scan ADR-018, cave-iac-scan, cave-compliance-scan ADR-058, cave-dast ADR-023, cave-defectdojo ADR-035) ayrı ayrı zaten REQUIRED. Bu ADR-057 onları **runtime-side'da cave-security-orchestrator** crate (Mirror-001 blanket; meta-coordinator) altında tek workflow engine'e bağlar.
+
+**Dual sub-orchestrator:** cave-security-orchestrator iki mod ile çalışır — **platform mode** (strict policy bundle, floor + ceiling aynı, no waiver) + **tenant mode** (platform floor + tenant-tunable ceiling, waiver flow ADR-140). Aynı core orchestrator binary, farklı policy bundle'ı yüklenir; pipeline scope'u (Cave team kodu vs tenant uygulaması) commit-time identity'den (ADR-RUNTIME-CERT-LIFECYCLE-001 PQC signer) belirlenir.
+
+Sovereign deployment'da DefectDojo helm bağımlılığı yok, finding aggregation runtime native (per-tenant product scope tenant mode'da, platform mode'da single-bucket), SLA enforcement Reflex Engine ile zincir, Sovereign Ledger (ADR-093) WORM signed proof. Kubescape Phase 3+ BLOCK transition cave-self-improver'ın reasoning-loop'unda phase-gate olarak yer alır. Tenant scanner extension'ları (Snyk, kendi SonarQube vb.) plugin slot'una bağlanır — additive, platform floor'u replace edemez.
 
 ## Compliance Mapping
 
