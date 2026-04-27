@@ -48,6 +48,7 @@ pub mod maglev;
 pub mod nat;
 pub mod policy;
 pub mod services;
+pub mod tunnel;
 pub mod wireguard;
 
 pub use types::{Cite, TenantId, UPSTREAM_VERSION};
