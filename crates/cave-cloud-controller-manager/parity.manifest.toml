@@ -81,6 +81,18 @@ local    = "src/service_topology.rs"
 upstream = "pkg/proxy/endpointslicecache.go"
 local    = "src/service_topology.rs"
 
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/service/controller.go"
+local    = "src/service_lb_lifecycle.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go"
+local    = "src/route_orchestrator.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/client-go/util/workqueue/rate_limiting_queue.go"
+local    = "src/route_orchestrator.rs"
+
 # ── In-tree function mappings ────────────────────────────────────────────────
 [[functions]]
 upstream_name = "syncNode"
@@ -267,6 +279,22 @@ local    = "src/providers/hetzner_targets.rs"
 upstream = "hcloud/action.go"
 local    = "src/providers/hetzner_targets.rs"
 
+[[providers.hetzner.files]]
+upstream = "hcloud/load_balancer.go"
+local    = "src/providers/hetzner_lb_advanced.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/certificate.go"
+local    = "src/providers/hetzner_lb_advanced.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/server.go"
+local    = "src/providers/hetzner_lb_advanced.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/network.go"
+local    = "src/providers/hetzner_lb_advanced.rs"
+
 # ── Azure (out-of-tree) provider mappings ────────────────────────────────────
 [[providers.azure]]
 upstream = "github.com/kubernetes-sigs/cloud-provider-azure"
@@ -320,3 +348,15 @@ local    = "src/providers/azure_advanced.rs"
 [[providers.azure.files]]
 upstream = "pkg/provider/azure_vnet_peering.go"
 local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_managedclusters.go"
+local    = "src/providers/azure_networking.rs"
+
+[[providers.azure.files]]
+upstream = "cluster-autoscaler/cloudprovider/azure/azure.go"
+local    = "src/providers/azure_networking.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_app_gateway.go"
+local    = "src/providers/azure_networking.rs"
