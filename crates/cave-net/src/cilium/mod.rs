@@ -72,6 +72,7 @@ pub mod operator;
 pub mod policy;
 pub mod policy_trace;
 pub mod proxy_health;
+pub mod readiness;
 pub mod recorder;
 pub mod reserved_ids;
 pub mod selector_cache;
