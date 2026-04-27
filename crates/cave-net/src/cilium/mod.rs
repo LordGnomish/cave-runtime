@@ -25,6 +25,7 @@ pub mod agent_api;
 pub mod auth;
 pub mod bandwidth;
 pub mod bgp;
+pub mod bpf_dump;
 pub mod bpfmaps;
 pub mod cilium_node;
 pub mod clustermesh;
