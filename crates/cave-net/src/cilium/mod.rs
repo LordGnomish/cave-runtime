@@ -22,6 +22,7 @@ pub mod types;
 
 pub mod access_log;
 pub mod agent_api;
+pub mod arp_announce;
 pub mod auth;
 pub mod bandwidth;
 pub mod bgp;
