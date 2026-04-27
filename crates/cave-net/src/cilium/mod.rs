@@ -30,6 +30,7 @@ pub mod bpfmaps;
 pub mod cilium_node;
 pub mod clustermesh;
 pub mod clustermesh_ext;
+pub mod conn_test;
 pub mod conntrack;
 pub mod dns_proxy;
 pub mod egress;
