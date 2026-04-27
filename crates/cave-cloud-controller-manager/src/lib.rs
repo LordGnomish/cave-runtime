@@ -23,6 +23,7 @@ pub mod node_controller;
 pub mod node_lifecycle;
 pub mod route_controller;
 pub mod route_ipam;
+pub mod route_orchestrator;
 pub mod service_controller;
 pub mod service_extras;
 pub mod service_lb_lifecycle;
