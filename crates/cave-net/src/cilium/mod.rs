@@ -30,6 +30,7 @@ pub mod bpf_dump;
 pub mod bpf_loader;
 pub mod bpfmaps;
 pub mod cilium_node;
+pub mod class_resolver;
 pub mod cluster_pool_refill;
 pub mod clustermesh;
 pub mod cni_chain;
