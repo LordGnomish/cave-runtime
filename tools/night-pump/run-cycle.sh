@@ -209,7 +209,7 @@ for ATTEMPT in 1 2 3; do
 
   ERR_FILE="$LOG_DIR/${crate}-attempt${ATTEMPT}.err"
   log "retry_${ATTEMPT}: cargo check"
-  if ( cd "$WT_DIR" && CARGO_TARGET_DIR="$SHARED_TARGET" cargo check -p "$crate" --tests --no-deps --quiet ) >"$ERR_FILE" 2>&1; then
+  if ( cd "$WT_DIR" && CARGO_TARGET_DIR="$SHARED_TARGET" cargo check -p "$crate" --tests --quiet ) >"$ERR_FILE" 2>&1; then
     cat "$ERR_FILE" >>"$CYCLE_LOG"
     SUCCESS_AT_RETRY=$ATTEMPT
     WINNING_DRAFT="$ATTEMPT_RAW"
