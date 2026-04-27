@@ -63,6 +63,7 @@ members = [
     "crates/cave-metrics",
     "crates/cave-logs",
     "crates/cave-trace",
+    "crates/cave-tracing",
     # === Security & Admission ===
     "crates/cave-admission",
     "crates/cave-security",
