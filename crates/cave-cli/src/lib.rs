@@ -11,7 +11,10 @@ pub mod chat;
 pub mod compat;
 pub mod env;
 pub mod native;
+pub mod shell;
+pub mod telemetry;
 pub mod tenant;
+pub mod tenant_scope;
 pub mod tui;
 pub mod watch;
 
