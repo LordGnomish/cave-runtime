@@ -29,6 +29,7 @@ pub mod clustermesh_ext;
 pub mod conntrack;
 pub mod egress;
 pub mod endpoint;
+pub mod endpoint_regen;
 pub mod envoy;
 pub mod fqdn;
 pub mod health;
