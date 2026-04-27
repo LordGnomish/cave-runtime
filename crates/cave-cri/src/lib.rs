@@ -75,6 +75,7 @@ pub mod logs;
 pub mod log_v2;
 pub mod health;
 pub mod auth;
+pub mod auth_v2;
 pub mod cgroup_v2;
 pub mod criu;
 pub mod manifest_list;

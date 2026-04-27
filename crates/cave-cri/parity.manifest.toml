@@ -1237,3 +1237,115 @@ local_test    = "test_stream_error_success_is_empty"
 [[tests]]
 upstream_test = "TestStreamErrorStatusRoundtrip"
 local_test    = "test_stream_error_status_roundtrip"
+
+# Image pull auth depth — TokenCache, BearerChallenge, SigV4, dockerconfigjson, retry
+
+[[files]]
+upstream = "remotes/docker/auth/fetch.go"
+local    = "src/auth_v2.rs"
+
+[[files]]
+upstream = "remotes/docker/auth/parse.go"
+local    = "src/auth_v2.rs"
+
+[[files]]
+upstream = "remotes/docker/scheduler.go"
+local    = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.Get"
+local_name    = "get"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.Insert"
+local_name    = "insert"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.EvictExpired"
+local_name    = "evict_expired"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "ParseBearerChallenge"
+local_name    = "parse"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "BearerChallengeTokenURL"
+local_name    = "token_url"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "SigV4AuthorizationHeader"
+local_name    = "authorization_header"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "DockerConfigParse"
+local_name    = "parse"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "DockerConfigSchemeFor"
+local_name    = "scheme_for"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "PullRetryBackoff"
+local_name    = "backoff_for_attempt"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "PullRetryJitter"
+local_name    = "jittered"
+file          = "src/auth_v2.rs"
+
+[[tests]]
+upstream_test = "TestTokenCacheReturnsInsertedToken"
+local_test    = "test_token_cache_returns_inserted_token"
+
+[[tests]]
+upstream_test = "TestTokenCacheSkewWindow"
+local_test    = "test_token_cache_skew_window_blocks_30s_before_expiry"
+
+[[tests]]
+upstream_test = "TestTokenCacheEvictsExpired"
+local_test    = "test_token_cache_evicts_expired"
+
+[[tests]]
+upstream_test = "TestBearerChallengeParseFull"
+local_test    = "test_bearer_challenge_parse_full"
+
+[[tests]]
+upstream_test = "TestBearerChallengeTokenURL"
+local_test    = "test_bearer_challenge_token_url"
+
+[[tests]]
+upstream_test = "TestBearerChallengeRejectsBasic"
+local_test    = "test_bearer_challenge_rejects_basic"
+
+[[tests]]
+upstream_test = "TestSigV4AuthorizationHeaderShape"
+local_test    = "test_sigv4_authorization_header_shape"
+
+[[tests]]
+upstream_test = "TestDockerConfigJSONParseBasicAuth"
+local_test    = "test_dockerconfigjson_parse_basic_auth"
+
+[[tests]]
+upstream_test = "TestDockerConfigJSONPrefersIdentityToken"
+local_test    = "test_dockerconfigjson_prefers_identitytoken"
+
+[[tests]]
+upstream_test = "TestPullRetryDefaultMatchesContainerd"
+local_test    = "test_pull_retry_default_matches_containerd"
+
+[[tests]]
+upstream_test = "TestPullRetryBackoffCapsAtMax"
+local_test    = "test_pull_retry_backoff_caps_at_max"
+
+[[tests]]
+upstream_test = "TestPullRetryJitterExtremes"
+local_test    = "test_pull_retry_jitter_extremes"

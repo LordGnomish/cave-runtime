@@ -281,6 +281,144 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Auth depth (TokenCache, BearerChallenge, SigV4, dockerconfigjson, retry) ──
+
+use crate::auth_v2;
+use chrono::TimeZone;
+
+fn ts(unix: i64) -> chrono::DateTime<chrono::Utc> {
+    chrono::Utc.timestamp_opt(unix, 0).unwrap()
+}
+
+#[test]
+fn test_token_cache_returns_inserted_token() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("docker.io", "scope", auth_v2::CachedToken {
+        token: "tk".into(),
+        expires_at: ts(2000),
+    });
+    assert_eq!(c.get("docker.io", "scope", ts(0)).unwrap().token, "tk");
+}
+
+#[test]
+fn test_token_cache_skew_window_blocks_30s_before_expiry() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("r", "s", auth_v2::CachedToken { token: "x".into(), expires_at: ts(1000) });
+    assert!(c.get("r", "s", ts(990)).is_none());
+}
+
+#[test]
+fn test_token_cache_evicts_expired() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("a", "s", auth_v2::CachedToken { token: "old".into(), expires_at: ts(100) });
+    c.insert("b", "s", auth_v2::CachedToken { token: "fresh".into(), expires_at: ts(10_000) });
+    let dropped = c.evict_expired(ts(500));
+    assert_eq!(dropped, 1);
+    assert_eq!(c.len(), 1);
+}
+
+#[test]
+fn test_bearer_challenge_parse_full() {
+    let c = auth_v2::BearerChallenge::parse(
+        r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull""#
+    ).unwrap();
+    assert_eq!(c.realm,   "https://auth.docker.io/token");
+    assert_eq!(c.service, "registry.docker.io");
+    assert_eq!(c.scope,   "repository:library/nginx:pull");
+}
+
+#[test]
+fn test_bearer_challenge_token_url() {
+    let c = auth_v2::BearerChallenge {
+        realm: "https://auth.docker.io/token".into(),
+        service: "registry.docker.io".into(),
+        scope: "repository:library/nginx:pull".into(),
+    };
+    let url = c.token_url();
+    assert!(url.contains("service=registry.docker.io"));
+    assert!(url.contains("scope=repository:library/nginx:pull"));
+}
+
+#[test]
+fn test_bearer_challenge_rejects_basic() {
+    assert!(auth_v2::BearerChallenge::parse("Basic realm=\"x\"").is_err());
+}
+
+#[test]
+fn test_sigv4_authorization_header_shape() {
+    let req = auth_v2::SigV4Request {
+        method: "POST",
+        host: "api.ecr.us-east-1.amazonaws.com",
+        path: "/",
+        query: "",
+        payload: b"{}",
+        region: "us-east-1",
+        service: "ecr",
+        access_key_id: "AKIDEXAMPLE",
+        secret_access_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        timestamp: chrono::Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap(),
+    };
+    let h = req.authorization_header();
+    assert!(h.starts_with("AWS4-HMAC-SHA256 "));
+    assert!(h.contains("Credential=AKIDEXAMPLE/20240101/us-east-1/ecr/aws4_request"));
+    assert!(h.contains("SignedHeaders=host;x-amz-date"));
+}
+
+#[test]
+fn test_dockerconfigjson_parse_basic_auth() {
+    let cfg = auth_v2::DockerConfig::parse(
+        r#"{"auths":{"docker.io":{"auth":"YWxpY2U6c2VjcmV0"}}}"#
+    ).unwrap();
+    let scheme = cfg.scheme_for("docker.io").unwrap();
+    match scheme {
+        crate::auth::AuthScheme::Basic { username, password } => {
+            assert_eq!(username, "alice");
+            assert_eq!(password, "secret");
+        }
+        _ => panic!("expected Basic"),
+    }
+}
+
+#[test]
+fn test_dockerconfigjson_prefers_identitytoken() {
+    let cfg = auth_v2::DockerConfig::parse(
+        r#"{"auths":{"r.io":{"auth":"YWxpY2U6c2VjcmV0","identitytoken":"id-tk"}}}"#
+    ).unwrap();
+    match cfg.scheme_for("r.io").unwrap() {
+        crate::auth::AuthScheme::Bearer { token } => assert_eq!(token, "id-tk"),
+        _ => panic!("expected Bearer"),
+    }
+}
+
+#[test]
+fn test_pull_retry_default_matches_containerd() {
+    let p = auth_v2::PullRetryPolicy::default();
+    assert_eq!(p.max_attempts, 3);
+    assert_eq!(p.initial_backoff_ms, 250);
+}
+
+#[test]
+fn test_pull_retry_backoff_caps_at_max() {
+    let p = auth_v2::PullRetryPolicy {
+        max_attempts: 10,
+        initial_backoff_ms: 100,
+        multiplier: 2,
+        max_backoff_ms: 1000,
+        jitter_fraction: 0.0,
+    };
+    assert_eq!(p.backoff_for_attempt(1), Some(100));
+    assert_eq!(p.backoff_for_attempt(5), Some(1000));
+    assert_eq!(p.backoff_for_attempt(20), None);
+}
+
+#[test]
+fn test_pull_retry_jitter_extremes() {
+    let p = auth_v2::PullRetryPolicy { jitter_fraction: 0.5, ..Default::default() };
+    assert_eq!(p.jittered(1000, 0.0), 500);
+    assert_eq!(p.jittered(1000, 1.0), 1500);
+    assert_eq!(p.jittered(1000, 0.5), 1000);
+}
+
 // ── Streaming session (SPDY/3.1, lifecycle, pty, error stream) ────────────────
 
 use crate::streaming_session as ss;
