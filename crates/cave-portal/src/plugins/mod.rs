@@ -7,15 +7,21 @@
 //! as the single data plane.
 
 pub mod argocd;
+pub mod argocd_advanced;
 pub mod badges;
 pub mod cost_insight;
+pub mod defectdojo;
 pub mod grafana;
+pub mod grafana_renderer;
+pub mod hubble;
 pub mod kubernetes;
 pub mod reflex;
+pub mod reflex_advanced;
 pub mod scaffolder;
 pub mod search;
 pub mod techdocs;
 pub mod vault;
+pub mod vault_advanced;
 
 /// Persona for whom a plugin view is intended.
 ///
