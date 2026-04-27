@@ -12,6 +12,7 @@ pub mod badges;
 pub mod cost_insight;
 pub mod defectdojo;
 pub mod grafana;
+pub mod grafana_alerting;
 pub mod grafana_renderer;
 pub mod hubble;
 pub mod kubernetes;
