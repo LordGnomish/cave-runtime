@@ -48,6 +48,7 @@ pub mod maglev;
 pub mod nat;
 pub mod policy;
 pub mod services;
+pub mod sock_lb;
 pub mod tunnel;
 pub mod wireguard;
 
