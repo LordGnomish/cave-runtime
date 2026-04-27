@@ -56,6 +56,7 @@ pub mod kv_identity;
 pub mod l2_announce;
 pub mod l7policy;
 pub mod l7proxy;
+pub mod label_resolver;
 pub mod lb;
 pub mod lrp;
 pub mod lb_ext;
