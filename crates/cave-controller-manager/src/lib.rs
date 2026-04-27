@@ -61,6 +61,13 @@ pub mod csr_signer;
 /// subject validation.
 pub mod csr_signer_deeper;
 
+/// 100-pct PUSH-HARD M15: CSR auto-approver — bootstrap + self-node-client
+/// recognizers (sarapprove parity).
+pub mod csr_auto_approver;
+
+/// 100-pct PUSH-HARD M15: PEM block extractor used by CSR signer dispatch.
+pub mod csr_pem;
+
 /// 100-pct sprint M4: RBAC controllers (ClusterRole aggregation).
 pub mod rbac;
 
