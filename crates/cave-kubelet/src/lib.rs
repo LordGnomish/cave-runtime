@@ -30,6 +30,16 @@ pub mod cpumanager;
 pub mod memorymanager;
 pub mod deviceplugin;
 pub mod dra;
+pub mod dra_v1alpha2;
+
+// deeper-003 — node-side runtime modules.
+pub mod container_metrics;
+pub mod image_gc;
+pub mod kubelet_config;
+pub mod node_lease;
+pub mod plugin_watcher;
+pub mod topology_manager;
+pub mod volume_reconciler;
 
 use agent::KubeletState;
 use std::sync::Arc;

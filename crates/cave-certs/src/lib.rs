@@ -6,6 +6,11 @@
 pub mod routes;
 pub mod models;
 pub mod engine;
+pub mod crds;
+pub mod acme_client;
+pub mod solvers;
+pub mod renewal;
+pub mod pqc;
 
 use axum::Router;
 

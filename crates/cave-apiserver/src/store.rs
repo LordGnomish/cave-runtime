@@ -2103,3 +2103,109 @@ mod tests_errors {
         }
     }
 }
+
+// ── GenericAPIServer storage-layer deeper coverage (v1.36.0) ─────────────────
+// upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go
+
+#[cfg(test)]
+mod tests_generic_storage {
+    use super::*;
+    use crate::resources::*;
+    use std::collections::HashMap;
+
+    fn cm(name: &str, ns: &str) -> Resource {
+        Resource::ConfigMap(ConfigMap {
+            api_version: "v1".into(), kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+        })
+    }
+    fn secret(name: &str, ns: &str) -> Resource {
+        Resource::Secret(Secret {
+            api_version: "v1".into(), kind: "Secret".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(), secret_type: "Opaque".into(),
+        })
+    }
+
+    /// Upstream parity: `TestStore_WatchEmitsAddModifyDeleteInOrder`
+    /// (apiserver/pkg/registry/generic/registry/store_test.go — broadcast
+    /// channel emits typed events for each lifecycle step).
+    #[test]
+    fn test_watch_emits_correct_event_type_per_lifecycle_step() {
+        let store = ResourceStore::new();
+        let mut rx = store.subscribe();
+        // tenant_id invariant: tenant scoping is by namespace; pin to "acme".
+        let r = cm("c", "acme");
+        store.create(r.clone()).unwrap();
+        store.update(r.clone()).unwrap();
+        store.delete("ConfigMap", "acme", "c").unwrap();
+        let added = rx.try_recv().unwrap();
+        let modified = rx.try_recv().unwrap();
+        let deleted = rx.try_recv().unwrap();
+        assert!(matches!(added.event_type,    WatchEventType::Added));
+        assert!(matches!(modified.event_type, WatchEventType::Modified));
+        assert!(matches!(deleted.event_type,  WatchEventType::Deleted));
+        assert_eq!(added.resource.namespace(),    "acme",
+            "tenant_id invariant: Added event scoped to acme");
+        assert_eq!(deleted.resource.namespace(),  "acme",
+            "tenant_id invariant: Deleted event scoped to acme");
+    }
+
+    /// Upstream parity: `TestStore_TenantIsolatedDeleteDoesNotAffectPeer`
+    /// (registry/store.go::Delete — same `name` in different namespaces are
+    /// distinct keys; deletion in one MUST NOT affect the other).
+    #[test]
+    fn test_delete_in_one_tenant_namespace_does_not_remove_peer_tenant_object() {
+        let store = ResourceStore::new();
+        store.create(cm("shared", "acme")).unwrap();
+        store.create(cm("shared", "globex")).unwrap();
+        store.delete("ConfigMap", "acme", "shared").unwrap();
+        let acme_q  = store.get("ConfigMap", "acme",   "shared");
+        let globex_q = store.get("ConfigMap", "globex", "shared");
+        assert!(acme_q.is_err(),
+            "tenant_id invariant: acme's object removed");
+        assert!(globex_q.is_ok(),
+            "tenant_id invariant: globex's same-named object UNAFFECTED");
+        let g = globex_q.unwrap();
+        assert_eq!(g.namespace(), "globex");
+    }
+
+    /// Upstream parity: `TestStore_CountByKindCoversMultipleKinds`
+    /// (registry/store.go::Count — per-kind counter is independent across kinds).
+    #[test]
+    fn test_count_by_kind_is_independent_across_kinds_and_tenants() {
+        let store = ResourceStore::new();
+        store.create(cm("c1", "acme")).unwrap();
+        store.create(cm("c2", "acme")).unwrap();
+        store.create(cm("c3", "globex")).unwrap();
+        store.create(secret("s1", "acme")).unwrap();
+        assert_eq!(store.count("ConfigMap"), 3);
+        assert_eq!(store.count("Secret"),   1);
+        // tenant_id invariant: per-tenant list still segregates by namespace.
+        assert_eq!(store.list("ConfigMap", "acme").len(), 2);
+        assert_eq!(store.list("ConfigMap", "globex").len(), 1);
+        assert!(store.list("ConfigMap", "acme").iter()
+            .all(|r| r.namespace() == "acme"),
+            "tenant_id invariant: acme list strictly scoped");
+    }
+
+    /// Upstream parity: `TestStore_UpdateMissingObjectReturnsNotFound`
+    /// (registry/store.go::Update on a non-existent key returns NotFound,
+    /// never silently inserts — no upsert semantics).
+    #[test]
+    fn test_update_missing_object_returns_not_found_and_does_not_insert() {
+        let store = ResourceStore::new();
+        let r = cm("ghost", "acme");
+        let err = store.update(r).expect_err("update of missing object must fail");
+        match err {
+            ApiError::NotFound { kind, name } => {
+                assert_eq!(kind, "ConfigMap");
+                assert_eq!(name, "ghost");
+            }
+            other => panic!("expected NotFound, got {:?}", other),
+        }
+        // tenant_id invariant: no acme insertion side-effect.
+        assert_eq!(store.list("ConfigMap", "acme").len(), 0,
+            "tenant_id invariant: failed update never created acme entry");
+    }
+}

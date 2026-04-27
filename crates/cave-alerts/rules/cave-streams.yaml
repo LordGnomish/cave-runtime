@@ -1,0 +1,69 @@
+crate: cave-streams
+group: cave-streams-slo
+
+alerts:
+  - alert: StreamsSloBurnRateFast
+    expr: '(sum(rate(kafka_server_brokertopicmetrics_failed_produce_requests_total[1h])) / sum(rate(kafka_server_brokertopicmetrics_total_produce_requests_total[1h]))) > (14.4 * 0.001)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "Streams produce failure fast burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/slo-burn-fast.md"
+
+  - alert: StreamsSloBurnRateSlow
+    expr: '(sum(rate(kafka_server_brokertopicmetrics_failed_produce_requests_total[6h])) / sum(rate(kafka_server_brokertopicmetrics_total_produce_requests_total[6h]))) > (6 * 0.001)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Streams produce failure slow burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/slo-burn-slow.md"
+
+  - alert: StreamsErrorBudgetLow
+    expr: '1 - (sum(rate(kafka_server_brokertopicmetrics_failed_produce_requests_total[7d])) / sum(rate(kafka_server_brokertopicmetrics_total_produce_requests_total[7d]))) < 0.999'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Streams 7-day success below 99.9%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/error-budget.md"
+
+  - alert: StreamsUnderReplicatedPartitions
+    expr: 'sum(kafka_server_replicamanager_underreplicatedpartitions) > 0'
+    for: 10m
+    severity: critical
+    annotations:
+      summary: "Under-replicated partitions present"
+      description: "{{ $value }} partitions are under-replicated."
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/under-replicated.md"
+
+  - alert: StreamsConsumerLagHigh
+    expr: 'max(kafka_consumergroup_lag) > 1000000'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Consumer lag > 1M messages"
+      description: "Consumer group {{ $labels.consumergroup }} lag = {{ $value }}"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/lag.md"
+
+  - alert: StreamsCardinalityExplosion
+    expr: 'count(count by (topic) (kafka_topic_partitions)) > 10000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Topic cardinality > 10k"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/cardinality.md"
+
+  - alert: StreamsIsrChurn
+    expr: 'sum(increase(kafka_server_replicamanager_isrshrinks_total[15m])) > 5'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "5+ ISR shrinks in 15m"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/isr-churn.md"
+
+  - alert: StreamsHealthProbeFailing
+    expr: 'min(up{job="cave-streams"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "Streams broker health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-streams/health.md"

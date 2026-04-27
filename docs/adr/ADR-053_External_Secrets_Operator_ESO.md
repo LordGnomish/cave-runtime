@@ -49,6 +49,10 @@ Kubernetes workloads need secrets from OpenBao (Hetzner) and Azure Key Vault (Az
 - Cache TTL creates brief stale window if ESO pod restarts during rotation.
 - ESO failure mode: if ESO pod is down, existing K8s Secrets remain but new secrets or rotations are not synced. P2 alert triggers.
 
+## Notes
+
+**Universal scope.** **Runtime mirror EXISTS**: `cave-external-secrets` crate (Mirror-001 blanket). Sovereign deployment'da ESO operator dependency'si yok — cave-external-secrets cave-vault (ADR-020) + cave-auth-azure (KV bridge) ile native sync. Lease tracking + rotation cave-vault'un primitive'i, ESO sync interval (1m) yerine sub-second. PQC envelope (ADR-014/142) — secret transport ML-KEM-768 encrypted, K8s Secret in-memory ML-DSA imzalı. Crossplane creds (ADR-073 absorbed) cave-crossplane mirror'ı cave-external-secrets üzerinden tüketir.
+
 ## Compliance Mapping
 
 SOC2 CC6.7 (credential lifecycle management). ISO A.8.24 (use of cryptography — secrets encrypted at rest in vault, decrypted only in ESO memory). GDPR Art.32 (security of processing — no credentials in Git or logs).

@@ -56,11 +56,34 @@
 //!   GET  /api/etcd/health     — health check
 //! ```
 
+pub mod auth_token;
+pub mod auth_v3;
 pub mod b64;
+pub mod balancer;
+pub mod client;
+pub mod client_v2;
+pub mod cluster_status;
+pub mod concurrency;
+pub mod concurrency_extras;
+pub mod defrag_scheduler;
 pub mod error;
+pub mod grpc_api;
+pub mod kms;
+pub mod kms_chain;
+pub mod kms_v2;
+pub mod lease_id_gen;
+pub mod maintenance;
+pub mod maintenance_v2;
+pub mod membership_audit;
+pub mod membership_v2;
 pub mod models;
-pub mod store;
+pub mod rbac_deeper;
 pub mod routes;
+pub mod snap_db;
+pub mod snapshot_stream;
+pub mod snapshot_wire;
+pub mod store;
+pub mod watch_filters;
 
 use store::KvStore;
 use std::sync::Arc;

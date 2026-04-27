@@ -188,6 +188,7 @@ pub async fn enable_mount(
         seal_wrap: body.seal_wrap.unwrap_or(false),
         uuid: uuid::Uuid::new_v4().to_string(),
         accessor: uuid::Uuid::new_v4().to_string(),
+        namespace_id: String::new(),
     };
     let mut mt = state.mount_table.write().await;
     mt.mounts.insert(path, entry);

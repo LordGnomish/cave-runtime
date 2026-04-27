@@ -4,10 +4,174 @@
 
 use crate::error::{CriError, CriResult};
 use crate::models::{ImageConfig, ImageReference, OciDescriptor, OciImage, OciLayer, OciManifest};
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use reqwest::Client;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// Parsed Bearer challenge from a registry's `WWW-Authenticate` response
+/// header. Cite: containerd v2.2.3
+/// `core/remotes/docker/auth/parse.go` (`ParseAuthHeader`) and
+/// distribution-spec v1.1 §4.4 (Token Authentication Specification).
+///
+/// Example header:
+/// ```text
+/// WWW-Authenticate: Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull"
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BearerChallenge {
+    pub realm: String,
+    pub service: Option<String>,
+    pub scope: Option<String>,
+    pub error: Option<String>,
+}
+
+impl BearerChallenge {
+    /// Parse a `WWW-Authenticate` header value. Accepts the canonical
+    /// `Bearer realm="...",service="...",scope="..."` shape and is
+    /// permissive about whitespace + parameter ordering.
+    pub fn parse(header: &str) -> CriResult<Self> {
+        let trimmed = header.trim();
+        let rest = trimmed.strip_prefix("Bearer")
+            .or_else(|| trimmed.strip_prefix("bearer"))
+            .ok_or_else(|| CriError::Registry(
+                "WWW-Authenticate: missing Bearer scheme".into()
+            ))?;
+        let mut params = HashMap::new();
+        for kv in split_csv_respecting_quotes(rest.trim()) {
+            let (k, v) = kv.split_once('=').ok_or_else(|| {
+                CriError::Registry(format!("WWW-Authenticate: malformed parameter '{}'", kv))
+            })?;
+            let key = k.trim().to_lowercase();
+            let value = v.trim().trim_matches('"').to_string();
+            params.insert(key, value);
+        }
+        let realm = params.remove("realm").ok_or_else(|| {
+            CriError::Registry("WWW-Authenticate: 'realm' parameter is mandatory".into())
+        })?;
+        Ok(Self {
+            realm,
+            service: params.remove("service"),
+            scope: params.remove("scope"),
+            error: params.remove("error"),
+        })
+    }
+
+    /// Build the token-endpoint URL for this challenge.
+    pub fn token_url(&self) -> String {
+        let mut url = self.realm.clone();
+        let mut sep = if url.contains('?') { '&' } else { '?' };
+        if let Some(svc) = &self.service {
+            url.push(sep);
+            url.push_str(&format!("service={}", urlencode(svc)));
+            sep = '&';
+        }
+        if let Some(scope) = &self.scope {
+            url.push(sep);
+            url.push_str(&format!("scope={}", urlencode(scope)));
+        }
+        url
+    }
+}
+
+fn split_csv_respecting_quotes(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    for c in s.chars() {
+        match c {
+            '"' => { in_quotes = !in_quotes; cur.push(c); }
+            ',' if !in_quotes => {
+                if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+                cur.clear();
+            }
+            _ => cur.push(c),
+        }
+    }
+    if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+    out
+}
+
+fn urlencode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
+}
+
+/// Tenant-scoped Bearer-token cache. Tokens are keyed by `(registry,
+/// repository, scope)` so a single tenant can hold per-repo tokens.
+/// Cite: containerd v2.2.3 `core/remotes/docker/authorizer.go` keeps the
+/// equivalent map in `dockerAuthorizer.handlers`.
+#[derive(Debug)]
+pub struct TokenCache {
+    pub tenant_id: String,
+    entries: Mutex<HashMap<TokenKey, CachedToken>>,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct TokenKey {
+    registry: String,
+    repository: String,
+    scope: String,
+}
+
+#[derive(Debug, Clone)]
+struct CachedToken {
+    token: String,
+    expires_at: DateTime<Utc>,
+}
+
+impl TokenCache {
+    pub fn new(tenant_id: impl Into<String>) -> Self {
+        Self { tenant_id: tenant_id.into(), entries: Mutex::new(HashMap::new()) }
+    }
+
+    pub fn put(&self, registry: &str, repository: &str, scope: &str, token: &str, ttl_secs: i64) {
+        let key = TokenKey {
+            registry: registry.to_string(),
+            repository: repository.to_string(),
+            scope: scope.to_string(),
+        };
+        let cached = CachedToken {
+            token: token.to_string(),
+            expires_at: Utc::now() + Duration::seconds(ttl_secs.max(1)),
+        };
+        self.entries.lock().unwrap().insert(key, cached);
+    }
+
+    pub fn get(&self, registry: &str, repository: &str, scope: &str) -> Option<String> {
+        let key = TokenKey {
+            registry: registry.to_string(),
+            repository: repository.to_string(),
+            scope: scope.to_string(),
+        };
+        let map = self.entries.lock().unwrap();
+        let entry = map.get(&key)?;
+        if Utc::now() >= entry.expires_at {
+            return None;
+        }
+        Some(entry.token.clone())
+    }
+
+    pub fn evict(&self, registry: &str, repository: &str, scope: &str) -> bool {
+        let key = TokenKey {
+            registry: registry.to_string(),
+            repository: repository.to_string(),
+            scope: scope.to_string(),
+        };
+        self.entries.lock().unwrap().remove(&key).is_some()
+    }
+
+    pub fn len(&self) -> usize { self.entries.lock().unwrap().len() }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+}
 
 /// Registry client for pulling OCI images.
 pub struct RegistryClient {

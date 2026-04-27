@@ -31,10 +31,28 @@ impl Capability {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PolicyRule {
     pub path: String,
     pub capabilities: Vec<Capability>,
+    /// Cite: openbao `vault/policy.go:139` (`AllowedParametersHCL`).
+    /// Whitelist of request body parameters; if non-empty, only these
+    /// keys may appear in a write.
+    #[serde(default)]
+    pub allowed_parameters: Vec<String>,
+    /// Cite: openbao `vault/policy.go:140` (`DeniedParametersHCL`).
+    /// Blacklist of request body parameters; takes precedence over
+    /// `allowed_parameters`.
+    #[serde(default)]
+    pub denied_parameters: Vec<String>,
+    /// Cite: openbao `vault/policy.go:141` (`RequiredParametersHCL`).
+    /// Mandatory request body parameters.
+    #[serde(default)]
+    pub required_parameters: Vec<String>,
+    /// Cite: openbao `vault/policy.go:137` (`MinWrappingTTLHCL`).
+    /// Minimum response-wrap TTL in seconds for matching paths.
+    #[serde(default)]
+    pub min_wrapping_ttl_seconds: i64,
 }
 
 impl PolicyRule {
@@ -60,6 +78,45 @@ impl PolicyRule {
         }
         self.capabilities.contains(cap)
     }
+
+    /// Cite: openbao `vault/acl.go::AllowOperation` parameter check —
+    /// the request body keys are validated against `required` /
+    /// `allowed` / `denied`. Returns `Ok(())` when allowed, otherwise
+    /// `Err(reason)` describing the first failure.
+    pub fn check_parameters<I>(&self, body_keys: I) -> Result<(), String>
+    where
+        I: IntoIterator,
+        I::Item: AsRef<str>,
+    {
+        let keys: Vec<String> = body_keys.into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+
+        // Required: every required key must be present.
+        for req in &self.required_parameters {
+            if !keys.iter().any(|k| k == req) {
+                return Err(format!("missing required parameter: {}", req));
+            }
+        }
+
+        for k in &keys {
+            // Denied takes precedence over allowed.
+            if self.denied_parameters.iter().any(|d| d == k || d == "*") {
+                return Err(format!("parameter '{}' is denied", k));
+            }
+        }
+
+        if !self.allowed_parameters.is_empty()
+            && !self.allowed_parameters.iter().any(|a| a == "*")
+        {
+            for k in &keys {
+                if !self.allowed_parameters.iter().any(|a| a == k) {
+                    return Err(format!("parameter '{}' is not in allowed_parameters", k));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,26 +127,65 @@ pub struct Policy {
 }
 
 impl Policy {
+    /// Parse HCL ACL policy. Mirrors openbao
+    /// `vault/policy.go:253` (ParseACLPolicy) + `:302` (parsePaths). Strips
+    /// `# …` and `// …` line comments before regex extraction so reviewer-
+    /// friendly policies parse cleanly.
     pub fn parse(name: &str, hcl: &str) -> VaultResult<Self> {
+        let stripped = strip_hcl_comments(hcl);
         let mut rules = Vec::new();
-        let path_re = regex::Regex::new(r#"path\s+"([^"]+)"\s*\{([^}]*)\}"#)
-            .map_err(|e| VaultError::Internal(e.to_string()))?;
         let cap_re = regex::Regex::new(r#"capabilities\s*=\s*\[([^\]]*)\]"#)
             .map_err(|e| VaultError::Internal(e.to_string()))?;
+        let required_re = regex::Regex::new(r#"required_parameters\s*=\s*\[([^\]]*)\]"#)
+            .map_err(|e| VaultError::Internal(e.to_string()))?;
+        let min_wrap_re = regex::Regex::new(r#"min_wrapping_ttl\s*=\s*"?([0-9]+)([smhd]?)"?"#)
+            .map_err(|e| VaultError::Internal(e.to_string()))?;
 
-        for caps in path_re.captures_iter(hcl) {
-            let path = caps[1].to_string();
-            let body = &caps[2];
+        for (path, body) in extract_path_blocks(&stripped) {
+            let body = body.as_str();
             let mut capabilities = Vec::new();
             if let Some(cap_match) = cap_re.captures(body) {
-                for cap_str in cap_match[1].split(',') {
-                    let cap_str = cap_str.trim().trim_matches('"');
+                for cap_str in split_csv_keep_quoted(&cap_match[1]) {
+                    let cap_str = cap_str.trim().trim_matches('"').trim();
+                    if cap_str.is_empty() { continue; }
                     if let Some(cap) = Capability::from_str(cap_str) {
                         capabilities.push(cap);
                     }
                 }
             }
-            rules.push(PolicyRule { path, capabilities });
+
+            let allowed_parameters = extract_inner_block(body, "allowed_parameters")
+                .map(|inner| extract_param_keys(&inner)).unwrap_or_default();
+            let denied_parameters = extract_inner_block(body, "denied_parameters")
+                .map(|inner| extract_param_keys(&inner)).unwrap_or_default();
+            let required_parameters = required_re.captures(body)
+                .map(|m| split_csv_keep_quoted(&m[1])
+                    .into_iter()
+                    .map(|s| s.trim().trim_matches('"').trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect())
+                .unwrap_or_default();
+            let min_wrapping_ttl_seconds = min_wrap_re.captures(body)
+                .map(|m| {
+                    let n: i64 = m[1].parse().unwrap_or(0);
+                    let unit = m.get(2).map(|x| x.as_str()).unwrap_or("");
+                    match unit {
+                        "m" => n * 60,
+                        "h" => n * 3600,
+                        "d" => n * 86_400,
+                        _   => n,
+                    }
+                })
+                .unwrap_or(0);
+
+            rules.push(PolicyRule {
+                path,
+                capabilities,
+                allowed_parameters,
+                denied_parameters,
+                required_parameters,
+                min_wrapping_ttl_seconds,
+            });
         }
         Ok(Policy { name: name.to_string(), rules, raw: hcl.to_string() })
     }
@@ -124,22 +220,23 @@ impl PolicyStore {
                 path: "*".to_string(),
                 capabilities: vec![Capability::Create, Capability::Read, Capability::Update,
                     Capability::Delete, Capability::List, Capability::Sudo],
+                ..Default::default()
             }],
             raw: r#"path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }"#.to_string(),
         });
         store.policies.insert("default".to_string(), Policy {
             name: "default".to_string(),
             rules: vec![
-                PolicyRule { path: "auth/token/lookup-self".to_string(), capabilities: vec![Capability::Read] },
-                PolicyRule { path: "auth/token/renew-self".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "auth/token/revoke-self".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/capabilities-self".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/leases/lookup".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/leases/renew".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/renew".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/tools/hash".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "sys/tools/random/*".to_string(), capabilities: vec![Capability::Update] },
-                PolicyRule { path: "identity/oidc/provider/+/userinfo".to_string(), capabilities: vec![Capability::Read, Capability::Update] },
+                PolicyRule { path: "auth/token/lookup-self".to_string(), capabilities: vec![Capability::Read] , ..Default::default() },
+                PolicyRule { path: "auth/token/renew-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "auth/token/revoke-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/capabilities-self".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/leases/lookup".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/leases/renew".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/renew".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/tools/hash".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "sys/tools/random/*".to_string(), capabilities: vec![Capability::Update] , ..Default::default() },
+                PolicyRule { path: "identity/oidc/provider/+/userinfo".to_string(), capabilities: vec![Capability::Read, Capability::Update] , ..Default::default() },
             ],
             raw: String::new(),
         });
@@ -182,6 +279,137 @@ impl PolicyStore {
     }
 }
 
+/// Walk an HCL document and yield `(path, body)` for every
+/// `path "<x>" { … }` block. Brace-aware so nested `{ … }` blocks
+/// (e.g. `denied_parameters = { … }`) don't truncate the body.
+fn extract_path_blocks(hcl: &str) -> Vec<(String, String)> {
+    let path_header = regex::Regex::new(r#"path\s+"([^"]+)"\s*\{"#).expect("static regex");
+    let mut out = Vec::new();
+    let bytes = hcl.as_bytes();
+    let mut cursor = 0usize;
+    while let Some(m) = path_header.find_at(hcl, cursor) {
+        let header_end = m.end();
+        let path = path_header.captures(&hcl[m.start()..])
+            .and_then(|c| c.get(1))
+            .map(|g| g.as_str().to_string())
+            .unwrap_or_default();
+
+        // Walk forward from header_end balancing braces. The header_end
+        // is positioned right after the opening `{` of the path block.
+        let mut depth: i32 = 1;
+        let mut idx = header_end;
+        while idx < bytes.len() && depth > 0 {
+            match bytes[idx] {
+                b'{' => depth += 1,
+                b'}' => depth -= 1,
+                _ => {}
+            }
+            idx += 1;
+        }
+        if depth == 0 {
+            // body is exclusive of the closing brace
+            let body = &hcl[header_end..idx - 1];
+            out.push((path, body.to_string()));
+            cursor = idx;
+        } else {
+            // unbalanced — skip the rest
+            break;
+        }
+    }
+    out
+}
+
+/// Locate `<key> = { … }` inside a path body and return the inner text.
+/// Brace-aware so further nested blocks don't truncate.
+fn extract_inner_block(body: &str, key: &str) -> Option<String> {
+    let header = regex::Regex::new(&format!(r#"{key}\s*=\s*\{{"#, key = regex::escape(key)))
+        .ok()?;
+    let m = header.find(body)?;
+    let header_end = m.end();
+    let bytes = body.as_bytes();
+    let mut depth: i32 = 1;
+    let mut idx = header_end;
+    while idx < bytes.len() && depth > 0 {
+        match bytes[idx] {
+            b'{' => depth += 1,
+            b'}' => depth -= 1,
+            _ => {}
+        }
+        idx += 1;
+    }
+    if depth == 0 {
+        Some(body[header_end..idx - 1].to_string())
+    } else {
+        None
+    }
+}
+
+/// Strip `# …` and `// …` line comments from an HCL document. Preserves
+/// in-string `#` characters by toggling on `"` boundaries.
+fn strip_hcl_comments(hcl: &str) -> String {
+    let mut out = String::with_capacity(hcl.len());
+    let mut in_string = false;
+    let mut prev = '\0';
+    let mut iter = hcl.chars().peekable();
+    while let Some(c) = iter.next() {
+        if c == '"' && prev != '\\' {
+            in_string = !in_string;
+            out.push(c);
+            prev = c;
+            continue;
+        }
+        if !in_string {
+            if c == '#' {
+                while let Some(&n) = iter.peek() {
+                    if n == '\n' { break; }
+                    iter.next();
+                }
+                continue;
+            }
+            if c == '/' && iter.peek() == Some(&'/') {
+                iter.next();
+                while let Some(&n) = iter.peek() {
+                    if n == '\n' { break; }
+                    iter.next();
+                }
+                continue;
+            }
+        }
+        out.push(c);
+        prev = c;
+    }
+    out
+}
+
+/// Split a CSV-style HCL list, respecting `"…"` quoting (so values
+/// containing commas don't split incorrectly).
+fn split_csv_keep_quoted(input: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    for c in input.chars() {
+        match c {
+            '"' => { in_quotes = !in_quotes; cur.push(c); }
+            ',' if !in_quotes => {
+                if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+                cur.clear();
+            }
+            _ => cur.push(c),
+        }
+    }
+    if !cur.trim().is_empty() { out.push(cur.trim().to_string()); }
+    out
+}
+
+/// Extract parameter keys from an HCL map body. Each entry has the
+/// form `"key" = [...values...]`; we only care about the keys here.
+fn extract_param_keys(body: &str) -> Vec<String> {
+    let key_re = regex::Regex::new(r#""([^"]+)"\s*=\s*\["#).expect("static regex");
+    key_re.captures_iter(body)
+        .map(|c| c[1].to_string())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,6 +447,7 @@ path "secret/admin/*" {
             rules: vec![PolicyRule {
                 path: "secret/forbidden".to_string(),
                 capabilities: vec![Capability::Deny],
+                ..Default::default()
             }],
             raw: String::new(),
         };

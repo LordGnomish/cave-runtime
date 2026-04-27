@@ -82,6 +82,265 @@ pub struct IdentityStore {
     pub group_aliases: HashMap<String, GroupAlias>,   // alias_id -> alias
 }
 
+// ─── Direct API (deeper-001) ────────────────────────────────────────────────
+//
+// Cite: openbao `vault/identity_store_entities.go:312`
+// (handleEntityUpdateCommon), `:421` (pathEntityNameRead),
+// `:535` (pathEntityIDDelete); `vault/identity_store_aliases.go:270`
+// (handleAliasCreate), `:350` (handleAliasUpdate);
+// `vault/identity_store_groups.go:188` (pathGroupRegister),
+// `:247` (handleGroupUpdateCommon), `:470` (handleGroupDeleteCommon).
+// The HTTP handlers in this file delegate to the same primitives;
+// extracting them here lets the deeper-001 batch test the semantics
+// without spinning up an axum server.
+
+impl IdentityStore {
+    /// Cite: openbao `vault/identity_store_entities.go:312`
+    /// (handleEntityUpdateCommon) — entity name is unique within the
+    /// namespace. Reusing a name returns the existing entity ID.
+    pub fn upsert_entity(
+        &mut self,
+        name: impl Into<String>,
+        policies: Vec<String>,
+        metadata: HashMap<String, String>,
+    ) -> String {
+        let name = name.into();
+        if let Some(existing_id) = self.entity_names.get(&name).cloned() {
+            if let Some(entity) = self.entities.get_mut(&existing_id) {
+                entity.policies = policies;
+                entity.metadata = metadata;
+                entity.last_update_time = Utc::now().to_rfc3339();
+            }
+            return existing_id;
+        }
+        let id = Uuid::new_v4().to_string();
+        let entity = Entity {
+            id: id.clone(),
+            name: name.clone(),
+            metadata,
+            policies,
+            aliases: Vec::new(),
+            disabled: false,
+            creation_time: Utc::now().to_rfc3339(),
+            last_update_time: Utc::now().to_rfc3339(),
+        };
+        self.entity_names.insert(name, id.clone());
+        self.entities.insert(id.clone(), entity);
+        id
+    }
+
+    /// Cite: openbao `vault/identity_store_aliases.go:270`
+    /// (handleAliasCreate). An alias binds an entity to a (mount_accessor,
+    /// alias_name) pair; (mount_accessor, name) is the uniqueness
+    /// constraint enforced at the upstream layer.
+    pub fn attach_entity_alias(
+        &mut self,
+        entity_id: &str,
+        mount_accessor: impl Into<String>,
+        mount_type: impl Into<String>,
+        alias_name: impl Into<String>,
+    ) -> Result<String, String> {
+        let entity_id = entity_id.to_string();
+        if !self.entities.contains_key(&entity_id) {
+            return Err(format!("entity {} not found", entity_id));
+        }
+        let mount_accessor = mount_accessor.into();
+        let alias_name = alias_name.into();
+        // Uniqueness: (mount_accessor, name) cannot duplicate.
+        if self.entity_aliases.values().any(|a|
+            a.mount_accessor == mount_accessor && a.name == alias_name
+        ) {
+            return Err(format!(
+                "alias ({}, {}) already exists",
+                mount_accessor, alias_name
+            ));
+        }
+        let alias_id = Uuid::new_v4().to_string();
+        let alias = EntityAlias {
+            id: alias_id.clone(),
+            canonical_id: entity_id.clone(),
+            mount_accessor,
+            mount_type: mount_type.into(),
+            name: alias_name,
+            metadata: HashMap::new(),
+            creation_time: Utc::now().to_rfc3339(),
+            last_update_time: Utc::now().to_rfc3339(),
+            merged_from_canonical_ids: Vec::new(),
+        };
+        self.entity_aliases.insert(alias_id.clone(), alias.clone());
+        if let Some(entity) = self.entities.get_mut(&entity_id) {
+            entity.aliases.push(alias);
+        }
+        Ok(alias_id)
+    }
+
+    /// Cite: openbao `vault/identity_store.go` alias resolution —
+    /// entity lookup by `(mount_accessor, alias_name)` is how the auth
+    /// pipeline turns a successful login into the canonical entity ID.
+    pub fn entity_by_alias(&self, mount_accessor: &str, alias_name: &str) -> Option<&Entity> {
+        let alias = self.entity_aliases.values().find(|a|
+            a.mount_accessor == mount_accessor && a.name == alias_name
+        )?;
+        self.entities.get(&alias.canonical_id)
+    }
+
+    /// Cite: openbao `vault/identity_store_entities.go:535`
+    /// (pathEntityIDDelete) — deleting an entity also drops every
+    /// alias that pointed at it.
+    pub fn delete_entity(&mut self, entity_id: &str) -> bool {
+        let Some(entity) = self.entities.remove(entity_id) else { return false };
+        self.entity_names.remove(&entity.name);
+        let alias_ids: Vec<String> = self.entity_aliases.iter()
+            .filter(|(_, a)| a.canonical_id == entity_id)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in alias_ids {
+            self.entity_aliases.remove(&id);
+        }
+        // Remove from any group memberships
+        for g in self.groups.values_mut() {
+            g.member_entity_ids.retain(|m| m != entity_id);
+        }
+        true
+    }
+
+    /// Cite: openbao `vault/identity_store_groups.go:188`
+    /// (pathGroupRegister) + `:247` (handleGroupUpdateCommon). Group
+    /// names are unique per namespace.
+    pub fn upsert_group(
+        &mut self,
+        name: impl Into<String>,
+        group_type: GroupType,
+        policies: Vec<String>,
+    ) -> String {
+        let name = name.into();
+        if let Some(existing_id) = self.group_names.get(&name).cloned() {
+            if let Some(g) = self.groups.get_mut(&existing_id) {
+                g.policies = policies;
+                g.last_update_time = Utc::now().to_rfc3339();
+            }
+            return existing_id;
+        }
+        let id = Uuid::new_v4().to_string();
+        let group = Group {
+            id: id.clone(),
+            name: name.clone(),
+            group_type: group_type.as_str().to_string(),
+            policies,
+            member_entity_ids: Vec::new(),
+            member_group_ids: Vec::new(),
+            metadata: HashMap::new(),
+            aliases: Vec::new(),
+            creation_time: Utc::now().to_rfc3339(),
+            last_update_time: Utc::now().to_rfc3339(),
+            parent_group_ids: Vec::new(),
+        };
+        self.group_names.insert(name, id.clone());
+        self.groups.insert(id.clone(), group);
+        id
+    }
+
+    /// Cite: openbao `vault/identity_store_groups.go:247`
+    /// (handleGroupUpdateCommon, internal-group branch) — internal
+    /// groups carry an explicit `member_entity_ids` slice; external
+    /// groups derive members from a `GroupAlias`.
+    pub fn add_entity_to_group(&mut self, group_id: &str, entity_id: &str) -> Result<(), String> {
+        if !self.entities.contains_key(entity_id) {
+            return Err(format!("entity {} not found", entity_id));
+        }
+        let g = self.groups.get_mut(group_id)
+            .ok_or_else(|| format!("group {} not found", group_id))?;
+        if g.group_type == "external" {
+            return Err("cannot add direct members to an external group".into());
+        }
+        if !g.member_entity_ids.iter().any(|m| m == entity_id) {
+            g.member_entity_ids.push(entity_id.to_string());
+        }
+        Ok(())
+    }
+
+    /// Cite: openbao `vault/identity_store_aliases.go::handleAliasCreate`
+    /// for groups — group aliases are how OIDC / LDAP groups bind to
+    /// internal vault groups via the mount_accessor.
+    pub fn attach_group_alias(
+        &mut self,
+        group_id: &str,
+        mount_accessor: impl Into<String>,
+        mount_type: impl Into<String>,
+        alias_name: impl Into<String>,
+    ) -> Result<String, String> {
+        let g = self.groups.get_mut(group_id)
+            .ok_or_else(|| format!("group {} not found", group_id))?;
+        if g.group_type != "external" {
+            return Err("group_alias may only be attached to external groups".into());
+        }
+        let alias_id = Uuid::new_v4().to_string();
+        let alias = GroupAlias {
+            id: alias_id.clone(),
+            canonical_id: group_id.to_string(),
+            mount_accessor: mount_accessor.into(),
+            mount_type: mount_type.into(),
+            name: alias_name.into(),
+            creation_time: Utc::now().to_rfc3339(),
+            last_update_time: Utc::now().to_rfc3339(),
+        };
+        g.aliases.push(alias.clone());
+        self.group_aliases.insert(alias_id.clone(), alias);
+        Ok(alias_id)
+    }
+
+    /// Cite: openbao `vault/identity_store_groups.go::isGroupMemberMatching`
+    /// — for external groups, an entity is a member iff one of its
+    /// aliases matches one of the group's group_aliases on
+    /// (mount_accessor, alias_name).
+    pub fn entity_is_member(&self, group_id: &str, entity_id: &str) -> bool {
+        let Some(group) = self.groups.get(group_id) else { return false };
+        if group.group_type == "internal" {
+            return group.member_entity_ids.iter().any(|m| m == entity_id);
+        }
+        // External: cross-match aliases
+        let Some(entity) = self.entities.get(entity_id) else { return false };
+        for ga in &group.aliases {
+            if entity.aliases.iter().any(|ea|
+                ea.mount_accessor == ga.mount_accessor && ea.name == ga.name
+            ) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Cite: openbao `vault/identity_store_groups.go::collectPoliciesByEntityID`
+    /// — the union of an entity's own policies + every group it belongs to.
+    /// Internal-group nesting is followed via `parent_group_ids` (one
+    /// hop here; full recursion happens in upstream's `MemberGroupIDs`).
+    pub fn effective_policies(&self, entity_id: &str) -> Vec<String> {
+        let mut policies: Vec<String> = self.entities.get(entity_id)
+            .map(|e| e.policies.clone())
+            .unwrap_or_default();
+        for group in self.groups.values() {
+            if self.entity_is_member(&group.id, entity_id) {
+                for p in &group.policies {
+                    if !policies.iter().any(|x| x == p) {
+                        policies.push(p.clone());
+                    }
+                }
+            }
+        }
+        policies.sort();
+        policies
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupType { Internal, External }
+
+impl GroupType {
+    pub fn as_str(&self) -> &'static str {
+        match self { Self::Internal => "internal", Self::External => "external" }
+    }
+}
+
 // Entity CRUD
 pub async fn create_entity(
     State(state): State<Arc<VaultState>>,

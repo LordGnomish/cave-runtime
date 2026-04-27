@@ -1,0 +1,68 @@
+crate: cave-pg
+group: cave-pg-slo
+
+alerts:
+  - alert: PgSloBurnRateFast
+    expr: '(sum(rate(pg_stat_database_xact_rollback[1h])) / sum(rate(pg_stat_database_xact_commit[1h]))) > (14.4 * 0.005)'
+    for: 2m
+    severity: critical
+    annotations:
+      summary: "Postgres rollback fast burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/slo-burn-fast.md"
+
+  - alert: PgSloBurnRateSlow
+    expr: '(sum(rate(pg_stat_database_xact_rollback[6h])) / sum(rate(pg_stat_database_xact_commit[6h]))) > (6 * 0.005)'
+    for: 15m
+    severity: warning
+    annotations:
+      summary: "Postgres rollback slow burn"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/slo-burn-slow.md"
+
+  - alert: PgErrorBudgetLow
+    expr: '1 - (sum(rate(pg_stat_database_xact_rollback[7d])) / sum(rate(pg_stat_database_xact_commit[7d]))) < 0.995'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Postgres 7-day commit success below 99.5%"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/error-budget.md"
+
+  - alert: PgConnectionPoolSaturation
+    expr: '(sum(pg_stat_activity_count{state="active"}) / max(pg_settings_max_connections)) > 0.85'
+    for: 10m
+    severity: warning
+    annotations:
+      summary: "Connection pool > 85% utilized"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/connections.md"
+
+  - alert: PgReplicationLagHigh
+    expr: 'max(pg_replication_lag_bytes) > 1073741824'   # 1 GiB
+    for: 5m
+    severity: critical
+    annotations:
+      summary: "Replication lag > 1 GiB"
+      description: "Standby {{ $labels.client_addr }} lag = {{ $value }} bytes"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/replication-lag.md"
+
+  - alert: PgDeadlockSpike
+    expr: 'sum(increase(pg_stat_database_deadlocks[15m])) > 5'
+    for: 5m
+    severity: warning
+    annotations:
+      summary: "5+ deadlocks in 15m"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/deadlocks.md"
+
+  - alert: PgCardinalityExplosion
+    expr: 'count(count by (datname) (pg_database_size_bytes)) > 1000'
+    for: 30m
+    severity: warning
+    annotations:
+      summary: "Postgres database cardinality > 1000"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/cardinality.md"
+
+  - alert: PgHealthProbeFailing
+    expr: 'min(up{job="cave-pg"}) < 1'
+    for: 1m
+    severity: critical
+    annotations:
+      summary: "Postgres health probe failing"
+      runbook_url: "https://docs.cave.dev/runbooks/cave-pg/health.md"
