@@ -44,6 +44,7 @@ pub mod health;
 pub mod hubble;
 pub mod hubble_ext;
 pub mod hubble_metrics;
+pub mod id_coord;
 pub mod identity;
 pub mod ingress;
 pub mod ipam;
