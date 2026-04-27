@@ -1349,3 +1349,114 @@ local_test    = "test_pull_retry_backoff_caps_at_max"
 [[tests]]
 upstream_test = "TestPullRetryJitterExtremes"
 local_test    = "test_pull_retry_jitter_extremes"
+
+# UserNS depth — idmapped mounts (KEP-127 phase 2), cgroup ns, validation
+
+[[files]]
+upstream = "pkg/cri/server/podsandbox/userns_idmap_linux.go"
+local    = "src/userns_v2.rs"
+
+[[files]]
+upstream = "libcontainer/configs/namespaces.go"
+local    = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "IdmappedMountOptions"
+local_name    = "options_string"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "IdmappedMountArgv"
+local_name    = "mount_argv"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "CgroupNamespaceCloneFlags"
+local_name    = "clone_flags"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "CgroupNamespaceTranslate"
+local_name    = "translate_for_view"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateIdMapping"
+local_name    = "validate_id_mapping"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateNoOverlap"
+local_name    = "validate_no_overlap"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateUserNamespace"
+local_name    = "validate_user_namespace"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "AllocatorStats"
+local_name    = "allocator_stats"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "BuildIdmappedMount"
+local_name    = "build_idmapped_mount"
+file          = "src/userns_v2.rs"
+
+[[tests]]
+upstream_test = "TestIdmappedMountOptionsString"
+local_test    = "test_idmapped_mount_options_string"
+
+[[tests]]
+upstream_test = "TestIdmappedMountArgvIncludesMountIdmappedBinary"
+local_test    = "test_idmapped_mount_argv_includes_mount_idmapped_binary"
+
+[[tests]]
+upstream_test = "TestMountAttrIdmapKernelConstant"
+local_test    = "test_mount_attr_idmap_kernel_constant"
+
+[[tests]]
+upstream_test = "TestCgroupNamespaceCloneFlag"
+local_test    = "test_cgroup_namespace_clone_flag"
+
+[[tests]]
+upstream_test = "TestCgroupNamespaceTranslatesPaths"
+local_test    = "test_cgroup_namespace_translates_paths"
+
+[[tests]]
+upstream_test = "TestValidateIdMappingRejectsReservedHostID"
+local_test    = "test_validate_id_mapping_rejects_reserved_host_id"
+
+[[tests]]
+upstream_test = "TestValidateIdMappingAcceptsDefaultKEP127"
+local_test    = "test_validate_id_mapping_accepts_default_kep_127"
+
+[[tests]]
+upstream_test = "TestValidateNoOverlapDetectsHostCollision"
+local_test    = "test_validate_no_overlap_detects_host_collision"
+
+[[tests]]
+upstream_test = "TestValidateUserNamespaceForPodOK"
+local_test    = "test_validate_user_namespace_for_pod_ok"
+
+[[tests]]
+upstream_test = "TestValidateUserNamespaceHostPassthroughRejected"
+local_test    = "test_validate_user_namespace_host_passthrough_rejected"
+
+[[tests]]
+upstream_test = "TestAllocatorStatsAlternatingFullFragmentation"
+local_test    = "test_allocator_stats_alternating_full_fragmentation"
+
+[[tests]]
+upstream_test = "TestAllocatorStatsContiguousZeroFragmentation"
+local_test    = "test_allocator_stats_contiguous_zero_fragmentation"
+
+[[tests]]
+upstream_test = "TestBuildIdmappedMountConsumesOneRange"
+local_test    = "test_build_idmapped_mount_consumes_one_range"
+
+[[tests]]
+upstream_test = "TestPoolIsAlignedCleanDivision"
+local_test    = "test_pool_is_aligned_clean_division"

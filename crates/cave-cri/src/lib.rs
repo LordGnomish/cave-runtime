@@ -87,6 +87,7 @@ pub mod streaming;
 pub mod streaming_session;
 pub mod transport;
 pub mod userns;
+pub mod userns_v2;
 
 #[cfg(test)]
 mod upstream_tests;

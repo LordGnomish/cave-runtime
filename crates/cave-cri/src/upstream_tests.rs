@@ -281,6 +281,124 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── UserNS depth (idmapped mount, cgroup ns, validation, allocator stats) ─────
+
+use crate::userns_v2;
+use std::collections::BTreeSet;
+
+#[test]
+fn test_idmapped_mount_options_string() {
+    let ns = crate::userns::UserNamespace::for_pod(2_000_000, 65_536);
+    let m = userns_v2::IdmappedMount {
+        source: "/src".into(),
+        target: "/dst".into(),
+        fs_type: "ext4".into(),
+        user_namespace: ns,
+    };
+    let s = m.options_string();
+    assert!(s.contains("uidmap=2000000:0:65536"));
+    assert!(s.contains("gidmap=2000000:0:65536"));
+}
+
+#[test]
+fn test_idmapped_mount_argv_includes_mount_idmapped_binary() {
+    let ns = crate::userns::UserNamespace::for_pod(1_500_000, 65_536);
+    let m = userns_v2::IdmappedMount {
+        source: "/x".into(),
+        target: "/y".into(),
+        fs_type: "xfs".into(),
+        user_namespace: ns,
+    };
+    assert_eq!(m.mount_argv()[0], "mount.idmapped");
+}
+
+#[test]
+fn test_mount_attr_idmap_kernel_constant() {
+    assert_eq!(userns_v2::MOUNT_ATTR_IDMAP, 0x0010_0000);
+}
+
+#[test]
+fn test_cgroup_namespace_clone_flag() {
+    let ns = userns_v2::CgroupNamespace { root: "/sys/fs/cgroup/pod".into() };
+    assert_eq!(ns.clone_flags(), userns_v2::CLONE_NEWCGROUP);
+}
+
+#[test]
+fn test_cgroup_namespace_translates_paths() {
+    let ns = userns_v2::CgroupNamespace { root: "/sys/fs/cgroup/pod".into() };
+    let view = ns.translate_for_view(std::path::Path::new("/sys/fs/cgroup/pod/sub")).unwrap();
+    assert_eq!(view, std::path::PathBuf::from("/sub"));
+    assert!(ns.translate_for_view(std::path::Path::new("/etc")).is_none());
+}
+
+#[test]
+fn test_validate_id_mapping_rejects_reserved_host_id() {
+    let m = crate::userns::IdMapping { container_id: 0, host_id: 500, size: 100 };
+    assert!(userns_v2::validate_id_mapping(&m).is_err());
+}
+
+#[test]
+fn test_validate_id_mapping_accepts_default_kep_127() {
+    let m = crate::userns::IdMapping { container_id: 0, host_id: 1_000_000, size: 65_536 };
+    assert!(userns_v2::validate_id_mapping(&m).is_ok());
+}
+
+#[test]
+fn test_validate_no_overlap_detects_host_collision() {
+    let mappings = vec![
+        crate::userns::IdMapping { container_id: 0,   host_id: 1_000_000, size: 100 },
+        crate::userns::IdMapping { container_id: 200, host_id: 1_000_050, size: 100 },
+    ];
+    assert!(userns_v2::validate_no_overlap(&mappings).is_err());
+}
+
+#[test]
+fn test_validate_user_namespace_for_pod_ok() {
+    let ns = crate::userns::UserNamespace::for_pod(1_000_000, 65_536);
+    assert!(userns_v2::validate_user_namespace(&ns).is_ok());
+}
+
+#[test]
+fn test_validate_user_namespace_host_passthrough_rejected() {
+    let ns = crate::userns::UserNamespace::host_passthrough();
+    assert!(userns_v2::validate_user_namespace(&ns).is_err());
+}
+
+#[test]
+fn test_allocator_stats_alternating_full_fragmentation() {
+    let mut allocated = BTreeSet::new();
+    allocated.insert(0);
+    allocated.insert(65_536 * 2);
+    allocated.insert(65_536 * 4);
+    let s = userns_v2::allocator_stats(0, 65_536 * 6, 65_536, &allocated);
+    assert_eq!(s.allocated_ranges, 3);
+    assert_eq!(s.fragmentation_ratio, 1.0);
+}
+
+#[test]
+fn test_allocator_stats_contiguous_zero_fragmentation() {
+    let mut allocated = BTreeSet::new();
+    allocated.insert(0);
+    allocated.insert(65_536);
+    allocated.insert(65_536 * 2);
+    let s = userns_v2::allocator_stats(0, 65_536 * 4, 65_536, &allocated);
+    assert_eq!(s.fragmentation_ratio, 0.0);
+}
+
+#[test]
+fn test_build_idmapped_mount_consumes_one_range() {
+    let alloc = crate::userns::UserNsAllocator::new(2_000_000, 2_000_000 + 65_536 * 4, 65_536);
+    let m = userns_v2::build_idmapped_mount(&alloc, "/s".into(), "/d".into(), "ext4").unwrap();
+    assert_eq!(alloc.allocated(), 1);
+    assert!(m.is_complete());
+}
+
+#[test]
+fn test_pool_is_aligned_clean_division() {
+    assert!(userns_v2::pool_is_aligned(0, 65_536 * 4, 65_536));
+    assert!(!userns_v2::pool_is_aligned(0, 65_537, 65_536));
+}
+
 // ── Auth depth (TokenCache, BearerChallenge, SigV4, dockerconfigjson, retry) ──
 
 use crate::auth_v2;
