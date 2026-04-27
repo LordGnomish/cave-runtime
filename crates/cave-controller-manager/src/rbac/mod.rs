@@ -7,3 +7,4 @@
 //!   `aggregationRule.clusterRoleSelectors[]` selector.
 
 pub mod cluster_role_aggregation;
+pub mod match_expressions;

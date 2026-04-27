@@ -1128,3 +1128,112 @@ local_path    = "/api/cri/cgroup/v2/controllers"
 kind          = "http"
 upstream_path = "RuntimeService.CgroupV2DevicesProgram"
 local_path    = "/api/cri/cgroup/v2/devices/program"
+
+# Streaming session — SPDY/3.1, lifecycle, pty, error stream
+
+[[files]]
+upstream = "vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy/connection.go"
+local    = "src/streaming_session.rs"
+
+[[files]]
+upstream = "vendor/k8s.io/apimachinery/pkg/util/httpstream/spdy/upgrade.go"
+local    = "src/streaming_session.rs"
+
+[[files]]
+upstream = "vendor/k8s.io/client-go/tools/remotecommand/v4.go"
+local    = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "SpdyFrame.Encode"
+local_name    = "encode"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "SpdyFrame.Decode"
+local_name    = "decode"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "StreamSession.OpenStream"
+local_name    = "open_stream"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "StreamSession.AckRecv"
+local_name    = "ack_recv"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "StreamSession.GoAway"
+local_name    = "go_away"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "StreamState.AfterSend"
+local_name    = "after_send"
+file          = "src/streaming_session.rs"
+
+[[functions]]
+upstream_name = "StreamErrorStatus.NonZeroExit"
+local_name    = "non_zero_exit"
+file          = "src/streaming_session.rs"
+
+[[tests]]
+upstream_test = "TestSpdyDataFrameRoundtrip"
+local_test    = "test_spdy_data_frame_roundtrip"
+
+[[tests]]
+upstream_test = "TestSpdySynStreamRoundtrip"
+local_test    = "test_spdy_syn_stream_roundtrip"
+
+[[tests]]
+upstream_test = "TestSpdyRstStreamRoundtrip"
+local_test    = "test_spdy_rst_stream_roundtrip"
+
+[[tests]]
+upstream_test = "TestSpdyGoAwayIncludesLastGoodStreamID"
+local_test    = "test_spdy_goaway_includes_last_good_stream_id"
+
+[[tests]]
+upstream_test = "TestStreamStateMachineLegalTransitions"
+local_test    = "test_stream_state_machine_legal_transitions"
+
+[[tests]]
+upstream_test = "TestStreamSessionAllocatesOddIDs"
+local_test    = "test_stream_session_allocates_odd_ids"
+
+[[tests]]
+upstream_test = "TestStreamSessionSendWindowUnderflowErrors"
+local_test    = "test_stream_session_send_window_underflow_errors"
+
+[[tests]]
+upstream_test = "TestStreamSessionWindowUpdateEmitsFrame"
+local_test    = "test_stream_session_window_update_emits_frame"
+
+[[tests]]
+upstream_test = "TestStreamSessionGoAwayBlocksNewStreams"
+local_test    = "test_stream_session_goaway_blocks_new_streams"
+
+[[tests]]
+upstream_test = "TestPtyResizeMessagePascalCaseJSON"
+local_test    = "test_pty_resize_message_pascal_case_json"
+
+[[tests]]
+upstream_test = "TestPtyWinsizeDefault80x24"
+local_test    = "test_pty_winsize_default_80x24"
+
+[[tests]]
+upstream_test = "TestPtyResizeRecordsNewWinsize"
+local_test    = "test_pty_resize_records_new_winsize"
+
+[[tests]]
+upstream_test = "TestStreamErrorNonZeroExitCarriesCode"
+local_test    = "test_stream_error_non_zero_exit_carries_code"
+
+[[tests]]
+upstream_test = "TestStreamErrorSuccessIsEmpty"
+local_test    = "test_stream_error_success_is_empty"
+
+[[tests]]
+upstream_test = "TestStreamErrorStatusRoundtrip"
+local_test    = "test_stream_error_status_roundtrip"

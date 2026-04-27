@@ -8,5 +8,6 @@
 //!   `kubernetes.io/service-account-token` secrets for ServiceAccounts and
 //!   manages bound projected tokens (`tokens_controller.go`).
 
+pub mod projected_token;
 pub mod sa_controller;
 pub mod token_controller;
