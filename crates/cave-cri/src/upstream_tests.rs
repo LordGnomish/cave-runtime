@@ -281,6 +281,124 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Streaming session (SPDY/3.1, lifecycle, pty, error stream) ────────────────
+
+use crate::streaming_session as ss;
+
+#[test]
+fn test_spdy_data_frame_roundtrip() {
+    let f = ss::SpdyFrame::data(7, b"hi".to_vec(), false);
+    let (back, _) = ss::SpdyFrame::decode(&f.encode()).unwrap();
+    assert_eq!(back, f);
+}
+
+#[test]
+fn test_spdy_syn_stream_roundtrip() {
+    let f = ss::SpdyFrame::syn_stream(11, true, true);
+    let (back, _) = ss::SpdyFrame::decode(&f.encode()).unwrap();
+    assert_eq!(back.kind, ss::SpdyFrameKind::SynStream);
+    assert_eq!(back.stream_id, 11);
+    assert!(back.is_fin());
+}
+
+#[test]
+fn test_spdy_rst_stream_roundtrip() {
+    let f = ss::SpdyFrame::rst_stream(3, 6);
+    let (back, _) = ss::SpdyFrame::decode(&f.encode()).unwrap();
+    assert_eq!(back.kind, ss::SpdyFrameKind::RstStream);
+    assert_eq!(back.stream_id, 3);
+}
+
+#[test]
+fn test_spdy_goaway_includes_last_good_stream_id() {
+    let f = ss::SpdyFrame::goaway(42, 0);
+    let (back, _) = ss::SpdyFrame::decode(&f.encode()).unwrap();
+    assert_eq!(back.kind, ss::SpdyFrameKind::GoAway);
+}
+
+#[test]
+fn test_stream_state_machine_legal_transitions() {
+    use ss::StreamState::*;
+    assert_eq!(Idle.after_send(false).unwrap(), Open);
+    assert_eq!(Open.after_send(true).unwrap(), HalfClosedLocal);
+    assert_eq!(HalfClosedRemote.after_send(true).unwrap(), Closed);
+    assert!(Closed.after_send(false).is_err());
+}
+
+#[test]
+fn test_stream_session_allocates_odd_ids() {
+    let s = ss::StreamSession::new();
+    let a = s.open_stream("stdin").unwrap();
+    let b = s.open_stream("stdout").unwrap();
+    assert_eq!(a, 1);
+    assert_eq!(b, 3);
+}
+
+#[test]
+fn test_stream_session_send_window_underflow_errors() {
+    let s = ss::StreamSession::new();
+    let id = s.open_stream("stdin").unwrap();
+    let huge = ss::SpdyFrame::data(id, vec![0u8; 100_000], false);
+    assert!(s.send(&huge).is_err());
+}
+
+#[test]
+fn test_stream_session_window_update_emits_frame() {
+    let s = ss::StreamSession::new();
+    let id = s.open_stream("stdout").unwrap();
+    let upd = s.ack_recv(id, 4096).unwrap();
+    assert_eq!(upd.kind, ss::SpdyFrameKind::WindowUpdate);
+}
+
+#[test]
+fn test_stream_session_goaway_blocks_new_streams() {
+    let s = ss::StreamSession::new();
+    s.go_away(0);
+    assert!(s.open_stream("late").is_err());
+}
+
+#[test]
+fn test_pty_resize_message_pascal_case_json() {
+    let m = ss::ResizeMessage { width: 200, height: 60 };
+    let json = String::from_utf8(m.encode()).unwrap();
+    assert!(json.contains("\"Width\":200"));
+    assert!(json.contains("\"Height\":60"));
+}
+
+#[test]
+fn test_pty_winsize_default_80x24() {
+    let w = ss::PtyWinsize::default();
+    assert_eq!((w.cols, w.rows), (80, 24));
+}
+
+#[test]
+fn test_pty_resize_records_new_winsize() {
+    let mut p = ss::Pty::new(ss::PtyWinsize::default());
+    p.resize(ss::ResizeMessage { width: 132, height: 50 });
+    assert_eq!(p.winsize.cols, 132);
+    assert_eq!(p.winsize.rows, 50);
+}
+
+#[test]
+fn test_stream_error_non_zero_exit_carries_code() {
+    let s = ss::StreamErrorStatus::non_zero_exit(137);
+    assert_eq!(s.status, "Failure");
+    assert_eq!(s.details.exit_code, Some(137));
+}
+
+#[test]
+fn test_stream_error_success_is_empty() {
+    let s = ss::StreamErrorStatus::success();
+    assert_eq!(s.status, "Success");
+}
+
+#[test]
+fn test_stream_error_status_roundtrip() {
+    let s = ss::StreamErrorStatus::non_zero_exit(2);
+    let back = ss::StreamErrorStatus::decode(&s.encode()).unwrap();
+    assert_eq!(s, back);
+}
+
 // ── Cgroup v2 unified hierarchy (M9) ───────────────────────────────────────────
 
 use crate::cgroup_v2;
