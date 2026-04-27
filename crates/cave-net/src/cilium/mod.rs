@@ -29,6 +29,7 @@ pub mod bgp;
 pub mod bpf_dump;
 pub mod bpfmaps;
 pub mod cilium_node;
+pub mod cluster_pool_refill;
 pub mod clustermesh;
 pub mod cni_chain;
 pub mod clustermesh_ext;
