@@ -17,6 +17,7 @@
 pub mod manager;
 pub mod models;
 pub mod routes;
+pub mod wire;
 
 use axum::Router;
 use models::{BackupJob, ConnectionPool, DatabaseInstance, DbSizeRecord, DbUser, MigrationRecord, QueryStat, ReplicationStatus, TableStat};
