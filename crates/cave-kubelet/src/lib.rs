@@ -35,6 +35,7 @@ pub mod sidecar;
 pub mod eviction_api;
 pub mod lifecycle;
 pub mod restart_backoff;
+pub mod cgroup_manager;
 
 // deeper-003 — node-side runtime modules.
 pub mod container_metrics;
