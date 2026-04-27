@@ -48,6 +48,7 @@ pub mod ipcache;
 pub mod ipsec;
 pub mod ipv6;
 pub mod kafka;
+pub mod key_rotation;
 pub mod kv_identity;
 pub mod l2_announce;
 pub mod l7policy;
