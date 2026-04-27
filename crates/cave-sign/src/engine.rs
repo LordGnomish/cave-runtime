@@ -1,4 +1,4 @@
-use crate::models::{ArtifactType, SignedArtifact, VerifyResult};
+use crate::models::{ArtifactType, SignedArtifact};
 
 pub fn is_valid_digest(digest: &str) -> bool {
     if let Some(hex) = digest.strip_prefix("sha256:") {

@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Span, ServiceDependency, Trace};
+use crate::types::{Span, Trace};
 
 // ─── Graph types ───────────────────────────────────────────────────────────
 
@@ -62,16 +62,14 @@ pub fn build_dependency_graph(traces: &[Trace]) -> DependencyGraph {
             if span.has_error() { e.1 += 1; }
 
             // Build edge: parent_service → this_service
-            if let Some(parent_id) = span.parent_span_id {
-                if let Some(parent) = span_map.get(&parent_id) {
-                    if parent.service_name != span.service_name {
+            if let Some(parent_id) = span.parent_span_id
+                && let Some(parent) = span_map.get(&parent_id)
+                    && parent.service_name != span.service_name {
                         let key = (parent.service_name.clone(), span.service_name.clone());
                         let edge = edge_map.entry(key).or_insert((0, 0));
                         edge.0 += 1;
                         if span.has_error() { edge.1 += 1; }
                     }
-                }
-            }
         }
     }
 

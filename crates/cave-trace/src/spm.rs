@@ -5,11 +5,10 @@
 
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Span, SpanStatus, TagValue};
+use crate::types::Span;
 
 // ─── Metric types ──────────────────────────────────────────────────────────
 

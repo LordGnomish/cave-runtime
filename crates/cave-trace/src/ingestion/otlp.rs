@@ -13,9 +13,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::ingestion::{normalise_service, us_to_ns};
-use crate::types::{Span, SpanEvent, SpanId, SpanKind, SpanLink, SpanStatus, TagValue, TraceId};
-use crate::{Result, TraceError};
+use crate::ingestion::normalise_service;
+use crate::types::{Span, SpanEvent, SpanKind, SpanLink, SpanStatus, TagValue};
+use crate::Result;
 
 // ─── OTLP JSON wire types ──────────────────────────────────────────────────
 
@@ -264,9 +264,8 @@ fn any_value_to_tag(v: &AnyValue) -> TagValue {
     if let Some(d) = v.double_value  { return TagValue::Float(d); }
     if let Some(n) = &v.int_value {
         if let Some(i) = n.as_i64() { return TagValue::Int(i); }
-        if let Some(s) = n.as_str() {
-            if let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
-        }
+        if let Some(s) = n.as_str()
+            && let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
     }
     if let Some(bs) = &v.bytes_value {
         use base64::{Engine as _, engine::general_purpose::STANDARD};

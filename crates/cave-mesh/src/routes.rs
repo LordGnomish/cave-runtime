@@ -20,17 +20,17 @@ use crate::{
         Sidecar, Telemetry, VirtualService, WorkloadEntry, WorkloadGroup,
     },
     multicluster::{RemoteCluster, TrustDomainFederation},
-    xds::{NodeInfo, XdsSnapshot},
+    xds::XdsSnapshot,
     MeshState,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get, post, put},
+    routing::{delete, get, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 

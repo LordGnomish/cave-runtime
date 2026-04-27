@@ -61,17 +61,15 @@ impl<'a> ChainValidator<'a> {
                 )));
             }
             // Revocation only applies to non-root elements
-            if !matches!(cert.kind, CaKind::Root) {
-                if let Some(crl) = self.crl {
-                    if let Some(entry) = crl.lookup(&cert.serial) {
+            if !matches!(cert.kind, CaKind::Root)
+                && let Some(crl) = self.crl
+                    && let Some(entry) = crl.lookup(&cert.serial) {
                         return Err(PkiError::Revoked {
                             serial: entry.serial.clone(),
                             revoked_at: entry.revoked_at.to_rfc3339(),
                             reason: entry.reason,
                         });
                     }
-                }
-            }
         }
 
         // Walk parent links.

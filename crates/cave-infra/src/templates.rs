@@ -327,6 +327,12 @@ pub struct TemplateRegistry {
     templates: DashMap<String, InfraTemplate>,
 }
 
+impl Default for TemplateRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TemplateRegistry {
     pub fn new() -> Self {
         let r = Self { templates: DashMap::new() };

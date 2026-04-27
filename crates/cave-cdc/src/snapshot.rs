@@ -107,11 +107,10 @@ impl SnapshotProgress {
         self.last_low_watermark = low;
         self.last_high_watermark = high;
         self.chunks_completed += 1;
-        if let Some(total) = self.chunks_total {
-            if self.chunks_completed >= total {
+        if let Some(total) = self.chunks_total
+            && self.chunks_completed >= total {
                 self.completed = true;
             }
-        }
         Ok(())
     }
 

@@ -32,7 +32,9 @@ pub fn parse_span_id(s: &str) -> Option<SpanId> {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum SpanKind {
+    #[default]
     Internal,
     Client,
     Server,
@@ -40,25 +42,17 @@ pub enum SpanKind {
     Consumer,
 }
 
-impl Default for SpanKind {
-    fn default() -> Self {
-        SpanKind::Internal
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "code", content = "message")]
+#[derive(Default)]
 pub enum Status {
+    #[default]
     Unset,
     Ok,
     Error(String),
 }
 
-impl Default for Status {
-    fn default() -> Self {
-        Status::Unset
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]

@@ -70,7 +70,7 @@ impl XrdStore {
         self.xrds
             .get(&key)
             .map(|r| r.clone())
-            .ok_or_else(|| CrossplaneError::XrdNotFound(key))
+            .ok_or(CrossplaneError::XrdNotFound(key))
     }
 
     pub fn get_by_name(&self, name: &str) -> CrossplaneResult<Xrd> {
@@ -107,7 +107,7 @@ impl XrdStore {
         self.xrds
             .get(&key)
             .map(|r| r.clone())
-            .ok_or_else(|| CrossplaneError::XrdNotFound(key))
+            .ok_or(CrossplaneError::XrdNotFound(key))
     }
 }
 

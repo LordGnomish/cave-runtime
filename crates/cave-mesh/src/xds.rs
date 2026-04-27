@@ -12,7 +12,7 @@
 //!       Actual gRPC transport (ADS/SotW/Delta) is wired via the admin API
 //!       (REST snapshot endpoints) or a future tonic-based transport layer.
 
-use crate::models::{DestinationRule, Gateway, ServiceEntry, VirtualService};
+use crate::models::{Gateway, ServiceEntry, VirtualService};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -906,7 +906,7 @@ impl XdsManager {
         virtual_services: &[VirtualService],
         destination_rules: &[crate::models::DestinationRule],
         gateways: &[Gateway],
-        service_entries: &[ServiceEntry],
+        _service_entries: &[ServiceEntry],
     ) -> XdsSnapshot {
         let mut snapshot = XdsSnapshot::empty();
 

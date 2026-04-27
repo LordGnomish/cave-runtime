@@ -114,8 +114,8 @@ fn apply_parser(line: &str, parser: &Parser, extra: &mut HashMap<String, String>
 }
 
 fn parse_json(line: &str, extra: &mut HashMap<String, String>) {
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-        if let Some(obj) = val.as_object() {
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line)
+        && let Some(obj) = val.as_object() {
             for (k, v) in obj {
                 let s = match v {
                     serde_json::Value::String(s) => s.clone(),
@@ -124,7 +124,6 @@ fn parse_json(line: &str, extra: &mut HashMap<String, String>) {
                 extra.insert(k.clone(), s);
             }
         }
-    }
 }
 
 fn parse_logfmt(line: &str, extra: &mut HashMap<String, String>) {
@@ -154,15 +153,14 @@ fn parse_logfmt(line: &str, extra: &mut HashMap<String, String>) {
 }
 
 fn parse_regexp(line: &str, pat: &str, extra: &mut HashMap<String, String>) {
-    if let Ok(re) = Regex::new(pat) {
-        if let Some(caps) = re.captures(line) {
+    if let Ok(re) = Regex::new(pat)
+        && let Some(caps) = re.captures(line) {
             for name in re.capture_names().flatten() {
                 if let Some(m) = caps.name(name) {
                     extra.insert(name.to_owned(), m.as_str().to_owned());
                 }
             }
         }
-    }
 }
 
 fn parse_pattern(line: &str, pat: &str, extra: &mut HashMap<String, String>) {
@@ -192,8 +190,8 @@ fn parse_pattern(line: &str, pat: &str, extra: &mut HashMap<String, String>) {
 fn parse_unpack(line: &str, extra: &mut HashMap<String, String>) {
     // Unpack expects a JSON object with a "_entry" field for the real log line
     // and all other fields as labels.
-    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-        if let Some(obj) = val.as_object() {
+    if let Ok(val) = serde_json::from_str::<serde_json::Value>(line)
+        && let Some(obj) = val.as_object() {
             for (k, v) in obj {
                 if k == "_entry" { continue; }
                 let s = match v {
@@ -203,7 +201,6 @@ fn parse_unpack(line: &str, extra: &mut HashMap<String, String>) {
                 extra.insert(k.clone(), s);
             }
         }
-    }
 }
 
 fn apply_label_filter(labels: &HashMap<String, String>, lf: &LabelFilter) -> bool {

@@ -2,7 +2,7 @@
 
 use crate::error::{InfraError, InfraResult};
 use crate::provider::ProviderRegistry;
-use crate::resource::{ResourceState, ResourceStatus, ResourceStore};
+use crate::resource::ResourceStore;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -81,7 +81,7 @@ pub async fn rollback_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resource::{ResourceKind, ResourceSpec};
+    use crate::resource::{ResourceKind, ResourceSpec, ResourceState};
     use std::collections::HashMap;
 
     fn make_resource(name: &str, cpu: i64) -> ResourceState {

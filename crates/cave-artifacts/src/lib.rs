@@ -19,7 +19,6 @@ pub mod upload;
 use axum::Router;
 use cave_db::CavePool;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 pub use models::*;
 

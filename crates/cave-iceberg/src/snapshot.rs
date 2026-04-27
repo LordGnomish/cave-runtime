@@ -131,13 +131,12 @@ impl Snapshot {
         if self.manifest_list.is_empty() {
             return Err(IcebergError::Snapshot("manifest_list path must not be empty".into()));
         }
-        if let Some(p) = self.parent_snapshot_id {
-            if p == self.snapshot_id {
+        if let Some(p) = self.parent_snapshot_id
+            && p == self.snapshot_id {
                 return Err(IcebergError::Snapshot(
                     "parent_snapshot_id must differ from snapshot_id".into(),
                 ));
             }
-        }
         Ok(())
     }
 }

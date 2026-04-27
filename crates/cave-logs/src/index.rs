@@ -149,7 +149,7 @@ impl LabelIndex {
         let idx = self.inner.read();
         let mut names: HashSet<&str> = HashSet::new();
         for (name, keys) in &idx.by_name {
-            if tenant.map_or(true, |t| keys.iter().any(|k| k.tenant == t)) {
+            if tenant.is_none_or(|t| keys.iter().any(|k| k.tenant == t)) {
                 names.insert(name.as_str());
             }
         }
@@ -163,7 +163,7 @@ impl LabelIndex {
         let idx = self.inner.read();
         let mut values: HashSet<&str> = HashSet::new();
         for ((n, v), keys) in &idx.by_value {
-            if n == name && tenant.map_or(true, |t| keys.iter().any(|k| k.tenant == t)) {
+            if n == name && tenant.is_none_or(|t| keys.iter().any(|k| k.tenant == t)) {
                 values.insert(v.as_str());
             }
         }

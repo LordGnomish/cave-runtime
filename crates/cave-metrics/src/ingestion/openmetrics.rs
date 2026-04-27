@@ -2,7 +2,6 @@
 //! Superset of Prometheus exposition format with EOF marker and additional types.
 
 use crate::error::Result;
-use crate::model::{Labels, Sample, TimeSeries};
 use super::IngestedBatch;
 
 /// Parse OpenMetrics text format.

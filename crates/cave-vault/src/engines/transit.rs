@@ -4,7 +4,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use base64::Engine as _;
@@ -207,7 +207,7 @@ fn chacha20_decrypt(key_bytes: &[u8], ciphertext: &[u8]) -> VaultResult<Vec<u8>>
 pub async fn create_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<serde_json::Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -233,12 +233,12 @@ pub async fn create_key(
 pub async fn read_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
     let keys_info: HashMap<String, Value> = key.versions.iter().map(|(v, kv)| {
         (v.to_string(), json!({
             "name": key.name,
@@ -261,7 +261,7 @@ pub async fn read_key(
 pub async fn delete_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.transit_store.write().await;
@@ -277,7 +277,7 @@ pub async fn delete_key(
 pub async fn list_keys(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
@@ -288,12 +288,12 @@ pub async fn list_keys(
 pub async fn rotate_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.transit_store.write().await;
     let key = store.keys.get_mut(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
     let new_version = key.latest_version + 1;
     let (key_bytes, public_key) = match &key.key_type {
         KeyType::Aes256Gcm96 | KeyType::Chacha20Poly1305 => (generate_aes256_key()?, None),
@@ -329,13 +329,13 @@ pub struct EncryptRequest {
 pub async fn encrypt(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<EncryptRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
 
     let version = body.key_version.unwrap_or(key.latest_version);
     let kv = key.versions.get(&version)
@@ -366,13 +366,13 @@ pub struct DecryptRequest {
 pub async fn decrypt(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<DecryptRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
 
     // Parse ciphertext: vault:v{N}:{base64}
     let parts: Vec<&str> = body.ciphertext.splitn(3, ':').collect();
@@ -404,12 +404,12 @@ pub async fn decrypt(
 pub async fn rewrap(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<DecryptRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     // Decrypt with old version, re-encrypt with latest
-    let decrypt_req = DecryptRequest {
+    let _decrypt_req = DecryptRequest {
         ciphertext: body.ciphertext.clone(),
         context: body.context.clone(),
         nonce: body.nonce.clone(),
@@ -466,11 +466,11 @@ pub struct SignRequest {
 pub async fn sign(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<SignRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
-    use ring::signature::{Ed25519KeyPair, KeyPair};
+    use ring::signature::Ed25519KeyPair;
 
     let store = state.transit_store.read().await;
     let key = store.keys.get(&key_name)
@@ -509,7 +509,7 @@ pub struct VerifyRequest {
 pub async fn verify(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<VerifyRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -556,7 +556,7 @@ pub struct GenerateDataKeyRequest {
 pub async fn generate_data_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, plaintext_or_wrapped, key_name)): Path<(String, String, String)>,
+    Path((_mount, plaintext_or_wrapped, key_name)): Path<(String, String, String)>,
     Json(body): Json<GenerateDataKeyRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -592,7 +592,7 @@ pub async fn generate_data_key(
 pub async fn export_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_type_path, key_name, version_str)): Path<(String, String, String, String)>,
+    Path((_mount, _key_type_path, key_name, version_str)): Path<(String, String, String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.transit_store.read().await;

@@ -18,7 +18,7 @@ pub async fn federate(
     State(state): State<Arc<MetricsState>>,
     Query(params): Query<FederateParams>,
 ) -> Response<String> {
-    let honor_labels = params.honor_labels.unwrap_or(false);
+    let _honor_labels = params.honor_labels.unwrap_or(false);
 
     let now_ms = now_ms();
     let lookback_ms = 5 * 60 * 1000; // 5m default

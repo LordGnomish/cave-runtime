@@ -17,6 +17,12 @@ pub struct CatalogEntry {
     pub tags: Vec<String>,
 }
 
+impl Default for TaskCatalog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskCatalog {
     pub fn new() -> Self {
         Self { tasks: HashMap::new() }

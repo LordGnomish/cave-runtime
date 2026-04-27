@@ -1,8 +1,6 @@
 //! Pulp v3 RBAC — roles, permissions per object, domain-aware.
 
-use crate::models::ContentType;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 // ─── Permissions ─────────────────────────────────────────────────────────────
 

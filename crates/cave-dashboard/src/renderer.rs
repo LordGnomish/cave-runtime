@@ -429,7 +429,7 @@ fn render_gauge_panel(panel: &Panel) -> String {
     )
 }
 
-fn render_graph_panel(panel: &Panel) -> String {
+fn render_graph_panel(_panel: &Panel) -> String {
     // Render a decorative bar chart placeholder
     let bars: String = (0..20).map(|i| {
         let h = 20 + (i * 7 + i * i / 4) % 80;
@@ -458,14 +458,14 @@ fn render_bar_gauge_panel(panel: &Panel) -> String {
     }).collect();
 
     if targets.is_empty() {
-        return format!(r#"<div class="panel-body">No targets configured</div>"#);
+        return r#"<div class="panel-body">No targets configured</div>"#.to_string();
     }
 
     format!(r#"<div class="panel-body" style="flex-direction:column;width:100%;padding:12px;">{targets}</div>"#)
 }
 
-fn render_table_panel(panel: &Panel) -> String {
-    let cols = vec!["Time", "Value", "Label"];
+fn render_table_panel(_panel: &Panel) -> String {
+    let cols = ["Time", "Value", "Label"];
     let header: String = cols.iter().map(|c| format!("<th>{c}</th>")).collect();
     let rows: String = (0..3).map(|_| {
         let cells: String = cols.iter().map(|_| "<td>—</td>").collect();
@@ -489,7 +489,7 @@ fn render_text_panel(panel: &Panel) -> String {
     format!(r#"<div class="panel-body text-panel">{}</div>"#, escape_html(content))
 }
 
-fn render_logs_panel(panel: &Panel) -> String {
+fn render_logs_panel(_panel: &Panel) -> String {
     let entries: String = (0..5).map(|i| {
         format!(
             r#"<div class="logs-entry">
@@ -505,19 +505,19 @@ fn render_logs_panel(panel: &Panel) -> String {
     )
 }
 
-fn render_traces_panel(panel: &Panel) -> String {
-    format!(r#"<div class="panel-body">🔍 Trace viewer — connect a Jaeger/Tempo datasource</div>"#)
+fn render_traces_panel(_panel: &Panel) -> String {
+    r#"<div class="panel-body">🔍 Trace viewer — connect a Jaeger/Tempo datasource</div>"#.to_string()
 }
 
-fn render_pie_chart_panel(panel: &Panel) -> String {
-    format!(r#"<div class="panel-body">🥧 Pie chart — awaiting data</div>"#)
+fn render_pie_chart_panel(_panel: &Panel) -> String {
+    r#"<div class="panel-body">🥧 Pie chart — awaiting data</div>"#.to_string()
 }
 
-fn render_heatmap_panel(panel: &Panel) -> String {
-    format!(r#"<div class="panel-body">🗺 Heatmap — awaiting data</div>"#)
+fn render_heatmap_panel(_panel: &Panel) -> String {
+    r#"<div class="panel-body">🗺 Heatmap — awaiting data</div>"#.to_string()
 }
 
-fn render_alert_list_panel(panel: &Panel) -> String {
+fn render_alert_list_panel(_panel: &Panel) -> String {
     format!(
         r#"<div class="panel-body" style="flex-direction:column;align-items:flex-start;width:100%;padding:12px;">
   <div style="color:{MUTED_COLOR};font-size:12px;">No alerts to display</div>
@@ -525,7 +525,7 @@ fn render_alert_list_panel(panel: &Panel) -> String {
     )
 }
 
-fn render_dashboard_list_panel(panel: &Panel) -> String {
+fn render_dashboard_list_panel(_panel: &Panel) -> String {
     format!(
         r#"<div class="panel-body" style="flex-direction:column;align-items:flex-start;width:100%;padding:12px;">
   <div style="color:{MUTED_COLOR};font-size:12px;">No dashboards to display</div>

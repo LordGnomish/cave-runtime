@@ -3,7 +3,6 @@
 
 use crate::models::Destination;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use uuid::Uuid;
 
 // ─── AppProject CRD ──────────────────────────────────────────────────────────
@@ -211,8 +210,7 @@ pub fn validate_application(
 fn glob_match(pattern: &str, value: &str) -> bool {
     if pattern == "*" { return true; }
     if pattern == value { return true; }
-    if pattern.ends_with("/*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    if let Some(prefix) = pattern.strip_suffix("/*") {
         return value.starts_with(prefix);
     }
     if pattern.contains('*') {

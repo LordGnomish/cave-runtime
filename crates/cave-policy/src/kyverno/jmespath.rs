@@ -770,7 +770,7 @@ fn split_first_segment(expr: &str) -> Option<(&str, String)> {
 }
 
 fn find_pipe(expr: &str) -> Option<usize> {
-    find_binary_op(expr, b'|', 1, |ahead| ahead.get(0) != Some(&b'|'))
+    find_binary_op(expr, b'|', 1, |ahead| ahead.first() != Some(&b'|'))
 }
 
 fn find_or(expr: &str) -> Option<usize> {

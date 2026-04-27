@@ -47,13 +47,11 @@ impl CompositionEngine {
             PatchType::FromCompositeFieldPath => {
                 if let (Some(from), Some(to)) =
                     (&patch.from_field_path, &patch.to_field_path)
-                {
-                    if let Some(value) = get_field_path(claim_spec, from) {
+                    && let Some(value) = get_field_path(claim_spec, from) {
                         let transformed =
                             Self::apply_transforms(value, &patch.transforms)?;
                         set_field_path(base, to, transformed);
                     }
-                }
             }
             PatchType::ToCompositeFieldPath => {
                 if let (Some(from), Some(_to)) =
@@ -89,13 +87,12 @@ impl CompositionEngine {
                 }
             }
             PatchType::PatchSet => {
-                if let Some(ps_name) = &patch.patch_set_name {
-                    if let Some(ps) = patch_sets.iter().find(|ps| &ps.name == ps_name) {
+                if let Some(ps_name) = &patch.patch_set_name
+                    && let Some(ps) = patch_sets.iter().find(|ps| &ps.name == ps_name) {
                         for ps_patch in &ps.patches {
                             self.apply_patch(base, ps_patch, claim_spec, patch_sets)?;
                         }
                     }
-                }
             }
             PatchType::CombineToComposite
             | PatchType::FromEnvironmentFieldPath
@@ -181,16 +178,14 @@ impl CompositionEngine {
         if let Some(multiplier) = math.multiply {
             result *= multiplier;
         }
-        if let Some(min) = math.clamp_min {
-            if result < min {
+        if let Some(min) = math.clamp_min
+            && result < min {
                 result = min;
             }
-        }
-        if let Some(max) = math.clamp_max {
-            if result > max {
+        if let Some(max) = math.clamp_max
+            && result > max {
                 result = max;
             }
-        }
 
         serde_json::json!(result)
     }
@@ -272,13 +267,10 @@ impl CompositionEngine {
                 let n = match &v {
                     serde_json::Value::Number(n) => n.as_i64().unwrap_or(0),
                     serde_json::Value::String(s) => s.parse::<i64>().unwrap_or(0),
-                    serde_json::Value::Bool(b) => {
-                        if *b {
+                    serde_json::Value::Bool(b)
+                        if *b => {
                             1
-                        } else {
-                            0
                         }
-                    }
                     _ => 0,
                 };
                 serde_json::json!(n)
@@ -287,13 +279,10 @@ impl CompositionEngine {
                 let n = match &v {
                     serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0),
                     serde_json::Value::String(s) => s.parse::<f64>().unwrap_or(0.0),
-                    serde_json::Value::Bool(b) => {
-                        if *b {
+                    serde_json::Value::Bool(b)
+                        if *b => {
                             1.0
-                        } else {
-                            0.0
                         }
-                    }
                     _ => 0.0,
                 };
                 serde_json::json!(n)

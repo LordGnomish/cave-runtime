@@ -565,16 +565,15 @@ fn builtin_strings_count(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_strings_any_prefix_match(args: &[Value]) -> Result<Value, PolicyError> {
-    let searches = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let searches = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("strings.any_prefix_match: arg 0 must be collection".into()))?;
     let prefixes = collection_values(args.get(1).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("strings.any_prefix_match: arg 1 must be collection".into()))?;
     for s in &searches {
         if let Some(s_str) = s.as_str() {
             for p in &prefixes {
-                if let Some(p_str) = p.as_str() {
-                    if s_str.starts_with(p_str) { return Ok(Value::bool(true)); }
-                }
+                if let Some(p_str) = p.as_str()
+                    && s_str.starts_with(p_str) { return Ok(Value::bool(true)); }
             }
         }
     }
@@ -582,16 +581,15 @@ fn builtin_strings_any_prefix_match(args: &[Value]) -> Result<Value, PolicyError
 }
 
 fn builtin_strings_any_suffix_match(args: &[Value]) -> Result<Value, PolicyError> {
-    let searches = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let searches = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("strings.any_suffix_match: arg 0 must be collection".into()))?;
     let suffixes = collection_values(args.get(1).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("strings.any_suffix_match: arg 1 must be collection".into()))?;
     for s in &searches {
         if let Some(s_str) = s.as_str() {
             for suf in &suffixes {
-                if let Some(suf_str) = suf.as_str() {
-                    if s_str.ends_with(suf_str) { return Ok(Value::bool(true)); }
-                }
+                if let Some(suf_str) = suf.as_str()
+                    && s_str.ends_with(suf_str) { return Ok(Value::bool(true)); }
             }
         }
     }
@@ -720,35 +718,35 @@ fn glob_to_regex(glob: &str) -> String {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 fn builtin_is_null(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Null)))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::Null)))))
 }
 
 fn builtin_is_boolean(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Bool(_))))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::Bool(_))))))
 }
 
 fn builtin_is_number(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Number(_))))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::Number(_))))))
 }
 
 fn builtin_is_string(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::String(_))))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::String(_))))))
 }
 
 fn builtin_is_array(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Array(_))))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::Array(_))))))
 }
 
 fn builtin_is_set(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Set(_)))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Set(_)))))
 }
 
 fn builtin_is_object(args: &[Value]) -> Result<Value, PolicyError> {
-    Ok(Value::bool(matches!(args.get(0), Some(Value::Json(serde_json::Value::Object(_))))))
+    Ok(Value::bool(matches!(args.first(), Some(Value::Json(serde_json::Value::Object(_))))))
 }
 
 fn builtin_type_name(args: &[Value]) -> Result<Value, PolicyError> {
-    let name = match args.get(0) {
+    let name = match args.first() {
         Some(Value::Json(serde_json::Value::Null)) => "null",
         Some(Value::Json(serde_json::Value::Bool(_))) => "boolean",
         Some(Value::Json(serde_json::Value::Number(_))) => "number",
@@ -764,7 +762,7 @@ fn builtin_type_name(args: &[Value]) -> Result<Value, PolicyError> {
 // ─── Aggregates ───────────────────────────────────────────────────────────────
 
 fn builtin_count(args: &[Value]) -> Result<Value, PolicyError> {
-    let n = match args.get(0) {
+    let n = match args.first() {
         Some(Value::Json(serde_json::Value::Array(a))) => a.len(),
         Some(Value::Json(serde_json::Value::Object(m))) => m.len(),
         Some(Value::Json(serde_json::Value::String(s))) => s.chars().count(),
@@ -775,52 +773,52 @@ fn builtin_count(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_sum(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("sum: arg must be collection".into()))?;
     let s: f64 = coll.iter().filter_map(|v| v.as_f64()).sum();
     Ok(Value::number_f64(s))
 }
 
 fn builtin_product(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("product: arg must be collection".into()))?;
     let p: f64 = coll.iter().filter_map(|v| v.as_f64()).product();
     Ok(Value::number_f64(p))
 }
 
 fn builtin_max(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("max: arg must be collection".into()))?;
     coll.into_iter()
         .max_by(json_cmp)
-        .map(|v| Value::Json(v))
+        .map(Value::Json)
         .ok_or_else(|| PolicyError::Eval("max: empty collection".into()))
 }
 
 fn builtin_min(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("min: arg must be collection".into()))?;
     coll.into_iter()
         .min_by(json_cmp)
-        .map(|v| Value::Json(v))
+        .map(Value::Json)
         .ok_or_else(|| PolicyError::Eval("min: empty collection".into()))
 }
 
 fn builtin_sort(args: &[Value]) -> Result<Value, PolicyError> {
-    let mut coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let mut coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("sort: arg must be collection".into()))?;
     coll.sort_by(json_cmp);
     Ok(Value::array(coll))
 }
 
 fn builtin_all(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("all: arg must be collection".into()))?;
     Ok(Value::bool(coll.iter().all(|v| v.as_bool().unwrap_or(false))))
 }
 
 fn builtin_any(args: &[Value]) -> Result<Value, PolicyError> {
-    let coll = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let coll = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("any: arg must be collection".into()))?;
     Ok(Value::bool(coll.iter().any(|v| v.as_bool().unwrap_or(false))))
 }
@@ -1010,7 +1008,7 @@ fn builtin_hex_decode(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_json_marshal(args: &[Value]) -> Result<Value, PolicyError> {
-    let v = args.get(0).ok_or_else(|| PolicyError::Eval("json.marshal: missing arg".into()))?;
+    let v = args.first().ok_or_else(|| PolicyError::Eval("json.marshal: missing arg".into()))?;
     let j = v.to_json_lossy();
     Ok(Value::string(serde_json::to_string(&j)?))
 }
@@ -1039,7 +1037,7 @@ fn builtin_json_filter(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_json_remove(args: &[Value]) -> Result<Value, PolicyError> {
-    let mut v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let mut v = args.first().and_then(|a| a.as_json()).cloned()
         .ok_or_else(|| PolicyError::Eval("json.remove: missing arg".into()))?;
     let paths = collection_values(args.get(1).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("json.remove: arg 1 must be collection".into()))?;
@@ -1054,7 +1052,7 @@ fn builtin_json_remove(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_json_patch(args: &[Value]) -> Result<Value, PolicyError> {
-    let mut v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let mut v = args.first().and_then(|a| a.as_json()).cloned()
         .ok_or_else(|| PolicyError::Eval("json.patch: missing arg 0".into()))?;
     let patches = arg_array(args, 1, "json.patch")?;
     for patch in &patches {
@@ -1069,7 +1067,7 @@ fn builtin_json_patch(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_yaml_marshal(args: &[Value]) -> Result<Value, PolicyError> {
-    let v = args.get(0).and_then(|a| a.as_json()).cloned()
+    let v = args.first().and_then(|a| a.as_json()).cloned()
         .ok_or_else(|| PolicyError::Eval("yaml.marshal: missing arg".into()))?;
     let s = serde_yaml::to_string(&v)?;
     Ok(Value::string(s))
@@ -1252,7 +1250,7 @@ fn builtin_time_weekday(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_time_add_date(args: &[Value]) -> Result<Value, PolicyError> {
-    use chrono::{Datelike, Months};
+    use chrono::Months;
     let ns = arg_i64(args, 0, "time.add_date")?;
     let years = arg_i64(args, 1, "time.add_date")? as i32;
     let months = arg_i64(args, 2, "time.add_date")? as i32;
@@ -1407,18 +1405,17 @@ fn builtin_cidr_contains(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_cidr_contains_matches(args: &[Value]) -> Result<Value, PolicyError> {
-    let cidrs = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let cidrs = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("net.cidr_contains_matches: arg 0 must be collection".into()))?;
     let addrs = collection_values(args.get(1).unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("net.cidr_contains_matches: arg 1 must be collection".into()))?;
     let mut results = Vec::new();
     for (i, cidr) in cidrs.iter().enumerate() {
         for (j, addr) in addrs.iter().enumerate() {
-            if let (Some(c), Some(a)) = (cidr.as_str(), addr.as_str()) {
-                if cidr_contains(c, a) {
+            if let (Some(c), Some(a)) = (cidr.as_str(), addr.as_str())
+                && cidr_contains(c, a) {
                     results.push(serde_json::json!([i, j]));
                 }
-            }
         }
     }
     Ok(Value::Set(results))
@@ -1441,7 +1438,7 @@ fn builtin_cidr_intersects(args: &[Value]) -> Result<Value, PolicyError> {
 }
 
 fn builtin_cidr_merge(args: &[Value]) -> Result<Value, PolicyError> {
-    let addrs = collection_values(args.get(0).unwrap_or(&Value::Undefined))
+    let addrs = collection_values(args.first().unwrap_or(&Value::Undefined))
         .ok_or_else(|| PolicyError::Eval("net.cidr_merge: arg must be collection".into()))?;
     Ok(Value::Set(addrs)) // simplified: return as-is
 }

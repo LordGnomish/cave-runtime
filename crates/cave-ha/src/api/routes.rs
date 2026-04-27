@@ -136,7 +136,7 @@ async fn trigger_snapshot(State(s): State<Arc<ApiState>>) -> impl IntoResponse {
 async fn metrics(State(s): State<Arc<ApiState>>) -> impl IntoResponse {
     let registry = s.metrics_registry.read().await;
     let mut buf = String::new();
-    if encode(&mut buf, &*registry).is_ok() {
+    if encode(&mut buf, &registry).is_ok() {
         (StatusCode::OK, [("content-type", "text/plain; version=0.0.4")], buf)
     } else {
         (

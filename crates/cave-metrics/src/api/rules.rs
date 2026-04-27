@@ -20,7 +20,7 @@ pub async fn list_rules(State(state): State<Arc<MetricsState>>) -> Json<serde_js
         }).collect();
 
         let alerting: Vec<serde_json::Value> = group.alert_rules.iter().map(|r| {
-            let alerts: Vec<serde_json::Value> = r.active.iter().map(|(fp, (state, ts))| {
+            let alerts: Vec<serde_json::Value> = r.active.iter().map(|(_fp, (state, ts))| {
                 serde_json::json!({
                     "labels": {},
                     "annotations": r.annotations.0,

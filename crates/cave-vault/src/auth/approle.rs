@@ -5,7 +5,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -117,7 +117,7 @@ pub async fn read_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.approle_store.read().await;
-    let role = store.roles.get(&role_name).ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+    let role = store.roles.get(&role_name).ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 
@@ -150,7 +150,7 @@ pub async fn read_role_id(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.approle_store.read().await;
-    let role = store.roles.get(&role_name).ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+    let role = store.roles.get(&role_name).ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(json!({ "role_id": role.role_id })))
 }
 
@@ -167,7 +167,7 @@ pub async fn update_role_id(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.approle_store.write().await;
-    let role = store.roles.get_mut(&role_name).ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+    let role = store.roles.get_mut(&role_name).ok_or(VaultError::RoleNotFound(role_name))?;
     role.role_id = body.role_id;
     Ok(VaultResponse::new())
 }
@@ -263,11 +263,10 @@ pub async fn destroy_secret_id(
         .to_string();
 
     let mut store = state.approle_store.write().await;
-    if let Some((rn, accessor)) = store.secret_id_by_id.remove(&secret_id) {
-        if rn == role_name {
+    if let Some((rn, accessor)) = store.secret_id_by_id.remove(&secret_id)
+        && rn == role_name {
             store.secret_ids.entry(rn).or_default().remove(&accessor);
         }
-    }
     Ok(VaultResponse::new())
 }
 
@@ -301,11 +300,10 @@ pub async fn login(
             .and_then(|m| m.get_mut(&accessor))
             .ok_or_else(|| VaultError::Auth("invalid secret_id".into()))?;
 
-        if let Some(exp) = entry.expires_at {
-            if Utc::now() > exp {
+        if let Some(exp) = entry.expires_at
+            && Utc::now() > exp {
                 return Err(VaultError::Auth("secret_id expired".into()));
             }
-        }
         if entry.num_uses > 0 {
             if entry.uses_remaining <= 0 {
                 return Err(VaultError::Auth("secret_id use limit exceeded".into()));

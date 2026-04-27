@@ -10,7 +10,7 @@
 
 use crate::batch::BatchSpanProcessor;
 use crate::id::{new_span_id, new_trace_id};
-use crate::sampling::{AlwaysOn, Sampler, SamplingDecision};
+use crate::sampling::{AlwaysOn, Sampler};
 use crate::types::*;
 use chrono::Utc;
 use parking_lot::Mutex;

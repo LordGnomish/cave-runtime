@@ -46,8 +46,8 @@ pub fn dedupe_findings(findings: Vec<Finding>) -> Vec<Finding> {
 
     for finding in findings {
         let key = finding.fingerprint.clone();
-        if !seen.contains_key(&key) {
-            seen.insert(key, true);
+        if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(key) {
+            e.insert(true);
             deduped.push(finding);
         }
     }
@@ -56,7 +56,7 @@ pub fn dedupe_findings(findings: Vec<Finding>) -> Vec<Finding> {
 }
 
 pub fn aggregate_verdict(findings: &[Finding], floor: Option<Severity>) -> ScanVerdict {
-    let floor = floor.unwrap_or(Severity::Low);
+    let _floor = floor.unwrap_or(Severity::Low);
 
     // Check severity levels
     let has_critical_or_high = findings.iter().any(|f| f.severity == Severity::Critical || f.severity == Severity::High);

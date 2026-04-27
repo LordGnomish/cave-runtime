@@ -11,7 +11,7 @@ pub mod remote_read;
 pub mod remote_write;
 pub mod statsd;
 
-use crate::model::{Labels, Sample, TimeSeries};
+use crate::model::TimeSeries;
 
 /// Parsed ingestion result: a batch of time series.
 pub type IngestedBatch = Vec<TimeSeries>;

@@ -8,7 +8,6 @@ pub mod opencensus;
 pub mod otlp;
 pub mod zipkin;
 
-use crate::types::Span;
 
 /// Normalise a service name: trim, fall back to "unknown" if empty.
 pub(crate) fn normalise_service(s: &str) -> String {

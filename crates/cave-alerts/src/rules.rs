@@ -60,11 +60,10 @@ pub enum RuleError {
 pub fn parse_rule_file(input: &str) -> Result<RuleFile, RuleError> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(input)?;
     // Map top-level "crate" → "crate_" (Rust reserved keyword)
-    if let Some(map) = value.as_mapping_mut() {
-        if let Some(v) = map.remove(&serde_yaml::Value::String("crate".into())) {
+    if let Some(map) = value.as_mapping_mut()
+        && let Some(v) = map.remove(serde_yaml::Value::String("crate".into())) {
             map.insert(serde_yaml::Value::String("crate_".into()), v);
         }
-    }
     let file: RuleFile = serde_yaml::from_value(value)?;
     validate(&file)?;
     Ok(file)
@@ -112,14 +111,13 @@ fn validate(file: &RuleFile) -> Result<(), RuleError> {
                 spec.alert
             )));
         }
-        if let Some(s) = &spec.r#for {
-            if crate::models::parse_duration(s).is_err() {
+        if let Some(s) = &spec.r#for
+            && crate::models::parse_duration(s).is_err() {
                 return Err(RuleError::Validation(format!(
                     "alert '{}' has invalid for: '{}'",
                     spec.alert, s
                 )));
             }
-        }
     }
     Ok(())
 }

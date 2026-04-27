@@ -1,6 +1,5 @@
 //! Coverage report parsing — LCOV and Cobertura formats.
 
-use std::collections::HashMap;
 
 /// File-level coverage data.
 #[derive(Debug, Clone)]
@@ -43,15 +42,14 @@ pub fn parse_lcov(content: &str) -> CoverageReport {
             hit_lines = line[3..].parse().unwrap_or(0);
         } else if line.starts_with("LF:") {
             total_lines = line[3..].parse().unwrap_or(0);
-        } else if line == "end_of_record" {
-            if let Some(path) = current_file.take() {
+        } else if line == "end_of_record"
+            && let Some(path) = current_file.take() {
                 files.push(FileCoverage {
                     path,
                     total_lines,
                     covered_lines: hit_lines,
                 });
             }
-        }
     }
 
     // Finalize any remaining file
@@ -103,18 +101,15 @@ pub fn parse_cobertura(content: &str) -> CoverageReport {
     }
 
     // Try to extract overall line-rate attribute
-    if let Ok(rate_re) = regex::Regex::new(r#"<coverage[^>]*line-rate="([^"]*)""#) {
-        if let Some(cap) = rate_re.captures(content) {
-            if let Some(rate_str) = cap.get(1) {
-                if let Ok(rate) = rate_str.as_str().parse::<f64>() {
+    if let Ok(rate_re) = regex::Regex::new(r#"<coverage[^>]*line-rate="([^"]*)""#)
+        && let Some(cap) = rate_re.captures(content)
+            && let Some(rate_str) = cap.get(1)
+                && let Ok(rate) = rate_str.as_str().parse::<f64>() {
                     // Estimate based on rate: assume 1000 lines as default
                     let est_lines = 1000u64;
                     total_lines = est_lines;
                     total_covered = (est_lines as f64 * rate) as u64;
                 }
-            }
-        }
-    }
 
     let coverage_percent = if total_lines > 0 {
         (total_covered as f64 / total_lines as f64) * 100.0

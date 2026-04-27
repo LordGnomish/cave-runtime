@@ -92,6 +92,12 @@ pub struct UploadRegistry {
     uploads: Mutex<HashMap<Uuid, Upload>>,
 }
 
+impl Default for UploadRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UploadRegistry {
     pub fn new() -> Self {
         Self { uploads: Mutex::new(HashMap::new()) }

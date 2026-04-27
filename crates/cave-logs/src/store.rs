@@ -17,7 +17,7 @@ use chrono::Utc;
 use crate::chunk::{HeadChunk, decode_chunk, DEFAULT_CHUNK_TARGET_SIZE, DEFAULT_CHUNK_MAX_AGE_SECS};
 use crate::index::{LabelIndex, StreamKey, ChunkMeta};
 use crate::models::{
-    Chunk, Codec, Direction, IndexStats, Labels, LogEntry, LogStream, TailEvent,
+    Chunk, Codec, Direction, IndexStats, Labels, LogEntry, TailEvent,
     TenantId, TimestampNs,
 };
 
@@ -48,15 +48,13 @@ impl ChunkStore {
                 && chunk.tenant == tenant
                 && chunk.max_ts >= start_ns
                 && chunk.min_ts <= end_ns
-            {
-                if let Ok(entries) = decode_chunk(chunk) {
+                && let Ok(entries) = decode_chunk(chunk) {
                     for e in entries {
                         if e.ts >= start_ns && e.ts <= end_ns {
                             out.push(e);
                         }
                     }
                 }
-            }
         }
         out
     }

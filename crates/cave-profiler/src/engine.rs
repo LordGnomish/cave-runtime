@@ -1,6 +1,6 @@
 use crate::models::{ProfileSession, StackFrame};
 
-pub fn top_functions<'a>(frames: &'a [StackFrame], n: usize) -> Vec<&'a StackFrame> {
+pub fn top_functions(frames: &[StackFrame], n: usize) -> Vec<&StackFrame> {
     let mut sorted: Vec<&StackFrame> = frames.iter().collect();
     sorted.sort_by(|a, b| b.self_samples.cmp(&a.self_samples));
     sorted.truncate(n);
@@ -23,7 +23,7 @@ pub fn samples_per_second(session: &ProfileSession) -> Option<f64> {
     })
 }
 
-pub fn find_hotspot<'a>(frames: &'a [StackFrame]) -> Option<&'a StackFrame> {
+pub fn find_hotspot(frames: &[StackFrame]) -> Option<&StackFrame> {
     frames.iter().max_by_key(|f| f.self_samples)
 }
 

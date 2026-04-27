@@ -9,10 +9,10 @@ use futures_util::{SinkExt, StreamExt};
 use axum::extract::ws::{Message, WebSocket};
 use tracing::warn;
 
-use crate::logql::ast::{Query, PipelineStage};
+use crate::logql::ast::Query;
 use crate::logql::eval::{apply_pipeline, labels_match};
 use crate::logql::parser::Parser;
-use crate::models::{TailEntry, TailEvent, TailResponse, TailStream};
+use crate::models::{TailEvent, TailResponse, TailStream};
 use crate::store::LogStore;
 
 /// Handle one WebSocket tail connection.
@@ -66,11 +66,10 @@ pub async fn handle_tail(
                                 }],
                                 dropped_entries: vec![],
                             };
-                            if let Ok(json) = serde_json::to_string(&resp) {
-                                if sender.send(Message::Text(json.into())).await.is_err() {
+                            if let Ok(json) = serde_json::to_string(&resp)
+                                && sender.send(Message::Text(json.into())).await.is_err() {
                                     break; // client disconnected
                                 }
-                            }
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {

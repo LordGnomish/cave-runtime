@@ -4,7 +4,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use chrono::Utc;
@@ -98,7 +98,7 @@ fn random_session_token() -> VaultResult<String> {
 pub async fn configure_root(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -114,7 +114,7 @@ pub async fn configure_root(
 pub async fn read_config(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;
@@ -129,12 +129,12 @@ pub async fn read_config(
 pub async fn create_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.aws_store.write().await;
-    let mut role = store.roles.entry(role_name.clone()).or_insert_with(|| AwsRole {
+    let role = store.roles.entry(role_name.clone()).or_insert_with(|| AwsRole {
         name: role_name.clone(),
         ..Default::default()
     });
@@ -154,19 +154,19 @@ pub async fn create_role(
 pub async fn read_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;
     let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+        .ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 
 pub async fn delete_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.aws_store.write().await;
@@ -177,7 +177,7 @@ pub async fn delete_role(
 pub async fn list_roles(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;
@@ -188,7 +188,7 @@ pub async fn list_roles(
 pub async fn generate_credentials(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.aws_store.read().await;

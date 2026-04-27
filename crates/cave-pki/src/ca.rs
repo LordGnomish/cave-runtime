@@ -211,7 +211,7 @@ impl Ca {
         chain.push(current.clone());
         while let Some(parent_serial) = current.issuer_serial.clone() {
             let parent = self.by_serial.get(&parent_serial).cloned()
-                .ok_or_else(|| PkiError::ParentNotFound(parent_serial))?;
+                .ok_or(PkiError::ParentNotFound(parent_serial))?;
             chain.push(parent.clone());
             current = parent;
         }

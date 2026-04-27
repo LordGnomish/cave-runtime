@@ -3,7 +3,6 @@ use crate::models::{
     ShiftOverride, Silence,
 };
 use chrono::{DateTime, Duration, Utc};
-use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -177,7 +176,7 @@ pub fn upcoming_shifts(
                 is_override: false,
             });
 
-            current_time = current_time + shift_duration;
+            current_time += shift_duration;
         }
     }
 
@@ -204,7 +203,7 @@ pub fn evaluate_silences(alert: &Alert, silences: &[Silence], at: DateTime<Utc>)
         }
         // All matchers must match the alert's labels
         s.matcher.iter().all(|(key, value)| {
-            alert.labels.get(key).map_or(false, |v| v == value)
+            alert.labels.get(key) == Some(value)
         })
     })
 }
@@ -268,6 +267,7 @@ mod tests {
     use super::*;
     use crate::models::{RotationType, Schedule, ScheduleType};
     use chrono::TimeZone;
+    use std::collections::HashMap;
 
     fn sample_schedule() -> Schedule {
         Schedule {

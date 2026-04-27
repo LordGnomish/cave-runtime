@@ -3,7 +3,6 @@
 use crate::openai::ChatCompletionChunk;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use futures::stream::{self, Stream, StreamExt};
-use serde::Serialize;
 use std::convert::Infallible;
 use std::time::Duration;
 

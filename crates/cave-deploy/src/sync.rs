@@ -20,16 +20,13 @@ pub struct SyncRequest {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[derive(Default)]
 pub enum SyncStrategy {
+    #[default]
     Apply,
     Hook,
 }
 
-impl Default for SyncStrategy {
-    fn default() -> Self {
-        Self::Apply
-    }
-}
 
 /// Outcome of a single resource sync attempt.
 #[derive(Debug, Clone)]

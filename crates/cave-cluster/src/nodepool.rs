@@ -107,14 +107,13 @@ impl NodePool {
                 reason: "node_count must be >= 0".into(),
             });
         }
-        if let (Some(min), Some(max)) = (self.min_count, self.max_count) {
-            if node_count < min || node_count > max {
+        if let (Some(min), Some(max)) = (self.min_count, self.max_count)
+            && (node_count < min || node_count > max) {
                 return Err(ClusterError::InvalidName {
                     name: self.name.clone(),
                     reason: format!("node_count {node_count} out of autoscaling range [{min}, {max}]"),
                 });
             }
-        }
         self.status = NodePoolStatus::Scaling;
         self.node_count = node_count;
         self.status = NodePoolStatus::Running;
@@ -152,6 +151,12 @@ impl NodePool {
 pub struct NodePoolStore {
     /// (cluster_name, pool_name) → NodePool
     pools: DashMap<(String, String), NodePool>,
+}
+
+impl Default for NodePoolStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodePoolStore {

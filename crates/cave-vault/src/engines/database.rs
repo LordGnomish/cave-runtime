@@ -4,10 +4,9 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
-use chrono::{Duration, Utc};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -74,7 +73,7 @@ fn random_string(len: usize) -> VaultResult<String> {
 pub async fn configure_connection(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, name)): Path<(String, String)>,
+    Path((_mount, name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -99,7 +98,7 @@ pub async fn configure_connection(
 pub async fn read_connection(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, name)): Path<(String, String)>,
+    Path((_mount, name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
@@ -111,7 +110,7 @@ pub async fn read_connection(
 pub async fn delete_connection(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, name)): Path<(String, String)>,
+    Path((_mount, name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.database_store.write().await;
@@ -122,7 +121,7 @@ pub async fn delete_connection(
 pub async fn list_connections(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
@@ -133,7 +132,7 @@ pub async fn list_connections(
 pub async fn create_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -159,19 +158,19 @@ pub async fn create_role(
 pub async fn read_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
     let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+        .ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 
 pub async fn delete_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.database_store.write().await;
@@ -182,7 +181,7 @@ pub async fn delete_role(
 pub async fn list_roles(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;
@@ -193,7 +192,7 @@ pub async fn list_roles(
 pub async fn generate_credentials(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.database_store.read().await;

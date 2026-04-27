@@ -19,11 +19,10 @@ pub fn generate_rule(
     };
 
     // Evaluate preconditions
-    if let Some(preconditions) = &rule.preconditions {
-        if !super::validate::eval_conditions(preconditions, trigger_resource, context)? {
+    if let Some(preconditions) = &rule.preconditions
+        && !super::validate::eval_conditions(preconditions, trigger_resource, context)? {
             return Ok(vec![]);
         }
-    }
 
     let resource = build_generated_resource(generate, trigger_resource, context, &rule.name)?;
     Ok(vec![GeneratedResource {
@@ -87,7 +86,7 @@ fn build_generated_resource(
     Ok(resource)
 }
 
-fn substitute_name(name: &str, trigger: &Value, context: &Value) -> Result<String, PolicyError> {
+fn substitute_name(name: &str, _trigger: &Value, context: &Value) -> Result<String, PolicyError> {
     // Support {{request.object.metadata.name}} in name field
     super::jmespath::substitute_variables(name, context)
 }

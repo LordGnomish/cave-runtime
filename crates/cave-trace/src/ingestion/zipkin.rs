@@ -3,10 +3,10 @@
 //! Zipkin v2 JSON format: https://zipkin.io/zipkin-api/#/default/post_spans
 
 use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::ingestion::{normalise_service, us_to_ns};
-use crate::types::{Span, SpanEvent, SpanId, SpanKind, SpanStatus, TagValue, TraceId};
+use crate::types::{Span, SpanEvent, SpanKind, SpanStatus, TagValue};
 use crate::{Result, TraceError};
 
 // ─── Zipkin v2 JSON wire types ─────────────────────────────────────────────

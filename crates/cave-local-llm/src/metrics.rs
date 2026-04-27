@@ -36,7 +36,7 @@ impl DraftMetrics {
         let drafts_generated_total = Counter::default();
         let drafts_failed_total = Counter::default();
         let draft_duration_seconds = Histogram::new(
-            [0.1_f64, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0].into_iter(),
+            [0.1_f64, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 120.0],
         );
 
         registry.register(
@@ -184,7 +184,7 @@ impl DaemonMetrics {
     pub fn new(registry: &mut Registry) -> Self {
         let daemon_ticks_total = Counter::default();
         let daemon_sleep_duration_seconds = Histogram::new(
-            [0.5_f64, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0].into_iter(),
+            [0.5_f64, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0],
         );
 
         registry.register(

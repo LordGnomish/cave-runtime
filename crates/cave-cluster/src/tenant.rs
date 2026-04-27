@@ -197,6 +197,12 @@ pub struct TenantStore {
     tenants: DashMap<String, Tenant>,
 }
 
+impl Default for TenantStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TenantStore {
     pub fn new() -> Self {
         Self {

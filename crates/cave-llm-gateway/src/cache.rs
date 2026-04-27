@@ -104,11 +104,10 @@ impl PromptCache {
         }
 
         // Evict if over limit (simple: remove a random entry)
-        if self.store.len() >= self.config.max_entries {
-            if let Some(old_key) = self.store.iter().next().map(|e| *e.key()) {
+        if self.store.len() >= self.config.max_entries
+            && let Some(old_key) = self.store.iter().next().map(|e| *e.key()) {
                 self.store.remove(&old_key);
             }
-        }
 
         let key = Self::fingerprint(req);
         let ttl = if self.config.ttl_secs == 0 {

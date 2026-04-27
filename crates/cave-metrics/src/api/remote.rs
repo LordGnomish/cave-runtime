@@ -16,7 +16,7 @@ use crate::ingestion::remote_read::{decode_read_request, encode_read_response, e
 
 pub async fn remote_write(
     State(state): State<Arc<MetricsState>>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
     body: Bytes,
 ) -> StatusCode {
     match decode_write_request(&body) {
@@ -72,7 +72,7 @@ pub async fn otlp_metrics(
     headers: HeaderMap,
     body: Bytes,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let content_type = headers.get("content-type")
+    let _content_type = headers.get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/json");
 

@@ -45,7 +45,7 @@ pub async fn serve(addr: String, plugins: Arc<PluginChain>) -> DnsResult<()> {
 
     axum::serve(listener, app)
         .await
-        .map_err(|e| DnsError::Io(e.into()))
+        .map_err(|e| DnsError::Io(e))
 }
 
 /// POST /dns-query — body is raw DNS message (application/dns-message).

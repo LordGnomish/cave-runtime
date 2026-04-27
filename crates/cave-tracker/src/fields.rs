@@ -16,9 +16,8 @@ pub fn create_field(name: &str, field_type: CustomFieldType, description: &str, 
 pub fn validate_field_value(field: &CustomFieldDef, value: &serde_json::Value) -> Vec<String> {
     let mut errors = Vec::new();
     match &field.field_type {
-        CustomFieldType::Number => {
-            if !value.is_number() { errors.push(format!("Field '{}': expected number", field.name)); }
-        }
+        CustomFieldType::Number
+            if !value.is_number() => { errors.push(format!("Field '{}': expected number", field.name)); }
         CustomFieldType::Select => {
             if let Some(s) = value.as_str() {
                 if !field.options.is_empty() && !field.options.contains(&s.to_string()) {
@@ -28,9 +27,8 @@ pub fn validate_field_value(field: &CustomFieldDef, value: &serde_json::Value) -
                 errors.push(format!("Field '{}': expected string", field.name));
             }
         }
-        CustomFieldType::Checkbox => {
-            if !value.is_boolean() { errors.push(format!("Field '{}': expected boolean", field.name)); }
-        }
+        CustomFieldType::Checkbox
+            if !value.is_boolean() => { errors.push(format!("Field '{}': expected boolean", field.name)); }
         _ => {} // Text, Date, User, Labels, MultiSelect — accept any for now
     }
     errors

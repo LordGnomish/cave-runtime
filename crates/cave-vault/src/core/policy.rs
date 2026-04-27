@@ -202,7 +202,7 @@ impl Policy {
                 }
             }
         }
-        best.map_or(false, |r| r.allows(cap))
+        best.is_some_and(|r| r.allows(cap))
     }
 }
 
@@ -269,11 +269,10 @@ impl PolicyStore {
             return true;
         }
         for name in policy_names {
-            if let Some(policy) = self.policies.get(name) {
-                if policy.allows(path, cap) {
+            if let Some(policy) = self.policies.get(name)
+                && policy.allows(path, cap) {
                     return true;
                 }
-            }
         }
         false
     }

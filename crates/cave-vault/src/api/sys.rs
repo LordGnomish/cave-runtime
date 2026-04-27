@@ -5,10 +5,10 @@ use crate::{AuthEntry, MountEntry, MountConfig, VaultState};
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -298,7 +298,7 @@ pub async fn read_policy(
     let _token = extract_token(&headers)?;
     let ps = state.policy_store.read().await;
     let policy = ps.get(&name)
-        .ok_or_else(|| VaultError::PolicyNotFound(name))?;
+        .ok_or(VaultError::PolicyNotFound(name))?;
     Ok(VaultResponse::new().with_data(json!({
         "name": policy.name,
         "policy": policy.raw,

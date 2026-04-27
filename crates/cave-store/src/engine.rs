@@ -8,7 +8,6 @@ use crate::wal::{WalEntry, WalWriter};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
@@ -198,9 +197,9 @@ impl MvccEngine {
 
     async fn apply_delete(&self, revision: i64, key: Vec<u8>) {
         let mut data = self.data.write().await;
-        if let Some(versions) = data.get_mut(&key) {
-            if let Some(last) = versions.last() {
-                if last.value.is_some() {
+        if let Some(versions) = data.get_mut(&key)
+            && let Some(last) = versions.last()
+                && last.value.is_some() {
                     versions.push(KeyVersion {
                         create_revision: last.create_revision,
                         mod_revision: revision,
@@ -209,8 +208,6 @@ impl MvccEngine {
                         lease_id: 0,
                     });
                 }
-            }
-        }
         self.revision.fetch_max(revision + 1, Ordering::SeqCst);
     }
 
@@ -295,13 +292,11 @@ impl MvccEngine {
         drop(data);
 
         // Attach key to lease if applicable
-        if lease_id != 0 {
-            if let Some(lease) = self.leases.write().await.get_mut(&lease_id) {
-                if !lease.keys.contains(&key) {
+        if lease_id != 0
+            && let Some(lease) = self.leases.write().await.get_mut(&lease_id)
+                && !lease.keys.contains(&key) {
                     lease.keys.push(key.clone());
                 }
-            }
-        }
 
         // WAL
         self.wal
@@ -394,8 +389,8 @@ impl MvccEngine {
 
         for (k, versions) in iter {
             let kv_at_rev = versions.iter().rev().find(|v| v.mod_revision <= at_rev);
-            if let Some(kv) = kv_at_rev {
-                if kv.value.is_some() {
+            if let Some(kv) = kv_at_rev
+                && kv.value.is_some() {
                     result.push(KvPair {
                         key: k.clone(),
                         value: if keys_only {
@@ -412,7 +407,6 @@ impl MvccEngine {
                         break;
                     }
                 }
-            }
         }
 
         result
@@ -445,9 +439,9 @@ impl MvccEngine {
         let mut prev_kvs = Vec::new();
 
         for k in &keys_to_delete {
-            if let Some(versions) = data.get_mut(k) {
-                if let Some(last) = versions.last() {
-                    if last.value.is_some() {
+            if let Some(versions) = data.get_mut(k)
+                && let Some(last) = versions.last()
+                    && last.value.is_some() {
                         if prev_kv {
                             prev_kvs.push(KvPair {
                                 key: k.clone(),
@@ -467,8 +461,6 @@ impl MvccEngine {
                         });
                         deleted += 1;
                     }
-                }
-            }
         }
         drop(data);
 
@@ -508,7 +500,7 @@ impl MvccEngine {
     }
 
     pub async fn txn(&self, txn: TxnRequest) -> StoreResult<TxnResponse> {
-        let current_rev = self.current_revision();
+        let _current_rev = self.current_revision();
         let data = self.data.read().await;
 
         // Evaluate compares

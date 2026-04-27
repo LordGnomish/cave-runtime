@@ -1,7 +1,7 @@
 //! HTTP routes for cave-llm-gateway — OpenAI-compatible API + admin endpoints.
 
 use crate::api_keys::{ApiKeyStore, Scope};
-use crate::alias::{AliasRegistry, ModelAlias};
+use crate::alias::ModelAlias;
 use crate::error::GatewayError;
 use crate::openai::{ChatCompletionRequest, ModelList, ModelObject, OpenAIError};
 use crate::rate_limit::RateLimit;
@@ -11,7 +11,7 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    routing::{delete, get, post, put},
+    routing::{delete, get, post},
     Json, Router,
 };
 use serde::Deserialize;
@@ -161,8 +161,8 @@ async fn get_model(
 
     // Check provider models
     for provider_name in s.router.provider_names() {
-        if let Some(provider) = s.router.providers.get(&provider_name) {
-            if provider.supported_models().contains(&model) {
+        if let Some(provider) = s.router.providers.get(&provider_name)
+            && provider.supported_models().contains(&model) {
                 return Json(json!({
                     "id": model,
                     "object": "model",
@@ -170,7 +170,6 @@ async fn get_model(
                     "owned_by": provider_name,
                 })).into_response();
             }
-        }
     }
 
     StatusCode::NOT_FOUND.into_response()

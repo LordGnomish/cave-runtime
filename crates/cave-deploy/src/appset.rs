@@ -356,7 +356,7 @@ pub fn evaluate_git_directory_generator(git_gen: &GitGenerator, paths: &[&str]) 
     for path in paths {
         for filter in &git_gen.directories {
             if matches_glob(&filter.path, path) && !filter.exclude {
-                let dir_name = path.split('/').last().unwrap_or(path);
+                let dir_name = path.split('/').next_back().unwrap_or(path);
                 let mut p = git_gen.values.clone();
                 p.insert("path".to_string(), path.to_string());
                 p.insert("path.basename".to_string(), dir_name.to_string());
@@ -407,8 +407,7 @@ pub fn evaluate_matrix_generator(
 
 fn matches_glob(pattern: &str, path: &str) -> bool {
     if pattern == "*" { return true; }
-    if pattern.ends_with("/*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    if let Some(prefix) = pattern.strip_suffix("/*") {
         return path.starts_with(prefix);
     }
     if pattern.contains('*') {

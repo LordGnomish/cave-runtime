@@ -127,10 +127,8 @@ fn load_tls_config(cert_path: &str, key_path: &str) -> DnsResult<ServerConfig> {
         .with_no_client_auth()
         .with_single_cert(
             certs_der
-                .into_iter()
-                .map(rustls::pki_types::CertificateDer::from)
-                .collect(),
-            rustls::pki_types::PrivateKeyDer::Pkcs8(key.into()),
+                .into_iter().collect(),
+            rustls::pki_types::PrivateKeyDer::Pkcs8(key),
         )
         .map_err(|e| DnsError::Tls(e.to_string()))?;
 

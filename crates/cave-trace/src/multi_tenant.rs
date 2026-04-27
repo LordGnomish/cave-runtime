@@ -3,7 +3,7 @@
 //! Tenancy follows the Grafana/Tempo convention: the `X-Scope-OrgID` HTTP header
 //! carries the tenant identifier. Absent header → "default" tenant.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::RwLock;
 use serde::{Deserialize, Serialize};
 

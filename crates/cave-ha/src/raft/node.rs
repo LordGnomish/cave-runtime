@@ -495,8 +495,8 @@ impl RaftNode {
         }
 
         // Stale term: reject (except pre-vote replies).
-        if msg_term < self.current_term {
-            if !matches!(&msg, RaftMessage::RequestVoteReply(rv) if rv.pre_vote) {
+        if msg_term < self.current_term
+            && !matches!(&msg, RaftMessage::RequestVoteReply(rv) if rv.pre_vote) {
                 debug!(
                     id = self.id,
                     from,
@@ -506,7 +506,6 @@ impl RaftNode {
                 );
                 return;
             }
-        }
 
         match msg {
             RaftMessage::RequestVote(m) => self.handle_request_vote(from, m).await,
@@ -665,11 +664,10 @@ impl RaftNode {
         let first = self.log.first_index();
         let last = self.log.last_index();
         for i in first..=last {
-            if let Ok(t) = self.log.term(i) {
-                if t == term {
+            if let Ok(t) = self.log.term(i)
+                && t == term {
                     return Some(i);
                 }
-            }
         }
         None
     }
@@ -974,7 +972,7 @@ impl RaftNode {
 
         // Notify proposals that are now committed.
         let mut resolved = vec![];
-        for (idx, _) in &self.pending_proposals {
+        for idx in self.pending_proposals.keys() {
             if *idx <= new_commit {
                 resolved.push(*idx);
             }

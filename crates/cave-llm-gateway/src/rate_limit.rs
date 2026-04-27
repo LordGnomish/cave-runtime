@@ -3,7 +3,7 @@
 use crate::error::{GatewayError, GatewayResult};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateLimit {

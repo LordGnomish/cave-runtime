@@ -17,8 +17,8 @@ pub fn record_event(actor: &str, action: &str, resource_type: &str, resource_id:
 
 pub fn filter_events<'a>(events: &'a [AuditEvent], resource_type: Option<&str>, actor: Option<&str>) -> Vec<&'a AuditEvent> {
     events.iter().filter(|e| {
-        resource_type.map_or(true, |rt| e.resource_type == rt) &&
-        actor.map_or(true, |a| e.actor == a)
+        resource_type.is_none_or(|rt| e.resource_type == rt) &&
+        actor.is_none_or(|a| e.actor == a)
     }).collect()
 }
 

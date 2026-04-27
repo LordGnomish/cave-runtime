@@ -163,12 +163,11 @@ impl<'a> RuleEngine<'a> {
 
         let mut alerts = Vec::new();
         for rule in self.store.rule_set.rules.iter().filter(|r| r.enabled) {
-            if let Some(expr) = self.store.compiled_rules.get(&rule.name) {
-                if eval(expr, &eval_ctx) {
+            if let Some(expr) = self.store.compiled_rules.get(&rule.name)
+                && eval(expr, &eval_ctx) {
                     let output = format_output(&rule.output, &event.fields);
                     alerts.push(Alert::new(rule, output, event.fields.clone()));
                 }
-            }
         }
         alerts
     }

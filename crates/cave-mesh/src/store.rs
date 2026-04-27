@@ -5,18 +5,12 @@
 //! Sidecar, EnvoyFilter, WorkloadGroup, WorkloadEntry, Telemetry.
 
 use crate::{
-    auth::AuthEngine,
     error::{MeshError, MeshResult},
     models::{
         AuthorizationPolicy, DestinationRule, EnvoyFilter, Gateway, PeerAuthentication,
         RateLimitPolicy, RequestAuthentication, ServiceEntry, Sidecar, Telemetry, VirtualService,
         WorkloadEntry, WorkloadGroup,
     },
-    mtls::MtlsManager,
-    rate_limit::RateLimiter,
-    sidecar::{EnvoyFilterManager, SidecarManager, WorkloadGroupManager},
-    telemetry::TelemetryManager,
-    traffic::TrafficManager,
     MeshState,
 };
 use cave_db::{migrate::run_migrations, CavePool};
@@ -209,7 +203,7 @@ impl DbMeshStorage {
     pub async fn new(pool: Arc<CavePool>) -> MeshResult<Self> {
         run_migrations(&pool, MODULE, MIGRATIONS)
             .await
-            .map_err(|e| MeshError::Storage(e))?;
+            .map_err(MeshError::Storage)?;
         info!("cave-mesh DB migrations applied");
         Ok(Self { pool })
     }

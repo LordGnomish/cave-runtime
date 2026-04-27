@@ -1,7 +1,7 @@
 //! Guardrails — input/output content filtering.
 
 use crate::error::{GatewayError, GatewayResult};
-use crate::openai::{ChatCompletionRequest, ChatCompletionResponse, MessageContent};
+use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 

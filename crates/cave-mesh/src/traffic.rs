@@ -12,8 +12,8 @@
 //!   • W3C Trace Context propagation
 
 use crate::models::{
-    ConsistentHashKey, Destination, DestinationRule, FaultEffect, HttpFaultInjection,
-    HttpMatchRequest, HttpRedirect, HttpRewrite, HttpRoute, HttpRouteDestination, IncomingRequest,
+    DestinationRule, FaultEffect, HttpFaultInjection,
+    HttpMatchRequest, HttpRoute, HttpRouteDestination, IncomingRequest,
     LoadBalancerMode, Locality, MirrorDecision, RouteDecision, VirtualService,
 };
 use std::{

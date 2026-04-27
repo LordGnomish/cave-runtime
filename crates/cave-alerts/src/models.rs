@@ -67,7 +67,7 @@ impl Alert {
 
     /// Whether this alert is currently active (firing and not yet ended).
     pub fn is_active(&self, now: DateTime<Utc>) -> bool {
-        matches!(self.state, AlertState::Firing) && self.ends_at.map_or(true, |e| e > now)
+        matches!(self.state, AlertState::Firing) && self.ends_at.is_none_or(|e| e > now)
     }
 }
 
@@ -91,18 +91,15 @@ pub enum AlertState {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum MatchType {
+    #[default]
     Equal,
     NotEqual,
     Regex,
     NotRegex,
 }
 
-impl Default for MatchType {
-    fn default() -> Self {
-        MatchType::Equal
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Matcher {

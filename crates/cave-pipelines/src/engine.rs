@@ -83,13 +83,11 @@ impl Dag {
                 remaining.remove(name.as_str());
                 // Decrement dependents
                 for (other_name, other_node) in &self.nodes {
-                    if other_node.deps.contains(name) {
-                        if let Some(d) = remaining.get_mut(other_name.as_str()) {
-                            if *d > 0 {
+                    if other_node.deps.contains(name)
+                        && let Some(d) = remaining.get_mut(other_name.as_str())
+                            && *d > 0 {
                                 *d -= 1;
                             }
-                        }
-                    }
                 }
             }
             waves.push(wave_sorted);
@@ -191,16 +189,14 @@ pub fn validate_params(
                 }
 
                 // Enum check
-                if let Some(enum_vals) = &spec.enum_values {
-                    if let ParamValue::String(s) = &param.value {
-                        if !enum_vals.contains(s) {
+                if let Some(enum_vals) = &spec.enum_values
+                    && let ParamValue::String(s) = &param.value
+                        && !enum_vals.contains(s) {
                             errors.push(format!(
                                 "Parameter '{}' value '{}' not in allowed values {:?}",
                                 spec.name, s, enum_vals
                             ));
                         }
-                    }
-                }
             }
         }
     }

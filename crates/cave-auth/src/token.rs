@@ -110,15 +110,14 @@ impl TokenManager {
             .map_err(|e| format!("Introspection parse error: {e}"))?;
 
         // Also check local denylist
-        if let Some(ref jti) = introspection.jti {
-            if self.is_denied(jti).await {
+        if let Some(ref jti) = introspection.jti
+            && self.is_denied(jti).await {
                 debug!(jti = %jti, "Token in local denylist");
                 return Ok(IntrospectionResponse {
                     active: false,
                     ..introspection
                 });
             }
-        }
 
         Ok(introspection)
     }

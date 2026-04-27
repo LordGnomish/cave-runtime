@@ -4,7 +4,6 @@
 //! URL structure but with a simplified signing scheme for the cave-store context.
 
 use crate::error::{StoreError, StoreResult};
-use base64::Engine;
 use chrono::Utc;
 use ring::hmac;
 

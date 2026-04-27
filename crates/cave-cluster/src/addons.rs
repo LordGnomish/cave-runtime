@@ -79,6 +79,12 @@ pub struct AddonManager {
     addons: DashMap<(String, String), AddonSpec>,
 }
 
+impl Default for AddonManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AddonManager {
     pub fn new() -> Self {
         Self {

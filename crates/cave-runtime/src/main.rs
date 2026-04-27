@@ -249,7 +249,7 @@ async fn main() -> anyhow::Result<()> {
         // Auth endpoints
         .merge(cave_auth::auth_routes::router())
         // JWT auth middleware
-        .layer(axum::middleware::from_fn(|mut req: axum::extract::Request, next: axum::middleware::Next| async move {
+        .layer(axum::middleware::from_fn(|req: axum::extract::Request, next: axum::middleware::Next| async move {
             let state = req.extensions().get::<Arc<cave_auth::jwt_middleware::AuthState>>().cloned();
             match state {
                 Some(s) => cave_auth::jwt_middleware::auth_middleware_inner(s, req, next).await,

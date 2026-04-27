@@ -6,7 +6,6 @@
 //!   • WorkloadGroupManager — WorkloadGroup + standalone WorkloadEntry (VM integration)
 
 use crate::models::{EnvoyFilter, Sidecar, WorkloadEntry, WorkloadGroup};
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,

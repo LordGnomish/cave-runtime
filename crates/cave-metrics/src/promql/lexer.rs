@@ -138,22 +138,20 @@ impl Lexer {
             }
         }
         // Duration check: 5m, 1h, etc.  (only if suffix follows immediately)
-        if let Some(suffix_start) = self.peek() {
-            if suffix_start.is_alphabetic() {
+        if let Some(suffix_start) = self.peek()
+            && suffix_start.is_alphabetic() {
                 let mut suffix = String::new();
                 while matches!(self.peek(), Some(c) if c.is_alphanumeric()) {
                     suffix.push(self.advance().unwrap());
                 }
-                if let Ok(base) = s.parse::<f64>() {
-                    if let Some(ms) = parse_duration_suffix(base, &suffix) {
+                if let Ok(base) = s.parse::<f64>()
+                    && let Some(ms) = parse_duration_suffix(base, &suffix) {
                         return Token::Duration(ms);
                     }
                     // It's a number followed by an identifier — put back
                     // We can't actually put back, so return a best-effort number.
-                }
                 return Token::Duration(0); // fallback
             }
-        }
         Token::Number(s.parse().unwrap_or(f64::NAN))
     }
 

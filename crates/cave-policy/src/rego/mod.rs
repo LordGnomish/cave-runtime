@@ -78,7 +78,7 @@ impl PolicyEngine {
                 &patch.path,
                 patch.value.as_ref(),
                 patch.from.as_deref(),
-            ).map_err(|e| crate::error::PolicyError::Eval(e))?;
+            ).map_err(crate::error::PolicyError::Eval)?;
         }
         Ok(())
     }

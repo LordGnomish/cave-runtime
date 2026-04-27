@@ -24,7 +24,6 @@
 //!   { .http.status_code >= 500 && .service.name = "api" }
 //!   { .http.method =~ "GET|POST" }
 
-use std::collections::HashMap;
 use crate::types::{Span, SpanStatus, TagValue};
 use crate::{Result, TraceError};
 
@@ -161,7 +160,7 @@ impl<'a> Lexer<'a> {
                 '.' => {
                     self.advance();
                     // read dotted path
-                    let start = self.pos;
+                    let _start = self.pos;
                     let ident = self.read_while(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-');
                     Token::DotIdent(ident.to_owned())
                 }
@@ -195,7 +194,7 @@ impl<'a> Lexer<'a> {
                 c if c.is_ascii_digit() || (c == '-' && self.input[self.pos+1..].starts_with(|d: char| d.is_ascii_digit())) => {
                     let start = self.pos;
                     if c == '-' { self.advance(); }
-                    let int_part = self.read_while(|c| c.is_ascii_digit());
+                    let _int_part = self.read_while(|c| c.is_ascii_digit());
                     let is_float = self.peek() == Some('.');
                     if is_float {
                         self.advance();

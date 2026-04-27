@@ -5,7 +5,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -101,7 +101,7 @@ pub async fn read_role(
     let _token = extract_token(&headers)?;
     let store = state.kubernetes_store.read().await;
     let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+        .ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 

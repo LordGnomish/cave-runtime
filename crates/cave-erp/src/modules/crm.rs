@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, post},
+    routing::post,
     Json, Router,
 };
 use chrono::Utc;
@@ -90,7 +90,7 @@ async fn convert_lead(
     Path(id): Path<Uuid>,
     Json(_req): Json<ConvertLeadRequest>,
 ) -> impl IntoResponse {
-    let mut leads = store.leads.write().await;
+    let leads = store.leads.write().await;
     let Some(lead_snapshot) = leads.get(&id).cloned() else {
         return (StatusCode::NOT_FOUND, Json(Lead {
             id: Uuid::nil(),

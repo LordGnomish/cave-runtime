@@ -58,7 +58,7 @@ pub fn format_search_bar(filter: &str) -> String {
 ///
 /// Returns `(start_index, slice)` so the caller can render absolute
 /// row numbers if it wants to.
-pub fn paginate<'a, T>(items: &'a [T], viewport_height: usize, selected: usize) -> (usize, &'a [T]) {
+pub fn paginate<T>(items: &[T], viewport_height: usize, selected: usize) -> (usize, &[T]) {
     if items.is_empty() || viewport_height == 0 {
         return (0, &[]);
     }

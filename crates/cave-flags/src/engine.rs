@@ -5,7 +5,7 @@
 
 use crate::models::{
     Constraint, ConstraintOperator, EvaluatedVariant, FeatureFlag, FeatureStrategy, Segment,
-    UnleashContext, Variant, WeightType,
+    UnleashContext, Variant,
 };
 use std::collections::HashMap;
 use tracing::trace;
@@ -161,12 +161,11 @@ fn evaluate_strategy(
     segments: &HashMap<i64, &Segment>,
 ) -> bool {
     for seg_id in &strategy.segments {
-        if let Some(seg) = segments.get(seg_id) {
-            if !evaluate_constraints(&seg.constraints, ctx) {
+        if let Some(seg) = segments.get(seg_id)
+            && !evaluate_constraints(&seg.constraints, ctx) {
                 trace!(strategy = %strategy.name, segment = seg_id, "segment constraint failed");
                 return false;
             }
-        }
     }
 
     if !evaluate_constraints(&strategy.constraints, ctx) {
@@ -457,8 +456,8 @@ pub fn select_variant(
     // Override check
     for variant in variants {
         for ov in &variant.overrides {
-            if let Some(ctx_val) = ctx.get_field(&ov.context_name) {
-                if ov.values.iter().any(|v| v == &ctx_val) {
+            if let Some(ctx_val) = ctx.get_field(&ov.context_name)
+                && ov.values.iter().any(|v| v == &ctx_val) {
                     return EvaluatedVariant {
                         name: variant.name.clone(),
                         enabled: true,
@@ -466,7 +465,6 @@ pub fn select_variant(
                         feature_enabled,
                     };
                 }
-            }
         }
     }
 

@@ -38,11 +38,10 @@ impl ApiKey {
         if self.revoked {
             return false;
         }
-        if let Some(expires_at) = self.expires_at {
-            if chrono::Utc::now().timestamp() > expires_at {
+        if let Some(expires_at) = self.expires_at
+            && chrono::Utc::now().timestamp() > expires_at {
                 return false;
             }
-        }
         true
     }
 

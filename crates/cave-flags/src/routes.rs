@@ -259,7 +259,7 @@ async fn evaluate_for_frontend(
     let toggles: Vec<FrontendToggle> = cache
         .features
         .iter()
-        .zip(raw.into_iter())
+        .zip(raw)
         .map(|(flag, (_name, enabled, variant))| FrontendToggle {
             name: flag.name.clone(),
             enabled,

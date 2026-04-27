@@ -1,4 +1,4 @@
-use crate::models::{ScaffoldTemplate, JobStatus};
+use crate::models::ScaffoldTemplate;
 use std::collections::HashMap;
 
 /// Validate that all required variables are provided
@@ -12,11 +12,10 @@ pub fn validate_parameters(template: &ScaffoldTemplate, params: &HashMap<String,
 /// Apply default values for missing optional variables
 pub fn apply_defaults(template: &ScaffoldTemplate, params: &mut HashMap<String, String>) {
     for var in &template.variables {
-        if !params.contains_key(&var.name) {
-            if let Some(ref default) = var.default_value {
+        if !params.contains_key(&var.name)
+            && let Some(ref default) = var.default_value {
                 params.insert(var.name.clone(), default.clone());
             }
-        }
     }
 }
 

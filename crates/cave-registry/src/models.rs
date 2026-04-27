@@ -226,8 +226,7 @@ pub enum V2Op {
 pub fn classify_v2_path(path: &str) -> V2Op {
     let path = path.trim_start_matches('/');
 
-    if path.ends_with("/tags/list") {
-        let name = &path[..path.len() - "/tags/list".len()];
+    if let Some(name) = path.strip_suffix("/tags/list") {
         if !name.is_empty() {
             return V2Op::TagsList(name.to_string());
         }

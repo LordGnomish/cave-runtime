@@ -259,11 +259,10 @@ fn find_op(s: &str) -> Option<usize> {
     for i in 0..bytes.len() {
         match bytes[i] {
             b'=' => return Some(i),
-            b'!' | b'~' => {
-                if i + 1 < bytes.len() && (bytes[i + 1] == b'=' || bytes[i + 1] == b'~') {
+            b'!' | b'~'
+                if i + 1 < bytes.len() && (bytes[i + 1] == b'=' || bytes[i + 1] == b'~') => {
                     return Some(i);
                 }
-            }
             _ => {}
         }
     }

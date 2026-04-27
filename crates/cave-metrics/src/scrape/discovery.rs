@@ -1,10 +1,8 @@
 //! Service discovery backends: static, file-based, and Kubernetes.
 
-use serde::{Deserialize, Serialize};
-use std::path::Path;
-use crate::error::Result;
+use serde::Deserialize;
 use crate::model::Labels;
-use super::target::{FileSdConfig, KubernetesSdConfig, ScrapeConfig, ScrapeTarget, StaticConfig};
+use super::target::{FileSdConfig, ScrapeConfig, ScrapeTarget, StaticConfig};
 
 /// Resolve static configs into targets.
 pub fn resolve_static(job_name: &str, config: &ScrapeConfig, sc: &StaticConfig) -> Vec<ScrapeTarget> {
@@ -25,17 +23,16 @@ pub fn resolve_file_sd(job_name: &str, config: &ScrapeConfig, fsc: &FileSdConfig
     let mut targets = Vec::new();
     for file_pattern in &fsc.files {
         // Simple glob expansion: for now treat as literal paths.
-        if let Ok(content) = std::fs::read_to_string(file_pattern) {
-            if let Ok(groups) = serde_json::from_str::<Vec<FileSdGroup>>(&content) {
+        if let Ok(content) = std::fs::read_to_string(file_pattern)
+            && let Ok(groups) = serde_json::from_str::<Vec<FileSdGroup>>(&content) {
                 for group in groups {
                     let sc = StaticConfig {
                         targets: group.targets,
-                        labels: Labels::from_pairs(group.labels.into_iter()),
+                        labels: Labels::from_pairs(group.labels),
                     };
                     targets.extend(resolve_static(job_name, config, &sc));
                 }
             }
-        }
     }
     targets
 }

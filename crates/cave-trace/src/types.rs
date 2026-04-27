@@ -230,11 +230,10 @@ impl Span {
             return v.display() != "false";
         }
         // OpenTelemetry http.status_code
-        if let Some(v) = self.tags.get("http.status_code") {
-            if let Some(code) = v.as_i64() {
+        if let Some(v) = self.tags.get("http.status_code")
+            && let Some(code) = v.as_i64() {
                 return code >= 500;
             }
-        }
         false
     }
 }
@@ -318,15 +317,14 @@ impl SpanNode {
         }
 
         // If no explicit root found, use the earliest span
-        if root_indices.is_empty() {
-            if let Some((idx, _)) = spans
+        if root_indices.is_empty()
+            && let Some((idx, _)) = spans
                 .iter()
                 .enumerate()
                 .min_by_key(|(_, s)| s.start_time_unix_nano)
             {
                 root_indices.push(idx);
             }
-        }
 
         fn build_node(idx: usize, spans: &[Span], cm: &HashMap<SpanId, Vec<usize>>) -> SpanNode {
             let span = spans[idx].clone();

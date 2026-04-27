@@ -31,7 +31,7 @@ pub async fn apply_update(zone: &mut Zone, update_msg: &Message) -> DnsResult<Me
         }
     };
 
-    if &zone.origin != &zone_name {
+    if zone.origin != zone_name {
         resp.set_response_code(ResponseCode::NotAuth);
         return Ok(resp);
     }

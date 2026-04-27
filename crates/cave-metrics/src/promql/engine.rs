@@ -109,8 +109,8 @@ impl Engine {
         }
 
         // Scalar op vector or vector op scalar
-        if let QueryResult::Scalar(scalar) = &rhs {
-            if let QueryResult::InstantVector(iv) = lhs {
+        if let QueryResult::Scalar(scalar) = &rhs
+            && let QueryResult::InstantVector(iv) = lhs {
                 return Ok(QueryResult::InstantVector(
                     iv.into_iter().map(|(l, v)| {
                         let val = b.op.apply(v, *scalar);
@@ -122,10 +122,9 @@ impl Engine {
                     }).filter(|(_, v)| !v.is_nan()).collect()
                 ));
             }
-        }
 
-        if let QueryResult::Scalar(scalar) = &lhs {
-            if let QueryResult::InstantVector(iv) = rhs {
+        if let QueryResult::Scalar(scalar) = &lhs
+            && let QueryResult::InstantVector(iv) = rhs {
                 return Ok(QueryResult::InstantVector(
                     iv.into_iter().map(|(l, v)| {
                         let val = b.op.apply(*scalar, v);
@@ -137,7 +136,6 @@ impl Engine {
                     }).filter(|(_, v)| !v.is_nan()).collect()
                 ));
             }
-        }
 
         // Vector op vector
         if let (QueryResult::InstantVector(liv), QueryResult::InstantVector(riv)) = (lhs, rhs) {

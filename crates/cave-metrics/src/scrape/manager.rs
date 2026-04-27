@@ -4,11 +4,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use parking_lot::RwLock;
 use tokio::time::interval;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::ingestion::exposition;
 use crate::ingestion::openmetrics;
-use crate::model::{Labels, Sample};
 use crate::tsdb::Tsdb;
 use super::target::{ScrapeConfig, ScrapeTarget};
 use super::discovery;

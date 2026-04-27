@@ -39,7 +39,7 @@ impl RewritePlugin {
         Ok(Self { rules })
     }
 
-    fn rewrite_name<'a>(&self, name: &'a str, rule: &CompiledRule) -> Option<String> {
+    fn rewrite_name(&self, name: &str, rule: &CompiledRule) -> Option<String> {
         match rule.rule.match_type {
             MatchType::Exact => {
                 if name == rule.rule.from || name == format!("{}.", rule.rule.from) {

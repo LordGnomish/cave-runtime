@@ -1,7 +1,5 @@
 use crate::engine::{ScanError, Scanner};
 use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
-use async_trait::async_trait;
-use regex::Regex;
 
 pub struct ImageScanner;
 

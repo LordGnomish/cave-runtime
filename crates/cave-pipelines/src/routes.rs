@@ -1,15 +1,15 @@
 //! HTTP API routes for cave-pipelines.
 
 use crate::{
-    engine::{validate_params, Dag},
+    engine::Dag,
     models::*,
-    triggers::{CronTrigger, EventListener, WebhookEvent, passes_interceptors},
+    triggers::{CronTrigger, EventListener, WebhookEvent},
     PipelinesState,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -124,7 +124,7 @@ struct StartRunRequest {
 }
 
 async fn start_pipeline_run(
-    State(state): State<Arc<PipelinesState>>,
+    State(_state): State<Arc<PipelinesState>>,
     Path(pipeline_id): Path<Uuid>,
     Json(req): Json<StartRunRequest>,
 ) -> (StatusCode, Json<PipelineRun>) {

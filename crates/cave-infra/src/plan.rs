@@ -1,8 +1,7 @@
 //! Change plan engine — diff desired vs actual state, generate an execution plan.
 
-use crate::error::{InfraError, InfraResult};
-use crate::graph::apply_order;
-use crate::resource::{ResourceSpec, ResourceState, ResourceStatus, ResourceStore};
+use crate::error::InfraResult;
+use crate::resource::{ResourceSpec, ResourceStatus, ResourceStore};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

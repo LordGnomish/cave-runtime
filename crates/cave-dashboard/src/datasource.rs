@@ -229,15 +229,14 @@ fn parse_prometheus_response(ref_id: &str, json: &serde_json::Value) -> QueryRes
 
             if let Some(vals) = result.get("values").and_then(|v| v.as_array()) {
                 for pair in vals {
-                    if let Some(arr) = pair.as_array() {
-                        if arr.len() >= 2 {
+                    if let Some(arr) = pair.as_array()
+                        && arr.len() >= 2 {
                             let ts_ms = arr[0].as_f64().map(|t| t * 1000.0).unwrap_or(0.0) as i64;
                             let val_str = arr[1].as_str().unwrap_or("0");
                             let val: f64 = val_str.parse().unwrap_or(0.0);
                             times.push(serde_json::Value::Number(serde_json::Number::from(ts_ms)));
                             values.push(serde_json::json!(val));
                         }
-                    }
                 }
             }
 
@@ -285,15 +284,14 @@ fn parse_loki_response(ref_id: &str, json: &serde_json::Value) -> QueryResult {
         for stream in streams {
             if let Some(values) = stream.get("values").and_then(|v| v.as_array()) {
                 for entry in values {
-                    if let Some(pair) = entry.as_array() {
-                        if pair.len() >= 2 {
+                    if let Some(pair) = entry.as_array()
+                        && pair.len() >= 2 {
                             let ts_ns = pair[0].as_str().unwrap_or("0").parse::<i64>().unwrap_or(0);
                             let ts_ms = ts_ns / 1_000_000;
                             let line = pair[1].as_str().unwrap_or("").to_string();
                             times.push(serde_json::Value::Number(serde_json::Number::from(ts_ms)));
                             lines.push(serde_json::Value::String(line));
                         }
-                    }
                 }
             }
         }
@@ -331,7 +329,7 @@ fn empty_result(ref_id: &str) -> QueryResult {
     }
 }
 
-fn error_result(ref_id: &str, msg: &str) -> QueryResult {
+fn error_result(_ref_id: &str, msg: &str) -> QueryResult {
     QueryResult {
         frames: vec![],
         status: 500,

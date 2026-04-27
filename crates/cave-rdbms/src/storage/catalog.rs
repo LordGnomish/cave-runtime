@@ -9,7 +9,7 @@ impl SystemCatalog {
     pub fn pg_tables(db: &Database) -> Vec<Vec<String>> {
         let mut rows = Vec::new();
         for (schema_name, schema) in &db.schemas {
-            for (table_name, _table) in &schema.tables {
+            for table_name in schema.tables.keys() {
                 rows.push(vec![
                     schema_name.clone(),
                     table_name.clone(),
@@ -26,7 +26,7 @@ impl SystemCatalog {
     pub fn information_schema_tables(db: &Database) -> Vec<Vec<String>> {
         let mut rows = Vec::new();
         for (schema_name, schema) in &db.schemas {
-            for (table_name, _table) in &schema.tables {
+            for table_name in schema.tables.keys() {
                 rows.push(vec![
                     "def".to_string(),         // table_catalog
                     schema_name.clone(),       // table_schema

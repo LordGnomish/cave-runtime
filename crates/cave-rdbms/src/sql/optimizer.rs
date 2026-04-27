@@ -11,11 +11,10 @@ impl Optimizer {
             Expr::BinaryOp { left, op, right } => {
                 let left = Self::fold_constants(left);
                 let right = Self::fold_constants(right);
-                if let (Expr::Literal(l), Expr::Literal(r)) = (&left, &right) {
-                    if let Some(result) = Self::eval_binop(l, *op, r) {
+                if let (Expr::Literal(l), Expr::Literal(r)) = (&left, &right)
+                    && let Some(result) = Self::eval_binop(l, *op, r) {
                         return Expr::Literal(result);
                     }
-                }
                 Expr::BinaryOp {
                     left: Box::new(left),
                     op: *op,
@@ -24,11 +23,10 @@ impl Optimizer {
             }
             Expr::UnaryOp { op, operand } => {
                 let operand = Self::fold_constants(operand);
-                if let Expr::Literal(lit) = &operand {
-                    if let Some(result) = Self::eval_unop(*op, lit) {
+                if let Expr::Literal(lit) = &operand
+                    && let Some(result) = Self::eval_unop(*op, lit) {
                         return Expr::Literal(result);
                     }
-                }
                 Expr::UnaryOp {
                     op: *op,
                     operand: Box::new(operand),

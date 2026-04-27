@@ -145,14 +145,13 @@ impl TableMetadata {
                 )));
             }
         }
-        if let Some(cur_id) = self.current_snapshot_id {
-            if !self.snapshots.iter().any(|s| s.snapshot_id == cur_id) {
+        if let Some(cur_id) = self.current_snapshot_id
+            && !self.snapshots.iter().any(|s| s.snapshot_id == cur_id) {
                 return Err(IcebergError::TableMetadata(format!(
                     "current_snapshot_id {} not found in snapshots",
                     cur_id
                 )));
             }
-        }
         Ok(())
     }
 }

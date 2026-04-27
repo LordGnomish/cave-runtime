@@ -38,11 +38,10 @@ impl PersonalAccessToken {
         if self.revoked {
             return false;
         }
-        if let Some(exp) = self.expires_at {
-            if Utc::now() > exp {
+        if let Some(exp) = self.expires_at
+            && Utc::now() > exp {
                 return false;
             }
-        }
         true
     }
 
@@ -167,11 +166,10 @@ impl PatService {
             return Err("PAT is revoked or expired".to_string());
         }
 
-        if let Some(scope) = required_scope {
-            if !pat.has_scope(scope) {
+        if let Some(scope) = required_scope
+            && !pat.has_scope(scope) {
                 return Err(format!("PAT lacks required scope: {scope}"));
             }
-        }
 
         pat.last_used_at = Some(Utc::now());
         Ok(pat.clone())

@@ -51,27 +51,23 @@
 //!   /api/dashboard/health            GET
 
 use crate::{
-    alerting::{build_alert_groups, evaluate_alert_rule},
-    auth::{generate_api_key, hash_api_key, require_editor},
+    alerting::build_alert_groups,
+    auth::{generate_api_key, hash_api_key},
     datasource::check_health,
     models::*,
-    provisioning::{
-        parse_alert_rule_provisioning, parse_contact_point_provisioning,
-        parse_datasource_provisioning, parse_notification_policy_provisioning,
-    },
-    query::{apply_transformations, QueryCache},
+    query::QueryCache,
     renderer::render_dashboard,
     store::{DashboardStore, StoreError},
 };
 use axum::{
     body::Body,
     extract::{Path, Query, State},
-    http::{header, HeaderMap, StatusCode},
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post, put},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -542,15 +538,15 @@ async fn delete_folder(
 }
 
 async fn get_folder_permissions(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
+    State(_state): State<AppState>,
+    Path(_uid): Path<String>,
 ) -> Response {
     Json(json!([])).into_response()
 }
 
 async fn set_folder_permissions(
-    State(state): State<AppState>,
-    Path(uid): Path<String>,
+    State(_state): State<AppState>,
+    Path(_uid): Path<String>,
     Json(_): Json<serde_json::Value>,
 ) -> Response {
     Json(json!({"message":"Folder permissions updated"})).into_response()
@@ -766,7 +762,7 @@ async fn delete_snapshot(
     }
 }
 
-async fn list_snapshots(State(state): State<AppState>) -> Response {
+async fn list_snapshots(State(_state): State<AppState>) -> Response {
     Json(json!([])).into_response()
 }
 
@@ -892,7 +888,7 @@ async fn get_user(
     }
 }
 
-async fn current_user(State(state): State<AppState>) -> Response {
+async fn current_user(State(_state): State<AppState>) -> Response {
     Json(json!({
         "id": 1,
         "uid": "admin",

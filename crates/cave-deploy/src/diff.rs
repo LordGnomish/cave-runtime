@@ -1,7 +1,6 @@
 //! Diff engine — live vs desired state, structured merge diff.
 
 use serde_json::Value;
-use std::collections::HashMap;
 
 /// A single diff entry between desired and live state.
 #[derive(Debug, Clone, PartialEq)]
@@ -144,7 +143,7 @@ impl IgnoredDiff {
         if let Some(ref ptr) = self.json_pointer {
             // Simple prefix match for JSON pointer
             let normalized_ptr = ptr.trim_start_matches('/').replace('/', ".");
-            return path.starts_with(&normalized_ptr) || &normalized_ptr == path;
+            return path.starts_with(&normalized_ptr) || normalized_ptr == path;
         }
         false
     }

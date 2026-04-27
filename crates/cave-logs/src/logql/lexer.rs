@@ -174,7 +174,7 @@ impl<'a> Lexer<'a> {
                 self.advance();
                 // Skip line comments: // ...
                 if self.peek() == Some(b'/') {
-                    while self.peek().map_or(false, |b| b != b'\n') { self.advance(); }
+                    while self.peek().is_some_and(|b| b != b'\n') { self.advance(); }
                     self.skip_whitespace();
                     self.next_token()
                 } else {
@@ -250,14 +250,14 @@ impl<'a> Lexer<'a> {
 
     fn read_number_or_duration(&mut self) -> Result<Token, LexError> {
         let start = self.pos;
-        while self.peek().map_or(false, |b| b.is_ascii_digit() || b == b'.') {
+        while self.peek().is_some_and(|b| b.is_ascii_digit() || b == b'.') {
             self.advance();
         }
         let num_str = std::str::from_utf8(&self.input[start..self.pos]).unwrap();
 
         // Check for duration suffix: s, m, h, d, w, y, ms, us, µs, ns
         let suffix_start = self.pos;
-        while self.peek().map_or(false, |b| b.is_ascii_alphabetic() || b == b'\xc2') {
+        while self.peek().is_some_and(|b| b.is_ascii_alphabetic() || b == b'\xc2') {
             self.advance();
         }
         if self.pos > suffix_start {
@@ -284,7 +284,7 @@ impl<'a> Lexer<'a> {
 
     fn read_ident_or_keyword(&mut self) -> Result<Token, LexError> {
         let start = self.pos;
-        while self.peek().map_or(false, |b| b.is_ascii_alphanumeric() || b == b'_') {
+        while self.peek().is_some_and(|b| b.is_ascii_alphanumeric() || b == b'_') {
             self.advance();
         }
         let word = std::str::from_utf8(&self.input[start..self.pos]).unwrap();

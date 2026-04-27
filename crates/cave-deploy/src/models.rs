@@ -321,18 +321,15 @@ pub struct ApplicationCondition {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ResourceTracking {
     Annotation,
     Label,
     /// ArgoCD tracking label (default).
+    #[default]
     ArgocdLabel,
 }
 
-impl Default for ResourceTracking {
-    fn default() -> Self {
-        Self::ArgocdLabel
-    }
-}
 
 // ─── Application CRD ─────────────────────────────────────────────────────────
 

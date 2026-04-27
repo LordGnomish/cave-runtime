@@ -188,24 +188,22 @@ impl PipelineEngine {
         };
 
         // Check required fields listed in the JSON Schema
-        if let Some(required) = promise.api_schema.get("required") {
-            if let Some(required_fields) = required.as_array() {
+        if let Some(required) = promise.api_schema.get("required")
+            && let Some(required_fields) = required.as_array() {
                 for field in required_fields {
-                    if let Some(field_name) = field.as_str() {
-                        if !spec_obj.contains_key(field_name) {
+                    if let Some(field_name) = field.as_str()
+                        && !spec_obj.contains_key(field_name) {
                             errors.push(format!("Required field '{}' is missing", field_name));
                         }
-                    }
                 }
             }
-        }
 
         // Check property types if `properties` is defined
-        if let Some(properties) = promise.api_schema.get("properties") {
-            if let Some(props_obj) = properties.as_object() {
+        if let Some(properties) = promise.api_schema.get("properties")
+            && let Some(props_obj) = properties.as_object() {
                 for (field_name, field_schema) in props_obj {
-                    if let Some(value) = spec_obj.get(field_name) {
-                        if let Some(expected_type) = field_schema.get("type").and_then(|t| t.as_str()) {
+                    if let Some(value) = spec_obj.get(field_name)
+                        && let Some(expected_type) = field_schema.get("type").and_then(|t| t.as_str()) {
                             let actual_ok = match expected_type {
                                 "string" => value.is_string(),
                                 "integer" | "number" => value.is_number(),
@@ -223,10 +221,8 @@ impl PipelineEngine {
                                 ));
                             }
                         }
-                    }
                 }
             }
-        }
 
         if errors.is_empty() {
             Ok(())

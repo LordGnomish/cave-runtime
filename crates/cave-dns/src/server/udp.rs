@@ -16,7 +16,7 @@ pub async fn serve(addr: String, plugins: Arc<PluginChain>) -> DnsResult<()> {
     let socket = Arc::new(
         UdpSocket::bind(&addr)
             .await
-            .map_err(|e| DnsError::Io(e))?,
+            .map_err(DnsError::Io)?,
     );
     tracing::info!(addr = %addr, "UDP DNS server listening");
 

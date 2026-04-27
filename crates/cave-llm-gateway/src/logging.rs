@@ -4,7 +4,6 @@ use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,11 +117,10 @@ impl RequestLogger {
 
     fn insert(&self, log: RequestLog) -> String {
         // Evict oldest if over limit
-        if self.logs.len() >= self.max_entries {
-            if let Some(old_key) = self.logs.iter().next().map(|e| e.key().clone()) {
+        if self.logs.len() >= self.max_entries
+            && let Some(old_key) = self.logs.iter().next().map(|e| e.key().clone()) {
                 self.logs.remove(&old_key);
             }
-        }
 
         // Increment consumer counter
         self.counter

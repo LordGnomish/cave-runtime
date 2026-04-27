@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 
 use crate::storage::TraceStore;
 use crate::types::{
-    LatencyHistogram, ServiceDependency, ServiceEdge, Span, SpanStatus, Trace, TraceId,
+    LatencyHistogram, ServiceDependency, ServiceEdge, Span, Trace, TraceId,
     TraceSearchQuery,
 };
 use crate::{Result, TraceError};
@@ -113,7 +113,7 @@ impl QueryEngine {
         let store = self.store.read().await;
         let mut counts: HashMap<(String, String), (u64, u64)> = HashMap::new(); // (total, errors)
 
-        let records = if let Some(t) = tenant_id {
+        let _records = if let Some(t) = tenant_id {
             store.all_records_for_tenant(t)
         } else {
             store.all_records_for_tenant("") // will be empty; let's iterate differently
@@ -134,11 +134,10 @@ impl QueryEngine {
 
         for record in records {
             for span in &record.spans {
-                if let (Some(s), Some(e)) = (start_ns, end_ns) {
-                    if span.start_time_unix_nano < s || span.start_time_unix_nano > e {
+                if let (Some(s), Some(e)) = (start_ns, end_ns)
+                    && (span.start_time_unix_nano < s || span.start_time_unix_nano > e) {
                         continue;
                     }
-                }
                 let key = (span.service_name.clone(), span.operation_name.clone());
                 let entry = counts.entry(key).or_insert((0, 0));
                 entry.0 += 1;
@@ -183,9 +182,9 @@ impl QueryEngine {
                 record.spans.iter().map(|s| (s.span_id, s)).collect();
 
             for span in &record.spans {
-                if let Some(parent_id) = span.parent_span_id {
-                    if let Some(parent) = span_map.get(&parent_id) {
-                        if parent.service_name != span.service_name {
+                if let Some(parent_id) = span.parent_span_id
+                    && let Some(parent) = span_map.get(&parent_id)
+                        && parent.service_name != span.service_name {
                             let edge = ServiceEdge {
                                 parent: parent.service_name.clone(),
                                 child: span.service_name.clone(),
@@ -195,8 +194,6 @@ impl QueryEngine {
                             if span.has_error() { e.1 += 1; }
                             e.2 += span.duration_ns;
                         }
-                    }
-                }
             }
         }
 

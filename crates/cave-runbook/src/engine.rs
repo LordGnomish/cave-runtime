@@ -216,7 +216,7 @@ fn evaluate_condition(
     condition: Option<&str>,
     _variables: &HashMap<String, serde_json::Value>,
 ) -> bool {
-    condition.map_or(true, |c| c != "false")
+    condition != Some("false")
 }
 
 /// Cancel an execution.

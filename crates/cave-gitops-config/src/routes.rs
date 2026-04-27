@@ -18,17 +18,11 @@ use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[derive(Default)]
 pub struct GitOpsAppState {
     pub store: GitOpsStore,
 }
 
-impl Default for GitOpsAppState {
-    fn default() -> Self {
-        Self {
-            store: GitOpsStore::new(),
-        }
-    }
-}
 
 pub fn create_router(state: Arc<GitOpsAppState>) -> Router {
     Router::new()

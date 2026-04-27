@@ -209,8 +209,8 @@ impl Parser {
         }
 
         // subquery: [range:step]
-        if matches!(self.peek(), Token::LBracket) {
-            if let Expr::VectorSelector(_) = &expr {
+        if matches!(self.peek(), Token::LBracket)
+            && let Expr::VectorSelector(_) = &expr {
                 // Check if it's matrix or subquery
                 let saved = self.pos;
                 self.advance(); // [
@@ -234,7 +234,7 @@ impl Parser {
                     } else if matches!(self.peek(), Token::RBracket) {
                         self.advance(); // ]
                         // Matrix selector
-                        return Ok(self.make_matrix(expr, range)?);
+                        return self.make_matrix(expr, range);
                     } else {
                         self.pos = saved;
                     }
@@ -242,7 +242,6 @@ impl Parser {
                     self.pos = saved;
                 }
             }
-        }
 
         Ok(expr)
     }
@@ -353,10 +352,7 @@ impl Parser {
                 self.eat(&Token::LParen)?;
                 let mut labels = Vec::new();
                 while !matches!(self.peek(), Token::RParen | Token::Eof) {
-                    match self.advance().clone() {
-                        Token::Ident(s) => labels.push(s),
-                        _ => {}
-                    }
+                    if let Token::Ident(s) = self.advance().clone() { labels.push(s) }
                     if matches!(self.peek(), Token::Comma) { self.advance(); }
                 }
                 self.eat(&Token::RParen)?;
@@ -389,11 +385,10 @@ impl Parser {
         let mut matchers = Vec::new();
 
         // Add __name__ matcher if we have a metric name
-        if let Some(ref n) = name {
-            if !n.is_empty() {
+        if let Some(ref n) = name
+            && !n.is_empty() {
                 matchers.push(LabelMatcher::equal("__name__", n.as_str()));
             }
-        }
 
         // Optional label selector block
         if matches!(self.peek(), Token::LBrace) {

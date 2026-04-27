@@ -71,8 +71,8 @@ pub async fn auth_middleware(
     validation.set_issuer(&[&state.issuer]);
 
     for key in &jwks.keys {
-        if let Ok(decoding_key) = DecodingKey::from_jwk(key) {
-            if let Ok(token_data) = decode::<RawClaims>(&token, &decoding_key, &validation) {
+        if let Ok(decoding_key) = DecodingKey::from_jwk(key)
+            && let Ok(token_data) = decode::<RawClaims>(&token, &decoding_key, &validation) {
                 match token_data.claims.to_identity() {
                     Ok(identity) => {
                         debug!(cave_uid = %identity.cave_uid, tenant = %identity.tenant_id, "Authenticated");
@@ -84,21 +84,18 @@ pub async fn auth_middleware(
                     }
                 }
             }
-        }
     }
 
     // No key worked — try refreshing JWKS (key rotation may have happened)
     if let Ok(fresh_jwks) = state.jwks_cache.refresh().await {
         for key in &fresh_jwks.keys {
-            if let Ok(decoding_key) = DecodingKey::from_jwk(key) {
-                if let Ok(token_data) = decode::<RawClaims>(&token, &decoding_key, &validation) {
-                    if let Ok(identity) = token_data.claims.to_identity() {
+            if let Ok(decoding_key) = DecodingKey::from_jwk(key)
+                && let Ok(token_data) = decode::<RawClaims>(&token, &decoding_key, &validation)
+                    && let Ok(identity) = token_data.claims.to_identity() {
                         debug!(cave_uid = %identity.cave_uid, "Authenticated after JWKS refresh");
                         req.extensions_mut().insert(identity);
                         return next.run(req).await;
                     }
-                }
-            }
         }
     }
 

@@ -17,8 +17,10 @@ pub enum SchemaFormat { Avro, Protobuf, Json }
 /// Cite: Confluent Schema Registry compatibility levels documentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum Compatibility {
     None,
+    #[default]
     Backward,
     BackwardTransitive,
     Forward,
@@ -114,9 +116,6 @@ pub struct SchemaRegistry {
     schemas: HashMap<String, Vec<Schema>>,
 }
 
-impl Default for Compatibility {
-    fn default() -> Self { Self::Backward }  // Confluent default.
-}
 
 impl SchemaRegistry {
     pub fn new(tenant_id: impl Into<String>, compatibility: Compatibility) -> Self {

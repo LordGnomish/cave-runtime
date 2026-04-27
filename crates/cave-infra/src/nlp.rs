@@ -183,11 +183,10 @@ fn extract_memory_gb(text: &str) -> Option<i64> {
     for pattern in re_patterns {
         if let Some(pos) = text.find(pattern) {
             let before = &text[..pos].trim_end();
-            if let Some(last) = before.split_whitespace().last() {
-                if let Ok(n) = last.parse::<i64>() {
+            if let Some(last) = before.split_whitespace().last()
+                && let Ok(n) = last.parse::<i64>() {
                     return Some(n);
                 }
-            }
         }
     }
     None
@@ -198,17 +197,16 @@ fn extract_storage_gb(text: &str) -> Option<i64> {
     for pattern in [" gb disk", " gb storage", "gb ssd", "gb hdd"] {
         if let Some(pos) = text.find(pattern) {
             let before = &text[..pos].trim_end();
-            if let Some(last) = before.split_whitespace().last() {
-                if let Ok(n) = last.parse::<i64>() {
+            if let Some(last) = before.split_whitespace().last()
+                && let Ok(n) = last.parse::<i64>() {
                     return Some(n);
                 }
-            }
         }
     }
     None
 }
 
-fn extract_name(text: &str, kind: &str) -> Option<String> {
+fn extract_name(text: &str, _kind: &str) -> Option<String> {
     // Look for patterns like "called foo", "named foo", "named 'foo'"
     for prefix in ["called ", "named "] {
         if let Some(pos) = text.find(prefix) {

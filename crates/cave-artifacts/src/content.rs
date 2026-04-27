@@ -16,18 +16,14 @@ pub struct RpmFilter {
 
 impl RpmFilter {
     pub fn matches(&self, pkg: &RpmPackage) -> bool {
-        if let Some(ref n) = self.name {
-            if !pkg.name.contains(n.as_str()) { return false; }
-        }
-        if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
-        }
-        if let Some(ref r) = self.release {
-            if pkg.release != *r { return false; }
-        }
-        if let Some(ref a) = self.arch {
-            if pkg.arch != *a { return false; }
-        }
+        if let Some(ref n) = self.name
+            && !pkg.name.contains(n.as_str()) { return false; }
+        if let Some(ref v) = self.version
+            && pkg.version != *v { return false; }
+        if let Some(ref r) = self.release
+            && pkg.release != *r { return false; }
+        if let Some(ref a) = self.arch
+            && pkg.arch != *a { return false; }
         true
     }
 }
@@ -42,15 +38,12 @@ pub struct DebFilter {
 
 impl DebFilter {
     pub fn matches(&self, pkg: &DebPackage) -> bool {
-        if let Some(ref n) = self.package {
-            if !pkg.package.contains(n.as_str()) { return false; }
-        }
-        if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
-        }
-        if let Some(ref a) = self.architecture {
-            if pkg.architecture != *a { return false; }
-        }
+        if let Some(ref n) = self.package
+            && !pkg.package.contains(n.as_str()) { return false; }
+        if let Some(ref v) = self.version
+            && pkg.version != *v { return false; }
+        if let Some(ref a) = self.architecture
+            && pkg.architecture != *a { return false; }
         true
     }
 }
@@ -65,15 +58,12 @@ pub struct PypiFilter {
 
 impl PypiFilter {
     pub fn matches(&self, pkg: &PythonPackage) -> bool {
-        if let Some(ref n) = self.name {
-            if !pkg.name.to_lowercase().contains(&n.to_lowercase()) { return false; }
-        }
-        if let Some(ref v) = self.version {
-            if pkg.version != *v { return false; }
-        }
-        if let Some(ref t) = self.package_type {
-            if pkg.packagetype != *t { return false; }
-        }
+        if let Some(ref n) = self.name
+            && !pkg.name.to_lowercase().contains(&n.to_lowercase()) { return false; }
+        if let Some(ref v) = self.version
+            && pkg.version != *v { return false; }
+        if let Some(ref t) = self.package_type
+            && pkg.packagetype != *t { return false; }
         true
     }
 }
@@ -81,7 +71,7 @@ impl PypiFilter {
 // ─── Checksum verification ───────────────────────────────────────────────────
 
 /// Verify a SHA-256 checksum against expected.
-pub fn verify_sha256(data: &[u8], expected_hex: &str) -> bool {
+pub fn verify_sha256(_data: &[u8], expected_hex: &str) -> bool {
     // In production this would use ring or sha2 crate.
     // For now: length-check + non-empty.
     !expected_hex.is_empty() && expected_hex.len() == 64

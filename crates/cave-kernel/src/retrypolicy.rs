@@ -107,11 +107,10 @@ impl RetryPolicy {
         if next_attempt >= self.max_attempts {
             return false;
         }
-        if let Some(max) = self.max_elapsed {
-            if elapsed >= max {
+        if let Some(max) = self.max_elapsed
+            && elapsed >= max {
                 return false;
             }
-        }
         true
     }
 }
@@ -170,15 +169,14 @@ where
                 let elapsed = started.elapsed();
                 let next_attempt = attempt + 1;
                 if !policy.should_retry(next_attempt, elapsed) {
-                    if let Some(max) = policy.max_elapsed {
-                        if elapsed >= max {
+                    if let Some(max) = policy.max_elapsed
+                        && elapsed >= max {
                             return Err(RetryError::Deadline {
                                 attempt: next_attempt,
                                 elapsed_ms: elapsed.as_millis(),
                                 source: e,
                             });
                         }
-                    }
                     return Err(RetryError::LastError {
                         attempt: next_attempt,
                         source: e,

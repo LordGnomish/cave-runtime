@@ -5,11 +5,11 @@ use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
     response::IntoResponse,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use chrono::{Duration, Utc};
-use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, SanType};
+use rcgen::{BasicConstraints, CertificateParams, DnType, IsCa, KeyPair};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -119,7 +119,7 @@ pub struct PkiStore {
 pub async fn generate_root(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, gen_type)): Path<(String, String)>,
+    Path((_mount, gen_type)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -178,7 +178,7 @@ pub async fn generate_root(
 }
 
 pub async fn generate_intermediate(
-    State(state): State<Arc<VaultState>>,
+    State(_state): State<Arc<VaultState>>,
     headers: HeaderMap,
     Path((_mount, gen_type)): Path<(String, String)>,
     Json(body): Json<Value>,
@@ -315,7 +315,7 @@ pub async fn read_role(
     let _token = extract_token(&headers)?;
     let store = state.pki_store.read().await;
     let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+        .ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 
@@ -376,7 +376,7 @@ pub async fn issue_cert(
         .and_then(|v| v.as_str())
         .map(crate::token::parse_duration)
         .filter(|&t| t > 0)
-        .unwrap_or_else(|| if role.ttl > 0 { role.ttl } else { 86400 });
+        .unwrap_or(if role.ttl > 0 { role.ttl } else { 86400 });
 
     // Generate end-entity cert using rcgen
     let ee_key = KeyPair::generate()

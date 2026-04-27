@@ -35,8 +35,10 @@ pub fn validate_denial_of_existence(nsec: &Record) -> DnsResult<()> {
 
 /// DNSSEC signing mode for a zone.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub enum SigningMode {
     /// Zone is not signed.
+    #[default]
     Unsigned,
     /// Zone is signed; new records get RRSIG on-the-fly.
     Online,
@@ -44,11 +46,6 @@ pub enum SigningMode {
     Offline,
 }
 
-impl Default for SigningMode {
-    fn default() -> Self {
-        Self::Unsigned
-    }
-}
 
 /// DNSSEC configuration for a zone.
 #[derive(Debug, Clone, Default)]

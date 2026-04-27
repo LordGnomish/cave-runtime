@@ -19,11 +19,10 @@ pub fn validate_rule(
     };
 
     // Evaluate preconditions
-    if let Some(preconditions) = &rule.preconditions {
-        if !eval_conditions(preconditions, resource, context)? {
+    if let Some(preconditions) = &rule.preconditions
+        && !eval_conditions(preconditions, resource, context)? {
             return Ok(None); // Preconditions not met — skip rule
         }
-    }
 
     // CEL validation
     if let Some(cel) = &validate.cel {
@@ -140,11 +139,10 @@ fn validate_foreach(
         }
 
         // Deny
-        if let Some(deny) = &foreach.deny {
-            if let Some(v) = validate_deny(deny, target, context, rule_name, None)? {
+        if let Some(deny) = &foreach.deny
+            && let Some(v) = validate_deny(deny, target, context, rule_name, None)? {
                 return Ok(Some(v));
             }
-        }
     }
     Ok(None)
 }
@@ -295,7 +293,7 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
         | ConditionOperator::DurationGreaterThanOrEquals | ConditionOperator::DurationLessThanOrEquals => {
             // Duration comparison: compare ns values
             let kns = parse_duration_ns(key_val.as_str().unwrap_or("0")).unwrap_or(0);
-            let vns = compare_to.as_ref().and_then(|v| v.as_str()).and_then(|s| parse_duration_ns(s)).unwrap_or(0);
+            let vns = compare_to.as_ref().and_then(|v| v.as_str()).and_then(parse_duration_ns).unwrap_or(0);
             Ok(match &cond.operator {
                 ConditionOperator::DurationGreaterThan => kns > vns,
                 ConditionOperator::DurationLessThan => kns < vns,
@@ -308,7 +306,7 @@ fn eval_condition(cond: &Condition, resource: &Value, context: &Value) -> Result
     }
 }
 
-fn eval_condition_value(v: &Value, resource: &Value, context: &Value) -> Result<Value, PolicyError> {
+fn eval_condition_value(v: &Value, resource: &Value, _context: &Value) -> Result<Value, PolicyError> {
     match v {
         Value::String(s) => {
             let trimmed = s.trim();

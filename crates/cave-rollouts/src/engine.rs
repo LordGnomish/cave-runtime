@@ -8,7 +8,6 @@ use crate::models::{
     CanaryStrategy, RolloutAction, RolloutPhase, RolloutStatus, RolloutStrategy, TrafficWeights,
     WeightDestination,
 };
-use chrono::Utc;
 use tracing::{debug, info, warn};
 
 // ── Engine decision types ─────────────────────────────────────────────────────
@@ -110,7 +109,7 @@ pub fn advance_canary(
             }
         }
 
-        CanaryStep::SetMirrorWeight { percentage } => {
+        CanaryStep::SetMirrorWeight { percentage: _ } => {
             status.current_step_index = Some((step_idx + 1) as u32);
             // Mirror doesn't count toward canary weight
             EngineDecision::SetWeight(status.canary_weight)
@@ -194,7 +193,7 @@ pub fn advance_blue_green(
         }
     }
 
-    let bg = status.blue_green.get_or_insert_with(|| BlueGreenStatus {
+    let _bg = status.blue_green.get_or_insert(BlueGreenStatus {
         active_rs: None,
         preview_rs: None,
         pre_promotion_analysis_run: None,
@@ -231,7 +230,7 @@ pub fn advance_blue_green(
 /// Given raw metric values for a single MetricResult, decide whether the
 /// analysis succeeds, fails, or is inconclusive.
 pub fn evaluate_metric(
-    name: &str,
+    _name: &str,
     values: &[f64],
     failure_limit: u32,
     success_condition: Option<&str>,
@@ -247,11 +246,10 @@ pub fn evaluate_metric(
             if evaluate_simple_condition(v, cond) {
                 failures += 1;
             }
-        } else if let Some(cond) = success_condition {
-            if !evaluate_simple_condition(v, cond) {
+        } else if let Some(cond) = success_condition
+            && !evaluate_simple_condition(v, cond) {
                 failures += 1;
             }
-        }
     }
 
     if failures > failure_limit {
@@ -275,8 +273,8 @@ fn evaluate_simple_condition(value: f64, condition: &str) -> bool {
         ("<", "<"),
         ("==", "=="),
     ] {
-        if let Some(rhs) = condition.strip_prefix(rest) {
-            if let Ok(threshold) = rhs.trim().parse::<f64>() {
+        if let Some(rhs) = condition.strip_prefix(rest)
+            && let Ok(threshold) = rhs.trim().parse::<f64>() {
                 return match op {
                     ">=" => value >= threshold,
                     "<=" => value <= threshold,
@@ -287,7 +285,6 @@ fn evaluate_simple_condition(value: f64, condition: &str) -> bool {
                     _ => false,
                 };
             }
-        }
     }
     false
 }
@@ -336,6 +333,7 @@ pub fn initial_status(strategy: &RolloutStrategy) -> RolloutStatus {
 mod tests {
     use super::*;
     use crate::models::*;
+    use chrono::Utc;
     use uuid::Uuid;
 
     fn canary_strategy_3_steps() -> CanaryStrategy {

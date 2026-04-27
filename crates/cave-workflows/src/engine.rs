@@ -71,11 +71,10 @@ pub fn has_cycle(node_ids: &[&str], edges: &[WorkflowEdge]) -> bool {
     }
 
     for id in node_ids {
-        if !visited.contains(*id) {
-            if dfs(id, &adj, &mut visited, &mut rec_stack) {
+        if !visited.contains(*id)
+            && dfs(id, &adj, &mut visited, &mut rec_stack) {
                 return true;
             }
-        }
     }
     false
 }

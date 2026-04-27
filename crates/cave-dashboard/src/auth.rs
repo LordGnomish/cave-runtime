@@ -1,12 +1,12 @@
 //! Multi-org, role-based access control, API key validation, service accounts.
 
-use crate::models::{ApiKey, OrgRole};
+use crate::models::OrgRole;
 use std::collections::HashMap;
 
 /// Compute a simple SHA-256 hex hash for an API key token.
 /// In production this should use a proper HMAC/bcrypt; here we use a fast hash.
 pub fn hash_api_key(token: &str) -> String {
-    use std::hash::{Hash, Hasher};
+    
     // Deterministic but not cryptographic — fine for an in-memory demo.
     // In prod: use ring::digest::digest(&ring::digest::SHA256, token.as_bytes())
     let mut h: u64 = 14695981039346656037;

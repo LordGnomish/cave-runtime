@@ -37,7 +37,7 @@ impl AlertStore {
         inner
             .alerts
             .values()
-            .filter(|a| tenant.map_or(true, |t| a.tenant_id == t))
+            .filter(|a| tenant.is_none_or(|t| a.tenant_id == t))
             .cloned()
             .collect()
     }
@@ -62,7 +62,7 @@ impl AlertStore {
         inner
             .silences
             .values()
-            .filter(|s| tenant.map_or(true, |t| s.tenant_id == t))
+            .filter(|s| tenant.is_none_or(|t| s.tenant_id == t))
             .cloned()
             .collect()
     }
@@ -87,7 +87,7 @@ impl AlertStore {
         inner
             .inhibit_rules
             .values()
-            .filter(|r| tenant.map_or(true, |t| r.tenant_id == t))
+            .filter(|r| tenant.is_none_or(|t| r.tenant_id == t))
             .cloned()
             .collect()
     }

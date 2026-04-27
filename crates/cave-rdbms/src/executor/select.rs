@@ -174,7 +174,7 @@ fn eval_expr(expr: &Expr, row: &Row, col_names: &[String]) -> Result<SqlValue, S
             let is_null = matches!(val, SqlValue::Null);
             Ok(SqlValue::Bool(if *not { !is_null } else { is_null }))
         }
-        _ => Err(format!("unsupported expression type in eval")),
+        _ => Err("unsupported expression type in eval".to_string()),
     }
 }
 

@@ -54,11 +54,10 @@ impl TcpTransport {
 
     async fn get_or_connect(&self, to: NodeId) -> HaResult<mpsc::UnboundedSender<Vec<u8>>> {
         let mut conns = self.conns.lock().await;
-        if let Some(tx) = conns.get(&to) {
-            if !tx.is_closed() {
+        if let Some(tx) = conns.get(&to)
+            && !tx.is_closed() {
                 return Ok(tx.clone());
             }
-        }
         let addr = self.peers.get(&to).ok_or_else(|| {
             HaError::Transport(format!("no address for node {to}"))
         })?;

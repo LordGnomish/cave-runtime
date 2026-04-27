@@ -221,8 +221,8 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Expr {
-        let e = self.parse_or();
-        e
+        
+        self.parse_or()
     }
 
     fn parse_or(&mut self) -> Expr {

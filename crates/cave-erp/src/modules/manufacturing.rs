@@ -140,8 +140,8 @@ async fn confirm_manufacturing_order(
             boms.get(&bom_id).cloned()
         };
 
-        if let Some(bom) = bom {
-            if let Some(routing_id) = bom.routing_id {
+        if let Some(bom) = bom
+            && let Some(routing_id) = bom.routing_id {
                 let routing = {
                     let routings = store.routings.read().await;
                     routings.get(&routing_id).cloned()
@@ -162,7 +162,6 @@ async fn confirm_manufacturing_order(
                     }
                 }
             }
-        }
 
         let mut mos = store.manufacturing_orders.write().await;
         if let Some(mo) = mos.get_mut(&id) {

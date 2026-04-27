@@ -1,7 +1,6 @@
 //! AlertManager HTTP client for pushing alerts and creating silences.
 
 use crate::error::{MetricsError, Result};
-use crate::rules::FiringAlert;
 use super::model::{Alert, Silence};
 
 pub struct AlertmanagerClient {

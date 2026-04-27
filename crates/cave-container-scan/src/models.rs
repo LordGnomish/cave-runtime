@@ -102,6 +102,7 @@ impl std::fmt::Display for Ecosystem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ScanOptions {
     pub timeout_seconds: Option<u32>,
     pub skip_rules: Vec<String>,
@@ -109,16 +110,6 @@ pub struct ScanOptions {
     pub severity_floor: Option<Severity>,
 }
 
-impl Default for ScanOptions {
-    fn default() -> Self {
-        Self {
-            timeout_seconds: None,
-            skip_rules: vec![],
-            include_only: None,
-            severity_floor: None,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScanRequest {

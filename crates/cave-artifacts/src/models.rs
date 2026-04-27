@@ -164,8 +164,10 @@ pub struct Remote {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum RemotePolicy {
     /// Download content when syncing.
+    #[default]
     Immediate,
     /// Download content on demand.
     OnDemand,
@@ -173,11 +175,6 @@ pub enum RemotePolicy {
     Streamed,
 }
 
-impl Default for RemotePolicy {
-    fn default() -> Self {
-        Self::Immediate
-    }
-}
 
 impl Remote {
     pub fn new(name: impl Into<String>, url: impl Into<String>, content_type: ContentType) -> Self {

@@ -4,7 +4,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use base64::Engine as _;
@@ -80,7 +80,7 @@ pub struct SshStore {
 pub async fn configure_ca(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -123,7 +123,7 @@ pub async fn configure_ca(
 
 pub async fn read_ca_public_key(
     State(state): State<Arc<VaultState>>,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let store = state.ssh_store.read().await;
     let ca = store.ca.as_ref().ok_or_else(|| VaultError::NotFound("no CA configured".into()))?;
@@ -133,12 +133,12 @@ pub async fn read_ca_public_key(
 pub async fn create_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ssh_store.write().await;
-    let mut role = store.roles.entry(role_name.clone()).or_insert_with(|| SshRole {
+    let role = store.roles.entry(role_name.clone()).or_insert_with(|| SshRole {
         name: role_name.clone(),
         ..Default::default()
     });
@@ -154,19 +154,19 @@ pub async fn create_role(
 pub async fn read_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
     let role = store.roles.get(&role_name)
-        .ok_or_else(|| VaultError::RoleNotFound(role_name))?;
+        .ok_or(VaultError::RoleNotFound(role_name))?;
     Ok(VaultResponse::new().with_data(serde_json::to_value(role).unwrap_or_default()))
 }
 
 pub async fn delete_role(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.ssh_store.write().await;
@@ -177,7 +177,7 @@ pub async fn delete_role(
 pub async fn list_roles(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
@@ -199,7 +199,7 @@ pub struct SignKeyRequest {
 pub async fn sign_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
     Json(body): Json<SignKeyRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -243,12 +243,12 @@ pub async fn sign_key(
 pub async fn generate_otp(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, role_name)): Path<(String, String)>,
+    Path((_mount, role_name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.ssh_store.read().await;
-    let role = store.roles.get(&role_name)
+    let _role = store.roles.get(&role_name)
         .ok_or_else(|| VaultError::RoleNotFound(role_name.clone()))?.clone();
     drop(store);
 
@@ -287,7 +287,7 @@ pub struct VerifyOtpRequest {
 pub async fn verify_otp(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
     Json(body): Json<VerifyOtpRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;

@@ -13,17 +13,14 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum ParamType {
+    #[default]
     String,
     Array,
     Object,
 }
 
-impl Default for ParamType {
-    fn default() -> Self {
-        Self::String
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]

@@ -7,10 +7,10 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-use crate::ingestion::{ms_to_ns, normalise_service, us_to_ns};
-use crate::types::{Span, SpanEvent, SpanId, SpanKind, SpanStatus, TagValue, TraceId};
+use crate::ingestion::normalise_service;
+use crate::types::{Span, SpanEvent, SpanKind, SpanStatus, TagValue};
 use crate::{Result, TraceError};
 
 // ─── Wire types ────────────────────────────────────────────────────────────
@@ -161,11 +161,10 @@ pub fn parse_opencensus_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> 
     resource_attrs.insert("service.name".into(), TagValue::String(service_name.clone()));
 
     if let Some(node) = &req.node {
-        if let Some(id) = &node.identifier {
-            if let Some(h) = &id.host_name {
+        if let Some(id) = &node.identifier
+            && let Some(h) = &id.host_name {
                 resource_attrs.insert("host.name".into(), TagValue::String(h.clone()));
             }
-        }
         if let Some(attrs) = &node.attributes {
             for (k, v) in attrs {
                 resource_attrs.insert(k.clone(), TagValue::String(v.clone()));
@@ -290,9 +289,8 @@ fn oc_attr_to_tag(v: &OcAttributeValue) -> TagValue {
     if let Some(d) = v.double_value  { return TagValue::Float(d); }
     if let Some(n) = &v.int_value {
         if let Some(i) = n.as_i64() { return TagValue::Int(i); }
-        if let Some(s) = n.as_str() {
-            if let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
-        }
+        if let Some(s) = n.as_str()
+            && let Ok(i) = s.parse::<i64>() { return TagValue::Int(i); }
     }
     TagValue::String(String::new())
 }

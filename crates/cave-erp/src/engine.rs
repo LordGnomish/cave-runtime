@@ -97,7 +97,7 @@ impl Stage for RecruitmentStage {
 /// Advance from current stage to next stage (by `order`). Returns a reference
 /// so callers that need an owned value can `.cloned()` when the concrete
 /// stage type is `Clone`.
-pub fn advance_stage<'a, S: Stage>(current_id: Uuid, stages: &'a [S]) -> Option<&'a S> {
+pub fn advance_stage<S: Stage>(current_id: Uuid, stages: &[S]) -> Option<&S> {
     let current = stages.iter().find(|s| s.id() == current_id)?;
     let current_order = current.order();
     stages

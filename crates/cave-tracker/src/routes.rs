@@ -1030,7 +1030,7 @@ async fn list_sprints(
     let store = state.store.read().await;
     let sprints: Vec<Sprint> = store.sprints.values()
         .filter(|s| {
-            if let Some(pid) = query.project_id { if s.project_id != pid { return false; } }
+            if let Some(pid) = query.project_id && s.project_id != pid { return false; }
             if let Some(ref st) = query.state {
                 let matches = match st.as_str() {
                     "future" => s.state == SprintState::Future,
@@ -1361,12 +1361,10 @@ async fn get_activity(
     let limit = query.limit.unwrap_or(50);
     let events: Vec<ActivityEvent> = store.activity_events.iter()
         .filter(|e| {
-            if let Some(pid) = query.project_id {
-                if e.project_id != Some(pid) { return false; }
-            }
-            if let Some(iid) = query.issue_id {
-                if e.issue_id != Some(iid) { return false; }
-            }
+            if let Some(pid) = query.project_id
+                && e.project_id != Some(pid) { return false; }
+            if let Some(iid) = query.issue_id
+                && e.issue_id != Some(iid) { return false; }
             true
         })
         .rev()
@@ -1383,12 +1381,10 @@ async fn get_notifications(
     let store = state.store.read().await;
     let notifications: Vec<Notification> = store.notifications.iter()
         .filter(|n| {
-            if let Some(ref r) = query.recipient {
-                if &n.recipient != r { return false; }
-            }
-            if let Some(unread_only) = query.unread_only {
-                if unread_only && n.read { return false; }
-            }
+            if let Some(ref r) = query.recipient
+                && &n.recipient != r { return false; }
+            if let Some(unread_only) = query.unread_only
+                && unread_only && n.read { return false; }
             true
         })
         .cloned()

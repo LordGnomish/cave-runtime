@@ -95,8 +95,8 @@ async fn table_info(
     Path((_db, schema, table)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let database = state.engine.get_database().await;
-    if let Some(s) = database.schemas.get(&schema) {
-        if let Some(t) = s.tables.get(&table) {
+    if let Some(s) = database.schemas.get(&schema)
+        && let Some(t) = s.tables.get(&table) {
             let columns: Vec<_> = t
                 .columns
                 .iter()
@@ -114,7 +114,6 @@ async fn table_info(
             }))
             .into_response();
         }
-    }
     (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "table not found"}))).into_response()
 }
 
@@ -123,8 +122,8 @@ async fn table_rows(
     Path((_db, schema, table)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let database = state.engine.get_database().await;
-    if let Some(s) = database.schemas.get(&schema) {
-        if let Some(t) = s.tables.get(&table) {
+    if let Some(s) = database.schemas.get(&schema)
+        && let Some(t) = s.tables.get(&table) {
             let rows: Vec<Vec<serde_json::Value>> = t
                 .rows
                 .iter()
@@ -140,7 +139,6 @@ async fn table_rows(
             }))
             .into_response();
         }
-    }
     (StatusCode::NOT_FOUND, Json(serde_json::json!({"error": "table not found"}))).into_response()
 }
 

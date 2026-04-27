@@ -1,23 +1,19 @@
 //! HTTP API routes for cave-artifacts — Pulp v3 REST API.
 
 use crate::{
-    distribution::validate_distribution,
     models::*,
     rbac::builtin_roles,
-    repair::{enqueue_repair, RepairOptions},
-    repository::{create_repository, enqueue_sync, versions_to_prune},
+    repository::create_repository,
     signing::SigningService,
-    tasks::TaskState,
-    upload::{parse_content_range, FinalizeUploadRequest, Upload, UploadRegistry},
+    upload::{FinalizeUploadRequest, Upload},
     ArtifactsState,
 };
 use axum::{
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
-    routing::{delete, get, post, put},
+    http::StatusCode,
+    routing::{get, post},
     Json, Router,
 };
-use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -146,7 +142,7 @@ async fn update_repo(
 
 async fn delete_repo(
     State(state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Json<serde_json::Value> {
     let task = state.task_queue.enqueue("pulp.tasks.repository.delete");
     Json(serde_json::json!({ "task": task.pulp_href }))
@@ -163,7 +159,7 @@ struct SyncRequest {
 async fn sync_repo(
     State(state): State<Arc<ArtifactsState>>,
     Path(_pulp_id): Path<Uuid>,
-    Json(req): Json<SyncRequest>,
+    Json(_req): Json<SyncRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let task = state.task_queue.enqueue("pulp.tasks.synchronize");
     (StatusCode::ACCEPTED, Json(serde_json::json!({ "task": task.pulp_href })))
@@ -198,7 +194,7 @@ async fn list_versions(
 
 async fn get_version(
     State(_state): State<Arc<ArtifactsState>>,
-    Path((_pulp_id, number)): Path<(Uuid, u64)>,
+    Path((_pulp_id, _number)): Path<(Uuid, u64)>,
 ) -> Result<Json<RepositoryVersion>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -213,8 +209,8 @@ async fn delete_version(
 
 async fn repair_version(
     State(state): State<Arc<ArtifactsState>>,
-    Path((_pulp_id, number)): Path<(Uuid, u64)>,
-    Json(opts): Json<serde_json::Value>,
+    Path((_pulp_id, _number)): Path<(Uuid, u64)>,
+    Json(_opts): Json<serde_json::Value>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let task = state.task_queue.enqueue("pulp.tasks.repair");
     (StatusCode::ACCEPTED, Json(serde_json::json!({ "task": task.pulp_href })))
@@ -240,7 +236,7 @@ async fn create_remote(
 
 async fn get_remote(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<Remote>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -271,7 +267,7 @@ async fn list_publications(
 
 async fn create_publication(
     State(state): State<Arc<ArtifactsState>>,
-    Json(req): Json<serde_json::Value>,
+    Json(_req): Json<serde_json::Value>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let task = state.task_queue.enqueue("pulp.tasks.publish");
     (StatusCode::ACCEPTED, Json(serde_json::json!({ "task": task.pulp_href })))
@@ -279,7 +275,7 @@ async fn create_publication(
 
 async fn get_publication(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<Publication>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -304,7 +300,7 @@ async fn create_distribution(
 
 async fn get_distribution(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<Distribution>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -364,7 +360,7 @@ async fn create_artifact(
 
 async fn get_artifact(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<Artifact>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -390,7 +386,7 @@ async fn create_upload(
 
 async fn get_upload(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<Upload>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }
@@ -404,7 +400,7 @@ async fn abort_upload(
 
 async fn commit_upload(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
     Json(req): Json<FinalizeUploadRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     (StatusCode::ACCEPTED, Json(serde_json::json!({
@@ -487,7 +483,7 @@ async fn create_role(
 
 async fn get_role(
     State(_state): State<Arc<ArtifactsState>>,
-    Path(pulp_id): Path<Uuid>,
+    Path(_pulp_id): Path<Uuid>,
 ) -> Result<Json<crate::models::Role>, (StatusCode, Json<serde_json::Value>)> {
     Err((StatusCode::NOT_FOUND, Json(serde_json::json!({ "detail": "Not found" }))))
 }

@@ -90,7 +90,7 @@ impl MountTable {
         for entry in self.mounts.values() {
             if req_path.starts_with(&entry.path) {
                 let len = entry.path.len();
-                if best.map_or(true, |b| b.path.len() < len) {
+                if best.is_none_or(|b| b.path.len() < len) {
                     best = Some(entry);
                 }
             }

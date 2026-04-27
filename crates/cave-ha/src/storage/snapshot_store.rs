@@ -93,13 +93,11 @@ impl SnapshotStore {
         while let Ok(Some(entry)) = entries.next_entry().await {
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if let Some(idx) = parse_snap_index(&name) {
-                if idx < keep_index {
-                    if let Err(e) = fs::remove_file(entry.path()).await {
+            if let Some(idx) = parse_snap_index(&name)
+                && idx < keep_index
+                    && let Err(e) = fs::remove_file(entry.path()).await {
                         warn!("cleanup snapshot {idx}: {e}");
                     }
-                }
-            }
         }
     }
 

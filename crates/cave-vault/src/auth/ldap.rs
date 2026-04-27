@@ -5,7 +5,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use serde::{Deserialize, Serialize};
@@ -150,7 +150,7 @@ pub async fn create_user_policy(
     let _token = extract_token(&headers)?;
     let mut store = state.ldap_store.write().await;
     store.users.insert(username.clone(), LdapUser {
-        username: username,
+        username,
         policies: body.policies.unwrap_or_default(),
         groups: body.groups.unwrap_or_default(),
     });

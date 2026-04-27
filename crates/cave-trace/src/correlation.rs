@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Span, TagValue, Trace, TraceId};
+use crate::types::{Span, TagValue, Trace};
 
 // ─── Log correlation ────────────────────────────────────────────────────────
 

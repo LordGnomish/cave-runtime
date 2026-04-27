@@ -11,11 +11,10 @@ pub fn validate_step(step: &Step) -> Vec<String> {
         errors.push("step name is required".to_string());
     }
     match &step.step_type {
-        StepType::Shell { command, .. } => {
-            if command.is_empty() {
+        StepType::Shell { command, .. }
+            if command.is_empty() => {
                 errors.push(format!("step {}: shell command is empty", step.id));
             }
-        }
         StepType::Http { url, method, .. } => {
             if url.is_empty() {
                 errors.push(format!("step {}: HTTP URL is empty", step.id));
@@ -36,14 +35,13 @@ pub fn validate_step(step: &Step) -> Vec<String> {
                 errors.push(format!("step {}: resource_name is empty", step.id));
             }
         }
-        StepType::ManualApproval { approvers, .. } => {
-            if approvers.is_empty() {
+        StepType::ManualApproval { approvers, .. }
+            if approvers.is_empty() => {
                 errors.push(format!(
                     "step {}: approval step requires at least one approver",
                     step.id
                 ));
             }
-        }
         _ => {}
     }
     errors

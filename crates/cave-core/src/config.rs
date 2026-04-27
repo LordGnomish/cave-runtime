@@ -125,6 +125,7 @@ pub struct DatabaseConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[derive(Default)]
 pub struct StorageConfig {
     /// Storage backend type
     #[serde(default)]
@@ -151,17 +152,6 @@ pub enum StorageBackend {
     Local,
 }
 
-impl Default for StorageConfig {
-    fn default() -> Self {
-        Self {
-            backend: StorageBackend::default(),
-            s3_endpoint: None,
-            s3_bucket: None,
-            azure_account: None,
-            azure_container: None,
-        }
-    }
-}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ModuleConfig {
@@ -233,11 +223,10 @@ impl CaveConfig {
         })?;
 
         // Environment variable overrides (CAVE_ prefix)
-        if let Ok(port) = std::env::var("CAVE_PORT") {
-            if let Ok(p) = port.parse() {
+        if let Ok(port) = std::env::var("CAVE_PORT")
+            && let Ok(p) = port.parse() {
                 config.server.port = p;
             }
-        }
         if let Ok(db_url) = std::env::var("CAVE_DATABASE_URL") {
             config.database.url = db_url;
         }

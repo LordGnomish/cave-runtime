@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use models::{BudgetPolicy, ChargebackRule, CostAllocation, CostCenter, Invoice, TagPolicy};
 
 /// In-memory store (PostgreSQL integration via cave-db is future work).
+#[derive(Default)]
 pub struct CostAllocStore {
     pub cost_centers: Vec<CostCenter>,
     pub allocations: Vec<CostAllocation>,
@@ -22,18 +23,6 @@ pub struct CostAllocStore {
     pub invoices: Vec<Invoice>,
 }
 
-impl Default for CostAllocStore {
-    fn default() -> Self {
-        Self {
-            cost_centers: Vec::new(),
-            allocations: Vec::new(),
-            budget_policies: Vec::new(),
-            chargeback_rules: Vec::new(),
-            tag_policies: Vec::new(),
-            invoices: Vec::new(),
-        }
-    }
-}
 
 /// Module state — Arc<CostAllocState> is shared across all route handlers.
 pub struct CostAllocState {

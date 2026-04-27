@@ -71,8 +71,7 @@ pub fn compute_interval(from: &str, to: &str) -> String {
 }
 
 fn parse_relative_secs(from: &str, _to: &str) -> i64 {
-    if from.starts_with("now-") {
-        let rest = &from[4..];
+    if let Some(rest) = from.strip_prefix("now-") {
         let (n, unit) = rest.split_at(rest.len().saturating_sub(1));
         let n: i64 = n.parse().unwrap_or(1);
         match unit {
@@ -141,13 +140,7 @@ fn replace_all(input: &str, vars: &HashMap<String, String>) -> String {
 pub fn adhoc_filters_to_label_matchers(filters: &[AdhocFilter]) -> String {
     filters.iter()
         .map(|f| {
-            let op = match f.operator.as_str() {
-                "=" => "=",
-                "!=" => "!=",
-                "=~" => "=~",
-                "!~" => "!~",
-                other => other,
-            };
+            let op = f.operator.as_str();
             format!("{}{}\"{}\"", f.key, op, f.value)
         })
         .collect::<Vec<_>>()

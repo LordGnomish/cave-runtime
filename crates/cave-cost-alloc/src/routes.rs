@@ -265,7 +265,7 @@ async fn showback(
     let reports = reporting::generate_showback(&store.cost_centers, &[]);
     let filtered = reports
         .into_iter()
-        .filter(|r| q.team.as_ref().map_or(true, |t| &r.team == t))
+        .filter(|r| q.team.as_ref().is_none_or(|t| &r.team == t))
         .collect();
     Json(filtered)
 }

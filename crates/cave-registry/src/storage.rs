@@ -303,11 +303,10 @@ impl RegistryStorage {
             // search across all repos for this digest
             for ((_, d), entry) in &idx.by_digest {
                 if d == &digest {
-                    if let Some(filter) = artifact_type_filter {
-                        if entry.artifact_type.as_deref() != Some(filter) {
+                    if let Some(filter) = artifact_type_filter
+                        && entry.artifact_type.as_deref() != Some(filter) {
                             continue;
                         }
-                    }
                     descriptors.push(Descriptor {
                         media_type: entry.content_type.clone(),
                         size: entry.data.len() as i64,

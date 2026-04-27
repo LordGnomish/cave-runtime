@@ -7,13 +7,9 @@
 //! • Anomaly detection (z-score on span duration)
 
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
-use crate::storage::TraceStore;
 use crate::types::{
-    build_histogram, LatencyHistogram, Span, SpanStatus, TagValue, Trace, TraceId,
-    TraceSearchQuery,
+    Span, Trace,
 };
 
 // ─── Latency breakdown ─────────────────────────────────────────────────────

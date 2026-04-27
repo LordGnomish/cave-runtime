@@ -298,8 +298,8 @@ impl<'a> Scanner<'a> {
             } else {
                 let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
                 let path_str = path.to_string_lossy().to_string();
-                if let Some(_eco) = lang_pkg::detect_manifest_type(file_name) {
-                    if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Some(_eco) = lang_pkg::detect_manifest_type(file_name)
+                    && let Ok(content) = std::fs::read_to_string(&path) {
                         let found: Vec<LangPackage> = match file_name {
                             "go.sum" => lang_pkg::parse_go_sum(&content, &path_str),
                             "package-lock.json" => lang_pkg::parse_package_lock_json(&content, &path_str),
@@ -311,7 +311,6 @@ impl<'a> Scanner<'a> {
                         };
                         pkgs.extend(found);
                     }
-                }
             }
         }
     }
@@ -330,9 +329,8 @@ impl<'a> Scanner<'a> {
             let vulns = self.vuln_db.lookup_package(&eco, &pkg.name);
             for vuln in vulns {
                 if ignore.is_ignored(&vuln.cve_id) { continue; }
-                if let Some(min) = min_severity {
-                    if vuln.severity < min { continue; }
-                }
+                if let Some(min) = min_severity
+                    && vuln.severity < min { continue; }
                 findings.push(VulnFinding {
                     cve_id: vuln.cve_id.clone(),
                     title: Some(vuln.title.clone()),
@@ -350,9 +348,8 @@ impl<'a> Scanner<'a> {
             let vulns = self.vuln_db.lookup_package(&pkg.ecosystem.to_string(), &pkg.name);
             for vuln in vulns {
                 if ignore.is_ignored(&vuln.cve_id) { continue; }
-                if let Some(min) = min_severity {
-                    if vuln.severity < min { continue; }
-                }
+                if let Some(min) = min_severity
+                    && vuln.severity < min { continue; }
                 findings.push(VulnFinding {
                     cve_id: vuln.cve_id.clone(),
                     title: Some(vuln.title.clone()),
@@ -375,7 +372,7 @@ impl<'a> Scanner<'a> {
 
     fn scan_secrets_in_dir(&self, dir: &Path) -> Vec<SecretFinding> {
         let mut findings = Vec::new();
-        let _ = self.walk_for_secrets(dir, &mut findings, 0);
+        self.walk_for_secrets(dir, &mut findings, 0);
         findings
     }
 
@@ -389,8 +386,8 @@ impl<'a> Scanner<'a> {
                 if !matches!(name, ".git" | "node_modules" | "target" | ".cache") {
                     self.walk_for_secrets(&path, findings, depth + 1);
                 }
-            } else if should_scan_for_secrets(&path) {
-                if let Ok(content) = std::fs::read_to_string(&path) {
+            } else if should_scan_for_secrets(&path)
+                && let Ok(content) = std::fs::read_to_string(&path) {
                     let path_str = path.to_string_lossy().to_string();
                     findings.extend(secret::scan_file_for_secrets(
                         &content,
@@ -398,7 +395,6 @@ impl<'a> Scanner<'a> {
                         &self.secret_patterns,
                     ));
                 }
-            }
         }
     }
 

@@ -7,19 +7,18 @@ use crate::error::{StoreError, StoreResult};
 use crate::s3::encryption::{self, ServerKeyStore};
 use crate::s3::lifecycle;
 use crate::s3::notification;
-use crate::s3::policy::{evaluate, BucketPolicy, Effect, PolicyContext};
+use crate::s3::policy::BucketPolicy;
 use crate::s3::types::*;
 use crate::wal::{WalEntry, WalWriter};
-use base64::Engine;
 use chrono::Utc;
 use ring::digest;
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 use tokio::sync::{broadcast, RwLock};
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 pub struct ObjectStore {
@@ -75,18 +74,16 @@ impl ObjectStore {
                     }
                 }
                 WalEntry::BucketLifecycle { name, rules_json } => {
-                    if let Some(b) = self.buckets.write().await.get_mut(name) {
-                        if let Ok(rules) = serde_json::from_str(rules_json) {
+                    if let Some(b) = self.buckets.write().await.get_mut(name)
+                        && let Ok(rules) = serde_json::from_str(rules_json) {
                             b.lifecycle_rules = rules;
                         }
-                    }
                 }
                 WalEntry::BucketNotification { name, config_json } => {
-                    if let Some(b) = self.buckets.write().await.get_mut(name) {
-                        if let Ok(cfg) = serde_json::from_str(config_json) {
+                    if let Some(b) = self.buckets.write().await.get_mut(name)
+                        && let Ok(cfg) = serde_json::from_str(config_json) {
                             b.notification_config = cfg;
                         }
-                    }
                 }
                 WalEntry::ObjectPut {
                     bucket,
@@ -697,7 +694,7 @@ impl ObjectStore {
             }
         } else {
             // Hard delete all versions
-            let removed = versions.drain(..).collect::<Vec<_>>();
+            let removed = std::mem::take(versions);
             for v in &removed {
                 if !v.storage_path.is_empty() {
                     let _ = std::fs::remove_file(self.data_dir.join(&v.storage_path));
@@ -837,7 +834,7 @@ impl ObjectStore {
             is_truncated,
             key_count: count,
             next_continuation_token: if is_truncated {
-                contents_last_key(&*objects, bucket, prefix, max_keys, continuation_token)
+                contents_last_key(&objects, bucket, prefix, max_keys, continuation_token)
             } else {
                 None
             },
@@ -992,12 +989,12 @@ impl ObjectStore {
         part_number: u32,
         data: Vec<u8>,
     ) -> StoreResult<String> {
-        if part_number < 1 || part_number > 10000 {
+        if !(1..=10000).contains(&part_number) {
             return Err(StoreError::InvalidPart(format!(
                 "part number {part_number} out of range [1, 10000]"
             )));
         }
-        let (bucket, key) = {
+        let (bucket, _key) = {
             let multiparts = self.multiparts.read().await;
             let mp = multiparts
                 .get(upload_id)

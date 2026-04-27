@@ -1,6 +1,6 @@
 //! RBAC bootstrap — admin, developer, and viewer roles + bindings.
 
-use crate::error::{ClusterError, ClusterResult};
+use crate::error::ClusterResult;
 use serde::{Deserialize, Serialize};
 
 /// CAVE platform role mapped to K8s ClusterRole.

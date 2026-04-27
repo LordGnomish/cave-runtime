@@ -38,7 +38,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{delete, get, patch, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use std::sync::Arc;
@@ -495,7 +495,7 @@ async fn webhook_validate(
     let kyverno = state.kyverno.read().unwrap();
     let webhook = state.webhook.read().unwrap();
 
-    match webhook.handle(&review, &*opa, &*kyverno) {
+    match webhook.handle(&review, &opa, &kyverno) {
         Ok(response_review) => Json(response_review).into_response(),
         Err(e) => {
             tracing::error!(target: "admission", error = e.to_string(), "webhook error");

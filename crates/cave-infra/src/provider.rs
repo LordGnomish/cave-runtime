@@ -1,7 +1,7 @@
 //! Provider abstraction — bare metal and cloud-like providers.
 
 use crate::error::{InfraError, InfraResult};
-use crate::resource::{ResourceKind, ResourceSpec, ResourceState};
+use crate::resource::{ResourceKind, ResourceSpec};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -162,11 +162,10 @@ impl Provider for BareMetalProvider {
     }
 
     async fn delete(&self, provider_id: &str, kind: &ResourceKind) -> InfraResult<()> {
-        if let ResourceKind::Server = kind {
-            if let Some(mut host) = self.inventory.get_mut(provider_id) {
+        if let ResourceKind::Server = kind
+            && let Some(mut host) = self.inventory.get_mut(provider_id) {
                 host.available = true;
             }
-        }
         Ok(())
     }
 }
@@ -242,6 +241,12 @@ impl Provider for NoopProvider {
 
 pub struct ProviderRegistry {
     providers: DashMap<String, Box<dyn Provider>>,
+}
+
+impl Default for ProviderRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ProviderRegistry {

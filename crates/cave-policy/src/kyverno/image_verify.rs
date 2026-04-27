@@ -259,8 +259,8 @@ fn mutate_image_digest_recursive(
             for key in keys {
                 let child_path = format!("{}/{}", path.trim_end_matches('/'), key);
                 if key == "image" {
-                    if let Some(Value::String(s)) = m.get(&key) {
-                        if s.as_str() == image {
+                    if let Some(Value::String(s)) = m.get(&key)
+                        && s.as_str() == image {
                             let new_image = format!("{}@{}", image, digest);
                             patches.push(serde_json::json!({
                                 "op": "replace",
@@ -269,7 +269,6 @@ fn mutate_image_digest_recursive(
                             }));
                             m.insert(key, Value::String(new_image));
                         }
-                    }
                 } else if let Some(child) = m.get_mut(&key) {
                     mutate_image_digest_recursive(child, image, digest, &child_path, patches);
                 }

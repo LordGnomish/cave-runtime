@@ -111,11 +111,10 @@ impl ProviderStore {
         match self.providers.remove(name) {
             Some((_, provider)) => {
                 for mrt in &provider.managed_resource_types {
-                    if let Some(group) = mrt.split('/').next() {
-                        if let Some(mut names) = self.managed_type_index.get_mut(group) {
+                    if let Some(group) = mrt.split('/').next()
+                        && let Some(mut names) = self.managed_type_index.get_mut(group) {
                             names.retain(|n| n != name);
                         }
-                    }
                 }
                 Ok(())
             }

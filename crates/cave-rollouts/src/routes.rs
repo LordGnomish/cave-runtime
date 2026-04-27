@@ -7,7 +7,7 @@ use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Json},
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Router,
 };
 use chrono::Utc;
@@ -15,7 +15,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::{
-    engine::{advance_canary, apply_canary_action, initial_status},
+    engine::initial_status,
     models::*,
     RolloutsState,
 };

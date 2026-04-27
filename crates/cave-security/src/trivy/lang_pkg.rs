@@ -210,7 +210,7 @@ pub fn parse_pom_xml(content: &str, file_path: &str) -> Vec<LangPackage> {
     pkgs
 }
 
-fn extract_xml_tag<'a>(content: &'a str, tag: &str) -> Option<String> {
+fn extract_xml_tag(content: &str, tag: &str) -> Option<String> {
     let open = format!("<{tag}>");
     let close = format!("</{tag}>");
     let start = content.find(&open)? + open.len();
@@ -251,11 +251,10 @@ pub fn parse_cargo_lock(content: &str, file_path: &str) -> Vec<LangPackage> {
 fn extract_toml_value(block: &str, key: &str) -> Option<String> {
     for line in block.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix(key) {
-            if let Some(rest) = rest.trim_start().strip_prefix('=') {
+        if let Some(rest) = line.strip_prefix(key)
+            && let Some(rest) = rest.trim_start().strip_prefix('=') {
                 return Some(rest.trim().trim_matches('"').to_string());
             }
-        }
     }
     None
 }

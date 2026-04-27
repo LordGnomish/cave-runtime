@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::ingestion::{normalise_service, us_to_ns};
 use crate::types::{Span, SpanEvent, SpanId, SpanKind, SpanLink, SpanStatus, TagValue, TraceId};
@@ -120,7 +120,7 @@ pub fn parse_jaeger_json(body: &[u8], tenant_id: &str) -> Result<Vec<Span>> {
         let process = envelope.process.as_ref();
         for jspan in &spans {
             let proc = jspan.process.as_ref().or(process);
-            if let Some(span) = convert_json_span(&jspan, proc, tenant_id) {
+            if let Some(span) = convert_json_span(jspan, proc, tenant_id) {
                 out.push(span);
             }
         }
@@ -149,7 +149,7 @@ fn convert_json_span(
         .map(|p| normalise_service(&p.service_name))
         .unwrap_or_else(|| "unknown".into());
 
-    let mut tags: HashMap<String, TagValue> = js.tags.as_deref()
+    let tags: HashMap<String, TagValue> = js.tags.as_deref()
         .map(parse_jaeger_tags)
         .unwrap_or_default();
 

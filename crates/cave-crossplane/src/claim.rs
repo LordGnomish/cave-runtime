@@ -45,8 +45,8 @@ impl ClaimStore {
         engine: &CompositionEngine,
     ) -> CrossplaneResult<(Claim, CompositeResource)> {
         // Validate spec against XRD schema (check required fields in first referenceable version)
-        if let Some(version) = xrd.versions.iter().find(|v| v.referenceable) {
-            if let Some(schema) = &version.schema {
+        if let Some(version) = xrd.versions.iter().find(|v| v.referenceable)
+            && let Some(schema) = &version.schema {
                 for required_field in &schema.required {
                     if crate::engine::get_field_path(&req.spec, required_field).is_none() {
                         return Err(CrossplaneError::ClaimValidation(format!(
@@ -56,7 +56,6 @@ impl ClaimStore {
                     }
                 }
             }
-        }
 
         // Render composition
         let rendered = engine.render(composition, &req.spec)?;
@@ -116,7 +115,7 @@ impl ClaimStore {
         self.claims
             .get(&key)
             .map(|r| r.clone())
-            .ok_or_else(|| CrossplaneError::ClaimNotFound(key))
+            .ok_or(CrossplaneError::ClaimNotFound(key))
     }
 
     pub fn list_claims_for_namespace(&self, ns: &str) -> Vec<Claim> {
@@ -185,7 +184,7 @@ impl ClaimStore {
         self.composites
             .get(&key)
             .map(|r| r.clone())
-            .ok_or_else(|| CrossplaneError::CompositeNotFound(key))
+            .ok_or(CrossplaneError::CompositeNotFound(key))
     }
 
     pub fn list_composites(&self) -> Vec<CompositeResource> {

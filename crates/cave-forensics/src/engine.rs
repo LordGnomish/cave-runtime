@@ -16,7 +16,7 @@ pub fn open_cases(cases: &[ForensicCase]) -> Vec<&ForensicCase> {
         .collect()
 }
 
-pub fn highest_severity<'a>(cases: &'a [ForensicCase]) -> Option<&'a ForensicCase> {
+pub fn highest_severity(cases: &[ForensicCase]) -> Option<&ForensicCase> {
     cases.iter().max_by_key(|c| severity_rank(&c.severity))
 }
 
@@ -25,7 +25,7 @@ pub fn evidence_count(case: &ForensicCase) -> usize {
 }
 
 pub fn has_valid_evidence(item: &EvidenceItem) -> bool {
-    item.hash_sha256.as_ref().map_or(false, |h| {
+    item.hash_sha256.as_ref().is_some_and(|h| {
         h.len() == 64 && h.chars().all(|c| c.is_ascii_hexdigit())
     })
 }

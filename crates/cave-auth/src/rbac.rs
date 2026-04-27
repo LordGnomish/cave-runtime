@@ -252,11 +252,10 @@ impl RbacEngine {
                 continue;
             }
             for binding in &policy.bindings {
-                if binding.cave_uid == cave_uid {
-                    if binding.permissions.iter().any(|p| p == permission || p == "*") {
+                if binding.cave_uid == cave_uid
+                    && binding.permissions.iter().any(|p| p == permission || p == "*") {
                         return true;
                     }
-                }
             }
         }
         false

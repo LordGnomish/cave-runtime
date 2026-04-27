@@ -299,7 +299,7 @@ fn json_remove(v: &mut serde_json::Value, parts: &[&str]) -> Result<(), String> 
     if parts.is_empty() {
         return Err("cannot remove root".into());
     }
-    let (head, tail) = parts.split_at(parts.len() - 1);
+    let (head, _tail) = parts.split_at(parts.len() - 1);
     let last = parts.last().unwrap();
     let parent = if head.is_empty() {
         v

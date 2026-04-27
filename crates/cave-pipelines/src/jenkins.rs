@@ -317,13 +317,12 @@ fn parse_environment_block(lines: &[&str], start: usize) -> (HashMap<String, Str
         let line = lines[i].trim();
         if line.contains('{') { depth += 1; }
         if line.contains('}') { depth -= 1; }
-        if depth > 0 {
-            if let Some(eq_pos) = line.find('=') {
+        if depth > 0
+            && let Some(eq_pos) = line.find('=') {
                 let key = line[..eq_pos].trim().to_string();
                 let val = line[eq_pos + 1..].trim().trim_matches('\'').trim_matches('"').to_string();
                 if !key.is_empty() { env.insert(key, val); }
             }
-        }
         i += 1;
     }
     (env, i - start - 1)
@@ -399,12 +398,11 @@ fn parse_post_block(lines: &[&str], start: usize) -> (Vec<PostAction>, usize) {
         if line.contains('{') { depth += 1; }
         if line.contains('}') {
             depth -= 1;
-            if depth == 1 {
-                if let Some(cond) = current_condition.take() {
+            if depth == 1
+                && let Some(cond) = current_condition.take() {
                     actions.push(PostAction { condition: cond, steps: current_steps.clone() });
                     current_steps.clear();
                 }
-            }
             if depth == 0 { break; }
         }
 
@@ -448,27 +446,24 @@ fn parse_options_block(lines: &[&str], start: usize) -> (JenkinsOptions, usize) 
 
 fn extract_stage_name(line: &str) -> String {
     // stage('Build') or stage "Build"
-    if let Some(start) = line.find('\'') {
-        if let Some(end) = line[start + 1..].find('\'') {
+    if let Some(start) = line.find('\'')
+        && let Some(end) = line[start + 1..].find('\'') {
             return line[start + 1..start + 1 + end].to_string();
         }
-    }
-    if let Some(start) = line.find('"') {
-        if let Some(end) = line[start + 1..].find('"') {
+    if let Some(start) = line.find('"')
+        && let Some(end) = line[start + 1..].find('"') {
             return line[start + 1..start + 1 + end].to_string();
         }
-    }
     "unnamed-stage".to_string()
 }
 
 fn extract_string_arg(line: &str) -> String {
     let s = line.trim();
     for delim in &['\'', '"'] {
-        if let Some(start) = s.find(*delim) {
-            if let Some(end) = s[start + 1..].find(*delim) {
+        if let Some(start) = s.find(*delim)
+            && let Some(end) = s[start + 1..].find(*delim) {
                 return s[start + 1..start + 1 + end].to_string();
             }
-        }
     }
     s.to_string()
 }
@@ -544,7 +539,7 @@ pub fn to_pipeline_spec(jf: &JenkinsFile) -> PipelineSpec {
         })
         .collect();
 
-    let env_params: Vec<ParamSpec> = jf.environment.iter().map(|(k, _v)| ParamSpec {
+    let env_params: Vec<ParamSpec> = jf.environment.keys().map(|k| ParamSpec {
         name: k.clone(),
         param_type: ParamType::String,
         description: None,

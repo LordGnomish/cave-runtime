@@ -31,6 +31,12 @@ impl ResourceKey {
     }
 }
 
+impl Default for HealthCheckRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HealthCheckRegistry {
     pub fn new() -> Self {
         let mut reg = Self {
@@ -139,7 +145,7 @@ pub fn check_statefulset(resource: &serde_json::Value) -> HealthCondition {
     let status = &resource["status"];
     let desired = resource.get("spec").and_then(|s| s.get("replicas")).and_then(|v| v.as_i64()).unwrap_or(1);
     let ready = status.get("readyReplicas").and_then(|v| v.as_i64()).unwrap_or(0);
-    let current = status.get("currentReplicas").and_then(|v| v.as_i64()).unwrap_or(0);
+    let _current = status.get("currentReplicas").and_then(|v| v.as_i64()).unwrap_or(0);
 
     if desired == 0 {
         return HealthCondition { status: HealthStatus::Suspended, message: Some("StatefulSet scaled to zero".to_string()) };

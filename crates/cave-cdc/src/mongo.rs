@@ -120,13 +120,12 @@ impl MongoDbConnector {
     /// Resume tokens MUST advance monotonically; an older one indicates
     /// a desynchronised checkpoint and is rejected.
     pub fn record_resume_token(&mut self, token: ResumeToken) -> CdcResult<()> {
-        if let Some(prev) = &self.last_resume_token {
-            if token < *prev {
+        if let Some(prev) = &self.last_resume_token
+            && token < *prev {
                 return Err(CdcError::InvalidConfig(format!(
                     "resume token regression: {:?} -> {:?}", prev, token,
                 )));
             }
-        }
         self.last_resume_token = Some(token);
         Ok(())
     }

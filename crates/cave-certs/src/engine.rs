@@ -14,7 +14,7 @@ pub fn compute_cert_state(cert: &Certificate) -> CertState {
 }
 
 /// Find certificates expiring within `days` days (but not already expired)
-pub fn expiring_soon<'a>(certs: &'a [Certificate], days: i64) -> Vec<&'a Certificate> {
+pub fn expiring_soon(certs: &[Certificate], days: i64) -> Vec<&Certificate> {
     let now = Utc::now();
     let threshold = now + chrono::Duration::days(days);
     certs

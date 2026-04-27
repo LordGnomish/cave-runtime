@@ -47,15 +47,14 @@ pub async fn detect_drift(store: &ResourceStore, registry: &ProviderRegistry) ->
                 // Compare actual provider state against desired
                 let mut drift_items = Vec::new();
                 for (key, desired) in &resource.spec.properties {
-                    if let Some(actual_val) = actual.get(key) {
-                        if actual_val != desired {
+                    if let Some(actual_val) = actual.get(key)
+                        && actual_val != desired {
                             drift_items.push(DriftItem {
                                 field: key.clone(),
                                 desired: desired.clone(),
                                 actual: actual_val.clone(),
                             });
                         }
-                    }
                 }
 
                 if drift_items.is_empty() {

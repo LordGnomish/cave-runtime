@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 use uuid::Uuid;
 use crate::model::Labels;
-use super::model::{Silence, SilenceMatcher, SilenceStatus};
+use super::model::Silence;
 
 pub struct SilenceStore {
     silences: RwLock<HashMap<String, Silence>>,

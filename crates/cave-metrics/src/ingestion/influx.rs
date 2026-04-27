@@ -17,10 +17,7 @@ pub fn parse(input: &str) -> IngestedBatch {
 /// Parse a single InfluxDB line protocol line.
 /// Returns one TimeSeries per field.
 pub fn parse_line(line: &str) -> Vec<TimeSeries> {
-    match try_parse_line(line) {
-        Ok(v) => v,
-        Err(_) => vec![],
-    }
+    try_parse_line(line).unwrap_or_default()
 }
 
 fn try_parse_line(line: &str) -> Result<Vec<TimeSeries>> {
@@ -113,9 +110,8 @@ fn parse_fields(s: &str) -> Vec<(String, f64)> {
             current.push(c);
         }
     }
-    if !current.is_empty() {
-        if let Some(kv) = parse_field_kv(&current) { out.push(kv); }
-    }
+    if !current.is_empty()
+        && let Some(kv) = parse_field_kv(&current) { out.push(kv); }
     out
 }
 
@@ -128,9 +124,9 @@ fn parse_field_kv(s: &str) -> Option<(String, f64)> {
         val_str[..val_str.len()-1].parse().ok()?
     } else if val_str.starts_with('"') {
         return None; // string fields not convertible
-    } else if val_str == "t" || val_str == "T" || val_str.to_ascii_lowercase() == "true" {
+    } else if val_str == "t" || val_str == "T" || val_str.eq_ignore_ascii_case("true") {
         1.0
-    } else if val_str == "f" || val_str == "F" || val_str.to_ascii_lowercase() == "false" {
+    } else if val_str == "f" || val_str == "F" || val_str.eq_ignore_ascii_case("false") {
         0.0
     } else {
         val_str.parse().ok()?

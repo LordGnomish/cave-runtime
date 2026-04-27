@@ -1,7 +1,6 @@
 //! Cluster health monitoring.
 
 use crate::cluster::{Cluster, ClusterStatus};
-use crate::error::ClusterResult;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

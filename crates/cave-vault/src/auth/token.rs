@@ -3,12 +3,12 @@ use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;
 use crate::VaultState;
 use axum::{
-    extract::{Extension, Json, State},
+    extract::{Json, State},
     http::HeaderMap,
     routing::{get, post},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
 

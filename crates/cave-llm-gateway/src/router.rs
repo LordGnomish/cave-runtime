@@ -78,7 +78,7 @@ impl GatewayRouter {
         // Rate limit (estimate token cost from messages length)
         let estimated_tokens: u32 = req.messages.iter()
             .filter_map(|m| m.content.as_text())
-            .map(|t| crate::cost::estimate_tokens(t))
+            .map(crate::cost::estimate_tokens)
             .sum();
 
         if let Err(e) = self.rate_limiter.check(consumer, estimated_tokens) {
@@ -138,7 +138,7 @@ impl GatewayRouter {
         }
     }
 
-    async fn dispatch(&self, consumer: &str, preferred_provider: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
+    async fn dispatch(&self, _consumer: &str, preferred_provider: &str, req: &ChatCompletionRequest) -> GatewayResult<ChatCompletionResponse> {
         match &self.strategy {
             RoutingStrategy::Fixed { provider } => {
                 let name = if preferred_provider == "local" || preferred_provider == "openai" || preferred_provider == "anthropic" {

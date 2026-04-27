@@ -15,10 +15,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::types::{
-    build_histogram, LatencyHistogram, Span, SpanId, SpanStatus, TagValue, Trace, TraceId,
+    build_histogram, LatencyHistogram, Span, SpanId, SpanStatus, Trace, TraceId,
     TraceSearchQuery,
 };
-use crate::{Result, TraceError};
 
 // ─── Bloom filter ──────────────────────────────────────────────────────────
 
@@ -28,6 +27,12 @@ const BLOOM_K: usize = 7; // number of hash functions
 pub struct BloomFilter {
     bits: Vec<u64>,
     item_count: usize,
+}
+
+impl Default for BloomFilter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl BloomFilter {
@@ -325,7 +330,7 @@ impl TraceStore {
             .iter()
             .filter(|((svc, _), ids)| {
                 svc == service
-                    && tenant_id.map_or(true, |t| {
+                    && tenant_id.is_none_or(|t| {
                         ids.iter()
                             .any(|id| self.traces.get(id).map(|r| r.tenant_id == t).unwrap_or(false))
                     })
@@ -342,10 +347,10 @@ impl TraceStore {
             .tag_index
             .keys()
             .filter(|(key, _)| {
-                tenant_id.map_or(true, |t| {
+                tenant_id.is_none_or(|t| {
                     self.tag_index
                         .get(&(key.clone(), "".to_string()))
-                        .map_or(true, |ids| {
+                        .is_none_or(|ids| {
                             ids.iter()
                                 .any(|id| self.traces.get(id).map(|r| r.tenant_id == t).unwrap_or(false))
                         })
@@ -418,37 +423,32 @@ impl TraceStore {
                 let record = self.traces.get(&id)?;
 
                 // Tenant filter
-                if let Some(t) = &query.tenant_id {
-                    if &record.tenant_id != t {
+                if let Some(t) = &query.tenant_id
+                    && &record.tenant_id != t {
                         return None;
                     }
-                }
 
                 // Time range
                 let trace_start = record.trace_start_ns();
-                if let Some(start) = query.start_time_ns {
-                    if trace_start < start {
+                if let Some(start) = query.start_time_ns
+                    && trace_start < start {
                         return None;
                     }
-                }
-                if let Some(end) = query.end_time_ns {
-                    if trace_start > end {
+                if let Some(end) = query.end_time_ns
+                    && trace_start > end {
                         return None;
                     }
-                }
 
                 // Duration range
                 let dur = record.trace_end_ns().saturating_sub(record.trace_start_ns());
-                if let Some(min_dur) = query.min_duration_ns {
-                    if dur < min_dur {
+                if let Some(min_dur) = query.min_duration_ns
+                    && dur < min_dur {
                         return None;
                     }
-                }
-                if let Some(max_dur) = query.max_duration_ns {
-                    if dur > max_dur {
+                if let Some(max_dur) = query.max_duration_ns
+                    && dur > max_dur {
                         return None;
                     }
-                }
 
                 // Tag filter
                 if let Some(ref required) = tag_required {
@@ -489,7 +489,7 @@ impl TraceStore {
             .into_iter()
             .flat_map(|ids| ids.iter())
             .filter_map(|id| self.traces.get(id))
-            .filter(|r| tenant_id.map_or(true, |t| r.tenant_id == t))
+            .filter(|r| tenant_id.is_none_or(|t| r.tenant_id == t))
             .flat_map(|r| r.spans.iter())
             .filter(|s| s.service_name == service)
             .collect()
@@ -510,12 +510,12 @@ impl TraceStore {
             .into_iter()
             .flat_map(|ids| ids.iter())
             .filter_map(|id| self.traces.get(id))
-            .filter(|r| tenant_id.map_or(true, |t| r.tenant_id == t))
+            .filter(|r| tenant_id.is_none_or(|t| r.tenant_id == t))
             .flat_map(|r| r.spans.iter())
             .filter(|s| s.service_name == service && s.operation_name == operation)
             .filter(|s| {
-                start_ns.map_or(true, |t| s.start_time_unix_nano >= t)
-                    && end_ns.map_or(true, |t| s.start_time_unix_nano <= t)
+                start_ns.is_none_or(|t| s.start_time_unix_nano >= t)
+                    && end_ns.is_none_or(|t| s.start_time_unix_nano <= t)
             })
             .map(|s| s.duration_ns)
             .collect();

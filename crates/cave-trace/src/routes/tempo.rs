@@ -17,7 +17,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -25,11 +25,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     multi_tenant::tenant_from_headers,
     query::QueryEngine,
-    spm::SpmRegistry,
     traceql,
     types::{
         format_span_id, format_trace_id, parse_trace_id, Span, SpanKind, SpanStatus, TagValue,
-        Trace, TraceId, TraceSearchQuery,
+        Trace, TraceSearchQuery,
     },
     TraceState,
 };
@@ -158,7 +157,7 @@ fn trace_to_tempo(trace: &Trace) -> TempoTrace {
 async fn get_trace(
     State(state): State<Arc<TraceState>>,
     Path(trace_id_str): Path<String>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
 ) -> Response {
     let trace_id = match parse_trace_id(&trace_id_str) {
         Ok(id) => id,
@@ -208,7 +207,7 @@ async fn search_traces(
     let tag_map: std::collections::HashMap<String, String> = params
         .tags
         .as_deref()
-        .map(|t| parse_tag_pairs(t))
+        .map(parse_tag_pairs)
         .unwrap_or_default();
 
     let query = TraceSearchQuery {
@@ -245,7 +244,7 @@ async fn search_traces(
 
 async fn search_with_traceql(
     query: &str,
-    state: &TraceState,
+    _state: &TraceState,
     engine: &QueryEngine,
     tenant_id: &str,
     params: &TempoSearchQuery,

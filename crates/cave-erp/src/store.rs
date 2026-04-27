@@ -73,7 +73,7 @@ pub struct ErpStore {
 
 impl Default for ErpStore {
     fn default() -> Self {
-        let mut store = ErpStore {
+        let store = ErpStore {
             company: Arc::new(RwLock::new(HashMap::new())),
             currency: Arc::new(RwLock::new(HashMap::new())),
             employees: Arc::new(RwLock::new(HashMap::new())),
@@ -122,7 +122,7 @@ impl Default for ErpStore {
 
         // Seed default company (synchronously via Arc construction)
         let company_id = Uuid::new_v4();
-        let company = Company {
+        let _company = Company {
             id: company_id,
             name: "Default Company".to_string(),
             legal_name: Some("Default Company Inc.".to_string()),
@@ -140,8 +140,7 @@ impl Default for ErpStore {
         };
 
         // Seed currencies (synchronously)
-        let currencies = vec![
-            ("EUR".to_string(), Currency {
+        let _currencies = [("EUR".to_string(), Currency {
                 code: "EUR".to_string(),
                 name: "Euro".to_string(),
                 symbol: "€".to_string(),
@@ -158,12 +157,10 @@ impl Default for ErpStore {
                 name: "Turkish Lira".to_string(),
                 symbol: "₺".to_string(),
                 rate_to_base: 0.033,
-            }),
-        ];
+            })];
 
         // Seed CRM stages
-        let crm_stages = vec![
-            CrmStage {
+        let _crm_stages = [CrmStage {
                 id: Uuid::new_v4(),
                 name: "New".to_string(),
                 order: 1,
@@ -202,12 +199,10 @@ impl Default for ErpStore {
                 probability: 100,
                 is_won: true,
                 is_lost: false,
-            },
-        ];
+            }];
 
         // Seed recruitment stages
-        let recruit_stages = vec![
-            RecruitmentStage {
+        let _recruit_stages = [RecruitmentStage {
                 id: Uuid::new_v4(),
                 name: "Applied".to_string(),
                 order: 1,
@@ -248,8 +243,7 @@ impl Default for ErpStore {
                 order: 6,
                 is_won: false,
                 is_lost: true,
-            },
-        ];
+            }];
 
         // Insert into store (this is done in a blocking context, so we need to be careful)
         // Since Arc<RwLock<>> cannot be mutated during construction without runtime,

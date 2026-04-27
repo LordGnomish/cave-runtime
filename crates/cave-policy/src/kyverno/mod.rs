@@ -211,11 +211,10 @@ impl KyvernoEngine {
             return false;
         }
         // Check exclude
-        if let Some(exclude) = &rule.exclude {
-            if matches_exclude(exclude, resource, namespace, operation) {
+        if let Some(exclude) = &rule.exclude
+            && matches_exclude(exclude, resource, namespace, operation) {
                 return false;
             }
-        }
         true
     }
 
@@ -286,21 +285,18 @@ fn matches_exclude(
     namespace: Option<&str>,
     operation: &str,
 ) -> bool {
-    if !exclude.any.is_empty() {
-        if exclude.any.iter().any(|f| filter_matches(f, resource, namespace, operation)) {
+    if !exclude.any.is_empty()
+        && exclude.any.iter().any(|f| filter_matches(f, resource, namespace, operation)) {
             return true;
         }
-    }
-    if !exclude.all.is_empty() {
-        if exclude.all.iter().all(|f| filter_matches(f, resource, namespace, operation)) {
+    if !exclude.all.is_empty()
+        && exclude.all.iter().all(|f| filter_matches(f, resource, namespace, operation)) {
             return true;
         }
-    }
-    if let Some(res_desc) = &exclude.resources {
-        if matches_resource_description(res_desc, resource, namespace, operation) {
+    if let Some(res_desc) = &exclude.resources
+        && matches_resource_description(res_desc, resource, namespace, operation) {
             return true;
         }
-    }
     false
 }
 
@@ -333,7 +329,7 @@ fn matches_resource_description(
             if k.contains('/') {
                 // apiVersion/Kind format
                 let parts: Vec<&str> = k.splitn(2, '/').collect();
-                parts.get(0).map(|&av| av == api_version || av == "*").unwrap_or(false)
+                parts.first().map(|&av| av == api_version || av == "*").unwrap_or(false)
                     && parts.get(1).map(|&ki| ki == kind || ki == "*").unwrap_or(false)
             } else {
                 k == kind || k == "*"
@@ -366,11 +362,10 @@ fn matches_resource_description(
     }
 
     // Check selector (label matching)
-    if let Some(selector) = &desc.selector {
-        if !label_selector_matches(selector, resource) {
+    if let Some(selector) = &desc.selector
+        && !label_selector_matches(selector, resource) {
             return false;
         }
-    }
 
     true
 }

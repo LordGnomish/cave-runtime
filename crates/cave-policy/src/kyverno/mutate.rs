@@ -21,11 +21,10 @@ pub fn mutate_rule(
     };
 
     // Evaluate preconditions
-    if let Some(preconditions) = &rule.preconditions {
-        if !super::validate::eval_conditions(preconditions, resource, context)? {
+    if let Some(preconditions) = &rule.preconditions
+        && !super::validate::eval_conditions(preconditions, resource, context)? {
             return Ok(None);
         }
-    }
 
     let mut current = resource.clone();
     let mut patches: Vec<serde_json::Value> = Vec::new();
@@ -51,7 +50,7 @@ pub fn mutate_rule(
                 &op.path,
                 op.value.as_ref(),
                 op.from.as_deref(),
-            ).map_err(|e| PolicyError::Mutation(e))?;
+            ).map_err(PolicyError::Mutation)?;
             patches.push(serde_json::to_value(op).unwrap_or_default());
         }
     }
@@ -88,11 +87,10 @@ fn mutate_foreach(
 
     for item in &items {
         // Check preconditions
-        if let Some(preconds) = &foreach.preconditions {
-            if !super::validate::eval_conditions(preconds, item, context)? {
+        if let Some(preconds) = &foreach.preconditions
+            && !super::validate::eval_conditions(preconds, item, context)? {
                 continue;
             }
-        }
 
         // patchStrategicMerge
         if let Some(psm) = &foreach.patch_strategic_merge {
@@ -115,7 +113,7 @@ fn mutate_foreach(
                     &op.path,
                     op.value.as_ref(),
                     op.from.as_deref(),
-                ).map_err(|e| PolicyError::Mutation(e))?;
+                ).map_err(PolicyError::Mutation)?;
                 patches.push(serde_json::to_value(op).unwrap_or_default());
             }
         }

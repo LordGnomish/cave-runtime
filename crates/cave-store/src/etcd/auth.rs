@@ -2,7 +2,7 @@
 
 use crate::error::{StoreError, StoreResult};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -152,6 +152,12 @@ pub struct ClusterStore {
     clusters: DashMap<String, Cluster>,
 }
 
+impl Default for ClusterStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ClusterStore {
     pub fn new() -> Self {
         Self {

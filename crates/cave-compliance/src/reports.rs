@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 pub fn generate_report(framework: &ComplianceFramework, findings: &[Finding], exceptions: &[ControlException]) -> ComplianceReport {
     let excepted_control_ids: std::collections::HashSet<Uuid> = exceptions.iter()
-        .filter(|e| e.expires_at.map_or(true, |exp| chrono::Utc::now() < exp))
+        .filter(|e| e.expires_at.is_none_or(|exp| chrono::Utc::now() < exp))
         .map(|e| e.control_id)
         .collect();
 

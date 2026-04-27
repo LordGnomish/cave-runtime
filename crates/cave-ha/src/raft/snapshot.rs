@@ -123,7 +123,7 @@ impl SnapshotTransfer {
         let total_chunks = if self.snapshot.data.is_empty() {
             1
         } else {
-            (self.snapshot.data.len() + self.chunk_size - 1) / self.chunk_size
+            self.snapshot.data.len().div_ceil(self.chunk_size)
         };
         self.next_chunk >= total_chunks
     }

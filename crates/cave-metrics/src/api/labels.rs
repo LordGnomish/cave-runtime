@@ -3,7 +3,6 @@
 use axum::{extract::{Path, Query, State}, Json};
 use serde::Deserialize;
 use std::sync::Arc;
-use crate::model::LabelMatcher;
 use crate::state::MetricsState;
 
 #[derive(Debug, Deserialize)]

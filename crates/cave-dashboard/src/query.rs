@@ -1,7 +1,7 @@
 //! Query engine — mixed datasource queries, caching, query inspector,
 //! and all Grafana transformations.
 
-use crate::models::{DataFrame, DataFrameData, DataFrameSchema, FieldSchema, DsQueryRequest, DsQueryResponse, QueryResult};
+use crate::models::{DataFrame, DataFrameData, DataFrameSchema, FieldSchema, QueryResult};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -125,7 +125,7 @@ fn transform_reduce(frames: Vec<DataFrame>, options: &serde_json::Value) -> Vec<
         .unwrap_or_else(|| vec!["last"]);
 
     frames.into_iter().map(|frame| {
-        let row_count = frame.data.values.first().map(|v| v.len()).unwrap_or(0);
+        let _row_count = frame.data.values.first().map(|v| v.len()).unwrap_or(0);
         let mut new_fields: Vec<FieldSchema> = vec![
             FieldSchema { name: "Field".into(), field_type: "string".into(), type_info: None, labels: None, config: None },
         ];
@@ -319,7 +319,7 @@ fn transform_filter_by_value(frames: Vec<DataFrame>, options: &serde_json::Value
 
 /// Organize: reorder, rename, and hide fields.
 fn transform_organize(frames: Vec<DataFrame>, options: &serde_json::Value) -> Vec<DataFrame> {
-    let index_by_name = options.get("indexByName").cloned().unwrap_or_default();
+    let _index_by_name = options.get("indexByName").cloned().unwrap_or_default();
     let rename_by_name = options.get("renameByName").cloned().unwrap_or_default();
     let exclude_by_name = options.get("excludeByName").cloned().unwrap_or_default();
 
@@ -397,7 +397,7 @@ fn transform_calculate_field(frames: Vec<DataFrame>, options: &serde_json::Value
 }
 
 /// Group by: aggregate rows by a set of fields.
-fn transform_group_by(frames: Vec<DataFrame>, options: &serde_json::Value) -> Vec<DataFrame> {
+fn transform_group_by(frames: Vec<DataFrame>, _options: &serde_json::Value) -> Vec<DataFrame> {
     // Simplified passthrough — full impl would aggregate rows
     frames
 }
@@ -540,12 +540,12 @@ fn transform_series_to_rows(frames: Vec<DataFrame>) -> Vec<DataFrame> {
 /// Join by field: join frames by a common field (like SQL JOIN).
 fn transform_join_by_field(frames: Vec<DataFrame>, options: &serde_json::Value) -> Vec<DataFrame> {
     // Simplified outer join on time field
-    let by_field = options.get("byField").and_then(|v| v.as_str()).unwrap_or("Time");
+    let _by_field = options.get("byField").and_then(|v| v.as_str()).unwrap_or("Time");
     transform_merge(frames) // Simplified
 }
 
 /// Labels to fields: expand label key-value pairs into separate columns.
-fn transform_labels_to_fields(frames: Vec<DataFrame>, options: &serde_json::Value) -> Vec<DataFrame> {
+fn transform_labels_to_fields(frames: Vec<DataFrame>, _options: &serde_json::Value) -> Vec<DataFrame> {
     frames.into_iter().map(|mut frame| {
         let mut extra_fields: Vec<FieldSchema> = Vec::new();
         for field in &frame.schema.fields {

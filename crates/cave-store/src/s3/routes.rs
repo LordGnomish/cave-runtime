@@ -16,15 +16,15 @@ use axum::{
     routing::{delete, get, head, post, put},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::s3::presigned;
-use crate::s3::store::{DeleteObjectEntry, ObjectStore};
+use crate::s3::store::DeleteObjectEntry;
 use crate::s3::types::{
-    BucketEncryption, BucketAcl, LifecycleRule, NotificationConfiguration,
-    SseAlgorithm, StorageClass, VersioningState,
+    BucketEncryption, LifecycleRule, NotificationConfiguration,
+    SseAlgorithm, VersioningState,
 };
 use crate::s3::xml;
 use crate::StoreState;
@@ -421,7 +421,7 @@ async fn put_bucket_encryption(state: Arc<StoreState>, bucket: String, body: Byt
     }
 }
 
-async fn put_bucket_acl(state: Arc<StoreState>, bucket: String, body: Bytes) -> Response {
+async fn put_bucket_acl(_state: Arc<StoreState>, _bucket: String, _body: Bytes) -> Response {
     // For now just return OK (ACL is tracked on the bucket)
     StatusCode::OK.into_response()
 }
@@ -455,7 +455,7 @@ async fn put_object(
     }
 
     // Presigned URL verification
-    if let (Some(alg), Some(cred), Some(exp), Some(sig)) = (
+    if let (Some(_alg), Some(cred), Some(exp), Some(sig)) = (
         &q.cave_algorithm,
         &q.cave_credential,
         q.cave_expires,
@@ -851,11 +851,10 @@ fn extract_user_metadata(headers: &HeaderMap) -> HashMap<String, String> {
     let mut meta = HashMap::new();
     for (name, value) in headers.iter() {
         let name_str = name.as_str();
-        if let Some(key) = name_str.strip_prefix("x-amz-meta-") {
-            if let Ok(v) = value.to_str() {
+        if let Some(key) = name_str.strip_prefix("x-amz-meta-")
+            && let Ok(v) = value.to_str() {
                 meta.insert(key.to_string(), v.to_string());
             }
-        }
     }
     meta
 }
@@ -957,7 +956,7 @@ fn parse_delete_objects_body(body: &[u8]) -> Vec<DeleteObjectEntry> {
     entries
 }
 
-fn extract_xml_tag<'a>(xml: &'a str, tag: &str) -> Option<String> {
+fn extract_xml_tag(xml: &str, tag: &str) -> Option<String> {
     let open = format!("<{tag}>");
     let close = format!("</{tag}>");
     let start = xml.find(&open)? + open.len();

@@ -23,7 +23,7 @@ use axum::{
 };
 use chrono::Utc;
 use serde_json::json;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::ingest::loki_push::{ingest_json, ingest_protobuf};
 use crate::ingest::otlp::ingest_otlp_json;
@@ -32,7 +32,7 @@ use crate::logql::ast::{Query as LogQuery};
 use crate::logql::eval::Evaluator;
 use crate::logql::parser::Parser;
 use crate::models::{
-    Direction, IndexStats, LabelParams, QueryData, QueryParams, QueryRangeParams,
+    LabelParams, QueryParams, QueryRangeParams,
     QueryResponse, SeriesParams, TailParams,
 };
 use crate::store::LogStore;
@@ -62,11 +62,10 @@ fn tenant_from_headers(headers: &HeaderMap) -> String {
 /// Parse a Loki time parameter (RFC3339, Unix seconds float, or Unix nanoseconds string).
 fn parse_time_param(s: &str) -> Option<i64> {
     // Unix nanoseconds (large integer string)
-    if s.len() > 13 {
-        if let Ok(ns) = s.parse::<i64>() {
+    if s.len() > 13
+        && let Ok(ns) = s.parse::<i64>() {
             return Some(ns);
         }
-    }
     // Unix seconds (possibly with fractional part)
     if let Ok(f) = s.parse::<f64>() {
         return Some((f * 1e9) as i64);
@@ -86,7 +85,8 @@ fn step_to_ns(step: &str) -> i64 {
     // duration suffix
     let (n_str, suffix) = step.split_at(step.find(|c: char| c.is_alphabetic()).unwrap_or(step.len()));
     let base: f64 = n_str.parse().unwrap_or(1.0);
-    let ns = match suffix {
+    
+    match suffix {
         "ns" => base as i64,
         "us" => (base * 1_000.0) as i64,
         "ms" => (base * 1_000_000.0) as i64,
@@ -95,8 +95,7 @@ fn step_to_ns(step: &str) -> i64 {
         "h" => (base * 3_600_000_000_000.0) as i64,
         "d" => (base * 86_400_000_000_000.0) as i64,
         _ => 1_000_000_000, // default 1s
-    };
-    ns
+    }
 }
 
 // ── Error responses ───────────────────────────────────────────────────────────
@@ -275,8 +274,8 @@ async fn series_handler(
     } else {
         for matcher_str in matchers {
             use crate::logql::eval::labels_match;
-            use crate::logql::ast::StreamSelector;
-            use crate::logql::lexer::Lexer;
+            
+            
             use crate::logql::parser::Parser;
             if let Ok(LogQuery::Log(lq)) = Parser::parse_query(matcher_str) {
                 let mut matched = state.store.matching_fps(&tenant, |l| labels_match(l, &lq.selector));

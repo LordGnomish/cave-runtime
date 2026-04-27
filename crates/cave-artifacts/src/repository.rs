@@ -2,7 +2,6 @@
 
 use crate::models::*;
 use crate::tasks::{Task, TaskQueue};
-use std::sync::Arc;
 
 // ─── Repository operations ───────────────────────────────────────────────────
 

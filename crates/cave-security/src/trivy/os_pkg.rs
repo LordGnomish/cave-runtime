@@ -83,13 +83,12 @@ pub fn detect_os(os_release: &str) -> OsInfo {
     OsInfo { family, name: name.trim_matches('"').to_string(), version: version.trim_matches('"').to_string() }
 }
 
-fn extract_value<'a>(content: &'a str, key: &str) -> Option<String> {
+fn extract_value(content: &str, key: &str) -> Option<String> {
     for line in content.lines() {
-        if let Some(rest) = line.strip_prefix(key) {
-            if let Some(rest) = rest.strip_prefix('=') {
+        if let Some(rest) = line.strip_prefix(key)
+            && let Some(rest) = rest.strip_prefix('=') {
                 return Some(rest.trim().trim_matches('"').to_string());
             }
-        }
     }
     None
 }
@@ -180,11 +179,10 @@ pub fn parse_dpkg_status(content: &str) -> Vec<OsPackage> {
 
     for line in content.lines() {
         if line.is_empty() {
-            if let Some(pkg) = current.take() {
-                if !pkg.name.is_empty() && !pkg.version.is_empty() {
+            if let Some(pkg) = current.take()
+                && !pkg.name.is_empty() && !pkg.version.is_empty() {
                     packages.push(pkg);
                 }
-            }
             continue;
         }
         if let Some((key, value)) = line.split_once(": ") {
@@ -233,11 +231,10 @@ pub fn parse_dpkg_status(content: &str) -> Vec<OsPackage> {
             }
         }
     }
-    if let Some(pkg) = current {
-        if !pkg.name.is_empty() && !pkg.version.is_empty() {
+    if let Some(pkg) = current
+        && !pkg.name.is_empty() && !pkg.version.is_empty() {
             packages.push(pkg);
         }
-    }
     packages
 }
 

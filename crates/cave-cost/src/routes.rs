@@ -138,7 +138,7 @@ async fn query_costs(
         .filter(|c| {
             req.namespace
                 .as_ref()
-                .map_or(true, |ns| &c.namespace == ns)
+                .is_none_or(|ns| &c.namespace == ns)
         })
         .cloned()
         .collect();
@@ -169,7 +169,7 @@ async fn get_allocations(
             params
                 .namespace
                 .as_ref()
-                .map_or(true, |ns| &c.namespace == ns)
+                .is_none_or(|ns| &c.namespace == ns)
         })
         .cloned()
         .collect();
@@ -487,7 +487,7 @@ async fn get_trends(
             params
                 .namespace
                 .as_ref()
-                .map_or(true, |ns| &c.namespace == ns)
+                .is_none_or(|ns| &c.namespace == ns)
         })
         .collect();
 

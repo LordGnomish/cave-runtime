@@ -463,9 +463,9 @@ async fn scim_patch_user(
     // Handle "active: false" deactivation from Okta
     if let Some(ops) = patch.get("Operations").and_then(|o| o.as_array()) {
         for op in ops {
-            if op.get("op").and_then(|o| o.as_str()) == Some("replace") {
-                if let Some(val) = op.get("value") {
-                    if val.get("active") == Some(&serde_json::Value::Bool(false)) {
+            if op.get("op").and_then(|o| o.as_str()) == Some("replace")
+                && let Some(val) = op.get("value")
+                    && val.get("active") == Some(&serde_json::Value::Bool(false)) {
                         user.active = false;
                         let cave_uid_str = user.id.clone().unwrap_or_default();
                         if let Ok(uid) = uuid::Uuid::parse_str(&cave_uid_str) {
@@ -476,8 +476,6 @@ async fn scim_patch_user(
                         }
                         warn!(scim_user = %user.user_name, "SCIM: user deactivated — revoking all PATs");
                     }
-                }
-            }
         }
     }
 

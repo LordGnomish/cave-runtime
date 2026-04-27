@@ -128,11 +128,10 @@ impl AuditLogger {
                 let _ = self.dispatch(backend, &json);
             }
         }
-        if let Ok(mut buf) = self.log_buffer.lock() {
-            if buf.len() < 10_000 {
+        if let Ok(mut buf) = self.log_buffer.lock()
+            && buf.len() < 10_000 {
                 buf.push(entry);
             }
-        }
     }
 
     /// Cite: openbao `builtin/audit/file/backend.go::LogRequest` and

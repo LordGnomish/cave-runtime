@@ -27,7 +27,7 @@ pub fn detect_breaking_changes(old_content: &str, new_content: &str) -> Vec<Stri
 }
 
 /// Get the latest version from a list of specs (semver comparison)
-pub fn latest_version<'a>(specs: &'a [ApiSpec]) -> Option<&'a ApiSpec> {
+pub fn latest_version(specs: &[ApiSpec]) -> Option<&ApiSpec> {
     specs.iter().max_by(|a, b| compare_versions(&a.version, &b.version))
 }
 

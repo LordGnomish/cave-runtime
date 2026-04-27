@@ -157,7 +157,7 @@ impl SealState {
         rng.fill(&mut master_key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
 
         let share_bytes = split_secret(&master_key, shares, threshold)?;
-        let hex_shares: Vec<String> = share_bytes.iter().map(|s| hex::encode(s)).collect();
+        let hex_shares: Vec<String> = share_bytes.iter().map(hex::encode).collect();
 
         let mut root_token_bytes = vec![0u8; 16];
         rng.fill(&mut root_token_bytes).map_err(|_| VaultError::Crypto("rng failure".into()))?;

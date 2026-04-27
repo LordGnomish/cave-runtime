@@ -8,22 +8,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "UPPERCASE")]
+#[derive(Default)]
 pub enum Priority {
     Emergency = 0,
     Alert = 1,
     Critical = 2,
     Error = 3,
+    #[default]
     Warning = 4,
     Notice = 5,
     Informational = 6,
     Debug = 7,
 }
 
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Warning
-    }
-}
 
 impl std::fmt::Display for Priority {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

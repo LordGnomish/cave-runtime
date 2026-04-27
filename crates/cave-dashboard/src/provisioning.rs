@@ -1,7 +1,7 @@
 //! Provisioning — load dashboards, datasources, and alert rules from YAML/JSON files.
 
 use crate::models::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::path::Path;
 use thiserror::Error;
 

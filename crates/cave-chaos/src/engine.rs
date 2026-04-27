@@ -4,11 +4,10 @@ use crate::models::{ChaosExperiment, ExperimentStatus, ExperimentType};
 pub fn validate_experiment(experiment: &ChaosExperiment) -> Vec<String> {
     let mut errors = vec![];
     match &experiment.experiment_type {
-        ExperimentType::NetworkLatency => {
-            if experiment.parameters.latency_ms.is_none() {
+        ExperimentType::NetworkLatency
+            if experiment.parameters.latency_ms.is_none() => {
                 errors.push("latency_ms required for NetworkLatency".to_string());
             }
-        }
         ExperimentType::NetworkPacketLoss => {
             if let Some(loss) = experiment.parameters.packet_loss_percent {
                 if loss > 100.0 {

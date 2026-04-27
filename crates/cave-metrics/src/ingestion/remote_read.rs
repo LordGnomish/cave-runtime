@@ -3,12 +3,11 @@
 use crate::error::Result;
 use crate::model::LabelMatcher;
 use crate::tsdb::Tsdb;
-use std::sync::Arc;
 
 use super::remote_write::{
     ReadRequest, ReadResponse, QueryResult as ProtoQueryResult,
     ProtoTimeSeries, ProtoLabel, ProtoSample,
-    MatchType, encode_write_request, decode_write_request,
+    MatchType,
 };
 use prost::Message;
 use snap::raw::{Decoder, Encoder};

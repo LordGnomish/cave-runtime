@@ -5,7 +5,7 @@ pub mod block;
 pub mod compaction;
 pub mod wal;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use parking_lot::RwLock;
 
@@ -72,11 +72,10 @@ impl InvertedIndex {
 
     fn remove(&mut self, labels: &Labels, fp: u64) {
         for (name, value) in labels.iter() {
-            if let Some(vals) = self.index.get_mut(name) {
-                if let Some(fps) = vals.get_mut(value) {
+            if let Some(vals) = self.index.get_mut(name)
+                && let Some(fps) = vals.get_mut(value) {
                     fps.remove(&fp);
                 }
-            }
         }
     }
 
@@ -233,11 +232,11 @@ impl Tsdb {
     pub fn append(&self, labels: Labels, sample: Sample) {
         let fp = labels.fingerprint();
         let mut head = self.head.write();
-        if !head.contains_key(&fp) {
+        head.entry(fp).or_insert_with(|| {
             let mut idx = self.index.write();
             idx.add(&labels, fp);
-            head.insert(fp, HeadSeries::new(labels));
-        }
+            HeadSeries::new(labels)
+        });
         head.get_mut(&fp).unwrap().append(sample);
     }
 
@@ -320,9 +319,8 @@ impl Tsdb {
         let head = self.head.read();
         let mut vals = HashSet::new();
         for fp in fps {
-            if let Some(s) = head.get(&fp) {
-                if let Some(v) = s.labels.get(name) { vals.insert(v.to_string()); }
-            }
+            if let Some(s) = head.get(&fp)
+                && let Some(v) = s.labels.get(name) { vals.insert(v.to_string()); }
         }
         let mut v: Vec<_> = vals.into_iter().collect();
         v.sort();

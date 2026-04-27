@@ -152,12 +152,10 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
             // Scope name/version become additional labels.
             let mut stream_labels = resource_attrs.clone();
             if let Some(scope) = &scope_log.scope {
-                if let Some(name) = &scope.name {
-                    if !name.is_empty() { stream_labels.insert("otel_scope_name".into(), name.clone()); }
-                }
-                if let Some(version) = &scope.version {
-                    if !version.is_empty() { stream_labels.insert("otel_scope_version".into(), version.clone()); }
-                }
+                if let Some(name) = &scope.name
+                    && !name.is_empty() { stream_labels.insert("otel_scope_name".into(), name.clone()); }
+                if let Some(version) = &scope.version
+                    && !version.is_empty() { stream_labels.insert("otel_scope_version".into(), version.clone()); }
             }
 
             let labels = Labels::new(stream_labels.clone());
@@ -174,22 +172,19 @@ pub fn ingest_otlp_json(body: &[u8], tenant: &str, store: &Arc<LogStore>) -> any
 
                 // Per-record attributes become entry metadata.
                 let mut meta = kv_to_map(&record.attributes);
-                if let Some(sev_text) = record.severity_text {
-                    if !sev_text.is_empty() { meta.insert("severity".into(), sev_text); }
-                }
+                if let Some(sev_text) = record.severity_text
+                    && !sev_text.is_empty() { meta.insert("severity".into(), sev_text); }
                 if let Some(sev_num) = record.severity_number {
                     meta.insert("severity_number".into(), sev_num.to_string());
                 }
-                if let Some(trace_id) = record.trace_id {
-                    if !trace_id.is_empty() && trace_id != "00000000000000000000000000000000" {
+                if let Some(trace_id) = record.trace_id
+                    && !trace_id.is_empty() && trace_id != "00000000000000000000000000000000" {
                         meta.insert("trace_id".into(), trace_id);
                     }
-                }
-                if let Some(span_id) = record.span_id {
-                    if !span_id.is_empty() && span_id != "0000000000000000" {
+                if let Some(span_id) = record.span_id
+                    && !span_id.is_empty() && span_id != "0000000000000000" {
                         meta.insert("span_id".into(), span_id);
                     }
-                }
 
                 entries.push(LogEntry { ts: ts_ns, line, metadata: meta });
             }

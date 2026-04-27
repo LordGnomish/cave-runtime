@@ -189,7 +189,7 @@ fn attr_labels(attrs: Option<&Vec<KeyValue>>) -> Vec<(String, String)> {
 fn nano_to_ms(nano: Option<&String>) -> i64 {
     nano.and_then(|s| s.parse::<u64>().ok())
         .map(|n| (n / 1_000_000) as i64)
-        .unwrap_or_else(|| now_ms())
+        .unwrap_or_else(now_ms)
 }
 
 fn dp_to_ts(name: &str, dp: &NumberDataPoint, resource_attrs: &[(String, String)]) -> TimeSeries {

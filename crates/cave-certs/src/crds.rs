@@ -129,6 +129,7 @@ impl IssuerRef {
 /// Cite: cert-manager `pkg/apis/certmanager/v1/types_certificate.go`
 /// `CertificateStatus` — conditions + notBefore/notAfter + renewalTime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct CertificateStatus {
     #[serde(default)]
     pub conditions: Vec<Condition>,
@@ -138,11 +139,6 @@ pub struct CertificateStatus {
     pub revision: u64,
 }
 
-impl Default for CertificateStatus {
-    fn default() -> Self {
-        Self { conditions: Vec::new(), not_before: None, not_after: None, renewal_time: None, revision: 0 }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Condition {

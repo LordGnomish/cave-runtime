@@ -38,6 +38,7 @@ pub struct Tenant {
 
 /// Per-tenant configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct TenantSettings {
     /// Maximum members allowed.
     pub max_members: Option<usize>,
@@ -55,19 +56,6 @@ pub struct TenantSettings {
     pub metadata: HashMap<String, serde_json::Value>,
 }
 
-impl Default for TenantSettings {
-    fn default() -> Self {
-        Self {
-            max_members: None,
-            allow_sub_tenants: false,
-            oidc_group_prefix: None,
-            sso_enforced: false,
-            mfa_required: false,
-            session_ttl_minutes: None,
-            metadata: HashMap::new(),
-        }
-    }
-}
 
 /// A member of a tenant.
 #[derive(Debug, Clone, Serialize, Deserialize)]

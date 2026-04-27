@@ -320,13 +320,12 @@ async fn validate_jwt(state: &AuthState, token: &str) -> Result<AuthContext, Res
     }
 
     // Force-refresh JWKS and retry once
-    if let Ok(fresh) = state.jwks_cache.refresh().await {
-        if let Some(ctx) = try_decode_jwt(token, &fresh.keys, &validation) {
+    if let Ok(fresh) = state.jwks_cache.refresh().await
+        && let Some(ctx) = try_decode_jwt(token, &fresh.keys, &validation) {
             debug!(cave_uid = %ctx.cave_uid, "JWT authenticated after JWKS refresh");
             state.audit.log(AuditEvent::auth_success(ctx.cave_uid, "jwt_validate"));
             return Ok(ctx);
         }
-    }
 
     state.audit.log(AuditEvent::auth_failure("jwt_validate", "invalid_token"));
     Err((

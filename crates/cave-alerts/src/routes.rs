@@ -24,14 +24,14 @@
 
 use crate::engine::{run_pipeline, PipelineInput};
 use crate::models::{
-    Alert, InhibitRule, Receiver, Route, Silence, DEFAULT_TENANT,
+    Alert, InhibitRule, Receiver, Route, Silence,
 };
 use crate::store::AlertStore;
 use crate::tenant::tenant_from_headers;
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
-    routing::{delete, get, post, put},
+    routing::{delete, get},
     Json, Router,
 };
 use chrono::Utc;
@@ -312,7 +312,7 @@ async fn put_route(
 mod tests {
     use super::*;
     use crate::models::{
-        AlertSeverity, AlertState, Matcher, ReceiverConfig, WebhookConfig,
+        AlertSeverity, AlertState, Matcher, ReceiverConfig, WebhookConfig, DEFAULT_TENANT,
     };
     use axum::body::Body;
     use axum::http::Request;

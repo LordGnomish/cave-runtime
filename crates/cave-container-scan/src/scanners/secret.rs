@@ -1,6 +1,5 @@
 use crate::engine::{ScanError, Scanner};
 use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
-use async_trait::async_trait;
 use regex::Regex;
 
 pub struct SecretScanner;
@@ -10,8 +9,8 @@ impl SecretScanner {
         let mut findings = vec![];
 
         // AWS Access Key pattern: AKIA[0-9A-Z]{16}
-        if let Ok(re) = Regex::new(r"AKIA[0-9A-Z]{16}") {
-            if re.is_match(content) {
+        if let Ok(re) = Regex::new(r"AKIA[0-9A-Z]{16}")
+            && re.is_match(content) {
                 let mut f = Finding::new(
                     "SEC-001".to_string(),
                     "AWS Access Key detected".to_string(),
@@ -24,11 +23,10 @@ impl SecretScanner {
                 f.confidence = Confidence::Confirmed;
                 findings.push(f);
             }
-        }
 
         // GitHub Token pattern: ghp_[A-Za-z0-9]{36}
-        if let Ok(re) = Regex::new(r"ghp_[A-Za-z0-9]{36}") {
-            if re.is_match(content) {
+        if let Ok(re) = Regex::new(r"ghp_[A-Za-z0-9]{36}")
+            && re.is_match(content) {
                 let mut f = Finding::new(
                     "SEC-002".to_string(),
                     "GitHub Personal Access Token detected".to_string(),
@@ -41,11 +39,10 @@ impl SecretScanner {
                 f.confidence = Confidence::Confirmed;
                 findings.push(f);
             }
-        }
 
         // Private key pattern
-        if let Ok(re) = Regex::new(r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----") {
-            if re.is_match(content) {
+        if let Ok(re) = Regex::new(r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----")
+            && re.is_match(content) {
                 let mut f = Finding::new(
                     "SEC-003".to_string(),
                     "Private key material detected".to_string(),
@@ -58,12 +55,11 @@ impl SecretScanner {
                 f.confidence = Confidence::Confirmed;
                 findings.push(f);
             }
-        }
 
         // High-entropy base64 blobs (Shannon entropy >= 4.5)
         for line in content.lines() {
-            if line.len() >= 40 && is_base64_like(line) {
-                if shannon_entropy(line) >= 4.5 {
+            if line.len() >= 40 && is_base64_like(line)
+                && shannon_entropy(line) >= 4.5 {
                     let mut f = Finding::new(
                         "SEC-004".to_string(),
                         "High-entropy secret candidate".to_string(),
@@ -77,7 +73,6 @@ impl SecretScanner {
                     findings.push(f);
                     break; // Only report once per content
                 }
-            }
         }
 
         findings
@@ -86,9 +81,9 @@ impl SecretScanner {
 
 fn is_base64_like(s: &str) -> bool {
     s.chars().all(|c| {
-        (c >= 'A' && c <= 'Z')
-            || (c >= 'a' && c <= 'z')
-            || (c >= '0' && c <= '9')
+        ('A'..='Z').contains(&c)
+            || ('a'..='z').contains(&c)
+            || ('0'..='9').contains(&c)
             || c == '+' || c == '/' || c == '='
     })
 }

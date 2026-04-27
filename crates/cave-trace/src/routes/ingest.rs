@@ -13,13 +13,12 @@ use std::sync::Arc;
 
 use axum::{
     body::Bytes,
-    extract::{Query, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
 
 use crate::{
     ingestion::{jaeger, opencensus, otlp, zipkin},
@@ -66,7 +65,7 @@ async fn ingest_otlp(
 
     match otlp::parse_otlp_json(&body, &tenant_id) {
         Ok(spans) => {
-            let accepted = ingest_spans_with_sampling(&state, spans).await;
+            let _accepted = ingest_spans_with_sampling(&state, spans).await;
             Json(otlp::ExportTraceServiceResponse::ok()).into_response()
         }
         Err(e) => {

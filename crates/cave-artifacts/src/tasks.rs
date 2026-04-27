@@ -6,8 +6,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::oneshot;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -139,6 +138,12 @@ pub struct TaskQueue {
     tasks: Mutex<HashMap<Uuid, Task>>,
 }
 
+impl Default for TaskQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskQueue {
     pub fn new() -> Self {
         Self { tasks: Mutex::new(HashMap::new()) }
@@ -164,12 +169,11 @@ impl TaskQueue {
 
     pub fn cancel(&self, id: &Uuid) -> bool {
         let mut tasks = self.tasks.lock().unwrap();
-        if let Some(task) = tasks.get_mut(id) {
-            if !task.is_terminal() {
+        if let Some(task) = tasks.get_mut(id)
+            && !task.is_terminal() {
                 task.mark_canceled();
                 return true;
             }
-        }
         false
     }
 

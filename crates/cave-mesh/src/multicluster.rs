@@ -12,7 +12,7 @@ use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 // ─────────────────────────────────────────────────────────────
 // Remote cluster descriptor

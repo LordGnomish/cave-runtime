@@ -29,7 +29,7 @@ impl ChunkWriter {
 
     /// Write a bit into the buffer.
     fn write_bit(&mut self, bit: bool) {
-        if self.bit_pos % 8 == 0 {
+        if self.bit_pos.is_multiple_of(8) {
             self.data.push(0);
         }
         if bit {

@@ -92,8 +92,8 @@ impl UpstreamTracker {
             match self.check_releases(project).await {
                 Ok(releases) => {
                     for release in releases {
-                        if let Some(published) = release.published_at {
-                            if published > since {
+                        if let Some(published) = release.published_at
+                            && published > since {
                                 changes.push(UpstreamChange {
                                     project: project.name.to_string(),
                                     cave_module: project.cave_module.to_string(),
@@ -105,7 +105,6 @@ impl UpstreamTracker {
                                     triage_reason: None,
                                 });
                             }
-                        }
                     }
                 }
                 Err(e) => {

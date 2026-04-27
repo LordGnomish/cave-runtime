@@ -62,13 +62,11 @@ fn walk_contains(dir: &std::path::Path, pattern: &str) -> bool {
             if walk_contains(&path, pattern) {
                 return true;
             }
-        } else if path.extension().map_or(false, |e| e == "rs") {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if content.contains(pattern) {
+        } else if path.extension().is_some_and(|e| e == "rs")
+            && let Ok(content) = std::fs::read_to_string(&path)
+                && content.contains(pattern) {
                     return true;
                 }
-            }
-        }
     }
     false
 }
@@ -80,18 +78,16 @@ fn walk_stub_count(dir: &std::path::Path) -> u32 {
         let path = entry.path();
         if path.is_dir() {
             count += walk_stub_count(&path);
-        } else if path.extension().map_or(false, |e| e == "rs") {
-            if let Ok(content) = std::fs::read_to_string(&path) {
+        } else if path.extension().is_some_and(|e| e == "rs")
+            && let Ok(content) = std::fs::read_to_string(&path) {
                 for line in content.lines() {
                     let trimmed = line.trim();
-                    if !trimmed.starts_with("//") {
-                        if trimmed.contains("todo!") || trimmed.contains("unimplemented!") {
+                    if !trimmed.starts_with("//")
+                        && (trimmed.contains("todo!") || trimmed.contains("unimplemented!")) {
                             count += 1;
                         }
-                    }
                 }
             }
-        }
     }
     count
 }

@@ -281,8 +281,8 @@ async fn list_findings(
     let store = state.store.read().await;
     let findings: Vec<&Finding> = store.findings.values()
         .filter(|f| {
-            q.control_ref.as_deref().map_or(true, |cr| f.control_ref == cr) &&
-            q.status.as_deref().map_or(true, |s| format!("{:?}", f.status).to_lowercase() == s.to_lowercase())
+            q.control_ref.as_deref().is_none_or(|cr| f.control_ref == cr) &&
+            q.status.as_deref().is_none_or(|s| format!("{:?}", f.status).to_lowercase() == s.to_lowercase())
         })
         .collect();
     Json(serde_json::json!({ "findings": findings, "total": findings.len() }))
@@ -348,11 +348,10 @@ async fn add_evidence(
     };
     let mut store = state.store.write().await;
     // Link evidence to finding if provided
-    if let Some(fid) = ev.finding_id {
-        if let Some(finding) = store.findings.get_mut(&fid) {
+    if let Some(fid) = ev.finding_id
+        && let Some(finding) = store.findings.get_mut(&fid) {
             finding.evidence_ids.push(ev.id);
         }
-    }
     store.evidence.insert(ev.id, ev.clone());
     (StatusCode::CREATED, Json(serde_json::to_value(&ev).unwrap()))
 }

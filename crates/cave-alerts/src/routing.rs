@@ -123,11 +123,10 @@ fn walk(
 }
 
 fn route_self_matches(route: &Route, alert: &Alert) -> bool {
-    if let Some(t) = &route.tenant_id {
-        if t != &alert.tenant_id {
+    if let Some(t) = &route.tenant_id
+        && t != &alert.tenant_id {
             return false;
         }
-    }
     all_match(&route.matchers, &alert.labels)
 }
 

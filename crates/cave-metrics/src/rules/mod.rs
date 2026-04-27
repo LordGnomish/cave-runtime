@@ -7,7 +7,6 @@ pub use alerting::{AlertRule, AlertState, FiringAlert};
 pub use recording::RecordingRule;
 
 use crate::error::Result;
-use crate::model::Labels;
 use crate::promql::Engine;
 use crate::tsdb::Tsdb;
 use std::sync::Arc;

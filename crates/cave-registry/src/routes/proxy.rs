@@ -13,7 +13,7 @@
 //! falls through the OCI adapter rather than this module.
 
 use crate::pipeline::{ScanPipelineOutcome, VerdictDecision};
-use crate::proxy::{Ecosystem, FetchedArtifact, ProxyError, ProxyMode};
+use crate::proxy::{Ecosystem, ProxyError};
 use crate::RegistryState;
 use axum::{
     body::Body,

@@ -363,9 +363,9 @@ impl AuthEngine {
                 let claim_name = key
                     .trim_start_matches("request.auth.claims[")
                     .trim_end_matches(']');
-                ctx.jwt_claims.as_ref().and_then(|c| c.get(claim_name)).and_then(|v| match v {
-                    Value::String(s) => Some(s.clone()),
-                    other => Some(other.to_string()),
+                ctx.jwt_claims.as_ref().and_then(|c| c.get(claim_name)).map(|v| match v {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
                 })
             }
             _ => None,

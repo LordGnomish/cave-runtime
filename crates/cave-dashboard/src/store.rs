@@ -156,7 +156,7 @@ pub enum StoreError {
 
 impl DashboardStore {
     pub fn new() -> Self {
-        let mut store = Self::default();
+        let store = Self::default();
         // Seed default org (id=1) and admin user
         {
             let mut inner = store.inner.write().unwrap();
@@ -258,14 +258,13 @@ impl DashboardStore {
         }
 
         // Apply folder
-        if let Some(fuid) = folder_uid {
-            if let Some(folder) = inner.folders.get(fuid) {
+        if let Some(fuid) = folder_uid
+            && let Some(folder) = inner.folders.get(fuid) {
                 dashboard.folder_uid = Some(folder.uid.clone());
                 dashboard.folder_id = Some(folder.id);
                 dashboard.folder_title = Some(folder.title.clone());
                 dashboard.folder_url = Some(folder.url.clone());
             }
-        }
 
         inner.dashboards.insert(dashboard.uid.clone(), dashboard.clone());
         Ok(dashboard)
@@ -305,16 +304,14 @@ impl DashboardStore {
             .values()
             .filter(|d| d.org_id == org_id)
             .filter(|d| {
-                if let Some(ref qstr) = q.query {
-                    if !qstr.is_empty() && !d.title.to_lowercase().contains(&qstr.to_lowercase()) {
+                if let Some(ref qstr) = q.query
+                    && !qstr.is_empty() && !d.title.to_lowercase().contains(&qstr.to_lowercase()) {
                         return false;
                     }
-                }
-                if !q.tag.is_empty() {
-                    if !q.tag.iter().all(|t| d.tags.contains(t)) {
+                if !q.tag.is_empty()
+                    && !q.tag.iter().all(|t| d.tags.contains(t)) {
                         return false;
                     }
-                }
                 if let Some(starred) = q.starred {
                     // In a real impl we'd check by user; simplified here
                     if starred != d.is_starred {
@@ -351,11 +348,10 @@ impl DashboardStore {
         // Also include folder results if no type filter
         if q.result_type.as_deref() != Some("dash-db") {
             for folder in inner.folders.values().filter(|f| f.org_id == org_id) {
-                if let Some(ref qstr) = q.query {
-                    if !qstr.is_empty() && !folder.title.to_lowercase().contains(&qstr.to_lowercase()) {
+                if let Some(ref qstr) = q.query
+                    && !qstr.is_empty() && !folder.title.to_lowercase().contains(&qstr.to_lowercase()) {
                         continue;
                     }
-                }
                 results.push(SearchResult {
                     id: folder.id,
                     uid: folder.uid.clone(),
@@ -577,7 +573,7 @@ impl DashboardStore {
 
     // ── Annotation ────────────────────────────────────────────────────────────
 
-    pub fn create_annotation(&self, req: CreateAnnotationRequest, user_id: i64, org_id: i64) -> StoreResult<Annotation> {
+    pub fn create_annotation(&self, req: CreateAnnotationRequest, user_id: i64, _org_id: i64) -> StoreResult<Annotation> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_annotation_id();
         let now = Utc::now();
@@ -607,7 +603,7 @@ impl DashboardStore {
         Ok(annotation)
     }
 
-    pub fn list_annotations(&self, dashboard_uid: Option<&str>, org_id: i64) -> StoreResult<Vec<Annotation>> {
+    pub fn list_annotations(&self, dashboard_uid: Option<&str>, _org_id: i64) -> StoreResult<Vec<Annotation>> {
         let inner = self.inner.read().map_err(|_| StoreError::Lock)?;
         let anns: Vec<Annotation> = inner.annotations.values()
             .filter(|a| {
@@ -630,7 +626,7 @@ impl DashboardStore {
 
     // ── Snapshot ──────────────────────────────────────────────────────────────
 
-    pub fn create_snapshot(&self, req: CreateSnapshotRequest, org_id: i64, user_id: i64) -> StoreResult<Snapshot> {
+    pub fn create_snapshot(&self, req: CreateSnapshotRequest, org_id: i64, _user_id: i64) -> StoreResult<Snapshot> {
         let mut inner = self.inner.write().map_err(|_| StoreError::Lock)?;
         let id = inner.next_snapshot_id();
         let key = req.key.unwrap_or_else(|| Uuid::new_v4().to_string().replace('-', ""));

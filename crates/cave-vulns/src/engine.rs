@@ -1,4 +1,4 @@
-use crate::models::{ComponentVersion, Severity, VulnScanResult, Vulnerability, VulnState};
+use crate::models::{ComponentVersion, Severity, VulnScanResult, Vulnerability};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -69,6 +69,7 @@ pub fn version_lt(current: &str, fixed_in: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::VulnState;
     use chrono::Utc;
 
     fn make_vuln(component: &str, version: &str, severity: Severity) -> Vulnerability {

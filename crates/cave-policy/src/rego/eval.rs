@@ -12,8 +12,7 @@
 
 use super::ast::*;
 use super::builtins::Builtins;
-use super::value::{Bindings, Value, json_get_path};
-use crate::error::PolicyError;
+use super::value::{Bindings, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -101,7 +100,7 @@ fn path_to_term(path: &[String]) -> Term {
     if path.is_empty() {
         return Term::Var("data".into());
     }
-    let mut base = Term::Var(path[0].clone());
+    let base = Term::Var(path[0].clone());
     let args: Vec<RefArg> = path[1..].iter().map(|s| RefArg::Field(s.clone())).collect();
     if args.is_empty() {
         base
@@ -442,11 +441,11 @@ fn eval_call(func: &Term, args: &[Term], bindings: &Bindings, ctx: &EvalCtx) -> 
         "lte" | "<=" => return compare_op_le(&arg_vals),
         "gte" | ">=" => return compare_op_ge(&arg_vals),
         "equal" | "==" => {
-            let eq = arg_vals.get(0) == arg_vals.get(1);
+            let eq = arg_vals.first() == arg_vals.get(1);
             return Value::bool(eq);
         }
         "neq" | "!=" => {
-            let neq = arg_vals.get(0) != arg_vals.get(1);
+            let neq = arg_vals.first() != arg_vals.get(1);
             return Value::bool(neq);
         }
         _ => {}
@@ -517,11 +516,10 @@ fn eval_rule_by_name(name: &str, bindings: &Bindings, ctx: &EvalCtx) -> Value {
     for module in ctx.modules.values() {
         let pkg_prefix = &module.package.path;
         for rule in &module.rules {
-            if rule.head.name == name {
-                if let Some(v) = eval_rule(rule, pkg_prefix, bindings, ctx) {
+            if rule.head.name == name
+                && let Some(v) = eval_rule(rule, pkg_prefix, bindings, ctx) {
                     return v;
                 }
-            }
         }
     }
     Value::Undefined
@@ -530,7 +528,7 @@ fn eval_rule_by_name(name: &str, bindings: &Bindings, ctx: &EvalCtx) -> Value {
 fn eval_function_rule(
     func_path: &[String],
     arg_vals: &[Value],
-    bindings: &Bindings,
+    _bindings: &Bindings,
     ctx: &EvalCtx,
 ) -> Value {
     // Check cycle detection

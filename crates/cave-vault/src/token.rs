@@ -118,21 +118,13 @@ pub fn parse_duration(s: &str) -> i64 {
     }
 }
 
+#[derive(Default)]
 pub struct TokenStore {
     tokens: HashMap<String, VaultToken>,
     accessors: HashMap<String, String>,
     children: HashMap<String, Vec<String>>,
 }
 
-impl Default for TokenStore {
-    fn default() -> Self {
-        Self {
-            tokens: HashMap::new(),
-            accessors: HashMap::new(),
-            children: HashMap::new(),
-        }
-    }
-}
 
 impl TokenStore {
     fn gen_token_id() -> VaultResult<String> {
@@ -161,11 +153,10 @@ impl TokenStore {
         if !params.no_default_policy.unwrap_or(false) && !policies.contains(&"default".to_string()) {
             policies.push("default".to_string());
         }
-        if policies.is_empty() {
-            if let Some(p) = parent {
+        if policies.is_empty()
+            && let Some(p) = parent {
                 policies = p.policies.clone();
             }
-        }
 
         let ttl_secs = params.ttl.as_deref()
             .map(parse_duration)

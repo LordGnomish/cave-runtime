@@ -24,12 +24,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analyzer,
-    dependency::{build_dependency_graph, to_jaeger_dependencies},
     multi_tenant::tenant_from_headers,
     query::QueryEngine,
-    spm::{to_jaeger_metrics, MetricsResponse, SpmRegistry},
-    types::{format_span_id, format_trace_id, parse_trace_id, Span, SpanStatus, Trace, TraceId},
+    spm::to_jaeger_metrics,
+    types::{format_span_id, format_trace_id, parse_trace_id, Span, Trace},
     TraceState,
 };
 
@@ -214,7 +212,7 @@ async fn get_trace(
     Path(trace_id_str): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let tenant_id = tenant_from_headers(&headers);
+    let _tenant_id = tenant_from_headers(&headers);
 
     let trace_id = match parse_trace_id(&trace_id_str) {
         Ok(id) => id,
@@ -399,11 +397,11 @@ struct MetricsQuery {
 async fn metrics_calls(
     State(state): State<Arc<TraceState>>,
     Query(params): Query<MetricsQuery>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
 ) -> Response {
     let snap = state.spm_registry.snapshot();
     let filtered: Vec<_> = snap.iter()
-        .filter(|m| params.service.as_deref().map_or(true, |s| m.service == s))
+        .filter(|m| params.service.as_deref().is_none_or(|s| m.service == s))
         .cloned()
         .collect();
     Json(to_jaeger_metrics(&filtered)).into_response()
@@ -412,16 +410,16 @@ async fn metrics_calls(
 async fn metrics_errors(
     State(state): State<Arc<TraceState>>,
     Query(params): Query<MetricsQuery>,
-    headers: HeaderMap,
+    _headers: HeaderMap,
 ) -> Response {
     let snap = state.spm_registry.snapshot();
     let filtered: Vec<_> = snap.iter()
-        .filter(|m| params.service.as_deref().map_or(true, |s| m.service == s))
+        .filter(|m| params.service.as_deref().is_none_or(|s| m.service == s))
         .cloned()
         .collect();
     Json(to_jaeger_metrics(&filtered)).into_response()
 }
 
-async fn metrics_minstep(headers: HeaderMap) -> Json<serde_json::Value> {
+async fn metrics_minstep(_headers: HeaderMap) -> Json<serde_json::Value> {
     Json(serde_json::json!({ "data": { "minStep": 1000 } }))
 }

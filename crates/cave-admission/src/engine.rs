@@ -130,8 +130,8 @@ pub fn evaluate_verify_images(rule: &VerifyImagesRule, resource: &Resource) -> O
         .and_then(Value::as_str)
         .unwrap_or("");
 
-    if !rule.allowed_registries.is_empty() && !image.is_empty() {
-        if !rule
+    if !rule.allowed_registries.is_empty() && !image.is_empty()
+        && !rule
             .allowed_registries
             .iter()
             .any(|r| image.starts_with(r.as_str()))
@@ -141,7 +141,6 @@ pub fn evaluate_verify_images(rule: &VerifyImagesRule, resource: &Resource) -> O
                 image
             ));
         }
-    }
 
     if rule.require_signature && !image.is_empty() {
         // Simulate signature check: images without a digest reference are considered unsigned.

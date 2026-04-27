@@ -20,7 +20,6 @@ use crate::{
         ERR_BLOB_UNKNOWN, ERR_BLOB_UPLOAD_INVALID, ERR_BLOB_UPLOAD_UNKNOWN,
         ERR_DIGEST_INVALID, ERR_MANIFEST_UNKNOWN, ERR_NAME_UNKNOWN, ERR_UNSUPPORTED,
     },
-    storage::RegistryStorage,
     RegistryState,
 };
 
@@ -305,8 +304,8 @@ async fn initiate_upload(
     query: &HashMap<String, String>,
 ) -> Response {
     // Cross-repo mount
-    if let (Some(mount), Some(from)) = (query.get("mount"), query.get("from")) {
-        if state.storage.mount_blob(mount, from, name).await {
+    if let (Some(mount), Some(from)) = (query.get("mount"), query.get("from"))
+        && state.storage.mount_blob(mount, from, name).await {
             return Response::builder()
                 .status(StatusCode::CREATED)
                 .header(
@@ -319,7 +318,6 @@ async fn initiate_upload(
                 .unwrap();
         }
         // Mount failed — fall through to normal upload
-    }
 
     let uuid = state.storage.start_upload(name).await;
     Response::builder()

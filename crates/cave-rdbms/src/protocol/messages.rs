@@ -78,7 +78,7 @@ fn parse_bind_message(body: &[u8]) -> Result<FrontendMessage, String> {
     let param_count = read_i16(body, &mut offset)? as usize;
     let mut params = Vec::new();
     for _ in 0..param_count {
-        let len = read_i32(body, &mut offset)? as i32;
+        let len = read_i32(body, &mut offset)?;
         if len == -1 {
             params.push(None);
         } else {

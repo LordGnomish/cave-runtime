@@ -9,8 +9,8 @@ impl FsScanner {
         let mut findings = vec![];
 
         // Check for vulnerable requests version
-        if let Ok(re) = Regex::new(r"requests\s*[<>]=?\s*2\.(3[01]|[12]\d|0-9)") {
-            if re.is_match(content) {
+        if let Ok(re) = Regex::new(r"requests\s*[<>]=?\s*2\.(3[01]|[12]\d|0-9)")
+            && re.is_match(content) {
                 let mut f = Finding::new(
                     "RQ-001".to_string(),
                     "Vulnerable requests package version".to_string(),
@@ -26,7 +26,6 @@ impl FsScanner {
                 f.confidence = Confidence::High;
                 findings.push(f);
             }
-        }
 
         findings
     }

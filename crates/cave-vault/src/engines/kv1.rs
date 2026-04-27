@@ -4,7 +4,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, Query, State},
     http::HeaderMap,
-    routing::{delete, get, post, put},
+    routing::get,
     Router,
 };
 use serde::Deserialize;

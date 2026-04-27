@@ -184,6 +184,12 @@ pub struct ResourceStore {
     history: DashMap<String, Vec<ResourceState>>,
 }
 
+impl Default for ResourceStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ResourceStore {
     pub fn new() -> Self {
         Self {

@@ -27,22 +27,18 @@ impl SyslogMessage {
     pub fn to_entry_and_labels(&self) -> (LogEntry, Labels) {
         let mut label_map: HashMap<String, String> = HashMap::new();
 
-        if let Some(h) = &self.hostname {
-            if h != "-" { label_map.insert("hostname".into(), h.clone()); }
-        }
-        if let Some(a) = &self.app_name {
-            if a != "-" { label_map.insert("app".into(), a.clone()); }
-        }
-        if let Some(p) = &self.proc_id {
-            if p != "-" { label_map.insert("proc_id".into(), p.clone()); }
-        }
+        if let Some(h) = &self.hostname
+            && h != "-" { label_map.insert("hostname".into(), h.clone()); }
+        if let Some(a) = &self.app_name
+            && a != "-" { label_map.insert("app".into(), a.clone()); }
+        if let Some(p) = &self.proc_id
+            && p != "-" { label_map.insert("proc_id".into(), p.clone()); }
         label_map.insert("facility".into(), self.facility.to_string());
         label_map.insert("severity".into(), severity_name(self.severity).to_owned());
 
         let mut meta: HashMap<String, String> = HashMap::new();
-        if let Some(mid) = &self.msg_id {
-            if mid != "-" { meta.insert("msg_id".into(), mid.clone()); }
-        }
+        if let Some(mid) = &self.msg_id
+            && mid != "-" { meta.insert("msg_id".into(), mid.clone()); }
         for (sd_id, params) in &self.structured_data {
             for (k, v) in params {
                 meta.insert(format!("{}.{}", sd_id, k), v.clone());
@@ -126,7 +122,7 @@ fn parse_5424_timestamp(s: &str) -> Option<TimestampNs> {
     if s == "-" { return None; }
     // RFC 3339: 2023-10-05T12:34:56.123456789Z or +00:00
     let dt = DateTime::parse_from_rfc3339(s).ok()?;
-    Some(dt.timestamp_nanos_opt()?)
+    dt.timestamp_nanos_opt()
 }
 
 fn parse_structured_data(s: &str) -> Option<(HashMap<String, HashMap<String, String>>, &str)> {
@@ -141,7 +137,7 @@ fn parse_structured_data(s: &str) -> Option<(HashMap<String, HashMap<String, Str
 
     while rest.starts_with('[') {
         rest = &rest[1..]; // consume '['
-        let id_end = rest.find(|c: char| c == ' ' || c == ']').unwrap_or(rest.len());
+        let id_end = rest.find([' ', ']']).unwrap_or(rest.len());
         let sd_id = rest[..id_end].to_owned();
         rest = &rest[id_end..];
 
@@ -250,11 +246,10 @@ fn parse_3164_timestamp(s: &str) -> Option<TimestampNs> {
 pub fn parse_syslog(line: &str) -> Option<SyslogMessage> {
     // RFC 5424 has "<PRI>1 " (version digit after priority)
     if let Some((_, rest)) = parse_priority(line) {
-        if rest.starts_with('1') || rest.starts_with("1 ") {
-            if let Some(msg) = parse_rfc5424(line) {
+        if (rest.starts_with('1') || rest.starts_with("1 "))
+            && let Some(msg) = parse_rfc5424(line) {
                 return Some(msg);
             }
-        }
     }
     parse_rfc3164(line)
 }

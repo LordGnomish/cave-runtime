@@ -16,7 +16,6 @@ use chrono::Utc;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
 
 /// Request body for dev token creation.
 #[derive(Debug, Deserialize)]

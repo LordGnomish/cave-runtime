@@ -6,9 +6,7 @@ use crate::models::{Change, ChangeType, ChangelogEntry};
 /// remove/revert → Removed, chore/refactor/style → Changed
 pub fn parse_commit(message: &str) -> Option<(ChangeType, String)> {
     let lower = message.to_lowercase();
-    let desc = message
-        .splitn(2, ':')
-        .nth(1)
+    let desc = message.split_once(':').map(|x| x.1)
         .map(|s| s.trim().to_string())
         .unwrap_or_default();
     if lower.starts_with("feat") {

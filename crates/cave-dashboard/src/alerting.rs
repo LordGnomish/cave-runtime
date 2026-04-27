@@ -23,25 +23,19 @@ pub struct EvalResult {
 /// This mirrors Grafana's classic condition evaluation.
 pub fn eval_threshold(value: f64, eval_type: &str, params: &[f64]) -> bool {
     match eval_type {
-        "gt" => params.first().map_or(false, |&t| value > t),
-        "lt" => params.first().map_or(false, |&t| value < t),
-        "gte" => params.first().map_or(false, |&t| value >= t),
-        "lte" => params.first().map_or(false, |&t| value <= t),
-        "eq" => params.first().map_or(false, |&t| (value - t).abs() < f64::EPSILON),
-        "within_range" => {
-            if params.len() >= 2 {
+        "gt" => params.first().is_some_and(|&t| value > t),
+        "lt" => params.first().is_some_and(|&t| value < t),
+        "gte" => params.first().is_some_and(|&t| value >= t),
+        "lte" => params.first().is_some_and(|&t| value <= t),
+        "eq" => params.first().is_some_and(|&t| (value - t).abs() < f64::EPSILON),
+        "within_range"
+            if params.len() >= 2 => {
                 value >= params[0] && value <= params[1]
-            } else {
-                false
             }
-        }
-        "outside_range" => {
-            if params.len() >= 2 {
+        "outside_range"
+            if params.len() >= 2 => {
                 value < params[0] || value > params[1]
-            } else {
-                false
             }
-        }
         "no_value" => false,
         _ => false,
     }
@@ -108,7 +102,7 @@ pub fn evaluate_alert_conditions(
     let mut overall = false;
     let mut first = true;
 
-    for (i, cond) in conditions.iter().enumerate() {
+    for cond in conditions.iter() {
         let ref_id = cond.query.params.first().map(|s| s.as_str()).unwrap_or("A");
         let values = series_values.get(ref_id).map(|v| v.as_slice()).unwrap_or(&[]);
 

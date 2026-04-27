@@ -90,11 +90,10 @@ pub enum PanelError {
 
 pub fn parse_catalog(input: &str) -> Result<PanelCatalog, PanelError> {
     let mut value: serde_yaml::Value = serde_yaml::from_str(input)?;
-    if let Some(map) = value.as_mapping_mut() {
-        if let Some(v) = map.remove(&serde_yaml::Value::String("crate".into())) {
+    if let Some(map) = value.as_mapping_mut()
+        && let Some(v) = map.remove(serde_yaml::Value::String("crate".into())) {
             map.insert(serde_yaml::Value::String("crate_".into()), v);
         }
-    }
     let cat: PanelCatalog = serde_yaml::from_value(value)?;
     validate(&cat)?;
     Ok(cat)
@@ -128,7 +127,7 @@ fn validate(cat: &PanelCatalog) -> Result<(), PanelError> {
                 cat.crate_, p.id
             )));
         }
-        if p.query.is_none() && p.queries.as_ref().map_or(true, |q| q.is_empty()) {
+        if p.query.is_none() && p.queries.as_ref().is_none_or(|q| q.is_empty()) {
             return Err(PanelError::Validation(format!(
                 "{}: panel {} ({}) has no query",
                 cat.crate_, p.id, p.title
@@ -146,8 +145,8 @@ fn validate(cat: &PanelCatalog) -> Result<(), PanelError> {
                 cat.crate_, p.id, p.title
             )));
         }
-        if let (Some(qs), Some(LegendSpec::Multi(legs))) = (&p.queries, &p.legend) {
-            if qs.len() != legs.len() {
+        if let (Some(qs), Some(LegendSpec::Multi(legs))) = (&p.queries, &p.legend)
+            && qs.len() != legs.len() {
                 return Err(PanelError::Validation(format!(
                     "{}: panel {} has {} queries but {} legends",
                     cat.crate_,
@@ -156,7 +155,6 @@ fn validate(cat: &PanelCatalog) -> Result<(), PanelError> {
                     legs.len()
                 )));
             }
-        }
     }
     Ok(())
 }

@@ -105,12 +105,11 @@ impl LedgerStore for FileStore {
 
     fn health_check(&self) -> Result<(), String> {
         // Check parent directory is writable
-        if let Some(parent) = self.path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = self.path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("Cannot create ledger directory: {e}"))?;
             }
-        }
         Ok(())
     }
 }
@@ -118,8 +117,10 @@ impl LedgerStore for FileStore {
 /// Configuration for selecting a ledger store backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum LedgerStoreConfig {
     /// In-memory (testing only)
+    #[default]
     Memory,
     /// Local file (development)
     File { path: String },
@@ -132,11 +133,6 @@ pub enum LedgerStoreConfig {
     },
 }
 
-impl Default for LedgerStoreConfig {
-    fn default() -> Self {
-        Self::Memory
-    }
-}
 
 #[cfg(test)]
 mod tests {

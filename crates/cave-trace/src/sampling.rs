@@ -13,13 +13,12 @@
 //! Adaptive: automatically adjust rate to hit a target throughput.
 //!   • `AdaptiveSampler`      — wraps probabilistic, adjusts rate each period
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{Span, SpanStatus, TraceId};
+use crate::types::{Span, TraceId};
 
 // ─── Sampler trait ─────────────────────────────────────────────────────────
 

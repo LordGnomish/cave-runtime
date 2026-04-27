@@ -10,18 +10,16 @@ use axum::{
     routing::post,
     Json, Router,
 };
-use futures::stream;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::convert::Infallible;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 
 use crate::engine::{
-    Compare, CompareResult, CompareTarget, MvccEngine, TxnOp, TxnRequest,
+    Compare, CompareResult, CompareTarget, TxnOp, TxnRequest,
 };
-use crate::etcd::auth::{AuthManager, PermissionEntry};
-use crate::etcd::cluster::ClusterManager;
+use crate::etcd::auth::PermissionEntry;
 use crate::StoreState;
 
 fn err_json(code: i32, message: impl ToString) -> Json<serde_json::Value> {

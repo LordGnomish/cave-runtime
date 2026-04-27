@@ -4,10 +4,10 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, Query, State},
     http::HeaderMap,
-    routing::{delete, get, patch, post, put},
+    routing::{get, post},
     Router,
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -214,13 +214,11 @@ pub async fn write_secret(
     let secret = mount_map.entry(path).or_default();
 
     // CAS check
-    if let Some(opts) = &body.options {
-        if let Some(cas) = opts.cas {
-            if cas != secret.current_version {
+    if let Some(opts) = &body.options
+        && let Some(cas) = opts.cas
+            && cas != secret.current_version {
                 return Err(VaultError::CasFailed);
             }
-        }
-    }
 
     let new_version = secret.current_version + 1;
     let now = Utc::now();
@@ -297,14 +295,13 @@ pub async fn delete_secret(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.kv2_store.write().await;
-    if let Some(m) = store.data.get_mut(&mount) {
-        if let Some(secret) = m.get_mut(&path) {
+    if let Some(m) = store.data.get_mut(&mount)
+        && let Some(secret) = m.get_mut(&path) {
             let cv = secret.current_version;
             if let Some(v) = secret.get_version_mut(cv) {
                 v.deletion_time = Some(Utc::now());
             }
         }
-    }
     Ok(VaultResponse::new())
 }
 
@@ -316,15 +313,14 @@ pub async fn delete_versions(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.kv2_store.write().await;
-    if let Some(m) = store.data.get_mut(&mount) {
-        if let Some(secret) = m.get_mut(&path) {
+    if let Some(m) = store.data.get_mut(&mount)
+        && let Some(secret) = m.get_mut(&path) {
             for vnum in body.versions {
                 if let Some(v) = secret.get_version_mut(vnum) {
                     v.deletion_time = Some(Utc::now());
                 }
             }
         }
-    }
     Ok(VaultResponse::new())
 }
 
@@ -336,17 +332,15 @@ pub async fn undelete_versions(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.kv2_store.write().await;
-    if let Some(m) = store.data.get_mut(&mount) {
-        if let Some(secret) = m.get_mut(&path) {
+    if let Some(m) = store.data.get_mut(&mount)
+        && let Some(secret) = m.get_mut(&path) {
             for vnum in body.versions {
-                if let Some(v) = secret.get_version_mut(vnum) {
-                    if !v.destroyed {
+                if let Some(v) = secret.get_version_mut(vnum)
+                    && !v.destroyed {
                         v.deletion_time = None;
                     }
-                }
             }
         }
-    }
     Ok(VaultResponse::new())
 }
 
@@ -358,8 +352,8 @@ pub async fn destroy_versions(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.kv2_store.write().await;
-    if let Some(m) = store.data.get_mut(&mount) {
-        if let Some(secret) = m.get_mut(&path) {
+    if let Some(m) = store.data.get_mut(&mount)
+        && let Some(secret) = m.get_mut(&path) {
             for vnum in body.versions {
                 if let Some(v) = secret.get_version_mut(vnum) {
                     v.destroyed = true;
@@ -367,7 +361,6 @@ pub async fn destroy_versions(
                 }
             }
         }
-    }
     Ok(VaultResponse::new())
 }
 

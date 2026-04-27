@@ -4,7 +4,7 @@ use crate::VaultState;
 use axum::{
     extract::{Json, Path, State},
     http::HeaderMap,
-    routing::{delete, get, post},
+    routing::{get, post},
     Router,
 };
 use base64::Engine as _;
@@ -129,7 +129,7 @@ fn validate_code(key: &TotpKey, code: u32) -> bool {
 pub async fn create_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<Value>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
@@ -205,12 +205,12 @@ pub async fn create_key(
 pub async fn read_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
     Ok(VaultResponse::new().with_data(json!({
         "name": key.name,
         "issuer": key.issuer,
@@ -228,7 +228,7 @@ pub async fn read_key(
 pub async fn delete_key(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.totp_store.write().await;
@@ -239,7 +239,7 @@ pub async fn delete_key(
 pub async fn list_keys(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path(mount): Path<String>,
+    Path(_mount): Path<String>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
@@ -250,12 +250,12 @@ pub async fn list_keys(
 pub async fn generate_code_handler(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
     let code = generate_code(key);
     Ok(VaultResponse::new().with_data(json!({
         "code": format!("{:0>width$}", code, width = key.digits as usize),
@@ -270,13 +270,13 @@ pub struct ValidateCodeRequest {
 pub async fn validate_code_handler(
     State(state): State<Arc<VaultState>>,
     headers: HeaderMap,
-    Path((mount, key_name)): Path<(String, String)>,
+    Path((_mount, key_name)): Path<(String, String)>,
     Json(body): Json<ValidateCodeRequest>,
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let store = state.totp_store.read().await;
     let key = store.keys.get(&key_name)
-        .ok_or_else(|| VaultError::KeyNotFound(key_name))?;
+        .ok_or(VaultError::KeyNotFound(key_name))?;
     let code_num: u32 = body.code.parse()
         .map_err(|_| VaultError::InvalidRequest("invalid code".into()))?;
     let valid = validate_code(key, code_num);

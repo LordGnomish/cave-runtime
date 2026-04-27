@@ -16,7 +16,7 @@ pub fn sum(values: &[SqlValue]) -> Option<SqlValue> {
         match val {
             SqlValue::Int4(n) => total += *n as i64,
             SqlValue::Int8(n) => total += n,
-            SqlValue::Numeric(f) => total = (*f as i64) + total,
+            SqlValue::Numeric(f) => total += (*f as i64),
             SqlValue::Null => {}
             _ => return None,
         }
