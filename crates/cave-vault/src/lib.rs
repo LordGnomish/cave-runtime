@@ -1,6 +1,7 @@
 pub mod api;
 pub mod auth;
 pub mod core;
+pub mod deep;
 pub mod engines;
 pub mod error;
 pub mod response;
