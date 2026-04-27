@@ -68,6 +68,7 @@ pub mod lb;
 pub mod lrp;
 pub mod lb_ext;
 pub mod maglev;
+pub mod maps_gc;
 pub mod nat;
 pub mod operator;
 pub mod policy;
