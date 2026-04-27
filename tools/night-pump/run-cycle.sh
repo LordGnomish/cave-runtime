@@ -180,32 +180,87 @@ SUCCESS_AT_RETRY=-1
 TOTAL_OLLAMA_CALLS=0
 TOTAL_OLLAMA_SECS=0
 WINNING_DRAFT=""
+WINNING_MODEL=""
 CURRENT_PROMPT="$PROMPT"
+
+# GitHub Models API token (optional — falls back to qwen-only loop if absent).
+GITHUB_TOKEN_FILE="$HOME/.config/cave-qwen-pump/github-token"
+GITHUB_TOKEN=""
+if [ -f "$GITHUB_TOKEN_FILE" ]; then
+  GITHUB_TOKEN="$(cat "$GITHUB_TOKEN_FILE" 2>/dev/null | tr -d '\n')"
+fi
+
+# Per-attempt model assignment: 1=qwen3-coder (local), 2=gpt-4o (remote, fast), 3=qwen3-coder (retry w/ feedback).
+attempt_model() {
+  case "$1" in
+    1) echo "qwen3-coder-next:Q4_K_M" ;;
+    2) [ -n "$GITHUB_TOKEN" ] && echo "gpt-4o" || echo "qwen3-coder-next:Q4_K_M" ;;
+    3) echo "qwen3-coder-next:Q4_K_M" ;;
+  esac
+}
+
+# Call gpt-4o via GitHub Models. Writes raw JSON to $1, returns HTTP status.
+call_github_models() {
+  local out="$1" prompt="$2" model="$3"
+  curl -sS -o "$out" -w "%{http_code}" \
+    --max-time 120 \
+    -X POST https://models.inference.ai.azure.com/chat/completions \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -d "$(jq -nc --arg m "$model" --arg p "$prompt" \
+          '{model:$m, messages:[{role:"user", content:$p}], max_tokens:4096, temperature:0.2}')" \
+    2>>"$CYCLE_LOG"
+}
 
 for ATTEMPT in 1 2 3; do
   RESPONSE_FILE="$LOG_DIR/${crate}-attempt${ATTEMPT}.json"
-  log "retry_${ATTEMPT}: calling ollama"
+  ATTEMPT_MODEL="$(attempt_model "$ATTEMPT")"
+  log "retry_${ATTEMPT}: calling $ATTEMPT_MODEL"
   T0=$(date +%s)
-  HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
-    --max-time 240 \
-    -X POST "$OLLAMA_HOST/api/generate" \
-    -H 'Content-Type: application/json' \
-    -d "$(jq -nc --arg m "$OLLAMA_MODEL" --arg p "$CURRENT_PROMPT" --arg ka "$OLLAMA_KEEP_ALIVE" \
-          '{model:$m, prompt:$p, stream:false, keep_alive:$ka, options:{num_ctx:8192, num_predict:4096, temperature:0.2}}')" \
-    2>>"$CYCLE_LOG") || HTTP_STATUS="curl_fail"
+
+  if [[ "$ATTEMPT_MODEL" == gpt-* ]]; then
+    HTTP_STATUS=$(call_github_models "$RESPONSE_FILE" "$CURRENT_PROMPT" "$ATTEMPT_MODEL") || HTTP_STATUS="curl_fail"
+  else
+    HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
+      --max-time 240 \
+      -X POST "$OLLAMA_HOST/api/generate" \
+      -H 'Content-Type: application/json' \
+      -d "$(jq -nc --arg m "$ATTEMPT_MODEL" --arg p "$CURRENT_PROMPT" --arg ka "$OLLAMA_KEEP_ALIVE" \
+            '{model:$m, prompt:$p, stream:false, keep_alive:$ka, options:{num_ctx:8192, num_predict:4096, temperature:0.2}}')" \
+      2>>"$CYCLE_LOG") || HTTP_STATUS="curl_fail"
+  fi
+
   T1=$(date +%s)
   TOTAL_OLLAMA_CALLS=$((TOTAL_OLLAMA_CALLS + 1))
   TOTAL_OLLAMA_SECS=$((TOTAL_OLLAMA_SECS + (T1 - T0)))
 
-  if [ "$HTTP_STATUS" != "200" ] || ! jq -e .response "$RESPONSE_FILE" >/dev/null 2>&1; then
-    log "retry_${ATTEMPT}: ollama_bad_response status=$HTTP_STATUS — try next"
+  # Validate response shape based on backend.
+  if [ "$HTTP_STATUS" != "200" ]; then
+    log "retry_${ATTEMPT}: bad_response status=$HTTP_STATUS — try next"
     continue
+  fi
+  if [[ "$ATTEMPT_MODEL" == gpt-* ]]; then
+    if ! jq -e '.choices[0].message.content' "$RESPONSE_FILE" >/dev/null 2>&1; then
+      log "retry_${ATTEMPT}: github_models_no_content — try next"
+      continue
+    fi
+  else
+    if ! jq -e .response "$RESPONSE_FILE" >/dev/null 2>&1; then
+      log "retry_${ATTEMPT}: ollama_no_response — try next"
+      continue
+    fi
   fi
 
   # Extract this attempt's content under a unique module name so it cannot
   # collide with any prior `mod tests` block already in the file.
+  # Backend-specific JSON path: ollama uses .response, gpt-* uses choices[0].message.content
   ATTEMPT_RAW="$LOG_DIR/${crate}-attempt${ATTEMPT}.rs"
-  jq -r .response "$RESPONSE_FILE" \
+  if [[ "$ATTEMPT_MODEL" == gpt-* ]]; then
+    JQ_PATH=".choices[0].message.content"
+  else
+    JQ_PATH=".response"
+  fi
+  jq -r "$JQ_PATH" "$RESPONSE_FILE" \
     | sed -E "/${FENCE_RE}/d" \
     | sed -E "s/^[[:space:]]*mod[[:space:]]+tests[[:space:]]*\{/mod cycle_${CYCLE_TS}_a${ATTEMPT} {/" \
     > "$ATTEMPT_RAW"
@@ -218,7 +273,7 @@ for ATTEMPT in 1 2 3; do
   cp "$SNAPSHOT" "$RUST_OUT"
   {
     echo ""
-    echo "// === cycle ${CYCLE_TS} attempt ${ATTEMPT} ==="
+    echo "// === cycle ${CYCLE_TS} attempt ${ATTEMPT} (${ATTEMPT_MODEL}) ==="
     cat "$ATTEMPT_RAW"
   } >> "$RUST_OUT"
 
@@ -228,7 +283,8 @@ for ATTEMPT in 1 2 3; do
     cat "$ERR_FILE" >>"$CYCLE_LOG"
     SUCCESS_AT_RETRY=$ATTEMPT
     WINNING_DRAFT="$ATTEMPT_RAW"
-    log "retry_${ATTEMPT}: success"
+    WINNING_MODEL="$ATTEMPT_MODEL"
+    log "retry_${ATTEMPT}: success ($ATTEMPT_MODEL)"
     break
   fi
   cat "$ERR_FILE" >>"$CYCLE_LOG"
@@ -336,18 +392,20 @@ fi
 # Append contribution row (machine-readable). Includes agentic retry stats:
 # success_at_retry = 1/2/3 if a qwen draft compiled, -1 if all retries failed
 # and the fallback placeholder was committed.
+MODEL_USED="${WINNING_MODEL:-fallback-stub}"
 jq -nc \
   --arg ts "$(ts)" \
   --arg crate "$crate" \
   --arg sha "$SHA" \
   --arg br "$WT_BR" \
   --arg model "$OLLAMA_MODEL" \
+  --arg model_used "$MODEL_USED" \
   --argjson n "$N" \
   --argjson success_at_retry "$SUCCESS_AT_RETRY" \
   --argjson ollama_calls "$TOTAL_OLLAMA_CALLS" \
   --argjson ollama_secs "$TOTAL_OLLAMA_SECS" \
   '{ts:$ts, worker_id:"qwen-pump-cron", batch_id:("pump-"+$crate),
-    test_delta:$n, commit_sha:$sha, model:$model, crate:$crate,
+    test_delta:$n, commit_sha:$sha, model:$model, model_used:$model_used, crate:$crate,
     branch:$br, merged_to:"main",
     success_at_retry:$success_at_retry, ollama_calls:$ollama_calls, ollama_secs:$ollama_secs}' \
   >> "$CONTRIB"
