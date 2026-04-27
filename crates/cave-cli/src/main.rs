@@ -10,8 +10,8 @@ use client::ApiClient;
 
 #[derive(Parser)]
 #[command(
-    name = "cave",
-    about = "CAVE Runtime CLI — terminal access to all platform modules",
+    name = "cavectl",
+    about = "CAVE Runtime CLI — single binary, native + compatibility surfaces (ADR-RUNTIME-CLI-CONSOLIDATION-001)",
     version,
     propagate_version = true
 )]
