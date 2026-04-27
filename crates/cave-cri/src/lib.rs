@@ -83,6 +83,7 @@ pub mod runtime_handler;
 pub mod sandbox;
 pub mod stats;
 pub mod streaming;
+pub mod streaming_session;
 pub mod transport;
 pub mod userns;
 
