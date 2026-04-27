@@ -54,6 +54,7 @@ pub mod operator;
 pub mod policy;
 pub mod services;
 pub mod sock_lb;
+pub mod srv6;
 pub mod tunnel;
 pub mod wireguard;
 
