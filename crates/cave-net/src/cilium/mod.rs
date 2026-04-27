@@ -33,6 +33,7 @@ pub mod cluster_pool_refill;
 pub mod clustermesh;
 pub mod cni_chain;
 pub mod clustermesh_ext;
+pub mod config_watcher;
 pub mod conn_test;
 pub mod conntrack;
 pub mod dns_proxy;
