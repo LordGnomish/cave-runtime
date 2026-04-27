@@ -20,7 +20,7 @@ dashmap = { workspace = true }
 async-trait = { workspace = true }
 kube = { workspace = true }
 k8s-openapi = { workspace = true }
-base64 = "0.22"
+base64 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

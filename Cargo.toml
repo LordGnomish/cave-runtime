@@ -189,6 +189,7 @@ reqwest-middleware = "0.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 async-trait = "0.1"
 # Testing — container-backed integration tests
+tempfile = "3"
 testcontainers = "0.23"
 testcontainers-modules = { version = "0.11", features = ["postgres"] }
 # Markdown rendering

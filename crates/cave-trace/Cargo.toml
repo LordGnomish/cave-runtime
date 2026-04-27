@@ -34,7 +34,7 @@ prometheus-client = { workspace = true }
 reqwest = { workspace = true }
 
 # Base64 for OTLP JSON encoding (protobuf bytes → base64)
-base64 = "0.22"
+base64 = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

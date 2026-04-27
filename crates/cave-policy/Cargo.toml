@@ -24,8 +24,8 @@ jsonwebtoken = { workspace = true }
 ring = { workspace = true }
 kube = { workspace = true }
 k8s-openapi = { workspace = true }
-base64 = "0.22"
-hex = "0.4"
+base64 = { workspace = true }
+hex = { workspace = true }
 tokio-postgres = { workspace = true }
 json-patch = "3"
 

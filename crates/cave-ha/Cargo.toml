@@ -16,8 +16,8 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 prometheus-client = { workspace = true }
-async-trait = "0.1"
-rand = "0.8"
+async-trait = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

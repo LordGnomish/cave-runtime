@@ -25,7 +25,7 @@ serde_json = { workspace = true }
 # Protobuf + compression
 prost = "0.13"
 snap = "1"
-flate2 = "1"
+flate2 = { workspace = true }
 lz4_flex = "0.11"
 zstd = "0.13"
 
@@ -43,9 +43,9 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 regex = { workspace = true }
-dashmap = "6"
-bytes = "1"
-base64 = "0.22"
+dashmap = { workspace = true }
+bytes = { workspace = true }
+base64 = { workspace = true }
 parking_lot = "0.12"
 smallvec = "1"
 indexmap = { version = "2", features = ["serde"] }

@@ -31,13 +31,13 @@ hickory-proto    = { version = "0.24", features = ["dnssec-ring"] }
 hickory-resolver = { version = "0.24", features = ["tokio-runtime", "dnssec-ring"] }
 
 # Async trait objects
-async-trait = "0.1"
+async-trait = { workspace = true }
 
 # Byte buffers
-bytes = "1"
+bytes = { workspace = true }
 
 # Concurrent hash map (cache, metrics)
-dashmap = "6"
+dashmap = { workspace = true }
 
 # Atomic arc swap for hot reload
 arc-swap = "1"
@@ -57,13 +57,13 @@ tokio-rustls  = "0.26"
 ipnet = "2"
 
 # Base64 for DNS-over-HTTPS GET requests
-base64 = "0.22"
+base64 = { workspace = true }
 
 # etcd backend
 etcd-client = "0.13"
 
 # futures utilities (join_all for spawned listeners)
-futures = "0.3"
+futures = { workspace = true }
 
 [dev-dependencies]
 tokio    = { workspace = true }
