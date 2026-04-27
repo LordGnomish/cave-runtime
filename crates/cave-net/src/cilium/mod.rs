@@ -27,6 +27,7 @@ pub mod auth;
 pub mod bandwidth;
 pub mod bgp;
 pub mod bpf_dump;
+pub mod bpf_loader;
 pub mod bpfmaps;
 pub mod cilium_node;
 pub mod cluster_pool_refill;
