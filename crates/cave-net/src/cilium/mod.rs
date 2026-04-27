@@ -20,6 +20,7 @@
 
 pub mod types;
 
+pub mod auth;
 pub mod bpfmaps;
 pub mod clustermesh;
 pub mod clustermesh_ext;
