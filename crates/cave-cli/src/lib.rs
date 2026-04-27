@@ -12,6 +12,7 @@ pub mod compat;
 pub mod env;
 pub mod native;
 pub mod tenant;
+pub mod tui;
 pub mod watch;
 
 pub use approval::{ApprovalBackend, ApprovalRecord, ApprovalState, InMemoryApprovals};
