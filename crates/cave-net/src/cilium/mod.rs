@@ -70,6 +70,7 @@ pub mod nat;
 pub mod operator;
 pub mod policy;
 pub mod policy_trace;
+pub mod proxy_health;
 pub mod recorder;
 pub mod selector_cache;
 pub mod services;
