@@ -31,6 +31,7 @@ pub mod egress;
 pub mod endpoint;
 pub mod envoy;
 pub mod fqdn;
+pub mod health;
 pub mod hubble;
 pub mod hubble_ext;
 pub mod hubble_metrics;
