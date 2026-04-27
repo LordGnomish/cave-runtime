@@ -49,6 +49,7 @@ pub mod auth_review;
 pub mod map_v2;
 pub mod aggregator_v3;
 pub mod webhook_admission_v2;
+pub mod audit_policy_v3;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;
