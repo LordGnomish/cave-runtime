@@ -111,6 +111,164 @@ mod tests {
         assert_eq!(err.plugin, "ProfileRegistry");
     }
 
+    // ── Multi-profile end-to-end ─────────────────────────────────────────
+
+    #[test]
+    fn registered_profile_count_round_trip() {
+        let mut reg = ProfileRegistry::new("p1");
+        reg.register(Profile { name: "p1".into(), framework: Framework::new() });
+        reg.register(Profile { name: "p2".into(), framework: Framework::new() });
+        reg.register(Profile { name: "p3".into(), framework: Framework::new() });
+        let names = reg.names();
+        assert_eq!(names, vec!["p1".to_string(), "p2".to_string(), "p3".to_string()]);
+    }
+
+    #[test]
+    fn default_profile_falls_back_when_pod_carries_empty_scheduler_name() {
+        let mut reg = ProfileRegistry::new("default-scheduler");
+        reg.register(Profile {
+            name: "default-scheduler".into(),
+            framework: Framework::new().with_filter(Box::new(AlwaysOk)),
+        });
+        reg.register(Profile { name: "ml".into(), framework: Framework::new() });
+        let pod = Pod::new("t", "ns", "p");
+        let prof = reg.for_pod(&pod).unwrap();
+        assert_eq!(prof.name, "default-scheduler");
+    }
+
+    #[test]
+    fn pod_routed_to_named_profile() {
+        let mut reg = ProfileRegistry::new("default-scheduler");
+        reg.register(Profile { name: "default-scheduler".into(), framework: Framework::new() });
+        reg.register(Profile {
+            name: "batch".into(),
+            framework: Framework::new().with_filter(Box::new(AlwaysOk)).with_score(Box::new(Five)),
+        });
+        let mut pod = Pod::new("t", "ns", "p");
+        pod.spec.scheduler_name = "batch".into();
+        let prof = reg.for_pod(&pod).unwrap();
+        assert_eq!(prof.name, "batch");
+        assert_eq!(prof.framework.scores.len(), 1);
+    }
+
+    #[test]
+    fn pod_with_unknown_scheduler_name_yields_unschedulable_status() {
+        let reg = ProfileRegistry::new("default");
+        let mut pod = Pod::new("t", "ns", "p");
+        pod.spec.scheduler_name = "nope".into();
+        let err = reg.for_pod(&pod).err().expect("missing profile");
+        assert_eq!(err.code, crate::framework::Code::Unschedulable);
+        assert!(err.reasons[0].contains("nope"));
+    }
+
+    // ── Profile + Bind handshake ─────────────────────────────────────────
+
+    #[test]
+    fn profile_bind_chain_runs_default_binder() {
+        use crate::bind::{DefaultBinder, NoopPreBinder, PostBindLogger};
+        use crate::cycle_state::CycleState;
+
+        let binder = std::sync::Arc::new(DefaultBinder::new());
+        let logger = std::sync::Arc::new(PostBindLogger::new());
+
+        struct WrapBind(std::sync::Arc<DefaultBinder>);
+        impl crate::extension_points::BindPlugin for WrapBind {
+            fn name(&self) -> &str { "DefaultBinder" }
+            fn bind(&self, p: &Pod, n: &str, s: &CycleState) -> Status {
+                self.0.bind(p, n, s)
+            }
+        }
+
+        struct WrapPostBind(std::sync::Arc<PostBindLogger>);
+        impl crate::extension_points::PostBindPlugin for WrapPostBind {
+            fn name(&self) -> &str { "PostBindLogger" }
+            fn post_bind(&self, p: &Pod, n: &str, s: &CycleState) {
+                self.0.post_bind(p, n, s);
+            }
+        }
+
+        let mut reg = ProfileRegistry::new("default");
+        reg.register(Profile {
+            name: "default".into(),
+            framework: Framework::new()
+                .with_pre_bind(Box::new(NoopPreBinder))
+                .with_bind(Box::new(WrapBind(binder.clone())))
+                .with_post_bind(Box::new(WrapPostBind(logger.clone()))),
+        });
+
+        let pod = Pod::new("t", "ns", "p");
+        let prof = reg.for_pod(&pod).unwrap();
+        let cs = CycleState::new();
+        assert!(prof.framework.run_pre_bind(&pod, "n1", &cs).is_success());
+        assert!(prof.framework.run_bind(&pod, "n1", &cs).is_success());
+        prof.framework.run_post_bind(&pod, "n1", &cs);
+        assert_eq!(binder.count(), 1);
+        assert_eq!(logger.events().len(), 1);
+    }
+
+    #[test]
+    fn profile_pre_enqueue_with_scheduling_gates() {
+        use crate::gates::SchedulingGates;
+
+        let mut reg = ProfileRegistry::new("default");
+        reg.register(Profile {
+            name: "default".into(),
+            framework: Framework::new().with_pre_enqueue(Box::new(SchedulingGates)),
+        });
+        let mut pod = Pod::new("t", "ns", "p");
+        pod.spec.scheduling_gates.push("acme.com/wait".into());
+
+        let prof = reg.for_pod(&pod).unwrap();
+        let st = prof.framework.run_pre_enqueue(&pod);
+        assert!(st.is_pending());
+        assert_eq!(st.plugin, "SchedulingGates");
+    }
+
+    #[test]
+    fn profile_uses_priority_sort_queue_sort_plugin() {
+        use crate::priority_sort::PrioritySort;
+        let mut reg = ProfileRegistry::new("default");
+        reg.register(Profile {
+            name: "default".into(),
+            framework: Framework::new().with_queue_sort(Box::new(PrioritySort)),
+        });
+        let prof = reg.get("default").unwrap();
+        let mut a = Pod::new("t", "ns", "a"); a.spec.priority = 100;
+        let mut b = Pod::new("t", "ns", "b"); b.spec.priority = 50;
+        assert_eq!(prof.framework.queue_sort(&a, &b), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn profile_each_has_isolated_state() {
+        use crate::bind::DefaultBinder;
+        struct WrapBind(std::sync::Arc<DefaultBinder>);
+        impl crate::extension_points::BindPlugin for WrapBind {
+            fn name(&self) -> &str { "DefaultBinder" }
+            fn bind(&self, p: &Pod, n: &str, s: &crate::cycle_state::CycleState) -> Status {
+                self.0.bind(p, n, s)
+            }
+        }
+        let bind_a = std::sync::Arc::new(DefaultBinder::new());
+        let bind_b = std::sync::Arc::new(DefaultBinder::new());
+        let mut reg = ProfileRegistry::new("a");
+        reg.register(Profile {
+            name: "a".into(),
+            framework: Framework::new().with_bind(Box::new(WrapBind(bind_a.clone()))),
+        });
+        reg.register(Profile {
+            name: "b".into(),
+            framework: Framework::new().with_bind(Box::new(WrapBind(bind_b.clone()))),
+        });
+        let cs = crate::cycle_state::CycleState::new();
+        let pod_a = { let mut p = Pod::new("t", "ns", "p"); p.spec.scheduler_name = "a".into(); p };
+        let pod_b = { let mut p = Pod::new("t", "ns", "q"); p.spec.scheduler_name = "b".into(); p };
+        reg.for_pod(&pod_a).unwrap().framework.run_bind(&pod_a, "n", &cs);
+        reg.for_pod(&pod_b).unwrap().framework.run_bind(&pod_b, "n", &cs);
+        reg.for_pod(&pod_b).unwrap().framework.run_bind(&pod_b, "n", &cs);
+        assert_eq!(bind_a.count(), 1);
+        assert_eq!(bind_b.count(), 2);
+    }
+
     #[test]
     fn each_profile_has_independent_weights() {
         let mut reg = ProfileRegistry::new("p1");
