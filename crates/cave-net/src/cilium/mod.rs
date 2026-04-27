@@ -29,6 +29,7 @@ pub mod bpf_dump;
 pub mod bpfmaps;
 pub mod cilium_node;
 pub mod clustermesh;
+pub mod cni_chain;
 pub mod clustermesh_ext;
 pub mod conn_test;
 pub mod conntrack;
