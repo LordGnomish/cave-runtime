@@ -281,6 +281,212 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Cgroup v2 runtime (freezer, cgroup.kill, PSI, memory.events) ──────────────
+
+use crate::cgroup_v2_runtime as cgrt;
+
+#[test]
+fn test_freezer_state_byte_roundtrips() {
+    for s in [cgrt::FreezerState::Thawed, cgrt::FreezerState::Frozen] {
+        assert_eq!(cgrt::FreezerState::from_str(s.as_byte()), Some(s));
+    }
+}
+
+#[test]
+fn test_cgroup_freeze_writes_one_thaw_writes_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cgroup.freeze"), "0").unwrap();
+    cgrt::freeze(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.freeze")).unwrap(), "1");
+    cgrt::thaw(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.freeze")).unwrap(), "0");
+}
+
+#[test]
+fn test_cgroup_kill_writes_one() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cgroup.kill"), "0").unwrap();
+    cgrt::cgroup_kill(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.kill")).unwrap(), "1");
+}
+
+#[test]
+fn test_cgroup_kill_missing_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let err = cgrt::cgroup_kill(dir.path()).unwrap_err();
+    assert!(err.to_string().contains("cgroup.kill"));
+}
+
+#[test]
+fn test_psi_parser_some_and_full() {
+    let raw = "some avg10=0.10 avg60=0.20 avg300=0.30 total=1000\nfull avg10=0.05 avg60=0.10 avg300=0.15 total=500\n";
+    let p = cgrt::parse_psi(raw).unwrap();
+    assert_eq!(p.some.avg10, 0.10);
+    assert_eq!(p.full.unwrap().total_us, 500);
+}
+
+#[test]
+fn test_read_cpu_pressure() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cpu.pressure"),
+        "some avg10=1.0 avg60=2.0 avg300=3.0 total=42\n").unwrap();
+    let p = cgrt::read_cpu_pressure(dir.path()).unwrap();
+    assert_eq!(p.some.avg10, 1.0);
+    assert!(p.full.is_none());
+}
+
+#[test]
+fn test_read_memory_pressure_with_full_axis() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("memory.pressure"),
+        "some avg10=0.5 avg60=0.5 avg300=0.5 total=100\nfull avg10=0.1 avg60=0.1 avg300=0.1 total=10\n").unwrap();
+    let p = cgrt::read_memory_pressure(dir.path()).unwrap();
+    assert!(p.full.is_some());
+    assert_eq!(p.full.unwrap().total_us, 10);
+}
+
+#[test]
+fn test_parse_memory_events_all_fields() {
+    let e = cgrt::parse_memory_events("low 0\nhigh 5\nmax 1\noom 2\noom_kill 3\noom_group_kill 4\n");
+    assert_eq!(e.high, 5);
+    assert_eq!(e.oom, 2);
+    assert_eq!(e.oom_group_kill, 4);
+}
+
+#[test]
+fn test_parse_memory_swap_events_fields() {
+    let e = cgrt::parse_memory_swap_events("high 1\nmax 2\nfail 3\n");
+    assert_eq!(e.high, 1);
+    assert_eq!(e.fail, 3);
+}
+
+#[test]
+fn test_read_memory_events_from_file() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("memory.events"), "oom 7\noom_kill 7\n").unwrap();
+    let e = cgrt::read_memory_events(dir.path()).unwrap();
+    assert_eq!(e.oom, 7);
+}
+
+// ── CRIU v2 (pre-dump, incremental, descriptor.json) ──────────────────────────
+
+use crate::criu_v2;
+
+#[test]
+fn test_pre_dump_argv_uses_pre_dump_subcommand() {
+    let argv = criu_v2::build_pre_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &criu_v2::AdvancedDumpOptions::default(),
+    );
+    assert_eq!(argv[1], "pre-dump");
+    assert!(argv.iter().any(|a| a == "--track-mem"));
+}
+
+#[test]
+fn test_advanced_dump_argv_chains_prev_image_dirs() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        prev_image_dirs: vec![std::path::PathBuf::from("/p0"), std::path::PathBuf::from("/p1")],
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    let prev_count = argv.iter().filter(|a| **a == "--prev-images-dir").count();
+    assert_eq!(prev_count, 2);
+}
+
+#[test]
+fn test_advanced_dump_argv_includes_externals() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        externals: vec!["mnt[host]:/tmp/host".into()],
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    assert!(argv.iter().any(|a| a == "--external"));
+    assert!(argv.contains(&"mnt[host]:/tmp/host".to_string()));
+}
+
+#[test]
+fn test_advanced_dump_argv_with_page_server() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        page_server: Some("10.0.0.1:5080".into()),
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    assert!(argv.iter().any(|a| a == "--page-server"));
+    assert!(argv.contains(&"10.0.0.1:5080".to_string()));
+}
+
+#[test]
+fn test_descriptor_json_roundtrip() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![std::path::PathBuf::from("/old")],
+        externals: vec!["mnt[h]:/h".into()],
+    };
+    d.write(dir.path()).unwrap();
+    let back = criu_v2::CriuDescriptor::read(dir.path()).unwrap();
+    assert_eq!(d, back);
+}
+
+#[test]
+fn test_verify_pre_dump_chain_intermediate_must_be_pre_dump() {
+    let dir1 = tempfile::tempdir().unwrap();
+    let dir2 = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::Dump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir1.path()).unwrap();
+    let r = criu_v2::verify_pre_dump_chain(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
+    assert!(r.is_err());
+}
+
+#[test]
+fn test_verify_pre_dump_chain_intermediate_pre_dump_ok() {
+    let dir1 = tempfile::tempdir().unwrap();
+    let dir2 = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir1.path()).unwrap();
+    assert!(criu_v2::verify_pre_dump_chain(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]).is_ok());
+}
+
+#[test]
+fn test_verify_pre_dump_chain_detects_duplicate() {
+    let dir = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir.path()).unwrap();
+    let p = dir.path().to_path_buf();
+    assert!(criu_v2::verify_pre_dump_chain(&[p.clone(), p]).is_err());
+}
+
+#[test]
+fn test_dump_kind_serialization_snake_case() {
+    assert_eq!(serde_json::to_string(&criu_v2::DumpKind::PreDump).unwrap(), "\"pre_dump\"");
+}
+
 // ── UserNS depth (idmapped mount, cgroup ns, validation, allocator stats) ─────
 
 use crate::userns_v2;

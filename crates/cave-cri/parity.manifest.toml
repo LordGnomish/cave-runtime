@@ -1460,3 +1460,159 @@ local_test    = "test_build_idmapped_mount_consumes_one_range"
 [[tests]]
 upstream_test = "TestPoolIsAlignedCleanDivision"
 local_test    = "test_pool_is_aligned_clean_division"
+
+# Cgroup v2 runtime — freezer, cgroup.kill, PSI, memory.events
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/freezer.go"
+local    = "src/cgroup_v2_runtime.rs"
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/memory.go"
+local    = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupFreeze"
+local_name    = "freeze"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupThaw"
+local_name    = "thaw"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupKill"
+local_name    = "cgroup_kill"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParsePSI"
+local_name    = "parse_psi"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ReadCpuPressure"
+local_name    = "read_cpu_pressure"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ReadMemoryPressure"
+local_name    = "read_memory_pressure"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParseMemoryEvents"
+local_name    = "parse_memory_events"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParseMemorySwapEvents"
+local_name    = "parse_memory_swap_events"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[tests]]
+upstream_test = "TestFreezerStateByteRoundtrips"
+local_test    = "test_freezer_state_byte_roundtrips"
+
+[[tests]]
+upstream_test = "TestCgroupFreezeThaw"
+local_test    = "test_cgroup_freeze_writes_one_thaw_writes_zero"
+
+[[tests]]
+upstream_test = "TestCgroupKillWritesOne"
+local_test    = "test_cgroup_kill_writes_one"
+
+[[tests]]
+upstream_test = "TestCgroupKillMissingErrors"
+local_test    = "test_cgroup_kill_missing_errors"
+
+[[tests]]
+upstream_test = "TestPsiParserSomeAndFull"
+local_test    = "test_psi_parser_some_and_full"
+
+[[tests]]
+upstream_test = "TestReadCpuPressure"
+local_test    = "test_read_cpu_pressure"
+
+[[tests]]
+upstream_test = "TestReadMemoryPressureWithFullAxis"
+local_test    = "test_read_memory_pressure_with_full_axis"
+
+[[tests]]
+upstream_test = "TestParseMemoryEventsAllFields"
+local_test    = "test_parse_memory_events_all_fields"
+
+[[tests]]
+upstream_test = "TestParseMemorySwapEventsFields"
+local_test    = "test_parse_memory_swap_events_fields"
+
+[[tests]]
+upstream_test = "TestReadMemoryEventsFromFile"
+local_test    = "test_read_memory_events_from_file"
+
+# CRIU v2 — pre-dump, incremental, descriptor.json
+
+[[files]]
+upstream = "criu/cr-pre-dump.c"
+local    = "src/criu_v2.rs"
+
+[[files]]
+upstream = "criu/files-img.c"
+local    = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildPreDumpArgv"
+local_name    = "build_pre_dump_argv"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildAdvancedDumpArgv"
+local_name    = "build_advanced_dump_argv"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildCriuDescriptor"
+local_name    = "build_descriptor"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "VerifyPreDumpChain"
+local_name    = "verify_pre_dump_chain"
+file          = "src/criu_v2.rs"
+
+[[tests]]
+upstream_test = "TestPreDumpArgvUsesPreDumpSubcommand"
+local_test    = "test_pre_dump_argv_uses_pre_dump_subcommand"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvChainsPrevImageDirs"
+local_test    = "test_advanced_dump_argv_chains_prev_image_dirs"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvIncludesExternals"
+local_test    = "test_advanced_dump_argv_includes_externals"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvWithPageServer"
+local_test    = "test_advanced_dump_argv_with_page_server"
+
+[[tests]]
+upstream_test = "TestDescriptorJsonRoundtrip"
+local_test    = "test_descriptor_json_roundtrip"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainIntermediateMustBePreDump"
+local_test    = "test_verify_pre_dump_chain_intermediate_must_be_pre_dump"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainIntermediatePreDumpOK"
+local_test    = "test_verify_pre_dump_chain_intermediate_pre_dump_ok"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainDetectsDuplicate"
+local_test    = "test_verify_pre_dump_chain_detects_duplicate"
+
+[[tests]]
+upstream_test = "TestDumpKindSerializationSnakeCase"
+local_test    = "test_dump_kind_serialization_snake_case"
