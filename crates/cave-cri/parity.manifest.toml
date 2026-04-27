@@ -1237,3 +1237,382 @@ local_test    = "test_stream_error_success_is_empty"
 [[tests]]
 upstream_test = "TestStreamErrorStatusRoundtrip"
 local_test    = "test_stream_error_status_roundtrip"
+
+# Image pull auth depth — TokenCache, BearerChallenge, SigV4, dockerconfigjson, retry
+
+[[files]]
+upstream = "remotes/docker/auth/fetch.go"
+local    = "src/auth_v2.rs"
+
+[[files]]
+upstream = "remotes/docker/auth/parse.go"
+local    = "src/auth_v2.rs"
+
+[[files]]
+upstream = "remotes/docker/scheduler.go"
+local    = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.Get"
+local_name    = "get"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.Insert"
+local_name    = "insert"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "TokenCache.EvictExpired"
+local_name    = "evict_expired"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "ParseBearerChallenge"
+local_name    = "parse"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "BearerChallengeTokenURL"
+local_name    = "token_url"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "SigV4AuthorizationHeader"
+local_name    = "authorization_header"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "DockerConfigParse"
+local_name    = "parse"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "DockerConfigSchemeFor"
+local_name    = "scheme_for"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "PullRetryBackoff"
+local_name    = "backoff_for_attempt"
+file          = "src/auth_v2.rs"
+
+[[functions]]
+upstream_name = "PullRetryJitter"
+local_name    = "jittered"
+file          = "src/auth_v2.rs"
+
+[[tests]]
+upstream_test = "TestTokenCacheReturnsInsertedToken"
+local_test    = "test_token_cache_returns_inserted_token"
+
+[[tests]]
+upstream_test = "TestTokenCacheSkewWindow"
+local_test    = "test_token_cache_skew_window_blocks_30s_before_expiry"
+
+[[tests]]
+upstream_test = "TestTokenCacheEvictsExpired"
+local_test    = "test_token_cache_evicts_expired"
+
+[[tests]]
+upstream_test = "TestBearerChallengeParseFull"
+local_test    = "test_bearer_challenge_parse_full"
+
+[[tests]]
+upstream_test = "TestBearerChallengeTokenURL"
+local_test    = "test_bearer_challenge_token_url"
+
+[[tests]]
+upstream_test = "TestBearerChallengeRejectsBasic"
+local_test    = "test_bearer_challenge_rejects_basic"
+
+[[tests]]
+upstream_test = "TestSigV4AuthorizationHeaderShape"
+local_test    = "test_sigv4_authorization_header_shape"
+
+[[tests]]
+upstream_test = "TestDockerConfigJSONParseBasicAuth"
+local_test    = "test_dockerconfigjson_parse_basic_auth"
+
+[[tests]]
+upstream_test = "TestDockerConfigJSONPrefersIdentityToken"
+local_test    = "test_dockerconfigjson_prefers_identitytoken"
+
+[[tests]]
+upstream_test = "TestPullRetryDefaultMatchesContainerd"
+local_test    = "test_pull_retry_default_matches_containerd"
+
+[[tests]]
+upstream_test = "TestPullRetryBackoffCapsAtMax"
+local_test    = "test_pull_retry_backoff_caps_at_max"
+
+[[tests]]
+upstream_test = "TestPullRetryJitterExtremes"
+local_test    = "test_pull_retry_jitter_extremes"
+
+# UserNS depth — idmapped mounts (KEP-127 phase 2), cgroup ns, validation
+
+[[files]]
+upstream = "pkg/cri/server/podsandbox/userns_idmap_linux.go"
+local    = "src/userns_v2.rs"
+
+[[files]]
+upstream = "libcontainer/configs/namespaces.go"
+local    = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "IdmappedMountOptions"
+local_name    = "options_string"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "IdmappedMountArgv"
+local_name    = "mount_argv"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "CgroupNamespaceCloneFlags"
+local_name    = "clone_flags"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "CgroupNamespaceTranslate"
+local_name    = "translate_for_view"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateIdMapping"
+local_name    = "validate_id_mapping"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateNoOverlap"
+local_name    = "validate_no_overlap"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "ValidateUserNamespace"
+local_name    = "validate_user_namespace"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "AllocatorStats"
+local_name    = "allocator_stats"
+file          = "src/userns_v2.rs"
+
+[[functions]]
+upstream_name = "BuildIdmappedMount"
+local_name    = "build_idmapped_mount"
+file          = "src/userns_v2.rs"
+
+[[tests]]
+upstream_test = "TestIdmappedMountOptionsString"
+local_test    = "test_idmapped_mount_options_string"
+
+[[tests]]
+upstream_test = "TestIdmappedMountArgvIncludesMountIdmappedBinary"
+local_test    = "test_idmapped_mount_argv_includes_mount_idmapped_binary"
+
+[[tests]]
+upstream_test = "TestMountAttrIdmapKernelConstant"
+local_test    = "test_mount_attr_idmap_kernel_constant"
+
+[[tests]]
+upstream_test = "TestCgroupNamespaceCloneFlag"
+local_test    = "test_cgroup_namespace_clone_flag"
+
+[[tests]]
+upstream_test = "TestCgroupNamespaceTranslatesPaths"
+local_test    = "test_cgroup_namespace_translates_paths"
+
+[[tests]]
+upstream_test = "TestValidateIdMappingRejectsReservedHostID"
+local_test    = "test_validate_id_mapping_rejects_reserved_host_id"
+
+[[tests]]
+upstream_test = "TestValidateIdMappingAcceptsDefaultKEP127"
+local_test    = "test_validate_id_mapping_accepts_default_kep_127"
+
+[[tests]]
+upstream_test = "TestValidateNoOverlapDetectsHostCollision"
+local_test    = "test_validate_no_overlap_detects_host_collision"
+
+[[tests]]
+upstream_test = "TestValidateUserNamespaceForPodOK"
+local_test    = "test_validate_user_namespace_for_pod_ok"
+
+[[tests]]
+upstream_test = "TestValidateUserNamespaceHostPassthroughRejected"
+local_test    = "test_validate_user_namespace_host_passthrough_rejected"
+
+[[tests]]
+upstream_test = "TestAllocatorStatsAlternatingFullFragmentation"
+local_test    = "test_allocator_stats_alternating_full_fragmentation"
+
+[[tests]]
+upstream_test = "TestAllocatorStatsContiguousZeroFragmentation"
+local_test    = "test_allocator_stats_contiguous_zero_fragmentation"
+
+[[tests]]
+upstream_test = "TestBuildIdmappedMountConsumesOneRange"
+local_test    = "test_build_idmapped_mount_consumes_one_range"
+
+[[tests]]
+upstream_test = "TestPoolIsAlignedCleanDivision"
+local_test    = "test_pool_is_aligned_clean_division"
+
+# Cgroup v2 runtime — freezer, cgroup.kill, PSI, memory.events
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/freezer.go"
+local    = "src/cgroup_v2_runtime.rs"
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/memory.go"
+local    = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupFreeze"
+local_name    = "freeze"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupThaw"
+local_name    = "thaw"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "CgroupKill"
+local_name    = "cgroup_kill"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParsePSI"
+local_name    = "parse_psi"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ReadCpuPressure"
+local_name    = "read_cpu_pressure"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ReadMemoryPressure"
+local_name    = "read_memory_pressure"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParseMemoryEvents"
+local_name    = "parse_memory_events"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[functions]]
+upstream_name = "ParseMemorySwapEvents"
+local_name    = "parse_memory_swap_events"
+file          = "src/cgroup_v2_runtime.rs"
+
+[[tests]]
+upstream_test = "TestFreezerStateByteRoundtrips"
+local_test    = "test_freezer_state_byte_roundtrips"
+
+[[tests]]
+upstream_test = "TestCgroupFreezeThaw"
+local_test    = "test_cgroup_freeze_writes_one_thaw_writes_zero"
+
+[[tests]]
+upstream_test = "TestCgroupKillWritesOne"
+local_test    = "test_cgroup_kill_writes_one"
+
+[[tests]]
+upstream_test = "TestCgroupKillMissingErrors"
+local_test    = "test_cgroup_kill_missing_errors"
+
+[[tests]]
+upstream_test = "TestPsiParserSomeAndFull"
+local_test    = "test_psi_parser_some_and_full"
+
+[[tests]]
+upstream_test = "TestReadCpuPressure"
+local_test    = "test_read_cpu_pressure"
+
+[[tests]]
+upstream_test = "TestReadMemoryPressureWithFullAxis"
+local_test    = "test_read_memory_pressure_with_full_axis"
+
+[[tests]]
+upstream_test = "TestParseMemoryEventsAllFields"
+local_test    = "test_parse_memory_events_all_fields"
+
+[[tests]]
+upstream_test = "TestParseMemorySwapEventsFields"
+local_test    = "test_parse_memory_swap_events_fields"
+
+[[tests]]
+upstream_test = "TestReadMemoryEventsFromFile"
+local_test    = "test_read_memory_events_from_file"
+
+# CRIU v2 — pre-dump, incremental, descriptor.json
+
+[[files]]
+upstream = "criu/cr-pre-dump.c"
+local    = "src/criu_v2.rs"
+
+[[files]]
+upstream = "criu/files-img.c"
+local    = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildPreDumpArgv"
+local_name    = "build_pre_dump_argv"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildAdvancedDumpArgv"
+local_name    = "build_advanced_dump_argv"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "BuildCriuDescriptor"
+local_name    = "build_descriptor"
+file          = "src/criu_v2.rs"
+
+[[functions]]
+upstream_name = "VerifyPreDumpChain"
+local_name    = "verify_pre_dump_chain"
+file          = "src/criu_v2.rs"
+
+[[tests]]
+upstream_test = "TestPreDumpArgvUsesPreDumpSubcommand"
+local_test    = "test_pre_dump_argv_uses_pre_dump_subcommand"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvChainsPrevImageDirs"
+local_test    = "test_advanced_dump_argv_chains_prev_image_dirs"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvIncludesExternals"
+local_test    = "test_advanced_dump_argv_includes_externals"
+
+[[tests]]
+upstream_test = "TestAdvancedDumpArgvWithPageServer"
+local_test    = "test_advanced_dump_argv_with_page_server"
+
+[[tests]]
+upstream_test = "TestDescriptorJsonRoundtrip"
+local_test    = "test_descriptor_json_roundtrip"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainIntermediateMustBePreDump"
+local_test    = "test_verify_pre_dump_chain_intermediate_must_be_pre_dump"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainIntermediatePreDumpOK"
+local_test    = "test_verify_pre_dump_chain_intermediate_pre_dump_ok"
+
+[[tests]]
+upstream_test = "TestVerifyPreDumpChainDetectsDuplicate"
+local_test    = "test_verify_pre_dump_chain_detects_duplicate"
+
+[[tests]]
+upstream_test = "TestDumpKindSerializationSnakeCase"
+local_test    = "test_dump_kind_serialization_snake_case"

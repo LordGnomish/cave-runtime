@@ -281,6 +281,468 @@ async fn test_container_stats() {
     assert!(stats.memory_percent.is_finite());
 }
 
+// ── Cgroup v2 runtime (freezer, cgroup.kill, PSI, memory.events) ──────────────
+
+use crate::cgroup_v2_runtime as cgrt;
+
+#[test]
+fn test_freezer_state_byte_roundtrips() {
+    for s in [cgrt::FreezerState::Thawed, cgrt::FreezerState::Frozen] {
+        assert_eq!(cgrt::FreezerState::from_str(s.as_byte()), Some(s));
+    }
+}
+
+#[test]
+fn test_cgroup_freeze_writes_one_thaw_writes_zero() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cgroup.freeze"), "0").unwrap();
+    cgrt::freeze(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.freeze")).unwrap(), "1");
+    cgrt::thaw(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.freeze")).unwrap(), "0");
+}
+
+#[test]
+fn test_cgroup_kill_writes_one() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cgroup.kill"), "0").unwrap();
+    cgrt::cgroup_kill(dir.path()).unwrap();
+    assert_eq!(std::fs::read_to_string(dir.path().join("cgroup.kill")).unwrap(), "1");
+}
+
+#[test]
+fn test_cgroup_kill_missing_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    let err = cgrt::cgroup_kill(dir.path()).unwrap_err();
+    assert!(err.to_string().contains("cgroup.kill"));
+}
+
+#[test]
+fn test_psi_parser_some_and_full() {
+    let raw = "some avg10=0.10 avg60=0.20 avg300=0.30 total=1000\nfull avg10=0.05 avg60=0.10 avg300=0.15 total=500\n";
+    let p = cgrt::parse_psi(raw).unwrap();
+    assert_eq!(p.some.avg10, 0.10);
+    assert_eq!(p.full.unwrap().total_us, 500);
+}
+
+#[test]
+fn test_read_cpu_pressure() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("cpu.pressure"),
+        "some avg10=1.0 avg60=2.0 avg300=3.0 total=42\n").unwrap();
+    let p = cgrt::read_cpu_pressure(dir.path()).unwrap();
+    assert_eq!(p.some.avg10, 1.0);
+    assert!(p.full.is_none());
+}
+
+#[test]
+fn test_read_memory_pressure_with_full_axis() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("memory.pressure"),
+        "some avg10=0.5 avg60=0.5 avg300=0.5 total=100\nfull avg10=0.1 avg60=0.1 avg300=0.1 total=10\n").unwrap();
+    let p = cgrt::read_memory_pressure(dir.path()).unwrap();
+    assert!(p.full.is_some());
+    assert_eq!(p.full.unwrap().total_us, 10);
+}
+
+#[test]
+fn test_parse_memory_events_all_fields() {
+    let e = cgrt::parse_memory_events("low 0\nhigh 5\nmax 1\noom 2\noom_kill 3\noom_group_kill 4\n");
+    assert_eq!(e.high, 5);
+    assert_eq!(e.oom, 2);
+    assert_eq!(e.oom_group_kill, 4);
+}
+
+#[test]
+fn test_parse_memory_swap_events_fields() {
+    let e = cgrt::parse_memory_swap_events("high 1\nmax 2\nfail 3\n");
+    assert_eq!(e.high, 1);
+    assert_eq!(e.fail, 3);
+}
+
+#[test]
+fn test_read_memory_events_from_file() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("memory.events"), "oom 7\noom_kill 7\n").unwrap();
+    let e = cgrt::read_memory_events(dir.path()).unwrap();
+    assert_eq!(e.oom, 7);
+}
+
+// ── CRIU v2 (pre-dump, incremental, descriptor.json) ──────────────────────────
+
+use crate::criu_v2;
+
+#[test]
+fn test_pre_dump_argv_uses_pre_dump_subcommand() {
+    let argv = criu_v2::build_pre_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &criu_v2::AdvancedDumpOptions::default(),
+    );
+    assert_eq!(argv[1], "pre-dump");
+    assert!(argv.iter().any(|a| a == "--track-mem"));
+}
+
+#[test]
+fn test_advanced_dump_argv_chains_prev_image_dirs() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        prev_image_dirs: vec![std::path::PathBuf::from("/p0"), std::path::PathBuf::from("/p1")],
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    let prev_count = argv.iter().filter(|a| **a == "--prev-images-dir").count();
+    assert_eq!(prev_count, 2);
+}
+
+#[test]
+fn test_advanced_dump_argv_includes_externals() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        externals: vec!["mnt[host]:/tmp/host".into()],
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    assert!(argv.iter().any(|a| a == "--external"));
+    assert!(argv.contains(&"mnt[host]:/tmp/host".to_string()));
+}
+
+#[test]
+fn test_advanced_dump_argv_with_page_server() {
+    let advanced = criu_v2::AdvancedDumpOptions {
+        page_server: Some("10.0.0.1:5080".into()),
+        ..Default::default()
+    };
+    let argv = criu_v2::build_advanced_dump_argv(
+        1, std::path::Path::new("/i"),
+        &crate::criu::CheckpointOptions::default(),
+        &advanced,
+    );
+    assert!(argv.iter().any(|a| a == "--page-server"));
+    assert!(argv.contains(&"10.0.0.1:5080".to_string()));
+}
+
+#[test]
+fn test_descriptor_json_roundtrip() {
+    let dir = tempfile::tempdir().unwrap();
+    let d = criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![std::path::PathBuf::from("/old")],
+        externals: vec!["mnt[h]:/h".into()],
+    };
+    d.write(dir.path()).unwrap();
+    let back = criu_v2::CriuDescriptor::read(dir.path()).unwrap();
+    assert_eq!(d, back);
+}
+
+#[test]
+fn test_verify_pre_dump_chain_intermediate_must_be_pre_dump() {
+    let dir1 = tempfile::tempdir().unwrap();
+    let dir2 = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::Dump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir1.path()).unwrap();
+    let r = criu_v2::verify_pre_dump_chain(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]);
+    assert!(r.is_err());
+}
+
+#[test]
+fn test_verify_pre_dump_chain_intermediate_pre_dump_ok() {
+    let dir1 = tempfile::tempdir().unwrap();
+    let dir2 = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir1.path()).unwrap();
+    assert!(criu_v2::verify_pre_dump_chain(&[dir1.path().to_path_buf(), dir2.path().to_path_buf()]).is_ok());
+}
+
+#[test]
+fn test_verify_pre_dump_chain_detects_duplicate() {
+    let dir = tempfile::tempdir().unwrap();
+    criu_v2::CriuDescriptor {
+        dump_kind: criu_v2::DumpKind::PreDump,
+        criu_version: "3.19".into(),
+        prev_image_dirs: vec![],
+        externals: vec![],
+    }.write(dir.path()).unwrap();
+    let p = dir.path().to_path_buf();
+    assert!(criu_v2::verify_pre_dump_chain(&[p.clone(), p]).is_err());
+}
+
+#[test]
+fn test_dump_kind_serialization_snake_case() {
+    assert_eq!(serde_json::to_string(&criu_v2::DumpKind::PreDump).unwrap(), "\"pre_dump\"");
+}
+
+// ── UserNS depth (idmapped mount, cgroup ns, validation, allocator stats) ─────
+
+use crate::userns_v2;
+use std::collections::BTreeSet;
+
+#[test]
+fn test_idmapped_mount_options_string() {
+    let ns = crate::userns::UserNamespace::for_pod(2_000_000, 65_536);
+    let m = userns_v2::IdmappedMount {
+        source: "/src".into(),
+        target: "/dst".into(),
+        fs_type: "ext4".into(),
+        user_namespace: ns,
+    };
+    let s = m.options_string();
+    assert!(s.contains("uidmap=2000000:0:65536"));
+    assert!(s.contains("gidmap=2000000:0:65536"));
+}
+
+#[test]
+fn test_idmapped_mount_argv_includes_mount_idmapped_binary() {
+    let ns = crate::userns::UserNamespace::for_pod(1_500_000, 65_536);
+    let m = userns_v2::IdmappedMount {
+        source: "/x".into(),
+        target: "/y".into(),
+        fs_type: "xfs".into(),
+        user_namespace: ns,
+    };
+    assert_eq!(m.mount_argv()[0], "mount.idmapped");
+}
+
+#[test]
+fn test_mount_attr_idmap_kernel_constant() {
+    assert_eq!(userns_v2::MOUNT_ATTR_IDMAP, 0x0010_0000);
+}
+
+#[test]
+fn test_cgroup_namespace_clone_flag() {
+    let ns = userns_v2::CgroupNamespace { root: "/sys/fs/cgroup/pod".into() };
+    assert_eq!(ns.clone_flags(), userns_v2::CLONE_NEWCGROUP);
+}
+
+#[test]
+fn test_cgroup_namespace_translates_paths() {
+    let ns = userns_v2::CgroupNamespace { root: "/sys/fs/cgroup/pod".into() };
+    let view = ns.translate_for_view(std::path::Path::new("/sys/fs/cgroup/pod/sub")).unwrap();
+    assert_eq!(view, std::path::PathBuf::from("/sub"));
+    assert!(ns.translate_for_view(std::path::Path::new("/etc")).is_none());
+}
+
+#[test]
+fn test_validate_id_mapping_rejects_reserved_host_id() {
+    let m = crate::userns::IdMapping { container_id: 0, host_id: 500, size: 100 };
+    assert!(userns_v2::validate_id_mapping(&m).is_err());
+}
+
+#[test]
+fn test_validate_id_mapping_accepts_default_kep_127() {
+    let m = crate::userns::IdMapping { container_id: 0, host_id: 1_000_000, size: 65_536 };
+    assert!(userns_v2::validate_id_mapping(&m).is_ok());
+}
+
+#[test]
+fn test_validate_no_overlap_detects_host_collision() {
+    let mappings = vec![
+        crate::userns::IdMapping { container_id: 0,   host_id: 1_000_000, size: 100 },
+        crate::userns::IdMapping { container_id: 200, host_id: 1_000_050, size: 100 },
+    ];
+    assert!(userns_v2::validate_no_overlap(&mappings).is_err());
+}
+
+#[test]
+fn test_validate_user_namespace_for_pod_ok() {
+    let ns = crate::userns::UserNamespace::for_pod(1_000_000, 65_536);
+    assert!(userns_v2::validate_user_namespace(&ns).is_ok());
+}
+
+#[test]
+fn test_validate_user_namespace_host_passthrough_rejected() {
+    let ns = crate::userns::UserNamespace::host_passthrough();
+    assert!(userns_v2::validate_user_namespace(&ns).is_err());
+}
+
+#[test]
+fn test_allocator_stats_alternating_full_fragmentation() {
+    let mut allocated = BTreeSet::new();
+    allocated.insert(0);
+    allocated.insert(65_536 * 2);
+    allocated.insert(65_536 * 4);
+    let s = userns_v2::allocator_stats(0, 65_536 * 6, 65_536, &allocated);
+    assert_eq!(s.allocated_ranges, 3);
+    assert_eq!(s.fragmentation_ratio, 1.0);
+}
+
+#[test]
+fn test_allocator_stats_contiguous_zero_fragmentation() {
+    let mut allocated = BTreeSet::new();
+    allocated.insert(0);
+    allocated.insert(65_536);
+    allocated.insert(65_536 * 2);
+    let s = userns_v2::allocator_stats(0, 65_536 * 4, 65_536, &allocated);
+    assert_eq!(s.fragmentation_ratio, 0.0);
+}
+
+#[test]
+fn test_build_idmapped_mount_consumes_one_range() {
+    let alloc = crate::userns::UserNsAllocator::new(2_000_000, 2_000_000 + 65_536 * 4, 65_536);
+    let m = userns_v2::build_idmapped_mount(&alloc, "/s".into(), "/d".into(), "ext4").unwrap();
+    assert_eq!(alloc.allocated(), 1);
+    assert!(m.is_complete());
+}
+
+#[test]
+fn test_pool_is_aligned_clean_division() {
+    assert!(userns_v2::pool_is_aligned(0, 65_536 * 4, 65_536));
+    assert!(!userns_v2::pool_is_aligned(0, 65_537, 65_536));
+}
+
+// ── Auth depth (TokenCache, BearerChallenge, SigV4, dockerconfigjson, retry) ──
+
+use crate::auth_v2;
+use chrono::TimeZone;
+
+fn ts(unix: i64) -> chrono::DateTime<chrono::Utc> {
+    chrono::Utc.timestamp_opt(unix, 0).unwrap()
+}
+
+#[test]
+fn test_token_cache_returns_inserted_token() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("docker.io", "scope", auth_v2::CachedToken {
+        token: "tk".into(),
+        expires_at: ts(2000),
+    });
+    assert_eq!(c.get("docker.io", "scope", ts(0)).unwrap().token, "tk");
+}
+
+#[test]
+fn test_token_cache_skew_window_blocks_30s_before_expiry() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("r", "s", auth_v2::CachedToken { token: "x".into(), expires_at: ts(1000) });
+    assert!(c.get("r", "s", ts(990)).is_none());
+}
+
+#[test]
+fn test_token_cache_evicts_expired() {
+    let c = auth_v2::TokenCache::new();
+    c.insert("a", "s", auth_v2::CachedToken { token: "old".into(), expires_at: ts(100) });
+    c.insert("b", "s", auth_v2::CachedToken { token: "fresh".into(), expires_at: ts(10_000) });
+    let dropped = c.evict_expired(ts(500));
+    assert_eq!(dropped, 1);
+    assert_eq!(c.len(), 1);
+}
+
+#[test]
+fn test_bearer_challenge_parse_full() {
+    let c = auth_v2::BearerChallenge::parse(
+        r#"Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:library/nginx:pull""#
+    ).unwrap();
+    assert_eq!(c.realm,   "https://auth.docker.io/token");
+    assert_eq!(c.service, "registry.docker.io");
+    assert_eq!(c.scope,   "repository:library/nginx:pull");
+}
+
+#[test]
+fn test_bearer_challenge_token_url() {
+    let c = auth_v2::BearerChallenge {
+        realm: "https://auth.docker.io/token".into(),
+        service: "registry.docker.io".into(),
+        scope: "repository:library/nginx:pull".into(),
+    };
+    let url = c.token_url();
+    assert!(url.contains("service=registry.docker.io"));
+    assert!(url.contains("scope=repository:library/nginx:pull"));
+}
+
+#[test]
+fn test_bearer_challenge_rejects_basic() {
+    assert!(auth_v2::BearerChallenge::parse("Basic realm=\"x\"").is_err());
+}
+
+#[test]
+fn test_sigv4_authorization_header_shape() {
+    let req = auth_v2::SigV4Request {
+        method: "POST",
+        host: "api.ecr.us-east-1.amazonaws.com",
+        path: "/",
+        query: "",
+        payload: b"{}",
+        region: "us-east-1",
+        service: "ecr",
+        access_key_id: "AKIDEXAMPLE",
+        secret_access_key: "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY",
+        timestamp: chrono::Utc.with_ymd_and_hms(2024, 1, 1, 12, 0, 0).unwrap(),
+    };
+    let h = req.authorization_header();
+    assert!(h.starts_with("AWS4-HMAC-SHA256 "));
+    assert!(h.contains("Credential=AKIDEXAMPLE/20240101/us-east-1/ecr/aws4_request"));
+    assert!(h.contains("SignedHeaders=host;x-amz-date"));
+}
+
+#[test]
+fn test_dockerconfigjson_parse_basic_auth() {
+    let cfg = auth_v2::DockerConfig::parse(
+        r#"{"auths":{"docker.io":{"auth":"YWxpY2U6c2VjcmV0"}}}"#
+    ).unwrap();
+    let scheme = cfg.scheme_for("docker.io").unwrap();
+    match scheme {
+        crate::auth::AuthScheme::Basic { username, password } => {
+            assert_eq!(username, "alice");
+            assert_eq!(password, "secret");
+        }
+        _ => panic!("expected Basic"),
+    }
+}
+
+#[test]
+fn test_dockerconfigjson_prefers_identitytoken() {
+    let cfg = auth_v2::DockerConfig::parse(
+        r#"{"auths":{"r.io":{"auth":"YWxpY2U6c2VjcmV0","identitytoken":"id-tk"}}}"#
+    ).unwrap();
+    match cfg.scheme_for("r.io").unwrap() {
+        crate::auth::AuthScheme::Bearer { token } => assert_eq!(token, "id-tk"),
+        _ => panic!("expected Bearer"),
+    }
+}
+
+#[test]
+fn test_pull_retry_default_matches_containerd() {
+    let p = auth_v2::PullRetryPolicy::default();
+    assert_eq!(p.max_attempts, 3);
+    assert_eq!(p.initial_backoff_ms, 250);
+}
+
+#[test]
+fn test_pull_retry_backoff_caps_at_max() {
+    let p = auth_v2::PullRetryPolicy {
+        max_attempts: 10,
+        initial_backoff_ms: 100,
+        multiplier: 2,
+        max_backoff_ms: 1000,
+        jitter_fraction: 0.0,
+    };
+    assert_eq!(p.backoff_for_attempt(1), Some(100));
+    assert_eq!(p.backoff_for_attempt(5), Some(1000));
+    assert_eq!(p.backoff_for_attempt(20), None);
+}
+
+#[test]
+fn test_pull_retry_jitter_extremes() {
+    let p = auth_v2::PullRetryPolicy { jitter_fraction: 0.5, ..Default::default() };
+    assert_eq!(p.jittered(1000, 0.0), 500);
+    assert_eq!(p.jittered(1000, 1.0), 1500);
+    assert_eq!(p.jittered(1000, 0.5), 1000);
+}
+
 // ── Streaming session (SPDY/3.1, lifecycle, pty, error stream) ────────────────
 
 use crate::streaming_session as ss;

@@ -75,8 +75,11 @@ pub mod logs;
 pub mod log_v2;
 pub mod health;
 pub mod auth;
+pub mod auth_v2;
 pub mod cgroup_v2;
+pub mod cgroup_v2_runtime;
 pub mod criu;
+pub mod criu_v2;
 pub mod manifest_list;
 pub mod pull_progress;
 pub mod runtime_handler;
@@ -86,6 +89,7 @@ pub mod streaming;
 pub mod streaming_session;
 pub mod transport;
 pub mod userns;
+pub mod userns_v2;
 
 #[cfg(test)]
 mod upstream_tests;
