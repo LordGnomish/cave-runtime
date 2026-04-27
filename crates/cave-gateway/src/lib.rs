@@ -30,6 +30,7 @@
 //! - Envoy: https://github.com/envoyproxy/envoy
 //! - Parity: Kong 3.x Admin API + Envoy v3 xDS
 
+pub mod access_log;
 pub mod acme;
 pub mod admin;
 pub mod circuit_breaker;
@@ -47,8 +48,10 @@ pub mod pqc;
 pub mod proxy;
 pub mod route_action;
 pub mod spiffe;
+pub mod stats_sink;
 pub mod store;
 pub mod tls;
+pub mod trace;
 pub mod xds;
 
 use axum::{routing::any, Router};
