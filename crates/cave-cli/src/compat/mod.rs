@@ -6,4 +6,6 @@
 //! intentionally thin — flag mapping, path routing, output shaping —
 //! and delegates real work to `crate::native`.
 
+pub mod argocd;
+pub mod helm;
 pub mod kubectl;
