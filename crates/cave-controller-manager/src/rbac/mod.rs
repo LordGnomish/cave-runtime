@@ -6,5 +6,6 @@
 //!   `rules[]` from the rules of every ClusterRole matching its
 //!   `aggregationRule.clusterRoleSelectors[]` selector.
 
+pub mod aggregation_conflict;
 pub mod cluster_role_aggregation;
 pub mod match_expressions;

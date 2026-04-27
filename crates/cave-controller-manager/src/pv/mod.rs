@@ -6,7 +6,9 @@
 //! * [`binder`] — claim/volume binding logic (immediate vs WaitForFirstConsumer).
 //! * [`expansion`] — volume expansion state machine.
 
+pub mod attach_detach;
 pub mod binder;
 pub mod expansion;
+pub mod protection;
 pub mod reclaim;
 pub mod snapshot;
