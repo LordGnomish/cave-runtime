@@ -21,6 +21,7 @@ pub mod broker;
 pub mod compression;
 pub mod connect;
 pub mod consumer_group;
+pub mod deep;
 pub mod error;
 pub mod mirror;
 pub mod protocol;
