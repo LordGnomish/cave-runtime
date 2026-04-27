@@ -30,6 +30,7 @@
 //! - Envoy: https://github.com/envoyproxy/envoy
 //! - Parity: Kong 3.x Admin API + Envoy v3 xDS
 
+pub mod acme;
 pub mod admin;
 pub mod circuit_breaker;
 pub mod eds;
@@ -42,8 +43,10 @@ pub mod matcher;
 pub mod models;
 pub mod outlier;
 pub mod plugins;
+pub mod pqc;
 pub mod proxy;
 pub mod route_action;
+pub mod spiffe;
 pub mod store;
 pub mod tls;
 pub mod xds;
