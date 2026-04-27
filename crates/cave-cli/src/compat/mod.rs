@@ -7,5 +7,7 @@
 //! and delegates real work to `crate::native`.
 
 pub mod argocd;
+pub mod harbor;
 pub mod helm;
 pub mod kubectl;
+pub mod vault;
