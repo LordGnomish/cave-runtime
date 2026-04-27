@@ -15,6 +15,7 @@ pub mod persistence;
 pub mod resp;
 pub mod server;
 pub mod types;
+pub mod wire;
 
 pub use server::run;
 pub use config::Config;

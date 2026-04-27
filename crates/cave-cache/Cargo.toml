@@ -17,6 +17,7 @@ tracing       = { workspace = true }
 ring          = { workspace = true }
 regex         = { workspace = true }
 rand          = { workspace = true }
+bytes         = { workspace = true }
 
 [dev-dependencies]
 tokio         = { workspace = true }
