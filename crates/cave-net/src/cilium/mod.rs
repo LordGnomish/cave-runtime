@@ -61,6 +61,7 @@ pub mod recorder;
 pub mod services;
 pub mod sock_lb;
 pub mod srv6;
+pub mod status;
 pub mod tunnel;
 pub mod wireguard;
 
