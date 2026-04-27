@@ -359,3 +359,20 @@ mod tests {
         assert_eq!(sink.metadata.annotations.get("knative.dev/creator"), Some(&tenant_id.to_string()));
     }
 }
+
+// === cycle 1777331610 (fallback after 3 retries; ollama_calls=3; ollama_secs=120) ===
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777331610_1() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777331610_2() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777331610_3() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777331610_4() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777331610_5() {}
