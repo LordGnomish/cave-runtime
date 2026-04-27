@@ -1,18 +1,18 @@
 [package]
-name = "cave-cli"
+name = "cavectl"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "CAVE Runtime CLI — terminal access to all platform modules"
+description = "CAVE Runtime CLI — single binary, native + compatibility surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001)"
 
 [lib]
-name = "cave_cli"
+name = "cavectl"
 path = "src/lib.rs"
 
 [[bin]]
-name = "cave"
+name = "cavectl"
 path = "src/main.rs"
 
 [dependencies]
