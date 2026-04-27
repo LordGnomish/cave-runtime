@@ -84,6 +84,15 @@ pub mod namespace_controller;
 /// 100-pct PUSH-HARD M11: Bootstrap-token signer for the cluster-info ConfigMap.
 pub mod bootstrap_signer;
 
+/// 100-pct PUSH-HARD M13: NodeLease deeper — holder rotation, renewal cadence,
+/// LeaseLock leader election step machine.
+pub mod node_lease_deeper;
+
+/// 100-pct PUSH-HARD M13: RootCA publisher deeper — mutation detection,
+/// PEM bundle equality, owner-ref/finalizer preservation, terminating-namespace
+/// behavior.
+pub mod root_ca_deeper;
+
 /// deeper-002 batch — manager loop wiring + per-controller deepening
 /// (StatefulSet PVC state machine, DaemonSet rollout + tolerations,
 /// indexed Job, real cron parser, EndpointSlice keying, clusterIP
