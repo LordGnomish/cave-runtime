@@ -32,6 +32,7 @@ pub mod deviceplugin;
 pub mod dra;
 pub mod dra_v1alpha2;
 pub mod sidecar;
+pub mod eviction_api;
 
 // deeper-003 — node-side runtime modules.
 pub mod container_metrics;
