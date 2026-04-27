@@ -36,6 +36,7 @@ pub mod gravitee;
 pub mod handler;
 pub mod health;
 pub mod lb;
+pub mod listener;
 pub mod matcher;
 pub mod models;
 pub mod plugins;
