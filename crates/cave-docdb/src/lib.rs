@@ -6,15 +6,19 @@
 //! mongoose, Java driver) without modification on port 27017.
 
 pub mod bson;
+pub mod change_stream;
 pub mod commands;
 pub mod cursor;
 pub mod engine;
 pub mod index;
 pub mod models;
+pub mod pipeline;
 pub mod projection;
 pub mod query;
+pub mod replica_set;
 pub mod routes;
 pub mod server;
+pub mod tenant;
 pub mod update;
 pub mod wire;
 
