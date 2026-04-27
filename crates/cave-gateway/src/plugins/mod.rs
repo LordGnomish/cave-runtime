@@ -25,6 +25,7 @@ pub mod request_termination;
 pub mod request_transformer;
 pub mod request_validation;
 pub mod response_transformer;
+pub mod waf;
 pub mod zipkin;
 
 use async_trait::async_trait;
