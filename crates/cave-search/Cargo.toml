@@ -1,0 +1,22 @@
+[package]
+name = "cave-search"
+description = "OpenSearch/Elasticsearch-compatible search engine — index, mapping, DSL, aggregations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+chrono        = { workspace = true }
+uuid          = { workspace = true }
+thiserror     = { workspace = true }
+tracing       = { workspace = true }
+parking_lot   = { workspace = true }
+axum          = { workspace = true }
+tokio         = { workspace = true }
+tower         = { workspace = true }
+
+[dev-dependencies]
+reqwest       = { workspace = true }
+tokio         = { workspace = true, features = ["full"] }

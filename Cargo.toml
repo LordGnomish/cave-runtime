@@ -116,6 +116,8 @@ members = [
     "crates/cave-datafusion",
     # === Object Storage (S3 + Azure Blob hybrid) ===
     "crates/cave-blob",
+    # === Search Engine (OpenSearch/Elasticsearch parity) ===
+    "crates/cave-search",
 ]
 
 [workspace.package]
