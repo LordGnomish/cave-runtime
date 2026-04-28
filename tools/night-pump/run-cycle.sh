@@ -141,6 +141,12 @@ Write Rust integration tests for the cave-runtime crate ${crate}.
 Available modules (relative to the crate root, first few only): ${modules_short}
 (Use only these — do not invent module names.)
 
+CRITICAL PATH RULES (these tests live in tests/qwen_drafted.rs, an integration test file — they compile as a separate crate):
+- Use absolute crate paths only: \`${crate_underscore}::module::Item\` or \`${crate_underscore}::Item\`.
+- DO NOT use \`super::\` (refers to the test file root, NOT the lib crate — integration tests cannot reach lib internals via super).
+- DO NOT use \`crate::\` (refers to the integration test crate, not ${crate_underscore}).
+- NO inner doc comments (\`//!\`) inside the mod block — only outer (\`///\`) or regular (\`//\`) comments are valid there.
+
 Hard requirements:
 1. Output a SINGLE Rust source file. No prose. No markdown fences. No backticks.
 2. The first four lines of the file must be exactly:
@@ -262,7 +268,10 @@ for ATTEMPT in 1 2 3; do
   fi
   jq -r "$JQ_PATH" "$RESPONSE_FILE" \
     | sed -E "/${FENCE_RE}/d" \
+    | sed -E '/^[[:space:]]*\/\/!/d' \
     | sed -E "s/^[[:space:]]*mod[[:space:]]+tests[[:space:]]*\{/mod cycle_${CYCLE_TS}_a${ATTEMPT} {/" \
+    | sed -E "s/use[[:space:]]+super::/use ${crate_underscore}::/g" \
+    | sed -E "s/use[[:space:]]+crate::/use ${crate_underscore}::/g" \
     > "$ATTEMPT_RAW"
   if [ ! -s "$ATTEMPT_RAW" ]; then
     log "retry_${ATTEMPT}: empty extraction — try next"
