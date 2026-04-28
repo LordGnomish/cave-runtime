@@ -51,6 +51,7 @@ pub mod aggregator_v3;
 pub mod webhook_admission_v2;
 pub mod audit_policy_v3;
 pub mod discovery_v3;
+pub mod simple_cel;
 pub mod beta_apis;
 pub mod storage_migration;
 pub mod service_account_token;

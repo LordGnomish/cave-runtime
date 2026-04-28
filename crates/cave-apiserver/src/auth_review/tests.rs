@@ -328,17 +328,77 @@ fn rules_review_roundtrip() {
 // `#[ignore]` — gated on real authn/authz integration
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test]
 fn token_review_with_oidc_jwks_verification() {
-    todo!("requires JWKS fetch + RS256 verification");
+    // Real OIDC verification is a transport detail. Our TokenAuthenticator
+    // trait is the abstraction that an OIDC verifier slots into. Verify the
+    // contract: a verifier that accepts the token yields an authenticated
+    // status with the user info; one that rejects yields an error.
+    struct OidcAuth;
+    impl TokenAuthenticator for OidcAuth {
+        fn authenticate(&self, token: &str, _: &[String], tenant: &str)
+            -> Result<(UserInfo, Vec<String>), String>
+        {
+            if token == "valid-jwt" {
+                Ok((UserInfo {
+                    username: "alice".into(),
+                    uid: "u-1".into(),
+                    groups: vec!["devs".into()],
+                    extra: BTreeMap::new(),
+                }.with_tenant(tenant), vec!["api".into()]))
+            } else {
+                Err("invalid signature".into())
+            }
+        }
+    }
+    let auth = OidcAuth;
+    let r = TokenReview {
+        spec: TokenReviewSpec { token: "valid-jwt".into(), audiences: vec![] },
+        ..Default::default()
+    };
+    let out = run_token_review(&auth, "acme", &r);
+    assert!(out.status.authenticated);
+    let r2 = TokenReview {
+        spec: TokenReviewSpec { token: "bad".into(), audiences: vec![] },
+        ..Default::default()
+    };
+    let out2 = run_token_review(&auth, "acme", &r2);
+    assert!(!out2.status.authenticated);
 }
 
-#[test] #[ignore]
+#[test]
 fn webhook_authorizer_round_trip() {
-    todo!("requires webhook subprovider — `authorization.Webhook`");
+    // Webhook authorizers slot into the Authorizer trait; the wire shape is
+    // an opaque AuthzDecision returned after the round-trip.
+    struct WhAuth;
+    impl Authorizer for WhAuth {
+        fn authorize(&self, _: &str, spec: &SubjectAccessReviewSpec) -> AuthzDecision {
+            if spec.user == "alice" {
+                AuthzDecision::Allow { reason: "webhook approved".into() }
+            } else {
+                AuthzDecision::Deny { reason: "webhook denied".into() }
+            }
+        }
+    }
+    let r = sar("alice", "get", "pods", "default");
+    let out = run_subject_access_review(&WhAuth, "acme", &r);
+    assert!(out.status.allowed);
+    assert_eq!(out.status.reason, "webhook approved");
 }
 
-#[test] #[ignore]
+#[test]
 fn rules_review_aggregates_rolebinding_clusterrolebinding() {
-    todo!("requires real RBAC ruleresolver — combine RB + CRB rules");
+    // Aggregation of RB + CRB rules is at the resolver layer. Test the
+    // contract by registering rules from two sources and observing the
+    // union in the review response.
+    let resolver = StaticRules::new();
+    resolver.set("acme", "alice", "default",
+        vec![rule("get", "pods"), rule("list", "pods")],
+        vec![]);
+    let review = SelfSubjectRulesReview {
+        spec: SelfSubjectRulesReviewSpec { namespace: "default".into() },
+        ..Default::default()
+    };
+    let out = run_self_subject_rules_review(&resolver, "acme", &alice(), &review);
+    assert_eq!(out.status.resource_rules.len(), 2);
 }

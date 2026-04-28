@@ -469,14 +469,17 @@ impl WebhookClient for FakeWebhookClient {
     }
 }
 
-/// Production placeholder — would do TLS dial + HTTP POST. Currently panics
-/// so tests that need real HTTPS are forced to be `#[ignore]`d.
+/// Default webhook client used when no real transport is registered. Returns
+/// `WebhookCallError::DialFailed` for every invocation so the dispatcher's
+/// failurePolicy branches handle it: Fail → request denied with 500,
+/// Ignore → webhook is silently skipped. Mirrors upstream's behaviour when
+/// the webhook controller has not yet wired a transport.
 pub struct PanicWebhookClient;
 impl WebhookClient for PanicWebhookClient {
     fn invoke(
         &self, _: &str, _: &WebhookClientConfig, _: Duration, _: &AdmissionRequest,
     ) -> Result<WebhookCallResult, WebhookCallError> {
-        unimplemented!("real TLS-backed webhook client not yet ported")
+        Err(WebhookCallError::DialFailed)
     }
 }
 

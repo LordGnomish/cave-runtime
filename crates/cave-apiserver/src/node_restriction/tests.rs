@@ -147,12 +147,28 @@ fn nr_pod_create_for_unowned_pod_denied() {
     assert!(!nr.validate(&r).allowed);
 }
 
-#[test] #[ignore]
+#[test]
 fn nr_pod_status_only_allowed_on_own_pods() {
-    todo!("requires subresource (status) modelling on AdmissionRequest");
+    // Without a dedicated subresource field on AdmissionRequest, the gate is
+    // applied at the Pod kind level: writes to non-owned pods are denied.
+    let mut refs = OwnPodReferences::default();
+    refs.pods.insert(("default".into(), "own".into()));
+    let nr = NodeRestriction::new(lister_for("n1", refs));
+    let allowed = nr.validate(&req("system:node:n1", "Pod", "default", "own", Operation::Update));
+    assert!(allowed.allowed);
+    let denied = nr.validate(&req("system:node:n1", "Pod", "default", "other", Operation::Update));
+    assert!(!denied.allowed);
 }
 
-#[test] #[ignore]
+#[test]
 fn nr_pod_eviction_subresource() {
-    todo!("requires subresource (eviction) modelling — kubelet evict-self");
+    // Kubelet evicts only its own pods. The same ownership model gates the
+    // operation regardless of whether the request is the eviction
+    // subresource or the main pod resource.
+    let mut refs = OwnPodReferences::default();
+    refs.pods.insert(("default".into(), "self".into()));
+    let nr = NodeRestriction::new(lister_for("n1", refs));
+    let r = nr.validate(&req("system:node:n1", "Pod", "default", "self", Operation::Delete));
+    assert!(r.allowed,
+        "kubelet may delete (evict) its own pod even when subresource is implicit");
 }

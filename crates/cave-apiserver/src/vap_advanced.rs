@@ -15,11 +15,13 @@
 //! ## Compile-gate strategy
 //!
 //! CEL evaluation is a multi-thousand-LOC body of work (cel-go ports) that we
-//! gate via `CelEvaluator` trait. Tests that *require* a real evaluator are
-//! marked `#[ignore]` and exercise behavior against a `PanicEvaluator` stub
-//! that calls `unimplemented!()`. Tests that only exercise resource matching,
-//! param resolution, fail policy, and policy CRUD do NOT require CEL and are
-//! enabled.
+//! gate via `CelEvaluator` trait. The default `PanicEvaluator` returns a
+//! `CelError::Compile` for every expression so policies dispatched without
+//! a registered evaluator fail closed under FailurePolicy=Fail and silenced
+//! under FailurePolicy=Ignore. Tests use `simple_cel::SimpleEvaluator`
+//! (a stdlib-only CEL subset covering paths, equality, has(), startsWith,
+//! endsWith, regex match, comparisons, arithmetic, and logical ops) for
+//! end-to-end parity coverage.
 //!
 //! Tenant invariant: a binding's paramRef resolution MUST never cross tenants.
 //! `ParamResolver` is responsible for enforcing the tenant scope; tests assert
@@ -285,12 +287,15 @@ pub trait CelEvaluator: Send + Sync {
     fn evaluate(&self, expr: &str, act: &CelActivation) -> Result<CelValue, CelError>;
 }
 
-/// Stub that always panics — used to gate `#[ignore]` tests that would
-/// require a real evaluator.
+/// Reject-everything evaluator. Returns a `CelError::Compile` for every
+/// expression so policies that route through it are denied under
+/// FailurePolicy=Fail and silenced under FailurePolicy=Ignore. Useful as a
+/// safe default when no evaluator has been registered.
 pub struct PanicEvaluator;
 impl CelEvaluator for PanicEvaluator {
     fn evaluate(&self, _expr: &str, _act: &CelActivation) -> Result<CelValue, CelError> {
-        unimplemented!("CEL evaluator not yet ported — see KEP-3488")
+        Err(CelError::Compile(
+            "no CEL evaluator registered — wire `simple_cel::SimpleEvaluator` into the dispatcher".into()))
     }
 }
 

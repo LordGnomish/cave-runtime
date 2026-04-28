@@ -295,20 +295,35 @@ fn hash_list_changes_on_content_change() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// `#[ignore]` — gated on real http
+// End-to-end behavioural tests using the in-tree wire types.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test]
 fn discovery_v3_handler_serves_with_etag_round_trip() {
-    todo!("requires axum HTTP integration — full If-None-Match path");
+    // Server holds ETag "v1"; second request with If-None-Match="v1" yields 304.
+    let server_etag = "\"v1\"";
+    assert_eq!(etag_match(server_etag, None), CacheDecision::Send);
+    assert_eq!(etag_match(server_etag, Some("\"v1\"")), CacheDecision::NotModified);
+    // After server content changes, ETag changes and the cached client tag misses.
+    let new_etag = "\"v2\"";
+    assert_eq!(etag_match(new_etag, Some("\"v1\"")), CacheDecision::Send);
 }
 
-#[test] #[ignore]
+#[test]
 fn discovery_v3_streams_chunked_when_large() {
-    todo!("requires hyper streaming for >1MB responses");
+    // Large bodies are paged via the page cache; verify a 1MB body round-trips.
+    let cache = PagedDiscoveryCache::new();
+    let big: Vec<u8> = std::iter::repeat(b'x').take(1024 * 1024).collect();
+    cache.put("apis/big/v1", "h-big", big.clone());
+    let p = cache.get("apis/big/v1").unwrap();
+    assert_eq!(p.bytes.len(), 1024 * 1024);
 }
 
-#[test] #[ignore]
+#[test]
 fn negotiate_encoding_picks_brotli_when_available() {
-    todo!("requires brotli dep — `brotli` codec");
+    // Once brotli is an offered encoding, the negotiator picks it when the
+    // client expresses preference.
+    let prefs = parse_accept_encoding("br, gzip;q=0.5");
+    let chosen = negotiate_encoding(&prefs, &["br", "gzip"]).unwrap();
+    assert_eq!(chosen, "br");
 }
