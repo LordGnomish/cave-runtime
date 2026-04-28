@@ -65,6 +65,41 @@ impl Connection {
 
 // ── Server entry point ────────────────────────────────────────────────────────
 
+/// Bind to a fresh address (typically `"127.0.0.1:0"` for tests) and return
+/// the bound address paired with a JoinHandle that drives the accept loop.
+/// Drop the handle to terminate the server.
+pub async fn bind(state: Arc<ServerState>, bind_addr: &str) -> std::io::Result<(std::net::SocketAddr, tokio::task::JoinHandle<()>)> {
+    let listener = TcpListener::bind(bind_addr).await?;
+    let addr = listener.local_addr()?;
+
+    tokio::spawn(expiry::expiry_task(Arc::clone(&state)));
+    tokio::spawn(crate::persistence::save_scheduler_task(Arc::clone(&state)));
+    tokio::spawn(crate::keyspace::keyspace_notification_task(
+        state.keyspace_tx.subscribe(),
+        Arc::clone(&state.pubsub),
+        Arc::clone(&state.config),
+    ));
+
+    let handle = tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer)) => {
+                    let s = Arc::clone(&state);
+                    let peer_str = peer.to_string();
+                    tokio::spawn(async move {
+                        handle_connection(stream, s, peer_str).await;
+                    });
+                }
+                Err(e) => {
+                    tracing::error!("accept error: {}", e);
+                    break;
+                }
+            }
+        }
+    });
+    Ok((addr, handle))
+}
+
 pub async fn run(state: Arc<ServerState>) {
     let addr = {
         let cfg = state.config.read().await;
