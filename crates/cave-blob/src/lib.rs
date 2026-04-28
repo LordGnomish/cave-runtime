@@ -13,10 +13,15 @@
 //! pure signing helpers.
 
 pub mod azure;
+pub mod erasure;
 pub mod error;
+pub mod kms;
 pub mod lifecycle;
+pub mod lock;
 pub mod multipart;
 pub mod object;
+pub mod replication;
 pub mod s3;
+pub mod server;
 pub mod store;
 pub mod tenant;

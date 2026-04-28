@@ -18,5 +18,10 @@ base64        = { workspace = true }
 bytes         = { workspace = true }
 rand          = { workspace = true }
 parking_lot   = { workspace = true }
+axum          = { workspace = true }
+tokio         = { workspace = true }
+tower         = { workspace = true }
 
 [dev-dependencies]
+reqwest       = { workspace = true }
+tokio         = { workspace = true, features = ["full"] }
