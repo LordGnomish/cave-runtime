@@ -1,6 +1,6 @@
 [package]
 name = "cave-upstream"
-description = "Upstream open source project tracker — monitors releases, triages changes"
+description = "Upstream open source project tracker — monitors releases, triages changes, drives self-improving port loop"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,5 +12,26 @@ reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+toml = { workspace = true }
+# Used by daemon for ~/Library/Application Support resolution
+dirs = "5"
+
+[dev-dependencies]
+mockito = "1"
+tempfile = "3"
+tokio = { workspace = true, features = ["full", "test-util", "macros"] }
+
+[[bin]]
+name = "cave-upstream-watchd"
+path = "src/bin/cave-upstream-watchd.rs"
