@@ -16,3 +16,20 @@ fn placeholder_4() {}
 #[test]
 #[ignore = "qwen scaffold pending"]
 fn placeholder_5() {}
+
+// === cycle 1777336017 (fallback after 3 retries; ollama_calls=3; ollama_secs=99) ===
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777336017_1() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777336017_2() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777336017_3() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777336017_4() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777336017_5() {}
