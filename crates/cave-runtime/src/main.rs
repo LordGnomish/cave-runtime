@@ -133,22 +133,121 @@ async fn main() -> anyhow::Result<()> {
     // Start background tasks
     metrics_state.start_background_tasks();
 
-    // Populate parity cache at startup. Three crates ship real measurements
-    // via calculate_parity(); for every other crate in crates/* we insert a
-    // placeholder (overall=0.0, upstream="tbd") so the portal surfaces all
-    // ~100 crate slots instead of just three. Real metrics replace the
-    // placeholder as each crate grows its own calculate_parity().
+    // Populate parity cache at startup — two passes:
+    //
+    //   1. Bake the parity manifest of every crate that ships
+    //      `parity.manifest.toml` into the binary via `include_str!` and run
+    //      the calculator at startup. This produces *real* file/function/
+    //      test/surface metrics for all 84 manifest-bearing crates.
+    //
+    //   2. Walk `crates/*` at runtime and insert a placeholder report
+    //      (overall=0.0, upstream="tbd") for any crate the calculator did
+    //      not cover yet. This guarantees the portal surfaces every crate
+    //      slot — newly-scaffolded crates show up immediately with zero
+    //      coverage so the gap is visible.
+    //
+    // The cave-portal `/api/portal/parity[/<module>]` endpoints read this
+    // cache, so every crate's parity gauge is populated *at boot* — no
+    // upstream UI redirect.
+    macro_rules! load_parity {
+        ($cache:expr, $crate_dir:literal, $key:literal) => {{
+            const MANIFEST: &str = include_str!(concat!("../../", $crate_dir, "/parity.manifest.toml"));
+            const BASE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../", $crate_dir);
+            match cave_kernel::parity::calculate_from_str(MANIFEST, BASE) {
+                Ok(r) => { $cache.insert($key.to_string(), r); }
+                Err(e) => tracing::warn!(crate_dir = $crate_dir, error = %e, "parity manifest parse failed"),
+            }
+        }};
+    }
     {
         let mut cache = portal_state.parity_cache.write().await;
-        if let Ok(r) = cave_etcd::calculate_parity() {
-            cache.insert("etcd".to_string(), r);
-        }
-        if let Ok(r) = cave_cri::calculate_parity() {
-            cache.insert("cri".to_string(), r);
-        }
-        if let Ok(r) = cave_apiserver::calculate_parity() {
-            cache.insert("apiserver".to_string(), r);
-        }
+        load_parity!(cache, "cave-admission", "admission");
+        load_parity!(cache, "cave-ai-obs", "ai-obs");
+        load_parity!(cache, "cave-alerts", "alerts");
+        load_parity!(cache, "cave-apiserver", "apiserver");
+        load_parity!(cache, "cave-artifacts", "artifacts");
+        load_parity!(cache, "cave-auth", "auth");
+        load_parity!(cache, "cave-backup", "backup");
+        load_parity!(cache, "cave-cache", "cache");
+        load_parity!(cache, "cave-certs", "certs");
+        load_parity!(cache, "cave-changelog", "changelog");
+        load_parity!(cache, "cave-chaos", "chaos");
+        load_parity!(cache, "cave-chat", "chat");
+        load_parity!(cache, "cave-cloud-controller-manager", "cloud-controller-manager");
+        load_parity!(cache, "cave-cluster", "cluster");
+        load_parity!(cache, "cave-compliance", "compliance");
+        load_parity!(cache, "cave-container-scan", "container-scan");
+        load_parity!(cache, "cave-controller-manager", "controller-manager");
+        load_parity!(cache, "cave-core", "core");
+        load_parity!(cache, "cave-cost", "cost");
+        load_parity!(cache, "cave-cost-alloc", "cost-alloc");
+        load_parity!(cache, "cave-cri", "cri");
+        load_parity!(cache, "cave-crossplane", "crossplane");
+        load_parity!(cache, "cave-dashboard", "dashboard");
+        load_parity!(cache, "cave-dast", "dast");
+        load_parity!(cache, "cave-db", "db");
+        load_parity!(cache, "cave-deploy", "deploy");
+        load_parity!(cache, "cave-devlake", "devlake");
+        load_parity!(cache, "cave-dns", "dns");
+        load_parity!(cache, "cave-docdb", "docdb");
+        load_parity!(cache, "cave-docs", "docs");
+        load_parity!(cache, "cave-docs-site", "docs-site");
+        load_parity!(cache, "cave-ebpf-common", "ebpf-common");
+        load_parity!(cache, "cave-erp", "erp");
+        load_parity!(cache, "cave-etcd", "etcd");
+        load_parity!(cache, "cave-flags", "flags");
+        load_parity!(cache, "cave-forensics", "forensics");
+        load_parity!(cache, "cave-gateway", "gateway");
+        load_parity!(cache, "cave-gitops-config", "gitops-config");
+        load_parity!(cache, "cave-ha", "ha");
+        load_parity!(cache, "cave-incidents", "incidents");
+        load_parity!(cache, "cave-infra", "infra");
+        load_parity!(cache, "cave-kamaji", "kamaji");
+        load_parity!(cache, "cave-keda", "keda");
+        load_parity!(cache, "cave-knative", "knative");
+        load_parity!(cache, "cave-kube-proxy", "kube-proxy");
+        load_parity!(cache, "cave-kubelet", "kubelet");
+        load_parity!(cache, "cave-ledger", "ledger");
+        load_parity!(cache, "cave-lint", "lint");
+        load_parity!(cache, "cave-llm-gateway", "llm-gateway");
+        load_parity!(cache, "cave-local-llm", "local-llm");
+        load_parity!(cache, "cave-logs", "logs");
+        load_parity!(cache, "cave-mesh", "mesh");
+        load_parity!(cache, "cave-metrics", "metrics");
+        load_parity!(cache, "cave-net", "net");
+        load_parity!(cache, "cave-oncall", "oncall");
+        load_parity!(cache, "cave-pam", "pam");
+        load_parity!(cache, "cave-pg", "pg");
+        load_parity!(cache, "cave-pii", "pii");
+        load_parity!(cache, "cave-pipelines", "pipelines");
+        load_parity!(cache, "cave-policy", "policy");
+        load_parity!(cache, "cave-portal", "portal");
+        load_parity!(cache, "cave-profiler", "profiler");
+        load_parity!(cache, "cave-rdbms", "rdbms");
+        load_parity!(cache, "cave-registry", "registry");
+        load_parity!(cache, "cave-rollouts", "rollouts");
+        load_parity!(cache, "cave-runbook", "runbook");
+        load_parity!(cache, "cave-sbom", "sbom");
+        load_parity!(cache, "cave-scaffold", "scaffold");
+        load_parity!(cache, "cave-scan", "scan");
+        load_parity!(cache, "cave-scheduler", "scheduler");
+        load_parity!(cache, "cave-secrets", "secrets");
+        load_parity!(cache, "cave-security", "security");
+        load_parity!(cache, "cave-sign", "sign");
+        load_parity!(cache, "cave-slo", "slo");
+        load_parity!(cache, "cave-status", "status");
+        load_parity!(cache, "cave-store", "store");
+        load_parity!(cache, "cave-streams", "streams");
+        load_parity!(cache, "cave-trace", "trace");
+        load_parity!(cache, "cave-tracker", "tracker");
+        load_parity!(cache, "cave-upstream", "upstream");
+        load_parity!(cache, "cave-uptime", "uptime");
+        load_parity!(cache, "cave-vault", "vault");
+        load_parity!(cache, "cave-vulns", "vulns");
+        load_parity!(cache, "cave-workflows", "workflows");
+
+        // Pass 2: placeholder fallback so any crate without a parity manifest
+        // (newly scaffolded, optional) still appears in the portal.
         if let Ok(entries) = std::fs::read_dir("crates") {
             for entry in entries.flatten() {
                 let Ok(name) = entry.file_name().into_string() else { continue };
@@ -169,6 +268,7 @@ async fn main() -> anyhow::Result<()> {
                 });
             }
         }
+        info!(modules = cache.len(), "parity cache populated");
     }
 
     let app = Router::new()

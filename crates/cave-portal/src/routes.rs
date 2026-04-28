@@ -24,11 +24,47 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/portal/adrs/{id}", get(get_adr))
         .route("/api/portal/parity", get(parity_all))
         .route("/api/portal/parity/{module}", get(parity_module))
+        .route("/api/portal/wraps", get(wraps_all))
+        .route("/api/portal/wraps/{id}", get(wrap_one))
+        .route("/api/portal/wraps/report", get(wraps_report))
         .route("/api/v1/attribution", get(attribution_api))
         .route("/portal/tracker", get(serve_tracker_ui))
         .route("/portal/registry", get(serve_registry_ui))
         .route("/portal/scan", get(serve_scan_ui))
         .with_state(state)
+}
+
+// ── Wraps ─────────────────────────────────────────────────────────────────────
+
+async fn wraps_all(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
+    let reg = state.wraps.read().await;
+    Json(serde_json::json!({
+        "entries": reg.entries(),
+        "total": reg.count(),
+    }))
+}
+
+async fn wrap_one(
+    Path(id): Path<String>,
+    AxumState(state): AxumState<Arc<State>>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let reg = state.wraps.read().await;
+    match reg.find(&id) {
+        Some(e) => (StatusCode::OK, Json(serde_json::to_value(e).unwrap_or_default())),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("wrap '{id}' not found") })),
+        ),
+    }
+}
+
+async fn wraps_report(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
+    let reg = state.wraps.read().await;
+    let report = reg.report();
+    Json(serde_json::json!({
+        "report": report,
+        "upstream_uis_replaced": reg.upstream_urls_replaced(),
+    }))
 }
 
 // ── Parity ────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ pub mod events;
 pub mod jobs;
 pub mod logs;
 pub mod metrics;
+pub mod progress;
 pub mod rbac;
 pub mod secrets;
 pub mod settings;
