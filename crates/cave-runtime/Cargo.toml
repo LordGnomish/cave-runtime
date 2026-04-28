@@ -114,6 +114,18 @@ cave-erp = { path = "../cave-erp" }
 cave-docdb = { path = "../cave-docdb" }
 cave-rdbms = { path = "../cave-rdbms" }
 cave-kamaji = { path = "../cave-kamaji" }
+# Parity tracking + portal API + remaining workspace crates referenced by main.rs
+cave-kernel = { path = "../cave-kernel" }
+cave-portal-api = { path = "../cave-portal-api" }
+cave-cloud-controller-manager = { path = "../cave-cloud-controller-manager" }
+cave-controller-manager = { path = "../cave-controller-manager" }
+cave-crossplane = { path = "../cave-crossplane" }
+cave-ebpf-common = { path = "../cave-ebpf-common" }
+cave-keda = { path = "../cave-keda" }
+cave-knative = { path = "../cave-knative" }
+cave-kube-proxy = { path = "../cave-kube-proxy" }
+cave-ledger = { path = "../cave-ledger" }
+cave-local-llm = { path = "../cave-local-llm" }
 # Framework
 axum = { workspace = true }
 tokio = { workspace = true }
