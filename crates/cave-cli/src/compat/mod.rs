@@ -7,7 +7,11 @@
 //! and delegates real work to `crate::native`.
 
 pub mod argocd;
+pub mod cilium;
+pub mod etcdctl;
 pub mod harbor;
 pub mod helm;
 pub mod kubectl;
+pub mod strimzi;
+pub mod talosctl;
 pub mod vault;
