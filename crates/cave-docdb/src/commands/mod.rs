@@ -26,7 +26,7 @@ pub async fn dispatch(
         "buildInfo" => hello::build_info().await,
         "listDatabases" => db::list_databases(engine).await,
         "listCollections" => db::list_collections(cmd_doc, engine).await,
-        "createCollection" => db::create_collection(cmd_doc, engine).await,
+        "createCollection" | "create" => db::create_collection(cmd_doc, engine).await,
         "drop" => db::drop_collection(cmd_doc, engine).await,
         "dropDatabase" => db::drop_database(cmd_doc, engine).await,
         "find" => crud::find(cmd_doc, engine, cursors).await,

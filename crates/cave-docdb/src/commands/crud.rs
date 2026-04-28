@@ -7,6 +7,27 @@ use crate::projection::apply_projection;
 use serde_json::Value;
 use std::sync::Arc;
 
+/// In MongoDB OP_MSG, the collection name is the **value** of the command-name
+/// field (e.g. `{"insert": "users", ...}` ⇒ collection = "users"). When the
+/// caller used the older convention (`{"users": 1, ...}`) we fall back to
+/// scanning keys for a non-meta candidate.
+fn extract_collection_name(cmd_doc: &Document, command: &str, exclude_keys: &[&str]) -> String {
+    if let Some(s) = cmd_doc.get(command).and_then(|v| v.as_str()) {
+        if !s.is_empty() {
+            return s.to_string();
+        }
+    }
+    cmd_doc
+        .keys()
+        .find(|k| {
+            !k.starts_with('$')
+                && !exclude_keys.contains(&k.as_str())
+                && k.as_str() != command
+        })
+        .cloned()
+        .unwrap_or_else(|| "collection".to_string())
+}
+
 pub async fn find(
     cmd_doc: &Document,
     engine: Arc<Engine>,
@@ -21,11 +42,7 @@ pub async fn find(
         "filter", "projection", "sort", "limit", "skip", "hint", "batchSize",
         "singleBatch", "comment", "maxTimeMS", "readConcern",
     ];
-    let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$') && !FIND_PARAMS.contains(&k.as_str()))
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+    let col_name = extract_collection_name(cmd_doc, "find", FIND_PARAMS);
 
     let filter_spec = cmd_doc.get("filter");
     let filter = filter_spec.as_ref().and_then(|f| {
@@ -116,11 +133,7 @@ pub async fn insert(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
-    let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$') && *k != "documents")
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+    let col_name = extract_collection_name(cmd_doc, "insert", &["documents"]);
 
     let documents = cmd_doc
         .get("documents")
@@ -143,10 +156,13 @@ pub async fn insert(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
     }
 
     let mut resp = Document::new();
+    let n = ids.len() as i64;
     resp.insert(
         "insertedIds".to_string(),
         Value::Array(ids.iter().map(|id| Value::String(id.clone())).collect()),
     );
+    // MongoDB insert response always includes `n` (count of inserted docs).
+    resp.insert("n".to_string(), Value::Number(n.into()));
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
 }
@@ -157,12 +173,41 @@ pub async fn update(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
-    let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$'))
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+    let col_name = extract_collection_name(cmd_doc, "update", &["updates", "filter"]);
 
+    let db = engine.get_or_create_database(&db_name).await;
+    let col = db.get_or_create_collection(&col_name).await;
+
+    // Standard MongoDB form: `updates: [{q, u, multi, upsert}, ...]`.
+    if let Some(updates) = cmd_doc.get("updates").and_then(|v| v.as_array()) {
+        let mut total_modified: i64 = 0;
+        for u in updates {
+            let q = u.get("q").and_then(|v| v.as_object());
+            let upd = u.get("u").and_then(|v| v.as_object());
+            if let Some(upd_obj) = upd {
+                let filter_doc = q.map(|qo| {
+                    let mut d = Document::new();
+                    for (k, v) in qo {
+                        d.insert(k.clone(), v.clone());
+                    }
+                    d
+                });
+                let mut update = Document::new();
+                for (k, v) in upd_obj {
+                    update.insert(k.clone(), v.clone());
+                }
+                total_modified += col.update_many(filter_doc.as_ref(), &update).await? as i64;
+            }
+        }
+        let mut resp = Document::new();
+        resp.insert("n".to_string(), Value::Number(total_modified.into()));
+        resp.insert("nModified".to_string(), Value::Number(total_modified.into()));
+        resp.insert("modifiedCount".to_string(), Value::Number(total_modified.into()));
+        resp.insert("ok".to_string(), Value::Number(1.into()));
+        return Ok(resp);
+    }
+
+    // Legacy single-update form (kept for backward compatibility).
     let filter_spec = cmd_doc.get("filter");
     let filter = filter_spec.as_ref().and_then(|f| {
         if let Value::Object(obj) = f {
@@ -180,9 +225,6 @@ pub async fn update(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         .get("update")
         .ok_or_else(|| "missing update".to_string())?;
 
-    let db = engine.get_or_create_database(&db_name).await;
-    let col = db.get_or_create_collection(&col_name).await;
-
     if let Some(obj) = update_spec.as_object() {
         let mut update = Document::new();
         for (k, v) in obj {
@@ -192,6 +234,8 @@ pub async fn update(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         let modified = col.update_many(filter.as_ref(), &update).await?;
 
         let mut resp = Document::new();
+        resp.insert("n".to_string(), Value::Number(modified.into()));
+        resp.insert("nModified".to_string(), Value::Number(modified.into()));
         resp.insert("modifiedCount".to_string(), Value::Number(modified.into()));
         resp.insert("ok".to_string(), Value::Number(1.into()));
         Ok(resp)
@@ -206,12 +250,33 @@ pub async fn delete(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
-    let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$') && *k != "filter")
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+    let col_name = extract_collection_name(cmd_doc, "delete", &["filter", "deletes"]);
 
+    let db = engine.get_or_create_database(&db_name).await;
+    let col = db.get_or_create_collection(&col_name).await;
+
+    // Standard MongoDB form: `deletes: [{q, limit}, ...]`.
+    if let Some(deletes) = cmd_doc.get("deletes").and_then(|v| v.as_array()) {
+        let mut total_deleted: i64 = 0;
+        for d in deletes {
+            let q = d.get("q").and_then(|v| v.as_object());
+            let filter_doc = q.map(|qo| {
+                let mut d = Document::new();
+                for (k, v) in qo {
+                    d.insert(k.clone(), v.clone());
+                }
+                d
+            });
+            total_deleted += col.delete_many(filter_doc.as_ref()).await? as i64;
+        }
+        let mut resp = Document::new();
+        resp.insert("n".to_string(), Value::Number(total_deleted.into()));
+        resp.insert("deletedCount".to_string(), Value::Number(total_deleted.into()));
+        resp.insert("ok".to_string(), Value::Number(1.into()));
+        return Ok(resp);
+    }
+
+    // Legacy form using `filter`.
     let filter_spec = cmd_doc.get("filter");
     let filter = filter_spec.as_ref().and_then(|f| {
         if let Value::Object(obj) = f {
@@ -225,12 +290,10 @@ pub async fn delete(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document,
         }
     });
 
-    let db = engine.get_or_create_database(&db_name).await;
-    let col = db.get_or_create_collection(&col_name).await;
-
     let deleted = col.delete_many(filter.as_ref()).await?;
 
     let mut resp = Document::new();
+    resp.insert("n".to_string(), Value::Number(deleted.into()));
     resp.insert("deletedCount".to_string(), Value::Number(deleted.into()));
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
@@ -340,13 +403,10 @@ pub async fn count(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Document, 
         .and_then(|v| v.as_str().map(|s| s.to_string()))
         .unwrap_or_else(|| "test".to_string());
 
-    let col_name = cmd_doc
-        .keys()
-        .find(|k| !k.starts_with('$') && *k != "filter")
-        .cloned()
-        .unwrap_or_else(|| "collection".to_string());
+    let col_name = extract_collection_name(cmd_doc, "count", &["filter", "query"]);
 
-    let filter_spec = cmd_doc.get("filter");
+    // Accept both `filter` (legacy) and `query` (MongoDB count command).
+    let filter_spec = cmd_doc.get("filter").or_else(|| cmd_doc.get("query"));
     let filter = filter_spec.as_ref().and_then(|f| {
         if let Value::Object(obj) = f {
             let mut doc = Document::new();

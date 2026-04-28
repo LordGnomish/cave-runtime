@@ -10,6 +10,37 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
+/// Bind to a fresh address (typically `"127.0.0.1:0"` for tests) and return
+/// the bound address paired with the JoinHandle driving the accept loop.
+pub async fn bind(
+    bind_addr: &str,
+    engine: Arc<Engine>,
+    cursors: Arc<CursorStore>,
+) -> std::io::Result<(std::net::SocketAddr, tokio::task::JoinHandle<()>)> {
+    let listener = TcpListener::bind(bind_addr).await?;
+    let addr = listener.local_addr()?;
+    let handle = tokio::spawn(async move {
+        loop {
+            match listener.accept().await {
+                Ok((socket, peer)) => {
+                    let e = engine.clone();
+                    let c = cursors.clone();
+                    tokio::spawn(async move {
+                        if let Err(err) = handle_connection(socket, e, c).await {
+                            tracing::warn!(target: "cave_docdb::wire", "conn from {} ended: {}", peer, err);
+                        }
+                    });
+                }
+                Err(e) => {
+                    tracing::error!(target: "cave_docdb::wire", "accept: {}", e);
+                    break;
+                }
+            }
+        }
+    });
+    Ok((addr, handle))
+}
+
 pub async fn spawn_wire_server(
     port: u16,
     engine: Arc<Engine>,
@@ -75,7 +106,26 @@ async fn handle_connection(
                     }
                 };
 
-                let cmd_name = body.keys().next().cloned().unwrap_or_default();
+                // The first body field is the command name in real MongoDB,
+                // but the in-process Document is a BTreeMap so insertion
+                // order is lost. Pick the first key that names a known
+                // command; fall back to the first non-meta key.
+                const KNOWN: &[&str] = &[
+                    "isMaster", "hello", "ismaster", "ping", "buildInfo",
+                    "listDatabases", "listCollections", "createCollection",
+                    "create", "drop", "dropDatabase", "find", "insert",
+                    "insertOne", "insertMany", "update", "updateOne",
+                    "updateMany", "delete", "deleteOne", "deleteMany",
+                    "count", "countDocuments", "aggregate", "createIndexes",
+                    "dropIndexes", "dropIndex", "listIndexes", "getMore",
+                    "killCursors", "endSessions", "currentOp", "serverStatus",
+                ];
+                let cmd_name = body
+                    .keys()
+                    .find(|k| KNOWN.contains(&k.as_str()))
+                    .cloned()
+                    .or_else(|| body.keys().find(|k| !k.starts_with('$')).cloned())
+                    .unwrap_or_default();
                 tracing::info!(target: "cave_docdb::wire", "executing command: {}", cmd_name);
 
                 let response = commands::dispatch(&cmd_name, &body, engine.clone(), cursors.clone())
