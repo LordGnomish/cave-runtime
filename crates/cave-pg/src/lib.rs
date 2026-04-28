@@ -14,9 +14,12 @@
 //! - User / role management
 //! - Database size monitoring and threshold alerts
 
+pub mod cnpg;
+pub mod engine;
 pub mod manager;
 pub mod models;
 pub mod routes;
+pub mod server;
 pub mod wire;
 
 use axum::Router;
