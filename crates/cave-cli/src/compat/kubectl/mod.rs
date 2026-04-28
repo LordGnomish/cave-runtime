@@ -9,6 +9,7 @@
 //! native vs compat traffic.
 
 pub mod apply;
+pub mod cp;
 pub mod create;
 pub mod delete;
 pub mod describe;
@@ -16,4 +17,5 @@ pub mod exec;
 pub mod get;
 pub mod logs;
 pub mod output;
+pub mod port_forward;
 pub mod resource;
