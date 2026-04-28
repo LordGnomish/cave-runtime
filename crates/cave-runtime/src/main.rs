@@ -133,7 +133,11 @@ async fn main() -> anyhow::Result<()> {
     // Start background tasks
     metrics_state.start_background_tasks();
 
-    // Populate parity cache at startup
+    // Populate parity cache at startup. Three crates ship real measurements
+    // via calculate_parity(); for every other crate in crates/* we insert a
+    // placeholder (overall=0.0, upstream="tbd") so the portal surfaces all
+    // ~100 crate slots instead of just three. Real metrics replace the
+    // placeholder as each crate grows its own calculate_parity().
     {
         let mut cache = portal_state.parity_cache.write().await;
         if let Ok(r) = cave_etcd::calculate_parity() {
@@ -144,6 +148,26 @@ async fn main() -> anyhow::Result<()> {
         }
         if let Ok(r) = cave_apiserver::calculate_parity() {
             cache.insert("apiserver".to_string(), r);
+        }
+        if let Ok(entries) = std::fs::read_dir("crates") {
+            for entry in entries.flatten() {
+                let Ok(name) = entry.file_name().into_string() else { continue };
+                if !entry.path().is_dir() { continue; }
+                let cache_key = name.strip_prefix("cave-").unwrap_or(&name).to_string();
+                if cache.contains_key(&cache_key) { continue; }
+                cache.insert(cache_key, cave_kernel::parity::ParityReport {
+                    module: name,
+                    upstream_ref: "tbd".to_string(),
+                    measured_at: chrono::Utc::now(),
+                    file_parity: cave_kernel::parity::ParityMetric { score: 0.0, matched: 0, total: 0 },
+                    function_parity: cave_kernel::parity::ParityMetric { score: 0.0, matched: 0, total: 0 },
+                    test_parity: cave_kernel::parity::ParityMetric { score: 0.0, matched: 0, total: 0 },
+                    surface_parity: cave_kernel::parity::ParityMetric { score: 0.0, matched: 0, total: 0 },
+                    overall: 0.0,
+                    stubs_detected: 0,
+                    gaps: vec![],
+                });
+            }
         }
     }
 
