@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent for cave-upstream-watchd.
+
+  Installation:
+    1. Build the binary:
+         cargo build --release -p cave-upstream --bin cave-upstream-watchd
+    2. Copy to a stable location:
+         mkdir -p ~/.local/bin
+         cp target/release/cave-upstream-watchd ~/.local/bin/
+    3. Edit the <string> values for ProgramArguments below if your install
+       prefix differs (default assumes ~/.local/bin/cave-upstream-watchd).
+    4. (Optional) Drop your GitHub token into:
+         ~/Library/Application Support/cave-runtime/upstream-watch.toml
+       e.g.:
+         github_token = "ghp_xxx"
+       Or set GITHUB_TOKEN in EnvironmentVariables below.
+    5. Install + start:
+         cp deploy/launchd/com.btartan.cave-upstream-watchd.plist \
+           ~/Library/LaunchAgents/
+         launchctl load -w \
+           ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+
+  Verify it's running:
+         launchctl list | grep cave-upstream-watchd
+         tail -f ~/Library/Logs/cave-upstream-watchd.log
+
+  Uninstall:
+         launchctl unload -w \
+           ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+         rm ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+
+  Note: The daemon runs continuously (its own internal scheduler). We
+  use KeepAlive=true so launchd restarts it if it dies. Per-project
+  cadence is set inside the daemon (15 min high-priority / 60 min
+  normal), not by launchd's StartInterval.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.btartan.cave-upstream-watchd</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/btartan/.local/bin/cave-upstream-watchd</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+        <!--
+          Uncomment and set if you don't want to put the token in the
+          TOML config file:
+          <key>GITHUB_TOKEN</key>
+          <string>ghp_xxx</string>
+        -->
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/btartan/Library/Logs/cave-upstream-watchd.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/btartan/Library/Logs/cave-upstream-watchd.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/btartan</string>
+
+    <!-- Throttle restarts to once every 30s if the daemon crashes. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>

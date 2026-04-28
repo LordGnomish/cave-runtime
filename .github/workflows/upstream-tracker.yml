@@ -1,63 +1,87 @@
 name: Upstream Tracker
 
+# 15-minute cadence — same as the local LaunchAgent. The watchd binary
+# enforces per-project tiered cadence internally (15 min for the 12
+# high-priority kernel modules, 60 min for everything else), so running
+# this workflow every 15 min is the correct upper bound.
+#
+# 4 polls/hour × 66 repos = 264 GitHub API calls/hour. Authenticated
+# limit is 5000/hour → 5.3% utilisation. ETag conditional requests bring
+# this much lower in steady state.
+#
+# Single source of truth: crates/cave-upstream/src/projects.rs. The
+# hardcoded 26-repo array that used to live here was deleted —
+# `cave-upstream-watchd` reads from the registry instead.
+
 on:
   schedule:
-    # Every Monday at 06:00 UTC
-    - cron: '0 6 * * 1'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      module:
+        description: 'Limit to one cave_module substring (e.g. cave-etcd). Empty = all 66.'
+        required: false
+        default: ''
 
 jobs:
-  track:
-    name: Check Upstream Projects
+  watch:
+    name: cave-upstream-watchd --once
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch upstream releases
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          shared-key: cave-upstream-watchd
+
+      - name: Build cave-upstream-watchd
+        run: cargo build --release -p cave-upstream --bin cave-upstream-watchd
+
+      - name: Run one tick
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Persistent state for CI runs — uploaded as artifact at the
+          # end so consecutive runs converge. (For long-term continuity
+          # the LaunchAgent on btartan's machine is the source of truth;
+          # CI is a redundancy net.)
+          CAVE_UPSTREAM_STATE_PATH: ${{ runner.temp }}/upstream-state.json
+          CAVE_QWEN_PUMP_QUEUE: ${{ runner.temp }}/pump-queue
         run: |
-          echo "=== CAVE Upstream Tracker ==="
-          echo "Checking 26 tracked open source projects..."
-          echo ""
-          # TODO: Replace with cave-upstream binary
-          # For now, check via GitHub API directly
-          PROJECTS=(
-            "Unleash/unleash"
-            "DefectDojo/django-DefectDojo"
-            "DependencyTrack/dependency-track"
-            "SonarSource/sonarqube"
-            "pulp/pulpcore"
-            "trufflesecurity/trufflehog"
-            "hadolint/hadolint"
-            "microsoft/presidio"
-            "backstage/backstage"
-            "apache/incubator-devlake"
-            "louislam/uptime-kuma"
-            "opencost/opencost"
-            "langfuse/langfuse"
-            "n8n-io/n8n"
-            "danny-avila/LibreChat"
-            "grafana/oncall"
-            "Apicurio/apicurio-registry"
-            "cert-manager/cert-manager"
-            "sigstore/cosign"
-            "cilium/tetragon"
-            "chaos-mesh/chaos-mesh"
-            "open-policy-agent/gatekeeper"
-            "vmware-tanzu/velero"
-            "gravitational/teleport"
-            "grafana/pyroscope"
-            "zaproxy/zaproxy"
-          )
+          mkdir -p "${{ runner.temp }}/pump-queue"
+          # Restore previous state from the most recent successful run if
+          # available (best-effort).
+          if [ -f .ci-cache/upstream-state.json ]; then
+            cp .ci-cache/upstream-state.json "$CAVE_UPSTREAM_STATE_PATH"
+          fi
 
-          for repo in "${PROJECTS[@]}"; do
-            LATEST=$(gh api repos/$repo/releases/latest --jq '.tag_name' 2>/dev/null || echo "no release")
-            echo "  $repo: $LATEST"
-          done
+          ARGS="--once"
+          if [ -n "${{ github.event.inputs.module }}" ]; then
+            ARGS="$ARGS --module ${{ github.event.inputs.module }}"
+          fi
 
-      - name: Generate upstream report
-        run: |
-          echo "TODO: AI-assisted triage (Claude API)"
-          echo "TODO: Auto-create issues for ADOPT items"
-          echo "TODO: Post weekly digest to Slack"
+          ./target/release/cave-upstream-watchd $ARGS
+
+      - name: Upload pump payloads (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pump-payloads-${{ github.run_id }}
+          path: ${{ runner.temp }}/pump-queue/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload state snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-state-${{ github.run_id }}
+          path: ${{ runner.temp }}/upstream-state.json
+          if-no-files-found: ignore
+          retention-days: 30
