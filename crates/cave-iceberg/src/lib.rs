@@ -21,3 +21,5 @@ pub mod table_metadata;
 pub mod tenant;
 pub mod error;
 pub mod deep;
+pub mod rest_catalog;
+pub mod server;
