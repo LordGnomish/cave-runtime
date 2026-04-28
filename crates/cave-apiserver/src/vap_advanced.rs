@@ -597,6 +597,9 @@ pub enum DispatchOutcome {
     Deny { message: String, reason: String },
     /// A validation returned a warning; AdmissionResponse should attach it.
     Warn(String),
+    /// ValidationAction=Audit produced an audit annotation. The host audit
+    /// emitter (audit_policy_v2/v3) records `validation.policy.admission.k8s.io/<key>`.
+    Audit(String),
     /// FailurePolicy=Ignore swallowed an error.
     SilencedError,
     /// FailurePolicy=Fail — surface the error.
@@ -704,7 +707,8 @@ impl Dispatcher {
                 ValidationAction::Deny => out.push(
                     DispatchOutcome::Deny { message: message.clone(), reason: reason.clone() }),
                 ValidationAction::Warn => out.push(DispatchOutcome::Warn(message.clone())),
-                ValidationAction::Audit => { /* TODO M4: emit audit annotation */ }
+                ValidationAction::Audit => out.push(
+                    DispatchOutcome::Audit(message.clone())),
             }
         }
         out
@@ -761,6 +765,7 @@ impl ValidatingWebhook for VapPlugin {
                         return resp;
                     }
                     DispatchOutcome::Warn(m) => warnings.push(m),
+                    DispatchOutcome::Audit(m) => warnings.push(format!("audit: {m}")),
                     DispatchOutcome::Error(m) => {
                         let mut resp = AdmissionResponse::deny(req, 500, m);
                         resp.warnings = warnings;

@@ -91,6 +91,7 @@ impl V {
         }
     }
 
+    #[allow(dead_code)]
     fn from_json(j: &serde_json::Value) -> V { V::Json(j.clone()) }
 }
 

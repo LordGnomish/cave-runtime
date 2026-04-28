@@ -831,13 +831,18 @@ fn dispatch_non_bool_validation_yields_fail() {
 }
 
 #[test]
-fn dispatch_audit_only_action_produces_no_outcome() {
-    // Audit-only validation actions are TODO M4; current behavior is to drop
-    // them. This guards the hand-off between M1 and M4.
+fn dispatch_audit_only_action_emits_audit_outcome() {
+    // ValidationAction=Audit emits a DispatchOutcome::Audit carrying the
+    // validation message. The plugin pushes this onto the response warnings
+    // prefixed with `audit: ` so the audit emitter (audit_policy_v2/v3) can
+    // record it under `validation.policy.admission.k8s.io/<key>`.
     let ev = FixedEvaluator::new().with("v", CelValue::Bool(false));
     let d = dispatcher_with_eval(ev);
     let mut p = vap("p", "acme");
-    p.spec.validations.push(Validation { expression: "v".into(), ..Default::default() });
+    p.spec.validations.push(Validation {
+        expression: "v".into(), message: "audit-me".into(),
+        ..Default::default()
+    });
     let mut b = binding("b", "acme", "p");
     b.spec.validation_actions = vec![ValidationAction::Audit];
     let r = req(Operation::Create, "default", "acme");
@@ -847,7 +852,8 @@ fn dispatch_audit_only_action_produces_no_outcome() {
         object_labels: &HashMap::new(), namespace_labels: &HashMap::new(),
     };
     let out = d.dispatch_one("acme", &p, &b, &r, &i);
-    assert!(out.is_empty(), "audit-only currently drops; M4 will surface");
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0], DispatchOutcome::Audit("audit-me".into()));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
