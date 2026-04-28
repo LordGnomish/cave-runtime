@@ -6042,4 +6042,344 @@ mod tests {
         store.set_applied_index(1234);
         assert_eq!(store.applied_index(), 1234);
     }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // etcd v3.6.10 parity-manifest tests
+    //
+    // Each test below mirrors a `tests/integration/v3_*_test.go` (or the
+    // equivalent `mvcc/*_test.go`) case from etcd v3.6.10 by NAME, using
+    // the real KvStore + grpc_api validators — no mocks, no behavioural
+    // approximation.
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// Mirrors `etcd-io/etcd/tests/integration/v3_kv_test.go#TestV3PutOverwrite`:
+    /// a re-Put of an existing key must bump `version` and `mod_revision`
+    /// while preserving `create_revision`.
+    #[test]
+    fn test_kv_put_overwrite() {
+        let store = KvStore::new();
+        let r1 = put(&store, "/k", "v1");
+        let create_rev = r1.header.revision;
+        let r2 = put(&store, "/k", "v2");
+        let r3 = put(&store, "/k", "v3");
+
+        let kvs = get(&store, "/k");
+        assert_eq!(kvs.len(), 1);
+        let kv = &kvs[0];
+        assert_eq!(kv.value_str(), "v3");
+        // v3.6.10 invariant: version == 3 after three writes.
+        assert_eq!(kv.version, 3);
+        // create_revision MUST stay pinned to the first put.
+        assert_eq!(kv.create_revision, create_rev);
+        // mod_revision MUST track the most-recent write.
+        assert_eq!(kv.mod_revision, r3.header.revision);
+        // Each successive write produces a strictly higher revision.
+        assert!(r2.header.revision > r1.header.revision);
+        assert!(r3.header.revision > r2.header.revision);
+    }
+
+    /// Mirrors `tests/integration/v3_kv_test.go#TestV3RangeWithRev`:
+    /// a Range with an explicit historical `revision` reconstructs the
+    /// state at that revision via the MVCC index.
+    #[test]
+    fn test_kv_range_with_rev() {
+        let store = KvStore::new();
+        put(&store, "/k", "v1");
+        let rev_v1 = store.current_revision();
+        put(&store, "/k", "v2");
+        let rev_v2 = store.current_revision();
+        put(&store, "/k", "v3");
+
+        // current view: v3
+        assert_eq!(get(&store, "/k")[0].value_str(), "v3");
+        // historical view at rev_v1: v1
+        assert_eq!(get_at(&store, "/k", rev_v1)[0].value_str(), "v1");
+        // historical view at rev_v2: v2
+        assert_eq!(get_at(&store, "/k", rev_v2)[0].value_str(), "v2");
+        // historical key with a never-existed revision returns empty.
+        assert!(get_at(&store, "/missing", rev_v1).is_empty());
+    }
+
+    /// Mirrors `tests/integration/v3_kv_test.go#TestV3DeleteRange`:
+    /// DeleteRange covers prefix-style ranges, returns `deleted` count
+    /// and (when requested) `prev_kvs` for every removed entry.
+    #[test]
+    fn test_kv_delete_range() {
+        let store = KvStore::new();
+        put(&store, "/p/a", "1");
+        put(&store, "/p/b", "2");
+        put(&store, "/p/c", "3");
+        put(&store, "/q/x", "ignore");
+
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "/p/".into(),
+            range_end: Some("/p0".into()),
+            prev_kv: true,
+        });
+        // All three /p/* entries removed in one call.
+        assert_eq!(resp.deleted, 3);
+        assert_eq!(resp.prev_kvs.len(), 3);
+        // /q/x is untouched.
+        assert_eq!(get(&store, "/q/x").len(), 1);
+        // /p/* are gone.
+        for k in ["/p/a", "/p/b", "/p/c"] {
+            assert!(get(&store, k).is_empty());
+        }
+        // delete-already-gone returns deleted=0.
+        let again = store.delete_range(&DeleteRangeRequest {
+            key: "/p/".into(),
+            range_end: Some("/p0".into()),
+            prev_kv: false,
+        });
+        assert_eq!(again.deleted, 0);
+    }
+
+    /// Mirrors `tests/integration/v3_kv_test.go#TestV3TxnTooManyOps`:
+    /// a Txn whose total `compare + success + failure` exceeds
+    /// `etcdserver.maxTxnOps` (128) is rejected.
+    #[test]
+    fn test_kv_txn_too_many_ops() {
+        let mut success: Vec<RequestOp> = Vec::new();
+        for i in 0..(crate::grpc_api::MAX_TXN_OPS + 1) {
+            success.push(RequestOp::Put(PutRequest {
+                key: format!("/k/{i}"),
+                value: "v".into(),
+                lease: None,
+                prev_kv: false,
+            }));
+        }
+        let req = TxnRequest { compare: vec![], success, failure: vec![] };
+        let err = crate::grpc_api::validate_txn(&req).unwrap_err();
+        match err {
+            EtcdError::Internal(msg) => assert!(msg.contains("too many operations")),
+            other => panic!("expected too-many-ops error, got {other:?}"),
+        }
+
+        // And exactly MAX_TXN_OPS ops is still accepted.
+        let just_at_limit: Vec<RequestOp> = (0..crate::grpc_api::MAX_TXN_OPS)
+            .map(|i| RequestOp::Put(PutRequest {
+                key: format!("/k/{i}"),
+                value: "v".into(),
+                lease: None,
+                prev_kv: false,
+            }))
+            .collect();
+        let ok_req = TxnRequest { compare: vec![], success: just_at_limit, failure: vec![] };
+        crate::grpc_api::validate_txn(&ok_req).unwrap();
+    }
+
+    /// Mirrors `tests/integration/v3_kv_test.go#TestV3TxnAtomicity`:
+    /// a Txn whose compare succeeds applies every success op as a unit,
+    /// every revision share the same single Txn (so all writes complete
+    /// before any other write interleaves).  Tests:
+    ///   * compare-fail path executes failure branch atomically,
+    ///   * compare-pass path executes success branch atomically,
+    ///   * post-commit revision == one increment per write op.
+    #[test]
+    fn test_txn_atomicity() {
+        let store = KvStore::new();
+        // pre-state
+        put(&store, "/a", "init");
+        let rev_before_txn = store.current_revision();
+
+        // compare ("a"=="init") → success: write /a=ok, /b=ok
+        let req = TxnRequest {
+            compare: vec![Compare {
+                key: "/a".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("init".into()),
+                version: None,
+                mod_revision: None,
+            }],
+            success: vec![
+                RequestOp::Put(PutRequest { key: "/a".into(), value: "ok".into(), lease: None, prev_kv: false }),
+                RequestOp::Put(PutRequest { key: "/b".into(), value: "ok".into(), lease: None, prev_kv: false }),
+            ],
+            failure: vec![
+                RequestOp::Put(PutRequest { key: "/never".into(), value: "should-not-write".into(), lease: None, prev_kv: false }),
+            ],
+        };
+        let resp = store.txn(&req);
+        assert!(resp.succeeded, "compare(value==init) should pass");
+
+        // Both success-branch puts visible.
+        assert_eq!(get(&store, "/a")[0].value_str(), "ok");
+        assert_eq!(get(&store, "/b")[0].value_str(), "ok");
+        // Failure-branch op MUST NOT have been applied.
+        assert!(get(&store, "/never").is_empty());
+        // Two writes ⇒ revision moved by exactly 2.
+        assert_eq!(store.current_revision(), rev_before_txn + 2);
+
+        // Compare-fail path: now /a == "ok", so an Equal-"init" compare fails.
+        let rev_before_fail = store.current_revision();
+        let fail_req = TxnRequest {
+            compare: vec![Compare {
+                key: "/a".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("init".into()),
+                version: None,
+                mod_revision: None,
+            }],
+            success: vec![
+                RequestOp::Put(PutRequest { key: "/a".into(), value: "should-not".into(), lease: None, prev_kv: false }),
+            ],
+            failure: vec![
+                RequestOp::Put(PutRequest { key: "/c".into(), value: "from-failure".into(), lease: None, prev_kv: false }),
+            ],
+        };
+        let fail_resp = store.txn(&fail_req);
+        assert!(!fail_resp.succeeded);
+        assert_eq!(get(&store, "/a")[0].value_str(), "ok"); // unchanged
+        assert_eq!(get(&store, "/c")[0].value_str(), "from-failure");
+        // Failure branch wrote one key ⇒ revision moved by 1.
+        assert_eq!(store.current_revision(), rev_before_fail + 1);
+    }
+
+    /// Mirrors `tests/integration/v3_watch_test.go#TestV3WatchFromCurrentRevision`:
+    /// a watch created with `start_revision = current` replays no
+    /// historical events but receives every put after creation.
+    #[tokio::test]
+    async fn test_watch_from_current_revision() {
+        let store = KvStore::new();
+        // Pre-existing data — must NOT be replayed.
+        put(&store, "/w/old", "old");
+        let start = store.current_revision();
+
+        let create = store.watch_create(&WatchCreateRequest {
+            key: "/w/".into(),
+            range_end: Some("/w0".into()),
+            start_revision: Some(start + 1), // strictly future
+            progress_notify: false,
+            prev_kv: false,
+        });
+        assert!(create.created);
+        // Replay snapshot must be empty for a future start_revision.
+        assert!(create.events.is_empty(), "no events expected: {:?}", create.events);
+
+        let mut rx = store.watch_subscribe(create.watch_id).unwrap();
+        // Spawn writer that produces a single event after subscribe.
+        let writer_store = std::sync::Arc::new(store);
+        let w = writer_store.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            w.put(&PutRequest { key: "/w/new".into(), value: "v".into(), lease: None, prev_kv: false });
+        });
+        let evt = tokio::time::timeout(std::time::Duration::from_millis(500), rx.recv())
+            .await
+            .expect("watch should fire within 500ms")
+            .expect("inbox channel must stay open");
+        assert!(matches!(evt.event_type, EventType::Put));
+        assert_eq!(evt.kv.key_str(), "/w/new");
+    }
+
+    /// Mirrors `tests/integration/v3_watch_test.go#TestV3WatchCancelSynced`:
+    /// `watch_cancel` on a synchronously-subscribed watch closes the
+    /// receiver (the inbox channel ends) and `watch_create` of a fresh
+    /// watch with the same prefix still works.
+    #[tokio::test]
+    async fn test_watch_cancel_synced() {
+        let store = KvStore::new();
+        let create = store.watch_create(&WatchCreateRequest {
+            key: "/w/".into(),
+            range_end: Some("/w0".into()),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        let mut rx = store.watch_subscribe(create.watch_id).unwrap();
+
+        // Drive one event so we know the channel is live.
+        store.put(&PutRequest { key: "/w/k1".into(), value: "v".into(), lease: None, prev_kv: false });
+        let _ = tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await;
+
+        // Cancel — the receiver should observe channel close (Ok(None)) on next recv.
+        store.watch_cancel(create.watch_id).unwrap();
+        // Drain anything queued, then expect None.
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await {
+                Ok(Some(_event)) => continue,         // queued event, keep draining
+                Ok(None) => break,                    // channel closed — success
+                Err(_) => panic!("channel did not close after watch_cancel"),
+            }
+        }
+        // Cancelling again is an error.
+        assert!(matches!(
+            store.watch_cancel(create.watch_id).unwrap_err(),
+            EtcdError::WatchNotFound(_)
+        ));
+        // A fresh watch on the same prefix still works.
+        let create2 = store.watch_create(&WatchCreateRequest {
+            key: "/w/".into(),
+            range_end: Some("/w0".into()),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        assert!(create2.created);
+        assert_ne!(create2.watch_id, create.watch_id);
+    }
+
+    /// Mirrors `mvcc/kvstore_test.go#TestRevisionMonotonicity`:
+    /// every successful write strictly increases `current_revision`,
+    /// even when many concurrent writers race.  Sequential check is
+    /// done first; concurrent check uses Arc + threads + sorts the
+    /// observed revisions to assert strict monotonicity.
+    #[test]
+    fn test_revision_monotonicity() {
+        // Sequential: revs are strictly increasing.
+        let store = KvStore::new();
+        let mut revs = Vec::new();
+        for i in 0..32 {
+            revs.push(put(&store, &format!("/seq/{i}"), "v").header.revision);
+        }
+        for window in revs.windows(2) {
+            assert!(window[1] > window[0], "revs not monotonic: {revs:?}");
+        }
+
+        // Concurrent: 8 threads × 25 distinct keys.  Etcd guarantees each
+        // write is assigned a unique `mod_revision` (the response-header
+        // revision is the cluster-wide current_rev at *observation* time
+        // and may collide between racing writers — that is correct behaviour).
+        // We therefore validate uniqueness by reading every key back and
+        // collecting their mod_revisions.
+        use std::sync::Arc;
+        use std::thread;
+        let store = Arc::new(KvStore::new());
+        let mut handles = Vec::new();
+        for tid in 0..8u64 {
+            let s = store.clone();
+            handles.push(thread::spawn(move || {
+                for i in 0..25u64 {
+                    s.put(&PutRequest {
+                        key: format!("/c/{tid}/{i}"),
+                        value: "v".into(),
+                        lease: None,
+                        prev_kv: false,
+                    });
+                }
+            }));
+        }
+        for h in handles { h.join().unwrap(); }
+
+        // Read all 200 keys back and confirm each mod_revision is distinct.
+        let mut mod_revs: Vec<u64> = Vec::new();
+        for tid in 0..8u64 {
+            for i in 0..25u64 {
+                let kvs = get(&store, &format!("/c/{tid}/{i}"));
+                assert_eq!(kvs.len(), 1, "missing key /c/{tid}/{i}");
+                mod_revs.push(kvs[0].mod_revision);
+            }
+        }
+        let total = mod_revs.len();
+        mod_revs.sort();
+        // Strict monotone after sort ⇒ all distinct.
+        for w in mod_revs.windows(2) {
+            assert!(w[0] < w[1], "duplicate mod_revision under concurrency: {w:?}");
+        }
+        assert_eq!(mod_revs.len(), total);
+        // Cluster current_revision is at least the largest mod_revision.
+        assert!(store.current_revision() >= *mod_revs.last().unwrap());
+    }
 }
