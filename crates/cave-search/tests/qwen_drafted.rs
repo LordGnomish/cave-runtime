@@ -384,3 +384,20 @@ mod tests {
         assert!(score > 0.0);
     }
 }
+
+// === cycle 1777342659 (fallback after 3 retries; ollama_calls=3; ollama_secs=74) ===
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777342659_1() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777342659_2() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777342659_3() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777342659_4() {}
+#[test]
+#[ignore = "qwen scaffold pending"]
+fn placeholder_1777342659_5() {}
