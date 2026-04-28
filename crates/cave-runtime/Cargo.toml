@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 # Shared infrastructure
+cave-kernel = { path = "../cave-kernel" }
+chrono = { version = "0.4", features = ["serde"] }
 cave-etcd = { path = "../cave-etcd" }
 cave-apiserver = { path = "../cave-apiserver" }
 cave-net = { path = "../cave-net" }
