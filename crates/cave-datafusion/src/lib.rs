@@ -12,6 +12,7 @@
 //! Primary citation: apache/datafusion v40 datafusion-expr/src/logical_plan/plan.rs
 //! and datafusion-physical-plan/src/{projection,filter,limit,aggregates}.rs.
 
+pub mod context;
 pub mod error;
 pub mod tenant;
 pub mod expr;
@@ -19,4 +20,5 @@ pub mod batch;
 pub mod logical_plan;
 pub mod execution_plan;
 pub mod optimizer;
+pub mod sql;
 pub mod statistics;
