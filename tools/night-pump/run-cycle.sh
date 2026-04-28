@@ -189,23 +189,32 @@ WINNING_DRAFT=""
 WINNING_MODEL=""
 CURRENT_PROMPT="$PROMPT"
 
-# GitHub Models API token (optional — falls back to qwen-only loop if absent).
+# Remote-model API tokens (optional — gracefully degrades if absent).
 GITHUB_TOKEN_FILE="$HOME/.config/cave-qwen-pump/github-token"
+GEMINI_TOKEN_FILE="$HOME/.config/cave-qwen-pump/gemini-token"
 GITHUB_TOKEN=""
+GEMINI_TOKEN=""
 if [ -f "$GITHUB_TOKEN_FILE" ]; then
   GITHUB_TOKEN="$(cat "$GITHUB_TOKEN_FILE" 2>/dev/null | tr -d '\n')"
 fi
+if [ -f "$GEMINI_TOKEN_FILE" ]; then
+  GEMINI_TOKEN="$(cat "$GEMINI_TOKEN_FILE" 2>/dev/null | tr -d '\n')"
+fi
 
-# Per-attempt model assignment: 1=qwen3-coder (local), 2=gpt-4o (remote, fast), 3=qwen3-coder (retry w/ feedback).
+# Per-attempt model assignment:
+#   1=qwen3-coder (local Ollama)
+#   2=gpt-4o (GitHub Models, fast remote, falls back to qwen if no token)
+#   3=gemini-2.5-flash-lite (Google AI Studio free tier, falls back to qwen if no token)
+# Each backend gets a different shot at the same prompt + ground-truth allowlist.
 attempt_model() {
   case "$1" in
     1) echo "qwen3-coder-next:Q4_K_M" ;;
     2) [ -n "$GITHUB_TOKEN" ] && echo "gpt-4o" || echo "qwen3-coder-next:Q4_K_M" ;;
-    3) echo "qwen3-coder-next:Q4_K_M" ;;
+    3) [ -n "$GEMINI_TOKEN" ] && echo "gemini-2.5-flash-lite" || echo "qwen3-coder-next:Q4_K_M" ;;
   esac
 }
 
-# Call gpt-4o via GitHub Models. Writes raw JSON to $1, returns HTTP status.
+# Call gpt-4o via GitHub Models (OpenAI-compat). Writes raw JSON to $1.
 call_github_models() {
   local out="$1" prompt="$2" model="$3"
   curl -sS -o "$out" -w "%{http_code}" \
@@ -218,6 +227,18 @@ call_github_models() {
     2>>"$CYCLE_LOG"
 }
 
+# Call Gemini via Google AI Studio. Writes raw JSON to $1.
+call_gemini() {
+  local out="$1" prompt="$2" model="$3"
+  curl -sS -o "$out" -w "%{http_code}" \
+    --max-time 240 \
+    -X POST "https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "$(jq -nc --arg p "$prompt" \
+          '{contents:[{parts:[{text:$p}]}], generationConfig:{maxOutputTokens:4096, temperature:0.2}}')" \
+    2>>"$CYCLE_LOG"
+}
+
 for ATTEMPT in 1 2 3; do
   RESPONSE_FILE="$LOG_DIR/${crate}-attempt${ATTEMPT}.json"
   ATTEMPT_MODEL="$(attempt_model "$ATTEMPT")"
@@ -226,6 +247,8 @@ for ATTEMPT in 1 2 3; do
 
   if [[ "$ATTEMPT_MODEL" == gpt-* ]]; then
     HTTP_STATUS=$(call_github_models "$RESPONSE_FILE" "$CURRENT_PROMPT" "$ATTEMPT_MODEL") || HTTP_STATUS="curl_fail"
+  elif [[ "$ATTEMPT_MODEL" == gemini-* ]]; then
+    HTTP_STATUS=$(call_gemini "$RESPONSE_FILE" "$CURRENT_PROMPT" "$ATTEMPT_MODEL") || HTTP_STATUS="curl_fail"
   else
     HTTP_STATUS=$(curl -sS -o "$RESPONSE_FILE" -w "%{http_code}" \
       --max-time 240 \
@@ -250,6 +273,11 @@ for ATTEMPT in 1 2 3; do
       log "retry_${ATTEMPT}: github_models_no_content — try next"
       continue
     fi
+  elif [[ "$ATTEMPT_MODEL" == gemini-* ]]; then
+    if ! jq -e '.candidates[0].content.parts[0].text' "$RESPONSE_FILE" >/dev/null 2>&1; then
+      log "retry_${ATTEMPT}: gemini_no_text — try next"
+      continue
+    fi
   else
     if ! jq -e .response "$RESPONSE_FILE" >/dev/null 2>&1; then
       log "retry_${ATTEMPT}: ollama_no_response — try next"
@@ -263,6 +291,8 @@ for ATTEMPT in 1 2 3; do
   ATTEMPT_RAW="$LOG_DIR/${crate}-attempt${ATTEMPT}.rs"
   if [[ "$ATTEMPT_MODEL" == gpt-* ]]; then
     JQ_PATH=".choices[0].message.content"
+  elif [[ "$ATTEMPT_MODEL" == gemini-* ]]; then
+    JQ_PATH=".candidates[0].content.parts[0].text"
   else
     JQ_PATH=".response"
   fi
