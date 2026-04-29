@@ -1,0 +1,30 @@
+# cave-runtime orchestrator — example config
+#
+# Each module binds to its own TCP port. To disable a module set `enabled = false`.
+# Runtime defaults match these values; this file is intended as documentation.
+
+log_level = "info"
+
+[etcd]
+enabled = true
+bind = "127.0.0.1:2379"
+
+[apiserver]
+enabled = true
+bind = "127.0.0.1:6443"
+
+[scheduler]
+enabled = true
+bind = "127.0.0.1:10259"
+
+[controller_manager]
+enabled = true
+bind = "127.0.0.1:10257"
+
+[cri]
+enabled = true
+bind = "127.0.0.1:10010"
+
+[kubelet]
+enabled = true
+bind = "127.0.0.1:10250"
