@@ -40,8 +40,9 @@ impl Shell {
 /// shells that paginate (zsh) benefit, and tests can do an exact-list
 /// snapshot.
 pub const TOP_VERBS: &[&str] = &[
-    "argocd", "chaos", "completion", "deploy", "describe", "events", "flag", "get", "harbor",
-    "helm", "kubectl", "logs", "secrets", "tenant", "topology", "tui", "vault",
+    "argocd", "chaos", "cilium", "completion", "deploy", "describe", "etcdctl", "events", "flag",
+    "get", "harbor", "helm", "kubectl", "logs", "secrets", "strimzi", "talosctl", "topology",
+    "vault",
 ];
 
 /// Generate the completion script for `shell` and the binary `name`.
@@ -253,14 +254,14 @@ mod tests {
         assert!(v.contains("deploy"));
         assert!(v.contains("get"));
         assert!(v.contains("logs"));
-        // Compat
-        assert!(v.contains("kubectl"));
-        assert!(v.contains("helm"));
-        assert!(v.contains("argocd"));
-        assert!(v.contains("vault"));
-        assert!(v.contains("harbor"));
-        // M5/M6
-        assert!(v.contains("tui"));
+        // All nine compat shims
+        for shim in [
+            "kubectl", "etcdctl", "cilium", "helm", "argocd", "vault", "harbor", "strimzi",
+            "talosctl",
+        ] {
+            assert!(v.contains(shim), "compat shim `{}` missing from TOP_VERBS", shim);
+        }
+        // Utility
         assert!(v.contains("completion"));
     }
 

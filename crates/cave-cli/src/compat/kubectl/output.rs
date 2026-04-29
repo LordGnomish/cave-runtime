@@ -55,7 +55,10 @@ pub fn parse(s: Option<&str>) -> Result<KubectlOutput> {
                 return Ok(KubectlOutput::GoTemplate(payload));
             }
             match lower.as_str() {
-                "wide" => Ok(KubectlOutput::Wide),
+                // `table` is the cavectl default; map onto Wide so the
+                // global `-o table` from the bin layer round-trips
+                // through this parser without erroring.
+                "wide" | "table" => Ok(KubectlOutput::Wide),
                 "json" => Ok(KubectlOutput::Json),
                 "yaml" => Ok(KubectlOutput::Yaml),
                 "name" => Ok(KubectlOutput::Name),

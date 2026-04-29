@@ -35,3 +35,5 @@ uuid.workspace = true
 [dev-dependencies]
 axum.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
+mockito = "1"
+tempfile = "3"
