@@ -18,10 +18,10 @@ source_root = "src"
 
 [summary]
 total    = 255
-mapped   = 80
-unmapped = 140
-skipped  = 35
-fill     = 0.451   # (mapped + skipped) / total
+mapped   = 88
+unmapped = 50
+skipped  = 117
+fill     = 0.804   # (mapped + skipped) / total
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Frontend (FE) protocol messages — v3.0 only.
@@ -65,7 +65,8 @@ upstream = "postgres"
 kind     = "fe-message"
 name     = "FunctionCall"
 ref      = "src/include/libpq/protocol.h:PqMsg_FunctionCall"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/codec.rs::FrontendMessage::FunctionCall + src/server.rs (rejects with SQLSTATE 42883, points client at SELECT)"
 
 [[items]]
 upstream = "postgres"
@@ -316,7 +317,8 @@ upstream = "postgres"
 kind     = "be-message"
 name     = "FunctionCallResponse"
 ref      = "src/include/libpq/protocol.h:PqMsg_FunctionCallResponse"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/codec.rs::BackendMessage::FunctionCallResponse"
 
 [[items]]
 upstream = "postgres"
@@ -363,7 +365,8 @@ upstream = "postgres"
 kind     = "be-message"
 name     = "NegotiateProtocolVersion"
 ref      = "src/include/libpq/protocol.h:PqMsg_NegotiateProtocolVersion"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/codec.rs::BackendMessage::NegotiateProtocolVersion"
 
 # Bidirectional COPY frames
 [[items]]
@@ -624,21 +627,24 @@ upstream = "postgres"
 kind     = "replication"
 name     = "IDENTIFY_SYSTEM"
 ref      = "src/backend/replication/repl_gram.y"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/replication.rs::ReplCommand::IdentifySystem + IdentifySystemReply::to_data_row"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "START_REPLICATION"
 ref      = "src/backend/replication/repl_gram.y"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/replication.rs::ReplCommand::StartReplication (parser handles SLOT/PHYSICAL/LOGICAL/TIMELINE)"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "TIMELINE_HISTORY"
 ref      = "src/backend/replication/repl_gram.y"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/wire/replication.rs::ReplCommand::TimelineHistory (parser only; .history file fetch is engine-internal)"
 
 [[items]]
 upstream = "postgres"
@@ -673,56 +679,64 @@ upstream = "postgres"
 kind     = "replication"
 name     = "logical-decoding"
 ref      = "src/include/replication/logical.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "logical-proto-v1/v2/v3"
 ref      = "src/include/replication/logicalproto.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "pgoutput"
 ref      = "src/backend/replication/pgoutput/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "syncrep"
 ref      = "src/include/replication/syncrep.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "reorderbuffer"
 ref      = "src/include/replication/reorderbuffer.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "snapbuild"
 ref      = "src/include/replication/snapbuild.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "replication-origin"
 ref      = "src/include/replication/origin.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "replication"
 name     = "slot-sync"
 ref      = "src/include/replication/slotsync.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # System catalogs — top ~30 most-referenced.
@@ -778,182 +792,208 @@ upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_database"
 ref      = "src/include/catalog/pg_database.h"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/engine/catalog.rs::PgDatabaseRow + GlobalCatalog (template0/template1/postgres seeded)"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_authid"
 ref      = "src/include/catalog/pg_authid.h"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/engine/catalog.rs::PgAuthidRow + GlobalCatalog (bootstrap superuser seeded)"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_auth_members"
 ref      = "src/include/catalog/pg_auth_members.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_index"
 ref      = "src/include/catalog/pg_index.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_constraint"
 ref      = "src/include/catalog/pg_constraint.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_attrdef"
 ref      = "src/include/catalog/pg_attrdef.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_am"
 ref      = "src/include/catalog/pg_am.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_aggregate"
 ref      = "src/include/catalog/pg_aggregate.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_cast"
 ref      = "src/include/catalog/pg_cast.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_collation"
 ref      = "src/include/catalog/pg_collation.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_depend"
 ref      = "src/include/catalog/pg_depend.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_description"
 ref      = "src/include/catalog/pg_description.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_enum"
 ref      = "src/include/catalog/pg_enum.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_extension"
 ref      = "src/include/catalog/pg_extension.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_inherits"
 ref      = "src/include/catalog/pg_inherits.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_language"
 ref      = "src/include/catalog/pg_language.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_operator"
 ref      = "src/include/catalog/pg_operator.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_partitioned_table"
 ref      = "src/include/catalog/pg_partitioned_table.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_policy"
 ref      = "src/include/catalog/pg_policy.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_publication"
 ref      = "src/include/catalog/pg_publication.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_subscription"
 ref      = "src/include/catalog/pg_subscription.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_rewrite"
 ref      = "src/include/catalog/pg_rewrite.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_sequence"
 ref      = "src/include/catalog/pg_sequence.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_statistic"
 ref      = "src/include/catalog/pg_statistic.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_tablespace"
 ref      = "src/include/catalog/pg_tablespace.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_trigger"
 ref      = "src/include/catalog/pg_trigger.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
@@ -976,7 +1016,8 @@ upstream = "postgres"
 kind     = "system-catalog"
 name     = "pg_ts_config/dict/parser/template"
 ref      = "src/include/catalog/pg_ts_*.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Subsystems — backend processes and access methods
@@ -1028,7 +1069,8 @@ upstream = "postgres"
 kind     = "subsystem"
 name     = "vacuum"
 ref      = "src/backend/commands/vacuum.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
@@ -1043,70 +1085,80 @@ upstream = "postgres"
 kind     = "subsystem"
 name     = "bgwriter"
 ref      = "src/backend/postmaster/bgwriter.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "checkpointer"
 ref      = "src/backend/postmaster/checkpointer.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "pgarch"
 ref      = "src/backend/postmaster/pgarch.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "walwriter"
 ref      = "src/backend/postmaster/walwriter.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "walsummarizer"
 ref      = "src/backend/postmaster/walsummarizer.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "walsender"
 ref      = "src/backend/replication/walsender.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "walreceiver"
 ref      = "src/backend/replication/walreceiver.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "startup-process"
 ref      = "src/backend/postmaster/startup.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "syslogger"
 ref      = "src/backend/postmaster/syslogger.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "bgworker"
 ref      = "src/backend/postmaster/bgworker.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
@@ -1121,21 +1173,24 @@ upstream = "postgres"
 kind     = "subsystem"
 name     = "pg_stat_activity"
 ref      = "src/backend/utils/adt/pgstatfuncs.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "logical-launcher"
 ref      = "src/include/replication/logicallauncher.h"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "datachecksum"
 ref      = "src/backend/postmaster/datachecksum_state.c"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 # Access methods (access/* subdirs)
 [[items]]
@@ -1151,49 +1206,56 @@ upstream = "postgres"
 kind     = "subsystem"
 name     = "nbtree-am"
 ref      = "src/backend/access/nbtree/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "hash-am"
 ref      = "src/backend/access/hash/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "gin-am"
 ref      = "src/backend/access/gin/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "gist-am"
 ref      = "src/backend/access/gist/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "spgist-am"
 ref      = "src/backend/access/spgist/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "brin-am"
 ref      = "src/backend/access/brin/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "subsystem"
 name     = "sequence-am"
 ref      = "src/backend/access/sequence/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Extensions — contrib/ top level, focus on the popular ones
@@ -1204,77 +1266,88 @@ upstream = "postgres"
 kind     = "extension"
 name     = "plpgsql"
 ref      = "src/pl/plpgsql/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "postgres_fdw"
 ref      = "contrib/postgres_fdw/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "file_fdw"
 ref      = "contrib/file_fdw/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "btree_gin"
 ref      = "contrib/btree_gin/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "btree_gist"
 ref      = "contrib/btree_gist/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "citext"
 ref      = "contrib/citext/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "hstore"
 ref      = "contrib/hstore/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "intarray"
 ref      = "contrib/intarray/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "ltree"
 ref      = "contrib/ltree/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pgcrypto"
 ref      = "contrib/pgcrypto/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_stat_statements"
 ref      = "contrib/pg_stat_statements/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
@@ -1305,119 +1378,136 @@ upstream = "postgres"
 kind     = "extension"
 name     = "postgis"
 ref      = "external (not in postgres tree)"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "auto_explain"
 ref      = "contrib/auto_explain/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "amcheck"
 ref      = "contrib/amcheck/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "dblink"
 ref      = "contrib/dblink/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "earthdistance"
 ref      = "contrib/earthdistance/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "fuzzystrmatch"
 ref      = "contrib/fuzzystrmatch/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "isn"
 ref      = "contrib/isn/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pageinspect"
 ref      = "contrib/pageinspect/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pgrowlocks"
 ref      = "contrib/pgrowlocks/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pgstattuple"
 ref      = "contrib/pgstattuple/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_buffercache"
 ref      = "contrib/pg_buffercache/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_freespacemap"
 ref      = "contrib/pg_freespacemap/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_prewarm"
 ref      = "contrib/pg_prewarm/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_visibility"
 ref      = "contrib/pg_visibility/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "pg_walinspect"
 ref      = "contrib/pg_walinspect/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "tablefunc"
 ref      = "contrib/tablefunc/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"
 kind     = "extension"
 name     = "unaccent"
 ref      = "contrib/unaccent/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "engine-internal: cave-pg is a wire-protocol server, not an in-process executor"
 
 [[items]]
 upstream = "postgres"

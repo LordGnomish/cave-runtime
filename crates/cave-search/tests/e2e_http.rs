@@ -298,3 +298,107 @@ async fn re_put_increments_version() {
     assert_eq!(v["_version"], 2);
     assert_eq!(v["result"], "updated");
 }
+
+#[tokio::test]
+async fn root_info_returns_version() {
+    let (base, _h) = spawn().await;
+    let r = reqwest::get(format!("{}/", base)).await.unwrap();
+    assert_eq!(r.status(), 200);
+    let v: Value = r.json().await.unwrap();
+    assert_eq!(v["name"], "cave-search");
+    assert!(v["version"]["number"].is_string());
+}
+
+#[tokio::test]
+async fn root_ping_returns_200() {
+    let (base, _h) = spawn().await;
+    let client = reqwest::Client::new();
+    let r = client.head(format!("{}/", base)).send().await.unwrap();
+    assert_eq!(r.status(), 200);
+}
+
+#[tokio::test]
+async fn bulk_indexes_documents() {
+    let (base, _h) = spawn().await;
+    let client = reqwest::Client::new();
+    client.put(format!("{}/things", base)).send().await.unwrap();
+    let body = "\
+{\"index\":{\"_index\":\"things\",\"_id\":\"1\"}}\n\
+{\"k\":\"a\"}\n\
+{\"index\":{\"_index\":\"things\",\"_id\":\"2\"}}\n\
+{\"k\":\"b\"}\n";
+    let r = client
+        .post(format!("{}/_bulk", base))
+        .header("content-type", "application/x-ndjson")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let v: Value = r.json().await.unwrap();
+    assert_eq!(v["errors"], false);
+    assert_eq!(v["items"].as_array().unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn msearch_returns_responses_array() {
+    let (base, _h) = spawn().await;
+    let client = reqwest::Client::new();
+    client.put(format!("{}/a", base)).send().await.unwrap();
+    let body = "\
+{\"index\":\"a\"}\n\
+{\"query\":{\"match_all\":{}}}\n";
+    let r = client
+        .post(format!("{}/_msearch", base))
+        .header("content-type", "application/x-ndjson")
+        .body(body)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let v: Value = r.json().await.unwrap();
+    assert_eq!(v["responses"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn put_and_get_mapping_round_trip() {
+    let (base, _h) = spawn().await;
+    let client = reqwest::Client::new();
+    client.put(format!("{}/idx", base)).send().await.unwrap();
+    let r = client
+        .put(format!("{}/idx/_mapping", base))
+        .json(&json!({"properties":{"color":{"type":"keyword"}}}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let g = client
+        .get(format!("{}/idx/_mapping", base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(g.status(), 200);
+    let v: Value = g.json().await.unwrap();
+    assert!(v["idx"]["mappings"]["properties"]["color"].is_object());
+}
+
+#[tokio::test]
+async fn field_caps_returns_field_types() {
+    let (base, _h) = spawn().await;
+    let client = reqwest::Client::new();
+    client
+        .put(format!("{}/idx", base))
+        .json(&json!({"mappings":{"properties":{"color":{"type":"keyword"},"n":{"type":"long"}}}}))
+        .send()
+        .await
+        .unwrap();
+    let r = client
+        .get(format!("{}/idx/_field_caps?fields=color,n", base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    let v: Value = r.json().await.unwrap();
+    assert!(v["fields"]["color"]["keyword"].is_object());
+    assert!(v["fields"]["n"]["long"].is_object());
+}

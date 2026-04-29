@@ -1,7 +1,7 @@
 //! Transaction support: MULTI, EXEC, DISCARD, WATCH, UNWATCH.
 
 use crate::db::Db;
-use crate::error::{CacheError, CacheResult};
+use crate::error::CacheResult;
 use crate::resp::Resp;
 
 /// State for a connection currently in MULTI mode.

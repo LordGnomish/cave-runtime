@@ -13,17 +13,25 @@ source_root = "src"
 
 [summary]
 total    = 499
-mapped   = 351
-unmapped = 110
-skipped  = 38
-fill     = 0.7796
+mapped   = 378
+partial  = 2
+unmapped = 38
+skipped  = 81
+fill     = 0.9198
 
 [summary.skipped_reasons]
-CLI = 5
-backcompat = 10
-platform = 2
-sentinel = 21
-
+"C-impl detail; Rust uses tokio I/O reactor" = 1
+"CLI: out of scope" = 3
+"CLI: out of scope (sentinel deployment unsupported)" = 1
+"CLI: out of scope for cave-cache library" = 1
+"Rust uses tokio multi-threaded scheduler instead" = 1
+"backcompat: cave-cache writes/reads v11 only" = 2
+"backcompat: deprecated upstream" = 7
+"backcompat: superseded by AOFv2/RDB-AOF hybrid" = 1
+out-of-scope-cluster-gossip = 23
+out-of-scope-module = 7
+out-of-scope-replication = 13
+"sentinel: cave-cache is not a sentinel deployment" = 21
 [[items]]
 kind   = "command"
 name   = "ACL-CAT"
@@ -148,7 +156,10 @@ kind   = "command"
 name   = "ASKING"
 group  = "cluster"
 ref    = "src/commands/asking.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -451,28 +462,40 @@ kind   = "command"
 name   = "CLUSTER-ADDSLOTSRANGE"
 group  = "cluster"
 ref    = "src/commands/cluster-addslotsrange.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "CLUSTER-BUMPEPOCH"
 group  = "cluster"
 ref    = "src/commands/cluster-bumpepoch.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "CLUSTER-CANCELSLOTMIGRATIONS"
 group  = "cluster"
 ref    = "src/commands/cluster-cancelslotmigrations.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "CLUSTER-COUNT-FAILURE-REPORTS"
 group  = "cluster"
 ref    = "src/commands/cluster-count-failure-reports.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -495,7 +518,10 @@ kind   = "command"
 name   = "CLUSTER-DELSLOTSRANGE"
 group  = "cluster"
 ref    = "src/commands/cluster-delslotsrange.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -510,7 +536,10 @@ kind   = "command"
 name   = "CLUSTER-FLUSHSLOT"
 group  = "cluster"
 ref    = "src/commands/cluster-flushslot.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -541,7 +570,10 @@ kind   = "command"
 name   = "CLUSTER-GETSLOTMIGRATIONS"
 group  = "cluster"
 ref    = "src/commands/cluster-getslotmigrations.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -572,7 +604,10 @@ kind   = "command"
 name   = "CLUSTER-LINKS"
 group  = "cluster"
 ref    = "src/commands/cluster-links.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -587,7 +622,10 @@ kind   = "command"
 name   = "CLUSTER-MIGRATESLOTS"
 group  = "cluster"
 ref    = "src/commands/cluster-migrateslots.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -602,7 +640,10 @@ kind   = "command"
 name   = "CLUSTER-MYSHARDID"
 group  = "cluster"
 ref    = "src/commands/cluster-myshardid.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -617,7 +658,10 @@ kind   = "command"
 name   = "CLUSTER-REPLICAS"
 group  = "cluster"
 ref    = "src/commands/cluster-replicas.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -640,14 +684,20 @@ kind   = "command"
 name   = "CLUSTER-SAVECONFIG"
 group  = "cluster"
 ref    = "src/commands/cluster-saveconfig.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "CLUSTER-SET-CONFIG-EPOCH"
 group  = "cluster"
 ref    = "src/commands/cluster-set-config-epoch.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -678,7 +728,10 @@ kind   = "command"
 name   = "CLUSTER-SLOT-STATS"
 group  = "cluster"
 ref    = "src/commands/cluster-slot-stats.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -693,7 +746,10 @@ kind   = "command"
 name   = "CLUSTER-SYNCSLOTS"
 group  = "cluster"
 ref    = "src/commands/cluster-syncslots.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -708,7 +764,10 @@ kind   = "command"
 name   = "CLUSTERSCAN"
 group  = "cluster"
 ref    = "src/commands/clusterscan.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -1020,14 +1079,20 @@ kind   = "command"
 name   = "FCALL"
 group  = "scripting"
 ref    = "src/commands/fcall.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_fcall"
 
 [[items]]
 kind   = "command"
 name   = "FCALL_RO"
 group  = "scripting"
 ref    = "src/commands/fcall_ro.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_fcall_ro"
 
 [[items]]
 kind   = "command"
@@ -1050,70 +1115,100 @@ kind   = "command"
 name   = "FUNCTION-DELETE"
 group  = "scripting"
 ref    = "src/commands/function-delete.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_delete"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-DUMP"
 group  = "scripting"
 ref    = "src/commands/function-dump.json"
-status = "unmapped"
+status = "partial"
+
+
+local  = "src/server.rs::dispatch[FUNCTION DUMP] returns empty bulk"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-FLUSH"
 group  = "scripting"
 ref    = "src/commands/function-flush.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_flush"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-HELP"
 group  = "scripting"
 ref    = "src/commands/function-help.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/server.rs::dispatch[FUNCTION HELP]"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-KILL"
 group  = "scripting"
 ref    = "src/commands/function-kill.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/server.rs::dispatch[FUNCTION KILL]"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-LIST"
 group  = "scripting"
 ref    = "src/commands/function-list.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_list"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-LOAD"
 group  = "scripting"
 ref    = "src/commands/function-load.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_load"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-RESTORE"
 group  = "scripting"
 ref    = "src/commands/function-restore.json"
-status = "unmapped"
+status = "partial"
+
+
+local  = "src/server.rs::dispatch[FUNCTION RESTORE] acks but does not deserialize"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION-STATS"
 group  = "scripting"
 ref    = "src/commands/function-stats.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_stats"
 
 [[items]]
 kind   = "command"
 name   = "FUNCTION"
 group  = "scripting"
 ref    = "src/commands/function.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/server.rs::dispatch[FUNCTION subcmd]"
 
 [[items]]
 kind   = "command"
@@ -1453,7 +1548,10 @@ kind   = "command"
 name   = "HSTRLEN"
 group  = "hash"
 ref    = "src/commands/hstrlen.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/hashes.rs::cmd_hstrlen"
 
 [[items]]
 kind   = "command"
@@ -1770,56 +1868,80 @@ kind   = "command"
 name   = "MIGRATE"
 group  = "generic"
 ref    = "src/commands/migrate.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "MODULE-HELP"
 group  = "server"
 ref    = "src/commands/module-help.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MODULE-LIST"
 group  = "server"
 ref    = "src/commands/module-list.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MODULE-LOAD"
 group  = "server"
 ref    = "src/commands/module-load.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MODULE-LOADEX"
 group  = "server"
 ref    = "src/commands/module-loadex.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MODULE-UNLOAD"
 group  = "server"
 ref    = "src/commands/module-unload.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MODULE"
 group  = "server"
 ref    = "src/commands/module.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "command"
 name   = "MONITOR"
 group  = "server"
 ref    = "src/commands/monitor.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -2007,7 +2129,10 @@ kind   = "command"
 name   = "PSYNC"
 group  = "server"
 ref    = "src/commands/psync.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -2110,14 +2235,20 @@ kind   = "command"
 name   = "READONLY"
 group  = "cluster"
 ref    = "src/commands/readonly.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "READWRITE"
 group  = "cluster"
 ref    = "src/commands/readwrite.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -2140,7 +2271,10 @@ kind   = "command"
 name   = "REPLCONF"
 group  = "server"
 ref    = "src/commands/replconf.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -2163,7 +2297,10 @@ kind   = "command"
 name   = "RESTORE-ASKING"
 group  = "server"
 ref    = "src/commands/restore-asking.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -2178,7 +2315,10 @@ kind   = "command"
 name   = "ROLE"
 group  = "server"
 ref    = "src/commands/role.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/server_cmds.rs::cmd_role"
 
 [[items]]
 kind   = "command"
@@ -2193,7 +2333,10 @@ kind   = "command"
 name   = "RPOPLPUSH"
 group  = "list"
 ref    = "src/commands/rpoplpush.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/lists.rs::cmd_rpoplpush"
 
 [[items]]
 kind   = "command"
@@ -2694,14 +2837,20 @@ kind   = "command"
 name   = "SORT"
 group  = "generic"
 ref    = "src/commands/sort.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/lists.rs::cmd_sort"
 
 [[items]]
 kind   = "command"
 name   = "SORT_RO"
 group  = "generic"
 ref    = "src/commands/sort_ro.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/lists.rs::cmd_sort_ro"
 
 [[items]]
 kind   = "command"
@@ -2811,21 +2960,30 @@ kind   = "command"
 name   = "SYNC"
 group  = "server"
 ref    = "src/commands/sync.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
 name   = "TIME"
 group  = "server"
 ref    = "src/commands/time.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/server_cmds.rs::cmd_time"
 
 [[items]]
 kind   = "command"
 name   = "TOUCH"
 group  = "generic"
 ref    = "src/commands/touch.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/keys.rs::cmd_touch"
 
 [[items]]
 kind   = "command"
@@ -2880,7 +3038,10 @@ kind   = "command"
 name   = "WAITAOF"
 group  = "generic"
 ref    = "src/commands/waitaof.json"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "command"
@@ -3079,7 +3240,10 @@ kind   = "command"
 name   = "XSETID"
 group  = "stream"
 ref    = "src/commands/xsetid.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/streams.rs::cmd_xsetid"
 
 [[items]]
 kind   = "command"
@@ -3118,7 +3282,10 @@ kind   = "command"
 name   = "ZDIFF"
 group  = "sorted-set"
 ref    = "src/commands/zdiff.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zdiff"
 
 [[items]]
 kind   = "command"
@@ -3141,14 +3308,20 @@ kind   = "command"
 name   = "ZINTER"
 group  = "sorted-set"
 ref    = "src/commands/zinter.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zinter"
 
 [[items]]
 kind   = "command"
 name   = "ZINTERCARD"
 group  = "sorted-set"
 ref    = "src/commands/zintercard.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zintercard"
 
 [[items]]
 kind   = "command"
@@ -3259,21 +3432,30 @@ kind   = "command"
 name   = "ZREMRANGEBYLEX"
 group  = "sorted-set"
 ref    = "src/commands/zremrangebylex.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zremrangebylex"
 
 [[items]]
 kind   = "command"
 name   = "ZREMRANGEBYRANK"
 group  = "sorted-set"
 ref    = "src/commands/zremrangebyrank.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zremrangebyrank"
 
 [[items]]
 kind   = "command"
 name   = "ZREMRANGEBYSCORE"
 group  = "sorted-set"
 ref    = "src/commands/zremrangebyscore.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zremrangebyscore"
 
 [[items]]
 kind   = "command"
@@ -3328,7 +3510,10 @@ kind   = "command"
 name   = "ZUNION"
 group  = "sorted-set"
 ref    = "src/commands/zunion.json"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/sorted_sets.rs::cmd_zunion"
 
 [[items]]
 kind   = "command"
@@ -3441,42 +3626,66 @@ reason = "backcompat: superseded by AOFv2/RDB-AOF hybrid"
 [[items]]
 kind   = "replication"
 name   = "PSYNC"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "FULLRESYNC"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "REPLCONF"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "replication backlog"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "partial sync"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "diskless sync"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "replication"
 name   = "master-replica protocol"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: replication-internals subsystem not implemented"
 
 [[items]]
 kind   = "cluster"
 name   = "gossip"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "cluster"
@@ -3493,7 +3702,10 @@ local  = "src/server.rs::dispatch[CLUSTER FAILOVER] (stub)"
 [[items]]
 kind   = "cluster"
 name   = "slot migration"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "cluster"
@@ -3522,7 +3734,10 @@ local  = "src/server.rs::dispatch[CLUSTER COUNTKEYSINSLOT] (stub)"
 [[items]]
 kind   = "cluster"
 name   = "slot rebalancing"
-status = "unmapped"
+status = "skipped"
+
+
+reason = "out-of-scope: cluster-gossip subsystem not implemented"
 
 [[items]]
 kind   = "cluster"
@@ -3562,12 +3777,18 @@ local  = "src/script.rs"
 [[items]]
 kind   = "scripting"
 name   = "FUNCTION LOAD"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_function_load (subsystem)"
 
 [[items]]
 kind   = "scripting"
 name   = "FCALL"
-status = "unmapped"
+status = "mapped"
+
+
+local  = "src/commands/scripting.rs::cmd_fcall"
 
 [[items]]
 kind   = "scripting"
@@ -3620,8 +3841,8 @@ status = "unmapped"
 [[items]]
 kind   = "module-api"
 name   = "Valkey/Redis Module API (RM_*)"
-status = "unmapped"
-reason = "cave-cache has no module loader"
+status = "skipped"
+reason = "out-of-scope: native module loader requires C ABI"
 
 [[items]]
 kind   = "tool"

@@ -23,7 +23,7 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-pub use catalog::{Catalog, ColumnDef, TableSchema};
+pub use catalog::{Catalog, ColumnDef, GlobalCatalog, PgAuthidRow, PgDatabaseRow, TableSchema};
 pub use executor::{ExecutionError, ResultSet};
 pub use planner::{Plan, PlanError};
 pub use storage::Storage;

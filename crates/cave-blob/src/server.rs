@@ -4,15 +4,23 @@
 //!
 //! | method | path                              | operation                |
 //! |--------|-----------------------------------|--------------------------|
+//! | GET    | /                                 | ListBuckets              |
 //! | PUT    | /:bucket                          | CreateBucket             |
 //! | DELETE | /:bucket                          | DeleteBucket             |
 //! | GET    | /:bucket?prefix=…                 | ListObjectsV2            |
+//! | GET    | /:bucket?location                 | GetBucketLocation        |
+//! | GET    | /:bucket?versioning               | GetBucketVersioning      |
+//! | PUT    | /:bucket?versioning               | PutBucketVersioning      |
+//! | POST   | /:bucket?delete                   | DeleteObjects            |
 //! | GET    | /:bucket/:key                     | GetObject                |
 //! | HEAD   | /:bucket/:key                     | HeadObject               |
 //! | PUT    | /:bucket/:key                     | PutObject                |
+//! | PUT    | /:bucket/:key (x-amz-copy-source) | CopyObject               |
+//! | PUT    | /:bucket/:key?partNumber&uploadId | UploadPart               |
+//! | PUT    | /:b/:k?partNumber&uploadId        | UploadPartCopy           |
+//! |        |   (with x-amz-copy-source)        |                          |
 //! | DELETE | /:bucket/:key                     | DeleteObject             |
 //! | POST   | /:bucket/:key?uploads             | CreateMultipartUpload    |
-//! | PUT    | /:bucket/:key?partNumber=&uploadId| UploadPart               |
 //! | POST   | /:bucket/:key?uploadId=           | CompleteMultipartUpload  |
 //! | DELETE | /:bucket/:key?uploadId=           | AbortMultipartUpload     |
 
@@ -23,7 +31,7 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{any, delete, get, head, post, put};
+use axum::routing::any;
 use axum::Router;
 use chrono::Utc;
 
@@ -52,6 +60,7 @@ impl AppState {
 
 pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
+        .route("/", any(root_handler))
         .route("/{bucket}", any(bucket_handler))
         .route("/{bucket}/", any(bucket_handler))
         .route("/{bucket}/{*key}", any(object_handler))
@@ -70,18 +79,38 @@ pub async fn bind(state: Arc<AppState>, bind_addr: &str) -> std::io::Result<(std
 
 // ── Handlers ────────────────────────────────────────────────────────────────
 
+async fn root_handler(
+    State(state): State<Arc<AppState>>,
+    method: axum::http::Method,
+) -> Response {
+    use axum::http::Method;
+    match method {
+        Method::GET => list_buckets(&state).await,
+        _ => not_implemented(),
+    }
+}
+
 async fn bucket_handler(
     State(state): State<Arc<AppState>>,
     Path(bucket): Path<String>,
     Query(q): Query<HashMap<String, String>>,
     method: axum::http::Method,
+    body: Bytes,
 ) -> Response {
     use axum::http::Method;
     match method {
+        Method::PUT if q.contains_key("versioning") => {
+            put_bucket_versioning(&state, &bucket, &body).await
+        }
         Method::PUT => create_bucket(&state, &bucket).await,
         Method::DELETE => delete_bucket(&state, &bucket).await,
+        Method::GET if q.contains_key("location") => get_bucket_location(&state, &bucket).await,
+        Method::GET if q.contains_key("versioning") => {
+            get_bucket_versioning(&state, &bucket).await
+        }
         Method::GET => list_objects(&state, &bucket, &q).await,
         Method::HEAD => head_bucket(&state, &bucket).await,
+        Method::POST if q.contains_key("delete") => delete_objects(&state, &bucket, &body).await,
         _ => not_implemented(),
     }
 }
@@ -95,8 +124,20 @@ async fn object_handler(
     body: Bytes,
 ) -> Response {
     use axum::http::Method;
+    let copy_source = headers
+        .get("x-amz-copy-source")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
     match method {
-        Method::PUT if q.contains_key("partNumber") => upload_part(&state, &bucket, &key, &q, body).await,
+        Method::PUT if q.contains_key("partNumber") && copy_source.is_some() => {
+            upload_part_copy(&state, copy_source.as_deref().unwrap_or(""), &q).await
+        }
+        Method::PUT if q.contains_key("partNumber") => {
+            upload_part(&state, &bucket, &key, &q, body).await
+        }
+        Method::PUT if copy_source.is_some() => {
+            copy_object(&state, &bucket, &key, copy_source.as_deref().unwrap_or("")).await
+        }
         Method::PUT => put_object(&state, &bucket, &key, headers, body).await,
         Method::GET => get_object(&state, &bucket, &key).await,
         Method::HEAD => head_object(&state, &bucket, &key).await,
@@ -125,6 +166,31 @@ async fn delete_bucket(state: &AppState, bucket: &str) -> Response {
 
 async fn head_bucket(state: &AppState, bucket: &str) -> Response {
     blob_result(state.store.bucket_meta(bucket).map(|_| ok_no_body()))
+}
+
+async fn list_buckets(state: &AppState) -> Response {
+    let buckets = state.store.list_buckets();
+    xml_response(render_list_buckets_xml(&buckets))
+}
+
+async fn get_bucket_location(state: &AppState, bucket: &str) -> Response {
+    match state.store.bucket_meta(bucket) {
+        Ok(_) => xml_response(render_bucket_location_xml()),
+        Err(e) => blob_error(e),
+    }
+}
+
+async fn get_bucket_versioning(state: &AppState, bucket: &str) -> Response {
+    match state.store.bucket_meta(bucket) {
+        Ok(meta) => xml_response(render_versioning_xml(meta.versioning_enabled)),
+        Err(e) => blob_error(e),
+    }
+}
+
+async fn put_bucket_versioning(state: &AppState, bucket: &str, body: &Bytes) -> Response {
+    let xml = std::str::from_utf8(body).unwrap_or("");
+    let enabled = parse_versioning_xml(xml);
+    blob_result(state.store.set_versioning(bucket, enabled).map(|_| ok_no_body()))
 }
 
 async fn list_objects(state: &AppState, bucket: &str, q: &HashMap<String, String>) -> Response {
@@ -160,6 +226,94 @@ async fn put_object(state: &AppState, bucket: &str, key: &str, headers: HeaderMa
             .unwrap(),
         Err(e) => blob_error(e),
     }
+}
+
+async fn copy_object(state: &AppState, dst_bucket: &str, dst_key: &str, copy_source: &str) -> Response {
+    let (src_bucket, src_key) = match parse_copy_source(copy_source) {
+        Some(p) => p,
+        None => return bad_request("invalid x-amz-copy-source"),
+    };
+    let src_obj = match state.store.get_object(&src_bucket, &src_key, None) {
+        Ok(o) => o,
+        Err(e) => return blob_error(e),
+    };
+    let mut dst = Object::new(dst_bucket, dst_key, src_obj.body, &src_obj.meta.content_type);
+    dst.meta.headers = src_obj.meta.headers.clone();
+    match state.store.put_object(dst) {
+        Ok(meta) => xml_response(format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+             <CopyObjectResult>\n  \
+             <ETag>\"{}\"</ETag>\n  \
+             <LastModified>{}</LastModified>\n\
+             </CopyObjectResult>",
+            meta.etag,
+            meta.last_modified.to_rfc3339()
+        )),
+        Err(e) => blob_error(e),
+    }
+}
+
+async fn upload_part_copy(state: &AppState, copy_source: &str, q: &HashMap<String, String>) -> Response {
+    let upload_id = match q.get("uploadId") {
+        Some(s) => s.clone(),
+        None => return bad_request("uploadId required"),
+    };
+    let part_number = match q.get("partNumber").and_then(|s| s.parse::<i32>().ok()) {
+        Some(n) => n,
+        None => return bad_request("partNumber required"),
+    };
+    let (src_bucket, src_key) = match parse_copy_source(copy_source) {
+        Some(p) => p,
+        None => return bad_request("invalid x-amz-copy-source"),
+    };
+    let src_obj = match state.store.get_object(&src_bucket, &src_key, None) {
+        Ok(o) => o,
+        Err(e) => return blob_error(e),
+    };
+    match state.uploads.upload_part(&upload_id, part_number, src_obj.body) {
+        Ok(etag) => xml_response(format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+             <CopyPartResult>\n  \
+             <ETag>\"{}\"</ETag>\n  \
+             <LastModified>{}</LastModified>\n\
+             </CopyPartResult>",
+            etag,
+            Utc::now().to_rfc3339()
+        )),
+        Err(e) => blob_error(e),
+    }
+}
+
+async fn delete_objects(state: &AppState, bucket: &str, body: &Bytes) -> Response {
+    let xml = std::str::from_utf8(body).unwrap_or("");
+    let req = match parse_delete_objects_xml(xml) {
+        Ok(r) => r,
+        Err(_) => return bad_request("invalid Delete body"),
+    };
+    let now = Utc::now();
+    let mut deleted: Vec<String> = Vec::new();
+    let mut errors: Vec<(String, String, String)> = Vec::new(); // (key, code, message)
+    for key in &req {
+        match state.store.delete_object(bucket, key, None, now) {
+            Ok(()) => deleted.push(key.clone()),
+            Err(BlobError::ObjectNotFound(_, _)) => {
+                // S3 returns deleted markers for not-found targets.
+                deleted.push(key.clone());
+            }
+            Err(BlobError::BucketNotFound(b)) => {
+                return blob_error(BlobError::BucketNotFound(b));
+            }
+            Err(e) => {
+                let code = match &e {
+                    BlobError::Immutable => "InvalidRetentionMode".to_string(),
+                    BlobError::TenantDenied(_) => "AccessDenied".to_string(),
+                    _ => "InternalError".to_string(),
+                };
+                errors.push((key.clone(), code, e.to_string()));
+            }
+        }
+    }
+    xml_response(render_delete_result_xml(&deleted, &errors))
 }
 
 async fn get_object(state: &AppState, bucket: &str, key: &str) -> Response {
@@ -296,6 +450,101 @@ fn render_list_xml(bucket: &str, prefix: &str, metas: &[ObjectMeta]) -> String {
     }
     out.push_str("</ListBucketResult>");
     out
+}
+
+fn render_list_buckets_xml(buckets: &[BucketMeta]) -> String {
+    let mut out = String::new();
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    out.push_str("<ListAllMyBucketsResult>\n");
+    out.push_str("  <Owner>\n    <ID>cave</ID>\n    <DisplayName>cave</DisplayName>\n  </Owner>\n");
+    out.push_str("  <Buckets>\n");
+    for b in buckets {
+        out.push_str("    <Bucket>\n");
+        out.push_str(&format!("      <Name>{}</Name>\n", b.name));
+        out.push_str(&format!(
+            "      <CreationDate>{}</CreationDate>\n",
+            b.created_at.to_rfc3339()
+        ));
+        out.push_str("    </Bucket>\n");
+    }
+    out.push_str("  </Buckets>\n");
+    out.push_str("</ListAllMyBucketsResult>");
+    out
+}
+
+fn render_bucket_location_xml() -> String {
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+     <LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">us-east-1</LocationConstraint>"
+        .to_string()
+}
+
+fn render_versioning_xml(enabled: bool) -> String {
+    let status = if enabled { "Enabled" } else { "Suspended" };
+    format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+         <VersioningConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\n  \
+         <Status>{}</Status>\n\
+         </VersioningConfiguration>",
+        status
+    )
+}
+
+/// Parse `<VersioningConfiguration><Status>Enabled|Suspended</Status>...`.
+pub fn parse_versioning_xml(xml: &str) -> bool {
+    if let Ok(s) = extract_xml_field(xml, "Status") {
+        s.eq_ignore_ascii_case("Enabled")
+    } else {
+        false
+    }
+}
+
+/// Parse the `Delete` request body into a list of object keys to delete.
+/// Quiet/Versioned variants are accepted but only Key is honored.
+pub fn parse_delete_objects_xml(xml: &str) -> Result<Vec<String>, &'static str> {
+    let mut out = Vec::new();
+    let mut cursor = xml;
+    while let Some(start) = cursor.find("<Object>") {
+        cursor = &cursor[start + 8..];
+        let end = cursor.find("</Object>").ok_or("unterminated Object")?;
+        let chunk = &cursor[..end];
+        let key = extract_xml_field(chunk, "Key")?.to_string();
+        out.push(key);
+        cursor = &cursor[end + 9..];
+    }
+    Ok(out)
+}
+
+fn render_delete_result_xml(deleted: &[String], errors: &[(String, String, String)]) -> String {
+    let mut out = String::new();
+    out.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    out.push_str("<DeleteResult xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\n");
+    for k in deleted {
+        out.push_str("  <Deleted>\n");
+        out.push_str(&format!("    <Key>{}</Key>\n", k));
+        out.push_str("  </Deleted>\n");
+    }
+    for (k, code, msg) in errors {
+        out.push_str("  <Error>\n");
+        out.push_str(&format!("    <Key>{}</Key>\n", k));
+        out.push_str(&format!("    <Code>{}</Code>\n", code));
+        out.push_str(&format!("    <Message>{}</Message>\n", msg));
+        out.push_str("  </Error>\n");
+    }
+    out.push_str("</DeleteResult>");
+    out
+}
+
+/// Parse `x-amz-copy-source` header; supports the two AWS forms:
+///   `bucket/key`        — relative
+///   `/bucket/key`       — leading slash
+/// Returns `None` if the header is malformed.
+pub fn parse_copy_source(header: &str) -> Option<(String, String)> {
+    let trimmed = header.trim_start_matches('/');
+    let (bucket, key) = trimmed.split_once('/')?;
+    if bucket.is_empty() || key.is_empty() {
+        return None;
+    }
+    Some((bucket.to_string(), key.to_string()))
 }
 
 pub fn parse_complete_multipart_xml(xml: &str) -> Result<Vec<(i32, String)>, &'static str> {
@@ -465,5 +714,324 @@ mod tests {
     fn extract_xml_field_missing_errors() {
         let s = "<X>1</X>";
         assert!(extract_xml_field(s, "Y").is_err());
+    }
+
+    // ── New ops ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_copy_source_relative() {
+        let p = parse_copy_source("src-bucket/path/key.txt").unwrap();
+        assert_eq!(p, ("src-bucket".into(), "path/key.txt".into()));
+    }
+
+    #[test]
+    fn parse_copy_source_leading_slash() {
+        let p = parse_copy_source("/src-bucket/k").unwrap();
+        assert_eq!(p, ("src-bucket".into(), "k".into()));
+    }
+
+    #[test]
+    fn parse_copy_source_invalid_returns_none() {
+        assert!(parse_copy_source("nokey").is_none());
+        assert!(parse_copy_source("/").is_none());
+    }
+
+    #[test]
+    fn parse_delete_objects_xml_one_key() {
+        let xml = "<Delete><Object><Key>a.txt</Key></Object></Delete>";
+        let keys = parse_delete_objects_xml(xml).unwrap();
+        assert_eq!(keys, vec!["a.txt"]);
+    }
+
+    #[test]
+    fn parse_delete_objects_xml_multiple() {
+        let xml = "<Delete>\
+                   <Object><Key>a</Key></Object>\
+                   <Object><Key>b/c</Key></Object>\
+                   </Delete>";
+        let keys = parse_delete_objects_xml(xml).unwrap();
+        assert_eq!(keys, vec!["a", "b/c"]);
+    }
+
+    #[test]
+    fn parse_delete_objects_xml_empty_ok() {
+        assert!(parse_delete_objects_xml("<Delete/>").unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_versioning_xml_enabled() {
+        let xml = "<VersioningConfiguration><Status>Enabled</Status></VersioningConfiguration>";
+        assert!(parse_versioning_xml(xml));
+    }
+
+    #[test]
+    fn parse_versioning_xml_suspended() {
+        let xml = "<VersioningConfiguration><Status>Suspended</Status></VersioningConfiguration>";
+        assert!(!parse_versioning_xml(xml));
+    }
+
+    #[test]
+    fn render_versioning_xml_enabled_string() {
+        assert!(render_versioning_xml(true).contains("<Status>Enabled</Status>"));
+        assert!(render_versioning_xml(false).contains("<Status>Suspended</Status>"));
+    }
+
+    #[test]
+    fn render_list_buckets_xml_empty() {
+        let s = render_list_buckets_xml(&[]);
+        assert!(s.contains("<ListAllMyBucketsResult>"));
+        assert!(s.contains("<Buckets>"));
+    }
+
+    #[test]
+    fn render_list_buckets_xml_with_buckets() {
+        let m = BucketMeta {
+            name: "bk".into(),
+            tenant: "default".into(),
+            created_at: Utc::now(),
+            versioning_enabled: false,
+            immutability_default: None,
+        };
+        let s = render_list_buckets_xml(&[m]);
+        assert!(s.contains("<Name>bk</Name>"));
+        assert!(s.contains("<CreationDate>"));
+    }
+
+    #[test]
+    fn render_bucket_location_default_region() {
+        let s = render_bucket_location_xml();
+        assert!(s.contains("us-east-1"));
+        assert!(s.contains("LocationConstraint"));
+    }
+
+    #[test]
+    fn render_delete_result_emits_deleted_and_error() {
+        let xml = render_delete_result_xml(
+            &["a".into(), "b".into()],
+            &[("c".into(), "AccessDenied".into(), "denied".into())],
+        );
+        assert!(xml.contains("<Deleted>"));
+        assert!(xml.contains("<Key>a</Key>"));
+        assert!(xml.contains("<Error>"));
+        assert!(xml.contains("<Code>AccessDenied</Code>"));
+    }
+
+    // ── Wired-handler smoke tests via tower::ServiceExt ─────────────────
+
+    #[tokio::test]
+    async fn list_buckets_returns_xml() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "alpha".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        let app = router(state);
+        let req = axum::http::Request::builder()
+            .method("GET")
+            .uri("/")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let s = String::from_utf8_lossy(&bytes).to_string();
+        assert!(s.contains("<Name>alpha</Name>"));
+    }
+
+    #[tokio::test]
+    async fn delete_objects_round_trip() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "buk".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        state
+            .store
+            .put_object(Object::new("buk", "a", b"x".to_vec(), "t"))
+            .unwrap();
+        state
+            .store
+            .put_object(Object::new("buk", "b", b"y".to_vec(), "t"))
+            .unwrap();
+        let body = "<Delete><Object><Key>a</Key></Object>\
+                    <Object><Key>b</Key></Object></Delete>";
+        let app = router(state.clone());
+        let req = axum::http::Request::builder()
+            .method("POST")
+            .uri("/buk?delete")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let s = String::from_utf8_lossy(&bytes).to_string();
+        assert!(s.contains("<Key>a</Key>"));
+        assert!(s.contains("<Key>b</Key>"));
+        // store should now be empty
+        assert!(state.store.list_objects("buk", "").unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn copy_object_creates_destination() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "src".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "dst".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        state
+            .store
+            .put_object(Object::new("src", "k.txt", b"payload".to_vec(), "text/plain"))
+            .unwrap();
+        let app = router(state.clone());
+        let req = axum::http::Request::builder()
+            .method("PUT")
+            .uri("/dst/copied.txt")
+            .header("x-amz-copy-source", "src/k.txt")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = state.store.get_object("dst", "copied.txt", None).unwrap();
+        assert_eq!(body.body, b"payload");
+    }
+
+    #[tokio::test]
+    async fn get_bucket_location_returns_region() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "buk".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        let app = router(state);
+        let req = axum::http::Request::builder()
+            .method("GET")
+            .uri("/buk?location")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        assert!(String::from_utf8_lossy(&bytes).contains("us-east-1"));
+    }
+
+    #[tokio::test]
+    async fn put_then_get_bucket_versioning() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "buk".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        let app = router(state.clone());
+        let body = "<VersioningConfiguration><Status>Enabled</Status></VersioningConfiguration>";
+        let req = axum::http::Request::builder()
+            .method("PUT")
+            .uri("/buk?versioning")
+            .body(Body::from(body))
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(state.store.bucket_meta("buk").unwrap().versioning_enabled);
+
+        let req2 = axum::http::Request::builder()
+            .method("GET")
+            .uri("/buk?versioning")
+            .body(Body::empty())
+            .unwrap();
+        let resp2 = app.oneshot(req2).await.unwrap();
+        assert_eq!(resp2.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp2.into_body(), usize::MAX).await.unwrap();
+        assert!(String::from_utf8_lossy(&bytes).contains("Enabled"));
+    }
+
+    #[tokio::test]
+    async fn upload_part_copy_returns_part_etag() {
+        use tower::ServiceExt;
+        let state = AppState::new();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "src".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        state
+            .store
+            .create_bucket(BucketMeta {
+                name: "dst".into(),
+                tenant: "default".into(),
+                created_at: Utc::now(),
+                versioning_enabled: false,
+                immutability_default: None,
+            })
+            .unwrap();
+        state
+            .store
+            .put_object(Object::new("src", "src.bin", b"abcdef".to_vec(), "x"))
+            .unwrap();
+        let upload_id = state.uploads.initiate("dst", "out.bin");
+
+        let app = router(state.clone());
+        let req = axum::http::Request::builder()
+            .method("PUT")
+            .uri(format!("/dst/out.bin?partNumber=1&uploadId={}", upload_id))
+            .header("x-amz-copy-source", "src/src.bin")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body = String::from_utf8_lossy(&bytes).to_string();
+        assert!(body.contains("<CopyPartResult>"));
+        let parts = state.uploads.list_parts(&upload_id).unwrap();
+        assert_eq!(parts.len(), 1);
+        assert_eq!(parts[0].size, 6);
     }
 }

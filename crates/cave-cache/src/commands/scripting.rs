@@ -10,7 +10,7 @@ use crate::resp::Resp;
 
 // ── EVAL / EVALSHA ────────────────────────────────────────────────────────────
 
-pub fn cmd_eval(args: &[Vec<u8>], db: &mut Db, scripts: &ScriptStore) -> CacheResult<Resp> {
+pub fn cmd_eval(args: &[Vec<u8>], db: &mut Db, _scripts: &ScriptStore) -> CacheResult<Resp> {
     if args.len() < 3 { return Err(CacheError::wrong_arity("eval")); }
     let script = std::str::from_utf8(&args[1])
         .map_err(|_| CacheError::generic("ERR Script contains invalid UTF-8"))?
@@ -72,13 +72,135 @@ pub fn cmd_script_exists(args: &[Vec<u8>], store: &ScriptStore) -> CacheResult<R
     Ok(Resp::Array(Some(results)))
 }
 
-pub fn cmd_script_flush(args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
+pub fn cmd_script_flush(_args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
     store.flush();
     Ok(Resp::ok())
 }
 
 pub fn cmd_script_debug(_args: &[Vec<u8>]) -> CacheResult<Resp> {
     Ok(Resp::ok()) // DEBUG mode not supported
+}
+
+// ── FUNCTION / FCALL ────────────────────────────────────────────────────────
+//
+// We reuse ScriptStore as a minimal function library: the function "name" maps
+// to its source. Engine prefixes, library boundaries, and ACL category hints
+// are accepted syntactically but not enforced. Actual evaluation flows through
+// the same Lua-subset evaluator as EVAL, so simple `return ...` bodies work.
+
+/// FUNCTION LOAD [REPLACE] code
+///
+/// Stores `code` keyed by an extracted library name. Returns the library name as
+/// a bulk string. We accept the library declaration syntax
+/// `#!lua name=mylib` ... but tolerate plain bodies (in which case the SHA1 is
+/// used as the library name, like SCRIPT LOAD).
+pub fn cmd_function_load(args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
+    if args.len() < 3 { return Err(CacheError::wrong_arity("function load")); }
+    let mut idx = 2;
+    let mut replace = false;
+    if idx < args.len() && args[idx].to_ascii_uppercase() == b"REPLACE" {
+        replace = true;
+        idx += 1;
+    }
+    if idx >= args.len() { return Err(CacheError::wrong_arity("function load")); }
+    let code = std::str::from_utf8(&args[idx])
+        .map_err(|_| CacheError::generic("ERR Function code contains invalid UTF-8"))?
+        .to_string();
+
+    // Extract library name from `#!lua name=mylib` shebang if present.
+    let name = code
+        .lines()
+        .next()
+        .and_then(|l| l.split_once("name="))
+        .map(|(_, rest)| rest.split_whitespace().next().unwrap_or("").to_string())
+        .filter(|n| !n.is_empty());
+
+    let key = match name {
+        Some(n) => {
+            if !replace && store.scripts.contains_key(&n) {
+                return Err(CacheError::generic(
+                    "ERR Library already exists. Use REPLACE option to overwrite.",
+                ));
+            }
+            n
+        }
+        None => {
+            // Fall back to SHA-keyed storage like SCRIPT LOAD.
+            return Ok(Resp::BulkString(Some(store.load(code).into_bytes())));
+        }
+    };
+
+    store.scripts.insert(key.clone(), code);
+    Ok(Resp::BulkString(Some(key.into_bytes())))
+}
+
+pub fn cmd_function_list(_args: &[Vec<u8>], store: &ScriptStore) -> CacheResult<Resp> {
+    let entries: Vec<Resp> = store.scripts.keys()
+        .map(|k| Resp::Array(Some(vec![
+            Resp::BulkString(Some(b"library_name".to_vec())),
+            Resp::BulkString(Some(k.clone().into_bytes())),
+            Resp::BulkString(Some(b"engine".to_vec())),
+            Resp::BulkString(Some(b"LUA".to_vec())),
+            Resp::BulkString(Some(b"functions".to_vec())),
+            Resp::Array(Some(vec![])),
+        ])))
+        .collect();
+    Ok(Resp::Array(Some(entries)))
+}
+
+pub fn cmd_function_flush(_args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
+    store.flush();
+    Ok(Resp::ok())
+}
+
+pub fn cmd_function_delete(args: &[Vec<u8>], store: &mut ScriptStore) -> CacheResult<Resp> {
+    if args.len() != 3 { return Err(CacheError::wrong_arity("function delete")); }
+    let name = std::str::from_utf8(&args[2])
+        .map_err(|_| CacheError::generic("ERR Library name must be valid UTF-8"))?;
+    if store.scripts.remove(name).is_some() {
+        Ok(Resp::ok())
+    } else {
+        Err(CacheError::generic("ERR Library not found"))
+    }
+}
+
+pub fn cmd_function_stats() -> Resp {
+    Resp::Array(Some(vec![
+        Resp::BulkString(Some(b"running_script".to_vec())),
+        Resp::nil(),
+        Resp::BulkString(Some(b"engines".to_vec())),
+        Resp::Array(Some(vec![])),
+    ]))
+}
+
+/// FCALL function numkeys [key ...] [arg ...]
+///
+/// Looks up `function` in the library store and evaluates it with the same
+/// Lua-subset interpreter EVAL uses. Functions defined via `#!lua name=...`
+/// libraries are stored as raw source — function-call dispatch within a
+/// library is not supported, so the entire library body is treated as the
+/// callable.
+pub fn cmd_fcall(args: &[Vec<u8>], db: &mut Db, store: &ScriptStore) -> CacheResult<Resp> {
+    if args.len() < 3 { return Err(CacheError::wrong_arity("fcall")); }
+    let func_name = std::str::from_utf8(&args[1])
+        .map_err(|_| CacheError::generic("ERR Function name must be valid UTF-8"))?;
+    let source = store.scripts.get(func_name)
+        .ok_or_else(|| CacheError::generic("ERR Function not found"))?
+        .clone();
+    let numkeys: usize = std::str::from_utf8(&args[2]).ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    let keys: Vec<Vec<u8>> = args[3..3 + numkeys.min(args.len().saturating_sub(3))].to_vec();
+    let argv: Vec<Vec<u8>> = if args.len() > 3 + numkeys {
+        args[3 + numkeys..].to_vec()
+    } else {
+        vec![]
+    };
+    evaluate_script(&source, &keys, &argv, db)
+}
+
+pub fn cmd_fcall_ro(args: &[Vec<u8>], db: &mut Db, store: &ScriptStore) -> CacheResult<Resp> {
+    cmd_fcall(args, db, store)
 }
 
 // ── Script evaluator ──────────────────────────────────────────────────────────
@@ -370,5 +492,86 @@ fn redis_call_impl(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         b"STRLEN" => cmd_strlen(args, db),
         _ => Err(CacheError::generic(format!("ERR Unknown Redis command called from script: '{}'",
             std::str::from_utf8(&cmd).unwrap_or("?")))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn function_load_named_library_round_trip() {
+        let mut store = ScriptStore::default();
+        let code = "#!lua name=mylib\nreturn 'ok'";
+        let r = cmd_function_load(
+            &[b"FUNCTION".to_vec(), b"LOAD".to_vec(), code.as_bytes().to_vec()],
+            &mut store,
+        ).unwrap();
+        match r {
+            Resp::BulkString(Some(b)) => assert_eq!(b, b"mylib"),
+            _ => panic!(),
+        }
+        assert!(store.scripts.contains_key("mylib"));
+
+        // Reloading without REPLACE should fail.
+        let again = cmd_function_load(
+            &[b"FUNCTION".to_vec(), b"LOAD".to_vec(), code.as_bytes().to_vec()],
+            &mut store,
+        );
+        assert!(again.is_err());
+
+        // REPLACE works.
+        let again = cmd_function_load(
+            &[b"FUNCTION".to_vec(), b"LOAD".to_vec(), b"REPLACE".to_vec(), code.as_bytes().to_vec()],
+            &mut store,
+        );
+        assert!(again.is_ok());
+    }
+
+    #[test]
+    fn function_list_and_delete() {
+        let mut store = ScriptStore::default();
+        store.scripts.insert("foo".to_string(), "return 1".to_string());
+        let r = cmd_function_list(&[], &store).unwrap();
+        match r {
+            Resp::Array(Some(items)) => assert_eq!(items.len(), 1),
+            _ => panic!(),
+        }
+        let r = cmd_function_delete(
+            &[b"FUNCTION".to_vec(), b"DELETE".to_vec(), b"foo".to_vec()],
+            &mut store,
+        ).unwrap();
+        assert!(matches!(r, Resp::SimpleString(_)));
+        assert!(store.scripts.is_empty());
+    }
+
+    #[test]
+    fn fcall_invokes_stored_function() {
+        let mut store = ScriptStore::default();
+        store.scripts.insert("hello".to_string(), "return 'world'".to_string());
+        let mut db = Db::new();
+        let r = cmd_fcall(
+            &[b"FCALL".to_vec(), b"hello".to_vec(), b"0".to_vec()],
+            &mut db,
+            &store,
+        ).unwrap();
+        match r {
+            Resp::SimpleString(s) | Resp::BulkString(Some(s)) => {
+                assert_eq!(s, b"world");
+            }
+            _ => panic!("unexpected: {:?}", r),
+        }
+    }
+
+    #[test]
+    fn fcall_unknown_function_errors() {
+        let store = ScriptStore::default();
+        let mut db = Db::new();
+        let r = cmd_fcall(
+            &[b"FCALL".to_vec(), b"nope".to_vec(), b"0".to_vec()],
+            &mut db,
+            &store,
+        );
+        assert!(r.is_err());
     }
 }

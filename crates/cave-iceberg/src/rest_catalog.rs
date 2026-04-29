@@ -246,12 +246,215 @@ impl RestCatalog {
         Ok(entry.clone())
     }
 
+    /// Upstream-spec commit:
+    ///   POST /v1/{prefix}/namespaces/{ns}/tables/{tbl}
+    ///   body = CommitTableRequest{ requirements[], updates[] }
+    ///
+    /// We honour the requirement subset that maps to in-memory state we
+    /// actually track:
+    ///   * `assert-table-uuid`           → no-op (we don't model UUID yet; we
+    ///                                     accept any UUID rather than fail).
+    ///   * `assert-current-snapshot-id`  → must match `entry.current_snapshot_id`.
+    ///   * `assert-create`               → table must NOT already exist.
+    /// We honour the update subset:
+    ///   * `set-snapshot` / `add-snapshot` → updates `current_snapshot_id`.
+    ///   * `set-current-snapshot`          → updates `current_snapshot_id`.
+    ///   * `set-location`                  → ignored (we don't track location
+    ///                                       separately from `metadata_location`).
+    ///
+    /// `new_metadata_location` is supplied out-of-band (the catalog itself
+    /// doesn't synthesise metadata.json files; the client writes them and
+    /// tells us the new path). For multi-table transactions the caller wraps
+    /// this method per table.
+    pub fn commit_with_updates(
+        &self,
+        namespace: &str,
+        name: &str,
+        new_metadata_location: &str,
+        requirements: &[CommitRequirement],
+        updates: &[CommitUpdate],
+        now_ms: i64,
+    ) -> CatalogResult<TableEntry> {
+        let mut tables = self.tables.write();
+        let key = (namespace.to_string(), name.to_string());
+
+        // assert-create: table must not already exist.
+        let asserts_create = requirements
+            .iter()
+            .any(|r| matches!(r, CommitRequirement::AssertCreate));
+        if asserts_create {
+            if tables.contains_key(&key) {
+                return Err(CatalogError::TableExists(namespace.into(), name.into()));
+            }
+            // Synthesize a fresh entry; namespace must exist.
+            drop(tables);
+            let ns = self.namespaces.read();
+            if !ns.contains_key(namespace) {
+                return Err(CatalogError::NamespaceNotFound(namespace.into()));
+            }
+            drop(ns);
+            let mut tables = self.tables.write();
+            let mut entry = TableEntry {
+                namespace: namespace.into(),
+                name: name.into(),
+                metadata_location: new_metadata_location.into(),
+                current_snapshot_id: None,
+                last_updated_ms: now_ms,
+                properties: BTreeMap::new(),
+            };
+            apply_updates(&mut entry, updates);
+            tables.insert(key, entry.clone());
+            return Ok(entry);
+        }
+
+        let entry = tables
+            .get_mut(&key)
+            .ok_or_else(|| CatalogError::TableNotFound(namespace.into(), name.into()))?;
+
+        for req in requirements {
+            match req {
+                CommitRequirement::AssertCreate => {} // handled above
+                CommitRequirement::AssertTableUuid { .. } => {
+                    // We don't track UUIDs; accept by convention.
+                }
+                CommitRequirement::AssertCurrentSnapshotId { snapshot_id } => {
+                    if entry.current_snapshot_id != *snapshot_id {
+                        return Err(CatalogError::CommitConflict {
+                            expected: format!("snapshot-id={:?}", snapshot_id),
+                            found: format!("snapshot-id={:?}", entry.current_snapshot_id),
+                        });
+                    }
+                }
+                CommitRequirement::AssertRefSnapshotId { snapshot_id, .. } => {
+                    if entry.current_snapshot_id != *snapshot_id {
+                        return Err(CatalogError::CommitConflict {
+                            expected: format!("ref-snapshot-id={:?}", snapshot_id),
+                            found: format!("snapshot-id={:?}", entry.current_snapshot_id),
+                        });
+                    }
+                }
+                CommitRequirement::Other { .. } => {
+                    // Unrecognised requirement types: accept (forward-compat).
+                }
+            }
+        }
+
+        entry.metadata_location = new_metadata_location.into();
+        entry.last_updated_ms = now_ms;
+        apply_updates(entry, updates);
+        Ok(entry.clone())
+    }
+
     pub fn table_count(&self) -> usize {
         self.tables.read().len()
     }
 
     pub fn namespace_count(&self) -> usize {
         self.namespaces.read().len()
+    }
+
+    /// Register an existing metadata.json under a (namespace, name) without
+    /// rewriting it — mirrors `Catalog.registerTable` and the
+    /// `POST /v1/{prefix}/namespaces/{ns}/register` endpoint.
+    ///
+    /// `overwrite=false` rejects collisions; `overwrite=true` replaces any
+    /// existing entry with the same (namespace, name).
+    pub fn register_table(
+        &self,
+        namespace: &str,
+        name: &str,
+        metadata_location: &str,
+        overwrite: bool,
+        now_ms: i64,
+    ) -> CatalogResult<TableEntry> {
+        validate_identifier(name)?;
+        let ns = self.namespaces.read();
+        if !ns.contains_key(namespace) {
+            return Err(CatalogError::NamespaceNotFound(namespace.into()));
+        }
+        drop(ns);
+        let mut tables = self.tables.write();
+        let key = (namespace.to_string(), name.to_string());
+        if !overwrite && tables.contains_key(&key) {
+            return Err(CatalogError::TableExists(namespace.into(), name.into()));
+        }
+        let entry = TableEntry {
+            namespace: namespace.into(),
+            name: name.into(),
+            metadata_location: metadata_location.into(),
+            current_snapshot_id: None,
+            last_updated_ms: now_ms,
+            properties: BTreeMap::new(),
+        };
+        tables.insert(key, entry.clone());
+        Ok(entry)
+    }
+}
+
+// ── CommitTable spec types (subset) ─────────────────────────────────────────
+//
+// Mirrors `apache/iceberg/open-api/rest-catalog-open-api.yaml`:
+//   * TableRequirement (discriminated union on `type`)
+//   * TableUpdate      (discriminated union on `action`)
+//
+// We model the variants the in-memory catalog can actually evaluate; unknown
+// types are tolerated (Other) so the wire payload deserialises even when a
+// client sends a richer body than we evaluate.
+
+/// Subset of upstream `TableRequirement`. The discriminator on the wire is
+/// `"type": "assert-..."`; here we map only the requirements that touch
+/// state we actually track (snapshot id, table existence).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CommitRequirement {
+    AssertCreate,
+    AssertTableUuid {
+        uuid: String,
+    },
+    AssertCurrentSnapshotId {
+        snapshot_id: Option<i64>,
+    },
+    AssertRefSnapshotId {
+        ref_name: String,
+        snapshot_id: Option<i64>,
+    },
+    /// Catch-all so unfamiliar requirement types deserialize cleanly.
+    Other {
+        type_tag: String,
+    },
+}
+
+/// Subset of upstream `TableUpdate`. We honour only those that mutate the
+/// fields TableEntry actually carries (current_snapshot_id, properties).
+#[derive(Debug, Clone, PartialEq)]
+pub enum CommitUpdate {
+    /// `set-snapshot-ref` (main branch) or `add-snapshot` set the current id.
+    SetCurrentSnapshot { snapshot_id: i64 },
+    /// `set-properties` merges into `entry.properties`.
+    SetProperties { updates: BTreeMap<String, String> },
+    /// `remove-properties` removes keys.
+    RemoveProperties { removals: Vec<String> },
+    /// Catch-all so unfamiliar action types deserialize cleanly.
+    Other { action: String },
+}
+
+fn apply_updates(entry: &mut TableEntry, updates: &[CommitUpdate]) {
+    for u in updates {
+        match u {
+            CommitUpdate::SetCurrentSnapshot { snapshot_id } => {
+                entry.current_snapshot_id = Some(*snapshot_id);
+            }
+            CommitUpdate::SetProperties { updates } => {
+                for (k, v) in updates {
+                    entry.properties.insert(k.clone(), v.clone());
+                }
+            }
+            CommitUpdate::RemoveProperties { removals } => {
+                for k in removals {
+                    entry.properties.remove(k);
+                }
+            }
+            CommitUpdate::Other { .. } => {}
+        }
     }
 }
 
@@ -511,5 +714,140 @@ mod tests {
         c.create_namespace("acme", empty_props()).unwrap();
         let e = c.create_table("acme", "t", "m", empty_props(), 0).unwrap();
         assert_eq!(e.full_name(), "acme.t");
+    }
+
+    #[test]
+    fn commit_with_updates_assert_current_snapshot_matches() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1.json", empty_props(), 0).unwrap();
+        // Put the table at snapshot 7.
+        c.commit("acme", "t", "v1.json", "v2.json", Some(7), 0).unwrap();
+        let entry = c
+            .commit_with_updates(
+                "acme",
+                "t",
+                "v3.json",
+                &[CommitRequirement::AssertCurrentSnapshotId { snapshot_id: Some(7) }],
+                &[CommitUpdate::SetCurrentSnapshot { snapshot_id: 8 }],
+                100,
+            )
+            .unwrap();
+        assert_eq!(entry.metadata_location, "v3.json");
+        assert_eq!(entry.current_snapshot_id, Some(8));
+    }
+
+    #[test]
+    fn commit_with_updates_assert_current_snapshot_mismatch_errors() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1.json", empty_props(), 0).unwrap();
+        let err = c
+            .commit_with_updates(
+                "acme",
+                "t",
+                "v2.json",
+                &[CommitRequirement::AssertCurrentSnapshotId { snapshot_id: Some(99) }],
+                &[],
+                0,
+            )
+            .unwrap_err();
+        assert!(matches!(err, CatalogError::CommitConflict { .. }));
+    }
+
+    #[test]
+    fn commit_with_updates_assert_create_creates_new_table() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        let entry = c
+            .commit_with_updates(
+                "acme",
+                "fresh",
+                "v1.json",
+                &[CommitRequirement::AssertCreate],
+                &[CommitUpdate::SetCurrentSnapshot { snapshot_id: 1 }],
+                0,
+            )
+            .unwrap();
+        assert_eq!(entry.metadata_location, "v1.json");
+        assert_eq!(entry.current_snapshot_id, Some(1));
+    }
+
+    #[test]
+    fn commit_with_updates_assert_create_rejects_existing() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1", empty_props(), 0).unwrap();
+        let err = c
+            .commit_with_updates(
+                "acme",
+                "t",
+                "v2",
+                &[CommitRequirement::AssertCreate],
+                &[],
+                0,
+            )
+            .unwrap_err();
+        assert!(matches!(err, CatalogError::TableExists(_, _)));
+    }
+
+    #[test]
+    fn commit_with_updates_set_properties_merges() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1", empty_props(), 0).unwrap();
+        let mut props = BTreeMap::new();
+        props.insert("owner".into(), "alice".into());
+        let entry = c
+            .commit_with_updates(
+                "acme",
+                "t",
+                "v2",
+                &[],
+                &[CommitUpdate::SetProperties { updates: props }],
+                0,
+            )
+            .unwrap();
+        assert_eq!(entry.properties.get("owner").unwrap(), "alice");
+    }
+
+    #[test]
+    fn register_table_creates_entry() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        let entry = c
+            .register_table("acme", "imported", "s3://bucket/v1.metadata.json", false, 0)
+            .unwrap();
+        assert_eq!(entry.metadata_location, "s3://bucket/v1.metadata.json");
+        assert!(c.load_table("acme", "imported").is_ok());
+    }
+
+    #[test]
+    fn register_table_rejects_collision_without_overwrite() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1", empty_props(), 0).unwrap();
+        let err = c.register_table("acme", "t", "v2", false, 0).unwrap_err();
+        assert!(matches!(err, CatalogError::TableExists(_, _)));
+    }
+
+    #[test]
+    fn register_table_overwrite_true_replaces() {
+        let c = RestCatalog::new();
+        c.create_namespace("acme", empty_props()).unwrap();
+        c.create_table("acme", "t", "v1", empty_props(), 0).unwrap();
+        let entry = c
+            .register_table("acme", "t", "v9", true, 0)
+            .unwrap();
+        assert_eq!(entry.metadata_location, "v9");
+    }
+
+    #[test]
+    fn register_table_unknown_namespace_errors() {
+        let c = RestCatalog::new();
+        let err = c
+            .register_table("ghost", "t", "v1", false, 0)
+            .unwrap_err();
+        assert!(matches!(err, CatalogError::NamespaceNotFound(_)));
     }
 }

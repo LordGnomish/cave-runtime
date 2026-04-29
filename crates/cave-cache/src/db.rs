@@ -9,10 +9,10 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 
 use crate::acl::AclState;
 use crate::cluster::ClusterState;
-use crate::config::{Config, EvictionPolicy};
+use crate::config::Config;
 use crate::error::{CacheError, CacheResult};
 use crate::keyspace::KeyspaceEvent;
-use crate::types::{Entry, Value};
+use crate::types::Entry;
 
 // ── Database ──────────────────────────────────────────────────────────────────
 

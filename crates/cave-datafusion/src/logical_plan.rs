@@ -15,6 +15,10 @@ pub enum AggregateFunc {
     Min,
     Max,
     Avg,
+    /// COUNT(DISTINCT col) — counts unique non-null values.
+    /// Mirrors apache/datafusion's `count_distinct` aggregate
+    /// (datafusion-functions-aggregate/src/count.rs).
+    CountDistinct,
 }
 
 impl AggregateFunc {
@@ -25,8 +29,17 @@ impl AggregateFunc {
             AggregateFunc::Min => "MIN",
             AggregateFunc::Max => "MAX",
             AggregateFunc::Avg => "AVG",
+            AggregateFunc::CountDistinct => "COUNT(DISTINCT)",
         }
     }
+}
+
+/// One column of an ORDER BY clause. Mirrors apache/datafusion's
+/// `datafusion-expr::expr::Sort` (subset — no NULLS FIRST/LAST option).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SortExpr {
+    pub column: String,
+    pub ascending: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -61,6 +74,13 @@ pub enum LogicalPlan {
         input: Box<LogicalPlan>,
         group_by: Vec<String>,
         aggregates: Vec<AggregateExpr>,
+    },
+    /// ORDER BY — sorts rows by one or more columns.
+    /// Mirrors apache/datafusion's `LogicalPlan::Sort`
+    /// (datafusion-expr/src/logical_plan/plan.rs).
+    Sort {
+        input: Box<LogicalPlan>,
+        exprs: Vec<SortExpr>,
     },
 }
 
@@ -111,6 +131,13 @@ impl LogicalPlan {
         }
     }
 
+    pub fn sort(self, exprs: Vec<SortExpr>) -> Self {
+        LogicalPlan::Sort {
+            input: Box::new(self),
+            exprs,
+        }
+    }
+
     /// Children of this plan node.
     pub fn children(&self) -> Vec<&LogicalPlan> {
         match self {
@@ -118,7 +145,8 @@ impl LogicalPlan {
             LogicalPlan::Projection { input, .. }
             | LogicalPlan::Filter { input, .. }
             | LogicalPlan::Limit { input, .. }
-            | LogicalPlan::Aggregate { input, .. } => vec![input.as_ref()],
+            | LogicalPlan::Aggregate { input, .. }
+            | LogicalPlan::Sort { input, .. } => vec![input.as_ref()],
         }
     }
 
@@ -129,6 +157,7 @@ impl LogicalPlan {
             LogicalPlan::Filter { .. } => "Filter",
             LogicalPlan::Limit { .. } => "Limit",
             LogicalPlan::Aggregate { .. } => "Aggregate",
+            LogicalPlan::Sort { .. } => "Sort",
         }
     }
 
@@ -207,6 +236,21 @@ impl LogicalPlan {
                             "aggregate {} requires a column",
                             a.func.name()
                         )));
+                    }
+                }
+                input.validate()?;
+            }
+            LogicalPlan::Sort { input, exprs } => {
+                if exprs.is_empty() {
+                    return Err(DataFusionError::Plan(
+                        "sort requires ≥ 1 sort expression".into(),
+                    ));
+                }
+                for s in exprs {
+                    if s.column.is_empty() {
+                        return Err(DataFusionError::Plan(
+                            "sort expression column must not be empty".into(),
+                        ));
                     }
                 }
                 input.validate()?;
@@ -429,6 +473,61 @@ mod tests {
     }
 
     // ── serde ─────────────────────────────────────────────────────────────────
+
+    // ── Sort ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn sort_node_constructor_and_name() {
+        let p = LogicalPlan::scan("t").sort(vec![SortExpr {
+            column: "id".into(),
+            ascending: true,
+        }]);
+        assert_eq!(p.name(), "Sort");
+        assert_eq!(p.depth(), 2);
+    }
+
+    #[test]
+    fn validate_sort_ok() {
+        let p = LogicalPlan::scan("t").sort(vec![SortExpr {
+            column: "id".into(),
+            ascending: false,
+        }]);
+        assert!(p.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_sort_empty_exprs_err() {
+        let p = LogicalPlan::scan("t").sort(vec![]);
+        assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn validate_sort_empty_column_err() {
+        let p = LogicalPlan::scan("t").sort(vec![SortExpr {
+            column: "".into(),
+            ascending: true,
+        }]);
+        assert!(p.validate().is_err());
+    }
+
+    #[test]
+    fn count_distinct_func_name() {
+        assert_eq!(AggregateFunc::CountDistinct.name(), "COUNT(DISTINCT)");
+    }
+
+    #[test]
+    fn validate_count_distinct_requires_column() {
+        // citation: COUNT(DISTINCT *) is not a valid SQL form
+        let p = LogicalPlan::scan("t").aggregate(
+            vec![],
+            vec![AggregateExpr {
+                func: AggregateFunc::CountDistinct,
+                column: None,
+                output_name: "n".into(),
+            }],
+        );
+        assert!(p.validate().is_err());
+    }
 
     #[test]
     fn plan_serde_roundtrip() {

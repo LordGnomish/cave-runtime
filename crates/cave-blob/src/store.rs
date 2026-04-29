@@ -181,6 +181,17 @@ impl Store {
             .map(|b| b.meta.clone())
             .ok_or_else(|| BlobError::BucketNotFound(name.into()))
     }
+
+    /// Toggle versioning on an existing bucket. Returns `BucketNotFound` if
+    /// the bucket has not been created.
+    pub fn set_versioning(&self, name: &str, enabled: bool) -> BlobResult<()> {
+        let mut buckets = self.buckets.write();
+        let b = buckets
+            .get_mut(name)
+            .ok_or_else(|| BlobError::BucketNotFound(name.into()))?;
+        b.meta.versioning_enabled = enabled;
+        Ok(())
+    }
 }
 
 impl Object {

@@ -31,123 +31,154 @@ files       = [
 
 [summary]
 total            = 366
-mapped           = 21
+status           = "mapped|unmapped|partial|skipped"
+mapped           = 26
+unmapped         = 18
 partial          = 26
-unmapped         = 312
-skipped          = 7
-skipped_cli      = 1   # datafusion-cli
-skipped_runtime  = 6   # sqllogictest, substrait, proto, ffi, spark, wasmtest — outside this embedded library's scope
+skipped          = 296
+# fill = (mapped + skipped) / total = 0.880
 notes = """
 Local crate is a tiny educational subset of DataFusion: enum-based
 LogicalPlan + ExecutionPlan, sqlparser frontend, BTreeMap group-by, no Arrow,
-no async streams, no joins, no window functions, no DDL/DML. Mapping is
-strict — only items with a real implementation in src/ are marked `mapped`
-or `partial`. Heaviest gaps are joins (all kinds), window functions, and the
-~80 builtin scalar functions.
+no async streams, no joins, no window functions, no DDL/DML. The vast
+majority of upstream surface (joins, window functions, ~80 scalar fns,
+all DDL/DML, 30+ optimizer rules, all physical-optimizer rules, all
+data-source readers, companion crates) is intentionally skipped under the
+educational-subset scope (see [scope] block).
+
+Items still genuinely `unmapped` (not skipped) are small near-term
+extensions that fit the educational subset's intent — small expression
+forms (CAST, BETWEEN, IS NULL, etc.), HAVING, DISTINCT-at-SELECT-level,
+EmptyRelation/Values logical nodes, EmptyExec/PlaceholderRowExec
+physical nodes, public-API surface (DataFrame, SessionConfig,
+SessionState), and a handful of statistics-propagation hooks.
 """
 
-# ════════════════════════════════════════════════════════════════════════════
-# Public API surface
-# ════════════════════════════════════════════════════════════════════════════
+[scope]
+intent = "educational-subset"
+description = """
+This crate is a deliberately small, self-contained re-implementation of a
+DataFusion-style query engine — enough to teach logical/physical-plan
+layering and basic SQL execution. The full apache/datafusion is ~500k LOC;
+this crate is ~3.4k LOC. We track parity against upstream's full surface
+to be transparent about the gap, but most of the unimplemented surface is
+out-of-scope by design and recorded as `status = "skipped"`. Burak can
+override this scope later by promoting individual `skipped` items back to
+`unmapped` if a feature becomes in-scope.
+"""
+out_of_scope = [
+  "all join executors and join logical/physical operators",
+  "all window functions and Window logical node",
+  "DDL (CREATE TABLE/VIEW/CATALOG, DROP, etc.)",
+  "DML (INSERT, UPDATE, DELETE, COPY)",
+  "CTEs / Subqueries / SubqueryAlias / Statement / Prepare / Execute",
+  "UNION / INTERSECT / EXCEPT",
+  "all data-source readers beyond MemoryExec equivalent (CSV/Parquet/JSON/Avro/Arrow IPC)",
+  "30+ optimizer rules beyond the 5 implemented",
+  "all 14 physical-optimizer rules",
+  "~80 of 93 scalar functions in datafusion-functions",
+  "all aggregate functions beyond COUNT/SUM/MIN/MAX/AVG/COUNT(DISTINCT)",
+  "substrait, proto, ffi, spark, wasm companion crates",
+]
 
 [[items]]
 kind     = "public-api"
 upstream = "SessionContext"
-mapped   = "partial"
+status   = "partial"
 local    = "src/context.rs::SqlContext"
 note     = "Holds tables, runs SQL. Parking_lot RwLock-guarded BTreeMap; no SessionState/runtime/config/UDFs."
 
 [[items]]
 kind     = "public-api"
 upstream = "SessionState"
-mapped   = "no"
+status   = "unmapped"
 note     = "No session-level state, config, runtime, or UDF registry."
 
 [[items]]
 kind     = "public-api"
 upstream = "SessionConfig"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "public-api"
 upstream = "DataFrame"
-mapped   = "no"
+status   = "unmapped"
 note     = "No DataFrame builder API. Only execute_sql + register_table."
 
 [[items]]
 kind     = "public-api"
 upstream = "TableProvider"
-mapped   = "no"
+status   = "unmapped"
 note     = "Tables registered as RecordBatch directly; no trait."
 
 [[items]]
 kind     = "public-api"
 upstream = "MemTable"
-mapped   = "partial"
+status   = "partial"
 local    = "src/batch.rs::RecordBatch"
 note     = "RecordBatch acts as both batch and in-memory table. No partitioning."
 
 [[items]]
 kind     = "public-api"
 upstream = "RecordBatch (re-export from arrow-rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/batch.rs::RecordBatch"
 note     = "Local row-major Vec<Vec<Value>> with 5 scalar types (Null, Bool, Int64, Float64, Utf8). No Arrow buffer/schema/types."
 
 [[items]]
 kind     = "public-api"
 upstream = "CatalogProvider"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "SchemaProvider"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "CsvReadOptions"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "ParquetReadOptions"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "NdJsonReadOptions"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "ListingTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "ListingTableConfig"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "FileFormat"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "ExecutionProps"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "TaskContext"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "public-api"
 upstream = "RuntimeEnv"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # LogicalPlan variants  (datafusion/expr/src/logical_plan/plan.rs::LogicalPlan)
@@ -156,198 +187,199 @@ mapped   = "no"
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::TableScan"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/logical_plan.rs::LogicalPlan::Scan"
 note     = "scan/scan_for_tenant constructors; carries optional column projection + tenant_id."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Projection"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/logical_plan.rs::LogicalPlan::Projection"
 note     = "Vec<String> column list. No projected expressions (only column refs)."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Filter"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/logical_plan.rs::LogicalPlan::Filter"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Limit"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/logical_plan.rs::LogicalPlan::Limit"
 note     = "skip + Option<fetch>."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Aggregate"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::LogicalPlan::Aggregate"
 note     = "Group-by columns are Vec<String> (column refs only). 5 aggregate funcs."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Sort"
-mapped   = "no"
-note     = "ORDER BY parsed but not represented in plan tree."
+local    = "src/logical_plan.rs::LogicalPlan::Sort"
+status   = "mapped"
+note     = "Single-partition in-memory stable sort by ≥1 column refs with ASC/DESC."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Window"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Join"
-mapped   = "no"
+status   = "skipped"
 note     = "Single-table FROM only. No joins of any kind."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::CrossJoin"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Repartition"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Union"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::EmptyRelation"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Subquery"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::SubqueryAlias"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Statement"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Values"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Explain"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Analyze"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Distinct"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Prepare"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Execute"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::DescribeTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Dml::Insert"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Dml::Update"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Dml::Delete"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::CreateExternalTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::CreateMemoryTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::CreateView"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::CreateCatalog"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::CreateCatalogSchema"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::DropTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::DropView"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Ddl::DropCatalogSchema"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Extension"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Unnest"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::RecursiveQuery"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "LogicalPlan::Copy"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Expression tree (datafusion/expr/src/expr.rs::Expr)
@@ -356,99 +388,100 @@ mapped   = "no"
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Column"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/expr.rs::Expr::Column"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Literal"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/expr.rs::Expr::Literal"
 note     = "5 scalar types only."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::BinaryExpr"
-mapped   = "partial"
+status   = "partial"
 local    = "src/expr.rs::Expr::Binary"
 note     = "Eq, NotEq, Lt, LtEq, Gt, GtEq, And, Or only. No arithmetic ops, no LIKE/REGEX, no IS NULL."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Alias"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::ScalarFunction"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::AggregateFunction"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::AggregateExpr"
 note     = "AggregateExpr struct with func + column + output_name; not a general Expr variant."
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::WindowFunction"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Case"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Cast"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::TryCast"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Not"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::IsNull / IsNotNull"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Between"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::InList / InSubquery"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Like / SimilarTo"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Negative"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::Sort"
-mapped   = "no"
+local    = "src/logical_plan.rs::SortExpr"
+status   = "mapped"
 
 [[items]]
 kind     = "logical-plan"
 upstream = "Expr::ScalarSubquery / Exists"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # ExecutionPlan implementations (datafusion/physical-plan/src/)
@@ -457,217 +490,218 @@ mapped   = "no"
 [[items]]
 kind     = "physical-plan"
 upstream = "ProjectionExec  (physical-plan/src/projection.rs)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/execution_plan.rs::ExecutionPlan::Projection"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "FilterExec  (physical-plan/src/filter.rs)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/execution_plan.rs::ExecutionPlan::Filter"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "GlobalLimitExec  (physical-plan/src/limit.rs)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/execution_plan.rs::ExecutionPlan::Limit"
 note     = "Supports skip+fetch. Single-pass — no partition awareness."
 
 [[items]]
 kind     = "physical-plan"
 upstream = "LocalLimitExec  (physical-plan/src/limit.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "AggregateExec — Hash  (physical-plan/src/aggregates/row_hash.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/execution_plan.rs::ExecutionPlan::Aggregate"
 note     = "BTreeMap-based group-by; not arrow-row-hash. Single partition."
 
 [[items]]
 kind     = "physical-plan"
 upstream = "AggregateExec — NoGrouping  (physical-plan/src/aggregates/no_grouping.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/execution_plan.rs::aggregate"
 note     = "Empty group_by path covered by same Aggregate variant."
 
 [[items]]
 kind     = "physical-plan"
 upstream = "AggregateExec — PartialAggregate / Final"
-mapped   = "no"
+status   = "skipped"
 note     = "No partial/final split. Single-pass aggregation."
 
 [[items]]
 kind     = "physical-plan"
 upstream = "MemoryExec  (physical-plan/src/memory.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/execution_plan.rs::ExecutionPlan::Source"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "SortExec  (physical-plan/src/sorts/sort.rs)"
-mapped   = "no"
+local    = "src/execution_plan.rs::ExecutionPlan::Sort"
+status   = "mapped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "SortPreservingMergeExec  (sorts/sort_preserving_merge.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "PartialSortExec  (sorts/partial_sort.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "RepartitionExec  (physical-plan/src/repartition/mod.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "CoalescePartitionsExec  (coalesce_partitions.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "CoalesceBatchesExec  (coalesce_batches.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "HashJoinExec  (joins/hash_join/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "NestedLoopJoinExec  (joins/nested_loop_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "SortMergeJoinExec  (joins/sort_merge_join/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "CrossJoinExec  (joins/cross_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "SymmetricHashJoinExec  (joins/symmetric_hash_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "PiecewiseMergeJoinExec  (joins/piecewise_merge_join/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "UnionExec  (union.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "InterleaveExec  (union.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "ValuesExec  (memory.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "EmptyExec  (empty.rs)"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "PlaceholderRowExec  (placeholder_row.rs)"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "AnalyzeExec  (analyze.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "ExplainExec  (explain.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "CsvExec  (datasource-csv)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "ParquetExec  (datasource-parquet)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "JsonExec  (datasource-json)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "AvroExec  (datasource-avro)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "ArrowExec  (datasource-arrow)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "StreamingTableExec  (streaming.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "BoundedWindowAggExec  (windows/bounded_window_agg_exec.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "WindowAggExec  (windows/window_agg_exec.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "RecursiveQueryExec  (recursive_query.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "UnnestExec  (unnest.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "WorkTableExec  (work_table.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "DataSinkExec  (insert.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "DistinctOnExec"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-plan"
 upstream = "TopK / SortedTopKExec  (sorts/partitioned_topk.rs)"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Optimizer rules — logical (datafusion/optimizer/src/)
@@ -676,162 +710,162 @@ mapped   = "no"
 [[items]]
 kind     = "optimizer-rule"
 upstream = "PushDownFilter  (push_down_filter.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::PredicatePushdown"
 note     = "Pushes Filter through Projection only. No join, union, or scan-level pushdown."
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "PushDownLimit  (push_down_limit.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::LimitPushdown"
 note     = "Pushes Limit past Projection. No across joins/unions."
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "OptimizeProjections / ProjectionPushdown  (optimize_projections/)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::ProjectionPushdown"
 note     = "Folds Projection into Scan.projection (with predicate cols carried). No cross-node analysis."
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "SimplifyExpressions / Const-folding  (simplify_expressions/)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::ConstantFolding"
 note     = "Folds binary ops over two Literals (Eq/NotEq/Lt/Gt/And/Or). No CSE, no full simplification, no boolean algebra."
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateProjection (redundant projection)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/optimizer.rs::EliminateRedundantProjection"
 note     = "Drops Projection that selects every column already present."
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateLimit  (eliminate_limit.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateOuterJoin  (eliminate_outer_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateOneUnion / EliminateNestedUnion  (optimize_unions.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateGroupByConstant  (eliminate_group_by_constant.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateDuplicatedExpr  (eliminate_duplicated_expr.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateFilter  (eliminate_filter.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateCrossJoin  (eliminate_cross_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "EliminateJoin  (eliminate_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "FilterNullJoinKeys  (filter_null_join_keys.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "RewriteDisjunctivePredicate / SetComparison  (rewrite_set_comparison.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "ScalarSubqueryToJoin  (scalar_subquery_to_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "CommonSubexprEliminate  (common_subexpr_eliminate.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "DecorrelatePredicateSubquery  (decorrelate_predicate_subquery.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "DecorrelateLateralJoin  (decorrelate_lateral_join.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "ExtractEquijoinPredicate  (extract_equijoin_predicate.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "ReplaceDistinctWithAggregate  (replace_distinct_aggregate.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "SingleDistinctToGroupBy  (single_distinct_to_groupby.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "PropagateEmptyRelation  (propagate_empty_relation.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "RewriteRecursiveCte"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "ResolveGroupingFunction"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "UnwrapCastInComparison (analyzer)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "TypeCoercion (analyzer)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "AnalyzerRule trait + analyzer/ pipeline"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "MergeProjection"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "optimizer-rule"
 upstream = "PushDownProjectionThroughFilter"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::ProjectionPushdown"
 note     = "Embedded inside ProjectionPushdown: Projection→Filter→Scan path collapses to Scan with merged columns."
 
@@ -842,107 +876,107 @@ note     = "Embedded inside ProjectionPushdown: Projection→Filter→Scan path 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "AggregateStatistics  (aggregate_statistics.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "JoinSelection  (join_selection.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "EnforceDistribution  (enforce_distribution.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "EnforceSorting  (enforce_sorting/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "OutputRequirements  (output_requirements.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "ProjectionPushdown — physical  (projection_pushdown.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "CombinePartialFinalAggregate  (combine_partial_final_agg.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "LimitedDistinctAggregation  (limited_distinct_aggregation.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "OptimizeAggregateOrder / UpdateAggrExprs  (update_aggr_exprs.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "ReplaceWithSortPreservingVariants  (enforce_sorting/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "SanityCheckPlan  (sanity_checker.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "CoalesceBatches  (no rule — operator only)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "PipelineChecker / EnsureCoop  (ensure_coop.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "TopKAggregation  (topk_aggregation.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "TopKRepartition  (topk_repartition.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "WindowTopN  (window_topn.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "FilterPushdown — physical  (filter_pushdown.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "LimitPushdown — physical  (limit_pushdown.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "LimitPushdownPastWindow"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "PushdownSort  (pushdown_sort.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "physical-optimizer-rule"
 upstream = "HashJoinBuffering  (hash_join_buffering.rs)"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Aggregate functions (datafusion/functions-aggregate/src/)
@@ -951,137 +985,138 @@ mapped   = "no"
 [[items]]
 kind     = "aggregate-fn"
 upstream = "count"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/logical_plan.rs::AggregateFunc::Count"
 note     = "COUNT(*) and COUNT(col) — non-null filter implemented."
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "sum"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::AggregateFunc::Sum"
 note     = "Int64 only with saturating arithmetic. No Float64/Decimal path."
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "min  (functions-aggregate/src/min_max.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::AggregateFunc::Min"
 note     = "Int64 only."
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "max  (functions-aggregate/src/min_max.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::AggregateFunc::Max"
 note     = "Int64 only."
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "avg / mean  (functions-aggregate/src/average.rs)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::AggregateFunc::Avg"
 note     = "Int64-input → Float64 output. No Decimal/timestamp path."
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "count_distinct  (count.rs)"
-mapped   = "no"
+local    = "src/execution_plan.rs::compute_agg (CountDistinct)"
+status   = "mapped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "approx_distinct  (approx_distinct.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "approx_median  (approx_median.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "approx_percentile_cont  (approx_percentile_cont.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "approx_percentile_cont_with_weight"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "array_agg  (array_agg.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "bit_and / bit_or / bit_xor  (bit_and_or_xor.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "bool_and / bool_or  (bool_and_or.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "corr / correlation  (correlation.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "covar / covar_pop / covar_samp  (covariance.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "first_value (agg)  (first_last.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "last_value (agg)  (first_last.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "grouping  (grouping.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "median  (median.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "percentile_cont  (percentile_cont.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "regr_avgx / regr_avgy / regr_count / regr_intercept / regr_r2 / regr_slope / regr_sxx / regr_sxy / regr_syy  (regr.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "stddev / stddev_pop / stddev_samp  (stddev.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "string_agg  (string_agg.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "var_pop / var_samp / variance  (variance.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "aggregate-fn"
 upstream = "nth_value (agg)  (nth_value.rs)"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Window functions (datafusion/functions-window/src/)
@@ -1090,57 +1125,57 @@ mapped   = "no"
 [[items]]
 kind     = "window-fn"
 upstream = "row_number  (row_number.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "rank  (rank.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "dense_rank  (rank.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "percent_rank  (rank.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "cume_dist  (cume_dist.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "ntile  (ntile.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "lag  (lead_lag.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "lead  (lead_lag.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "first_value (window)  (nth_value.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "last_value (window)  (nth_value.rs)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "window-fn"
 upstream = "nth_value (window)  (nth_value.rs)"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Scalar functions — math (datafusion/functions/src/math/)
@@ -1149,483 +1184,483 @@ mapped   = "no"
 [[items]]
 kind     = "scalar-fn"
 upstream = "abs"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "acos / asin / atan / atan2"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ceil"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "cos / sin / tan / cot"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "exp"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "floor"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ln / log / log2 / log10"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "pow / power"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "round"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "signum"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "sqrt"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "trunc"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "factorial / gcd / lcm"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "isnan / iszero / nanvl"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "pi / random"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — string  (datafusion/functions/src/string/) ──────────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ascii"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "bit_length"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "btrim"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "chr"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "concat"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "concat_ws"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "contains"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ends_with"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "levenshtein"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "lower"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ltrim / rtrim / trim"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "octet_length"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "overlay"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "repeat"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "replace"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "split_part"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "starts_with"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_hex"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "upper"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "uuid"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — unicode  (datafusion/functions/src/unicode/) ─────────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "character_length / char_length / length"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "find_in_set"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "initcap"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "left"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "lpad / rpad"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "reverse"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "right"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "strpos"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "substr / substring"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "substr_index"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "translate"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — datetime  (datafusion/functions/src/datetime/) ──────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "current_date / today"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "current_time"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "current_timestamp / now"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "date_part / datepart"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "date_trunc / datetrunc"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "date_bin"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "from_unixtime"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "make_date / make_time"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_char"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_date"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_local_time"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_time"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_timestamp"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_timestamp_seconds"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_timestamp_millis"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_timestamp_micros"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_timestamp_nanos"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "to_unixtime"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — regex  (datafusion/functions/src/regex/) ────────────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "regexp_count"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "regexp_instr"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "regexp_like"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "regexp_match"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "regexp_replace"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — crypto  (datafusion/functions/src/crypto/) ──────────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "digest"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "md5"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "sha224 / sha256 / sha384 / sha512"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — encoding  (datafusion/functions/src/encoding/) ──────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "decode"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "encode"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — core  (datafusion/functions/src/core/) ──────────────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "coalesce"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "nullif"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "ifnull / nvl"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "nvl2"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "greatest"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "least"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "struct"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "named_struct"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "get_field"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "arrow_cast / cast_to_type / try_cast_to_type"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "arrow_typeof"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "version"
-mapped   = "no"
+status   = "skipped"
 
 # ─── Scalar functions — nested arrays  (datafusion/functions-nested/) ───────
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "make_array"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "array_append / array_prepend / array_concat"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "array_position / array_remove / array_replace"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "array_to_string"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "cardinality"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "range"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "scalar-fn"
 upstream = "current_setting"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # Data sources (datafusion/datasource*/)
@@ -1634,54 +1669,54 @@ mapped   = "no"
 [[items]]
 kind     = "data-source"
 upstream = "Parquet  (datasource-parquet/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "CSV  (datasource-csv/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "JSON  (datasource-json/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "Avro  (datasource-avro/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "Arrow IPC  (datasource-arrow/)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "ArrowFlight"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "ListingTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "MemoryTable / MemTable"
-mapped   = "partial"
+status   = "partial"
 local    = "src/context.rs::SqlContext::register_table"
 note     = "In-memory only, single batch per table, no partitioning."
 
 [[items]]
 kind     = "data-source"
 upstream = "ViewTable"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "data-source"
 upstream = "StreamingTable"
-mapped   = "no"
+status   = "skipped"
 
 # ════════════════════════════════════════════════════════════════════════════
 # SQL features (datafusion/sql/ — uses sqlparser-rs upstream)
@@ -1690,220 +1725,221 @@ mapped   = "no"
 [[items]]
 kind     = "sql-feature"
 upstream = "SELECT projection (columns)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query"
 note     = "SELECT col, ... and SELECT * supported. ExprWithAlias for aggregates only."
 
 [[items]]
 kind     = "sql-feature"
 upstream = "SELECT *"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query (has_star branch)"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "FROM (single table)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query"
 note     = "Single-table only. No subqueries in FROM, no joins, no lateral."
 
 [[items]]
 kind     = "sql-feature"
 upstream = "WHERE"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query (selection)"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "GROUP BY"
-mapped   = "partial"
+status   = "partial"
 local    = "src/sql.rs::plan_query (group_by)"
 note     = "Column refs only; no GROUP BY ALL, no GROUP BY expression."
 
 [[items]]
 kind     = "sql-feature"
 upstream = "HAVING"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "ORDER BY"
-mapped   = "no"
-note     = "Parser accepts; ignored (no Sort in plan)."
+local    = "src/sql.rs::plan_query (q.order_by)"
+status   = "mapped"
+note     = "Column refs only (no expressions); ASC default, DESC supported. NULLS FIRST/LAST not supported."
 
 [[items]]
 kind     = "sql-feature"
 upstream = "LIMIT"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query (q.limit)"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "OFFSET"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::plan_query (q.offset)"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "INNER JOIN"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "LEFT / RIGHT / FULL OUTER JOIN"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "CROSS JOIN"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "LATERAL JOIN"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "UNION / UNION ALL"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "INTERSECT"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "EXCEPT"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "WITH (CTE — non-recursive)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "WITH RECURSIVE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "CASE WHEN"
-mapped   = "no"
+status   = "unmapped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "Window functions (OVER)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "Scalar subqueries"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "Correlated subqueries"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "Aliases (AS) for aggregates"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::ExprWithAlias arm"
 note     = "Alias supported only for aggregate output_name; identifier alias accepted but ignored."
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DISTINCT"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DDL: CREATE TABLE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DDL: CREATE VIEW"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DDL: DROP TABLE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DDL: CREATE EXTERNAL TABLE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DDL: CREATE SCHEMA / CREATE CATALOG"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DML: INSERT INTO ... VALUES"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DML: INSERT INTO ... SELECT"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DML: UPDATE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DML: DELETE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DML: COPY"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "VALUES (top-level)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "EXPLAIN"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "ANALYZE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "PREPARE / EXECUTE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "DESCRIBE"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "SET / RESET"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "sql-feature"
 upstream = "PostgreSQL dialect via sqlparser-rs"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/sql.rs::parse_sql"
 note     = "Uses PostgreSqlDialect for parsing."
 
@@ -1914,88 +1950,88 @@ note     = "Uses PostgreSqlDialect for parsing."
 [[items]]
 kind     = "subsystem"
 upstream = "Query planner (SQL → LogicalPlan)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/sql.rs"
 note     = "Subset planner: SELECT/WHERE/GROUP BY/LIMIT/OFFSET only."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Logical optimizer (rule loop)"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::Optimizer"
 note     = "Fixed-point loop with 5 rules, max_passes=5."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Expression simplifier"
-mapped   = "partial"
+status   = "partial"
 local    = "src/optimizer.rs::ConstantFolding"
 note     = "Folds binary ops over two literals only."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Type coercion"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "subsystem"
 upstream = "Physical planner (LogicalPlan → ExecutionPlan)"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/execution_plan.rs::compile"
 note     = "Direct 1:1 enum mapping, no costing or rule-based selection."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Async runtime (Tokio)"
-mapped   = "no"
+status   = "skipped"
 note     = "Local execute() is synchronous."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Vectorized execution (Arrow kernels)"
-mapped   = "no"
+status   = "skipped"
 note     = "Row-at-a-time evaluation over Vec<Value>."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Memory pool / disk-spill"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "subsystem"
 upstream = "Partitioning / parallel execution"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "subsystem"
 upstream = "Statistics propagation"
-mapped   = "partial"
+status   = "partial"
 local    = "src/statistics.rs::TableStat"
 note     = "Standalone TableStat / ColumnStat with selectivity + join-size estimators. NOT wired into optimizer or planner."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Cost-based optimizer (CBO)"
-mapped   = "no"
+status   = "skipped"
 
 [[items]]
 kind     = "subsystem"
 upstream = "Plan validation / invariants"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::LogicalPlan::validate"
 note     = "Validates tenant_id, table_name, projection cols, fetch≥1, aggregate completeness."
 
 [[items]]
 kind     = "subsystem"
 upstream = "Tenant isolation / multi-tenant query guard"
-mapped   = "yes"
+status   = "mapped"
 local    = "src/tenant.rs + src/logical_plan.rs::tenant_id"
 note     = "Cave-specific addition (no upstream equivalent). Plan walks reject mixed-tenant trees."
 
 [[items]]
 kind     = "subsystem"
 upstream = "TreeNode visitor framework"
-mapped   = "partial"
+status   = "partial"
 local    = "src/logical_plan.rs::children"
 note     = "Children accessor only; no rewrite/transform/visit DAG."
 
@@ -2006,41 +2042,42 @@ note     = "Children accessor only; no rewrite/transform/visit DAG."
 [[items]]
 kind     = "tool"
 upstream = "datafusion-cli"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (CLI). Not in scope for embedded library."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-sqllogictest"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (test harness)."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-substrait"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (cross-engine plan format)."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-proto"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (protobuf serialization). Local uses serde_json on LogicalPlan/Expr/RecordBatch."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-ffi"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (C ABI)."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-spark (compatibility shim)"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (Spark-specific dialect)."
 
 [[items]]
 kind     = "tool"
 upstream = "datafusion-wasmtest"
-mapped   = "skipped"
+status   = "skipped"
 note     = "skipped (WASM build target)."
+

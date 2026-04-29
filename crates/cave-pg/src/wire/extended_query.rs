@@ -25,8 +25,10 @@ use bytes::BytesMut;
 
 use super::codec::{
     BackendMessage, FieldDescription, FrontendMessage, ProtocolError, ProtocolResult,
-    decode_backend, encode_backend, encode_frontend,
+    decode_backend, encode_frontend,
 };
+#[cfg(test)]
+use super::codec::encode_backend;
 use super::simple_query::TxStatus;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

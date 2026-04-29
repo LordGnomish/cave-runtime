@@ -4,7 +4,6 @@ use std::time::Instant;
 
 use crate::config::EvictionPolicy;
 use crate::db::Db;
-use crate::types::Entry;
 
 /// Try to evict keys if maxmemory is exceeded.
 /// Returns the number of keys evicted.

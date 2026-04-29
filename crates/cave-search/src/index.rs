@@ -170,6 +170,29 @@ impl IndexRegistry {
             .ok_or_else(|| SearchError::IndexNotFound(name.into()))?;
         Ok(f(data))
     }
+
+    /// Merge new field mappings into an existing index. Existing fields
+    /// keep their type; conflicting redefinitions return InvalidMapping.
+    pub fn put_mapping(&self, name: &str, mapping: IndexMapping) -> SearchResult<()> {
+        let mut idx = self.indices.write();
+        let data = idx
+            .get_mut(name)
+            .ok_or_else(|| SearchError::IndexNotFound(name.into()))?;
+        for (field, fm) in mapping.properties {
+            if let Some(existing) = data.mapping.properties.get(&field) {
+                if existing.field_type != fm.field_type {
+                    return Err(SearchError::InvalidMapping(format!(
+                        "cannot redefine field [{}]: {} -> {}",
+                        field,
+                        existing.field_type.as_str(),
+                        fm.field_type.as_str()
+                    )));
+                }
+            }
+            data.mapping.properties.insert(field, fm);
+        }
+        Ok(())
+    }
 }
 
 pub fn tokenize(s: &str) -> Vec<String> {
@@ -340,6 +363,36 @@ mod tests {
             tokenize("Hello, World! 123"),
             vec!["hello", "world", "123"]
         );
+    }
+
+    #[test]
+    fn put_mapping_adds_new_field() {
+        let r = IndexRegistry::new();
+        r.create("b", IndexMapping::new()).unwrap();
+        let mut update = IndexMapping::new();
+        update.add_field("color", FieldType::Keyword);
+        r.put_mapping("b", update).unwrap();
+        r.with_index("b", |d| {
+            assert_eq!(d.mapping.field_type("color"), Some(FieldType::Keyword));
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn put_mapping_rejects_type_change() {
+        let r = IndexRegistry::new();
+        r.create("b", mapping_with("n", FieldType::Long)).unwrap();
+        let mut update = IndexMapping::new();
+        update.add_field("n", FieldType::Keyword);
+        let err = r.put_mapping("b", update).unwrap_err();
+        assert!(matches!(err, SearchError::InvalidMapping(_)));
+    }
+
+    #[test]
+    fn put_mapping_unknown_index_errors() {
+        let r = IndexRegistry::new();
+        let err = r.put_mapping("missing", IndexMapping::new()).unwrap_err();
+        assert!(matches!(err, SearchError::IndexNotFound(_)));
     }
 
     #[test]

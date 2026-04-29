@@ -8,8 +8,8 @@
 //!    [GROUP BY col]`
 
 use sqlparser::ast::{
-    BinaryOperator, Expr as SqlExpr, FunctionArg, FunctionArgExpr, FunctionArguments, Query,
-    SelectItem, SetExpr, Statement, TableFactor, Value as SqlValue,
+    BinaryOperator, DuplicateTreatment, Expr as SqlExpr, FunctionArg, FunctionArgExpr,
+    FunctionArguments, Query, SelectItem, SetExpr, Statement, TableFactor, Value as SqlValue,
 };
 use sqlparser::dialect::PostgreSqlDialect;
 use sqlparser::parser::Parser;
@@ -17,7 +17,7 @@ use sqlparser::parser::Parser;
 use crate::batch::Value;
 use crate::error::{DataFusionError, DfResult};
 use crate::expr::{BinaryOp, Expr};
-use crate::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan};
+use crate::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan, SortExpr};
 
 pub fn parse_sql(sql: &str) -> DfResult<LogicalPlan> {
     let stmts = Parser::parse_sql(&PostgreSqlDialect {}, sql)
@@ -120,6 +120,28 @@ fn plan_query(q: Query) -> DfResult<LogicalPlan> {
         plan = plan.project(projection_cols);
     }
 
+    // ORDER BY → Sort. Only column references with optional ASC/DESC are
+    // supported; expressions in ORDER BY (e.g. `ORDER BY a + b`) error out.
+    if let Some(order_by) = &q.order_by {
+        if !order_by.exprs.is_empty() {
+            let mut sort_exprs = Vec::with_capacity(order_by.exprs.len());
+            for ob in &order_by.exprs {
+                let column = match &ob.expr {
+                    SqlExpr::Identifier(id) => id.value.clone(),
+                    other => {
+                        return Err(DataFusionError::Plan(format!(
+                            "ORDER BY only supports column refs, got {:?}",
+                            other
+                        )))
+                    }
+                };
+                let ascending = ob.asc.unwrap_or(true);
+                sort_exprs.push(SortExpr { column, ascending });
+            }
+            plan = plan.sort(sort_exprs);
+        }
+    }
+
     if let Some(SqlExpr::Value(SqlValue::Number(n, _))) = q.limit {
         let n = n.parse::<usize>().unwrap_or(0);
         let off = q
@@ -144,7 +166,7 @@ fn parse_aggregate(expr: &SqlExpr) -> DfResult<Option<AggregateExpr>> {
             .last()
             .map(|p| p.value.to_uppercase())
             .unwrap_or_default();
-        let func = match name.as_str() {
+        let mut func = match name.as_str() {
             "COUNT" => AggregateFunc::Count,
             "SUM" => AggregateFunc::Sum,
             "MIN" => AggregateFunc::Min,
@@ -152,6 +174,24 @@ fn parse_aggregate(expr: &SqlExpr) -> DfResult<Option<AggregateExpr>> {
             "AVG" => AggregateFunc::Avg,
             _ => return Ok(None),
         };
+        // Detect DISTINCT inside the call list (e.g. COUNT(DISTINCT col)).
+        let is_distinct = match &f.args {
+            FunctionArguments::List(list) => matches!(
+                list.duplicate_treatment,
+                Some(DuplicateTreatment::Distinct)
+            ),
+            _ => false,
+        };
+        if is_distinct {
+            if func == AggregateFunc::Count {
+                func = AggregateFunc::CountDistinct;
+            } else {
+                return Err(DataFusionError::Plan(format!(
+                    "DISTINCT only supported on COUNT, got {}",
+                    name
+                )));
+            }
+        }
         let column = match &f.args {
             FunctionArguments::List(list) => list.args.first().and_then(|a| match a {
                 FunctionArg::Unnamed(FunctionArgExpr::Wildcard) => None,
@@ -162,9 +202,16 @@ fn parse_aggregate(expr: &SqlExpr) -> DfResult<Option<AggregateExpr>> {
             }),
             _ => None,
         };
-        let output = match &column {
-            Some(col) => format!("{}({})", name.to_lowercase(), col),
-            None => format!("{}(*)", name.to_lowercase()),
+        let output = if is_distinct {
+            match &column {
+                Some(col) => format!("count(distinct {})", col),
+                None => "count(distinct *)".into(),
+            }
+        } else {
+            match &column {
+                Some(col) => format!("{}({})", name.to_lowercase(), col),
+                None => format!("{}(*)", name.to_lowercase()),
+            }
         };
         return Ok(Some(AggregateExpr {
             func,
@@ -365,6 +412,80 @@ mod tests {
             }
         }
         panic!("predicate not parsed correctly");
+    }
+
+    // ── ORDER BY ──────────────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_order_by_default_asc() {
+        let p = parse_sql("SELECT * FROM t ORDER BY id").unwrap();
+        match p {
+            LogicalPlan::Sort { exprs, .. } => {
+                assert_eq!(exprs.len(), 1);
+                assert_eq!(exprs[0].column, "id");
+                assert!(exprs[0].ascending);
+            }
+            other => panic!("expected Sort, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_order_by_desc() {
+        let p = parse_sql("SELECT * FROM t ORDER BY id DESC").unwrap();
+        match p {
+            LogicalPlan::Sort { exprs, .. } => {
+                assert!(!exprs[0].ascending);
+            }
+            other => panic!("expected Sort, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_order_by_multi_column() {
+        let p = parse_sql("SELECT * FROM t ORDER BY a ASC, b DESC").unwrap();
+        match p {
+            LogicalPlan::Sort { exprs, .. } => {
+                assert_eq!(exprs.len(), 2);
+                assert_eq!(exprs[0].column, "a");
+                assert!(exprs[0].ascending);
+                assert_eq!(exprs[1].column, "b");
+                assert!(!exprs[1].ascending);
+            }
+            other => panic!("expected Sort, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_order_by_then_limit() {
+        // ORDER BY must wrap the inner plan; LIMIT wraps the Sort.
+        let p = parse_sql("SELECT * FROM t ORDER BY id LIMIT 5").unwrap();
+        match p {
+            LogicalPlan::Limit { input, fetch, .. } => {
+                assert_eq!(fetch, Some(5));
+                assert!(matches!(*input, LogicalPlan::Sort { .. }));
+            }
+            other => panic!("expected Limit, got {:?}", other),
+        }
+    }
+
+    // ── COUNT(DISTINCT) ───────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_count_distinct() {
+        let p = parse_sql("SELECT COUNT(DISTINCT dept) FROM emp").unwrap();
+        match p {
+            LogicalPlan::Aggregate { aggregates, .. } => {
+                assert_eq!(aggregates[0].func, AggregateFunc::CountDistinct);
+                assert_eq!(aggregates[0].column.as_deref(), Some("dept"));
+            }
+            other => panic!("expected Aggregate, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_distinct_on_sum_errors() {
+        // DISTINCT only supported on COUNT in this subset.
+        assert!(parse_sql("SELECT SUM(DISTINCT salary) FROM emp").is_err());
     }
 
     #[test]

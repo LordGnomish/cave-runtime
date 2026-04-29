@@ -1,7 +1,7 @@
 //! RESP3 TCP server — connection handling, command dispatch, pub/sub, transactions.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tokio::io::BufReader;
 use tokio::net::{TcpListener, TcpStream};
@@ -9,10 +9,9 @@ use tokio::sync::mpsc;
 
 use crate::commands::transactions::TransactionState;
 use crate::commands::*;
-use crate::config::Config;
 use crate::db::{PubSubMessage, PubSubKind, ServerState};
 use crate::error::{CacheError, CacheResult};
-use crate::resp::{encode_resp, parse_command, write_resp, Reader, Resp};
+use crate::resp::{encode_resp, parse_command, write_resp, Resp};
 use crate::types::bytes_to_i64;
 
 // ── Connection state ──────────────────────────────────────────────────────────
@@ -249,7 +248,7 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             b"EXEC" | b"DISCARD" | b"MULTI" | b"WATCH" | b"UNWATCH" | b"RESET" | b"QUIT" => {}
             _ => {
                 if let Some(tx) = conn.tx_state.as_mut() {
-                    if let Some(err) = &tx.error {
+                    if let Some(_err) = &tx.error {
                         // Already have a queuing error
                     } else {
                         tx.queue_command(args.to_vec());
@@ -538,6 +537,49 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
                 _ => Resp::error("ERR unknown subcommand for 'script'"),
             }
         }
+        b"FUNCTION" => {
+            if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'function' command"); }
+            match args[1].to_ascii_uppercase().as_slice() {
+                b"LOAD" => {
+                    let mut scripts = state.scripts.write().await;
+                    scripting::cmd_function_load(args, &mut scripts).unwrap_or_else(|e| Resp::from_error(&e))
+                }
+                b"LIST" => {
+                    let scripts = state.scripts.read().await;
+                    scripting::cmd_function_list(args, &scripts).unwrap_or(Resp::empty_array())
+                }
+                b"FLUSH" => {
+                    let mut scripts = state.scripts.write().await;
+                    scripting::cmd_function_flush(args, &mut scripts).unwrap_or(Resp::ok())
+                }
+                b"DELETE" => {
+                    let mut scripts = state.scripts.write().await;
+                    scripting::cmd_function_delete(args, &mut scripts).unwrap_or_else(|e| Resp::from_error(&e))
+                }
+                b"STATS" => scripting::cmd_function_stats(),
+                b"DUMP" => Resp::BulkString(Some(b"".to_vec())),
+                b"RESTORE" => Resp::ok(),
+                b"KILL" => Resp::error("NOTBUSY No scripts in execution right now."),
+                b"HELP" => Resp::Array(Some(vec![
+                    Resp::BulkString(Some(b"FUNCTION LOAD [REPLACE] <code>".to_vec())),
+                    Resp::BulkString(Some(b"FUNCTION LIST [LIBRARYNAME <pattern>] [WITHCODE]".to_vec())),
+                    Resp::BulkString(Some(b"FUNCTION FLUSH [ASYNC|SYNC]".to_vec())),
+                    Resp::BulkString(Some(b"FUNCTION DELETE <library>".to_vec())),
+                    Resp::BulkString(Some(b"FUNCTION STATS".to_vec())),
+                ])),
+                _ => Resp::error("ERR unknown subcommand for 'function'"),
+            }
+        }
+        b"FCALL" | b"FCALL_RO" => {
+            let db_idx = conn.db_index;
+            let args = args.to_vec();
+            let scripts = state.scripts.read().await;
+            let mut db = state.dbs[db_idx].write().await;
+            match scripting::cmd_fcall(&args, &mut db, &scripts) {
+                Ok(r) => r,
+                Err(e) => Resp::from_error(&e),
+            }
+        }
 
         // ── Server commands ────────────────────────────────────────────────────
         b"INFO" => {
@@ -635,7 +677,7 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
             if args.len() < 2 { return Resp::error("ERR wrong number of arguments for 'cluster' command"); }
             match args[1].to_ascii_uppercase().as_slice() {
                 b"INFO" => {
-                    let pairs: Vec<Resp> = cluster.info().into_iter()
+                    let _pairs: Vec<Resp> = cluster.info().into_iter()
                         .map(|(k, v)| Resp::BulkString(Some(format!("{}:{}", k, v).into_bytes())))
                         .collect();
                     let info_str = cluster.info().iter()
@@ -674,6 +716,8 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
         b"BGREWRITEAOF" => server_cmds::cmd_bgrewriteaof(),
         b"LASTSAVE" => server_cmds::cmd_lastsave(),
         b"LOLWUT" => server_cmds::cmd_lolwut(),
+        b"TIME" => server_cmds::cmd_time(),
+        b"ROLE" => server_cmds::cmd_role(),
         b"REPLICAOF" | b"SLAVEOF" => {
             server_cmds::cmd_replicaof(args).unwrap_or_else(|e| Resp::from_error(&e))
         }
@@ -781,6 +825,9 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         b"LTRIM" => lists::cmd_ltrim(args, &mut db),
         b"LPOS" => lists::cmd_lpos(args, &mut db),
         b"LMOVE" => lists::cmd_lmove(args, &mut db),
+        b"RPOPLPUSH" => lists::cmd_rpoplpush(args, &mut db),
+        b"SORT" => lists::cmd_sort(args, &mut db),
+        b"SORT_RO" => lists::cmd_sort_ro(args, &mut db),
         b"LMPOP" => {
             // LMPOP count key [key ...] LEFT|RIGHT [COUNT count]
             Ok(Resp::nil_array()) // simplified
@@ -843,6 +890,13 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         b"ZDIFFSTORE" => sorted_sets::cmd_zdiffstore(args, &mut db),
         b"ZRANDMEMBER" => sorted_sets::cmd_zrandmember(args, &mut db),
         b"ZMPOP" => Ok(Resp::nil_array()), // simplified
+        b"ZUNION" => sorted_sets::cmd_zunion(args, &mut db),
+        b"ZINTER" => sorted_sets::cmd_zinter(args, &mut db),
+        b"ZDIFF" => sorted_sets::cmd_zdiff(args, &mut db),
+        b"ZINTERCARD" => sorted_sets::cmd_zintercard(args, &mut db),
+        b"ZREMRANGEBYRANK" => sorted_sets::cmd_zremrangebyrank(args, &mut db),
+        b"ZREMRANGEBYSCORE" => sorted_sets::cmd_zremrangebyscore(args, &mut db),
+        b"ZREMRANGEBYLEX" => sorted_sets::cmd_zremrangebylex(args, &mut db),
 
         // ── Hashes ────────────────────────────────────────────────────────────
         b"HSET" => hashes::cmd_hset(args, &mut db),
@@ -860,6 +914,7 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         b"HSETNX" => hashes::cmd_hsetnx(args, &mut db),
         b"HRANDFIELD" => hashes::cmd_hrandfield(args, &mut db),
         b"HSCAN" => hashes::cmd_hscan(args, &mut db),
+        b"HSTRLEN" => hashes::cmd_hstrlen(args, &mut db),
         b"HEXPIRE" | b"HPEXPIRE" | b"HEXPIREAT" | b"HPEXPIREAT" => Ok(Resp::Array(Some(vec![]))),
         b"HTTL" | b"HPTTL" | b"HEXPIRETIME" | b"HPEXPIRETIME" => Ok(Resp::Array(Some(vec![]))),
         b"HPERSIST" => Ok(Resp::Array(Some(vec![]))),
@@ -879,6 +934,7 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         b"XPENDING" => streams::cmd_xpending(args, &mut db),
         b"XCLAIM" => streams::cmd_xclaim(args, &mut db),
         b"XAUTOCLAIM" => streams::cmd_xautoclaim(args, &mut db),
+        b"XSETID" => streams::cmd_xsetid(args, &mut db),
 
         // ── HyperLogLog ───────────────────────────────────────────────────────
         b"PFADD" => hyperloglog::cmd_pfadd(args, &mut db),
@@ -920,6 +976,7 @@ async fn execute_db_command(args: &[Vec<u8>], db_index: usize, state: &Arc<Serve
         // ── Keys ──────────────────────────────────────────────────────────────
         b"DEL" => keys::cmd_del(args, &mut db),
         b"UNLINK" => keys::cmd_unlink(args, &mut db),
+        b"TOUCH" => keys::cmd_touch(args, &mut db),
         b"EXISTS" => keys::cmd_exists(args, &mut db),
         b"TYPE" => keys::cmd_type(args, &mut db),
         b"RENAME" => keys::cmd_rename(args, &mut db),

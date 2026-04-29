@@ -2,14 +2,13 @@
 //! LTRIM, LPOS, LMOVE, BLPOP, BRPOP, BLMOVE.
 
 use std::collections::VecDeque;
-use std::time::Duration;
 
 use tokio::sync::mpsc;
 
 use crate::db::{BlockedPop, Db};
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_i64, normalize_index, Entry, Value};
+use crate::types::{bytes_to_f64, bytes_to_i64, normalize_index, Entry, Value};
 
 // ── LPUSH / RPUSH / LPUSHX / RPUSHX ─────────────────────────────────────────
 
@@ -279,10 +278,9 @@ pub fn cmd_lrem(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
                     }
                 } else {
                     // Remove all occurrences
+                    let before = list.len();
                     list.retain(|v| v.as_slice() != element.as_slice());
-                    removed = (list.len()) as i64; // wrong but we don't know the delta easily
-                    // recalc:
-                    removed = 0; // placeholder — actually retained is what's left
+                    removed = (before - list.len()) as i64;
                 }
                 let is_empty = list.is_empty();
                 if is_empty { db.remove(&args[1]); }
@@ -458,7 +456,7 @@ async fn blpop_impl(
     args: &[Vec<u8>],
     db: &mut Db,
     left: bool,
-    timeout: f64,
+    _timeout: f64,
 ) -> CacheResult<Option<(Vec<u8>, Vec<u8>)>> {
     let cmd = if left { "blpop" } else { "brpop" };
     if args.len() < 3 { return Err(CacheError::wrong_arity(cmd)); }
@@ -555,4 +553,218 @@ pub fn wake_blocked(db: &mut Db, key: &[u8]) -> usize {
         }
     }
     0
+}
+
+// ── RPOPLPUSH (deprecated, kept for backcompat) ─────────────────────────────
+
+/// RPOPLPUSH source destination — equivalent to LMOVE source destination RIGHT LEFT.
+pub fn cmd_rpoplpush(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() != 3 { return Err(CacheError::wrong_arity("rpoplpush")); }
+    let lmove_args: Vec<Vec<u8>> = vec![
+        b"LMOVE".to_vec(),
+        args[1].clone(),
+        args[2].clone(),
+        b"RIGHT".to_vec(),
+        b"LEFT".to_vec(),
+    ];
+    cmd_lmove(&lmove_args, db)
+}
+
+// ── SORT / SORT_RO ──────────────────────────────────────────────────────────
+
+/// SORT key [ASC|DESC] [ALPHA] [LIMIT off cnt] [STORE dst]
+///
+/// Implements the most-common subset: numeric/alpha sort over a list/set/zset
+/// with optional ASC/DESC, LIMIT, and STORE. Does NOT support BY/GET patterns.
+pub fn cmd_sort(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() < 2 { return Err(CacheError::wrong_arity("sort")); }
+    let key = &args[1];
+
+    let mut alpha = false;
+    let mut desc = false;
+    let mut offset: usize = 0;
+    let mut count: usize = usize::MAX;
+    let mut store: Option<Vec<u8>> = None;
+
+    let mut i = 2;
+    while i < args.len() {
+        match args[i].to_ascii_uppercase().as_slice() {
+            b"ASC" => { desc = false; i += 1; }
+            b"DESC" => { desc = true; i += 1; }
+            b"ALPHA" => { alpha = true; i += 1; }
+            b"LIMIT" => {
+                if i + 2 >= args.len() { return Err(CacheError::Syntax); }
+                let off = bytes_to_i64(&args[i + 1]).ok_or(CacheError::NotInteger)?;
+                let cnt = bytes_to_i64(&args[i + 2]).ok_or(CacheError::NotInteger)?;
+                offset = if off < 0 { 0 } else { off as usize };
+                count = if cnt < 0 { usize::MAX } else { cnt as usize };
+                i += 3;
+            }
+            b"STORE" => {
+                if i + 1 >= args.len() { return Err(CacheError::Syntax); }
+                store = Some(args[i + 1].clone());
+                i += 2;
+            }
+            // BY / GET are accepted syntactically but treated as identity (no key lookup).
+            b"BY" | b"GET" => {
+                if i + 1 >= args.len() { return Err(CacheError::Syntax); }
+                i += 2;
+            }
+            _ => i += 1,
+        }
+    }
+
+    // Collect input elements
+    let elements: Vec<Vec<u8>> = match db.get(key) {
+        Some(e) => match &e.value {
+            Value::List(l) => l.iter().cloned().collect(),
+            Value::Set(s) => s.iter().cloned().collect(),
+            Value::ZSet(z) => z.iter_asc().map(|(m, _)| m.clone()).collect(),
+            Value::String(_) | Value::Hash(_) | Value::Stream(_) => {
+                return Err(CacheError::WrongType);
+            }
+        },
+        None => vec![],
+    };
+
+    // Sort
+    let mut sorted: Vec<Vec<u8>> = elements;
+    if alpha {
+        sorted.sort();
+    } else {
+        // Numeric sort: parse each as f64; if any fails, return error like Redis.
+        let mut parsed: Vec<(f64, Vec<u8>)> = Vec::with_capacity(sorted.len());
+        for e in sorted.into_iter() {
+            let n = bytes_to_f64(&e).ok_or_else(||
+                CacheError::generic("ERR One or more scores can't be converted into double")
+            )?;
+            parsed.push((n, e));
+        }
+        parsed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        sorted = parsed.into_iter().map(|(_, v)| v).collect();
+    }
+    if desc { sorted.reverse(); }
+
+    let result: Vec<Vec<u8>> = sorted.into_iter().skip(offset).take(count).collect();
+
+    if let Some(dst) = store {
+        let len = result.len() as i64;
+        if result.is_empty() {
+            db.remove(&dst);
+        } else {
+            let list: std::collections::VecDeque<Vec<u8>> = result.into_iter().collect();
+            db.insert(dst, Entry::new(Value::List(list)));
+        }
+        Ok(Resp::Integer(len))
+    } else {
+        Ok(Resp::Array(Some(
+            result.into_iter().map(|v| Resp::BulkString(Some(v))).collect()
+        )))
+    }
+}
+
+/// SORT_RO key ... — read-only variant; identical semantics minus STORE.
+pub fn cmd_sort_ro(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() < 2 { return Err(CacheError::wrong_arity("sort_ro")); }
+    // Reject STORE clause
+    for a in args.iter().skip(2) {
+        if a.to_ascii_uppercase() == b"STORE" {
+            return Err(CacheError::generic("ERR SORT_RO is read-only and cannot accept STORE"));
+        }
+    }
+    cmd_sort(args, db)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rpoplpush_moves_right_to_left() {
+        let mut db = Db::new();
+        let mut l = std::collections::VecDeque::new();
+        l.push_back(b"a".to_vec());
+        l.push_back(b"b".to_vec());
+        db.insert(b"src".to_vec(), Entry::new(Value::List(l)));
+        let r = cmd_rpoplpush(
+            &[b"RPOPLPUSH".to_vec(), b"src".to_vec(), b"dst".to_vec()],
+            &mut db,
+        ).unwrap();
+        match r {
+            Resp::BulkString(Some(b)) => assert_eq!(b, b"b"),
+            _ => panic!(),
+        }
+        if let Some(e) = db.get(b"dst") {
+            if let Value::List(l) = &e.value {
+                assert_eq!(l.len(), 1);
+                assert_eq!(&l[0], b"b");
+            } else { panic!(); }
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn sort_alpha_ascending() {
+        let mut db = Db::new();
+        let mut l = std::collections::VecDeque::new();
+        l.push_back(b"banana".to_vec());
+        l.push_back(b"apple".to_vec());
+        l.push_back(b"cherry".to_vec());
+        db.insert(b"k".to_vec(), Entry::new(Value::List(l)));
+
+        let r = cmd_sort(
+            &[b"SORT".to_vec(), b"k".to_vec(), b"ALPHA".to_vec()],
+            &mut db,
+        ).unwrap();
+        match r {
+            Resp::Array(Some(items)) => {
+                assert_eq!(items.len(), 3);
+                if let Resp::BulkString(Some(b)) = &items[0] { assert_eq!(b, b"apple"); }
+                if let Resp::BulkString(Some(b)) = &items[2] { assert_eq!(b, b"cherry"); }
+            }
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn sort_numeric_descending_with_limit_and_store() {
+        let mut db = Db::new();
+        let mut l = std::collections::VecDeque::new();
+        for v in &["3", "1", "2", "5", "4"] {
+            l.push_back(v.as_bytes().to_vec());
+        }
+        db.insert(b"k".to_vec(), Entry::new(Value::List(l)));
+
+        let r = cmd_sort(
+            &[
+                b"SORT".to_vec(), b"k".to_vec(),
+                b"DESC".to_vec(),
+                b"LIMIT".to_vec(), b"0".to_vec(), b"3".to_vec(),
+                b"STORE".to_vec(), b"dst".to_vec(),
+            ],
+            &mut db,
+        ).unwrap();
+        match r {
+            Resp::Integer(n) => assert_eq!(n, 3),
+            _ => panic!(),
+        }
+        if let Some(e) = db.get(b"dst") {
+            if let Value::List(l) = &e.value {
+                assert_eq!(l.len(), 3);
+                assert_eq!(&l[0], b"5");
+                assert_eq!(&l[1], b"4");
+                assert_eq!(&l[2], b"3");
+            } else { panic!(); }
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn sort_ro_rejects_store() {
+        let mut db = Db::new();
+        db.insert(b"k".to_vec(), Entry::new(Value::List(std::collections::VecDeque::new())));
+        let r = cmd_sort_ro(
+            &[b"SORT_RO".to_vec(), b"k".to_vec(), b"STORE".to_vec(), b"dst".to_vec()],
+            &mut db,
+        );
+        assert!(r.is_err());
+    }
 }

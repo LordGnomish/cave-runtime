@@ -203,7 +203,7 @@ impl ZSet {
             return vec![];
         }
         let all: Vec<_> = self.ordered.keys().collect();
-        let total = all.len();
+        let _total = all.len();
         all.iter()
             .rev()
             .skip(start)

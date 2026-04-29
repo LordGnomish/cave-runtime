@@ -120,6 +120,9 @@ struct Session {
     server: Arc<PgServer>,
     process_id: i32,
     secret_key: i32,
+    /// Negotiated tenant identity from the startup `cave_tenant=` parameter.
+    /// Held for downstream auditing/routing once tenant-scoped catalog reads land.
+    #[allow(dead_code)]
     tenant: Option<String>,
     txn: Option<TxnId>,
 }
@@ -190,6 +193,29 @@ pub async fn handle_connection(
                 encode_backend(&BackendMessage::ReadyForQuery(current_status(&session)), &mut write_buf);
             }
             FrontendMessage::Flush => {}
+            FrontendMessage::FunctionCall { function_oid, .. } => {
+                // The fast-path FunctionCall is deprecated upstream and cave-pg
+                // does not expose an in-process function catalog (pg_proc).
+                // Reject explicitly with the same SQLSTATE PostgreSQL itself uses
+                // for unknown functions (`42883`) and remind the client to
+                // submit a regular SELECT instead.
+                encode_backend(
+                    &BackendMessage::ErrorResponse(vec![
+                        (b'S', "ERROR".into()),
+                        (b'C', "42883".into()),
+                        (
+                            b'M',
+                            format!(
+                                "fast-path FunctionCall (oid={}) is not supported by cave-pg; \
+                                 submit a regular `SELECT fn(...)` query instead",
+                                function_oid
+                            ),
+                        ),
+                    ]),
+                    &mut write_buf,
+                );
+                encode_backend(&BackendMessage::ReadyForQuery(current_status(&session)), &mut write_buf);
+            }
             other => {
                 // Extended-query and other unsupported messages → error + ReadyForQuery.
                 encode_backend(

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_f64, bytes_to_i64, f64_to_bytes, i64_to_bytes, Entry, Value};
+use crate::types::{bytes_to_f64, bytes_to_i64, i64_to_bytes, Entry, Value};
 
 pub fn cmd_hset(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     if args.len() < 4 || (args.len() - 2) % 2 != 0 {
@@ -341,5 +341,48 @@ pub fn cmd_hscan(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             Resp::BulkString(Some(b"0".to_vec())),
             Resp::Array(Some(vec![])),
         ]))),
+    }
+}
+
+// ── HSTRLEN ──────────────────────────────────────────────────────────────────
+
+/// HSTRLEN key field — returns the byte length of the value associated with `field`
+/// in the hash stored at `key`. Returns 0 if the key or field doesn't exist.
+pub fn cmd_hstrlen(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() != 3 { return Err(CacheError::wrong_arity("hstrlen")); }
+    match db.get_typed(&args[1], "hash")? {
+        Some(e) => match &e.value {
+            Value::Hash(h) => Ok(Resp::Integer(
+                h.get(args[2].as_slice()).map(|v| v.len() as i64).unwrap_or(0),
+            )),
+            _ => unreachable!(),
+        },
+        None => Ok(Resp::Integer(0)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hstrlen_returns_value_length() {
+        let mut db = Db::new();
+        let mut h = HashMap::new();
+        h.insert(b"f1".to_vec(), b"hello".to_vec());
+        h.insert(b"f2".to_vec(), b"".to_vec());
+        db.insert(b"k".to_vec(), Entry::new(Value::Hash(h)));
+
+        let r = cmd_hstrlen(&[b"HSTRLEN".to_vec(), b"k".to_vec(), b"f1".to_vec()], &mut db).unwrap();
+        assert!(matches!(r, Resp::Integer(5)));
+
+        let r = cmd_hstrlen(&[b"HSTRLEN".to_vec(), b"k".to_vec(), b"f2".to_vec()], &mut db).unwrap();
+        assert!(matches!(r, Resp::Integer(0)));
+
+        let r = cmd_hstrlen(&[b"HSTRLEN".to_vec(), b"k".to_vec(), b"missing".to_vec()], &mut db).unwrap();
+        assert!(matches!(r, Resp::Integer(0)));
+
+        let r = cmd_hstrlen(&[b"HSTRLEN".to_vec(), b"nope".to_vec(), b"f".to_vec()], &mut db).unwrap();
+        assert!(matches!(r, Resp::Integer(0)));
     }
 }

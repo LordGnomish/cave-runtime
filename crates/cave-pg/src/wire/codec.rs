@@ -84,6 +84,16 @@ pub enum FrontendMessage {
     CopyFail(String),
     /// 'p' — Password / SCRAM client-first / SCRAM client-final / SASL response.
     Password(Vec<u8>),
+    /// 'F' — FunctionCall (deprecated fast-path).  We accept the on-wire form
+    /// for protocol completeness; the dispatcher rejects calls with an
+    /// ErrorResponse referring the client to a regular SELECT, since cave-pg
+    /// does not expose an in-process function catalog.
+    FunctionCall {
+        function_oid: u32,
+        arg_formats: Vec<i16>,
+        args: Vec<Option<Vec<u8>>>,
+        result_format: i16,
+    },
 }
 
 // ── Backend messages ─────────────────────────────────────────────────────────
@@ -147,6 +157,18 @@ pub enum BackendMessage {
     CopyData(Vec<u8>),
     /// 'c' — CopyDone (backend → frontend).
     CopyDone,
+    /// 'V' — FunctionCallResponse.  Single-value reply to a `FunctionCall`.
+    /// Length -1 means SQL NULL.
+    FunctionCallResponse(Option<Vec<u8>>),
+    /// 'v' — NegotiateProtocolVersion.  Sent by the server when the client
+    /// requests a higher minor protocol version than the server supports
+    /// (libpq names it `v3.NegotiateProtocolVersion`).  Carries the maximum
+    /// minor version the server actually speaks plus the names of any
+    /// `_pq_.*` startup options the server did not understand.
+    NegotiateProtocolVersion {
+        newest_minor_supported: i32,
+        unrecognized_options: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -247,6 +269,29 @@ pub fn encode_frontend(msg: &FrontendMessage, buf: &mut BytesMut) {
         CopyDone => write_typed(b'c', buf, |_| {}),
         CopyFail(msg) => write_typed(b'f', buf, |b| put_cstr(b, msg)),
         Password(p) => write_typed(b'p', buf, |b| b.put_slice(p)),
+        FunctionCall {
+            function_oid,
+            arg_formats,
+            args,
+            result_format,
+        } => write_typed(b'F', buf, |b| {
+            b.put_u32(*function_oid);
+            b.put_i16(arg_formats.len() as i16);
+            for f in arg_formats {
+                b.put_i16(*f);
+            }
+            b.put_i16(args.len() as i16);
+            for a in args {
+                match a {
+                    Some(v) => {
+                        b.put_i32(v.len() as i32);
+                        b.put_slice(v);
+                    }
+                    None => b.put_i32(-1),
+                }
+            }
+            b.put_i16(*result_format);
+        }),
     }
 }
 
@@ -354,6 +399,23 @@ pub fn encode_backend(msg: &BackendMessage, buf: &mut BytesMut) {
         }
         CopyData(d) => write_typed(b'd', buf, |b| b.put_slice(d)),
         CopyDone => write_typed(b'c', buf, |_| {}),
+        FunctionCallResponse(value) => write_typed(b'V', buf, |b| match value {
+            Some(v) => {
+                b.put_i32(v.len() as i32);
+                b.put_slice(v);
+            }
+            None => b.put_i32(-1),
+        }),
+        NegotiateProtocolVersion {
+            newest_minor_supported,
+            unrecognized_options,
+        } => write_typed(b'v', buf, |b| {
+            b.put_i32(*newest_minor_supported);
+            b.put_i32(unrecognized_options.len() as i32);
+            for opt in unrecognized_options {
+                put_cstr(b, opt);
+            }
+        }),
     }
 }
 
@@ -462,6 +524,36 @@ pub fn decode_frontend(buf: &mut BytesMut, awaiting_startup: bool) -> ProtocolRe
         b'c' => FrontendMessage::CopyDone,
         b'f' => FrontendMessage::CopyFail(read_cstr(&mut payload)?),
         b'p' => FrontendMessage::Password(payload.to_vec()),
+        b'F' => {
+            let function_oid = read_u32(&mut payload)?;
+            let nf = read_i16(&mut payload)?;
+            let mut arg_formats = Vec::with_capacity(nf.max(0) as usize);
+            for _ in 0..nf {
+                arg_formats.push(read_i16(&mut payload)?);
+            }
+            let na = read_i16(&mut payload)?;
+            let mut args = Vec::with_capacity(na.max(0) as usize);
+            for _ in 0..na {
+                let len = read_i32(&mut payload)?;
+                if len == -1 {
+                    args.push(None);
+                } else if len < 0 {
+                    return Err(ProtocolError::InvalidValue {
+                        field: "FunctionCall.arg_len",
+                        reason: format!("{}", len),
+                    });
+                } else {
+                    args.push(Some(read_bytes(&mut payload, len as usize)?));
+                }
+            }
+            let result_format = read_i16(&mut payload)?;
+            FrontendMessage::FunctionCall {
+                function_oid,
+                arg_formats,
+                args,
+                result_format,
+            }
+        }
         other => return Err(ProtocolError::UnknownFrontendType(other)),
     };
     Ok(msg)
@@ -608,6 +700,37 @@ pub fn decode_backend(buf: &mut BytesMut) -> ProtocolResult<BackendMessage> {
         }
         b'd' => BackendMessage::CopyData(payload.to_vec()),
         b'c' => BackendMessage::CopyDone,
+        b'V' => {
+            let len = read_i32(&mut payload)?;
+            if len == -1 {
+                BackendMessage::FunctionCallResponse(None)
+            } else if len < 0 {
+                return Err(ProtocolError::InvalidValue {
+                    field: "FunctionCallResponse.len",
+                    reason: format!("{}", len),
+                });
+            } else {
+                BackendMessage::FunctionCallResponse(Some(read_bytes(&mut payload, len as usize)?))
+            }
+        }
+        b'v' => {
+            let newest_minor_supported = read_i32(&mut payload)?;
+            let n = read_i32(&mut payload)?;
+            if n < 0 {
+                return Err(ProtocolError::InvalidValue {
+                    field: "NegotiateProtocolVersion.option_count",
+                    reason: format!("{}", n),
+                });
+            }
+            let mut opts = Vec::with_capacity(n as usize);
+            for _ in 0..n {
+                opts.push(read_cstr(&mut payload)?);
+            }
+            BackendMessage::NegotiateProtocolVersion {
+                newest_minor_supported,
+                unrecognized_options: opts,
+            }
+        }
         other => return Err(ProtocolError::UnknownBackendType(other)),
     };
     Ok(msg)
@@ -1086,5 +1209,46 @@ mod tests {
         assert_eq!(m2, FrontendMessage::Sync);
         assert_eq!(m3, FrontendMessage::Terminate);
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn function_call_round_trip() {
+        rt_frontend(FrontendMessage::FunctionCall {
+            function_oid: 1574, // pg_proc.oid for nextval
+            arg_formats: vec![0],
+            args: vec![Some(b"my_seq".to_vec())],
+            result_format: 0,
+        });
+    }
+    #[test]
+    fn function_call_with_null_arg() {
+        rt_frontend(FrontendMessage::FunctionCall {
+            function_oid: 42,
+            arg_formats: vec![1, 1],
+            args: vec![None, Some(vec![0xde, 0xad, 0xbe, 0xef])],
+            result_format: 1,
+        });
+    }
+    #[test]
+    fn function_call_response_some() {
+        rt_backend(BackendMessage::FunctionCallResponse(Some(b"42".to_vec())));
+    }
+    #[test]
+    fn function_call_response_null() {
+        rt_backend(BackendMessage::FunctionCallResponse(None));
+    }
+    #[test]
+    fn negotiate_protocol_version_no_options() {
+        rt_backend(BackendMessage::NegotiateProtocolVersion {
+            newest_minor_supported: 0,
+            unrecognized_options: vec![],
+        });
+    }
+    #[test]
+    fn negotiate_protocol_version_with_options() {
+        rt_backend(BackendMessage::NegotiateProtocolVersion {
+            newest_minor_supported: 2,
+            unrecognized_options: vec!["_pq_.future_feature".into(), "_pq_.unknown".into()],
+        });
     }
 }

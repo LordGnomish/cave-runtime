@@ -148,6 +148,191 @@ impl Catalog {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// `pg_database` / `pg_authid` shim — minimal in-memory mirrors of the two
+// global cluster catalogs.  These are not meant to drive query planning;
+// they exist so that introspection tools (libpq, psql `\l`, `\du`,
+// CloudNativePG's bootstrap scripts) can read the cluster's databases and
+// roles via the standard catalog names.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Row in `pg_database` (subset of `src/include/catalog/pg_database.h`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PgDatabaseRow {
+    pub oid: u32,
+    pub datname: String,
+    pub datdba: u32,
+    pub encoding: i32,
+    pub datcollate: String,
+    pub datctype: String,
+    pub datistemplate: bool,
+    pub datallowconn: bool,
+}
+
+/// Row in `pg_authid` (subset of `src/include/catalog/pg_authid.h`).
+///
+/// `rolpassword` is intentionally `Option<String>` and never serialised in
+/// plaintext when present — callers should hash before storing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PgAuthidRow {
+    pub oid: u32,
+    pub rolname: String,
+    pub rolsuper: bool,
+    pub rolinherit: bool,
+    pub rolcreaterole: bool,
+    pub rolcreatedb: bool,
+    pub rolcanlogin: bool,
+    pub rolreplication: bool,
+    pub rolbypassrls: bool,
+    pub rolconnlimit: i32,
+    pub rolpassword: Option<String>,
+}
+
+/// In-memory store for `pg_database` + `pg_authid`.  Backs the SHOW commands
+/// and the `cave-portal` PG read paths that ask "what databases / roles
+/// exist on this cluster".
+#[derive(Debug, Default)]
+pub struct GlobalCatalog {
+    databases: BTreeMap<String, PgDatabaseRow>,
+    roles: BTreeMap<String, PgAuthidRow>,
+    next_oid: u32,
+}
+
+impl GlobalCatalog {
+    /// Fresh catalog seeded with the canonical defaults a real cluster has
+    /// after `initdb`: the `template0`, `template1`, and `postgres` databases
+    /// owned by the bootstrap superuser, plus the `postgres` superuser role.
+    pub fn with_defaults() -> Self {
+        let mut g = Self {
+            databases: BTreeMap::new(),
+            roles: BTreeMap::new(),
+            next_oid: 16384,
+        };
+        // Bootstrap superuser — fixed OID 10 mirrors upstream.
+        g.roles.insert(
+            "postgres".into(),
+            PgAuthidRow {
+                oid: 10,
+                rolname: "postgres".into(),
+                rolsuper: true,
+                rolinherit: true,
+                rolcreaterole: true,
+                rolcreatedb: true,
+                rolcanlogin: true,
+                rolreplication: true,
+                rolbypassrls: true,
+                rolconnlimit: -1,
+                rolpassword: None,
+            },
+        );
+        for (oid, name, allowconn, istemplate) in [
+            (1u32, "template1", true, true),
+            (4u32, "template0", false, true),
+            (5u32, "postgres", true, false),
+        ] {
+            g.databases.insert(
+                name.into(),
+                PgDatabaseRow {
+                    oid,
+                    datname: name.into(),
+                    datdba: 10,
+                    encoding: 6, // PG_UTF8
+                    datcollate: "C".into(),
+                    datctype: "C".into(),
+                    datistemplate: istemplate,
+                    datallowconn: allowconn,
+                },
+            );
+        }
+        g
+    }
+
+    fn alloc_oid(&mut self) -> u32 {
+        let oid = self.next_oid;
+        self.next_oid += 1;
+        oid
+    }
+
+    pub fn create_database(
+        &mut self,
+        name: &str,
+        owner_oid: u32,
+    ) -> CatalogResult<u32> {
+        if self.databases.contains_key(name) {
+            return Err(CatalogError::TableExists(name.into()));
+        }
+        let oid = self.alloc_oid();
+        self.databases.insert(
+            name.into(),
+            PgDatabaseRow {
+                oid,
+                datname: name.into(),
+                datdba: owner_oid,
+                encoding: 6,
+                datcollate: "C".into(),
+                datctype: "C".into(),
+                datistemplate: false,
+                datallowconn: true,
+            },
+        );
+        Ok(oid)
+    }
+
+    pub fn drop_database(&mut self, name: &str) -> CatalogResult<()> {
+        self.databases
+            .remove(name)
+            .ok_or_else(|| CatalogError::TableNotFound(name.into()))?;
+        Ok(())
+    }
+
+    pub fn database(&self, name: &str) -> Option<&PgDatabaseRow> {
+        self.databases.get(name)
+    }
+
+    pub fn list_databases(&self) -> Vec<&PgDatabaseRow> {
+        self.databases.values().collect()
+    }
+
+    pub fn create_role(&mut self, name: &str, can_login: bool) -> CatalogResult<u32> {
+        if self.roles.contains_key(name) {
+            return Err(CatalogError::TableExists(name.into()));
+        }
+        let oid = self.alloc_oid();
+        self.roles.insert(
+            name.into(),
+            PgAuthidRow {
+                oid,
+                rolname: name.into(),
+                rolsuper: false,
+                rolinherit: true,
+                rolcreaterole: false,
+                rolcreatedb: false,
+                rolcanlogin: can_login,
+                rolreplication: false,
+                rolbypassrls: false,
+                rolconnlimit: -1,
+                rolpassword: None,
+            },
+        );
+        Ok(oid)
+    }
+
+    pub fn drop_role(&mut self, name: &str) -> CatalogResult<()> {
+        self.roles
+            .remove(name)
+            .ok_or_else(|| CatalogError::TableNotFound(name.into()))?;
+        Ok(())
+    }
+
+    pub fn role(&self, name: &str) -> Option<&PgAuthidRow> {
+        self.roles.get(name)
+    }
+
+    pub fn list_roles(&self) -> Vec<&PgAuthidRow> {
+        self.roles.values().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,5 +469,91 @@ mod tests {
         let o1 = c.create_table("public", "a", cols()).unwrap();
         let o2 = c.create_table("public", "b", cols()).unwrap();
         assert!(o2 > o1);
+    }
+
+    // ── GlobalCatalog (pg_database + pg_authid) ─────────────────────────────
+
+    #[test]
+    fn global_catalog_seeds_canonical_databases() {
+        let g = GlobalCatalog::with_defaults();
+        assert!(g.database("template0").unwrap().datistemplate);
+        assert!(!g.database("template0").unwrap().datallowconn);
+        assert!(g.database("template1").unwrap().datistemplate);
+        assert!(g.database("template1").unwrap().datallowconn);
+        assert!(!g.database("postgres").unwrap().datistemplate);
+    }
+
+    #[test]
+    fn global_catalog_seeds_bootstrap_superuser() {
+        let g = GlobalCatalog::with_defaults();
+        let r = g.role("postgres").unwrap();
+        assert_eq!(r.oid, 10);
+        assert!(r.rolsuper);
+        assert!(r.rolcanlogin);
+        assert!(r.rolreplication);
+    }
+
+    #[test]
+    fn create_database_then_lookup() {
+        let mut g = GlobalCatalog::with_defaults();
+        let oid = g.create_database("appdb", 10).unwrap();
+        let row = g.database("appdb").unwrap();
+        assert_eq!(row.oid, oid);
+        assert_eq!(row.datdba, 10);
+        assert!(!row.datistemplate);
+        assert!(row.datallowconn);
+    }
+
+    #[test]
+    fn create_database_duplicate_errors() {
+        let mut g = GlobalCatalog::with_defaults();
+        let err = g.create_database("postgres", 10).unwrap_err();
+        assert_eq!(err, CatalogError::TableExists("postgres".into()));
+    }
+
+    #[test]
+    fn drop_database_then_missing() {
+        let mut g = GlobalCatalog::with_defaults();
+        g.drop_database("template1").unwrap();
+        assert!(g.database("template1").is_none());
+    }
+
+    #[test]
+    fn create_role_then_lookup() {
+        let mut g = GlobalCatalog::with_defaults();
+        let oid = g.create_role("alice", true).unwrap();
+        let r = g.role("alice").unwrap();
+        assert_eq!(r.oid, oid);
+        assert!(r.rolcanlogin);
+        assert!(!r.rolsuper);
+    }
+
+    #[test]
+    fn create_role_no_login_role() {
+        let mut g = GlobalCatalog::with_defaults();
+        g.create_role("readers", false).unwrap();
+        assert!(!g.role("readers").unwrap().rolcanlogin);
+    }
+
+    #[test]
+    fn list_databases_and_roles_includes_seed_data() {
+        let g = GlobalCatalog::with_defaults();
+        assert_eq!(g.list_databases().len(), 3);
+        assert_eq!(g.list_roles().len(), 1);
+    }
+
+    #[test]
+    fn drop_role_then_missing() {
+        let mut g = GlobalCatalog::with_defaults();
+        g.create_role("bob", true).unwrap();
+        g.drop_role("bob").unwrap();
+        assert!(g.role("bob").is_none());
+    }
+
+    #[test]
+    fn drop_unknown_role_errors() {
+        let mut g = GlobalCatalog::with_defaults();
+        let err = g.drop_role("ghost").unwrap_err();
+        assert_eq!(err, CatalogError::TableNotFound("ghost".into()));
     }
 }

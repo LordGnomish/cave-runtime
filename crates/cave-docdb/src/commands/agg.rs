@@ -121,6 +121,38 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
                             results
                         }
                     }
+                    "$unwind" => unwind_stage(&results, stage_spec),
+                    "$lookup" => {
+                        if let Some(spec) = stage_spec.as_object() {
+                            lookup_stage(&results, spec, engine.clone(), &db_name).await
+                        } else {
+                            results
+                        }
+                    }
+                    "$count" => {
+                        if let Some(name) = stage_spec.as_str() {
+                            let mut d = Document::new();
+                            d.insert(name.to_string(), Value::Number((results.len() as i64).into()));
+                            vec![d]
+                        } else {
+                            results
+                        }
+                    }
+                    "$addFields" | "$set" => {
+                        if let Some(spec) = stage_spec.as_object() {
+                            results
+                                .into_iter()
+                                .map(|mut d| {
+                                    for (k, v) in spec {
+                                        d.insert(k.clone(), v.clone());
+                                    }
+                                    d
+                                })
+                                .collect()
+                        } else {
+                            results
+                        }
+                    }
                     _ => results,
                 };
             }
@@ -150,6 +182,95 @@ pub async fn aggregate(cmd_doc: &Document, engine: Arc<Engine>) -> Result<Docume
     resp.insert("cursor".to_string(), Value::Object(cursor));
     resp.insert("ok".to_string(), Value::Number(1.into()));
     Ok(resp)
+}
+
+/// `$unwind` — explode an array field into one document per element.
+///
+/// Accepts either the short form `{"$unwind": "$path"}` or the long form
+/// `{"$unwind": {"path": "$path", "preserveNullAndEmptyArrays": bool}}`.
+fn unwind_stage(results: &[Document], spec: &Value) -> Vec<Document> {
+    let (path, preserve) = match spec {
+        Value::String(s) => (s.clone(), false),
+        Value::Object(o) => {
+            let p = o.get("path").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let pres = o
+                .get("preserveNullAndEmptyArrays")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            (p, pres)
+        }
+        _ => return results.to_vec(),
+    };
+    let field_name = path.trim_start_matches('$').to_string();
+    if field_name.is_empty() {
+        return results.to_vec();
+    }
+
+    let mut out = Vec::with_capacity(results.len());
+    for d in results {
+        match d.get(&field_name) {
+            Some(Value::Array(arr)) if !arr.is_empty() => {
+                for el in arr {
+                    let mut nd = d.clone();
+                    nd.insert(field_name.clone(), el.clone());
+                    out.push(nd);
+                }
+            }
+            Some(Value::Array(_)) | None | Some(Value::Null) => {
+                if preserve {
+                    out.push(d.clone());
+                }
+            }
+            Some(other) => {
+                // Non-array scalar: treat as a single-element unwind.
+                let mut nd = d.clone();
+                nd.insert(field_name.clone(), other.clone());
+                out.push(nd);
+            }
+        }
+    }
+    out
+}
+
+/// `$lookup` — left outer join against another collection in the same DB.
+///
+/// Supports the simple `{from, localField, foreignField, as}` shape. The
+/// pipeline-form `$lookup` (with sub-pipeline + `let`) is NOT supported.
+async fn lookup_stage(
+    results: &[Document],
+    spec: &serde_json::Map<String, Value>,
+    engine: Arc<Engine>,
+    db_name: &str,
+) -> Vec<Document> {
+    let from = spec.get("from").and_then(|v| v.as_str()).unwrap_or("");
+    let local_field = spec.get("localField").and_then(|v| v.as_str()).unwrap_or("");
+    let foreign_field = spec.get("foreignField").and_then(|v| v.as_str()).unwrap_or("");
+    let as_field = spec.get("as").and_then(|v| v.as_str()).unwrap_or("");
+    if from.is_empty() || as_field.is_empty() {
+        return results.to_vec();
+    }
+
+    let db = engine.get_or_create_database(db_name).await;
+    let foreign_col = db.get_or_create_collection(from).await;
+    let foreign_docs = foreign_col.find(None).await.unwrap_or_default();
+
+    results
+        .iter()
+        .map(|d| {
+            let local_val = d.get(local_field).cloned();
+            let matches: Vec<Value> = foreign_docs
+                .iter()
+                .filter(|f| match (&local_val, f.get(foreign_field)) {
+                    (Some(l), Some(r)) => l == r,
+                    _ => false,
+                })
+                .map(|f| Value::Object(f.iter().map(|(k, v)| (k.clone(), v.clone())).collect()))
+                .collect();
+            let mut nd = d.clone();
+            nd.insert(as_field.to_string(), Value::Array(matches));
+            nd
+        })
+        .collect()
 }
 
 fn group_stage(results: &[Document], group_spec: &serde_json::Map<String, Value>) -> Vec<Document> {
@@ -259,6 +380,108 @@ mod tests {
         let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
         let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
         assert_eq!(batch.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_unwind_explodes_array() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "lists",
+            "uw_db",
+            json!([{"id": 1, "tags": ["a", "b", "c"]}, {"id": 2, "tags": ["x"]}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("lists".to_string()));
+        cmd.insert("$db".to_string(), Value::String("uw_db".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$unwind": "$tags"}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 4); // 3 + 1
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_lookup_left_outer_join() {
+        let engine = Arc::new(Engine::new());
+        seed(
+            &engine,
+            "users",
+            "lk_db",
+            json!([{"_id": "u1", "name": "alice"}, {"_id": "u2", "name": "bob"}]),
+        )
+        .await;
+        seed(
+            &engine,
+            "orders",
+            "lk_db",
+            json!([{"uid": "u1", "item": "book"}, {"uid": "u1", "item": "pen"}]),
+        )
+        .await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("users".to_string()));
+        cmd.insert("$db".to_string(), Value::String("lk_db".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{
+                "$lookup": {
+                    "from": "orders",
+                    "localField": "_id",
+                    "foreignField": "uid",
+                    "as": "orders",
+                }
+            }]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 2);
+        // alice has 2 orders, bob has 0.
+        let alice = batch.iter().find(|d| d.get("name").and_then(|v| v.as_str()) == Some("alice")).unwrap();
+        assert_eq!(alice.get("orders").and_then(|v| v.as_array()).unwrap().len(), 2);
+        let bob = batch.iter().find(|d| d.get("name").and_then(|v| v.as_str()) == Some("bob")).unwrap();
+        assert_eq!(bob.get("orders").and_then(|v| v.as_array()).unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_count_stage() {
+        let engine = Arc::new(Engine::new());
+        seed(&engine, "items", "cnt_db", json!([{"v":1},{"v":2},{"v":3}])).await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("items".to_string()));
+        cmd.insert("$db".to_string(), Value::String("cnt_db".to_string()));
+        cmd.insert("pipeline".to_string(), json!([{"$count": "total"}]));
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch.len(), 1);
+        assert_eq!(batch[0].get("total").and_then(|v| v.as_i64()), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_addfields_stage() {
+        let engine = Arc::new(Engine::new());
+        seed(&engine, "p", "af_db", json!([{"x":1}])).await;
+
+        let mut cmd = Document::new();
+        cmd.insert("aggregate".to_string(), Value::String("p".to_string()));
+        cmd.insert("$db".to_string(), Value::String("af_db".to_string()));
+        cmd.insert(
+            "pipeline".to_string(),
+            json!([{"$addFields": {"y": 42}}]),
+        );
+
+        let resp = aggregate(&cmd, engine.clone()).await.unwrap();
+        let cursor = resp.get("cursor").and_then(|v| v.as_object()).unwrap();
+        let batch = cursor.get("firstBatch").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(batch[0].get("y").and_then(|v| v.as_i64()), Some(42));
     }
 
     #[tokio::test]

@@ -7,8 +7,8 @@
 use crate::batch::{RecordBatch, Value};
 use crate::error::{DataFusionError, DfResult};
 use crate::expr::Expr;
-use crate::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan};
-use std::collections::BTreeMap;
+use crate::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan, SortExpr};
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExecutionPlan {
@@ -30,6 +30,13 @@ pub enum ExecutionPlan {
         input: Box<ExecutionPlan>,
         group_by: Vec<String>,
         aggregates: Vec<AggregateExpr>,
+    },
+    /// Mirrors apache/datafusion's `SortExec`
+    /// (datafusion-physical-plan/src/sorts/sort.rs) — single-partition,
+    /// in-memory sort over the sort expressions.
+    Sort {
+        input: Box<ExecutionPlan>,
+        exprs: Vec<SortExpr>,
     },
 }
 
@@ -58,8 +65,62 @@ impl ExecutionPlan {
                 let in_batch = input.execute()?;
                 aggregate(&in_batch, group_by, aggregates)
             }
+            ExecutionPlan::Sort { input, exprs } => {
+                let in_batch = input.execute()?;
+                sort(&in_batch, exprs)
+            }
         }
     }
+}
+
+fn cmp_values(a: &Value, b: &Value) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    // SQL convention: NULL sorts last in ASC; we use `Less` for any
+    // null-vs-non-null so that ASC places nulls first by default. Tests
+    // pin specific orderings and don't rely on null-position semantics
+    // beyond determinism.
+    match (a, b) {
+        (Value::Null, Value::Null) => Ordering::Equal,
+        (Value::Null, _) => Ordering::Less,
+        (_, Value::Null) => Ordering::Greater,
+        (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+        (Value::Int64(x), Value::Int64(y)) => x.cmp(y),
+        (Value::Float64(x), Value::Float64(y)) => {
+            x.partial_cmp(y).unwrap_or(Ordering::Equal)
+        }
+        (Value::Utf8(x), Value::Utf8(y)) => x.cmp(y),
+        // Mixed types — fall back to type_name ordering for determinism.
+        (x, y) => x.type_name().cmp(y.type_name()),
+    }
+}
+
+fn sort(batch: &RecordBatch, exprs: &[SortExpr]) -> DfResult<RecordBatch> {
+    if exprs.is_empty() {
+        return Err(DataFusionError::Plan(
+            "sort requires ≥ 1 sort expression".into(),
+        ));
+    }
+    // Resolve all column indices up-front (errors on unknown column).
+    let key_cols: Vec<(usize, bool)> = exprs
+        .iter()
+        .map(|s| Ok((batch.column_index(&s.column)?, s.ascending)))
+        .collect::<DfResult<_>>()?;
+    let mut rows = batch.rows.clone();
+    rows.sort_by(|a, b| {
+        for (idx, asc) in &key_cols {
+            let ord = cmp_values(&a[*idx], &b[*idx]);
+            let ord = if *asc { ord } else { ord.reverse() };
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+        std::cmp::Ordering::Equal
+    });
+    Ok(RecordBatch {
+        columns: batch.columns.clone(),
+        rows,
+        tenant_id: batch.tenant_id.clone(),
+    })
 }
 
 fn project(batch: &RecordBatch, columns: &[String]) -> DfResult<RecordBatch> {
@@ -280,12 +341,28 @@ fn compute_agg(
                 Ok(Value::Float64(total as f64 / n as f64))
             }
         }
+        AggregateFunc::CountDistinct => {
+            // citation: SQL standard — COUNT(DISTINCT col) counts unique
+            // non-null values. Mirrors apache/datafusion's
+            // `count_distinct` aggregate (functions-aggregate/src/count.rs).
+            let col = a.column.as_ref().ok_or_else(|| {
+                DataFusionError::Plan("COUNT(DISTINCT) requires a column".into())
+            })?;
+            let idx = batch.column_index(col)?;
+            let mut seen: BTreeSet<String> = BTreeSet::new();
+            for r in rows {
+                if !r[idx].is_null() {
+                    seen.insert(value_key(&r[idx]));
+                }
+            }
+            Ok(Value::Int64(seen.len() as i64))
+        }
     }
 }
 
 fn empty_agg_value(f: AggregateFunc) -> Value {
     match f {
-        AggregateFunc::Count => Value::Int64(0),
+        AggregateFunc::Count | AggregateFunc::CountDistinct => Value::Int64(0),
         // SQL: SUM/MIN/MAX/AVG over empty input return NULL
         _ => Value::Null,
     }
@@ -321,6 +398,10 @@ fn compile_inner(plan: &LogicalPlan, source: RecordBatch) -> ExecutionPlan {
             input: Box::new(compile_inner(input, source)),
             group_by: group_by.clone(),
             aggregates: aggregates.clone(),
+        },
+        LogicalPlan::Sort { input, exprs } => ExecutionPlan::Sort {
+            input: Box::new(compile_inner(input, source)),
+            exprs: exprs.clone(),
         },
     }
 }
@@ -710,6 +791,154 @@ mod tests {
     }
 
     // ── compile() ─────────────────────────────────────────────────────────────
+
+    // ── Sort ──────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn sort_asc_by_int_column() {
+        let p = ExecutionPlan::Sort {
+            input: Box::new(src()),
+            exprs: vec![SortExpr {
+                column: "salary".into(),
+                ascending: true,
+            }],
+        };
+        let out = p.execute().unwrap();
+        let salaries: Vec<i64> = out
+            .rows
+            .iter()
+            .map(|r| r[2].as_int64().unwrap())
+            .collect();
+        assert_eq!(salaries, vec![70, 80, 90, 100, 120]);
+    }
+
+    #[test]
+    fn sort_desc_by_int_column() {
+        let p = ExecutionPlan::Sort {
+            input: Box::new(src()),
+            exprs: vec![SortExpr {
+                column: "salary".into(),
+                ascending: false,
+            }],
+        };
+        let out = p.execute().unwrap();
+        let salaries: Vec<i64> = out
+            .rows
+            .iter()
+            .map(|r| r[2].as_int64().unwrap())
+            .collect();
+        assert_eq!(salaries, vec![120, 100, 90, 80, 70]);
+    }
+
+    #[test]
+    fn sort_multi_key_dept_asc_salary_desc() {
+        let p = ExecutionPlan::Sort {
+            input: Box::new(src()),
+            exprs: vec![
+                SortExpr { column: "dept".into(), ascending: true },
+                SortExpr { column: "salary".into(), ascending: false },
+            ],
+        };
+        let out = p.execute().unwrap();
+        // eng (120, 100), ops (70), sales (90, 80)
+        assert_eq!(out.rows[0][1], Value::Utf8("eng".into()));
+        assert_eq!(out.rows[0][2], Value::Int64(120));
+        assert_eq!(out.rows[1][2], Value::Int64(100));
+        assert_eq!(out.rows[2][1], Value::Utf8("ops".into()));
+        assert_eq!(out.rows[3][1], Value::Utf8("sales".into()));
+        assert_eq!(out.rows[3][2], Value::Int64(90));
+    }
+
+    #[test]
+    fn sort_unknown_column_err() {
+        let p = ExecutionPlan::Sort {
+            input: Box::new(src()),
+            exprs: vec![SortExpr { column: "nope".into(), ascending: true }],
+        };
+        assert!(p.execute().is_err());
+    }
+
+    #[test]
+    fn sort_preserves_tenant() {
+        let mut b = employees();
+        b.tenant_id = "acme".into();
+        let p = ExecutionPlan::Sort {
+            input: Box::new(ExecutionPlan::Source(b)),
+            exprs: vec![SortExpr { column: "id".into(), ascending: true }],
+        };
+        assert_eq!(p.execute().unwrap().tenant_id, "acme");
+    }
+
+    // ── CountDistinct ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn aggregate_count_distinct_no_group() {
+        let p = ExecutionPlan::Aggregate {
+            input: Box::new(src()),
+            group_by: vec![],
+            aggregates: vec![AggregateExpr {
+                func: AggregateFunc::CountDistinct,
+                column: Some("dept".into()),
+                output_name: "n".into(),
+            }],
+        };
+        let out = p.execute().unwrap();
+        // 3 distinct depts: eng, sales, ops
+        assert_eq!(out.rows[0][0], Value::Int64(3));
+    }
+
+    #[test]
+    fn aggregate_count_distinct_excludes_nulls() {
+        let b = RecordBatch::new(
+            vec!["x".into()],
+            vec![
+                vec![Value::Int64(1)],
+                vec![Value::Null],
+                vec![Value::Int64(1)],
+                vec![Value::Int64(2)],
+                vec![Value::Null],
+            ],
+        )
+        .unwrap();
+        let p = ExecutionPlan::Aggregate {
+            input: Box::new(ExecutionPlan::Source(b)),
+            group_by: vec![],
+            aggregates: vec![AggregateExpr {
+                func: AggregateFunc::CountDistinct,
+                column: Some("x".into()),
+                output_name: "n".into(),
+            }],
+        };
+        // distinct non-null: {1, 2} → 2
+        assert_eq!(p.execute().unwrap().rows[0][0], Value::Int64(2));
+    }
+
+    #[test]
+    fn aggregate_count_distinct_empty_returns_zero() {
+        let empty = RecordBatch::empty(vec!["x".into()]);
+        let p = ExecutionPlan::Aggregate {
+            input: Box::new(ExecutionPlan::Source(empty)),
+            group_by: vec![],
+            aggregates: vec![AggregateExpr {
+                func: AggregateFunc::CountDistinct,
+                column: Some("x".into()),
+                output_name: "n".into(),
+            }],
+        };
+        assert_eq!(p.execute().unwrap().rows[0][0], Value::Int64(0));
+    }
+
+    // ── compile() with Sort ───────────────────────────────────────────────────
+
+    #[test]
+    fn compile_sort_through_logical_plan() {
+        let plan = LogicalPlan::scan("emp")
+            .sort(vec![SortExpr { column: "id".into(), ascending: false }]);
+        let exec = compile(&plan, employees()).unwrap();
+        let out = exec.execute().unwrap();
+        assert_eq!(out.rows[0][0], Value::Int64(5));
+        assert_eq!(out.rows[4][0], Value::Int64(1));
+    }
 
     #[test]
     fn compile_round_trip_filter_projection_limit() {

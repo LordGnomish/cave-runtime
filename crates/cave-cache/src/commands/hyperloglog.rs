@@ -13,6 +13,7 @@ const HLL_P: usize = 14;
 const HLL_M: usize = 1 << HLL_P; // 16384 registers
 const HLL_HEADER_SIZE: usize = 16;
 const HLL_MAGIC: &[u8] = b"HYLL";
+#[allow(dead_code)]
 const HLL_SPARSE_XZERO_MAX_LEN: usize = 16384;
 
 pub fn cmd_pfadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
@@ -267,7 +268,7 @@ fn murmur3_64(data: &[u8], seed: u64) -> u64 {
     }
 
     let tail = &data[blocks * 16..];
-    let mut k1: u64 = 0;
+    let _k1: u64 = 0;
     let mut k2: u64 = 0;
 
     if tail.len() >= 8 { k2 ^= (tail[7] as u64) << 56; }

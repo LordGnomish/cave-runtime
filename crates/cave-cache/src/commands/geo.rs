@@ -175,7 +175,7 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
     let mut center_lon: f64 = 0.0;
     let mut center_lat: f64 = 0.0;
     let mut radius_m: f64 = 0.0;
-    let mut is_circle = true;
+    let mut _is_circle = true;
     let mut count: Option<usize> = None;
     let mut ascending = true;
     let mut withcoord = false;
@@ -202,7 +202,7 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
                 let r = bytes_to_f64(&args[i + 1]).ok_or(CacheError::NotFloat)?;
                 let unit = parse_unit(&args[i + 2])?;
                 radius_m = r * unit;
-                is_circle = true;
+                _is_circle = true;
                 i += 3;
             }
             b"BYBOX" => {
@@ -211,7 +211,7 @@ fn geosearch_impl(args: &[Vec<u8>], db: &mut Db, dst: Option<Vec<u8>>) -> CacheR
                 let unit = parse_unit(&args[i + 3])?;
                 // Convert box to bounding circle for simplicity
                 radius_m = ((w / 2.0).hypot(h / 2.0)) * unit;
-                is_circle = false;
+                _is_circle = false;
                 i += 4;
             }
             b"ASC" => { ascending = true; i += 1; }

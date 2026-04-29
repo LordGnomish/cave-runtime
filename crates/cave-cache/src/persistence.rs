@@ -1,16 +1,13 @@
 //! RDB snapshot and AOF (Append-Only File) persistence.
 
-use std::collections::VecDeque;
-use std::io::{self, Write};
-use std::path::Path;
+use std::io;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tokio::fs::{File, OpenOptions};
+use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::RwLock;
 
-use crate::db::{Db, ServerState};
+use crate::db::ServerState;
 use crate::resp::encode_resp2;
 use crate::resp::Resp;
 

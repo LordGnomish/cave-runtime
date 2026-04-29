@@ -385,12 +385,11 @@ mod tests {
     #[test]
     fn voting_members_excludes_zero_vote() {
         let mut rs = ReplicaSet::new("rs0");
-        let mut a = member(0, 1.0);
+        let a = member(0, 1.0);
         let mut b = member(1, 1.0);
         b.votes = 0;
-        rs.add_member(a.clone());
+        rs.add_member(a);
         rs.add_member(b);
-        let _ = a; // silence unused
         assert_eq!(rs.voting_members(), 1);
     }
 }

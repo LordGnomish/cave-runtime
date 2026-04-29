@@ -212,6 +212,163 @@ pub fn format_lsn(lsn: u64) -> String {
     format!("{:X}/{:X}", lsn >> 32, lsn & 0xFFFFFFFF)
 }
 
+// ── Replication command-language verbs (`repl_gram.y`) ───────────────────────
+//
+// Once a connection has flagged `replication=true` in its startup parameters,
+// the Query path no longer accepts SQL — the only verbs the walsender accepts
+// are the ones below.  We model the parser as a small string-based decoder
+// that produces a typed `ReplCommand`; the wire-level frame is still a
+// `FrontendMessage::Query`, so the server hands the command string here for
+// classification.
+
+/// One of the replication-protocol verbs accepted by `walsender` after a
+/// `replication=true` startup.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplCommand {
+    /// `IDENTIFY_SYSTEM` — returns a single row with system identifier,
+    /// timeline ID, latest LSN, and (optionally) database name.
+    IdentifySystem,
+    /// `START_REPLICATION [SLOT name] [PHYSICAL|LOGICAL] LSN [TIMELINE n]`
+    /// or for logical: `START_REPLICATION SLOT name LOGICAL LSN [(opt = val, ...)]`
+    StartReplication {
+        slot: Option<String>,
+        kind: ReplKind,
+        start_lsn: u64,
+        timeline: Option<u32>,
+    },
+    /// `TIMELINE_HISTORY tli` — fetch the .history file for a timeline.
+    TimelineHistory { timeline: u32 },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplKind {
+    Physical,
+    Logical,
+}
+
+/// Reply payload for `IDENTIFY_SYSTEM`.  Encoded as a four-column DataRow
+/// with text-format cells.  Mirrors `walsender.c::IdentifySystem`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentifySystemReply {
+    pub system_id: String,
+    pub timeline: u32,
+    pub xlog_pos: u64,
+    pub dbname: Option<String>,
+}
+
+impl IdentifySystemReply {
+    /// Encode as a `Vec<Option<Vec<u8>>>` ready to drop into `BackendMessage::DataRow`.
+    pub fn to_data_row(&self) -> Vec<Option<Vec<u8>>> {
+        vec![
+            Some(self.system_id.as_bytes().to_vec()),
+            Some(self.timeline.to_string().into_bytes()),
+            Some(format_lsn(self.xlog_pos).into_bytes()),
+            self.dbname.as_ref().map(|d| d.as_bytes().to_vec()),
+        ]
+    }
+}
+
+/// Parse a replication-protocol command string, as produced by libpq's
+/// walsender client.  Whitespace-tolerant; case-insensitive on keywords.
+///
+/// Returns `None` for an empty/whitespace string and `Err` for a recognised
+/// command with malformed arguments.
+pub fn parse_repl_command(s: &str) -> ProtocolResult<Option<ReplCommand>> {
+    let trimmed = s.trim().trim_end_matches(';').trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let mut tokens = trimmed.split_whitespace();
+    let head = match tokens.next() {
+        Some(h) => h.to_ascii_uppercase(),
+        None => return Ok(None),
+    };
+    match head.as_str() {
+        "IDENTIFY_SYSTEM" => {
+            if tokens.next().is_some() {
+                return Err(ProtocolError::InvalidValue {
+                    field: "IDENTIFY_SYSTEM",
+                    reason: "unexpected trailing tokens".into(),
+                });
+            }
+            Ok(Some(ReplCommand::IdentifySystem))
+        }
+        "TIMELINE_HISTORY" => {
+            let tli = tokens.next().ok_or(ProtocolError::InvalidValue {
+                field: "TIMELINE_HISTORY",
+                reason: "missing timeline".into(),
+            })?;
+            let timeline = tli.parse::<u32>().map_err(|e| ProtocolError::InvalidValue {
+                field: "TIMELINE_HISTORY.timeline",
+                reason: e.to_string(),
+            })?;
+            Ok(Some(ReplCommand::TimelineHistory { timeline }))
+        }
+        "START_REPLICATION" => {
+            // Grammar (subset):
+            //   START_REPLICATION [SLOT slot_name] (PHYSICAL|LOGICAL) lsn [TIMELINE tli]
+            let mut slot = None;
+            let mut kind: Option<ReplKind> = None;
+            let mut start_lsn: Option<u64> = None;
+            let mut timeline: Option<u32> = None;
+            let rest: Vec<&str> = tokens.collect();
+            let mut i = 0;
+            while i < rest.len() {
+                let tok = rest[i].to_ascii_uppercase();
+                match tok.as_str() {
+                    "SLOT" => {
+                        i += 1;
+                        let name = rest.get(i).ok_or(ProtocolError::InvalidValue {
+                            field: "START_REPLICATION.SLOT",
+                            reason: "missing slot name".into(),
+                        })?;
+                        slot = Some((*name).to_string());
+                    }
+                    "PHYSICAL" => kind = Some(ReplKind::Physical),
+                    "LOGICAL" => kind = Some(ReplKind::Logical),
+                    "TIMELINE" => {
+                        i += 1;
+                        let tli = rest.get(i).ok_or(ProtocolError::InvalidValue {
+                            field: "START_REPLICATION.TIMELINE",
+                            reason: "missing timeline".into(),
+                        })?;
+                        timeline = Some(tli.parse::<u32>().map_err(|e| {
+                            ProtocolError::InvalidValue {
+                                field: "START_REPLICATION.TIMELINE",
+                                reason: e.to_string(),
+                            }
+                        })?);
+                    }
+                    other => {
+                        // First non-keyword positional → LSN
+                        if start_lsn.is_none() && other.contains('/') {
+                            start_lsn = Some(parse_lsn(other)?);
+                        } else {
+                            return Err(ProtocolError::InvalidValue {
+                                field: "START_REPLICATION",
+                                reason: format!("unexpected token '{}'", rest[i]),
+                            });
+                        }
+                    }
+                }
+                i += 1;
+            }
+            let kind = kind.unwrap_or(ReplKind::Physical);
+            let start_lsn = start_lsn.ok_or(ProtocolError::InvalidValue {
+                field: "START_REPLICATION",
+                reason: "missing start LSN".into(),
+            })?;
+            Ok(Some(ReplCommand::StartReplication {
+                slot,
+                kind,
+                start_lsn,
+                timeline,
+            }))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Parse a `pg_lsn` text representation back into a u64.
 pub fn parse_lsn(s: &str) -> ProtocolResult<u64> {
     let (hi, lo) = s.split_once('/').ok_or(ProtocolError::InvalidValue {
@@ -393,5 +550,127 @@ mod tests {
             ProtocolError::InvalidValue { .. } => {}
             other => panic!("expected InvalidValue, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn parse_identify_system() {
+        let cmd = parse_repl_command("IDENTIFY_SYSTEM").unwrap().unwrap();
+        assert_eq!(cmd, ReplCommand::IdentifySystem);
+    }
+
+    #[test]
+    fn parse_identify_system_lowercase() {
+        let cmd = parse_repl_command("identify_system").unwrap().unwrap();
+        assert_eq!(cmd, ReplCommand::IdentifySystem);
+    }
+
+    #[test]
+    fn parse_identify_system_with_semicolon() {
+        let cmd = parse_repl_command("IDENTIFY_SYSTEM;").unwrap().unwrap();
+        assert_eq!(cmd, ReplCommand::IdentifySystem);
+    }
+
+    #[test]
+    fn parse_start_replication_physical_no_slot() {
+        let cmd = parse_repl_command("START_REPLICATION 0/16000000")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::StartReplication {
+                slot: None,
+                kind: ReplKind::Physical,
+                start_lsn: 0x16000000,
+                timeline: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_start_replication_physical_with_slot_and_timeline() {
+        let cmd = parse_repl_command("START_REPLICATION SLOT my_slot PHYSICAL 1/0 TIMELINE 7")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::StartReplication {
+                slot: Some("my_slot".into()),
+                kind: ReplKind::Physical,
+                start_lsn: 0x1_0000_0000,
+                timeline: Some(7),
+            }
+        );
+    }
+
+    #[test]
+    fn parse_start_replication_logical() {
+        let cmd = parse_repl_command("START_REPLICATION SLOT decoder LOGICAL 0/0")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::StartReplication {
+                slot: Some("decoder".into()),
+                kind: ReplKind::Logical,
+                start_lsn: 0,
+                timeline: None,
+            }
+        );
+    }
+
+    #[test]
+    fn parse_start_replication_missing_lsn_errors() {
+        let err = parse_repl_command("START_REPLICATION").unwrap_err();
+        match err {
+            ProtocolError::InvalidValue { field, .. } => assert_eq!(field, "START_REPLICATION"),
+            other => panic!("expected InvalidValue, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn parse_timeline_history() {
+        let cmd = parse_repl_command("TIMELINE_HISTORY 5").unwrap().unwrap();
+        assert_eq!(cmd, ReplCommand::TimelineHistory { timeline: 5 });
+    }
+
+    #[test]
+    fn parse_unknown_returns_none() {
+        let cmd = parse_repl_command("SELECT 1").unwrap();
+        assert!(cmd.is_none());
+    }
+
+    #[test]
+    fn parse_empty_returns_none() {
+        assert!(parse_repl_command("").unwrap().is_none());
+        assert!(parse_repl_command("   ").unwrap().is_none());
+        assert!(parse_repl_command(";").unwrap().is_none());
+    }
+
+    #[test]
+    fn identify_system_data_row_text_format() {
+        let reply = IdentifySystemReply {
+            system_id: "7398765432109876543".into(),
+            timeline: 1,
+            xlog_pos: 0x16ABCDEF,
+            dbname: Some("postgres".into()),
+        };
+        let row = reply.to_data_row();
+        assert_eq!(row.len(), 4);
+        assert_eq!(row[0].as_deref(), Some(&b"7398765432109876543"[..]));
+        assert_eq!(row[1].as_deref(), Some(&b"1"[..]));
+        assert_eq!(row[2].as_deref(), Some(&b"0/16ABCDEF"[..]));
+        assert_eq!(row[3].as_deref(), Some(&b"postgres"[..]));
+    }
+
+    #[test]
+    fn identify_system_data_row_no_dbname_is_null() {
+        let reply = IdentifySystemReply {
+            system_id: "1".into(),
+            timeline: 1,
+            xlog_pos: 0,
+            dbname: None,
+        };
+        let row = reply.to_data_row();
+        assert_eq!(row[3], None);
     }
 }

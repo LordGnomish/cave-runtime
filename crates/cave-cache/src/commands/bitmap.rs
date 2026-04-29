@@ -393,7 +393,7 @@ fn bitfield_incrby(
     let old = bitfield_get(db, key, is_signed, bits, offset)?;
     let new_val = old.wrapping_add(delta);
 
-    let (result, overflowed) = if is_signed {
+    let (result, _overflowed) = if is_signed {
         let min = if bits == 64 { i64::MIN } else { -(1i64 << (bits - 1)) };
         let max = if bits == 64 { i64::MAX } else { (1i64 << (bits - 1)) - 1 };
         if new_val < min || new_val > max {

@@ -4,7 +4,7 @@
 use crate::db::{glob_match, Db};
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_i64, Entry, Value};
+use crate::types::{bytes_to_i64, Value};
 
 // ── DEL / UNLINK ─────────────────────────────────────────────────────────────
 
@@ -17,6 +17,22 @@ pub fn cmd_del(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 pub fn cmd_unlink(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     // Same as DEL for our purposes (no async deletion)
     cmd_del(args, db)
+}
+
+// ── TOUCH ────────────────────────────────────────────────────────────────────
+
+/// TOUCH — alters the last-access time of one or more keys; returns the number
+/// of keys that exist (and were touched). Skips expired keys.
+pub fn cmd_touch(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() < 2 { return Err(CacheError::wrong_arity("touch")); }
+    let mut touched = 0i64;
+    for key in &args[1..] {
+        if let Some(entry) = db.get_mut(key) {
+            entry.touch();
+            touched += 1;
+        }
+    }
+    Ok(Resp::Integer(touched))
 }
 
 // ── EXISTS ───────────────────────────────────────────────────────────────────
@@ -240,7 +256,7 @@ pub fn cmd_dbsize(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
 // ── FLUSHDB ──────────────────────────────────────────────────────────────────
 
-pub fn cmd_flushdb(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+pub fn cmd_flushdb(_args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     // ASYNC/SYNC modifier is accepted but we always flush synchronously
     db.flush();
     Ok(Resp::ok())
@@ -373,4 +389,29 @@ pub fn cmd_restore(args: &[Vec<u8>], _db: &mut Db) -> CacheResult<Resp> {
     // Simplified: we don't actually restore, just acknowledge
     if args.len() < 4 { return Err(CacheError::wrong_arity("restore")); }
     Ok(Resp::ok())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{Entry, Value};
+
+    #[test]
+    fn touch_counts_existing_keys() {
+        let mut db = Db::new();
+        db.insert(b"k1".to_vec(), Entry::new(Value::String(b"v".to_vec())));
+        db.insert(b"k2".to_vec(), Entry::new(Value::String(b"v".to_vec())));
+        let r = cmd_touch(&[b"TOUCH".to_vec(), b"k1".to_vec(), b"k2".to_vec(), b"missing".to_vec()], &mut db).unwrap();
+        match r {
+            Resp::Integer(n) => assert_eq!(n, 2),
+            _ => panic!("expected integer"),
+        }
+    }
+
+    #[test]
+    fn touch_arity_error() {
+        let mut db = Db::new();
+        let r = cmd_touch(&[b"TOUCH".to_vec()], &mut db);
+        assert!(r.is_err());
+    }
 }

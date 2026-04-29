@@ -65,7 +65,8 @@ fn collect_scan_tables(plan: &crate::logical_plan::LogicalPlan) -> Vec<String> {
         crate::logical_plan::LogicalPlan::Projection { input, .. }
         | crate::logical_plan::LogicalPlan::Filter { input, .. }
         | crate::logical_plan::LogicalPlan::Limit { input, .. }
-        | crate::logical_plan::LogicalPlan::Aggregate { input, .. } => collect_scan_tables(input),
+        | crate::logical_plan::LogicalPlan::Aggregate { input, .. }
+        | crate::logical_plan::LogicalPlan::Sort { input, .. } => collect_scan_tables(input),
     }
 }
 
@@ -79,7 +80,8 @@ fn rewrite_scan_tenant(plan: &mut crate::logical_plan::LogicalPlan, batch: &Reco
         crate::logical_plan::LogicalPlan::Projection { input, .. }
         | crate::logical_plan::LogicalPlan::Filter { input, .. }
         | crate::logical_plan::LogicalPlan::Limit { input, .. }
-        | crate::logical_plan::LogicalPlan::Aggregate { input, .. } => rewrite_scan_tenant(input, batch),
+        | crate::logical_plan::LogicalPlan::Aggregate { input, .. }
+        | crate::logical_plan::LogicalPlan::Sort { input, .. } => rewrite_scan_tenant(input, batch),
     }
 }
 

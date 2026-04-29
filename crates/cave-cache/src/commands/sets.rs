@@ -8,6 +8,7 @@ use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
 use crate::types::{bytes_to_i64, Entry, Value};
 
+#[allow(dead_code)]
 fn get_set<'a>(db: &'a mut Db, key: &[u8]) -> CacheResult<Option<&'a HashSet<Vec<u8>>>> {
     match db.get_typed(key, "set")? {
         Some(e) => match &e.value {

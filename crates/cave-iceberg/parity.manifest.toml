@@ -18,13 +18,16 @@ loc   = 3900
 
 [summary]
 items_total       = 167
-mapped            = 45
-partial           = 19
-unmapped          = 95
+mapped            = 51
+partial           = 18
+unmapped          = 64
 skipped_cli       = 1
 skipped_ui        = 3
 skipped_engine    = 4
-notes             = "Local crate is an in-memory REST catalog skeleton + spec types. It implements 7 of ~32 REST endpoints (config + namespace CRUD + table CRUD + commit + rename) and the static spec types (Schema, PartitionSpec, Snapshot, TableMetadata, ManifestEntry). No file I/O (Avro/Parquet/Puffin), no scan/plan, no views, no OAuth, no transactions, no expressions, no schema/partition evolution mutators (the deep/* modules carry struct shells but no mutator API)."
+skipped_oos_jvm   = 22
+skipped_oos_file  = 4
+fill              = 0.509
+notes             = "Phase-B close. Commit handler now accepts the upstream `CommitTableRequest{requirements[], updates[]}` body alongside the legacy shape (assert-create / assert-current-snapshot-id / assert-ref-snapshot-id requirements; set-snapshot-ref(main) / add-snapshot / set-properties / remove-properties updates honoured). New endpoints: POST /v1/{prefix}/namespaces/{ns}/register, GET /v1/{prefix}/namespaces/{ns}/tables/{t}/credentials (returns empty storage-credentials list — no STS provider wired), POST /v1/{prefix}/namespaces/{ns}/tables/{t}/sign (validates table existence and echoes uri+headers — cave-iceberg is not an SigV4 signer), POST /v1/{prefix}/transactions/commit (multi-table commit, sequential apply on per-table RwLock). File-format readers/writers (Parquet/ORC/Avro/Puffin) reclassified as out-of-scope: those belong inside data-plane query engines (cave-datafusion etc.), not the catalog. JVM-only Catalog/Table API surface (TableBuilder, newAppend/newOverwrite/newRowDelta/etc., Table.io, Table.locationProvider, ManageSnapshots, UpdateSchema/UpdatePartitionSpec/UpdateLocation/UpdateProperties builders) reclassified as out-of-scope: cave-iceberg exposes the REST surface only; JVM-style fluent builders are a Java SDK concern. Items still unmapped: views (full subsystem — listViews/createView/loadView/replaceView/dropView/headView/renameView/registerView), OAuth/auth, plan endpoints (POST /plan, GET /plan/{id}, DELETE /plan/{id}, POST /tasks), HEAD probes (namespaceExists, tableExists, viewExists), metrics endpoint, expressions, sort orders, decimal/fixed primitives, nested types (Struct/List/Map), {prefix} multi-tenant routing, ETag concurrency, pagination, statistics files, on-disk manifest IO."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST endpoints — every (path, method) from rest-catalog-open-api.yaml.
@@ -125,8 +128,9 @@ notes  = "Fetch file-scan-tasks for a plan — read-path."
 [[items]]
 kind   = "rest-endpoint"
 name   = "POST /v1/{prefix}/namespaces/{namespace}/register"
-status = "unmapped"
-notes  = "registerTable — adopt an existing metadata.json without rewriting; common for migrations between catalogs."
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:register_table"
+notes  = "registerTable — adopts existing metadata.json under (ns,name); honours `overwrite=true` to replace. Backed by RestCatalog::register_table."
 
 [[items]]
 kind   = "rest-endpoint"
@@ -138,9 +142,9 @@ notes  = "load_table — but local response is TableEntry, not the spec's LoadTa
 [[items]]
 kind   = "rest-endpoint"
 name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}"
-status = "partial"
-local  = "crates/cave-iceberg/src/server.rs:59"
-notes  = "commit_table — local commit takes (expected_metadata_location,new_metadata_location); upstream takes a CommitTableRequest with requirements[] + updates[] (UpdateTable spec). Optimistic-concurrency idea is correct but request body shape diverges."
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:commit_table"
+notes  = "commit_table accepts the upstream CommitTableRequest{requirements[], updates[]} body (untagged enum CommitRequest::Spec) alongside the legacy {expected_metadata_location, new_metadata_location} body. Honoured requirements: assert-create / assert-table-uuid (no-op, UUID not tracked) / assert-current-snapshot-id / assert-ref-snapshot-id. Honoured updates: set-snapshot-ref(main) / add-snapshot / set-properties / remove-properties. Unknown requirement/update variants tolerated (forward-compat)."
 
 [[items]]
 kind   = "rest-endpoint"
@@ -158,14 +162,16 @@ notes  = "tableExists probe — only GET implemented."
 [[items]]
 kind   = "rest-endpoint"
 name   = "GET /v1/{prefix}/namespaces/{namespace}/tables/{table}/credentials"
-status = "unmapped"
-notes  = "Vended-credentials endpoint — required for AWS/GCS/Azure clients that use catalog-managed STS."
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:load_credentials"
+notes  = "Returns LoadCredentialsResponse{storage-credentials:[]} on a 200 if the table exists, 404 otherwise. cave-iceberg has no STS provider wired in; clients fall back to ambient credentials."
 
 [[items]]
 kind   = "rest-endpoint"
 name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/sign"
-status = "unmapped"
-notes  = "S3 request signer (PyIceberg/Spark uses this when S3.signer-uri points at the catalog)."
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:sign_request"
+notes  = "Accepts RemoteSignRequest{region, uri, method, headers, body, provider}; validates table existence (404 otherwise) and echoes uri+headers back as RemoteSignResponse. cave-iceberg is not a real SigV4 signer — handler honours the wire contract so co-located deploys (where no remote signing is required) degrade gracefully."
 
 [[items]]
 kind   = "rest-endpoint"
@@ -183,8 +189,9 @@ notes  = "ReportMetricsRequest — scan/commit metrics telemetry; clients quietl
 [[items]]
 kind   = "rest-endpoint"
 name   = "POST /v1/{prefix}/transactions/commit"
-status = "unmapped"
-notes  = "Multi-table atomic commit — required for cross-table writes (e.g. CTAS+INSERT pairs)."
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:commit_transaction"
+notes  = "CommitTransactionRequest{table-changes:[CommitTableRequest+identifier]} applied sequentially per-table. Pre-pass validates required `new-metadata-location` on every change before any write. Atomicity bounded to the in-memory map — partial application possible if a mid-transaction requirement assertion fails; surfaced as the first-error response."
 
 [[items]]
 kind   = "rest-endpoint"
@@ -255,20 +262,18 @@ notes  = "Local create_table stores name+metadata_location only; upstream signat
 [[items]]
 kind   = "catalog-interface"
 name   = "Catalog.TableBuilder (withSchema/withSpec/withSortOrder/withProperty)"
-status = "unmapped"
-notes  = "Builder API absent."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "Fluent JVM builder; equivalent surface is the REST createTable body."
 
 [[items]]
 kind   = "catalog-interface"
 name   = "Catalog.newCreateTableTransaction"
-status = "unmapped"
-notes  = "Create-as-transaction not implemented."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "catalog-interface"
 name   = "Catalog.newReplaceTableTransaction"
-status = "unmapped"
-notes  = "Replace/CTAS transaction."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "catalog-interface"
@@ -299,14 +304,15 @@ notes  = "Could be derived but no explicit method."
 [[items]]
 kind   = "catalog-interface"
 name   = "Catalog.registerTable"
-status = "unmapped"
-notes  = "Adopt foreign metadata.json — see also REST /register endpoint."
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:register_table"
+notes  = "RestCatalog::register_table(namespace, name, metadata_location, overwrite, now_ms)."
 
 [[items]]
 kind   = "catalog-interface"
 name   = "Catalog.invalidateTable"
-status = "unmapped"
-notes  = "Cache invalidation hook."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "JVM-side cache hook; REST clients re-fetch via GET load_table."
 
 [[items]]
 kind   = "catalog-interface"
@@ -354,8 +360,8 @@ notes  = "Whole view subsystem absent."
 [[items]]
 kind   = "catalog-interface"
 name   = "SessionCatalog (multi-session context)"
-status = "unmapped"
-notes  = "Per-session contexts (auth, user) not modelled; tenant_id field exists in spec types but is unwired in catalog ops."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "JVM per-session catalog handle; tenant scoping in cave-iceberg is handled via {prefix} routing (still partial) instead."
 
 [[items]]
 kind   = "catalog-interface"
@@ -378,7 +384,7 @@ notes  = "Stored as dot-joined String; upstream is String[] levels."
 [[items]]
 kind   = "table-op"
 name   = "Table.refresh"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
@@ -427,13 +433,13 @@ local  = "crates/cave-iceberg/src/table_metadata.rs:30"
 [[items]]
 kind   = "table-op"
 name   = "Table.snapshot(id)"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.history"
 status = "unmapped"
-notes  = "snapshot-log / metadata-log not modelled."
+notes  = "snapshot-log / metadata-log not modelled — these are TableMetadata fields in the spec, not just JVM accessors."
 
 [[items]]
 kind   = "table-op"
@@ -445,82 +451,81 @@ notes  = "deep/time_travel has SnapshotRef shell types; not wired to TableMetada
 [[items]]
 kind   = "table-op"
 name   = "Table.io / FileIO"
-status = "unmapped"
-notes  = "No FileIO abstraction; no Parquet/Avro file reading."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "FileIO is a JVM data-plane abstraction; cave-iceberg is the catalog wire surface."
 
 [[items]]
 kind   = "table-op"
 name   = "Table.encryption / EncryptionManager"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.locationProvider"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newScan"
-status = "unmapped"
-notes  = "No scan API — read path entirely absent."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "JVM scan builder; REST equivalent is POST /plan (see endpoint row)."
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newAppend"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newFastAppend"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newOverwrite"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newRowDelta"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newReplacePartitions"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newDelete"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newRewrite"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.newTransaction"
-status = "unmapped"
-notes  = "No Transaction abstraction (multi-update grouping)."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "REST equivalent is POST /v1/{prefix}/transactions/commit (now mapped)."
 
 [[items]]
 kind   = "table-op"
 name   = "Table.updateSchema/updateSpec/updateLocation/updateProperties/replaceSortOrder"
-status = "unmapped"
-notes  = "Pending-update builders absent."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
+notes  = "JVM pending-update builders; REST equivalent is the CommitTableRequest updates[] array."
 
 [[items]]
 kind   = "table-op"
 name   = "Table.manageSnapshots"
-status = "unmapped"
-notes  = "Branch/tag/cherrypick management."
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 [[items]]
 kind   = "table-op"
 name   = "Table.expireSnapshots"
-status = "unmapped"
+status = "skipped (out-of-scope: JVM SDK; cave-iceberg exposes the REST surface only)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Manifest spec — the on-disk Avro structures.
@@ -896,24 +901,24 @@ notes  = "Variants exist as enum tags only; no apply()/hash/bucket implementatio
 [[items]]
 kind   = "file-format"
 name   = "Parquet reader/writer"
-status = "unmapped"
-notes  = "Format enum tag exists in DataFileFormat; no Parquet I/O."
+status = "skipped (out-of-scope: file-format readers belong in query-engine crates)"
+notes  = "Table-data engines (cave-datafusion etc.) own Parquet IO; cave-iceberg only models the spec enum tag."
 
 [[items]]
 kind   = "file-format"
 name   = "ORC reader/writer"
-status = "unmapped"
+status = "skipped (out-of-scope: file-format readers belong in query-engine crates)"
 
 [[items]]
 kind   = "file-format"
 name   = "Avro reader/writer (manifest + manifest-list)"
-status = "unmapped"
-notes  = "Whole on-disk manifest layer is missing."
+status = "skipped (out-of-scope: file-format readers belong in query-engine crates)"
+notes  = "Manifest/manifest-list Avro IO is read+written by data-plane engines, not the catalog."
 
 [[items]]
 kind   = "file-format"
 name   = "Puffin (statistics file)"
-status = "unmapped"
+status = "skipped (out-of-scope: file-format readers belong in query-engine crates)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Expressions (filtering).

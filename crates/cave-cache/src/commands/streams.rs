@@ -24,7 +24,7 @@ pub fn cmd_xadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
 
     let key = args[1].clone();
     let mut maxlen: Option<(bool, usize)> = None; // (approximate, count)
-    let mut minid: Option<StreamId> = None;
+    let mut _minid: Option<StreamId> = None;
     let mut i = 2;
 
     // Parse options
@@ -41,7 +41,7 @@ pub fn cmd_xadd(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             b"MINID" => {
                 i += 1;
                 let _approx = if i < args.len() && args[i] == b"~" { i += 1; true } else { false };
-                minid = Some(StreamId::parse(&args[i]).ok_or_else(|| CacheError::generic("ERR Invalid stream ID"))?);
+                _minid = Some(StreamId::parse(&args[i]).ok_or_else(|| CacheError::generic("ERR Invalid stream ID"))?);
                 i += 1;
             }
             b"NOMKSTREAM" => { i += 1; }
@@ -121,13 +121,13 @@ pub fn cmd_xread(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     if args.len() < 4 { return Err(CacheError::wrong_arity("xread")); }
 
     let mut count: Option<usize> = None;
-    let mut block: Option<u64> = None;
+    let mut _block: Option<u64> = None;
     let mut i = 1;
 
     while i < args.len() {
         match args[i].to_ascii_uppercase().as_slice() {
             b"COUNT" => { i += 1; count = Some(bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as usize); i += 1; }
-            b"BLOCK" => { i += 1; block = Some(bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as u64); i += 1; }
+            b"BLOCK" => { i += 1; _block = Some(bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)? as u64); i += 1; }
             b"STREAMS" => { i += 1; break; }
             _ => { i += 1; }
         }
@@ -259,7 +259,7 @@ pub fn cmd_xtrim(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
     let key = &args[1];
     let strategy = &args[2];
     let mut i = 3;
-    let approx = if i < args.len() && args[i] == b"~" { i += 1; true } else { false };
+    let _approx = if i < args.len() && args[i] == b"~" { i += 1; true } else { false };
     let threshold = bytes_to_i64(&args[i]).ok_or(CacheError::NotInteger)?;
 
     match db.get_typed_mut(key, "stream")? {
@@ -848,5 +848,74 @@ pub fn cmd_xautoclaim(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
             _ => unreachable!(),
         },
         None => Err(CacheError::generic("ERR no such key")),
+    }
+}
+
+// ── XSETID ───────────────────────────────────────────────────────────────────
+
+/// XSETID key last-id [ENTRIESADDED entries-added] [MAXDELETEDID max-deleted-id]
+///
+/// Updates the stream's `last_id` cursor. Subsequent auto-generated IDs (XADD with `*`)
+/// will be strictly greater. Returns +OK on success, errors if `last-id` is older than
+/// the highest existing entry id.
+pub fn cmd_xsetid(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
+    if args.len() < 3 { return Err(CacheError::wrong_arity("xsetid")); }
+    let key = &args[1];
+    let new_id = StreamId::parse(&args[2])
+        .ok_or_else(|| CacheError::generic("ERR Invalid stream ID specified"))?;
+
+    match db.get_typed_mut(key, "stream")? {
+        Some(entry) => match &mut entry.value {
+            Value::Stream(stream) => {
+                // Reject if there's an entry with an id greater than the proposed last-id.
+                if let Some(highest) = stream.entries.iter().map(|e| e.id.clone()).max() {
+                    if new_id < highest {
+                        return Err(CacheError::generic(
+                            "ERR The ID specified in XSETID is smaller than the target stream top item",
+                        ));
+                    }
+                }
+                stream.last_id = new_id;
+                Ok(Resp::ok())
+            }
+            _ => unreachable!(),
+        },
+        None => Err(CacheError::generic("ERR no such key")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn xsetid_updates_last_id() {
+        let mut db = Db::new();
+        let mut stream = Stream::default();
+        stream.last_id = StreamId { ms: 100, seq: 0 };
+        db.insert(b"s".to_vec(), Entry::new(Value::Stream(stream)));
+
+        let r = cmd_xsetid(
+            &[b"XSETID".to_vec(), b"s".to_vec(), b"200-5".to_vec()],
+            &mut db,
+        ).unwrap();
+        assert!(matches!(r, Resp::SimpleString(_)));
+
+        if let Some(e) = db.get(b"s") {
+            if let Value::Stream(s) = &e.value {
+                assert_eq!(s.last_id.ms, 200);
+                assert_eq!(s.last_id.seq, 5);
+            } else { panic!(); }
+        } else { panic!(); }
+    }
+
+    #[test]
+    fn xsetid_missing_key_errors() {
+        let mut db = Db::new();
+        let r = cmd_xsetid(
+            &[b"XSETID".to_vec(), b"nope".to_vec(), b"1-0".to_vec()],
+            &mut db,
+        );
+        assert!(r.is_err());
     }
 }

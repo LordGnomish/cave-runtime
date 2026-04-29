@@ -13,10 +13,10 @@ source_root = "src"
 
 [summary]
 total    = 271
-mapped   = 72
-unmapped = 164
-skipped  = 35
-fill     = 0.395
+mapped   = 82
+unmapped = 127
+skipped  = 62
+fill     = 0.531
 
 # ============================================================================
 # wire-op (9)
@@ -300,14 +300,16 @@ upstream = "mongo"
 kind     = "command"
 name     = "findAndModify"
 ref      = "src/mongo/db/commands/query_cmd/write_commands.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/extra.rs::find_and_modify"
 
 [[items]]
 upstream = "mongo"
 kind     = "command"
 name     = "distinct"
 ref      = "src/mongo/db/commands/query_cmd/distinct.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/extra.rs::distinct"
 
 [[items]]
 upstream = "mongo"
@@ -321,14 +323,16 @@ upstream = "mongo"
 kind     = "command"
 name     = "explain"
 ref      = "src/mongo/db/commands/query_cmd/explain_cmd.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/extra.rs::explain"
 
 [[items]]
 upstream = "mongo"
 kind     = "command"
 name     = "renameCollection"
 ref      = "src/mongo/db/commands/rename_collection_cmd.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/extra.rs::rename_collection"
 
 [[items]]
 upstream = "mongo"
@@ -741,7 +745,8 @@ upstream = "mongo"
 kind     = "command"
 name     = "bulkWrite"
 ref      = "src/mongo/db/commands/query_cmd/bulk_write.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/extra.rs::bulk_write"
 
 [[items]]
 upstream = "mongo"
@@ -824,14 +829,16 @@ upstream = "mongo"
 kind     = "agg-stage"
 name     = "$unwind"
 ref      = "src/mongo/db/pipeline/document_source_unwind.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/agg.rs::unwind_stage"
 
 [[items]]
 upstream = "mongo"
 kind     = "agg-stage"
 name     = "$lookup"
 ref      = "src/mongo/db/pipeline/document_source_lookup.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/agg.rs::lookup_stage"
 
 [[items]]
 upstream = "mongo"
@@ -866,7 +873,8 @@ upstream = "mongo"
 kind     = "agg-stage"
 name     = "$count"
 ref      = "src/mongo/db/pipeline/document_source_count.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/agg.rs::aggregate (\"$count\")"
 
 [[items]]
 upstream = "mongo"
@@ -887,7 +895,8 @@ upstream = "mongo"
 kind     = "agg-stage"
 name     = "$set"
 ref      = "src/mongo/db/pipeline/document_source_add_fields.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/agg.rs::aggregate (\"$set\")"
 
 [[items]]
 upstream = "mongo"
@@ -901,7 +910,8 @@ upstream = "mongo"
 kind     = "agg-stage"
 name     = "$addFields"
 ref      = "src/mongo/db/pipeline/document_source_add_fields.cpp"
-status   = "unmapped"
+status   = "mapped"
+local    = "src/commands/agg.rs::aggregate (\"$addFields\")"
 
 [[items]]
 upstream = "mongo"
@@ -1445,84 +1455,96 @@ upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetGetStatus"
 ref      = "src/mongo/db/repl/repl_set_get_status_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetGetConfig"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetReconfig"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetInitiate"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetStepDown"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetFreeze"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetMaintenance"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetSyncFrom"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetUpdatePosition"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetHeartbeat"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetRequestVotes"
 ref      = "src/mongo/db/repl/repl_set_request_votes.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 [[items]]
 upstream = "mongo"
 kind     = "replica-set-cmd"
 name     = "replSetAbortPrimaryCatchUp"
 ref      = "src/mongo/db/repl/repl_set_commands.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: full multi-node replica-set protocol requires separate coordination process; cave-docdb provides the single-node hello/replSetGet shape only"
 
 # ============================================================================
 # sharding-cmd (~12)  — mongos-side cluster commands
@@ -1533,84 +1555,96 @@ upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "addShard"
 ref      = "src/mongo/s/commands/cluster_add_shard_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "removeShard"
 ref      = "src/mongo/s/commands/cluster_remove_shard_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "listShards"
 ref      = "src/mongo/s/commands/cluster_list_shards_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "shardCollection"
 ref      = "src/mongo/s/commands/cluster_shard_collection_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "splitChunk"
 ref      = "src/mongo/s/commands/cluster_split_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "moveChunk"
 ref      = "src/mongo/s/commands/cluster_move_chunk_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "moveRange"
 ref      = "src/mongo/s/commands/cluster_move_range_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "balancerStart"
 ref      = "src/mongo/s/commands/cluster_control_balancer_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "balancerStop"
 ref      = "src/mongo/s/commands/cluster_control_balancer_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "balancerStatus"
 ref      = "src/mongo/s/commands/cluster_control_balancer_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "reshardCollection"
 ref      = "src/mongo/s/commands/cluster_reshard_collection_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 [[items]]
 upstream = "mongo"
 kind     = "sharding-cmd"
 name     = "clearJumboFlag"
 ref      = "src/mongo/s/commands/cluster_clear_jumbo_flag_cmd.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: sharding/mongos requires separate coordination process"
 
 # ============================================================================
 # auth-mechanism (8)
@@ -1924,21 +1958,24 @@ upstream = "mongo"
 kind     = "subsystem"
 name     = "KeyString"
 ref      = "src/mongo/db/storage/key_string/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: storage-engine internal (KeyString is WiredTiger ordering format)"
 
 [[items]]
 upstream = "mongo"
 kind     = "subsystem"
 name     = "oplog"
 ref      = "src/mongo/db/repl/oplog.cpp"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: replica-set internal (oplog requires multi-node coordination)"
 
 [[items]]
 upstream = "mongo"
 kind     = "subsystem"
 name     = "journal"
 ref      = "src/mongo/db/storage/journal/"
-status   = "unmapped"
+status   = "skipped"
+reason   = "out-of-scope: storage-engine internal (cave-docdb uses in-memory engine, no on-disk journal)"
 
 [[items]]
 upstream = "mongo"

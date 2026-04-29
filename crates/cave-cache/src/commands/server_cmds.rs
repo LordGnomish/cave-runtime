@@ -748,3 +748,67 @@ pub fn cmd_acl(args: &[Vec<u8>], acl: &crate::acl::AclState) -> CacheResult<Resp
         ))),
     }
 }
+
+// ── TIME ─────────────────────────────────────────────────────────────────────
+
+/// TIME — returns current UNIX time in seconds and microseconds within the second.
+pub fn cmd_time() -> Resp {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = now.as_secs();
+    let micros = now.subsec_micros();
+    Resp::Array(Some(vec![
+        Resp::BulkString(Some(secs.to_string().into_bytes())),
+        Resp::BulkString(Some(micros.to_string().into_bytes())),
+    ]))
+}
+
+// ── ROLE ─────────────────────────────────────────────────────────────────────
+
+/// ROLE — returns the replication role information for this instance.
+/// cave-cache currently runs as a standalone master with no replicas.
+pub fn cmd_role() -> Resp {
+    Resp::Array(Some(vec![
+        Resp::BulkString(Some(b"master".to_vec())),
+        Resp::Integer(0), // replication offset
+        Resp::Array(Some(vec![])), // connected replicas
+    ]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn time_returns_two_element_array() {
+        match cmd_time() {
+            Resp::Array(Some(items)) => {
+                assert_eq!(items.len(), 2);
+                for item in items {
+                    match item {
+                        Resp::BulkString(Some(b)) => {
+                            let s = std::str::from_utf8(&b).unwrap();
+                            assert!(s.parse::<u64>().is_ok());
+                        }
+                        _ => panic!("expected bulk string"),
+                    }
+                }
+            }
+            _ => panic!("expected array"),
+        }
+    }
+
+    #[test]
+    fn role_returns_master() {
+        match cmd_role() {
+            Resp::Array(Some(items)) => {
+                assert_eq!(items.len(), 3);
+                assert!(matches!(&items[0], Resp::BulkString(Some(b)) if b == b"master"));
+                assert!(matches!(items[1], Resp::Integer(0)));
+                assert!(matches!(&items[2], Resp::Array(Some(v)) if v.is_empty()));
+            }
+            _ => panic!("expected array"),
+        }
+    }
+}

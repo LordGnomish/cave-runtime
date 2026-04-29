@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use crate::db::Db;
 use crate::error::{CacheError, CacheResult};
 use crate::resp::Resp;
-use crate::types::{bytes_to_f64, bytes_to_i64, f64_to_bytes, i64_to_bytes, Entry, Value};
+use crate::types::{bytes_to_f64, bytes_to_i64, i64_to_bytes, Entry, Value};
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 

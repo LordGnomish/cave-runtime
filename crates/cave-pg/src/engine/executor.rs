@@ -4,9 +4,8 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use super::catalog::{Catalog, ColumnDef, TableSchema};
+use super::catalog::{ColumnDef, TableSchema};
 use super::planner::{Plan, PlanExpr, PlanOp, Projection};
-use super::storage::Storage;
 use super::txn::{IsolationLevel, TxnId, TxnManager, TxnState};
 use super::value::{ScalarType, ScalarValue};
 use super::SqlEngine;

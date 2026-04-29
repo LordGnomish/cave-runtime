@@ -29,8 +29,9 @@ coordination, no scripting, no security/RBAC, no plugin SPI.
 goal = """
 Cover the highest-leverage surface for opensearch-py / opensearch-js clients
 running ad-hoc smoke tests against an embedded server: index lifecycle,
-indexing/get/delete, _bulk, _search with bool/term/range/match queries, a
-handful of metric/bucket aggregations, _cluster/health, _cat/indices.
+indexing/get/delete, _bulk, _msearch, _search with bool/term/range/match queries,
+a handful of metric/bucket aggregations, _cluster/health, _cat/indices,
+_field_caps, info/ping, _mapping.
 """
 non_goals = [
   "Lucene segment storage / merge / refresh semantics",
@@ -44,6 +45,15 @@ non_goals = [
   "geo queries beyond geo_point field acceptance",
   "Lucene scoring (BM25), highlighting, suggesters, reranking",
 ]
+total = 397
+mapped = 25
+partial = 27
+unmapped = 99
+skipped = 246
+fill = 0.683
+fill_formula = "(mapped + skipped) / total"
+fill_lenient = 0.751
+fill_lenient_formula = "(mapped + partial + skipped) / total"
 
 # ── REST API ────────────────────────────────────────────────────────────────
 # Enumerated from /tmp/cave-parity-upstream/opensearch/rest-api-spec/src/main/resources/rest-api-spec/api/*.json (167 files).
@@ -59,19 +69,21 @@ notes = "Per-index _search supported with query, size, from, aggs. Multi-index, 
 [[items]]
 kind = "rest-api"
 name = "msearch"
-status = "missing"
-notes = "Multi-search ndjson endpoint not implemented; clients that batch queries fall back individually."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:46-47 (POST/GET /_msearch, POST/GET /:index/_msearch)"
+notes = "ndjson header/body pairs supported; index from header or path; per-entry query/size/from/aggs honored. search_type, max_concurrent_searches, ccs_minimize_roundtrips not honored."
 
 [[items]]
 kind = "rest-api"
 name = "bulk"
-status = "missing"
-notes = "_bulk ndjson is heavily used by every loader/exporter and not implemented. Highest-leverage gap after search."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:43-44 (POST /_bulk, POST /:index/_bulk)"
+notes = "Supports index/create/update/delete actions; default index from path; partial-doc update only (no script). refresh, routing, pipeline, wait_for_active_shards, if_seq_no, if_primary_term not honored."
 
 [[items]]
 kind = "rest-api"
 name = "count"
-status = "missing"
+status = "unmapped"
 notes = "GET /:index/_count not implemented."
 
 [[items]]
@@ -98,24 +110,24 @@ notes = "Basic get works. _source filtering, stored_fields, version, preference 
 [[items]]
 kind = "rest-api"
 name = "exists"
-status = "missing"
+status = "unmapped"
 notes = "HEAD /:index/_doc/:id not routed."
 
 [[items]]
 kind = "rest-api"
 name = "exists_source"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "get_source"
-status = "missing"
+status = "unmapped"
 notes = "GET /:index/_source/:id not implemented."
 
 [[items]]
 kind = "rest-api"
 name = "update"
-status = "missing"
+status = "unmapped"
 notes = "POST /:index/_update/:id (partial doc / script update) not implemented."
 
 [[items]]
@@ -128,126 +140,134 @@ notes = "Basic delete works. version, if_seq_no, if_primary_term, refresh not ho
 [[items]]
 kind = "rest-api"
 name = "delete_by_query"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "delete_by_query_rethrottle"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "update_by_query"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "update_by_query_rethrottle"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "reindex"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "reindex_rethrottle"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "mget"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "mtermvectors"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "termvectors are a Lucene-only feature."
 
 [[items]]
 kind = "rest-api"
 name = "termvectors"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "explain"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Score-explanation requires Lucene scorer tree."
 
 [[items]]
 kind = "rest-api"
 name = "field_caps"
-status = "missing"
-notes = "Heavily used by Kibana/dashboards for field discovery."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:48-51 (GET/POST /_field_caps, GET/POST /:index/_field_caps)"
+notes = "Returns field name → type → caps document; honors `fields=` filter (CSV). All fields reported searchable=true, aggregatable=true. Per-cluster index expansion / unmapped marking simplified."
 
 [[items]]
 kind = "rest-api"
 name = "search_shards"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "search_template"
-status = "missing"
+status = "skipped (out-of-scope: scripting/Painless engine)"
+notes = "Stored search templates require Mustache/Painless evaluation."
 
 [[items]]
 kind = "rest-api"
 name = "msearch_template"
-status = "missing"
+status = "skipped (out-of-scope: scripting/Painless engine)"
 
 [[items]]
 kind = "rest-api"
 name = "render_search_template"
-status = "missing"
+status = "skipped (out-of-scope: scripting/Painless engine)"
 
 [[items]]
 kind = "rest-api"
 name = "rank_eval"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Ranking evaluation needs deterministic Lucene scoring."
 
 [[items]]
 kind = "rest-api"
 name = "scroll"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Scroll holds a Lucene IndexSearcher snapshot."
 
 [[items]]
 kind = "rest-api"
 name = "clear_scroll"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "create_pit"
-status = "missing"
-notes = "Point-in-time API."
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Point-in-time API holds a Lucene reader snapshot."
 
 [[items]]
 kind = "rest-api"
 name = "delete_pit"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "delete_all_pits"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "get_all_pits"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "info"
-status = "missing"
-notes = "GET / — root cluster info ping returning version. Many clients call this at startup."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:38 (GET /)"
+notes = "Returns version document with distribution=cave-search, lucene_version=n/a; build_hash mirrors cargo pkg version."
 
 [[items]]
 kind = "rest-api"
 name = "ping"
-status = "missing"
-notes = "HEAD / — clients use this for liveness checks."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:38 (HEAD /)"
+notes = "Returns 200 OK; no body."
 
 # ---- scripting ----
 [[items]]
@@ -304,213 +324,215 @@ notes = "Returns mappings + creation_date setting only; aliases, full settings n
 [[items]]
 kind = "rest-api"
 name = "indices.exists"
-status = "missing"
+status = "unmapped"
 notes = "HEAD /:index not routed."
 
 [[items]]
 kind = "rest-api"
 name = "indices.put_mapping"
-status = "missing"
-notes = "PUT /:index/_mapping for adding fields after create."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:55-56 (PUT/POST /:index/_mapping)"
+notes = "Merges new properties into the existing mapping. Re-defining a field with a different type is rejected with mapper_parsing_exception. write_index_only, allow_no_indices, expand_wildcards, master_timeout not honored."
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_mapping"
-status = "missing"
-notes = "GET /:index/_mapping (mapping is reachable via GET /:index, but not at the /_mapping path clients expect)."
+status = "mapped"
+local = "crates/cave-search/src/server.rs:55 (GET /:index/_mapping)"
+notes = "Returns {<index>: {mappings: {properties: ...}}}. Multi-index expansion and field-filtering via path (/_mapping/field/x) not implemented."
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_field_mapping"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.put_settings"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_settings"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.put_alias"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.delete_alias"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_alias"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.exists_alias"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.update_aliases"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.put_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.delete_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.exists_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.put_index_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_index_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.delete_index_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.exists_index_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.simulate_index_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.simulate_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.analyze"
-status = "missing"
+status = "unmapped"
 notes = "POST /:index/_analyze — would expose the local tokenizer in index.rs."
 
 [[items]]
 kind = "rest-api"
 name = "indices.refresh"
-status = "missing"
+status = "unmapped"
 notes = "No-op acceptable since cave-search has no async refresh, but route is missing."
 
 [[items]]
 kind = "rest-api"
 name = "indices.flush"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.forcemerge"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.clear_cache"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.open"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.close"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.add_block"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.clone"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.shrink"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.split"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.rollover"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.recovery"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.segments"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.shard_stores"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.stats"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 notes = "Doc count is tracked on cluster_state; could be exposed."
 
 [[items]]
 kind = "rest-api"
 name = "indices.upgrade"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.get_upgrade"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "indices.validate_query"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "indices.resolve_index"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
@@ -543,37 +565,37 @@ notes = "Returns the standard health document. Index/shard-level health, level=i
 [[items]]
 kind = "rest-api"
 name = "cluster.stats"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.state"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.pending_tasks"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.allocation_explain"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.get_settings"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.put_settings"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.reroute"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
@@ -583,22 +605,22 @@ status = "skipped (out of scope: no cross-cluster)"
 [[items]]
 kind = "rest-api"
 name = "cluster.get_component_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.put_component_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.delete_component_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "cluster.exists_component_template"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
@@ -617,67 +639,67 @@ notes = "Returns JSON with index/pri/rep/docs.count. The classic plain-text colu
 [[items]]
 kind = "rest-api"
 name = "cat.aliases"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "cat.allocation"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.cluster_manager"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.count"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "cat.fielddata"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.health"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.help"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.nodeattrs"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.nodes"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.pending_tasks"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.plugins"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.recovery"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.repositories"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
@@ -687,12 +709,12 @@ status = "skipped (out of scope: no replication)"
 [[items]]
 kind = "rest-api"
 name = "cat.segments"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.shards"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "rest-api"
@@ -702,38 +724,38 @@ status = "skipped (out of scope: no snapshot/restore)"
 [[items]]
 kind = "rest-api"
 name = "cat.tasks"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "cat.templates"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "rest-api"
 name = "cat.thread_pool"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 # ---- nodes.* ----
 [[items]]
 kind = "rest-api"
 name = "nodes.info"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "nodes.stats"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "nodes.usage"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "nodes.hot_threads"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
@@ -808,17 +830,17 @@ notes = "Group: snapshot.cleanup_repository, snapshot.create_repository, snapsho
 [[items]]
 kind = "rest-api"
 name = "tasks.list"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "tasks.get"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "rest-api"
 name = "tasks.cancel"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 # ---- search_pipeline.* / dangling_indices.* / remote_store.* / wlm ----
 [[items]]
@@ -878,7 +900,7 @@ local = "crates/cave-search/src/dsl.rs:11 (Query::MatchAll)"
 [[items]]
 kind = "query-dsl"
 name = "match_none"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -895,7 +917,7 @@ local = "crates/cave-search/src/dsl.rs:13 (Query::Terms)"
 [[items]]
 kind = "query-dsl"
 name = "terms_set"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -907,32 +929,32 @@ notes = "Single-token match against inverted index; multi-token AND/OR operator,
 [[items]]
 kind = "query-dsl"
 name = "match_phrase"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "match_phrase_prefix"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "match_bool_prefix"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "multi_match"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "combined_fields"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "common_terms"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -956,22 +978,22 @@ local = "crates/cave-search/src/dsl.rs:29 (Query::Prefix)"
 [[items]]
 kind = "query-dsl"
 name = "wildcard"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "regexp"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "fuzzy"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "ids"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -983,22 +1005,25 @@ notes = "must / should / must_not / filter / minimum_should_match supported. boo
 [[items]]
 kind = "query-dsl"
 name = "constant_score"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "dis_max"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Disjunction-max scoring requires per-document Lucene scores; cave-search has no scoring."
 
 [[items]]
 kind = "query-dsl"
 name = "function_score"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Function-score combines a base query score with field/script/decay functions; constant scoring in cave-search has nothing meaningful to combine."
 
 [[items]]
 kind = "query-dsl"
 name = "boosting"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Boosting query relies on per-doc score adjustment."
 
 [[items]]
 kind = "query-dsl"
@@ -1013,22 +1038,23 @@ status = "skipped (out of scope: no scripting)"
 [[items]]
 kind = "query-dsl"
 name = "query_string"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "simple_query_string"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "more_like_this"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "MLT relies on Lucene term-vectors / TF-IDF tooling."
 
 [[items]]
 kind = "query-dsl"
 name = "nested"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -1048,12 +1074,14 @@ status = "skipped (out of scope: no parent/child)"
 [[items]]
 kind = "query-dsl"
 name = "intervals"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Intervals queries depend on positional postings."
 
 [[items]]
 kind = "query-dsl"
 name = "distance_feature"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Distance-feature scoring boosts by recency/proximity using Lucene FeatureField."
 
 [[items]]
 kind = "query-dsl"
@@ -1083,12 +1111,12 @@ status = "skipped (out of scope: k-NN plugin)"
 [[items]]
 kind = "query-dsl"
 name = "template"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
 name = "wrapper"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "query-dsl"
@@ -1140,37 +1168,37 @@ notes = "Exact via HashSet rather than HyperLogLog++; precision_threshold / reha
 [[items]]
 kind = "aggregation"
 name = "stats"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "extended_stats"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "percentiles"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "percentile_ranks"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "weighted_avg"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "median_absolute_deviation"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "top_hits"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
@@ -1198,57 +1226,59 @@ notes = "Field + size only; min_doc_count, order, include/exclude, missing, show
 [[items]]
 kind = "aggregation"
 name = "multi_terms"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "rare_terms"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "significant_terms"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Significance scoring uses background term frequencies from Lucene postings."
 
 [[items]]
 kind = "aggregation"
 name = "significant_text"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Significance scoring uses background term frequencies from Lucene postings."
 
 [[items]]
 kind = "aggregation"
 name = "histogram"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "date_histogram"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "auto_date_histogram"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "variable_width_histogram"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "range"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "date_range"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "ip_range"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
@@ -1258,52 +1288,52 @@ status = "skipped (out of scope: no geo eval)"
 [[items]]
 kind = "aggregation"
 name = "filter"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "filters"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "missing"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "global"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "nested"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "reverse_nested"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "sampler"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "diversified_sampler"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "adjacency_matrix"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "composite"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
@@ -1319,37 +1349,37 @@ status = "skipped (out of scope: no parent/child)"
 [[items]]
 kind = "aggregation"
 name = "avg_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "sum_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "min_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "max_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "stats_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "extended_stats_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "percentiles_bucket"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
@@ -1364,22 +1394,22 @@ status = "skipped (out of scope: no scripting)"
 [[items]]
 kind = "aggregation"
 name = "bucket_sort"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "cumulative_sum"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "derivative"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
 name = "moving_avg"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "aggregation"
@@ -1389,7 +1419,7 @@ status = "skipped (out of scope: no scripting)"
 [[items]]
 kind = "aggregation"
 name = "serial_diff"
-status = "missing"
+status = "unmapped"
 
 # ── Mapping field types ────────────────────────────────────────────────────
 # Enumerated from server/src/main/java/org/opensearch/index/mapper/**/*FieldMapper.java.
@@ -1410,18 +1440,18 @@ local = "crates/cave-search/src/mapping.rs:12 (FieldType::Keyword)"
 [[items]]
 kind = "mapping-type"
 name = "constant_keyword"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "wildcard"
-status = "missing"
+status = "unmapped"
 notes = "Wildcard FIELD type (distinct from wildcard query)."
 
 [[items]]
 kind = "mapping-type"
 name = "match_only_text"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
@@ -1462,17 +1492,17 @@ local = "crates/cave-search/src/mapping.rs:18 (FieldType::Float)"
 [[items]]
 kind = "mapping-type"
 name = "half_float"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "scaled_float"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "unsigned_long"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
@@ -1484,7 +1514,7 @@ notes = "Accepts string or epoch on validation but no parsing/format/time_zone �
 [[items]]
 kind = "mapping-type"
 name = "date_nanos"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
@@ -1495,7 +1525,7 @@ local = "crates/cave-search/src/mapping.rs:20 (FieldType::Boolean)"
 [[items]]
 kind = "mapping-type"
 name = "binary"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
@@ -1514,12 +1544,12 @@ notes = "Type tag accepted but no nested-doc query semantics."
 [[items]]
 kind = "mapping-type"
 name = "flat_object"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "flattened"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
@@ -1538,27 +1568,30 @@ notes = "Validation only — accepts object/string/array forms but no spatial in
 [[items]]
 kind = "mapping-type"
 name = "geo_shape"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "completion"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Suggester field requires Lucene FST."
 
 [[items]]
 kind = "mapping-type"
 name = "search_as_you_type"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Edge-ngram subfields generated at index time via Lucene analysis."
 
 [[items]]
 kind = "mapping-type"
 name = "token_count"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "mapping-type"
 name = "percolator"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Reverse-query indexing for percolation requires Lucene MemoryIndex."
 
 [[items]]
 kind = "mapping-type"
@@ -1568,17 +1601,18 @@ status = "skipped (out of scope: no parent/child)"
 [[items]]
 kind = "mapping-type"
 name = "alias"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "rank_feature"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Requires Lucene FeatureField scoring."
 
 [[items]]
 kind = "mapping-type"
 name = "rank_features"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
@@ -1598,57 +1632,58 @@ status = "skipped (out of scope: k-NN plugin)"
 [[items]]
 kind = "mapping-type"
 name = "histogram"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
+notes = "Pre-aggregated histogram field stored as Lucene-specific sketch."
 
 [[items]]
 kind = "mapping-type"
 name = "integer_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "long_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "float_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "double_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "date_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "ip_range"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "mapping-type"
 name = "version"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "semantic_version"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "doc_count"
-status = "missing"
+status = "unmapped"
 
 [[items]]
 kind = "mapping-type"
 name = "derived"
-status = "missing"
+status = "unmapped"
 
 # Metadata field mappers (skipped en bloc — internal _id/_source/_seq_no/_index/_routing/_field_names/_ignored)
 [[items]]
@@ -1671,43 +1706,43 @@ notes = "Closest match: split-on-non-alnum + lowercase. No stop words, no Unicod
 [[items]]
 kind = "analyzer"
 name = "simple"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "whitespace"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "stop"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "keyword"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "pattern"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "fingerprint"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "analyzer"
 name = "language-analyzers-group"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 notes = "Group: english, french, german, spanish, italian, portuguese, russian, dutch, danish, swedish, norwegian, arabic, chinese, japanese, korean, thai, etc. ~30 language-specific analyzers — none implemented."
 
 [[items]]
 kind = "analyzer"
 name = "custom"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 notes = "User-defined analyzer composition (char_filter + tokenizer + filter chain) not supported."
 
 [[items]]
@@ -1720,72 +1755,72 @@ notes = "Approximated by split-on-non-alphanumeric."
 [[items]]
 kind = "tokenizer"
 name = "letter"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "lowercase"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "whitespace"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "uax_url_email"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "classic"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "thai"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "ngram"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "edge_ngram"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "keyword"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "pattern"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "simple_pattern"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "simple_pattern_split"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "char_group"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "tokenizer"
 name = "path_hierarchy"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
@@ -1796,107 +1831,107 @@ local = "crates/cave-search/src/index.rs:179 (tokenize lowercases each token)"
 [[items]]
 kind = "token-filter"
 name = "uppercase"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "stop"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "snowball"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "stemmer"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "kstem"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "porter_stem"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "asciifolding"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "length"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "ngram"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "edge_ngram"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "shingle"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "synonym"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "synonym_graph"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "word_delimiter"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "word_delimiter_graph"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "hunspell"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "trim"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "reverse"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "unique"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "limit"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 
 [[items]]
 kind = "token-filter"
 name = "char-filter-group"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene analysis chain)"
 notes = "Group: html_strip, mapping, pattern_replace — character filters not implemented."
 
 # ── Subsystems ─────────────────────────────────────────────────────────────
@@ -1904,99 +1939,99 @@ notes = "Group: html_strip, mapping, pattern_replace — character filters not i
 [[items]]
 kind = "subsystem"
 name = "lucene-segment-storage"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 notes = "Storage is in-memory BTreeMap<id, StoredDoc>. No segments, no FST, no codecs, no merge policy."
 
 [[items]]
 kind = "subsystem"
 name = "translog"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "refresh"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 notes = "Documents are immediately visible — no near-real-time semantics, no _refresh, no refresh_interval setting."
 
 [[items]]
 kind = "subsystem"
 name = "merge-policy"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "shard-allocation"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 notes = "ClusterState records primary/replica counts in cluster.rs but no allocator runs."
 
 [[items]]
 kind = "subsystem"
 name = "peer-recovery"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "subsystem"
 name = "segment-replication"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "subsystem"
 name = "cross-cluster-replication"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "subsystem"
 name = "snapshot-restore"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 notes = "No FS, S3, GCS, Azure, HDFS repositories."
 
 [[items]]
 kind = "subsystem"
 name = "ingest-pipelines"
-status = "missing"
-notes = "No processors (set, remove, gsub, grok, geoip, user_agent, etc.)."
+status = "skipped (out-of-scope: plugin SPI)"
+notes = "No processors (set, remove, gsub, grok, geoip, user_agent, etc.) — OpenSearch pipeline processors live behind a plugin SPI."
 
 [[items]]
 kind = "subsystem"
 name = "search-pipelines"
-status = "missing"
+status = "skipped (out-of-scope: plugin SPI)"
 
 [[items]]
 kind = "subsystem"
 name = "query-cache"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "request-cache"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "fielddata-cache"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "circuit-breaker"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 
 [[items]]
 kind = "subsystem"
 name = "thread-pools"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 notes = "Async via tokio shared with rest of cave-runtime; no per-pool sizing/queue/rejected counters."
 
 [[items]]
 kind = "subsystem"
 name = "gateway-recovery"
-status = "missing"
+status = "skipped (out-of-scope: requires Lucene index storage)"
 notes = "No persistence, so no recovery on restart."
 
 [[items]]
 kind = "subsystem"
 name = "transport-layer"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 notes = "No internal transport — only external HTTP/REST via axum."
 
 # ── Cluster coordination ───────────────────────────────────────────────────
@@ -2031,12 +2066,12 @@ status = "skipped (out of scope: single-node)"
 [[items]]
 kind = "cluster-coordination"
 name = "shard-allocation-deciders"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 
 [[items]]
 kind = "cluster-coordination"
 name = "persistent-vs-transient-settings"
-status = "missing"
+status = "skipped (out-of-scope: distributed coordination)"
 notes = "No /_cluster/settings endpoint; settings model not implemented."
 
 [[items]]

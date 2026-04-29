@@ -273,6 +273,10 @@ fn map_children<R: OptimizerRule + ?Sized>(plan: LogicalPlan, rule: &R) -> Logic
             group_by,
             aggregates,
         },
+        LogicalPlan::Sort { input, exprs } => LogicalPlan::Sort {
+            input: Box::new(rule.rewrite(*input)),
+            exprs,
+        },
     }
 }
 
@@ -579,7 +583,8 @@ mod tests {
             LogicalPlan::Projection { input, .. }
             | LogicalPlan::Filter { input, .. }
             | LogicalPlan::Limit { input, .. }
-            | LogicalPlan::Aggregate { input, .. } => walk_plan(input, f),
+            | LogicalPlan::Aggregate { input, .. }
+            | LogicalPlan::Sort { input, .. } => walk_plan(input, f),
         }
     }
 }

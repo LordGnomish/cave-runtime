@@ -7,6 +7,7 @@ pub mod agg;
 pub mod index;
 pub mod cursor;
 pub mod admin;
+pub mod extra;
 
 use crate::bson::Document;
 use crate::engine::Engine;
@@ -43,6 +44,11 @@ pub async fn dispatch(
         "endSessions" => admin::end_sessions().await,
         "currentOp" => admin::current_op().await,
         "serverStatus" => admin::server_status().await,
+        "findAndModify" | "findandmodify" => extra::find_and_modify(cmd_doc, engine).await,
+        "bulkWrite" => extra::bulk_write(cmd_doc, engine).await,
+        "distinct" => extra::distinct(cmd_doc, engine).await,
+        "renameCollection" => extra::rename_collection(cmd_doc, engine).await,
+        "explain" => extra::explain(cmd_doc, engine).await,
         _ => {
             let mut resp = Document::new();
             resp.insert("ok".to_string(), Value::Number(0.into()));

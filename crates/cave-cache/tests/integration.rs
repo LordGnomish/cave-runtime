@@ -4,12 +4,9 @@
 //! hashes, streams, bitmaps, HyperLogLog, geo, expiry, transactions, scripting,
 //! and pub/sub.
 
-use cave_cache::db::{Db, ServerState};
+use cave_cache::db::Db;
 use cave_cache::commands::*;
 use cave_cache::resp::Resp;
-use cave_cache::types::{Entry, Value};
-use cave_cache::config::Config;
-use std::sync::Arc;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -736,7 +733,7 @@ fn test_hash_slot() {
 #[test]
 fn test_acl_authenticate() {
     use cave_cache::acl::AclState;
-    let mut acl = AclState::new();
+    let acl = AclState::new();
     // default user with no password: always passes when no password set
     let ok = acl.authenticate("default", "");
     assert!(ok);
