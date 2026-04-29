@@ -1,0 +1,97 @@
+# Search engine
+groups:
+  - name: cave-search-slo
+    interval: 30s
+    rules:
+      - alert: SearchSloBurnRateFast
+        expr: |
+          (
+            sum(rate(search_total{job="cave-search",code=~"5.."}[1h]))
+            /
+            sum(rate(search_total{job="cave-search"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-search fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/slo-burn-fast.md"
+      - alert: SearchSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(search_total{job="cave-search",code=~"5.."}[6h]))
+            /
+            sum(rate(search_total{job="cave-search"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-search slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/slo-burn-slow.md"
+      - alert: SearchErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(search_total{job="cave-search",code=~"5.."}[7d]))
+              / sum(rate(search_total{job="cave-search"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-search 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/error-budget.md"
+      - alert: SearchLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(search_duration_seconds_bucket{job="cave-search"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-search p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/latency.md"
+      - alert: SearchSaturationHigh
+        expr: 'sum(search_inflight_requests{job="cave-search"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-search inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/saturation.md"
+      - alert: SearchMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-search"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-search RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/memory.md"
+      - alert: SearchCardinalityExplosion
+        expr: 'count(count by (tenant_id) (search_total{job="cave-search"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-search tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/cardinality.md"
+      - alert: SearchHealthProbeFailing
+        expr: 'min(up{job="cave-search"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-search health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-search/health.md"

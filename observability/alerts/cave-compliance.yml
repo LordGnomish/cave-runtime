@@ -1,0 +1,97 @@
+# Compliance evaluator
+groups:
+  - name: cave-compliance-slo
+    interval: 30s
+    rules:
+      - alert: ComplianceSloBurnRateFast
+        expr: |
+          (
+            sum(rate(compliance_total{job="cave-compliance",code=~"5.."}[1h]))
+            /
+            sum(rate(compliance_total{job="cave-compliance"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-compliance fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/slo-burn-fast.md"
+      - alert: ComplianceSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(compliance_total{job="cave-compliance",code=~"5.."}[6h]))
+            /
+            sum(rate(compliance_total{job="cave-compliance"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-compliance slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/slo-burn-slow.md"
+      - alert: ComplianceErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(compliance_total{job="cave-compliance",code=~"5.."}[7d]))
+              / sum(rate(compliance_total{job="cave-compliance"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-compliance 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/error-budget.md"
+      - alert: ComplianceLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(compliance_duration_seconds_bucket{job="cave-compliance"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-compliance p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/latency.md"
+      - alert: ComplianceSaturationHigh
+        expr: 'sum(compliance_inflight_requests{job="cave-compliance"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-compliance inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/saturation.md"
+      - alert: ComplianceMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-compliance"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-compliance RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/memory.md"
+      - alert: ComplianceCardinalityExplosion
+        expr: 'count(count by (tenant_id) (compliance_total{job="cave-compliance"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-compliance tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/cardinality.md"
+      - alert: ComplianceHealthProbeFailing
+        expr: 'min(up{job="cave-compliance"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-compliance health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-compliance/health.md"

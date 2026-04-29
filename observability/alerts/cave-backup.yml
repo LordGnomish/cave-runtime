@@ -1,0 +1,97 @@
+# Backup / restore
+groups:
+  - name: cave-backup-slo
+    interval: 30s
+    rules:
+      - alert: BackupSloBurnRateFast
+        expr: |
+          (
+            sum(rate(backup_total{job="cave-backup",code=~"5.."}[1h]))
+            /
+            sum(rate(backup_total{job="cave-backup"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-backup fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/slo-burn-fast.md"
+      - alert: BackupSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(backup_total{job="cave-backup",code=~"5.."}[6h]))
+            /
+            sum(rate(backup_total{job="cave-backup"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-backup slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/slo-burn-slow.md"
+      - alert: BackupErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(backup_total{job="cave-backup",code=~"5.."}[7d]))
+              / sum(rate(backup_total{job="cave-backup"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-backup 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/error-budget.md"
+      - alert: BackupLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(backup_duration_seconds_bucket{job="cave-backup"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-backup p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/latency.md"
+      - alert: BackupSaturationHigh
+        expr: 'sum(backup_inflight_requests{job="cave-backup"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-backup inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/saturation.md"
+      - alert: BackupMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-backup"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-backup RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/memory.md"
+      - alert: BackupCardinalityExplosion
+        expr: 'count(count by (tenant_id) (backup_total{job="cave-backup"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-backup tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/cardinality.md"
+      - alert: BackupHealthProbeFailing
+        expr: 'min(up{job="cave-backup"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-backup health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-backup/health.md"

@@ -1,0 +1,97 @@
+# Argo Rollouts parity
+groups:
+  - name: cave-rollouts-slo
+    interval: 30s
+    rules:
+      - alert: RolloutsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(rollout_total{job="cave-rollouts",code=~"5.."}[1h]))
+            /
+            sum(rate(rollout_total{job="cave-rollouts"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-rollouts fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/slo-burn-fast.md"
+      - alert: RolloutsSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(rollout_total{job="cave-rollouts",code=~"5.."}[6h]))
+            /
+            sum(rate(rollout_total{job="cave-rollouts"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-rollouts slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/slo-burn-slow.md"
+      - alert: RolloutsErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(rollout_total{job="cave-rollouts",code=~"5.."}[7d]))
+              / sum(rate(rollout_total{job="cave-rollouts"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rollouts 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/error-budget.md"
+      - alert: RolloutsLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(rollout_duration_seconds_bucket{job="cave-rollouts"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rollouts p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/latency.md"
+      - alert: RolloutsSaturationHigh
+        expr: 'sum(rollout_inflight_requests{job="cave-rollouts"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rollouts inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/saturation.md"
+      - alert: RolloutsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-rollouts"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rollouts RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/memory.md"
+      - alert: RolloutsCardinalityExplosion
+        expr: 'count(count by (tenant_id) (rollout_total{job="cave-rollouts"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rollouts tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/cardinality.md"
+      - alert: RolloutsHealthProbeFailing
+        expr: 'min(up{job="cave-rollouts"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-rollouts health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rollouts/health.md"

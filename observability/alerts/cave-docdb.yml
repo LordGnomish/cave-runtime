@@ -1,0 +1,97 @@
+# Document database
+groups:
+  - name: cave-docdb-slo
+    interval: 30s
+    rules:
+      - alert: DocdbSloBurnRateFast
+        expr: |
+          (
+            sum(rate(docdb_total{job="cave-docdb",code=~"5.."}[1h]))
+            /
+            sum(rate(docdb_total{job="cave-docdb"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-docdb fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/slo-burn-fast.md"
+      - alert: DocdbSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(docdb_total{job="cave-docdb",code=~"5.."}[6h]))
+            /
+            sum(rate(docdb_total{job="cave-docdb"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-docdb slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/slo-burn-slow.md"
+      - alert: DocdbErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(docdb_total{job="cave-docdb",code=~"5.."}[7d]))
+              / sum(rate(docdb_total{job="cave-docdb"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-docdb 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/error-budget.md"
+      - alert: DocdbLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(docdb_duration_seconds_bucket{job="cave-docdb"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-docdb p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/latency.md"
+      - alert: DocdbSaturationHigh
+        expr: 'sum(docdb_inflight_requests{job="cave-docdb"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-docdb inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/saturation.md"
+      - alert: DocdbMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-docdb"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-docdb RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/memory.md"
+      - alert: DocdbCardinalityExplosion
+        expr: 'count(count by (tenant_id) (docdb_total{job="cave-docdb"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-docdb tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/cardinality.md"
+      - alert: DocdbHealthProbeFailing
+        expr: 'min(up{job="cave-docdb"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-docdb health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/health.md"

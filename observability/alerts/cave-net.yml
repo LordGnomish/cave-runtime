@@ -1,0 +1,97 @@
+# Cilium-parity CNI
+groups:
+  - name: cave-net-slo
+    interval: 30s
+    rules:
+      - alert: NetSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cilium_total{job="cave-net",code=~"5.."}[1h]))
+            /
+            sum(rate(cilium_total{job="cave-net"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-net fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/slo-burn-fast.md"
+      - alert: NetSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(cilium_total{job="cave-net",code=~"5.."}[6h]))
+            /
+            sum(rate(cilium_total{job="cave-net"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-net slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/slo-burn-slow.md"
+      - alert: NetErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(cilium_total{job="cave-net",code=~"5.."}[7d]))
+              / sum(rate(cilium_total{job="cave-net"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-net 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/error-budget.md"
+      - alert: NetLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(cilium_duration_seconds_bucket{job="cave-net"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-net p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/latency.md"
+      - alert: NetSaturationHigh
+        expr: 'sum(cilium_inflight_requests{job="cave-net"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-net inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/saturation.md"
+      - alert: NetMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-net"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-net RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/memory.md"
+      - alert: NetCardinalityExplosion
+        expr: 'count(count by (tenant_id) (cilium_total{job="cave-net"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-net tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/cardinality.md"
+      - alert: NetHealthProbeFailing
+        expr: 'min(up{job="cave-net"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-net health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-net/health.md"

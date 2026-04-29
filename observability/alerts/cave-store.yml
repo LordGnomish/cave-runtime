@@ -1,0 +1,97 @@
+# Generic KV store
+groups:
+  - name: cave-store-slo
+    interval: 30s
+    rules:
+      - alert: StoreSloBurnRateFast
+        expr: |
+          (
+            sum(rate(store_total{job="cave-store",code=~"5.."}[1h]))
+            /
+            sum(rate(store_total{job="cave-store"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-store fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/slo-burn-fast.md"
+      - alert: StoreSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(store_total{job="cave-store",code=~"5.."}[6h]))
+            /
+            sum(rate(store_total{job="cave-store"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-store slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/slo-burn-slow.md"
+      - alert: StoreErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(store_total{job="cave-store",code=~"5.."}[7d]))
+              / sum(rate(store_total{job="cave-store"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-store 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/error-budget.md"
+      - alert: StoreLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(store_duration_seconds_bucket{job="cave-store"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-store p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/latency.md"
+      - alert: StoreSaturationHigh
+        expr: 'sum(store_inflight_requests{job="cave-store"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-store inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/saturation.md"
+      - alert: StoreMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-store"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-store RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/memory.md"
+      - alert: StoreCardinalityExplosion
+        expr: 'count(count by (tenant_id) (store_total{job="cave-store"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-store tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/cardinality.md"
+      - alert: StoreHealthProbeFailing
+        expr: 'min(up{job="cave-store"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-store health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-store/health.md"
