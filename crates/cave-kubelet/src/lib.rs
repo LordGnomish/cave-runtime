@@ -42,6 +42,7 @@ pub mod status_manager;
 pub mod runtime_cache;
 pub mod pod_worker;
 pub mod image_manager;
+pub mod cri_client;
 
 // deeper-003 — node-side runtime modules.
 pub mod container_metrics;
