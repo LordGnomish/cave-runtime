@@ -151,6 +151,7 @@ impl SealState {
         if self.initialized {
             return Err(VaultError::AlreadyInitialized);
         }
+        Self::validate_threshold(shares, threshold)?;
         let rng = SystemRandom::new();
         let mut master_key = vec![0u8; 32];
         rng.fill(&mut master_key).map_err(|_| VaultError::Crypto("rng failure".into()))?;
@@ -203,6 +204,135 @@ impl SealState {
         self.pending_shares.clear();
         self.unseal_progress = 0;
         self.unseal_nonce = uuid::Uuid::new_v4().to_string();
+    }
+
+    /// Cite: openbao `vault/seal.go` SealConfig.Validate +
+    /// `sdk/helper/shamir/shamir.go:192` (Split) bounds — `n` must fit in
+    /// `[1, 255]`, `k` must fit in `[1, n]`. cave additionally requires
+    /// `k >= 2` to match the upstream Shamir implementation (a 1-of-n
+    /// "scheme" is degenerate and rejected by openbao at the API layer).
+    pub fn validate_threshold(shares: u8, threshold: u8) -> VaultResult<()> {
+        if shares == 0 {
+            return Err(VaultError::InvalidRequest("shares must be >= 1".into()));
+        }
+        if threshold < 2 {
+            return Err(VaultError::InvalidRequest("threshold must be >= 2".into()));
+        }
+        if threshold > shares {
+            return Err(VaultError::InvalidRequest(
+                "threshold cannot exceed shares".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+// ─── Auto-seal interface (deeper-001) ───────────────────────────────────────
+//
+// Cite: openbao `vault/seal_autoseal.go:39` (autoSeal struct) +
+// `:55` (NewAutoSeal). The auto-seal flow delegates the master-key
+// wrap/unwrap to a remote KMS backend; the local Shamir shares are
+// replaced with recovery shares whose only job is to bootstrap the seal
+// configuration after a quorum-loss event.
+
+/// Recognised KMS backends for auto-unseal. Mirrors the wrapping types
+/// declared in `github.com/openbao/go-kms-wrapping/v2` (see also
+/// `vault/seal_autoseal.go:42` `barrierType wrapping.WrapperType`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutoSealType {
+    /// `vault/seal/transit` — wraps the master key via a remote Vault
+    /// running the Transit secrets engine.
+    Transit,
+    /// `vault/seal/azurekeyvault` — Azure Key Vault HSM.
+    AzureKeyVault,
+    /// `vault/seal/awskms` — AWS KMS.
+    AwsKms,
+    /// `vault/seal/gcpckms` — GCP Cloud KMS.
+    GcpCkms,
+    /// `vault/seal/ocikms` — Oracle Cloud Infrastructure KMS.
+    OciKms,
+    /// `vault/seal/pkcs11` — KMIP / PKCS#11 HSM.
+    Pkcs11,
+    /// Built-in Shamir (no auto-unseal). Used when no `seal {}` block
+    /// is configured.
+    Shamir,
+}
+
+impl AutoSealType {
+    /// Wrapping-type identifier emitted in the seal status payload.
+    /// Cite: openbao `vault/seal_autoseal.go:104` (BarrierType).
+    pub fn barrier_type(&self) -> &'static str {
+        match self {
+            Self::Transit       => "transit",
+            Self::AzureKeyVault => "azurekeyvault",
+            Self::AwsKms        => "awskms",
+            Self::GcpCkms       => "gcpckms",
+            Self::OciKms        => "ocikms",
+            Self::Pkcs11        => "pkcs11",
+            Self::Shamir        => "shamir",
+        }
+    }
+
+    /// Cite: `vault/seal_autoseal.go:113` `StoredKeysSupported() ⇒ Generic`.
+    /// Every auto-seal backend stores the master key remotely; only
+    /// Shamir keeps it derived from local shares.
+    pub fn stores_keys_remotely(&self) -> bool {
+        !matches!(self, Self::Shamir)
+    }
+
+    /// Cite: `vault/seal_autoseal.go:116` `RecoveryKeySupported() ⇒ true`.
+    /// Auto-seal types replace the unseal flow with a recovery-key
+    /// flow whose threshold is configured separately.
+    pub fn supports_recovery_key(&self) -> bool {
+        self.stores_keys_remotely()
+    }
+}
+
+/// Cite: openbao `vault/seal.go:279` (SealConfig). cave's view is the
+/// subset of fields driven by the operator config + the unseal RPC.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AutoSealConfig {
+    pub seal_type: AutoSealType,
+    /// Number of recovery shares (only meaningful when
+    /// `seal_type.supports_recovery_key()`).
+    pub recovery_shares: u8,
+    /// Threshold for recovery-share quorum.
+    pub recovery_threshold: u8,
+    /// Backend-specific endpoint (Vault Transit address, Azure Key Vault
+    /// URL, etc).  Opaque to cave; the wrapper validates it.
+    pub endpoint: String,
+    /// Optional named key inside the backend (e.g. transit key name,
+    /// Azure Key Vault key id).
+    pub key_id: String,
+}
+
+impl AutoSealConfig {
+    pub fn validate(&self) -> VaultResult<()> {
+        if self.seal_type == AutoSealType::Shamir {
+            if self.recovery_shares != 0 || self.recovery_threshold != 0 {
+                return Err(VaultError::InvalidRequest(
+                    "Shamir seal does not use recovery shares".into(),
+                ));
+            }
+            return Ok(());
+        }
+        if self.endpoint.trim().is_empty() {
+            return Err(VaultError::InvalidRequest(
+                "auto-seal endpoint must not be empty".into(),
+            ));
+        }
+        if self.recovery_shares == 0 {
+            return Err(VaultError::InvalidRequest(
+                "auto-seal requires at least 1 recovery share".into(),
+            ));
+        }
+        if self.recovery_threshold < 1 || self.recovery_threshold > self.recovery_shares {
+            return Err(VaultError::InvalidRequest(
+                "recovery threshold must be in [1, recovery_shares]".into(),
+            ));
+        }
+        Ok(())
     }
 }
 

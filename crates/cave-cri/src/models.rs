@@ -84,6 +84,11 @@ pub struct Mount {
     pub destination: PathBuf,
     pub read_only: bool,
     pub mount_type: MountType,
+    /// CRI-side propagation mode (private / rslave / rshared). Mirrors
+    /// containerd `pkg/cri/server/container_create_linux.go` mount propagation
+    /// translation in v2.2.3.
+    #[serde(default)]
+    pub propagation: MountPropagation,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +96,56 @@ pub enum MountType {
     Bind,
     Volume,
     Tmpfs,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MountPropagation {
+    #[default]
+    Private,
+    HostToContainer,
+    Bidirectional,
+}
+
+/// Cite: containerd `pkg/cri/server/container_create_linux.go`
+/// (setOCISecurityContext) v2.2.3 + runc `libcontainer/specconv/spec_linux.go`
+/// v1.4.2. Full per-container security knobs that get folded into the OCI
+/// runtime spec.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SecurityContext {
+    pub run_as_user: Option<u32>,
+    pub run_as_group: Option<u32>,
+    #[serde(default)]
+    pub supplemental_groups: Vec<u32>,
+    pub run_as_non_root: bool,
+    pub readonly_rootfs: bool,
+    pub allow_privilege_escalation: bool,
+    pub privileged: bool,
+    #[serde(default)]
+    pub capabilities_add: Vec<String>,
+    #[serde(default)]
+    pub capabilities_drop: Vec<String>,
+    pub seccomp_profile: Option<SeccompProfile>,
+    pub apparmor_profile: Option<String>,
+    pub selinux_label: Option<SelinuxLabel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SeccompProfile {
+    /// `RuntimeDefault` — apply the runtime's built-in seccomp filter.
+    RuntimeDefault,
+    /// `Unconfined` — disable seccomp entirely.
+    Unconfined,
+    /// `Localhost` — load the JSON profile at the given path.
+    Localhost(String),
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SelinuxLabel {
+    pub user: Option<String>,
+    pub role: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    pub level: Option<String>,
 }
 
 /// OCI image metadata.
@@ -227,6 +282,26 @@ pub struct SandboxSpec {
     pub port_mappings: Vec<PortMapping>,
     pub log_directory: Option<String>,
     pub cgroup_parent: Option<String>,
+    /// Runtime handler name from `PodSandboxConfig.runtime_handler`
+    /// (Kubernetes `RuntimeClass.handler`). Empty/None → use the registry
+    /// default. See KEP-585.
+    #[serde(default)]
+    pub runtime_handler: Option<String>,
+    /// User-namespace mode for the pod (KEP-127). `Host` (default) skips
+    /// remapping; `Pod` remaps container UID/GID 0 to a per-pod host
+    /// range allocated by `UserNsAllocator`.
+    #[serde(default)]
+    pub user_namespace_mode: UserNamespaceMode,
+}
+
+/// `pod.spec.hostUsers` translation. KEP-127.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserNamespaceMode {
+    /// `hostUsers: true` — share the host user namespace.
+    #[default]
+    Host,
+    /// `hostUsers: false` — allocate a private user namespace per pod.
+    Pod,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -366,6 +441,10 @@ pub struct RuntimeCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RuntimeStatus {
     pub conditions: Vec<RuntimeCondition>,
+    /// Runtime handlers advertised to the kubelet (KEP-585). Empty when
+    /// no handlers are registered.
+    #[serde(default)]
+    pub runtime_handlers: Vec<crate::runtime_handler::RuntimeHandler>,
 }
 
 /// Node-wide CPU stats.
@@ -750,6 +829,7 @@ mod tests {
             destination: "/container/path".into(),
             read_only: true,
             mount_type: MountType::Bind,
+            propagation: crate::models::MountPropagation::Private,
         };
         let json = serde_json::to_string(&m).unwrap();
         assert!(json.contains("host/path"));

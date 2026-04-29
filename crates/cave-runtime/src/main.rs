@@ -191,7 +191,6 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_workflows::router(workflows_state))
         .merge(cave_scan::router(scan_state))
         .merge(cave_portal::router(portal_state))
-        .merge(cave_portal_api::routes::progress::router())
         .merge(cave_scaffold::router(scaffold_state))
         .merge(cave_chaos::router(chaos_state))
         .merge(cave_policy::router(policy_state))

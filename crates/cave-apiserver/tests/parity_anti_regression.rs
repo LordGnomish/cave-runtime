@@ -8,6 +8,18 @@
 fn parity_is_strict_one_zero_zero_zero() {
     let report = cave_apiserver::calculate_parity().expect("manifest parses + calculator runs");
 
+    eprintln!(
+        "cave-apiserver parity: file={}/{} fn={}/{} test={}/{} surface={}/{} stubs={} overall={:.3}",
+        report.file_parity.matched, report.file_parity.total,
+        report.function_parity.matched, report.function_parity.total,
+        report.test_parity.matched, report.test_parity.total,
+        report.surface_parity.matched, report.surface_parity.total,
+        report.stubs_detected, report.overall,
+    );
+    for g in &report.gaps {
+        eprintln!("  gap: {:?} {} -> {:?}", g.kind, g.upstream, g.local);
+    }
+
     let dims = [
         ("file", &report.file_parity),
         ("function", &report.function_parity),

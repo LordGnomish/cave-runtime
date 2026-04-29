@@ -3,12 +3,22 @@
 //! Asserts each parity dimension is 1.000 and `stubs_detected == 0`. This is
 //! the K8s-core floor: any drop blocks merge. To raise the floor, port more
 //! upstream tests / functions and add their entries to `parity.manifest.toml`.
-//!
-//! Compile-time-rooted at this crate so the calculator walks the right tree.
 
 #[test]
 fn parity_is_strict_one_zero_zero_zero() {
     let report = cave_etcd::calculate_parity().expect("manifest parses + calculator runs");
+
+    eprintln!(
+        "cave-etcd parity: file={}/{} fn={}/{} test={}/{} surface={}/{} stubs={} overall={:.3}",
+        report.file_parity.matched, report.file_parity.total,
+        report.function_parity.matched, report.function_parity.total,
+        report.test_parity.matched, report.test_parity.total,
+        report.surface_parity.matched, report.surface_parity.total,
+        report.stubs_detected, report.overall,
+    );
+    for g in &report.gaps {
+        eprintln!("  gap: {:?} {} -> {:?}", g.kind, g.upstream, g.local);
+    }
 
     let dims = [
         ("file", &report.file_parity),

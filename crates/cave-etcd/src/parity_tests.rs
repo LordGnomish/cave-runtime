@@ -225,12 +225,12 @@ fn test_watch_cancel_synced() {
     let id = resp.watch_id;
     assert!(store.get_watch_config(id).is_some(), "config exists pre-cancel");
 
-    let cancelled = store.watch_cancel(id);
-    assert!(cancelled, "cancel must report success on existing watch");
+    store.watch_cancel(id).expect("cancel must succeed on existing watch");
     assert!(store.get_watch_config(id).is_none(), "config gone post-cancel");
 
-    // Cancelling a non-existent / already-cancelled id is a no-op (returns false).
-    assert!(!store.watch_cancel(id));
+    // Cancelling a non-existent / already-cancelled id surfaces WatchNotFound.
+    let err = store.watch_cancel(id);
+    assert!(matches!(err, Err(EtcdError::WatchNotFound(_))));
 }
 
 // ── Lease ───────────────────────────────────────────────────────────────────

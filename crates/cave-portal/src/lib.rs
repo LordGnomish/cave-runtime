@@ -4,8 +4,13 @@ pub mod catalog;
 pub mod dashboard;
 pub mod engine;
 pub mod models;
+pub mod plugins;
 pub mod routes;
 pub mod ui;
+
+/// Per-module admin views (etcd / cri / apiserver / iam / mesh / pg / vault)
+/// + per-tenant dashboard. Pinned to backstage/backstage v1.50.3.
+pub mod admin;
 
 use axum::Router;
 use cave_kernel::parity::ParityReport;

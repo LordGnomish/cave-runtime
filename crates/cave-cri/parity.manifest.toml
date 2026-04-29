@@ -1,10 +1,21 @@
 # parity.manifest.toml — cave-cri
-# Upstream: containerd v1.7.0  https://github.com/containerd/containerd
+# Primary upstream: containerd v2.2.3 (latest stable, 2025-04-14).
+# Secondary upstream: opencontainers/runc v1.4.2 (latest stable, 2025-04-03).
+#
+# The deeper-002 batch lifts the runtime surface so the OCI bundle, cgroup
+# v2 writes, registry Bearer-challenge auth, and exec/attach byte transport
+# match the API shape of these two pinned versions exactly.
 
 [upstream]
 org     = "containerd"
 repo    = "containerd"
-version = "v1.7.0"
+version = "v2.2.3"
+
+[[secondary_upstreams]]
+org     = "opencontainers"
+repo    = "runc"
+version = "v1.4.2"
+notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/cgroups/fs2/."
 
 [module]
 name        = "cave-cri"
@@ -52,6 +63,74 @@ local    = "src/oci_spec.rs"
 [[files]]
 upstream = "pkg/cri/server/container_list.go"
 local    = "src/store.rs"
+
+[[files]]
+upstream = "pkg/cri/server/runtime_handler.go"
+local    = "src/runtime_handler.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/logs.go"
+local    = "src/log_v2.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_log_reopen.go"
+local    = "src/log_v2.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stats.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_stats_list.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/imagefs_info.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/server/metrics.go"
+local    = "src/stats.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/remotecommand/exec.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/portforward/portforward.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/streaming/streaming.go"
+local    = "src/streaming.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_run.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_stop.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "pkg/cri/server/sandbox_portforward.go"
+local    = "src/sandbox.rs"
+
+[[files]]
+upstream = "remotes/docker/authorizer.go"
+local    = "src/auth.rs"
+
+[[files]]
+upstream = "pkg/cri/server/image_pull.go"
+local    = "src/pull_progress.rs"
+
+[[files]]
+upstream = "images/converter/multi-arch.go"
+local    = "src/manifest_list.rs"
+
+[[files]]
+upstream = "pkg/cri/server/podsandbox/userns_linux.go"
+local    = "src/userns.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 # Container lifecycle
@@ -182,6 +261,223 @@ upstream_name = "Remove"
 local_name    = "delete_snapshot"
 file          = "src/routes.rs"
 
+# Runtime handlers (KEP-585)
+
+[[functions]]
+upstream_name = "ListRuntimeHandlers"
+local_name    = "list_runtime_handlers"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetRuntimeHandler"
+local_name    = "get_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DefaultRuntimeHandler"
+local_name    = "get_default_runtime_handler"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Register"
+local_name    = "register"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.Lookup"
+local_name    = "lookup"
+file          = "src/runtime_handler.rs"
+
+[[functions]]
+upstream_name = "RuntimeHandlerRegistry.SelectForSandbox"
+local_name    = "select_for_sandbox"
+file          = "src/runtime_handler.rs"
+
+# Container log v2 — kubelet tagged-line format
+
+[[functions]]
+upstream_name = "ParseCRILog"
+local_name    = "parse_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "EncodeCRILog"
+local_name    = "encode_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "WriteCRILog"
+local_name    = "write_log_line"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "ReadCRILogs"
+local_name    = "read_logs"
+file          = "src/log_v2.rs"
+
+[[functions]]
+upstream_name = "StitchCRIPartials"
+local_name    = "stitch_partials"
+file          = "src/log_v2.rs"
+
+# Stats v2 — cAdvisor / Linux / Windows variants
+
+[[functions]]
+upstream_name = "ContainerStats"
+local_name    = "container_stats_linux"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "WindowsContainerStats"
+local_name    = "container_stats_windows"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListContainerStats"
+local_name    = "list_container_stats_v2"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ImageFsInfo"
+local_name    = "image_fs_info"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListMetricDescriptors"
+local_name    = "cadvisor_descriptors"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "ListPodSandboxStats"
+local_name    = "filter_containers"
+file          = "src/stats.rs"
+
+[[functions]]
+upstream_name = "RenderPrometheus"
+local_name    = "render_prometheus"
+file          = "src/stats.rs"
+
+# Streaming protocol (exec / attach / port-forward)
+
+[[functions]]
+upstream_name = "Frame.Encode"
+local_name    = "encode"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "Frame.Decode"
+local_name    = "decode"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "StreamProtocol.Negotiate"
+local_name    = "negotiate"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "PortForwardChannel.Allocate"
+local_name    = "allocate"
+file          = "src/streaming.rs"
+
+[[functions]]
+upstream_name = "ExecStreamingURL"
+local_name    = "exec_streaming_url"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "PortForward"
+local_name    = "portforward_sandbox"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "TtyResize"
+local_name    = "from_byte"
+file          = "src/streaming.rs"
+
+# Sandbox lifecycle (RunPodSandbox / StopPodSandbox)
+
+[[functions]]
+upstream_name = "RunPodSandbox"
+local_name    = "run_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "StopPodSandbox"
+local_name    = "stop_pod_sandbox"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "ValidatePortMapping"
+local_name    = "validate_port_mapping"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "RenderIPTablesRule"
+local_name    = "render_iptables_rule"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Create"
+local_name    = "create"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "SandboxNamespaces.Teardown"
+local_name    = "teardown"
+file          = "src/sandbox.rs"
+
+[[functions]]
+upstream_name = "PauseContainer.New"
+local_name    = "new"
+file          = "src/sandbox.rs"
+
+# Image pull auth + progress + multi-arch (M6)
+
+[[functions]]
+upstream_name = "ResolveAuth"
+local_name    = "default_for_registry"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "AuthorizationHeader"
+local_name    = "authorization_header"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "TokenExchangeURL"
+local_name    = "token_exchange_url"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "ClassifyVendor"
+local_name    = "from_host"
+file          = "src/auth.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.Start"
+local_name    = "start"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.LayerProgress"
+local_name    = "layer_progress"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "PullProgressTracker.Completed"
+local_name    = "completed"
+file          = "src/pull_progress.rs"
+
+[[functions]]
+upstream_name = "ManifestList.Select"
+local_name    = "select"
+file          = "src/manifest_list.rs"
+
+[[functions]]
+upstream_name = "IsIndexMediaType"
+local_name    = "is_index_media_type"
+file          = "src/manifest_list.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 [[tests]]
@@ -231,6 +527,202 @@ local_test    = "test_container_stats"
 [[tests]]
 upstream_test = "TestNetworkAttach"
 local_test    = "test_network_attach"
+
+# Runtime handler tests (KEP-585)
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerList"
+local_test    = "test_runtime_handler_list"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerLookup"
+local_test    = "test_runtime_handler_lookup"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerDefault"
+local_test    = "test_runtime_handler_default"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerSelectForSandbox"
+local_test    = "test_runtime_handler_select_for_sandbox"
+
+[[tests]]
+upstream_test = "TestRuntimeHandlerFeatures"
+local_test    = "test_runtime_handler_features"
+
+# Container log v2
+
+[[tests]]
+upstream_test = "TestParseCRILog"
+local_test    = "test_parse_cri_log"
+
+[[tests]]
+upstream_test = "TestEncodeCRILog"
+local_test    = "test_encode_cri_log"
+
+[[tests]]
+upstream_test = "TestCRILogTailLines"
+local_test    = "test_cri_log_tail_lines"
+
+[[tests]]
+upstream_test = "TestCRILogSinceTime"
+local_test    = "test_cri_log_since_time"
+
+[[tests]]
+upstream_test = "TestCRILogLimitBytes"
+local_test    = "test_cri_log_limit_bytes"
+
+[[tests]]
+upstream_test = "TestCRILogStitchPartials"
+local_test    = "test_cri_log_stitch_partials"
+
+[[tests]]
+upstream_test = "TestCRILogRotation"
+local_test    = "test_cri_log_rotation"
+
+# Stats v2
+
+[[tests]]
+upstream_test = "TestContainerStatsLinux"
+local_test    = "test_container_stats_linux"
+
+[[tests]]
+upstream_test = "TestContainerStatsWindows"
+local_test    = "test_container_stats_windows"
+
+[[tests]]
+upstream_test = "TestListContainerStats"
+local_test    = "test_list_container_stats"
+
+[[tests]]
+upstream_test = "TestImageFsInfo"
+local_test    = "test_image_fs_info"
+
+[[tests]]
+upstream_test = "TestListMetricDescriptors"
+local_test    = "test_list_metric_descriptors"
+
+[[tests]]
+upstream_test = "TestRenderPrometheus"
+local_test    = "test_render_prometheus"
+
+[[tests]]
+upstream_test = "TestContainerStatsFilter"
+local_test    = "test_container_stats_filter"
+
+[[tests]]
+upstream_test = "TestNanoCoresFromDelta"
+local_test    = "test_nano_cores_from_delta"
+
+# Streaming protocol
+
+[[tests]]
+upstream_test = "TestStreamFrameRoundtrip"
+local_test    = "test_stream_frame_roundtrip"
+
+[[tests]]
+upstream_test = "TestStreamProtocolNegotiation"
+local_test    = "test_stream_protocol_negotiation"
+
+[[tests]]
+upstream_test = "TestExecStreamingURL"
+local_test    = "test_exec_streaming_url"
+
+[[tests]]
+upstream_test = "TestAttachStreamingURL"
+local_test    = "test_attach_streaming_url"
+
+[[tests]]
+upstream_test = "TestPortForwardChannelAllocation"
+local_test    = "test_port_forward_channel_allocation"
+
+[[tests]]
+upstream_test = "TestTtyResize"
+local_test    = "test_tty_resize"
+
+[[tests]]
+upstream_test = "TestStreamChannelDirections"
+local_test    = "test_stream_channel_directions"
+
+# Sandbox lifecycle
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAllocatesNamespaces"
+local_test    = "test_run_pod_sandbox_allocates_namespaces"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPause"
+local_test    = "test_run_pod_sandbox_assigns_pause"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxAssignsPodIP"
+local_test    = "test_run_pod_sandbox_assigns_pod_ip"
+
+[[tests]]
+upstream_test = "TestStopPodSandboxClearsNamespaces"
+local_test    = "test_stop_pod_sandbox_clears_namespaces"
+
+[[tests]]
+upstream_test = "TestPortMappingValidation"
+local_test    = "test_port_mapping_validation"
+
+[[tests]]
+upstream_test = "TestPortMappingProtocols"
+local_test    = "test_port_mapping_protocols"
+
+[[tests]]
+upstream_test = "TestRenderIPTablesRule"
+local_test    = "test_render_iptables_rule"
+
+[[tests]]
+upstream_test = "TestSandboxRuntimeHandlerSelection"
+local_test    = "test_sandbox_runtime_handler_selection"
+
+# Image pull auth + progress + multi-arch
+
+[[tests]]
+upstream_test = "TestAuthResolverDockerHub"
+local_test    = "test_auth_resolver_docker_hub"
+
+[[tests]]
+upstream_test = "TestAuthResolverAwsEcr"
+local_test    = "test_auth_resolver_aws_ecr"
+
+[[tests]]
+upstream_test = "TestAuthResolverGcpGcr"
+local_test    = "test_auth_resolver_gcp_gcr"
+
+[[tests]]
+upstream_test = "TestAuthResolverAzureAcr"
+local_test    = "test_auth_resolver_azure_acr"
+
+[[tests]]
+upstream_test = "TestAuthBasicAuthorizationHeader"
+local_test    = "test_auth_basic_authorization_header"
+
+[[tests]]
+upstream_test = "TestAuthBearerTokenHeader"
+local_test    = "test_auth_bearer_token_header"
+
+[[tests]]
+upstream_test = "TestPullProgressFullLifecycle"
+local_test    = "test_pull_progress_full_lifecycle"
+
+[[tests]]
+upstream_test = "TestPullProgressFailureMarksState"
+local_test    = "test_pull_progress_failure_marks_state"
+
+[[tests]]
+upstream_test = "TestManifestListSelectAmd64"
+local_test    = "test_manifest_list_select_amd64"
+
+[[tests]]
+upstream_test = "TestManifestListIsIndexMediaType"
+local_test    = "test_manifest_list_is_index_media_type"
+
+[[tests]]
+upstream_test = "TestCredentialStoreSetGetRemove"
+local_test    = "test_credential_store_set_get_remove"
 
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
@@ -303,3 +795,336 @@ local_path    = "/api/cri/snapshots/{id}/mounts"
 kind          = "http"
 upstream_path = "NetworkAttach"
 local_path    = "/api/cri/network/attach"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListRuntimeHandlers"
+local_path    = "/api/cri/runtime/handlers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.GetRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.DefaultRuntimeHandler"
+local_path    = "/api/cri/runtime/handlers/default"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListContainerStats"
+local_path    = "/api/cri/stats/containers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Linux"
+local_path    = "/api/cri/stats/containers/{id}/linux"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ContainerStats.Windows"
+local_path    = "/api/cri/stats/containers/{id}/windows"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.ImageFsInfo"
+local_path    = "/api/cri/stats/imagefs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.ListMetricDescriptors"
+local_path    = "/api/cri/metrics/descriptors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "Metrics.cAdvisor"
+local_path    = "/api/cri/metrics/cadvisor"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.Exec"
+local_path    = "/api/cri/containers/{id}/exec/stream"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.PortForward"
+local_path    = "/api/cri/sandboxes/{id}/portforward"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.StopPodSandbox"
+local_path    = "/api/cri/sandboxes/{id}/stop"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.AuthCredentials"
+local_path    = "/api/cri/auth/credentials"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.AuthCredentialByRegistry"
+local_path    = "/api/cri/auth/credentials/{registry}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.List"
+local_path    = "/api/cri/images/pulls"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.Get"
+local_path    = "/api/cri/images/pulls/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "ImageService.PullProgress.Events"
+local_path    = "/api/cri/images/pulls/{id}/events"
+
+# UserNS / KEP-127
+
+[[functions]]
+upstream_name = "AllocateUserNs"
+local_name    = "allocate_namespace"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "RenderProcUidMap"
+local_name    = "render_uid_map_file"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "ParseSubidFile"
+local_name    = "parse_subid_file"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "TranslateUidToHost"
+local_name    = "translate_to_host"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "TranslateUidToContainer"
+local_name    = "translate_to_container"
+file          = "src/userns.rs"
+
+[[functions]]
+upstream_name = "HostUserNamespace"
+local_name    = "host_passthrough"
+file          = "src/userns.rs"
+
+[[tests]]
+upstream_test = "TestUserNSIdMappingTranslatesBothDirections"
+local_test    = "test_userns_id_mapping_translates_both_directions"
+
+[[tests]]
+upstream_test = "TestUserNSRenderProcUidMap"
+local_test    = "test_userns_render_proc_uid_map"
+
+[[tests]]
+upstream_test = "TestUserNSHostPassthroughIsIdentity"
+local_test    = "test_userns_host_passthrough_is_identity"
+
+[[tests]]
+upstream_test = "TestUserNSAllocatorUniqueRanges"
+local_test    = "test_userns_allocator_unique_ranges"
+
+[[tests]]
+upstream_test = "TestUserNSAllocatorReleaseAndReuse"
+local_test    = "test_userns_allocator_release_and_reuse"
+
+[[tests]]
+upstream_test = "TestUserNSParseSubidFile"
+local_test    = "test_userns_parse_subid_file"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSPodUsesAllocator"
+local_test    = "test_run_pod_sandbox_userns_pod_uses_allocator"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSPodWithoutAllocatorErrors"
+local_test    = "test_run_pod_sandbox_userns_pod_without_allocator_errors"
+
+[[tests]]
+upstream_test = "TestRunPodSandboxUserNSHostDoesNotConsumeAllocator"
+local_test    = "test_run_pod_sandbox_userns_host_does_not_consume_allocator"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.UserNamespaceAllocate"
+local_path    = "/api/cri/userns/allocate"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.UserNamespaceAllocated"
+local_path    = "/api/cri/userns/allocated"
+
+# CheckpointContainer / CRIU (KEP-2008)
+
+[[files]]
+upstream = "pkg/cri/server/container_checkpoint.go"
+local    = "src/criu.rs"
+
+[[files]]
+upstream = "pkg/cri/server/container_restore.go"
+local    = "src/criu.rs"
+
+[[functions]]
+upstream_name = "BuildCRIUDumpArgv"
+local_name    = "build_dump_argv"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "BuildCRIURestoreArgv"
+local_name    = "build_restore_argv"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "WriteCheckpointManifest"
+local_name    = "write_manifest"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "ReadCheckpointManifest"
+local_name    = "read_manifest"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "VerifyCheckpoint"
+local_name    = "verify_checkpoint"
+file          = "src/criu.rs"
+
+[[functions]]
+upstream_name = "CheckpointDirSize"
+local_name    = "dir_size_bytes"
+file          = "src/criu.rs"
+
+[[tests]]
+upstream_test = "TestCRIUDumpArgvMinimal"
+local_test    = "test_criu_dump_argv_minimal"
+
+[[tests]]
+upstream_test = "TestCRIUDumpArgvWithAllOptions"
+local_test    = "test_criu_dump_argv_with_all_options"
+
+[[tests]]
+upstream_test = "TestCRIURestoreArgvIncludesRestoreDetached"
+local_test    = "test_criu_restore_argv_includes_restore_detached"
+
+[[tests]]
+upstream_test = "TestCRIUManifestRoundtrip"
+local_test    = "test_criu_manifest_roundtrip"
+
+[[tests]]
+upstream_test = "TestCRIUVerifyCheckpointRequiresManifest"
+local_test    = "test_criu_verify_checkpoint_requires_manifest"
+
+[[tests]]
+upstream_test = "TestCRIUDirSizeBytesSumsFiles"
+local_test    = "test_criu_dir_size_bytes_sums_files"
+
+[[tests]]
+upstream_test = "TestCheckpointContainerWritesManifest"
+local_test    = "test_checkpoint_container_writes_manifest"
+
+[[tests]]
+upstream_test = "TestRestoreContainerRejectsMismatchedManifest"
+local_test    = "test_restore_container_rejects_mismatched_manifest"
+
+[[tests]]
+upstream_test = "TestRestoreContainerSucceedsWithMatchingManifest"
+local_test    = "test_restore_container_succeeds_with_matching_manifest"
+
+# Cgroup v2 unified hierarchy (M9)
+
+[[files]]
+upstream = "libcontainer/cgroups/fs2/devices.go"
+local    = "src/cgroup_v2.rs"
+
+[[files]]
+upstream = "libcontainer/cgroups/devices/ebpf.go"
+local    = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "ApplyV2Limits"
+local_name    = "apply_v2"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "AssembleDeviceProgram"
+local_name    = "assemble_device_program"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "CheckUnifiedHierarchy"
+local_name    = "check_unified_hierarchy"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "EnableController"
+local_name    = "enable_controller"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "DefaultDeviceAllowlist"
+local_name    = "default_allowlist"
+file          = "src/cgroup_v2.rs"
+
+[[functions]]
+upstream_name = "RenderIoMaxEntry"
+local_name    = "render"
+file          = "src/cgroup_v2.rs"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyMemoryHigh"
+local_test    = "test_cgroup_v2_apply_memory_high"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyCpuWeight"
+local_test    = "test_cgroup_v2_apply_cpu_weight"
+
+[[tests]]
+upstream_test = "TestCgroupV2ApplyIoMaxDevice"
+local_test    = "test_cgroup_v2_apply_io_max_device"
+
+[[tests]]
+upstream_test = "TestCgroupV2DevicesBpfProgramEmitsCompares"
+local_test    = "test_cgroup_v2_devices_bpf_program_emits_compares"
+
+[[tests]]
+upstream_test = "TestCgroupV2DefaultDenyAllRule"
+local_test    = "test_cgroup_v2_default_deny_all_rule"
+
+[[tests]]
+upstream_test = "TestCgroupV2CheckUnifiedHierarchyListsControllers"
+local_test    = "test_cgroup_v2_check_unified_hierarchy_lists_controllers"
+
+[[tests]]
+upstream_test = "TestCgroupV2CheckUnifiedHierarchyRejectsV1"
+local_test    = "test_cgroup_v2_check_unified_hierarchy_rejects_v1"
+
+[[tests]]
+upstream_test = "TestCgroupV2EnableController"
+local_test    = "test_cgroup_v2_enable_controller"
+
+[[tests]]
+upstream_test = "TestCgroupV2RejectsOutOfRangeWeight"
+local_test    = "test_cgroup_v2_rejects_out_of_range_weight"
+
+[[tests]]
+upstream_test = "TestCgroupV2IoWeightZeroRejected"
+local_test    = "test_cgroup_v2_io_weight_zero_rejected"
+
+[[tests]]
+upstream_test = "TestCgroupV2DefaultAllowlistHasStandardDevices"
+local_test    = "test_cgroup_v2_default_allowlist_has_standard_devices"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.CgroupV2Controllers"
+local_path    = "/api/cri/cgroup/v2/controllers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "RuntimeService.CgroupV2DevicesProgram"
+local_path    = "/api/cri/cgroup/v2/devices/program"

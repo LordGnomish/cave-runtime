@@ -1,0 +1,31 @@
+[package]
+name = "night-pump"
+version = "0.1.0"
+edition = "2021"
+description = "Cave Runtime night-pump — coordinates worker batches against a YAML queue"
+license = "Apache-2.0"
+
+# Standalone workspace — not part of the cave-runtime crate workspace.
+[workspace]
+
+[[bin]]
+name = "night-pump"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+axum = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+sysinfo = "0.32"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"

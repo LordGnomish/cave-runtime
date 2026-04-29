@@ -70,6 +70,57 @@ impl Kv2Secret {
     pub fn get_version_mut(&mut self, v: u64) -> Option<&mut Kv2Version> {
         self.versions.iter_mut().find(|ver| ver.version == v)
     }
+
+    /// Cite: openbao `builtin/logical/kv/path_data.go:229` (cleanupOldVersions)
+    /// — when the version count exceeds `max_versions`, prune the oldest
+    /// LIVE versions (not destroyed ones) until the live-count fits.
+    /// Returns the list of pruned version numbers.
+    pub fn prune_to_max_versions(&mut self) -> Vec<u64> {
+        let max = self.max_versions.max(1);
+        let mut pruned = Vec::new();
+        while self.versions.len() as u64 > max && !self.versions.is_empty() {
+            let evicted = self.versions.remove(0);
+            self.oldest_version = evicted.version + 1;
+            pruned.push(evicted.version);
+        }
+        pruned
+    }
+
+    /// Cite: openbao `builtin/logical/kv/delete_version_after.go` +
+    /// `path_data.go:680` (KeyMetadata.AddVersion). When
+    /// `delete_version_after` (seconds) is set, a version is considered
+    /// expired once `now > version.created_time + delete_version_after`.
+    pub fn is_version_expired(&self, version: u64, now: DateTime<Utc>) -> bool {
+        if self.delete_version_after <= 0 {
+            return false;
+        }
+        let Some(v) = self.get_version(version) else { return false };
+        if v.destroyed {
+            return false;
+        }
+        let ttl_chrono = chrono::Duration::seconds(self.delete_version_after);
+        v.created_time + ttl_chrono < now
+    }
+
+    /// Mark every version older than `cutoff_age` (seconds) as soft-deleted.
+    /// Cite: `builtin/logical/kv/delete_version_after.go` — the periodic
+    /// sweep that the upstream backend runs as part of `pathDataDelete`.
+    pub fn sweep_expired(&mut self, now: DateTime<Utc>) -> Vec<u64> {
+        if self.delete_version_after <= 0 {
+            return Vec::new();
+        }
+        let ttl = chrono::Duration::seconds(self.delete_version_after);
+        let mut swept = Vec::new();
+        for v in self.versions.iter_mut() {
+            if v.destroyed { continue; }
+            if v.deletion_time.is_some() { continue; }
+            if v.created_time + ttl < now {
+                v.deletion_time = Some(now);
+                swept.push(v.version);
+            }
+        }
+        swept
+    }
 }
 
 #[derive(Default)]

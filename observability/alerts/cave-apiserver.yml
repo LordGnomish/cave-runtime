@@ -1,0 +1,97 @@
+# Kubernetes API server parity
+groups:
+  - name: cave-apiserver-slo
+    interval: 30s
+    rules:
+      - alert: ApiserverSloBurnRateFast
+        expr: |
+          (
+            sum(rate(apiserver_request_total{job="cave-apiserver",code=~"5.."}[1h]))
+            /
+            sum(rate(apiserver_request_total{job="cave-apiserver"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-apiserver fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/slo-burn-fast.md"
+      - alert: ApiserverSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(apiserver_request_total{job="cave-apiserver",code=~"5.."}[6h]))
+            /
+            sum(rate(apiserver_request_total{job="cave-apiserver"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-apiserver slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/slo-burn-slow.md"
+      - alert: ApiserverErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(apiserver_request_total{job="cave-apiserver",code=~"5.."}[7d]))
+              / sum(rate(apiserver_request_total{job="cave-apiserver"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-apiserver 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/error-budget.md"
+      - alert: ApiserverLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(apiserver_request_duration_seconds_bucket{job="cave-apiserver"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-apiserver p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/latency.md"
+      - alert: ApiserverSaturationHigh
+        expr: 'sum(apiserver_request_inflight_requests{job="cave-apiserver"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-apiserver inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/saturation.md"
+      - alert: ApiserverMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-apiserver"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-apiserver RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/memory.md"
+      - alert: ApiserverCardinalityExplosion
+        expr: 'count(count by (tenant_id) (apiserver_request_total{job="cave-apiserver"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-apiserver tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/cardinality.md"
+      - alert: ApiserverHealthProbeFailing
+        expr: 'min(up{job="cave-apiserver"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-apiserver health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-apiserver/health.md"

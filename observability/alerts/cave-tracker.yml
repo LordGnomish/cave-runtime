@@ -1,0 +1,97 @@
+# Issue tracker
+groups:
+  - name: cave-tracker-slo
+    interval: 30s
+    rules:
+      - alert: TrackerSloBurnRateFast
+        expr: |
+          (
+            sum(rate(tracker_total{job="cave-tracker",code=~"5.."}[1h]))
+            /
+            sum(rate(tracker_total{job="cave-tracker"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-tracker fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/slo-burn-fast.md"
+      - alert: TrackerSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(tracker_total{job="cave-tracker",code=~"5.."}[6h]))
+            /
+            sum(rate(tracker_total{job="cave-tracker"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-tracker slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/slo-burn-slow.md"
+      - alert: TrackerErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(tracker_total{job="cave-tracker",code=~"5.."}[7d]))
+              / sum(rate(tracker_total{job="cave-tracker"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-tracker 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/error-budget.md"
+      - alert: TrackerLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(tracker_duration_seconds_bucket{job="cave-tracker"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-tracker p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/latency.md"
+      - alert: TrackerSaturationHigh
+        expr: 'sum(tracker_inflight_requests{job="cave-tracker"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-tracker inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/saturation.md"
+      - alert: TrackerMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-tracker"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-tracker RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/memory.md"
+      - alert: TrackerCardinalityExplosion
+        expr: 'count(count by (tenant_id) (tracker_total{job="cave-tracker"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-tracker tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/cardinality.md"
+      - alert: TrackerHealthProbeFailing
+        expr: 'min(up{job="cave-tracker"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-tracker health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-tracker/health.md"

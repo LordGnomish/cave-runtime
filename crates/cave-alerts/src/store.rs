@@ -1,242 +1,206 @@
-use crate::models::{Alert, AlertGroup, AlertStats, AlertStatus, Receiver, Silence, SilenceMatcher};
-use chrono::Utc;
+//! In-memory store for the Alertmanager-style HTTP surface.
+
+use crate::models::{Alert, InhibitRule, Receiver, Route, Silence};
+use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Default)]
+struct Inner {
+    alerts: HashMap<Uuid, Alert>,
+    silences: HashMap<Uuid, Silence>,
+    inhibit_rules: HashMap<Uuid, InhibitRule>,
+    receivers: HashMap<String, Receiver>,
+    routes: Option<Route>,
+}
+
+#[derive(Clone, Default)]
 pub struct AlertStore {
-    pub alerts: RwLock<HashMap<Uuid, Alert>>,
-    pub groups: RwLock<HashMap<Uuid, AlertGroup>>,
-    pub silences: RwLock<HashMap<Uuid, Silence>>,
-    pub receivers: RwLock<HashMap<Uuid, Receiver>>,
+    inner: Arc<RwLock<Inner>>,
 }
 
 impl AlertStore {
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self::default())
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    // -----------------------------------------------------------------------
-    // Alerts
-    // -----------------------------------------------------------------------
+    // ─── Alerts ────────────────────────────────────────────────────────
 
-    pub fn insert_alert(&self, alert: Alert) {
-        self.alerts.write().unwrap().insert(alert.id, alert);
+    pub fn upsert_alert(&self, alert: Alert) -> Alert {
+        self.inner.write().alerts.insert(alert.id, alert.clone());
+        alert
+    }
+
+    pub fn list_alerts(&self, tenant: Option<&str>) -> Vec<Alert> {
+        let inner = self.inner.read();
+        inner
+            .alerts
+            .values()
+            .filter(|a| tenant.map_or(true, |t| a.tenant_id == t))
+            .cloned()
+            .collect()
     }
 
     pub fn get_alert(&self, id: Uuid) -> Option<Alert> {
-        self.alerts.read().unwrap().get(&id).cloned()
+        self.inner.read().alerts.get(&id).cloned()
     }
 
-    pub fn list_alerts(&self) -> Vec<Alert> {
-        self.alerts.read().unwrap().values().cloned().collect()
+    pub fn delete_alert(&self, id: Uuid) -> bool {
+        self.inner.write().alerts.remove(&id).is_some()
     }
 
-    pub fn update_alert(&self, alert: Alert) -> bool {
-        let mut map = self.alerts.write().unwrap();
-        if map.contains_key(&alert.id) {
-            map.insert(alert.id, alert);
-            true
-        } else {
-            false
-        }
+    // ─── Silences ──────────────────────────────────────────────────────
+
+    pub fn create_silence(&self, silence: Silence) -> Silence {
+        self.inner.write().silences.insert(silence.id, silence.clone());
+        silence
     }
 
-    pub fn remove_alert(&self, id: Uuid) -> Option<Alert> {
-        self.alerts.write().unwrap().remove(&id)
-    }
-
-    /// Return alerts optionally filtered by status/severity/source.
-    pub fn filter_alerts(
-        &self,
-        status: Option<&str>,
-        severity: Option<&str>,
-        source: Option<&str>,
-    ) -> Vec<Alert> {
-        self.alerts
-            .read()
-            .unwrap()
+    pub fn list_silences(&self, tenant: Option<&str>) -> Vec<Silence> {
+        let inner = self.inner.read();
+        inner
+            .silences
             .values()
-            .filter(|a| {
-                if let Some(s) = status {
-                    let s_str = serde_json::to_string(&a.status)
-                        .unwrap_or_default()
-                        .trim_matches('"')
-                        .to_string();
-                    if s_str != s {
-                        return false;
-                    }
-                }
-                if let Some(sev) = severity {
-                    let sev_str = serde_json::to_string(&a.severity)
-                        .unwrap_or_default()
-                        .trim_matches('"')
-                        .to_string();
-                    if sev_str != sev {
-                        return false;
-                    }
-                }
-                if let Some(src) = source {
-                    if a.source != src {
-                        return false;
-                    }
-                }
-                true
-            })
+            .filter(|s| tenant.map_or(true, |t| s.tenant_id == t))
             .cloned()
             .collect()
     }
 
-    // -----------------------------------------------------------------------
-    // Silences
-    // -----------------------------------------------------------------------
-
-    pub fn insert_silence(&self, silence: Silence) {
-        self.silences.write().unwrap().insert(silence.id, silence);
+    pub fn delete_silence(&self, id: Uuid) -> bool {
+        self.inner.write().silences.remove(&id).is_some()
     }
 
     pub fn get_silence(&self, id: Uuid) -> Option<Silence> {
-        self.silences.read().unwrap().get(&id).cloned()
+        self.inner.read().silences.get(&id).cloned()
     }
 
-    pub fn list_silences(&self) -> Vec<Silence> {
-        self.silences.read().unwrap().values().cloned().collect()
+    // ─── Inhibit rules ────────────────────────────────────────────────
+
+    pub fn create_inhibit_rule(&self, rule: InhibitRule) -> InhibitRule {
+        self.inner.write().inhibit_rules.insert(rule.id, rule.clone());
+        rule
     }
 
-    /// Expire a silence (set active=false and ends_at=now).
-    pub fn expire_silence(&self, id: Uuid) -> bool {
-        let mut map = self.silences.write().unwrap();
-        if let Some(s) = map.get_mut(&id) {
-            s.active = false;
-            s.ends_at = Utc::now();
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Find all currently active silences whose matchers match the given labels.
-    pub fn find_active_silences(&self, labels: &HashMap<String, String>) -> Vec<Silence> {
-        let now = Utc::now();
-        self.silences
-            .read()
-            .unwrap()
+    pub fn list_inhibit_rules(&self, tenant: Option<&str>) -> Vec<InhibitRule> {
+        let inner = self.inner.read();
+        inner
+            .inhibit_rules
             .values()
-            .filter(|s| {
-                s.active
-                    && s.starts_at <= now
-                    && s.ends_at > now
-                    && silence_matches_labels(&s.matchers, labels)
-            })
+            .filter(|r| tenant.map_or(true, |t| r.tenant_id == t))
             .cloned()
             .collect()
     }
 
-    // -----------------------------------------------------------------------
-    // Receivers
-    // -----------------------------------------------------------------------
+    pub fn delete_inhibit_rule(&self, id: Uuid) -> bool {
+        self.inner.write().inhibit_rules.remove(&id).is_some()
+    }
 
-    pub fn insert_receiver(&self, receiver: Receiver) {
-        self.receivers.write().unwrap().insert(receiver.id, receiver);
+    // ─── Receivers ─────────────────────────────────────────────────────
+
+    pub fn upsert_receiver(&self, receiver: Receiver) {
+        self.inner.write().receivers.insert(receiver.name.clone(), receiver);
     }
 
     pub fn list_receivers(&self) -> Vec<Receiver> {
-        self.receivers.read().unwrap().values().cloned().collect()
+        self.inner.read().receivers.values().cloned().collect()
     }
 
-    // -----------------------------------------------------------------------
-    // Groups
-    // -----------------------------------------------------------------------
-
-    /// Group firing alerts by the union of their label keys (common grouping).
-    pub fn group_alerts(&self) -> Vec<AlertGroup> {
-        let alerts = self.alerts.read().unwrap();
-        let mut buckets: HashMap<String, Vec<Alert>> = HashMap::new();
-
-        for alert in alerts.values() {
-            if alert.status != AlertStatus::Firing {
-                continue;
-            }
-            // Group key: sorted label key=value pairs
-            let mut parts: Vec<String> =
-                alert.labels.iter().map(|(k, v)| format!("{k}={v}")).collect();
-            parts.sort();
-            let key = parts.join(",");
-            buckets.entry(key).or_default().push(alert.clone());
-        }
-
-        let mut groups_lock = self.groups.write().unwrap();
-        groups_lock.clear();
-
-        buckets
-            .into_iter()
-            .map(|(key, group_alerts)| {
-                // Build common labels from the group key
-                let labels: HashMap<String, String> = key
-                    .split(',')
-                    .filter_map(|kv| {
-                        let mut it = kv.splitn(2, '=');
-                        let k = it.next()?;
-                        let v = it.next()?;
-                        Some((k.to_string(), v.to_string()))
-                    })
-                    .collect();
-
-                let group = AlertGroup {
-                    id: Uuid::new_v4(),
-                    name: key.clone(),
-                    labels,
-                    alerts: group_alerts,
-                    created_at: Utc::now(),
-                };
-                groups_lock.insert(group.id, group.clone());
-                group
-            })
-            .collect()
+    pub fn receiver_map(&self) -> HashMap<String, Receiver> {
+        self.inner.read().receivers.clone()
     }
 
-    // -----------------------------------------------------------------------
-    // Stats
-    // -----------------------------------------------------------------------
+    pub fn delete_receiver(&self, name: &str) -> bool {
+        self.inner.write().receivers.remove(name).is_some()
+    }
 
-    pub fn compute_stats(&self) -> AlertStats {
-        let alerts = self.alerts.read().unwrap();
-        let mut stats = AlertStats::default();
-        stats.total = alerts.len() as u64;
+    // ─── Routes ────────────────────────────────────────────────────────
 
-        for a in alerts.values() {
-            match a.status {
-                AlertStatus::Firing => stats.firing += 1,
-                AlertStatus::Resolved => stats.resolved += 1,
-                AlertStatus::Silenced => stats.silenced += 1,
-                AlertStatus::Acknowledged => stats.acknowledged += 1,
-            }
-            let sev_key = serde_json::to_string(&a.severity)
-                .unwrap_or_default()
-                .trim_matches('"')
-                .to_string();
-            *stats.by_severity.entry(sev_key).or_insert(0) += 1;
-        }
+    pub fn set_root_route(&self, route: Route) {
+        self.inner.write().routes = Some(route);
+    }
 
-        stats
+    pub fn get_root_route(&self) -> Option<Route> {
+        self.inner.read().routes.clone()
     }
 }
 
-fn silence_matches_labels(matchers: &[SilenceMatcher], labels: &HashMap<String, String>) -> bool {
-    matchers.iter().all(|m| {
-        let label_value = labels.get(&m.name);
-        match label_value {
-            None => false,
-            Some(v) => {
-                if m.is_regex {
-                    v.contains(m.value.as_str())
-                } else if m.is_equal {
-                    v == &m.value
-                } else {
-                    v != &m.value
-                }
-            }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Alert, AlertSeverity, AlertState, Matcher, ReceiverConfig, WebhookConfig};
+    use chrono::{Duration, Utc};
+    use std::collections::HashMap;
+
+    fn alert_with_tenant(tenant: &str) -> Alert {
+        Alert {
+            id: Uuid::new_v4(),
+            name: "X".into(),
+            labels: HashMap::new(),
+            annotations: HashMap::new(),
+            severity: AlertSeverity::Warning,
+            state: AlertState::Firing,
+            starts_at: Utc::now(),
+            ends_at: None,
+            fingerprint: "fp".into(),
+            tenant_id: tenant.into(),
+            generator_url: None,
         }
-    })
+    }
+
+    #[test]
+    fn test_upsert_and_list_alerts() {
+        let store = AlertStore::new();
+        store.upsert_alert(alert_with_tenant("a"));
+        store.upsert_alert(alert_with_tenant("b"));
+        assert_eq!(store.list_alerts(None).len(), 2);
+        assert_eq!(store.list_alerts(Some("a")).len(), 1);
+    }
+
+    #[test]
+    fn test_delete_alert() {
+        let store = AlertStore::new();
+        let a = store.upsert_alert(alert_with_tenant("a"));
+        assert!(store.delete_alert(a.id));
+        assert!(!store.delete_alert(a.id));
+    }
+
+    #[test]
+    fn test_create_and_list_silences_with_tenant_filter() {
+        let store = AlertStore::new();
+        let now = Utc::now();
+        let mut s = Silence::new(vec![], now, now + Duration::hours(1), "alice", "x");
+        s.tenant_id = "acme".into();
+        store.create_silence(s);
+        assert_eq!(store.list_silences(Some("acme")).len(), 1);
+        assert_eq!(store.list_silences(Some("globex")).len(), 0);
+    }
+
+    #[test]
+    fn test_create_and_delete_inhibit_rule() {
+        let store = AlertStore::new();
+        let rule = InhibitRule::new("r", vec![Matcher::equal("a", "b")], vec![Matcher::equal("c", "d")], vec![]);
+        let r = store.create_inhibit_rule(rule);
+        assert!(store.delete_inhibit_rule(r.id));
+    }
+
+    #[test]
+    fn test_upsert_receiver_and_map() {
+        let store = AlertStore::new();
+        let r = Receiver::new("rcv").with_config(ReceiverConfig::Webhook(WebhookConfig {
+            url: "http://x".into(),
+            send_resolved: true,
+        }));
+        store.upsert_receiver(r);
+        let m = store.receiver_map();
+        assert!(m.contains_key("rcv"));
+    }
+
+    #[test]
+    fn test_set_root_route_round_trip() {
+        let store = AlertStore::new();
+        let root = Route::root("default");
+        store.set_root_route(root);
+        assert!(store.get_root_route().is_some());
+    }
 }

@@ -1,0 +1,97 @@
+# Authentication
+groups:
+  - name: cave-auth-slo
+    interval: 30s
+    rules:
+      - alert: AuthSloBurnRateFast
+        expr: |
+          (
+            sum(rate(auth_total{job="cave-auth",code=~"5.."}[1h]))
+            /
+            sum(rate(auth_total{job="cave-auth"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-auth fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/slo-burn-fast.md"
+      - alert: AuthSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(auth_total{job="cave-auth",code=~"5.."}[6h]))
+            /
+            sum(rate(auth_total{job="cave-auth"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-auth slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/slo-burn-slow.md"
+      - alert: AuthErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(auth_total{job="cave-auth",code=~"5.."}[7d]))
+              / sum(rate(auth_total{job="cave-auth"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-auth 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/error-budget.md"
+      - alert: AuthLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(auth_duration_seconds_bucket{job="cave-auth"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-auth p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/latency.md"
+      - alert: AuthSaturationHigh
+        expr: 'sum(auth_inflight_requests{job="cave-auth"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-auth inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/saturation.md"
+      - alert: AuthMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-auth"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-auth RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/memory.md"
+      - alert: AuthCardinalityExplosion
+        expr: 'count(count by (tenant_id) (auth_total{job="cave-auth"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-auth tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/cardinality.md"
+      - alert: AuthHealthProbeFailing
+        expr: 'min(up{job="cave-auth"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-auth health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-auth/health.md"

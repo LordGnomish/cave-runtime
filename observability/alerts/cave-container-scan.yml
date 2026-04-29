@@ -1,0 +1,97 @@
+# Container image scan
+groups:
+  - name: cave-container-scan-slo
+    interval: 30s
+    rules:
+      - alert: ContainerScanSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cscan_total{job="cave-container-scan",code=~"5.."}[1h]))
+            /
+            sum(rate(cscan_total{job="cave-container-scan"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-container-scan fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/slo-burn-fast.md"
+      - alert: ContainerScanSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(cscan_total{job="cave-container-scan",code=~"5.."}[6h]))
+            /
+            sum(rate(cscan_total{job="cave-container-scan"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-container-scan slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/slo-burn-slow.md"
+      - alert: ContainerScanErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(cscan_total{job="cave-container-scan",code=~"5.."}[7d]))
+              / sum(rate(cscan_total{job="cave-container-scan"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-container-scan 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/error-budget.md"
+      - alert: ContainerScanLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(cscan_duration_seconds_bucket{job="cave-container-scan"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-container-scan p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/latency.md"
+      - alert: ContainerScanSaturationHigh
+        expr: 'sum(cscan_inflight_requests{job="cave-container-scan"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-container-scan inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/saturation.md"
+      - alert: ContainerScanMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-container-scan"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-container-scan RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/memory.md"
+      - alert: ContainerScanCardinalityExplosion
+        expr: 'count(count by (tenant_id) (cscan_total{job="cave-container-scan"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-container-scan tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/cardinality.md"
+      - alert: ContainerScanHealthProbeFailing
+        expr: 'min(up{job="cave-container-scan"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-container-scan health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-container-scan/health.md"

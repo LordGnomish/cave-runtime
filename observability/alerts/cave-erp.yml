@@ -1,0 +1,97 @@
+# ERP layer
+groups:
+  - name: cave-erp-slo
+    interval: 30s
+    rules:
+      - alert: ErpSloBurnRateFast
+        expr: |
+          (
+            sum(rate(erp_total{job="cave-erp",code=~"5.."}[1h]))
+            /
+            sum(rate(erp_total{job="cave-erp"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-erp fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/slo-burn-fast.md"
+      - alert: ErpSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(erp_total{job="cave-erp",code=~"5.."}[6h]))
+            /
+            sum(rate(erp_total{job="cave-erp"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-erp slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/slo-burn-slow.md"
+      - alert: ErpErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(erp_total{job="cave-erp",code=~"5.."}[7d]))
+              / sum(rate(erp_total{job="cave-erp"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-erp 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/error-budget.md"
+      - alert: ErpLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(erp_duration_seconds_bucket{job="cave-erp"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-erp p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/latency.md"
+      - alert: ErpSaturationHigh
+        expr: 'sum(erp_inflight_requests{job="cave-erp"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-erp inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/saturation.md"
+      - alert: ErpMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-erp"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-erp RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/memory.md"
+      - alert: ErpCardinalityExplosion
+        expr: 'count(count by (tenant_id) (erp_total{job="cave-erp"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-erp tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/cardinality.md"
+      - alert: ErpHealthProbeFailing
+        expr: 'min(up{job="cave-erp"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-erp health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-erp/health.md"

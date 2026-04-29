@@ -1,0 +1,97 @@
+# Chat / messaging
+groups:
+  - name: cave-chat-slo
+    interval: 30s
+    rules:
+      - alert: ChatSloBurnRateFast
+        expr: |
+          (
+            sum(rate(chat_total{job="cave-chat",code=~"5.."}[1h]))
+            /
+            sum(rate(chat_total{job="cave-chat"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-chat fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/slo-burn-fast.md"
+      - alert: ChatSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(chat_total{job="cave-chat",code=~"5.."}[6h]))
+            /
+            sum(rate(chat_total{job="cave-chat"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-chat slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/slo-burn-slow.md"
+      - alert: ChatErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(chat_total{job="cave-chat",code=~"5.."}[7d]))
+              / sum(rate(chat_total{job="cave-chat"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-chat 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/error-budget.md"
+      - alert: ChatLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(chat_duration_seconds_bucket{job="cave-chat"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-chat p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/latency.md"
+      - alert: ChatSaturationHigh
+        expr: 'sum(chat_inflight_requests{job="cave-chat"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-chat inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/saturation.md"
+      - alert: ChatMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-chat"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-chat RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/memory.md"
+      - alert: ChatCardinalityExplosion
+        expr: 'count(count by (tenant_id) (chat_total{job="cave-chat"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-chat tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/cardinality.md"
+      - alert: ChatHealthProbeFailing
+        expr: 'min(up{job="cave-chat"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-chat health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-chat/health.md"

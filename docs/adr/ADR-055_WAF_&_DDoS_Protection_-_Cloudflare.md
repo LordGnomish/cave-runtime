@@ -27,7 +27,7 @@ CAVE's external-facing endpoints (Kong API gateway, Backstage portal, Grafana da
 
 ## Decision
 
-**Cloudflare** provides L3/L4 DDoS protection (free tier) + L7 WAF rules. Already used for DNS (ADR-024) — no additional dependency. Kong rate limiting (ADR-027) provides application-level protection. Two layers: Cloudflare (network/transport/application WAF) + Kong (API-level rate limiting, JWT auth, request validation).
+**Profile-conditional WAF.** Azure profile: Cloudflare L3/L4 DDoS + L7 WAF (managed rulesets, free tier güçlü, AKS managed ekosistemiyle uyum). Sovereign profile (Hetzner-only / disconnected / on-prem): Cloudflare KULLANILMAZ — cave-waf runtime crate (Pingora-class L3/L4 + OWASP CRS L7) zorunlu replacement. Rule schema unified across both profiles (OWASP CRS sözlüğü). Kong second layer ortak.
 
 
 ## Rejected Options
@@ -51,7 +51,16 @@ CAVE's external-facing endpoints (Kong API gateway, Backstage portal, Grafana da
 - Cloudflare proxy adds ~10ms latency (can use DNS-only mode for internal traffic).
 - Free tier WAF rules are limited — Pro/Business tier may be needed for advanced rules (evaluated per demand).
 
-Compliance Mapping
+## Notes
+
+**Profile-conditional WAF.**
+- **Azure profile:** Cloudflare L3/L4 + L7 WAF (managed). DNS bağımlılığı (ADR-024) ile aynı vendor.
+- **Sovereign profile:** Cloudflare YASAK. cave-waf runtime crate (Mirror-001 blanket; Pingora-class L3/L4 + OWASP CRS L7) zorunlu — cave-gateway plugin chain'inde cave-waf-rules slot'u (ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 extension'ı). Renovate / cave-self-improver pull ile rule auto-update.
+- **Rule schema ortak:** OWASP CRS sözlüğü her iki profile'da aynı, deployment-time switch profile'a göre.
+- ML anomaly detection Reflex Engine entegre (sovereign profile'da).
+- PQC mTLS edge → cave-mesh, Cloudflare değil.
+
+## Compliance Mapping
 
 SOC2 CC7.5 (availability — DDoS protection). ISO A.8.22 (network security — WAF). ISO A.8.20 (network security controls — application filtering). NIS2 Art.21 (network protection — DDoS mitigation). GDPR Art.32 (availability of processing systems).
 

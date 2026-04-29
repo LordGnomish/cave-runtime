@@ -1,0 +1,97 @@
+# Container registry
+groups:
+  - name: cave-registry-slo
+    interval: 30s
+    rules:
+      - alert: RegistrySloBurnRateFast
+        expr: |
+          (
+            sum(rate(registry_total{job="cave-registry",code=~"5.."}[1h]))
+            /
+            sum(rate(registry_total{job="cave-registry"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-registry fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/slo-burn-fast.md"
+      - alert: RegistrySloBurnRateSlow
+        expr: |
+          (
+            sum(rate(registry_total{job="cave-registry",code=~"5.."}[6h]))
+            /
+            sum(rate(registry_total{job="cave-registry"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-registry slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/slo-burn-slow.md"
+      - alert: RegistryErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(registry_total{job="cave-registry",code=~"5.."}[7d]))
+              / sum(rate(registry_total{job="cave-registry"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-registry 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/error-budget.md"
+      - alert: RegistryLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(registry_duration_seconds_bucket{job="cave-registry"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-registry p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/latency.md"
+      - alert: RegistrySaturationHigh
+        expr: 'sum(registry_inflight_requests{job="cave-registry"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-registry inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/saturation.md"
+      - alert: RegistryMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-registry"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-registry RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/memory.md"
+      - alert: RegistryCardinalityExplosion
+        expr: 'count(count by (tenant_id) (registry_total{job="cave-registry"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-registry tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/cardinality.md"
+      - alert: RegistryHealthProbeFailing
+        expr: 'min(up{job="cave-registry"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-registry health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-registry/health.md"

@@ -1,10 +1,11 @@
 # parity.manifest.toml — cave-etcd
-# Upstream: etcd v3.5.13  https://github.com/etcd-io/etcd
+# Upstream: etcd v3.6.10  https://github.com/etcd-io/etcd
+# Bumped from v3.6.0 in feat/cave-etcd-deeper-002.
 
 [upstream]
 org     = "etcd-io"
 repo    = "etcd"
-version = "v3.5.13"
+version = "v3.6.10"
 
 [module]
 name        = "cave-etcd"
@@ -48,6 +49,24 @@ local    = "src/store.rs"
 
 [[files]]
 upstream = "server/auth/store.go"
+local    = "src/store.rs"
+
+# Raft membership / joint consensus (etcd v3.6)
+[[files]]
+upstream = "server/etcdserver/server.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "raft/confchange/confchange.go"
+local    = "src/store.rs"
+
+[[files]]
+upstream = "raft/quorum/joint.go"
+local    = "src/store.rs"
+
+# Snapshot streaming
+[[files]]
+upstream = "server/etcdserver/api/snap/snapshotter.go"
 local    = "src/store.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
@@ -243,6 +262,31 @@ upstream_name = "MemberList"
 local_name    = "cluster_member_list"
 file          = "src/routes.rs"
 
+[[functions]]
+upstream_name = "MemberPromote"
+local_name    = "cluster_member_promote"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "EnterJoint"
+local_name    = "enter_joint"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "LeaveJoint"
+local_name    = "leave_joint"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "Snapshot"
+local_name    = "snapshot_stream"
+file          = "src/store.rs"
+
+[[functions]]
+upstream_name = "Restore"
+local_name    = "restore_snapshot"
+file          = "src/store.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 # Tests yet to be ported from upstream (test_parity = 0 until added)
 
@@ -305,6 +349,53 @@ local_test    = "test_auth_permission"
 [[tests]]
 upstream_test = "TestV3RevisionMonotonicity"
 local_test    = "test_revision_monotonicity"
+
+# v3.6 raft membership / joint consensus
+[[tests]]
+upstream_test = "TestMemberPromote"
+local_test    = "test_member_promote_learner_to_voter"
+
+[[tests]]
+upstream_test = "TestMemberPromoteRejectsNonLearner"
+local_test    = "test_member_promote_rejects_voter"
+
+[[tests]]
+upstream_test = "TestEnterJointConfChange"
+local_test    = "test_enter_joint_config_with_adds"
+
+[[tests]]
+upstream_test = "TestLeaveJointConfChange"
+local_test    = "test_leave_joint_commits_new_config"
+
+[[tests]]
+upstream_test = "TestJointQuorumLargestOfBoth"
+local_test    = "test_joint_quorum_uses_both_configs"
+
+# v3.6 watch multiplexer
+[[tests]]
+upstream_test = "TestV3WatchMultipleStreams"
+local_test    = "test_watch_multiplex_per_id_filtering"
+
+[[tests]]
+upstream_test = "TestV3WatchCancel"
+local_test    = "test_watch_cancel_drops_subscription"
+
+[[tests]]
+upstream_test = "TestV3WatchProgressNotify"
+local_test    = "test_watch_progress_notify"
+
+# v3.6 snapshot
+[[tests]]
+upstream_test = "TestSnapshotChunked"
+local_test    = "test_snapshot_stream_chunks"
+
+[[tests]]
+upstream_test = "TestSnapshotChecksum"
+local_test    = "test_snapshot_includes_sha256_checksum"
+
+[[tests]]
+upstream_test = "TestSnapshotRestore"
+local_test    = "test_restore_snapshot_recovers_state"
 
 # ── Surface mappings (HTTP) ──────────────────────────────────────────────────
 
@@ -462,3 +553,18 @@ local_path    = "/api/etcd/v3/cluster/member/update"
 kind          = "http"
 upstream_path = "/v3/cluster/member/list"
 local_path    = "/api/etcd/v3/cluster/member/list"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/promote"
+local_path    = "/api/etcd/v3/cluster/member/promote"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/joint/enter"
+local_path    = "/api/etcd/v3/cluster/joint/enter"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/joint/leave"
+local_path    = "/api/etcd/v3/cluster/joint/leave"

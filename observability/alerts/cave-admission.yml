@@ -1,0 +1,97 @@
+# Admission webhooks
+groups:
+  - name: cave-admission-slo
+    interval: 30s
+    rules:
+      - alert: AdmissionSloBurnRateFast
+        expr: |
+          (
+            sum(rate(admission_total{job="cave-admission",code=~"5.."}[1h]))
+            /
+            sum(rate(admission_total{job="cave-admission"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-admission fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/slo-burn-fast.md"
+      - alert: AdmissionSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(admission_total{job="cave-admission",code=~"5.."}[6h]))
+            /
+            sum(rate(admission_total{job="cave-admission"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-admission slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/slo-burn-slow.md"
+      - alert: AdmissionErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(admission_total{job="cave-admission",code=~"5.."}[7d]))
+              / sum(rate(admission_total{job="cave-admission"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-admission 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/error-budget.md"
+      - alert: AdmissionLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(admission_duration_seconds_bucket{job="cave-admission"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-admission p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/latency.md"
+      - alert: AdmissionSaturationHigh
+        expr: 'sum(admission_inflight_requests{job="cave-admission"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-admission inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/saturation.md"
+      - alert: AdmissionMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-admission"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-admission RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/memory.md"
+      - alert: AdmissionCardinalityExplosion
+        expr: 'count(count by (tenant_id) (admission_total{job="cave-admission"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-admission tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/cardinality.md"
+      - alert: AdmissionHealthProbeFailing
+        expr: 'min(up{job="cave-admission"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-admission health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-admission/health.md"

@@ -1,0 +1,97 @@
+# Local LLM runtime
+groups:
+  - name: cave-local-llm-slo
+    interval: 30s
+    rules:
+      - alert: LocalLlmSloBurnRateFast
+        expr: |
+          (
+            sum(rate(local_llm_total{job="cave-local-llm",code=~"5.."}[1h]))
+            /
+            sum(rate(local_llm_total{job="cave-local-llm"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-local-llm fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/slo-burn-fast.md"
+      - alert: LocalLlmSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(local_llm_total{job="cave-local-llm",code=~"5.."}[6h]))
+            /
+            sum(rate(local_llm_total{job="cave-local-llm"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-local-llm slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/slo-burn-slow.md"
+      - alert: LocalLlmErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(local_llm_total{job="cave-local-llm",code=~"5.."}[7d]))
+              / sum(rate(local_llm_total{job="cave-local-llm"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-local-llm 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/error-budget.md"
+      - alert: LocalLlmLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(local_llm_duration_seconds_bucket{job="cave-local-llm"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-local-llm p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/latency.md"
+      - alert: LocalLlmSaturationHigh
+        expr: 'sum(local_llm_inflight_requests{job="cave-local-llm"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-local-llm inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/saturation.md"
+      - alert: LocalLlmMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-local-llm"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-local-llm RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/memory.md"
+      - alert: LocalLlmCardinalityExplosion
+        expr: 'count(count by (tenant_id) (local_llm_total{job="cave-local-llm"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-local-llm tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/cardinality.md"
+      - alert: LocalLlmHealthProbeFailing
+        expr: 'min(up{job="cave-local-llm"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-local-llm health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-local-llm/health.md"

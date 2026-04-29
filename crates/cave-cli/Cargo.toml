@@ -1,22 +1,37 @@
 [package]
-name = "cave-cli"
+name = "cavectl"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "CAVE Runtime CLI — terminal access to all platform modules"
+description = "CAVE Runtime CLI — single binary, native + compatibility surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001)"
+
+[lib]
+name = "cavectl"
+path = "src/lib.rs"
 
 [[bin]]
-name = "cave"
+name = "cavectl"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
 clap = { workspace = true, features = ["env"] }
 colored = "2"
+crossterm = "0.28"
+futures.workspace = true
+parking_lot.workspace = true
+ratatui = "0.29"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
 tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tokio = { workspace = true, features = ["full", "test-util"] }

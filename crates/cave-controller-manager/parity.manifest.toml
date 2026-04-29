@@ -1,0 +1,54 @@
+# parity.manifest.toml — cave-controller-manager
+# Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
+# Tracks pkg/controller for the kube-controller-manager binary.
+
+[upstream]
+org     = "kubernetes"
+repo    = "kubernetes"
+version = "v1.36.0"
+
+[module]
+name        = "cave-controller-manager"
+description = "Workload controllers — Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+[[files]]
+upstream = "pkg/controller/deployment/deployment_controller.go"
+local    = "src/deployment.rs"
+
+[[files]]
+upstream = "pkg/controller/replicaset/replica_set.go"
+local    = "src/replicaset.rs"
+
+[[files]]
+upstream = "pkg/controller/statefulset/stateful_set.go"
+local    = "src/statefulset.rs"
+
+[[files]]
+upstream = "pkg/controller/daemon/daemon_controller.go"
+local    = "src/daemonset.rs"
+
+[[files]]
+upstream = "pkg/controller/job/job_controller.go"
+local    = "src/job.rs"
+
+[[files]]
+upstream = "pkg/controller/cronjob/cronjob_controllerv2.go"
+local    = "src/cronjob.rs"
+
+[[files]]
+upstream = "pkg/controller/podautoscaler/horizontal.go"
+local    = "src/hpa.rs"
+
+[[files]]
+upstream = "pkg/controller/disruption/disruption.go"
+local    = "src/pdb.rs"
+
+[[files]]
+upstream = "pkg/controller/endpointslice/endpointslice_controller.go"
+local    = "src/endpointslice.rs"
+
+[[files]]
+upstream = "pkg/controller/service/controller.go"
+local    = "src/service.rs"

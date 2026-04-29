@@ -110,7 +110,7 @@ pub fn schedule(req: &ScheduleRequest, state: &SchedulerState) -> ScheduleResult
 
     // Update allocated resources
     if let Some(mut node) = state.nodes.get_mut(&winner.name) {
-        node.allocated.subtract(&ResourceRequest { cpu_millicores: 0, memory_bytes: 0 }); // placeholder
+        node.allocated.subtract(&ResourceRequest { cpu_millicores: 0, memory_bytes: 0, ..Default::default() }); // placeholder
         node.allocated.cpu_millicores += req.resources.cpu_millicores;
         node.allocated.memory_bytes += req.resources.memory_bytes;
         node.allocated.pods += 1;
@@ -156,7 +156,7 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "nginx".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000 },
+            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -175,7 +175,7 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "big".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 4000, memory_bytes: 8_000_000_000 },
+            resources: ResourceRequest { cpu_millicores: 4000, memory_bytes: 8_000_000_000, ..Default::default() },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -199,7 +199,7 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "ml-job".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 1000, memory_bytes: 4_000_000_000 },
+            resources: ResourceRequest { cpu_millicores: 1000, memory_bytes: 4_000_000_000, ..Default::default() },
             node_selector: selector,
             tolerations: vec![],
             affinity: None,
@@ -219,7 +219,7 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "normal".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000 },
+            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: None,
@@ -238,7 +238,7 @@ mod tests {
         let req = ScheduleRequest {
             pod_name: "app".into(),
             namespace: "default".into(),
-            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000 },
+            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
             node_selector: HashMap::new(),
             tolerations: vec![],
             affinity: Some(Affinity { preferred_nodes: vec!["b".into()], required_labels: HashMap::new() }),

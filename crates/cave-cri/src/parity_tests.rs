@@ -76,6 +76,8 @@ fn make_sandbox(name: &str, ns: &str, state: SandboxState) -> Sandbox {
             port_mappings: vec![],
             log_directory: None,
             cgroup_parent: None,
+            runtime_handler: None,
+            user_namespace_mode: UserNamespaceMode::default(),
         },
         state,
         created_at: Utc::now(),

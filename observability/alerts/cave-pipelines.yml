@@ -1,0 +1,97 @@
+# CI/CD pipelines
+groups:
+  - name: cave-pipelines-slo
+    interval: 30s
+    rules:
+      - alert: PipelinesSloBurnRateFast
+        expr: |
+          (
+            sum(rate(pipeline_total{job="cave-pipelines",code=~"5.."}[1h]))
+            /
+            sum(rate(pipeline_total{job="cave-pipelines"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-pipelines fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/slo-burn-fast.md"
+      - alert: PipelinesSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(pipeline_total{job="cave-pipelines",code=~"5.."}[6h]))
+            /
+            sum(rate(pipeline_total{job="cave-pipelines"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-pipelines slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/slo-burn-slow.md"
+      - alert: PipelinesErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(pipeline_total{job="cave-pipelines",code=~"5.."}[7d]))
+              / sum(rate(pipeline_total{job="cave-pipelines"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pipelines 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/error-budget.md"
+      - alert: PipelinesLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(pipeline_duration_seconds_bucket{job="cave-pipelines"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pipelines p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/latency.md"
+      - alert: PipelinesSaturationHigh
+        expr: 'sum(pipeline_inflight_requests{job="cave-pipelines"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pipelines inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/saturation.md"
+      - alert: PipelinesMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-pipelines"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pipelines RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/memory.md"
+      - alert: PipelinesCardinalityExplosion
+        expr: 'count(count by (tenant_id) (pipeline_total{job="cave-pipelines"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-pipelines tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/cardinality.md"
+      - alert: PipelinesHealthProbeFailing
+        expr: 'min(up{job="cave-pipelines"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-pipelines health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-pipelines/health.md"

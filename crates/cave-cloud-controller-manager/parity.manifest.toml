@@ -1,0 +1,322 @@
+# parity.manifest.toml — cave-cloud-controller-manager
+# Tracks the kube-controller-manager → cloud-controller-manager split, plus
+# two out-of-tree provider implementations (Hetzner, Azure).
+
+[upstream]
+org     = "kubernetes"
+repo    = "kubernetes"
+version = "v1.36.0"
+
+[module]
+name        = "cave-cloud-controller-manager"
+description = "Cloud provider trait + node/service/route controllers + Hetzner & Azure provider scaffolds"
+source_root = "src"
+
+# ── In-tree (kubernetes/kubernetes) file mappings ────────────────────────────
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/cloud.go"
+local    = "src/provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_controller.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_lifecycle_controller.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/node/helpers/address.go"
+local    = "src/node_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/service/controller.go"
+local    = "src/service_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go"
+local    = "src/route_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/utils/net/ipnet.go"
+local    = "src/route_controller.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/nodelifecycle/node_lifecycle_controller.go"
+local    = "src/node_lifecycle.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/nodeipam/ipam/range_allocator.go"
+local    = "src/route_ipam.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/client-go/util/retry/util.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/client-go/util/flowcontrol/throttle.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "cmd/cloud-controller-manager/app/options/options.go"
+local    = "src/provider_runtime.rs"
+
+[[files]]
+upstream = "pkg/api/service/util.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "pkg/apis/core/validation/validation.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "pkg/registry/core/service/portallocator/allocator.go"
+local    = "src/service_extras.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/discovery/v1/types.go"
+local    = "src/service_topology.rs"
+
+[[files]]
+upstream = "pkg/proxy/endpointslicecache.go"
+local    = "src/service_topology.rs"
+
+# ── In-tree function mappings ────────────────────────────────────────────────
+[[functions]]
+upstream_name = "syncNode"
+local_name    = "reconcile"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "ensureNodeExistsByProviderID"
+local_name    = "handle_shutdown"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "mergeNodeAddresses"
+local_name    = "canonicalize_addresses"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "preferredNodeAddress"
+local_name    = "preferred_address"
+file          = "src/node_controller.rs"
+
+[[functions]]
+upstream_name = "syncLoadBalancerIfNeeded"
+local_name    = "reconcile"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "needsUpdate"
+local_name    = "lb_spec_drifted"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "shouldSyncLoadBalancer"
+local_name    = "should_manage"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ensureLoadBalancer"
+local_name    = "reconcile_phase"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ensureLoadBalancerDeleted"
+local_name    = "reconcile_phase"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "reconcile"
+local_name    = "plan_routes"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "reconcileRoutes"
+local_name    = "reconcile"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "findBlackholeRoutes"
+local_name    = "detect_blackhole"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "IsIPv6CIDR"
+local_name    = "cidr_family"
+file          = "src/route_controller.rs"
+
+[[functions]]
+upstream_name = "InstanceMetadata"
+local_name    = "InstanceMetadata::validate"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "InstanceExists"
+local_name    = "InstancesV2Iface::instance_exists"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "monitorNodeHealth"
+local_name    = "monitor_node"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "processTaintBaseEviction"
+local_name    = "evaluate_eviction"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "AllocateNext"
+local_name    = "CidrAllocator::allocate"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "Occupy"
+local_name    = "CidrAllocator::reserve"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "IsErrorRetryable"
+local_name    = "classify_error"
+file          = "src/provider_runtime.rs"
+
+[[functions]]
+upstream_name = "tokenBucketRateLimiter"
+local_name    = "TokenBucket"
+file          = "src/provider_runtime.rs"
+
+[[functions]]
+upstream_name = "GetLoadBalancerSourceRanges"
+local_name    = "validate_source_ranges"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "validateExternalIPs"
+local_name    = "validate_external_ips"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "validateServicePortName"
+local_name    = "validate_port_names"
+file          = "src/service_extras.rs"
+
+[[functions]]
+upstream_name = "GetEndpointAddresses"
+local_name    = "select_targets"
+file          = "src/service_topology.rs"
+
+[[functions]]
+upstream_name = "shouldUseHints"
+local_name    = "EndpointHints::matches_zone"
+file          = "src/service_topology.rs"
+
+[[functions]]
+upstream_name = "validateService"
+local_name    = "validate_service_type"
+file          = "src/service_topology.rs"
+
+# ── Hetzner (out-of-tree) provider mappings ──────────────────────────────────
+[[providers.hetzner]]
+upstream = "github.com/hetznercloud/hcloud-cloud-controller-manager"
+version  = "v1.30.1"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/instances.go"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/load_balancers.go"
+local    = "src/providers/hetzner.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/load_balancer.go"
+local    = "src/providers/hetzner_lb.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/floating_ip.go"
+local    = "src/providers/hetzner_failover.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/server_type.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/network.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/volume.go"
+local    = "src/providers/hetzner_resources.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/certificate.go"
+local    = "src/providers/hetzner_lb.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/placement_group.go"
+local    = "src/providers/hetzner_targets.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/primary_ip.go"
+local    = "src/providers/hetzner_targets.rs"
+
+[[providers.hetzner.files]]
+upstream = "hcloud/action.go"
+local    = "src/providers/hetzner_targets.rs"
+
+# ── Azure (out-of-tree) provider mappings ────────────────────────────────────
+[[providers.azure]]
+upstream = "github.com/kubernetes-sigs/cloud-provider-azure"
+version  = "v1.35.3"
+local    = "src/providers/azure.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_loadbalancer.go"
+local    = "src/providers/azure.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_zones.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_app_gateway.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_securitygroup_repo.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_managed_disk.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_workload_identity.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_managedclusters.go"
+local    = "src/providers/azure_resources.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_publicipaddressclient.go"
+local    = "src/providers/azure_extras.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_availabilityset.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_disk_encryption.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_files.go"
+local    = "src/providers/azure_advanced.rs"
+
+[[providers.azure.files]]
+upstream = "pkg/provider/azure_vnet_peering.go"
+local    = "src/providers/azure_advanced.rs"

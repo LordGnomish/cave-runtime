@@ -29,6 +29,78 @@ CAVE needs a single API gateway for LLM inference that routes requests to differ
 
 **LiteLLM** as unified LLM gateway for all profiles. Routes requests to Ollama (Hetzner) or Azure OpenAI (Azure) based on data classification. Provides token metering for per-tenant FinOps attribution. PII redaction via Microsoft Presidio middleware before any LLM provider receives data.
 
+## Decision (v2 — LLMPool addendum, 2026-04-26)
+
+Original v1 decision (LiteLLM pattern as `cave-llm-gateway`) intact. v2 extends with:
+
+### LLMPool — IDM-style multi-source pool per tenant
+
+Each tenant declares N local + M SaaS LLMs concurrently (subject to infra capacity + budget).
+
+**Example (Burak's Mac):**
+- Local: `qwen3-coder-next:Q4_K_M` (Ollama, 24h keep_alive)
+- SaaS: Claude (Anthropic, $200/mo budget)
+- Routing: coding tasks → Qwen3-coder, self_improve → Claude with Qwen fallback
+
+### LLMPool CRD
+
+```yaml
+apiVersion: cave.run/v1
+kind: LLMPool
+metadata: { name: default, tenant: <tenant-id> }
+spec:
+  local:
+    - name: qwen3-coder
+      engine: ollama
+      model: qwen3-coder-next:Q4_K_M
+      capacity: { vram_gb: 8, keep_alive: 24h }
+      tasks: [coding, completion]
+  saas:
+    - name: claude
+      provider: anthropic
+      model: claude-sonnet-4-6
+      credentials: secretRef:claude-key
+      budget_monthly_usd: 200
+      tasks: [planning, self_improve, reasoning]
+  routing:
+    - task: coding
+      primary: qwen3-coder
+      fallback: [claude]
+    - task: self_improve
+      primary: claude
+      fallback: [qwen3-coder]
+```
+
+### New components
+
+- `LLMPool` CRD reconciler in `cave-llm-gateway`
+- `pool/manager.rs` — local LLM spawn (Ollama/llama.cpp) + auto-eject after keep_alive
+- `capacity/probe.rs` — hardware detection (RAM/VRAM/cores), spawn limit per host
+- `routing/task_router.rs` — task-tag → provider selection from pool, fallback chain
+
+### Per-task routing
+
+Every LLM request carries `task` tag. Router selects from pool:
+- `coding` → prefer local (cost + latency)
+- `self_improve` → prefer Claude/GPT-5 (frontier quality)
+- `embedding` → prefer local nomic-embed (fast, free)
+- `reasoning` → tenant choice via routing config
+
+### Capacity-aware spawning
+
+Tenant cannot spawn local LLMs beyond host capacity:
+- Mac (64GB RAM): 1-2 paralel Q4_K_M models
+- Hetzner xlarge (256GB RAM): 5-10 paralel
+- Reject spawn with `LLMPoolError::CapacityExceeded`
+
+### Sovereign-first default
+
+New tenant onboard with `default` LLMPool: only Cave-hosted Qwen3 + opt-in cloud providers.
+
+### Backward compatibility
+
+v1 tenant configs (single classification routing) auto-migrate to LLMPool with single-entry pool. No breaking changes.
+
 ## Rejected
 
 - **Direct API calls:** No unified interface. Each application must implement provider-specific SDKs, classification routing, token counting, and PII redaction independently. Massive duplication across tenant applications.

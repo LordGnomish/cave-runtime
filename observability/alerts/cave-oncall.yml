@@ -1,0 +1,97 @@
+# On-call rotation
+groups:
+  - name: cave-oncall-slo
+    interval: 30s
+    rules:
+      - alert: OncallSloBurnRateFast
+        expr: |
+          (
+            sum(rate(oncall_total{job="cave-oncall",code=~"5.."}[1h]))
+            /
+            sum(rate(oncall_total{job="cave-oncall"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-oncall fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/slo-burn-fast.md"
+      - alert: OncallSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(oncall_total{job="cave-oncall",code=~"5.."}[6h]))
+            /
+            sum(rate(oncall_total{job="cave-oncall"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-oncall slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/slo-burn-slow.md"
+      - alert: OncallErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(oncall_total{job="cave-oncall",code=~"5.."}[7d]))
+              / sum(rate(oncall_total{job="cave-oncall"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-oncall 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/error-budget.md"
+      - alert: OncallLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(oncall_duration_seconds_bucket{job="cave-oncall"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-oncall p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/latency.md"
+      - alert: OncallSaturationHigh
+        expr: 'sum(oncall_inflight_requests{job="cave-oncall"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-oncall inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/saturation.md"
+      - alert: OncallMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-oncall"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-oncall RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/memory.md"
+      - alert: OncallCardinalityExplosion
+        expr: 'count(count by (tenant_id) (oncall_total{job="cave-oncall"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-oncall tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/cardinality.md"
+      - alert: OncallHealthProbeFailing
+        expr: 'min(up{job="cave-oncall"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-oncall health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-oncall/health.md"

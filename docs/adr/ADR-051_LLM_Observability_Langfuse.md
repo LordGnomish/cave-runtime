@@ -51,6 +51,10 @@ CAVE routes LLM inference through LiteLLM gateway (ADR-013) to Ollama (Hetzner) 
 - Restricted = zero observability for restricted AI interactions — debugging requires alternative approaches.
 - Younger project (~2023) — smaller community than W&B/MLflow but growing rapidly.
 
+## Notes
+
+**Universal scope.** **Runtime mirror REQUIRED**: cave-llm-obs crate (Mirror-001 blanket; ADR-013 cave-llm-gateway'in doğal sister'ı, single upstream Langfuse). Sovereign deployment'da Langfuse Helm kırılırsa runtime kendi observability sink'ini koşar — classification-aware retention runtime-level enforce, ADR-103 invariant cave-llm-obs'da baştan PQC-signed audit trail (ADR-014). Prompt versioning cave-llm-gateway tenant model-allowlist + prompt-allowlist ile tek surface. cave-self-improver gece pump'ında prompt regression detection bu telemetry'yi kullanır.
+
 ## Compliance Mapping
 
 GDPR Art.5(1)(c) (data minimisation — classification-based retention). GDPR Art.25 (data protection by design — restricted disables logging). SOC2 CC7.2 (AI monitoring — inference audit trail). ISO A.8.16 (monitoring activities). NIS2 Art.21 (AI system monitoring).
