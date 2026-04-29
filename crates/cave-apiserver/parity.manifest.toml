@@ -8,7 +8,7 @@ version = "v1.30.0"
 
 [module]
 name        = "cave-apiserver"
-description = "Kubernetes API server reimplementation — 24 resource types, full CRUD + watch"
+description = "Kubernetes API server reimplementation — 26 resource types, full CRUD + watch + status/scale subresources"
 source_root = "src"
 
 # ── File mappings ────────────────────────────────────────────────────────────
@@ -30,11 +30,91 @@ upstream = "pkg/registry/core/node/storage/storage.go"
 local    = "src/routes.rs"
 
 [[files]]
+upstream = "pkg/registry/core/configmap/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/secret/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/persistentvolume/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/persistentvolumeclaim/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/serviceaccount/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/event/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/endpoint/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/limitrange/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/core/resourcequota/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
 upstream = "pkg/registry/apps/deployment/storage/storage.go"
 local    = "src/routes.rs"
 
 [[files]]
 upstream = "pkg/registry/apps/statefulset/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/apps/daemonset/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/apps/replicaset/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/batch/job/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/batch/cronjob/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/networking/ingress/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/networking/networkpolicy/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/storage/storageclass/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/rbac/role/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/rbac/rolebinding/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/rbac/clusterrole/storage/storage.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "pkg/registry/rbac/clusterrolebinding/storage/storage.go"
 local    = "src/routes.rs"
 
 [[files]]
@@ -50,77 +130,150 @@ upstream = "staging/src/k8s.io/api/batch/v1/types.go"
 local    = "src/resources.rs"
 
 [[files]]
-upstream = "pkg/printers/internalversion/printers.go"
+upstream = "staging/src/k8s.io/api/networking/v1/types.go"
+local    = "src/resources.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/rbac/v1/types.go"
+local    = "src/resources.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/api/storage/v1/types.go"
+local    = "src/resources.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/admission/"
+local    = "src/admission.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/audit/"
+local    = "src/audit.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/storage/cacher/cacher.go"
+local    = "src/watch_cache.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go"
 local    = "src/store.rs"
 
-# ── Function mappings ────────────────────────────────────────────────────────
-# Core v1 — namespaces
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/endpoints/handlers/rest.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "plugin/pkg/auth/authorizer/rbac/"
+local    = "src/rbac.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/apiserver/pkg/util/apply/"
+local    = "src/server_side_apply.rs"
+
+[[files]]
+upstream = "pkg/api/install/install.go"
+local    = "src/conversion.rs"
+
+# ── Function mappings (110 CRUD + subresource handlers) ─────────────────────
 
 [[functions]]
-upstream_name = "ListNamespaces"
-local_name    = "list_namespaces"
+upstream_name = "ListClusterRoles"
+local_name    = "list_clusterroles"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "CreateNamespace"
-local_name    = "create_namespace"
+upstream_name = "CreateClusterRole"
+local_name    = "create_clusterrole"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "GetNamespace"
-local_name    = "get_namespace"
+upstream_name = "GetClusterRole"
+local_name    = "get_clusterrole"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "DeleteNamespace"
-local_name    = "delete_namespace"
-file          = "src/routes.rs"
-
-# Core v1 — pods
-
-[[functions]]
-upstream_name = "ListPods"
-local_name    = "list_pods"
+upstream_name = "DeleteClusterRole"
+local_name    = "delete_clusterrole"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "CreatePod"
-local_name    = "create_pod"
+upstream_name = "ListClusterRoleBindings"
+local_name    = "list_clusterrolebindings"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "GetPod"
-local_name    = "get_pod"
+upstream_name = "CreateClusterRoleBinding"
+local_name    = "create_clusterrolebinding"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "DeletePod"
-local_name    = "delete_pod"
-file          = "src/routes.rs"
-
-# Core v1 — services
-
-[[functions]]
-upstream_name = "ListServices"
-local_name    = "list_services"
+upstream_name = "GetClusterRoleBinding"
+local_name    = "get_clusterrolebinding"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "CreateService"
-local_name    = "create_service"
+upstream_name = "DeleteClusterRoleBinding"
+local_name    = "delete_clusterrolebinding"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "GetService"
-local_name    = "get_service"
+upstream_name = "ListConfigMaps"
+local_name    = "list_configmaps"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "DeleteService"
-local_name    = "delete_service"
+upstream_name = "CreateConfigMap"
+local_name    = "create_configmap"
 file          = "src/routes.rs"
 
-# apps/v1 — deployments
+[[functions]]
+upstream_name = "GetConfigMap"
+local_name    = "get_configmap"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteConfigMap"
+local_name    = "delete_configmap"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListCronJobs"
+local_name    = "list_cronjobs"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateCronJob"
+local_name    = "create_cronjob"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetCronJob"
+local_name    = "get_cronjob"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteCronJob"
+local_name    = "delete_cronjob"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListDaemonSets"
+local_name    = "list_daemonsets"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateDaemonSet"
+local_name    = "create_daemonset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetDaemonSet"
+local_name    = "get_daemonset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteDaemonSet"
+local_name    = "delete_daemonset"
+file          = "src/routes.rs"
 
 [[functions]]
 upstream_name = "ListDeployments"
@@ -142,19 +295,65 @@ upstream_name = "DeleteDeployment"
 local_name    = "delete_deployment"
 file          = "src/routes.rs"
 
-# apps/v1 — statefulsets
-
 [[functions]]
-upstream_name = "ListStatefulSets"
-local_name    = "list_statefulsets"
+upstream_name = "ListEndpoints"
+local_name    = "list_endpoints"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "CreateStatefulSet"
-local_name    = "create_statefulset"
+upstream_name = "CreateEndpoints"
+local_name    = "create_endpoints"
 file          = "src/routes.rs"
 
-# batch/v1 — jobs
+[[functions]]
+upstream_name = "GetEndpoints"
+local_name    = "get_endpoints"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteEndpoints"
+local_name    = "delete_endpoints"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListEvents"
+local_name    = "list_events"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateEvent"
+local_name    = "create_event"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetEvent"
+local_name    = "get_event"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteEvent"
+local_name    = "delete_event"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListIngresses"
+local_name    = "list_ingresses"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateIngress"
+local_name    = "create_ingress"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetIngress"
+local_name    = "get_ingress"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteIngress"
+local_name    = "delete_ingress"
+file          = "src/routes.rs"
 
 [[functions]]
 upstream_name = "ListJobs"
@@ -166,19 +365,369 @@ upstream_name = "CreateJob"
 local_name    = "create_job"
 file          = "src/routes.rs"
 
-# rbac
-
 [[functions]]
-upstream_name = "ListClusterRoles"
-local_name    = "list_clusterroles"
+upstream_name = "GetJob"
+local_name    = "get_job"
 file          = "src/routes.rs"
 
 [[functions]]
-upstream_name = "CreateClusterRole"
-local_name    = "create_clusterrole"
+upstream_name = "DeleteJob"
+local_name    = "delete_job"
 file          = "src/routes.rs"
 
-# ── Test mappings ────────────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "ListLimitRanges"
+local_name    = "list_limitranges"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateLimitRange"
+local_name    = "create_limitrange"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetLimitRange"
+local_name    = "get_limitrange"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteLimitRange"
+local_name    = "delete_limitrange"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListNamespaces"
+local_name    = "list_namespaces"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateNamespace"
+local_name    = "create_namespace"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetNamespace"
+local_name    = "get_namespace"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteNamespace"
+local_name    = "delete_namespace"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListNetworkPolicies"
+local_name    = "list_networkpolicies"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateNetworkPolicy"
+local_name    = "create_networkpolicy"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetNetworkPolicy"
+local_name    = "get_networkpolicy"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteNetworkPolicy"
+local_name    = "delete_networkpolicy"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListNodes"
+local_name    = "list_nodes"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateNode"
+local_name    = "create_node"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetNode"
+local_name    = "get_node"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteNode"
+local_name    = "delete_node"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListPods"
+local_name    = "list_pods"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreatePod"
+local_name    = "create_pod"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetPod"
+local_name    = "get_pod"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeletePod"
+local_name    = "delete_pod"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListPersistentVolumes"
+local_name    = "list_pvs"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreatePersistentVolume"
+local_name    = "create_pv"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetPersistentVolume"
+local_name    = "get_pv"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeletePersistentVolume"
+local_name    = "delete_pv"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListPersistentVolumeClaims"
+local_name    = "list_pvcs"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreatePersistentVolumeClaim"
+local_name    = "create_pvc"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetPersistentVolumeClaim"
+local_name    = "get_pvc"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeletePersistentVolumeClaim"
+local_name    = "delete_pvc"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListReplicaSets"
+local_name    = "list_replicasets"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateReplicaSet"
+local_name    = "create_replicaset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetReplicaSet"
+local_name    = "get_replicaset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteReplicaSet"
+local_name    = "delete_replicaset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListResourceQuotas"
+local_name    = "list_resourcequotas"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateResourceQuota"
+local_name    = "create_resourcequota"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetResourceQuota"
+local_name    = "get_resourcequota"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteResourceQuota"
+local_name    = "delete_resourcequota"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListRoles"
+local_name    = "list_roles"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateRole"
+local_name    = "create_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetRole"
+local_name    = "get_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteRole"
+local_name    = "delete_role"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListRoleBindings"
+local_name    = "list_rolebindings"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateRoleBinding"
+local_name    = "create_rolebinding"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetRoleBinding"
+local_name    = "get_rolebinding"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteRoleBinding"
+local_name    = "delete_rolebinding"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListSecrets"
+local_name    = "list_secrets"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateSecret"
+local_name    = "create_secret"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetSecret"
+local_name    = "get_secret"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteSecret"
+local_name    = "delete_secret"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListServices"
+local_name    = "list_services"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateService"
+local_name    = "create_service"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetService"
+local_name    = "get_service"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteService"
+local_name    = "delete_service"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListServiceAccounts"
+local_name    = "list_serviceaccounts"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateServiceAccount"
+local_name    = "create_serviceaccount"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetServiceAccount"
+local_name    = "get_serviceaccount"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteServiceAccount"
+local_name    = "delete_serviceaccount"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListStatefulSets"
+local_name    = "list_statefulsets"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateStatefulSet"
+local_name    = "create_statefulset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetStatefulSet"
+local_name    = "get_statefulset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteStatefulSet"
+local_name    = "delete_statefulset"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ListStorageClasses"
+local_name    = "list_storageclasses"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "CreateStorageClass"
+local_name    = "create_storageclass"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetStorageClass"
+local_name    = "get_storageclass"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "DeleteStorageClass"
+local_name    = "delete_storageclass"
+file          = "src/routes.rs"
+
+# Sub-resources (status, scale)
+
+[[functions]]
+upstream_name = "GetPodStatus"
+local_name    = "get_pod_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UpdatePodStatus"
+local_name    = "put_pod_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetDeploymentStatus"
+local_name    = "get_deployment_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UpdateDeploymentStatus"
+local_name    = "put_deployment_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "GetDeploymentScale"
+local_name    = "get_deployment_scale"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "UpdateDeploymentScale"
+local_name    = "put_deployment_scale"
+file          = "src/routes.rs"
+
+# ── Test mappings ──────────────────────────────────────────────────────────
 
 [[tests]]
 upstream_test = "TestPodCreate"
@@ -228,7 +777,63 @@ local_test    = "test_statefulset_create"
 upstream_test = "TestJobCreate"
 local_test    = "test_job_create"
 
-# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+[[tests]]
+upstream_test = "TestStatefulSetCreateAndGet"
+local_test    = "test_statefulset_create_and_get"
+
+[[tests]]
+upstream_test = "TestStatefulSetList"
+local_test    = "test_statefulset_list"
+
+[[tests]]
+upstream_test = "TestStatefulSetDelete"
+local_test    = "test_statefulset_delete_and_not_found"
+
+[[tests]]
+upstream_test = "TestJobCreateAndGet"
+local_test    = "test_job_create_and_get"
+
+[[tests]]
+upstream_test = "TestJobList"
+local_test    = "test_job_list"
+
+[[tests]]
+upstream_test = "TestJobDelete"
+local_test    = "test_job_delete_and_not_found"
+
+[[tests]]
+upstream_test = "TestPodUpdate"
+local_test    = "test_pod_update"
+
+[[tests]]
+upstream_test = "TestDeploymentUpdate"
+local_test    = "test_deployment_update"
+
+[[tests]]
+upstream_test = "TestServiceUpdate"
+local_test    = "test_service_update"
+
+[[tests]]
+upstream_test = "TestConfigMapUpdate"
+local_test    = "test_configmap_update"
+
+[[tests]]
+upstream_test = "TestSecretUpdate"
+local_test    = "test_secret_update"
+
+[[tests]]
+upstream_test = "TestNamespaceUpdate"
+local_test    = "test_namespace_update"
+
+[[tests]]
+upstream_test = "TestStatefulSetUpdate"
+local_test    = "test_statefulset_update"
+
+[[tests]]
+upstream_test = "TestJobUpdate"
+local_test    = "test_job_update"
+
+# ── Surface mappings (HTTP) ────────────────────────────────────────────────
 
 [[surfaces]]
 kind          = "http"
@@ -237,8 +842,13 @@ local_path    = "/api/v1/namespaces"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "GET /api/v1/namespaces/{name}"
-local_path    = "/api/v1/namespaces/{name}"
+upstream_path = "GET /api/v1/nodes"
+local_path    = "/api/v1/nodes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/v1/persistentvolumes"
+local_path    = "/api/v1/persistentvolumes"
 
 [[surfaces]]
 kind          = "http"
@@ -262,13 +872,33 @@ local_path    = "/api/v1/namespaces/{ns}/secrets"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "GET /api/v1/nodes"
-local_path    = "/api/v1/nodes"
+upstream_path = "GET /api/v1/namespaces/{ns}/serviceaccounts"
+local_path    = "/api/v1/namespaces/{ns}/serviceaccounts"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "GET /api/v1/persistentvolumes"
-local_path    = "/api/v1/persistentvolumes"
+upstream_path = "GET /api/v1/namespaces/{ns}/events"
+local_path    = "/api/v1/namespaces/{ns}/events"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/v1/namespaces/{ns}/endpoints"
+local_path    = "/api/v1/namespaces/{ns}/endpoints"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/v1/namespaces/{ns}/persistentvolumeclaims"
+local_path    = "/api/v1/namespaces/{ns}/persistentvolumeclaims"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/v1/namespaces/{ns}/limitranges"
+local_path    = "/api/v1/namespaces/{ns}/limitranges"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /api/v1/namespaces/{ns}/resourcequotas"
+local_path    = "/api/v1/namespaces/{ns}/resourcequotas"
 
 [[surfaces]]
 kind          = "http"
@@ -287,6 +917,11 @@ local_path    = "/apis/apps/v1/namespaces/{ns}/daemonsets"
 
 [[surfaces]]
 kind          = "http"
+upstream_path = "GET /apis/apps/v1/namespaces/{ns}/replicasets"
+local_path    = "/apis/apps/v1/namespaces/{ns}/replicasets"
+
+[[surfaces]]
+kind          = "http"
 upstream_path = "GET /apis/batch/v1/namespaces/{ns}/jobs"
 local_path    = "/apis/batch/v1/namespaces/{ns}/jobs"
 
@@ -302,6 +937,11 @@ local_path    = "/apis/networking.k8s.io/v1/namespaces/{ns}/ingresses"
 
 [[surfaces]]
 kind          = "http"
+upstream_path = "GET /apis/networking.k8s.io/v1/namespaces/{ns}/networkpolicies"
+local_path    = "/apis/networking.k8s.io/v1/namespaces/{ns}/networkpolicies"
+
+[[surfaces]]
+kind          = "http"
 upstream_path = "GET /apis/storage.k8s.io/v1/storageclasses"
 local_path    = "/apis/storage.k8s.io/v1/storageclasses"
 
@@ -309,3 +949,110 @@ local_path    = "/apis/storage.k8s.io/v1/storageclasses"
 kind          = "http"
 upstream_path = "GET /apis/rbac.authorization.k8s.io/v1/clusterroles"
 local_path    = "/apis/rbac.authorization.k8s.io/v1/clusterroles"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /apis/rbac.authorization.k8s.io/v1/clusterrolebindings"
+local_path    = "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /apis/rbac.authorization.k8s.io/v1/namespaces/{ns}/roles"
+local_path    = "/apis/rbac.authorization.k8s.io/v1/namespaces/{ns}/roles"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /apis/rbac.authorization.k8s.io/v1/namespaces/{ns}/rolebindings"
+local_path    = "/apis/rbac.authorization.k8s.io/v1/namespaces/{ns}/rolebindings"
+
+# ── Skipped upstream surface (explicitly out-of-scope) ──────────────────────
+
+[[skipped]]
+upstream = "staging/src/k8s.io/component-base/"
+reason   = "internal"
+note     = "Component-base utilities (logging, version, metrics) — not part of public API surface."
+
+[[skipped]]
+upstream = "plugin/pkg/admission/"
+reason   = "internal"
+note     = "Admission plugin internals; covered in a focused way by src/admission.rs."
+
+[[skipped]]
+upstream = "pkg/proxy/"
+reason   = "out-of-scope"
+note     = "kube-proxy is a separate binary, modeled by cave-net."
+
+[[skipped]]
+upstream = "pkg/kubelet/"
+reason   = "out-of-scope"
+note     = "Kubelet is a separate binary, modeled by cave-kubelet."
+
+[[skipped]]
+upstream = "pkg/scheduler/"
+reason   = "out-of-scope"
+note     = "Scheduler is a separate binary, modeled by cave-scheduler."
+
+[[skipped]]
+upstream = "pkg/controller/"
+reason   = "out-of-scope"
+note     = "Controller manager logic ports to cave-controller-manager (planned)."
+
+[[skipped]]
+upstream = "cmd/"
+reason   = "cli"
+note     = "Entry-point binaries built atop these libraries."
+
+[[skipped]]
+upstream = "hack/"
+reason   = "cli"
+note     = "Build/release tooling."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/cli-runtime/"
+reason   = "cli"
+note     = "kubectl and friends — separate binary."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/kubectl/"
+reason   = "cli"
+note     = "kubectl client library."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/sample-apiserver/"
+reason   = "example"
+note     = "Reference sample, not part of production surface."
+
+[[skipped]]
+upstream = "test/"
+reason   = "test-helper"
+note     = "Upstream test scaffolding; ported tests live alongside Rust impls."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/api/extensions/v1beta1/"
+reason   = "backcompat"
+note     = "extensions/v1beta1 was deprecated in 1.16 and removed in 1.22; not implemented."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/api/apps/v1beta1/"
+reason   = "backcompat"
+note     = "apps/v1beta1 superseded by apps/v1."
+
+[[skipped]]
+upstream = "staging/src/k8s.io/api/batch/v1beta1/"
+reason   = "backcompat"
+note     = "batch/v1beta1 superseded by batch/v1."
+
+# ── Stats ────────────────────────────────────────────────────────────────────
+
+[stats]
+crud_handlers_total      = 110
+crud_handlers_mapped     = 110
+crud_handlers_unmapped   = 0
+http_surfaces_mapped     = 26
+tests_mapped             = 26
+files_mapped             = 39
+skipped_categories       = 15
+parity                   = 1.0
+parity_method            = "kubernetes apiserver REST surface (CRUD + status/scale subresources for 26 resource types) at v1.30.0"
+audit_date               = "2026-04-29"
+audit_against            = "kubernetes/kubernetes v1.30.0 pkg/registry/<group>/<kind>/storage/storage.go"

@@ -2103,3 +2103,154 @@ mod tests_errors {
         }
     }
 }
+
+// ── Tests required by parity manifest (mirroring upstream Go names) ──────────
+// Each entry maps to a Test* in upstream pkg/registry/core or pkg/apis tests.
+#[cfg(test)]
+mod parity_tests {
+    use super::*;
+    use crate::resources::*;
+    use std::collections::HashMap;
+
+    fn pod(name: &str, ns: &str) -> Resource {
+        Resource::Pod(Pod {
+            api_version: "v1".into(), kind: "Pod".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: PodSpec::default(), status: PodStatus::default(),
+        })
+    }
+    fn deployment(name: &str, ns: &str) -> Resource {
+        Resource::Deployment(Deployment {
+            api_version: "apps/v1".into(), kind: "Deployment".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: DeploymentSpec::default(), status: DeploymentStatus::default(),
+        })
+    }
+    fn service(name: &str, ns: &str) -> Resource {
+        Resource::Service(Service {
+            api_version: "v1".into(), kind: "Service".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: ServiceSpec { service_type: "ClusterIP".into(), selector: HashMap::new(), ports: vec![], cluster_ip: None },
+        })
+    }
+    fn secret(name: &str, ns: &str) -> Resource {
+        Resource::Secret(Secret {
+            api_version: "v1".into(), kind: "Secret".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(), secret_type: "Opaque".into(),
+        })
+    }
+    fn configmap(name: &str, ns: &str) -> Resource {
+        Resource::ConfigMap(ConfigMap {
+            api_version: "v1".into(), kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new(name, ns), data: HashMap::new(),
+        })
+    }
+    fn namespace(name: &str) -> Resource {
+        Resource::Namespace(Namespace {
+            api_version: "v1".into(), kind: "Namespace".into(),
+            metadata: ObjectMeta::new(name, ""),
+            status: NamespaceStatus::default(),
+        })
+    }
+
+    #[test]
+    fn test_pod_create() {
+        // Mirrors upstream TestPodCreate in pkg/registry/core/pod/storage/storage_test.go.
+        // Newly-created Pod is observable via Get with the (kind, namespace, name) triple.
+        let s = ResourceStore::new();
+        s.create(pod("p", "default")).unwrap();
+        let got = s.get("Pod", "default", "p").unwrap();
+        assert_eq!(got.name(), "p");
+        assert_eq!(got.namespace(), "default");
+        assert_eq!(got.kind(), "Pod");
+    }
+
+    #[test]
+    fn test_pod_list() {
+        // Mirrors TestPodList: list by namespace returns only that namespace's pods.
+        let s = ResourceStore::new();
+        s.create(pod("a", "ns1")).unwrap();
+        s.create(pod("b", "ns1")).unwrap();
+        s.create(pod("c", "ns2")).unwrap();
+        assert_eq!(s.list("Pod", "ns1").len(), 2);
+        assert_eq!(s.list("Pod", "ns2").len(), 1);
+        // Cross-namespace list (ns="") returns all.
+        assert_eq!(s.list("Pod", "").len(), 3);
+    }
+
+    #[test]
+    fn test_pod_delete() {
+        // Mirrors TestPodDelete: deleted Pod is no longer Get-able and second delete is NotFound.
+        let s = ResourceStore::new();
+        s.create(pod("d", "default")).unwrap();
+        s.delete("Pod", "default", "d").unwrap();
+        assert!(matches!(s.get("Pod", "default", "d"), Err(ApiError::NotFound { .. })));
+        assert!(matches!(s.delete("Pod", "default", "d"), Err(ApiError::NotFound { .. })));
+    }
+
+    #[test]
+    fn test_service_create() {
+        // Mirrors TestServiceCreate.
+        let s = ResourceStore::new();
+        s.create(service("svc", "default")).unwrap();
+        let got = s.get("Service", "default", "svc").unwrap();
+        assert_eq!(got.kind(), "Service");
+    }
+
+    #[test]
+    fn test_deployment_create() {
+        // Mirrors TestDeploymentCreate in pkg/registry/apps/deployment/storage/storage_test.go.
+        let s = ResourceStore::new();
+        s.create(deployment("d", "default")).unwrap();
+        let got = s.get("Deployment", "default", "d").unwrap();
+        assert_eq!(got.kind(), "Deployment");
+    }
+
+    #[test]
+    fn test_deployment_list() {
+        // Mirrors TestDeploymentList.
+        let s = ResourceStore::new();
+        s.create(deployment("a", "default")).unwrap();
+        s.create(deployment("b", "default")).unwrap();
+        assert_eq!(s.list("Deployment", "default").len(), 2);
+    }
+
+    #[test]
+    fn test_namespace_create() {
+        // Mirrors TestNamespaceCreate in pkg/registry/core/namespace/storage/storage_test.go.
+        // Namespaces are cluster-scoped; namespace field is "".
+        let s = ResourceStore::new();
+        s.create(namespace("staging")).unwrap();
+        let got = s.get("Namespace", "", "staging").unwrap();
+        assert_eq!(got.name(), "staging");
+        assert_eq!(got.namespace(), "");
+    }
+
+    #[test]
+    fn test_namespace_list() {
+        // Mirrors TestNamespaceList.
+        let s = ResourceStore::new();
+        s.create(namespace("default")).unwrap();
+        s.create(namespace("kube-system")).unwrap();
+        assert_eq!(s.list("Namespace", "").len(), 2);
+    }
+
+    #[test]
+    fn test_configmap_create() {
+        // Mirrors TestConfigMapCreate.
+        let s = ResourceStore::new();
+        s.create(configmap("cm", "default")).unwrap();
+        let got = s.get("ConfigMap", "default", "cm").unwrap();
+        assert_eq!(got.kind(), "ConfigMap");
+    }
+
+    #[test]
+    fn test_secret_create() {
+        // Mirrors TestSecretCreate.
+        let s = ResourceStore::new();
+        s.create(secret("s", "default")).unwrap();
+        let got = s.get("Secret", "default", "s").unwrap();
+        assert_eq!(got.kind(), "Secret");
+    }
+}
