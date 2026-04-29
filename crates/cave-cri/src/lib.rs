@@ -73,6 +73,9 @@ pub mod oci_spec;
 pub mod logs;
 pub mod health;
 
+#[cfg(test)]
+mod parity_tests;
+
 use routes::CriState;
 use store::{ContainerStore, ImageStore, SandboxStore, SnapshotStore};
 use registry::RegistryClient;

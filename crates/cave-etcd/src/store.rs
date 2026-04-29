@@ -56,6 +56,9 @@ pub struct KvStore {
 }
 
 impl KvStore {
+    /// Upper bound on ops per transaction (matches etcd's --max-txn-ops default).
+    pub const MAX_TXN_OPS: usize = 128;
+
     pub fn new() -> Self {
         let (watch_tx, _) = broadcast::channel(4096);
         let initial_members = vec![Member {
@@ -515,11 +518,28 @@ impl KvStore {
         }
     }
 
+    /// Validating wrapper around `txn`. Rejects requests whose total
+    /// ops (compare + success + failure) exceed `MAX_TXN_OPS`, mirroring
+    /// etcd's --max-txn-ops cap.
+    pub fn txn_checked(&self, req: &TxnRequest) -> EtcdResult<TxnResponse> {
+        let ops = req.compare.len() + req.success.len() + req.failure.len();
+        if ops > Self::MAX_TXN_OPS {
+            return Err(EtcdError::TooManyTxnOps { ops, max: Self::MAX_TXN_OPS });
+        }
+        Ok(self.txn(req))
+    }
+
     // ── Watch ─────────────────────────────────────────────────────────────
 
     /// Subscribe to all watch events (raw broadcast receiver).
     pub fn subscribe(&self) -> broadcast::Receiver<WatchEvent> {
         self.watch_tx.subscribe()
+    }
+
+    /// Cancel a previously created watch. Returns `true` if a config was
+    /// removed, `false` if the watch_id was unknown / already cancelled.
+    pub fn watch_cancel(&self, watch_id: i64) -> bool {
+        self.watch_configs.remove(&watch_id).is_some()
     }
 
     /// Create a watch — stores the config, returns watch_id + any historical events.

@@ -60,6 +60,9 @@ pub enum EtcdError {
 
     #[error("role not granted to user")]
     RoleNotGranted,
+
+    #[error("too many ops in transaction: {ops} > max {max}")]
+    TooManyTxnOps { ops: usize, max: usize },
 }
 
 pub type EtcdResult<T> = Result<T, EtcdError>;

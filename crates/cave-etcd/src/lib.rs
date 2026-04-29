@@ -62,6 +62,9 @@ pub mod models;
 pub mod store;
 pub mod routes;
 
+#[cfg(test)]
+mod parity_tests;
+
 use store::KvStore;
 use std::sync::Arc;
 

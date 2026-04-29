@@ -25,6 +25,9 @@ pub mod server_side_apply;
 pub mod audit;
 pub mod rbac;
 
+#[cfg(test)]
+mod parity_tests;
+
 use store::ResourceStore;
 use std::sync::Arc;
 
