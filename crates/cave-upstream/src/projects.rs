@@ -261,9 +261,9 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "Loki",
         github_repo: "grafana/loki",
-        cave_module: "cave-logs",
-        track_features: "LogQL spec, push API (protobuf), chunk format, label indexing, retention rules",
-        check_frequency: "biweekly",
+        cave_module: "cave-loki",
+        track_features: "LogQL spec, push API (protobuf), chunk format, label indexing, retention rules, distributor/ingester/querier/compactor/store/ruler modules",
+        check_frequency: "weekly",
         category: "observability",
         phase: 1,
     },

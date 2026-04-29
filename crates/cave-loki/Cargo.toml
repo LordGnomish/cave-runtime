@@ -1,0 +1,30 @@
+[package]
+name = "cave-loki"
+description = "Cave-side reimplementation of grafana/loki — line-by-line port of distributor, ingester, querier, compactor, store, ruler, schema, chunkenc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+bytes = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+futures = { workspace = true }
+snap = { workspace = true }
+zstd = { workspace = true }
+flate2 = { workspace = true }
+lz4_flex = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "test-util", "macros"] }
+tempfile = "3"

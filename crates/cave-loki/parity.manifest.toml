@@ -1,0 +1,99 @@
+# parity.manifest.toml — cave-loki
+# Upstream: grafana/loki  https://github.com/grafana/loki
+# Skeleton — Qwen will fill mappings as it ports each module.
+
+[upstream]
+org     = "grafana"
+repo    = "loki"
+# Pin the upstream tag this manifest targets. cave-upstream-watchd will
+# bump this whenever a new release fires a port job.
+version = "v3.3.0"
+
+[module]
+name        = "cave-loki"
+description = "Cave-side reimplementation of grafana/loki, line-by-line port"
+source_root = "src"
+
+# ── Submodule status ─────────────────────────────────────────────────────────
+# Each upstream Go package we port lives here. Status starts `unmapped` and
+# transitions to `partial` -> `mapped` as Qwen lands compile-passing test
+# coverage against the upstream public surface.
+
+[[submodules]]
+name          = "distributor"
+upstream_path = "pkg/distributor"
+target_path   = "src/distributor.rs"
+status        = "unmapped"
+notes         = "Push API ingest + per-tenant rate limiting + replication factor"
+
+[[submodules]]
+name          = "ingester"
+upstream_path = "pkg/ingester"
+target_path   = "src/ingester.rs"
+status        = "unmapped"
+notes         = "Chunk lifecycle, WAL, stream management, flush to store"
+
+[[submodules]]
+name          = "querier"
+upstream_path = "pkg/querier"
+target_path   = "src/querier.rs"
+status        = "unmapped"
+notes         = "LogQL query frontend, label/series/values queries, tail"
+
+[[submodules]]
+name          = "compactor"
+upstream_path = "pkg/compactor"
+target_path   = "src/compactor.rs"
+status        = "unmapped"
+notes         = "Index compaction, retention enforcement, deletes"
+
+[[submodules]]
+name          = "store"
+upstream_path = "pkg/storage"
+target_path   = "src/store.rs"
+status        = "unmapped"
+notes         = "Object-store + index abstractions (S3 / GCS / filesystem / TSDB)"
+
+[[submodules]]
+name          = "ruler"
+upstream_path = "pkg/ruler"
+target_path   = "src/ruler.rs"
+status        = "unmapped"
+notes         = "Recording + alerting rules over LogQL, remote-write"
+
+[[submodules]]
+name          = "schema"
+upstream_path = "pkg/storage/config"
+target_path   = "src/schema.rs"
+status        = "unmapped"
+notes         = "Index schema config (boltdb-shipper / tsdb), period configs"
+
+[[submodules]]
+name          = "chunkenc"
+upstream_path = "pkg/chunkenc"
+target_path   = "src/chunkenc.rs"
+status        = "unmapped"
+notes         = "Chunk encoding (gzip / lz4 / snappy / zstd), block format"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# Filled by Qwen when porting individual files.
+# [[files]]
+# upstream = "pkg/distributor/distributor.go"
+# local    = "src/distributor.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "Distributor.Push"
+# local_name    = "Distributor::push"
+# file          = "src/distributor.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestDistributor_Push"
+# local_test    = "test_distributor_push"
+
+# ── HTTP/gRPC surface mappings ───────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/loki/api/v1/push"
+# local_path    = "/loki/api/v1/push"

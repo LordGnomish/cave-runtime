@@ -38,8 +38,11 @@ pub use projects::TRACKED_PROJECTS;
 /// Everything else falls back to the normal (60-minute) cadence. Match is by
 /// exact equality against `TrackedProject::cave_module`.
 ///
-/// Source: Charter "self-improving" article — these 12 modules form the
+/// Source: Charter "self-improving" article — the first 12 entries are the
 /// runtime kernel. New releases here should reach the port queue first.
+/// `cave-loki` is added as an *active port target* — the first crate where
+/// Qwen drives a full upstream reimplementation end-to-end, so we want
+/// release deltas to land fast.
 pub const HIGH_PRIORITY_MODULES: &[&str] = &[
     "cave-apiserver",
     "cave-etcd",
@@ -53,6 +56,7 @@ pub const HIGH_PRIORITY_MODULES: &[&str] = &[
     "cave-vault",
     "cave-cache",
     "cave-registry",
+    "cave-loki",
 ];
 
 /// Returns `true` if the given `cave_module` is on the high-priority list.
@@ -83,6 +87,12 @@ mod lib_tests {
 
     #[test]
     fn high_priority_list_size_matches_charter() {
-        assert_eq!(HIGH_PRIORITY_MODULES.len(), 12);
+        // 12 charter kernel modules + cave-loki (active port target).
+        assert_eq!(HIGH_PRIORITY_MODULES.len(), 13);
+    }
+
+    #[test]
+    fn high_priority_includes_cave_loki() {
+        assert!(is_high_priority("cave-loki"));
     }
 }

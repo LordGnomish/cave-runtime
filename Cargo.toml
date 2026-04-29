@@ -114,6 +114,8 @@ members = [
     # === Data Lake Foundation ===
     "crates/cave-iceberg",
     "crates/cave-datafusion",
+    # === Loki Port (Qwen test target) ===
+    "crates/cave-loki",
 ]
 
 [workspace.package]
