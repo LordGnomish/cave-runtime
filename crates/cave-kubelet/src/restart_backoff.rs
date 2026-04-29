@@ -88,7 +88,7 @@ pub fn decide_restart(
     exit_code: Option<i32>,
     state: &ContainerRestartState,
     now: DateTime<Utc>,
-    cfg: &BackoffConfig,
+    _cfg: &BackoffConfig,
 ) -> RestartDecision {
     let term_time = match state.last_terminated_at {
         Some(t) => t,
