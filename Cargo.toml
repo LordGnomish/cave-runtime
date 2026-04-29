@@ -97,6 +97,8 @@ members = [
     "crates/cave-net",
     "crates/cave-scheduler",
     "crates/cave-etcd",
+    "crates/cave-controller-manager",
+    "crates/cave-cloud-controller-manager",
     "crates/cave-crossplane",
     # === New crates (this session) ===
     "crates/cave-oncall",

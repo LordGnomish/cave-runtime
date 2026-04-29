@@ -1,0 +1,17 @@
+[package]
+name = "cave-cloud-controller-manager"
+version = "0.1.0"
+edition = "2021"
+description = "Cloud-provider controllers — node lifecycle, route, service load balancer reconciliation"
+license = "Apache-2.0"
+
+[dependencies]
+axum = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+thiserror = "1"
+dashmap = "6"
+cave-kernel = { path = "../cave-kernel" }
