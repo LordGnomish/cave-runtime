@@ -188,13 +188,11 @@ pub struct Observer {
     flows: Vec<FlowLog>,
     seen: u64,
     started_ns: u64,
-    /// Wall-clock ns at last status read.
-    last_status_ns: u64,
 }
 
 impl Observer {
     pub fn new(tenant: TenantId, max_flows: u64, started_ns: u64) -> Self {
-        Self { tenant, max_flows, flows: Vec::new(), seen: 0, started_ns, last_status_ns: started_ns }
+        Self { tenant, max_flows, flows: Vec::new(), seen: 0, started_ns }
     }
 
     pub fn ingest(&mut self, flow: FlowLog) {
