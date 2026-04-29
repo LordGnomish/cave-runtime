@@ -497,17 +497,3 @@ mod tests {
     }
 }
 
-// PollOutcome needs Debug for panic-formatting in test failures, but we
-// don't want it derivable on the public type because it gets noisy in
-// tracing output. Provide a manual impl gated to tests.
-#[cfg(test)]
-impl std::fmt::Debug for PollOutcome {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PollOutcome::NewRelease(d) => write!(f, "NewRelease({} -> {})", d.old_tag.as_deref().unwrap_or("∅"), d.new_tag),
-            PollOutcome::Unchanged => write!(f, "Unchanged"),
-            PollOutcome::NoReleases => write!(f, "NoReleases"),
-            PollOutcome::RateLimited { reset_at } => write!(f, "RateLimited(reset_at={reset_at:?})"),
-        }
-    }
-}

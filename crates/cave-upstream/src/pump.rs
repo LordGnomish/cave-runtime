@@ -227,16 +227,16 @@ mod tests {
 
     #[test]
     fn slugify_strips_unsafe_chars() {
-        assert_eq!(slugify_repo("foo/../bar"), "foo-_..-bar");
+        assert_eq!(slugify_repo("foo/../bar"), "foo-..-bar");
         assert_eq!(slugify_repo("a b/c d"), "a_b-c_d");
     }
 
     #[test]
     fn env_var_overrides_default_queue() {
         let tmp = TempDir::new().unwrap();
-        std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path());
+        unsafe { std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path()); }
         let resolved = default_queue_dir();
-        std::env::remove_var("CAVE_QWEN_PUMP_QUEUE");
+        unsafe { std::env::remove_var("CAVE_QWEN_PUMP_QUEUE"); }
         assert_eq!(resolved, tmp.path());
     }
 

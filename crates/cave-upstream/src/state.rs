@@ -250,9 +250,9 @@ mod tests {
         let custom = tmp.path().join("custom.json");
         // SAFETY: tests in this module are not run in parallel against this
         // env var; we set/unset locally.
-        std::env::set_var("CAVE_UPSTREAM_STATE_PATH", &custom);
+        unsafe { std::env::set_var("CAVE_UPSTREAM_STATE_PATH", &custom); }
         let resolved = WatchState::default_path();
-        std::env::remove_var("CAVE_UPSTREAM_STATE_PATH");
+        unsafe { std::env::remove_var("CAVE_UPSTREAM_STATE_PATH"); }
         assert_eq!(resolved, custom);
     }
 }
