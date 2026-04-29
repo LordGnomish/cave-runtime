@@ -27,11 +27,93 @@ pub fn create_router(state: Arc<State>) -> Router {
         .route("/api/portal/wraps", get(wraps_all))
         .route("/api/portal/wraps/{id}", get(wrap_one))
         .route("/api/portal/wraps/report", get(wraps_report))
+        .route("/api/portal/modules-live", get(modules_live))
+        .route("/api/portal/modules-live/{name}", get(module_detail))
+        .route("/api/portal/modules-live/{name}/parity", get(module_parity_manifest))
         .route("/api/v1/attribution", get(attribution_api))
         .route("/portal/tracker", get(serve_tracker_ui))
         .route("/portal/registry", get(serve_registry_ui))
         .route("/portal/scan", get(serve_scan_ui))
         .with_state(state)
+}
+
+// ── Live module registry ──────────────────────────────────────────────────────
+
+async fn modules_live(AxumState(state): AxumState<Arc<State>>) -> Json<serde_json::Value> {
+    match state.modules.list_all() {
+        Ok(list) => {
+            let total = list.len();
+            let healthy = list.iter().filter(|m| matches!(m.build_status, crate::registry::BuildStatus::Healthy)).count();
+            let degraded = list.iter().filter(|m| matches!(m.build_status, crate::registry::BuildStatus::Degraded)).count();
+            let unknown_count = list.iter().filter(|m| matches!(m.build_status, crate::registry::BuildStatus::Unknown)).count();
+            let total_tests: u32 = list.iter().map(|m| m.tests).sum();
+            let total_loc: u32 = list.iter().map(|m| m.loc).sum();
+            let total_stubs: u32 = list.iter().map(|m| m.stubs).sum();
+            Json(serde_json::json!({
+                "modules": list,
+                "total": total,
+                "healthy": healthy,
+                "degraded": degraded,
+                "unknown": unknown_count,
+                "total_tests": total_tests,
+                "total_loc": total_loc,
+                "total_stubs": total_stubs,
+            }))
+        }
+        Err(e) => Json(serde_json::json!({
+            "error": e.to_string(),
+            "modules": [],
+        })),
+    }
+}
+
+async fn module_detail(
+    Path(name): Path<String>,
+    AxumState(state): AxumState<Arc<State>>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    match state.modules.get(&name) {
+        Ok(detail) => (StatusCode::OK, Json(serde_json::to_value(detail).unwrap_or_default())),
+        Err(crate::registry::RegistryError::NotFound(_)) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("module '{name}' not found") })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ),
+    }
+}
+
+async fn module_parity_manifest(
+    Path(name): Path<String>,
+    AxumState(state): AxumState<Arc<State>>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    match state.modules.get(&name) {
+        Ok(detail) => match detail.parity_manifest_raw {
+            Some(raw) => (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "module": detail.summary.name,
+                    "manifest_toml": raw,
+                    "parity_score": detail.summary.parity_score,
+                    "upstream_ref": detail.summary.upstream_ref,
+                    "upstream_repo": detail.summary.upstream_repo,
+                })),
+            ),
+            None => (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": format!("module '{}' has no parity manifest", detail.summary.name) })),
+            ),
+        },
+        Err(crate::registry::RegistryError::NotFound(_)) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": format!("module '{name}' not found") })),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ),
+    }
 }
 
 // ── Wraps ─────────────────────────────────────────────────────────────────────

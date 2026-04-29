@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAVE Platform — Sign in</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#1f6feb;--green:#3fb950}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+.wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:32px}
+.card{max-width:520px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:36px}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.logo-mark{width:34px;height:34px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:8px;display:grid;place-items:center;color:#fff;font-weight:800;letter-spacing:-0.5px}
+h1{font-size:22px;font-weight:700;margin-bottom:6px}
+p.subtitle{color:var(--muted);margin-bottom:22px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:11px 16px;border:0;border-radius:6px;background:var(--accent2);color:#fff;font-weight:600;text-decoration:none;cursor:pointer;font-size:14px;transition:background 0.18s ease}
+.btn:hover{background:var(--accent)}
+.btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border);margin-top:10px}
+.btn-secondary:hover{background:var(--card);border-color:var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px}
+.fact{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;text-align:center}
+.fact-num{font-size:18px;font-weight:700;color:var(--accent)}
+.fact-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-top:2px}
+.foot{margin-top:22px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:12px;text-align:center}
+.foot a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="logo">
+      <div class="logo-mark">CV</div>
+      <strong style="font-size:16px">CAVE Platform</strong>
+    </div>
+    <h1>Sign in to continue</h1>
+    <p class="subtitle">Single-pane-of-glass access to every runtime module — no upstream UI redirects.</p>
+    <a class="btn" href="/oauth/login">Sign in with Keycloak</a>
+    <a class="btn btn-secondary" href="/api/portal/modules-live">View public module status</a>
+
+    <div class="facts" id="facts">
+      <div class="fact"><div class="fact-num" id="fact-modules">—</div><div class="fact-label">Modules</div></div>
+      <div class="fact"><div class="fact-num" id="fact-tests">—</div><div class="fact-label">Tests</div></div>
+      <div class="fact"><div class="fact-num" id="fact-loc">—</div><div class="fact-label">Lines</div></div>
+    </div>
+
+    <div class="foot">
+      Already signed in? Visit <a href="/admin">/admin</a> · Trouble? Try <a href="/oauth/logout">log out</a>
+    </div>
+  </div>
+</div>
+<script>
+fetch('/api/portal/modules-live').then(r=>r.json()).then(j=>{
+  if(j.total){document.getElementById('fact-modules').textContent=j.total;}
+  if(j.total_tests){document.getElementById('fact-tests').textContent=j.total_tests;}
+  if(j.total_loc){document.getElementById('fact-loc').textContent=j.total_loc.toLocaleString();}
+}).catch(()=>{});
+</script>
+</body>
+</html>

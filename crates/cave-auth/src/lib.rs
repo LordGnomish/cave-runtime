@@ -40,6 +40,7 @@ pub use middleware::CaveAuthLayer;
 pub mod oidc;
 pub mod pat;
 pub mod scim;
+pub mod seed;
 pub mod session;
 pub mod tenant;
 pub mod token;

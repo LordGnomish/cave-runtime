@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CAVE Admin — Runtime Modules</title>
+<style>
+:root{--bg:#0d1117;--card:#161b22;--card-hover:#1c2230;--border:#30363d;--border-strong:#3d444d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--accent2:#1f6feb;--green:#3fb950;--yellow:#d29922;--red:#f85149;--gray:#6e7681}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+
+header.top{display:flex;align-items:center;gap:14px;padding:12px 22px;background:#161b22;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700}
+.logo-mark{width:28px;height:28px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:6px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px;letter-spacing:-0.5px}
+.tabs{display:flex;gap:18px;margin-left:18px}
+.tab{color:var(--muted);text-decoration:none;font-size:13px;padding:6px 0;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--text)}
+.spacer{flex:1}
+.who{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+.who .role{display:inline-block;padding:2px 8px;background:rgba(63,185,80,0.15);color:var(--green);border-radius:11px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px}
+.who a{color:var(--accent);text-decoration:none;margin-left:8px}
+
+main{padding:22px;max-width:1400px;margin:0 auto}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.lede{color:var(--muted);margin-bottom:22px}
+
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px}
+.kpi-num{font-size:24px;font-weight:700}
+.kpi-num.healthy{color:var(--green)}
+.kpi-num.degraded{color:var(--yellow)}
+.kpi-num.unknown{color:var(--gray)}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+
+.toolbar{display:flex;gap:10px;margin-bottom:14px;align-items:center}
+.search{flex:1;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}
+.search:focus{outline:0;border-color:var(--accent)}
+select{padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;cursor:pointer;transition:border-color 0.18s ease,background 0.18s ease}
+.card:hover{border-color:var(--accent);background:var(--card-hover)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.card-name{font-weight:600;font-size:14px}
+.badge{display:inline-block;padding:2px 8px;border-radius:11px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px}
+.badge-healthy{background:rgba(63,185,80,0.15);color:var(--green)}
+.badge-degraded{background:rgba(210,153,34,0.15);color:var(--yellow)}
+.badge-unknown{background:rgba(110,118,129,0.18);color:var(--gray)}
+.card-desc{color:var(--muted);font-size:12px;margin-bottom:10px;min-height:34px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:11px}
+.metric{background:var(--bg);padding:6px;border-radius:4px;text-align:center}
+.metric-num{font-weight:700;color:var(--text);font-size:13px}
+.metric-num.zero{color:var(--gray)}
+.metric-num.warn{color:var(--yellow)}
+.metric-label{color:var(--muted);font-size:10px;margin-top:1px;text-transform:uppercase;letter-spacing:0.3px}
+.parity-bar{height:4px;background:var(--bg);border-radius:2px;margin-top:10px;overflow:hidden}
+.parity-fill{height:100%;background:linear-gradient(90deg,var(--yellow),var(--green));border-radius:2px}
+.last-commit{margin-top:10px;color:var(--muted);font-size:11px;font-family:ui-monospace,SFMono-Regular,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.detail{display:none;position:fixed;top:60px;right:22px;width:480px;max-height:calc(100vh - 80px);background:var(--card);border:1px solid var(--border-strong);border-radius:8px;padding:18px;z-index:50;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,0.5)}
+.detail.open{display:block}
+.detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.detail-title{font-weight:700;font-size:16px}
+.detail-close{background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:18px;padding:4px}
+.detail-section{margin-bottom:14px}
+.detail-section h3{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px}
+.detail-section pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;font-family:ui-monospace,SFMono-Regular,monospace;overflow:auto;max-height:200px}
+.empty{text-align:center;color:var(--muted);padding:40px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <div class="logo-mark">CV</div>
+    <span>CAVE Admin</span>
+  </div>
+  <nav class="tabs">
+    <a class="tab active" href="/admin">Modules</a>
+    <a class="tab" href="/api/portal/wraps">Wraps</a>
+    <a class="tab" href="/api/portal/parity">Parity</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="who" id="who">
+    <span id="who-name">…</span>
+    <span class="role" id="who-role">user</span>
+    <a href="/oauth/logout">Sign out</a>
+  </div>
+</header>
+
+<main>
+  <h1>Runtime Modules</h1>
+  <p class="lede">Live view of every workspace crate. Tests, LOC, parity, last commit, build status — sourced from the filesystem at runtime, 5-minute TTL.</p>
+
+  <div class="kpi" id="kpi"></div>
+
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="Filter modules — search by name or description">
+    <select id="filter-status">
+      <option value="">All statuses</option>
+      <option value="healthy">Healthy</option>
+      <option value="degraded">Degraded</option>
+      <option value="unknown">Unknown</option>
+    </select>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="empty">Loading…</div>
+  </div>
+</main>
+
+<div class="detail" id="detail">
+  <div class="detail-head">
+    <div class="detail-title" id="detail-title">—</div>
+    <button class="detail-close" onclick="closeDetail()">×</button>
+  </div>
+  <div id="detail-body"></div>
+</div>
+
+<script>
+let modules=[];
+
+async function loadMe(){
+  try{
+    const r=await fetch('/me',{credentials:'same-origin'});
+    if(!r.ok){document.getElementById('who-name').textContent='Anonymous';document.getElementById('who-role').textContent='guest';return;}
+    const j=await r.json();
+    document.getElementById('who-name').textContent=j.username||j.sub;
+    const role=(j.roles&&j.roles[0])||'user';
+    document.getElementById('who-role').textContent=role;
+  }catch(e){
+    document.getElementById('who-name').textContent='Anonymous';
+  }
+}
+
+async function loadModules(){
+  const r=await fetch('/api/portal/modules-live');
+  const j=await r.json();
+  modules=j.modules||[];
+  renderKpi(j);
+  renderGrid();
+}
+
+function renderKpi(j){
+  const el=document.getElementById('kpi');
+  el.innerHTML=`
+    <div class="kpi-card"><div class="kpi-num">${j.total||0}</div><div class="kpi-label">Total Modules</div></div>
+    <div class="kpi-card"><div class="kpi-num healthy">${j.healthy||0}</div><div class="kpi-label">Healthy</div></div>
+    <div class="kpi-card"><div class="kpi-num degraded">${j.degraded||0}</div><div class="kpi-label">Degraded</div></div>
+    <div class="kpi-card"><div class="kpi-num unknown">${j.unknown||0}</div><div class="kpi-label">Unknown</div></div>
+    <div class="kpi-card"><div class="kpi-num">${(j.total_tests||0).toLocaleString()}</div><div class="kpi-label">Tests</div></div>
+    <div class="kpi-card"><div class="kpi-num">${(j.total_loc||0).toLocaleString()}</div><div class="kpi-label">Lines of Rust</div></div>
+    <div class="kpi-card"><div class="kpi-num ${(j.total_stubs||0)>0?'degraded':''}">${j.total_stubs||0}</div><div class="kpi-label">Stubs</div></div>
+  `;
+}
+
+function renderGrid(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const status=document.getElementById('filter-status').value;
+  const grid=document.getElementById('grid');
+  const filtered=modules.filter(m=>{
+    if(status&&m.build_status!==status)return false;
+    if(q){
+      const hay=`${m.name} ${m.display_name} ${m.description||''}`.toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  });
+  if(filtered.length===0){grid.innerHTML='<div class="empty">No modules match.</div>';return;}
+  grid.innerHTML=filtered.map(m=>{
+    const parityPct=Math.round((m.parity_score||0)*100);
+    const cls=m.build_status==='healthy'?'badge-healthy':m.build_status==='degraded'?'badge-degraded':'badge-unknown';
+    const stubsCls=m.stubs>0?'warn':'zero';
+    return `
+      <div class="card" onclick="openDetail('${m.crate_dir}')">
+        <div class="card-head">
+          <div class="card-name">${m.display_name}</div>
+          <span class="badge ${cls}">${m.build_status}</span>
+        </div>
+        <div class="card-desc">${escape_html(m.description||'No description')}</div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-num ${m.tests===0?'zero':''}">${m.tests}</div><div class="metric-label">Tests</div></div>
+          <div class="metric"><div class="metric-num">${m.loc.toLocaleString()}</div><div class="metric-label">LOC</div></div>
+          <div class="metric"><div class="metric-num ${stubsCls}">${m.stubs}</div><div class="metric-label">Stubs</div></div>
+          <div class="metric"><div class="metric-num">${parityPct}%</div><div class="metric-label">Parity</div></div>
+        </div>
+        <div class="parity-bar"><div class="parity-fill" style="width:${parityPct}%"></div></div>
+        ${m.last_commit?`<div class="last-commit">${escape_html(m.last_commit)}</div>`:''}
+      </div>
+    `;
+  }).join('');
+}
+
+async function openDetail(crate){
+  const r=await fetch(`/api/portal/modules-live/${encodeURIComponent(crate)}`);
+  if(!r.ok){alert('Module not found');return;}
+  const d=await r.json();
+  document.getElementById('detail-title').textContent=d.summary.name;
+  const body=document.getElementById('detail-body');
+  const s=d.summary;
+  body.innerHTML=`
+    <div class="detail-section">
+      <h3>Description</h3>
+      <div>${escape_html(s.description||'(no description)')}</div>
+    </div>
+    <div class="detail-section">
+      <h3>Status</h3>
+      <div>Build: <strong>${s.build_status}</strong> · Tests: <strong>${s.tests}</strong> · LOC: <strong>${s.loc.toLocaleString()}</strong> · Stubs: <strong>${s.stubs}</strong> · Parity: <strong>${Math.round((s.parity_score||0)*100)}%</strong></div>
+    </div>
+    ${s.upstream_repo?`<div class="detail-section"><h3>Upstream</h3><div><a href="${s.upstream_repo}" target="_blank" rel="noopener" style="color:var(--accent)">${s.upstream_repo}</a> @ ${s.upstream_ref||''}</div></div>`:''}
+    ${s.last_commit?`<div class="detail-section"><h3>Last Commit</h3><pre>${escape_html(s.last_commit)}</pre></div>`:''}
+    <div class="detail-section">
+      <h3>Source files (${d.source_files.length})</h3>
+      <pre>${escape_html(d.source_files.join('\n'))}</pre>
+    </div>
+    ${d.parity_manifest_raw?`<div class="detail-section"><h3>Parity Manifest</h3><pre>${escape_html(d.parity_manifest_raw)}</pre></div>`:''}
+    ${d.readme_excerpt?`<div class="detail-section"><h3>README excerpt</h3><pre>${escape_html(d.readme_excerpt)}</pre></div>`:''}
+  `;
+  document.getElementById('detail').classList.add('open');
+}
+
+function closeDetail(){document.getElementById('detail').classList.remove('open');}
+
+function escape_html(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+document.getElementById('search').addEventListener('input',renderGrid);
+document.getElementById('filter-status').addEventListener('change',renderGrid);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
+
+loadMe();
+loadModules();
+</script>
+</body>
+</html>

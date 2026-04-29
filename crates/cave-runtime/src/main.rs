@@ -16,6 +16,8 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 static PORTAL_HTML: &str = include_str!("portal_index.html");
+static LANDING_HTML: &str = include_str!("landing.html");
+static ADMIN_HTML: &str = include_str!("admin.html");
 
 #[derive(Parser)]
 #[command(name = "cave-runtime", version, about = "CAVE Platform Unified Runtime")]
@@ -73,6 +75,13 @@ async fn main() -> anyhow::Result<()> {
     let workflows_state = Arc::new(cave_workflows::State::default());
     let scan_state = Arc::new(cave_scan::State::default());
     let portal_state = Arc::new(cave_portal::PortalState::default());
+
+    // OAuth/SSO state — config from env, real HTTP exchanger pointing at Keycloak.
+    // The bypass paths below admit /oauth/* and /me before auth middleware fires.
+    let oauth_state = Arc::new(cave_portal::oauth::OAuthState::new(
+        cave_portal::oauth::OAuthConfig::from_env(),
+        Arc::new(cave_portal::oauth::HttpExchanger::new()),
+    ));
     let scaffold_state = Arc::new(cave_scaffold::State::default());
     let chaos_state = Arc::new(cave_chaos::State::default());
     let policy_state = Arc::new(cave_policy::State::default());
@@ -272,8 +281,12 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let app = Router::new()
-        // Portal UI
-        .route("/", get(portal))
+        // Portal UI — root checks for session cookie, redirects to /landing if absent
+        .route("/", get(portal_root))
+        .route("/landing", get(landing))
+        .route("/admin", get(admin_html))
+        .route("/admin/", get(admin_html))
+        .route("/portal", get(portal))
         // Core health endpoints
         .route("/health", get(health))
         .route("/ready", get(ready))
@@ -315,6 +328,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_workflows::router(workflows_state))
         .merge(cave_scan::router(scan_state))
         .merge(cave_portal::router(portal_state))
+        .merge(cave_portal::oauth::router(oauth_state))
         .merge(cave_scaffold::router(scaffold_state))
         .merge(cave_chaos::router(chaos_state))
         .merge(cave_policy::router(policy_state))
@@ -392,6 +406,7 @@ async fn main() -> anyhow::Result<()> {
                 "/api/v1/attribution".into(),
                 "/loki/".into(), "/tempo/".into(),
                 "/api/registry/".into(),
+                "/oauth/".into(), "_exact:/me".into(),
             ],
         })))
         // Middleware
@@ -408,6 +423,36 @@ async fn main() -> anyhow::Result<()> {
 
 async fn portal() -> impl IntoResponse {
     Html(PORTAL_HTML)
+}
+
+async fn landing() -> impl IntoResponse {
+    Html(LANDING_HTML)
+}
+
+async fn admin_html() -> impl IntoResponse {
+    Html(ADMIN_HTML)
+}
+
+/// Root handler: if a session cookie is present, render the admin dashboard;
+/// otherwise show the landing page with a Sign in button. Cookie *value* is
+/// not validated here — that happens server-side on `/me` and the protected
+/// API routes — so an attacker can't bypass auth by forging a cookie name.
+async fn portal_root(headers: axum::http::HeaderMap) -> impl IntoResponse {
+    let cookie = headers
+        .get(axum::http::header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let cookie_name = std::env::var("CAVE_SESSION_COOKIE_NAME")
+        .unwrap_or_else(|_| "cave_session".to_string());
+    let signed_in = cookie
+        .split(';')
+        .map(str::trim)
+        .any(|p| p.starts_with(&format!("{cookie_name}=")) && !p.ends_with('='));
+    if signed_in {
+        Html(ADMIN_HTML).into_response()
+    } else {
+        Html(LANDING_HTML).into_response()
+    }
 }
 
 async fn health() -> axum::Json<serde_json::Value> {

@@ -1,0 +1,142 @@
+{
+  "realm": "cave",
+  "enabled": true,
+  "displayName": "CAVE Platform",
+  "displayNameHtml": "<b>CAVE</b> Platform",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 86400,
+  "accessTokenLifespan": 900,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Platform administrator — full access to /admin and all tenants.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "cave"
+      },
+      {
+        "name": "operator",
+        "description": "Cluster operator — read across tenants, no tenant data writes.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "cave"
+      },
+      {
+        "name": "tenant",
+        "description": "Tenant member — read+write within own tenant.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "cave"
+      }
+    ]
+  },
+  "defaultRoles": ["tenant"],
+  "users": [
+    {
+      "username": "${CAVE_ADMIN_USERNAME:-admin}",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@cave.local",
+      "firstName": "CAVE",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${CAVE_ADMIN_PASSWORD:-admin}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "operator", "tenant"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "cave-portal",
+      "name": "CAVE Portal",
+      "description": "OIDC client for the cave-portal web shell. PKCE-backed authorization code flow.",
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${CAVE_PORTAL_CLIENT_SECRET:-cave-portal-dev-secret}",
+      "redirectUris": [
+        "http://localhost:8080/oauth/callback",
+        "https://*.cave.local/oauth/callback",
+        "https://portal.cave.local/oauth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:8080",
+        "https://*.cave.local"
+      ],
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/##https://*.cave.local/##https://portal.cave.local/",
+        "access.token.lifespan": "900"
+      },
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "web-origins",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true
+    }
+  ],
+  "groups": [
+    {
+      "name": "platform-admins",
+      "path": "/platform-admins",
+      "realmRoles": ["admin"]
+    },
+    {
+      "name": "operators",
+      "path": "/operators",
+      "realmRoles": ["operator"]
+    }
+  ],
+  "smtpServer": {},
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en", "tr"],
+  "defaultLocale": "en",
+  "browserSecurityHeaders": {
+    "contentSecurityPolicy": "frame-src 'self'; frame-ancestors 'self'; object-src 'none';",
+    "xContentTypeOptions": "nosniff",
+    "xRobotsTag": "none",
+    "xFrameOptions": "SAMEORIGIN",
+    "contentSecurityPolicyReportOnly": "",
+    "xXSSProtection": "1; mode=block",
+    "strictTransportSecurity": "max-age=31536000; includeSubDomains"
+  }
+}
