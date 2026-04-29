@@ -1,0 +1,97 @@
+# Continuous profiler
+groups:
+  - name: cave-profiler-slo
+    interval: 30s
+    rules:
+      - alert: ProfilerSloBurnRateFast
+        expr: |
+          (
+            sum(rate(profiler_total{job="cave-profiler",code=~"5.."}[1h]))
+            /
+            sum(rate(profiler_total{job="cave-profiler"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-profiler fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/slo-burn-fast.md"
+      - alert: ProfilerSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(profiler_total{job="cave-profiler",code=~"5.."}[6h]))
+            /
+            sum(rate(profiler_total{job="cave-profiler"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-profiler slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/slo-burn-slow.md"
+      - alert: ProfilerErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(profiler_total{job="cave-profiler",code=~"5.."}[7d]))
+              / sum(rate(profiler_total{job="cave-profiler"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-profiler 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/error-budget.md"
+      - alert: ProfilerLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(profiler_duration_seconds_bucket{job="cave-profiler"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-profiler p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/latency.md"
+      - alert: ProfilerSaturationHigh
+        expr: 'sum(profiler_inflight_requests{job="cave-profiler"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-profiler inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/saturation.md"
+      - alert: ProfilerMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-profiler"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-profiler RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/memory.md"
+      - alert: ProfilerCardinalityExplosion
+        expr: 'count(count by (tenant_id) (profiler_total{job="cave-profiler"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-profiler tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/cardinality.md"
+      - alert: ProfilerHealthProbeFailing
+        expr: 'min(up{job="cave-profiler"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-profiler health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-profiler/health.md"

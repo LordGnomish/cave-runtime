@@ -1,0 +1,97 @@
+# Synthetic monitoring
+groups:
+  - name: cave-uptime-slo
+    interval: 30s
+    rules:
+      - alert: UptimeSloBurnRateFast
+        expr: |
+          (
+            sum(rate(uptime_total{job="cave-uptime",code=~"5.."}[1h]))
+            /
+            sum(rate(uptime_total{job="cave-uptime"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-uptime fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/slo-burn-fast.md"
+      - alert: UptimeSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(uptime_total{job="cave-uptime",code=~"5.."}[6h]))
+            /
+            sum(rate(uptime_total{job="cave-uptime"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-uptime slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/slo-burn-slow.md"
+      - alert: UptimeErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(uptime_total{job="cave-uptime",code=~"5.."}[7d]))
+              / sum(rate(uptime_total{job="cave-uptime"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-uptime 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/error-budget.md"
+      - alert: UptimeLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(uptime_duration_seconds_bucket{job="cave-uptime"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-uptime p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/latency.md"
+      - alert: UptimeSaturationHigh
+        expr: 'sum(uptime_inflight_requests{job="cave-uptime"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-uptime inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/saturation.md"
+      - alert: UptimeMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-uptime"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-uptime RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/memory.md"
+      - alert: UptimeCardinalityExplosion
+        expr: 'count(count by (tenant_id) (uptime_total{job="cave-uptime"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-uptime tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/cardinality.md"
+      - alert: UptimeHealthProbeFailing
+        expr: 'min(up{job="cave-uptime"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-uptime health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-uptime/health.md"

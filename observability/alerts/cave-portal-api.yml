@@ -1,0 +1,97 @@
+# Portal API
+groups:
+  - name: cave-portal-api-slo
+    interval: 30s
+    rules:
+      - alert: PortalApiSloBurnRateFast
+        expr: |
+          (
+            sum(rate(portal_api_total{job="cave-portal-api",code=~"5.."}[1h]))
+            /
+            sum(rate(portal_api_total{job="cave-portal-api"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-portal-api fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/slo-burn-fast.md"
+      - alert: PortalApiSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(portal_api_total{job="cave-portal-api",code=~"5.."}[6h]))
+            /
+            sum(rate(portal_api_total{job="cave-portal-api"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-portal-api slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/slo-burn-slow.md"
+      - alert: PortalApiErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(portal_api_total{job="cave-portal-api",code=~"5.."}[7d]))
+              / sum(rate(portal_api_total{job="cave-portal-api"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-portal-api 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/error-budget.md"
+      - alert: PortalApiLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(portal_api_duration_seconds_bucket{job="cave-portal-api"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-portal-api p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/latency.md"
+      - alert: PortalApiSaturationHigh
+        expr: 'sum(portal_api_inflight_requests{job="cave-portal-api"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-portal-api inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/saturation.md"
+      - alert: PortalApiMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-portal-api"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-portal-api RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/memory.md"
+      - alert: PortalApiCardinalityExplosion
+        expr: 'count(count by (tenant_id) (portal_api_total{job="cave-portal-api"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-portal-api tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/cardinality.md"
+      - alert: PortalApiHealthProbeFailing
+        expr: 'min(up{job="cave-portal-api"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-portal-api health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-portal-api/health.md"

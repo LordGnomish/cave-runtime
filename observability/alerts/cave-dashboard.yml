@@ -1,0 +1,97 @@
+# Dashboard engine
+groups:
+  - name: cave-dashboard-slo
+    interval: 30s
+    rules:
+      - alert: DashboardSloBurnRateFast
+        expr: |
+          (
+            sum(rate(grafana_total{job="cave-dashboard",code=~"5.."}[1h]))
+            /
+            sum(rate(grafana_total{job="cave-dashboard"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-dashboard fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/slo-burn-fast.md"
+      - alert: DashboardSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(grafana_total{job="cave-dashboard",code=~"5.."}[6h]))
+            /
+            sum(rate(grafana_total{job="cave-dashboard"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-dashboard slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/slo-burn-slow.md"
+      - alert: DashboardErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(grafana_total{job="cave-dashboard",code=~"5.."}[7d]))
+              / sum(rate(grafana_total{job="cave-dashboard"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dashboard 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/error-budget.md"
+      - alert: DashboardLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(grafana_duration_seconds_bucket{job="cave-dashboard"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dashboard p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/latency.md"
+      - alert: DashboardSaturationHigh
+        expr: 'sum(grafana_inflight_requests{job="cave-dashboard"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dashboard inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/saturation.md"
+      - alert: DashboardMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-dashboard"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dashboard RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/memory.md"
+      - alert: DashboardCardinalityExplosion
+        expr: 'count(count by (tenant_id) (grafana_total{job="cave-dashboard"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-dashboard tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/cardinality.md"
+      - alert: DashboardHealthProbeFailing
+        expr: 'min(up{job="cave-dashboard"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-dashboard health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-dashboard/health.md"
