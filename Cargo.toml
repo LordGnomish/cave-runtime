@@ -58,6 +58,7 @@ members = [
     # === Observability ===
     "crates/cave-metrics",
     "crates/cave-logs",
+    "crates/cave-loki",
     "crates/cave-trace",
     # === Security & Admission ===
     "crates/cave-admission",

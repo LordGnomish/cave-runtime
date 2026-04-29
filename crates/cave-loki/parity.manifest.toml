@@ -1,0 +1,55 @@
+# cave-loki parity manifest
+# Tracks the port of grafana/loki Go modules into Rust.
+# Each [[modules]] block represents one upstream pkg/<name>/.
+
+upstream_repo = "grafana/loki"
+upstream_ref = "v3.7.1"
+target_crate = "cave-loki"
+
+[[modules]]
+name = "distributor"
+upstream_path = "pkg/distributor"
+target_rust_path = "src/distributor.rs"
+status = "unmapped"
+
+[[modules]]
+name = "ingester"
+upstream_path = "pkg/ingester"
+target_rust_path = "src/ingester.rs"
+status = "unmapped"
+
+[[modules]]
+name = "querier"
+upstream_path = "pkg/querier"
+target_rust_path = "src/querier.rs"
+status = "unmapped"
+
+[[modules]]
+name = "querier_frontend"
+upstream_path = "pkg/querier-frontend"
+target_rust_path = "src/querier_frontend.rs"
+status = "unmapped"
+
+[[modules]]
+name = "ruler"
+upstream_path = "pkg/ruler"
+target_rust_path = "src/ruler.rs"
+status = "unmapped"
+
+[[modules]]
+name = "compactor"
+upstream_path = "pkg/compactor"
+target_rust_path = "src/compactor.rs"
+status = "unmapped"
+
+[[modules]]
+name = "scheduler"
+upstream_path = "pkg/scheduler"
+target_rust_path = "src/scheduler.rs"
+status = "unmapped"
+
+[[modules]]
+name = "store"
+upstream_path = "pkg/storage"
+target_rust_path = "src/store.rs"
+status = "unmapped"
