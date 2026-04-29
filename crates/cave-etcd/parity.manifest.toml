@@ -243,6 +243,33 @@ upstream_name = "MemberList"
 local_name    = "cluster_member_list"
 file          = "src/routes.rs"
 
+[[functions]]
+upstream_name = "MemberPromote"
+local_name    = "cluster_member_promote"
+file          = "src/routes.rs"
+
+# ── Functions added 2026-04-29 to close gRPC public-surface parity ──────────
+
+[[functions]]
+upstream_name = "AuthStatus"
+local_name    = "auth_status"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "HashKV"
+local_name    = "maintenance_hash_kv"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "MoveLeader"
+local_name    = "maintenance_move_leader"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Downgrade"
+local_name    = "maintenance_downgrade"
+file          = "src/routes.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 # Tests yet to be ported from upstream (test_parity = 0 until added)
 
@@ -462,3 +489,149 @@ local_path    = "/api/etcd/v3/cluster/member/update"
 kind          = "http"
 upstream_path = "/v3/cluster/member/list"
 local_path    = "/api/etcd/v3/cluster/member/list"
+
+# ── Surfaces added 2026-04-29 ───────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/auth/status"
+local_path    = "/api/etcd/v3/auth/status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/hashkv"
+local_path    = "/api/etcd/v3/maintenance/hashkv"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/transfer-leadership"
+local_path    = "/api/etcd/v3/maintenance/transfer-leadership"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/maintenance/downgrade"
+local_path    = "/api/etcd/v3/maintenance/downgrade"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v3/cluster/member/promote"
+local_path    = "/api/etcd/v3/cluster/member/promote"
+
+# ── New tests for the 5 RPCs added 2026-04-29 ───────────────────────────────
+
+[[tests]]
+upstream_test = "TestV3AuthStatus"
+local_test    = "test_auth_status_reflects_enable_disable"
+
+[[tests]]
+upstream_test = "TestV3AuthRevisionMonotonic"
+local_test    = "test_auth_revision_bumps_on_every_mutation"
+
+[[tests]]
+upstream_test = "TestV3HashKV"
+local_test    = "test_hash_kv_at_current_matches_hash"
+
+[[tests]]
+upstream_test = "TestV3HashKVDeleted"
+local_test    = "test_hash_kv_excludes_deleted_keys"
+
+[[tests]]
+upstream_test = "TestV3HashKVAtRevision"
+local_test    = "test_hash_kv_at_historical_revision"
+
+[[tests]]
+upstream_test = "TestV3HashKVCompactRevision"
+local_test    = "test_hash_kv_includes_compact_revision"
+
+[[tests]]
+upstream_test = "TestV3MoveLeader"
+local_test    = "test_move_leader_to_existing_member_succeeds"
+
+[[tests]]
+upstream_test = "TestV3MoveLeaderToLearner"
+local_test    = "test_move_leader_rejects_learner_target"
+
+[[tests]]
+upstream_test = "TestV3DowngradeValidate"
+local_test    = "test_downgrade_validate_does_not_change_version"
+
+[[tests]]
+upstream_test = "TestV3DowngradeEnable"
+local_test    = "test_downgrade_enable_sets_target_version"
+
+[[tests]]
+upstream_test = "TestV3DowngradeCancel"
+local_test    = "test_downgrade_cancel_resets_to_server_version"
+
+[[tests]]
+upstream_test = "TestV3MemberPromote"
+local_test    = "test_member_promote_learner_succeeds"
+
+[[tests]]
+upstream_test = "TestV3MemberPromoteNotLearner"
+local_test    = "test_member_promote_voting_member_errors"
+
+[[tests]]
+upstream_test = "TestV3MemberPromoteUnknown"
+local_test    = "test_member_promote_unknown_member_errors"
+
+# ── Skipped upstream surface (explicitly out-of-scope) ──────────────────────
+# Each entry documents *why* a piece of upstream Go is intentionally not ported.
+# Categories: cli (etcdctl/etcdutl), internal (raft/wal/storage internals),
+# embed (Go-only embedded API), backcompat (v2 legacy), test-helper.
+
+[[skipped]]
+upstream = "etcdctl/"
+reason   = "cli"
+note     = "Command-line client; users run cave-cli/etcdctl-compatible binary."
+
+[[skipped]]
+upstream = "etcdutl/"
+reason   = "cli"
+note     = "Recovery/snapshot CLI; deferred to a separate ops binary."
+
+[[skipped]]
+upstream = "raft/"
+reason   = "internal"
+note     = "Raft consensus engine — Cave runs single-leader plumbing today; clustering parity is its own sprint."
+
+[[skipped]]
+upstream = "server/wal/"
+reason   = "internal"
+note     = "WAL on-disk format is an internal storage detail, not part of the public client surface."
+
+[[skipped]]
+upstream = "server/storage/backend/bolt/"
+reason   = "internal"
+note     = "BoltDB-specific storage backend; Cave uses an in-memory + history index instead."
+
+[[skipped]]
+upstream = "client/v3/"
+reason   = "embed"
+note     = "Go client library for embedding etcd; clients of Cave use HTTP/JSON, not the Go API."
+
+[[skipped]]
+upstream = "client/v2/"
+reason   = "backcompat"
+note     = "Legacy v2 API removed in upstream 3.5+; not implemented."
+
+[[skipped]]
+upstream = "tests/integration/"
+reason   = "test-helper"
+note     = "Upstream test scaffolding; ported tests live alongside their Rust impl."
+
+# ── Stats ────────────────────────────────────────────────────────────────────
+# parity = mapped / (mapped + unmapped)  — skipped is explicit and excluded.
+# Audit performed 2026-04-29 against etcd v3.5.13 rpc.proto and v3rpc/*.go.
+
+[stats]
+grpc_methods_total       = 40
+grpc_methods_mapped      = 40
+grpc_methods_unmapped    = 0
+http_surfaces_mapped     = 33
+tests_mapped             = 29
+skipped_categories       = 8
+parity                   = 1.0
+parity_method            = "etcd v3 gRPC public surface (rpc.proto services KV/Watch/Lease/Cluster/Maintenance/Auth)"
+audit_date               = "2026-04-29"
+audit_against            = "etcd-io/etcd v3.5.13"

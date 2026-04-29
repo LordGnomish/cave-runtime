@@ -51,17 +51,22 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
         .route("/api/etcd/v3/auth/role/list", post(auth_role_list))
         .route("/api/etcd/v3/auth/role/grant", post(auth_role_grant_permission))
         .route("/api/etcd/v3/auth/role/revoke", post(auth_role_revoke_permission))
+        .route("/api/etcd/v3/auth/status", post(auth_status))
         // Maintenance
         .route("/api/etcd/v3/maintenance/status", post(maintenance_status))
         .route("/api/etcd/v3/maintenance/alarm", post(maintenance_alarm))
         .route("/api/etcd/v3/maintenance/defragment", post(maintenance_defragment))
         .route("/api/etcd/v3/maintenance/hash", post(maintenance_hash))
+        .route("/api/etcd/v3/maintenance/hashkv", post(maintenance_hash_kv))
         .route("/api/etcd/v3/maintenance/snapshot", post(maintenance_snapshot))
+        .route("/api/etcd/v3/maintenance/transfer-leadership", post(maintenance_move_leader))
+        .route("/api/etcd/v3/maintenance/downgrade", post(maintenance_downgrade))
         // Cluster
         .route("/api/etcd/v3/cluster/member/add", post(cluster_member_add))
         .route("/api/etcd/v3/cluster/member/remove", post(cluster_member_remove))
         .route("/api/etcd/v3/cluster/member/update", post(cluster_member_update))
         .route("/api/etcd/v3/cluster/member/list", post(cluster_member_list))
+        .route("/api/etcd/v3/cluster/member/promote", post(cluster_member_promote))
         // Version
         .route("/api/etcd/v3/version", get(version))
         // Parity
@@ -218,8 +223,22 @@ async fn kv_delete_range(
 
 async fn kv_txn(
     State(store): State<Arc<KvStore>>,
-    Json(req): Json<TxnRequest>,
+    Json(mut req): Json<TxnRequest>,
 ) -> Json<TxnResponse> {
+    // Wire parity: etcd v3 JSON gateway base64-encodes keys/values inside
+    // RequestOp envelopes; decode them before evaluating.
+    for c in req.compare.iter_mut() {
+        c.key = String::from_utf8_lossy(&b64::decode(&c.key)).to_string();
+        if let Some(ref v) = c.value {
+            c.value = Some(String::from_utf8_lossy(&b64::decode(v)).to_string());
+        }
+    }
+    for op in req.success.iter_mut() {
+        decode_request_op(op);
+    }
+    for op in req.failure.iter_mut() {
+        decode_request_op(op);
+    }
     Json(store.txn(&req))
 }
 
@@ -359,6 +378,10 @@ async fn auth_disable(
         .auth_disable()
         .map(Json)
         .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+async fn auth_status(State(store): State<Arc<KvStore>>) -> Json<AuthStatusResponse> {
+    Json(store.auth_status())
 }
 
 async fn auth_authenticate(
@@ -510,8 +533,32 @@ async fn maintenance_hash(State(store): State<Arc<KvStore>>) -> Json<HashRespons
     Json(store.hash())
 }
 
+async fn maintenance_hash_kv(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<HashKVRequest>,
+) -> Json<HashKVResponse> {
+    Json(store.hash_kv(req.revision))
+}
+
 async fn maintenance_snapshot(State(store): State<Arc<KvStore>>) -> Json<SnapshotResponse> {
     Json(store.snapshot())
+}
+
+async fn maintenance_move_leader(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MoveLeaderRequest>,
+) -> Result<Json<MoveLeaderResponse>, (StatusCode, String)> {
+    store
+        .move_leader(req.target_id)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
+}
+
+async fn maintenance_downgrade(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<DowngradeRequest>,
+) -> Json<DowngradeResponse> {
+    Json(store.downgrade(&req))
 }
 
 // ── Cluster ────────────────────────────────────────────────────────────────
@@ -545,6 +592,16 @@ async fn cluster_member_update(
 
 async fn cluster_member_list(State(store): State<Arc<KvStore>>) -> Json<MemberListResponse> {
     Json(store.member_list())
+}
+
+async fn cluster_member_promote(
+    State(store): State<Arc<KvStore>>,
+    Json(req): Json<MemberPromoteRequest>,
+) -> Result<Json<MemberPromoteResponse>, (StatusCode, String)> {
+    store
+        .member_promote(req.id)
+        .map(Json)
+        .map_err(|e| (StatusCode::NOT_FOUND, e.to_string()))
 }
 
 // ── Version ────────────────────────────────────────────────────────────────

@@ -569,6 +569,90 @@ pub struct AuthRoleRevokePermissionResponse {
     pub header: ResponseHeader,
 }
 
+// ── AuthStatus (etcd v3 RPC) ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuthStatusRequest {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthStatusResponse {
+    pub header: ResponseHeader,
+    pub enabled: bool,
+    #[serde(rename = "authRevision")]
+    pub auth_revision: u64,
+}
+
+// ── HashKV (etcd v3 Maintenance) ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HashKVRequest {
+    /// 0 means "current"
+    pub revision: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HashKVResponse {
+    pub header: ResponseHeader,
+    pub hash: u32,
+    #[serde(rename = "compact_revision")]
+    pub compact_revision: i64,
+}
+
+// ── MoveLeader (etcd v3 Maintenance) ────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MoveLeaderRequest {
+    #[serde(rename = "targetID")]
+    pub target_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveLeaderResponse {
+    pub header: ResponseHeader,
+}
+
+// ── Downgrade (etcd v3 Maintenance) ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "UPPERCASE")]
+pub enum DowngradeAction {
+    Validate,
+    Enable,
+    Cancel,
+}
+
+impl Default for DowngradeAction {
+    fn default() -> Self {
+        DowngradeAction::Validate
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DowngradeRequest {
+    pub action: DowngradeAction,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DowngradeResponse {
+    pub header: ResponseHeader,
+    pub version: String,
+}
+
+// ── MemberPromote (etcd v3 Cluster) ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MemberPromoteRequest {
+    #[serde(rename = "ID")]
+    pub id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberPromoteResponse {
+    pub header: ResponseHeader,
+    pub members: Vec<Member>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

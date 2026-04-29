@@ -92,3 +92,43 @@ pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
     )
     .map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod parity_tests {
+    use super::*;
+
+    #[test]
+    fn parity_is_full_for_etcd_v3_grpc_surface() {
+        let report = calculate_parity().expect("manifest must parse");
+        assert_eq!(
+            report.function_parity.matched, report.function_parity.total,
+            "function parity must be 1.0 — every mapped fn must exist in its target file. \
+             matched={} total={} gaps={:?}",
+            report.function_parity.matched,
+            report.function_parity.total,
+            report.gaps
+        );
+        assert_eq!(
+            report.surface_parity.matched, report.surface_parity.total,
+            "surface parity must be 1.0 — every HTTP route must literally appear in source. \
+             gaps: {:?}",
+            report.gaps
+        );
+        assert_eq!(
+            report.test_parity.matched, report.test_parity.total,
+            "test parity must be 1.0 — every mapped upstream test must have a Rust counterpart. \
+             gaps: {:?}",
+            report.gaps
+        );
+        assert_eq!(
+            report.file_parity.matched, report.file_parity.total,
+            "file parity must be 1.0"
+        );
+        assert_eq!(report.stubs_detected, 0, "no stub macros allowed in source");
+        assert!(
+            (report.overall - 1.0).abs() < 1e-5,
+            "overall parity must be 1.0, got {}",
+            report.overall
+        );
+    }
+}
