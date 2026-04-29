@@ -21,7 +21,6 @@ use crate::cilium::policy::{EndpointSelector, PolicyError};
 use crate::cilium::types::{Cite, TenantId};
 use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::net::IpAddr;
 use std::str::FromStr;
 
@@ -214,6 +213,7 @@ mod tests {
     use crate::cilium::identity::LabelSet;
     use crate::cilium::policy::{EndpointSelector, MatchExpression, SelectorOp};
     use crate::cilium_test_ctx;
+    use std::collections::HashMap;
     use std::net::Ipv4Addr;
 
     fn ip(a: u8, b: u8, c: u8, d: u8) -> IpAddr {
