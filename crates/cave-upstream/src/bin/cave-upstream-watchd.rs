@@ -92,6 +92,11 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
+    // Treat an empty token (e.g. `github_token = ""` in TOML) as no token —
+    // otherwise it gets sent as `Authorization: token ` and GitHub returns 401.
+    if matches!(cfg.github_token.as_deref(), Some("")) {
+        cfg.github_token = None;
+    }
 
     if cli.print_config {
         // Redact token before printing
