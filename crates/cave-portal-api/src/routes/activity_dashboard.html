@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cave — Activity</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --fg: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+  h1 .meta { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 10px; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-bottom: 16px;
+  }
+  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .controls label { color: var(--muted); font-size: 12px; }
+  .controls select {
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+  }
+  .nav-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .nav-tabs a {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+  }
+  .nav-tabs a.active { color: var(--fg); border-color: var(--accent); background: rgba(88,166,255,0.08); }
+
+  /* hour × weekday grid */
+  .heatmap {
+    display: grid;
+    grid-template-columns: 60px repeat(24, 1fr);
+    gap: 2px;
+    font-size: 10px;
+  }
+  .heatmap .hd { color: var(--muted); text-align: center; padding-bottom: 4px; }
+  .heatmap .wd { color: var(--muted); padding-right: 8px; align-self: center; text-align: right; }
+  .heatmap .cell {
+    aspect-ratio: 1 / 1;
+    background: rgba(88,166,255,0.04);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+  .heatmap .cell:hover { outline: 1px solid var(--accent); }
+  .legend { display: flex; gap: 4px; align-items: center; color: var(--muted); font-size: 11px; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 2px; }
+
+  /* daily calendar (GitHub-style) */
+  .calendar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: repeat(7, 12px);
+    gap: 3px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+  }
+  .calendar .day {
+    width: 12px; height: 12px;
+    border-radius: 2px;
+    background: rgba(88,166,255,0.04);
+    cursor: pointer;
+  }
+  .calendar .day:hover { outline: 1px solid var(--accent); }
+
+  .tooltip {
+    position: fixed; pointer-events: none;
+    background: #21262d; color: var(--fg);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; font-size: 11px;
+    z-index: 1000; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    display: none;
+  }
+
+  .stat-row { display: flex; gap: 24px; flex-wrap: wrap; }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .insight {
+    background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent);
+    padding: 8px 12px; margin: 10px 0 0; font-size: 12px; color: var(--fg);
+  }
+</style>
+</head>
+<body>
+  <h1>
+    Activity
+    <span class="meta" id="meta">loading…</span>
+  </h1>
+  <p style="color: var(--muted); font-size: 13px; margin: 0 0 16px;">
+    When are commits being made, and by which model — the work-pattern lens.
+  </p>
+
+  <div class="nav-tabs">
+    <a href="/admin/attribution">Attribution</a>
+    <a href="/admin/activity" class="active">Activity</a>
+    <a href="/admin/dora">DORA</a>
+  </div>
+
+  <div class="controls">
+    <label for="range">range</label>
+    <select id="range">
+      <option value="7d">last 7 days</option>
+      <option value="30d" selected>last 30 days</option>
+      <option value="90d">last 90 days</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <h2>Daily contribution calendar</h2>
+    <div class="calendar" id="calendar"></div>
+    <div class="legend" style="margin-top:8px;">
+      <span>less</span>
+      <div class="swatch" style="background:rgba(88,166,255,0.05)"></div>
+      <div class="swatch" style="background:rgba(88,166,255,0.25)"></div>
+      <div class="swatch" style="background:rgba(88,166,255,0.5)"></div>
+      <div class="swatch" style="background:rgba(88,166,255,0.85)"></div>
+      <span>more</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Hour-of-day × weekday heatmap</h2>
+    <div class="heatmap" id="heatmap"></div>
+    <div id="insights"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Range totals</h2>
+    <div class="stat-row" id="totals"></div>
+  </div>
+
+  <div class="tooltip" id="tooltip"></div>
+
+<script>
+const MODEL_COLOURS = {
+  qwen:'#7e57c2', 'gpt-4o':'#26a69a', gemini:'#42a5f5', 'fallback-stub':'#ef5350',
+  opus:'#ab47bc', sonnet:'#5c6bc0', haiku:'#66bb6a', claude:'#8d6e63',
+  burak:'#ffa726', unattributed:'#78909c'
+};
+const colourFor = (m) => MODEL_COLOURS[m] || '#bdbdbd';
+
+const tip = document.getElementById('tooltip');
+function showTip(html, e) {
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top  = (e.clientY + 12) + 'px';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+function renderHeatmap(grid) {
+  const root = document.getElementById('heatmap');
+  root.innerHTML = '';
+  // header row
+  root.appendChild(Object.assign(document.createElement('div'), { className: 'hd', textContent: '' }));
+  for (let h = 0; h < 24; h++) {
+    const el = document.createElement('div');
+    el.className = 'hd';
+    el.textContent = h;
+    root.appendChild(el);
+  }
+  let max = 0;
+  for (const row of grid) for (const c of row) if (c.commits > max) max = c.commits;
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  for (let d = 0; d < 7; d++) {
+    const lbl = document.createElement('div');
+    lbl.className = 'wd';
+    lbl.textContent = dayNames[d];
+    root.appendChild(lbl);
+    for (let h = 0; h < 24; h++) {
+      const c = grid[d][h];
+      const intensity = max > 0 ? c.commits / max : 0;
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.background = c.commits > 0
+        ? `rgba(88,166,255,${0.08 + 0.7 * intensity})`
+        : 'rgba(88,166,255,0.04)';
+      cell.addEventListener('mouseenter', (e) => {
+        const models = Object.entries(c.by_model || {})
+          .sort((a,b) => b[1]-a[1])
+          .map(([m,n]) => `<span style="color:${colourFor(m)}">${m}</span>: ${n}`)
+          .join('<br>');
+        showTip(
+          `<b>${dayNames[d]} ${h}:00</b><br>${c.commits} commits` +
+          (models ? `<br>${models}` : ''), e);
+      });
+      cell.addEventListener('mousemove', (e) => {
+        tip.style.left = (e.clientX + 12) + 'px';
+        tip.style.top  = (e.clientY + 12) + 'px';
+      });
+      cell.addEventListener('mouseleave', hideTip);
+      root.appendChild(cell);
+    }
+  }
+}
+
+function renderCalendar(calendar) {
+  const root = document.getElementById('calendar');
+  root.innerHTML = '';
+  let max = 0;
+  for (const d of calendar) if (d.commits > max) max = d.commits;
+  // Pad before the first day so the column is always Mon-Sun aligned
+  if (calendar.length > 0) {
+    const first = new Date(calendar[0].date + 'T00:00:00Z');
+    const wd = (first.getUTCDay() + 6) % 7; // 0 = Mon
+    for (let i = 0; i < wd; i++) {
+      const ph = document.createElement('div');
+      ph.className = 'day';
+      ph.style.background = 'transparent';
+      root.appendChild(ph);
+    }
+  }
+  for (const d of calendar) {
+    const intensity = max > 0 ? d.commits / max : 0;
+    const sq = document.createElement('div');
+    sq.className = 'day';
+    sq.style.background = d.commits > 0
+      ? `rgba(88,166,255,${0.08 + 0.8 * intensity})`
+      : 'rgba(88,166,255,0.04)';
+    sq.addEventListener('mouseenter', (e) => {
+      const models = Object.entries(d.by_model || {})
+        .sort((a,b) => b[1]-a[1])
+        .map(([m,n]) => `<span style="color:${colourFor(m)}">${m}</span>: ${n}`)
+        .join('<br>');
+      showTip(`<b>${d.date}</b><br>${d.commits} commits` +
+              (models ? `<br>${models}` : ''), e);
+    });
+    sq.addEventListener('mousemove', (e) => {
+      tip.style.left = (e.clientX + 12) + 'px';
+      tip.style.top  = (e.clientY + 12) + 'px';
+    });
+    sq.addEventListener('mouseleave', hideTip);
+    root.appendChild(sq);
+  }
+}
+
+function deriveInsights(grid) {
+  // For each model, find which (weekday range, hour range) it dominates.
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const perModelHourTotals = {};
+  for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) {
+    const cell = grid[d][h];
+    for (const [m, n] of Object.entries(cell.by_model || {})) {
+      perModelHourTotals[m] ||= new Array(24).fill(0);
+      perModelHourTotals[m][h] += n;
+    }
+  }
+  const lines = [];
+  for (const [m, hours] of Object.entries(perModelHourTotals)) {
+    const total = hours.reduce((a,b) => a+b, 0);
+    if (total < 3) continue;
+    // peak window of 4 contiguous hours
+    let bestStart = 0, bestSum = 0;
+    for (let s = 0; s < 24; s++) {
+      let sum = 0;
+      for (let k = 0; k < 4; k++) sum += hours[(s + k) % 24];
+      if (sum > bestSum) { bestSum = sum; bestStart = s; }
+    }
+    const pct = ((bestSum / total) * 100).toFixed(0);
+    if (pct >= 40) {
+      const e = (bestStart + 4) % 24;
+      lines.push(
+        `<span style="color:${colourFor(m)}">${m}</span> peaks ` +
+        `${String(bestStart).padStart(2,'0')}:00–${String(e).padStart(2,'0')}:00 ` +
+        `(${pct}% of its commits)`);
+    }
+  }
+  document.getElementById('insights').innerHTML =
+    lines.length ? lines.map((l) => `<div class="insight">${l}</div>`).join('') : '';
+}
+
+function renderTotals(data) {
+  const totalsEl = document.getElementById('totals');
+  totalsEl.innerHTML = '';
+  const items = [
+    { label: 'commits in range', value: data.total_commits },
+    { label: 'days', value: data.range_days },
+    { label: 'avg/day', value: (data.total_commits / Math.max(1, data.range_days)).toFixed(1) },
+  ];
+  for (const it of items) {
+    const div = document.createElement('div');
+    div.className = 'stat';
+    div.innerHTML = `<span class="label">${it.label}</span><span class="value">${it.value}</span>`;
+    totalsEl.appendChild(div);
+  }
+}
+
+async function refresh() {
+  const range = document.getElementById('range').value;
+  document.getElementById('meta').textContent = 'loading…';
+  try {
+    const r = await fetch(`/api/portal/activity/heatmap?range=${range}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    renderCalendar(data.calendar);
+    renderHeatmap(data.grid);
+    deriveInsights(data.grid);
+    renderTotals(data);
+    document.getElementById('meta').textContent = `generated ${data.generated_at}`;
+  } catch (e) {
+    document.getElementById('meta').textContent = `error: ${e.message}`;
+  }
+}
+
+document.getElementById('range').addEventListener('change', refresh);
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
+</script>
+</body>
+</html>

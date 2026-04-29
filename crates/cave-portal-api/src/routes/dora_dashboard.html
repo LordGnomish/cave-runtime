@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cave — DORA</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --fg: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --elite:  #4caf50;
+    --high:   #66bb6a;
+    --medium: #ffa726;
+    --low:    #ef5350;
+    --unk:    #78909c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+  h1 .meta { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 10px; }
+  h2 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .nav-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .nav-tabs a {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+  }
+  .nav-tabs a.active { color: var(--fg); border-color: var(--accent); background: rgba(88,166,255,0.08); }
+
+  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .controls label { color: var(--muted); font-size: 12px; }
+  .controls select {
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+  }
+
+  .kpi-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+    border-top: 4px solid var(--unk);
+  }
+  .kpi.band-Elite  { border-top-color: var(--elite); }
+  .kpi.band-High   { border-top-color: var(--high); }
+  .kpi.band-Medium { border-top-color: var(--medium); }
+  .kpi.band-Low    { border-top-color: var(--low); }
+
+  .kpi .value {
+    font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums;
+    margin: 4px 0 4px;
+  }
+  .kpi .band {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 500;
+    background: rgba(120,144,156,0.15); color: var(--unk);
+  }
+  .band-Elite  .band { background: rgba(76,175,80,0.18);  color: var(--elite); }
+  .band-High   .band { background: rgba(102,187,106,0.18); color: var(--high); }
+  .band-Medium .band { background: rgba(255,167,38,0.18); color: var(--medium); }
+  .band-Low    .band { background: rgba(239,83,80,0.18);  color: var(--low); }
+
+  .kpi .chart { height: 60px; margin-top: 10px; }
+  .kpi .footnote { color: var(--muted); font-size: 11px; margin-top: 6px; }
+
+  .totals { color: var(--muted); font-size: 12px; margin-top: 16px; }
+</style>
+</head>
+<body>
+  <h1>
+    DORA
+    <span class="meta" id="meta">loading…</span>
+  </h1>
+  <p style="color: var(--muted); font-size: 13px; margin: 0 0 16px;">
+    Four metrics computed from git log + cave-oncall (when wired). Bands per
+    DORA 2023 benchmarks: Elite / High / Medium / Low.
+  </p>
+
+  <div class="nav-tabs">
+    <a href="/admin/attribution">Attribution</a>
+    <a href="/admin/activity">Activity</a>
+    <a href="/admin/dora" class="active">DORA</a>
+  </div>
+
+  <div class="controls">
+    <label for="range">range</label>
+    <select id="range">
+      <option value="7d">last 7 days</option>
+      <option value="30d" selected>last 30 days</option>
+      <option value="90d">last 90 days</option>
+    </select>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi" id="card-df">
+      <h2>Deployment Frequency</h2>
+      <div class="value" id="v-df">—</div>
+      <span class="band" id="b-df">Unknown</span>
+      <div class="chart"><canvas id="c-df"></canvas></div>
+      <div class="footnote">deploy: / release: prefixed commits</div>
+    </div>
+    <div class="kpi" id="card-lt">
+      <h2>Lead Time for Changes</h2>
+      <div class="value" id="v-lt">—</div>
+      <span class="band" id="b-lt">Unknown</span>
+      <div class="chart"><canvas id="c-lt"></canvas></div>
+      <div class="footnote">first commit → deploy (mean)</div>
+    </div>
+    <div class="kpi" id="card-mttr">
+      <h2>Mean Time To Restore</h2>
+      <div class="value" id="v-mttr">—</div>
+      <span class="band" id="b-mttr">Unknown</span>
+      <div class="chart"><canvas id="c-mttr"></canvas></div>
+      <div class="footnote">cave-oncall (CAVE_ONCALL_URL)</div>
+    </div>
+    <div class="kpi" id="card-cfr">
+      <h2>Change Failure Rate</h2>
+      <div class="value" id="v-cfr">—</div>
+      <span class="band" id="b-cfr">Unknown</span>
+      <div class="chart"><canvas id="c-cfr"></canvas></div>
+      <div class="footnote">(reverts + hotfixes) / deploys</div>
+    </div>
+  </div>
+
+  <div class="totals" id="totals"></div>
+
+<script>
+const charts = {};
+
+function applyBand(prefix, band) {
+  const card = document.getElementById('card-' + prefix);
+  card.classList.remove('band-Elite','band-High','band-Medium','band-Low');
+  card.classList.add('band-' + band);
+  document.getElementById('b-' + prefix).textContent = band;
+}
+
+function tinyChart(canvasId, points, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: points.map((p) => p.date),
+      datasets: [{
+        data: points.map((p) => p.value),
+        borderColor: color,
+        backgroundColor: color + '33',
+        fill: true, tension: 0.25, borderWidth: 2,
+        pointRadius: 0,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      responsive: true,
+      plugins: { legend: { display: false }, tooltip: { enabled: true } },
+      scales: {
+        x: { display: false },
+        y: { display: false, beginAtZero: true },
+      },
+    },
+  });
+}
+
+async function fetchJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} → ${r.status}`);
+  return r.json();
+}
+
+const COLOURS = {
+  deployment_frequency: '#42a5f5',
+  lead_time:            '#26a69a',
+  mttr:                 '#ab47bc',
+  change_failure_rate:  '#ef5350',
+};
+
+async function refresh() {
+  const range = document.getElementById('range').value;
+  document.getElementById('meta').textContent = 'loading…';
+  try {
+    const summary = await fetchJson(`/api/portal/dora/summary?range=${range}`);
+    document.getElementById('v-df').textContent   = summary.deployment_frequency.display;
+    document.getElementById('v-lt').textContent   = summary.lead_time_for_changes.display;
+    document.getElementById('v-mttr').textContent = summary.mttr.display;
+    document.getElementById('v-cfr').textContent  = summary.change_failure_rate.display;
+    applyBand('df',   summary.deployment_frequency.band);
+    applyBand('lt',   summary.lead_time_for_changes.band);
+    applyBand('mttr', summary.mttr.band);
+    applyBand('cfr',  summary.change_failure_rate.band);
+
+    const [df, lt, cfr] = await Promise.all([
+      fetchJson(`/api/portal/dora/timeline?metric=deployment_frequency&range=${range}`),
+      fetchJson(`/api/portal/dora/timeline?metric=lead_time&range=${range}`),
+      fetchJson(`/api/portal/dora/timeline?metric=change_failure_rate&range=${range}`),
+    ]);
+    tinyChart('c-df',   df.points,  COLOURS.deployment_frequency);
+    tinyChart('c-lt',   lt.points,  COLOURS.lead_time);
+    tinyChart('c-cfr',  cfr.points, COLOURS.change_failure_rate);
+    // No timeline endpoint for MTTR — leave its chart empty.
+
+    document.getElementById('totals').textContent =
+      `${summary.deploy_count} deploy · ${summary.revert_count} revert · ${summary.hotfix_count} hotfix · ` +
+      `range=${summary.range_days}d · generated ${summary.generated_at}`;
+    document.getElementById('meta').textContent = `generated ${summary.generated_at}`;
+  } catch (e) {
+    document.getElementById('meta').textContent = `error: ${e.message}`;
+  }
+}
+
+document.getElementById('range').addEventListener('change', refresh);
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
+</script>
+</body>
+</html>

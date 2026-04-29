@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cave — Attribution</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --fg: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --warn: #f7b955;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--fg);
+  }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+  h1 .meta { color: var(--muted); font-size: 13px; font-weight: 400; margin-left: 10px; }
+  h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--fg); }
+  .grid {
+    display: grid; gap: 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px;
+  }
+  .panel.full { grid-column: 1 / -1; }
+  .stat-row { display: flex; gap: 24px; flex-wrap: wrap; margin: 12px 0 0; }
+  .stat { display: flex; flex-direction: column; }
+  .stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .controls label { color: var(--muted); font-size: 12px; }
+  .controls select, .controls input {
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; font-size: 12px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+  td.heat { font-variant-numeric: tabular-nums; }
+  .chart-wrap { position: relative; height: 320px; }
+  .chart-wrap.tall { height: 380px; }
+  .chip {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; background: rgba(88,166,255,0.12); color: var(--accent);
+  }
+  .footer { color: var(--muted); font-size: 11px; margin-top: 20px; }
+  #unattributed-warn { color: var(--warn); font-size: 12px; margin-top: 8px; display: none; }
+  #unattributed-warn.show { display: block; }
+  .nav-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .nav-tabs a {
+    padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); text-decoration: none; font-size: 13px;
+  }
+  .nav-tabs a.active { color: var(--fg); border-color: var(--accent); background: rgba(88,166,255,0.08); }
+</style>
+</head>
+<body>
+  <h1>
+    Attribution
+    <span class="meta" id="meta">loading…</span>
+  </h1>
+  <p style="color: var(--muted); font-size: 13px; margin: 0 0 16px;">
+    Per-model breakdown of every commit reachable in this repo. Updates every 5 min.
+  </p>
+
+  <div class="nav-tabs">
+    <a href="/admin/attribution" class="active">Attribution</a>
+    <a href="/admin/activity">Activity</a>
+    <a href="/admin/dora">DORA</a>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Commits by model</h2>
+      <div class="chart-wrap"><canvas id="pie"></canvas></div>
+      <div class="stat-row">
+        <div class="stat"><span class="label">Total commits</span><span class="value" id="total-commits">—</span></div>
+        <div class="stat"><span class="label">Unattributed</span><span class="value" id="unattributed-count">—</span></div>
+      </div>
+      <div id="unattributed-warn"></div>
+    </div>
+
+    <div class="panel">
+      <h2>
+        Lines added by model
+        <span class="controls" style="float:right;">
+          <label for="granularity">granularity</label>
+          <select id="granularity">
+            <option value="day">day</option>
+            <option value="week">week</option>
+            <option value="month" selected>month</option>
+          </select>
+        </span>
+      </h2>
+      <div class="chart-wrap tall"><canvas id="bars"></canvas></div>
+    </div>
+
+    <div class="panel full">
+      <h2>Module × model heatmap (commit count)</h2>
+      <div style="overflow-x:auto;"><table id="heatmap"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Endpoints: <span class="chip">/api/portal/attribution/summary</span>
+    <span class="chip">/api/portal/attribution/timeline</span>
+    <span class="chip">/api/portal/attribution/by-module</span>
+  </div>
+
+<script>
+// Stable colour map keyed on canonical model labels.
+const MODEL_COLOURS = {
+  qwen:           '#7e57c2',
+  'gpt-4o':       '#26a69a',
+  gemini:         '#42a5f5',
+  'fallback-stub':'#ef5350',
+  opus:           '#ab47bc',
+  sonnet:         '#5c6bc0',
+  haiku:          '#66bb6a',
+  claude:         '#8d6e63',
+  burak:          '#ffa726',
+  unattributed:   '#78909c',
+};
+const colourFor = (m) => MODEL_COLOURS[m] || '#bdbdbd';
+
+let pieChart, barsChart;
+
+async function fetchJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${url} → ${r.status}`);
+  return r.json();
+}
+
+function renderPie(summary) {
+  const labels = Object.keys(summary.by_model);
+  const data = labels.map((l) => summary.by_model[l].commits);
+  const colours = labels.map(colourFor);
+
+  document.getElementById('total-commits').textContent = summary.total_commits;
+  const unatt = (summary.by_model.unattributed || {}).commits || 0;
+  document.getElementById('unattributed-count').textContent = unatt;
+  const warn = document.getElementById('unattributed-warn');
+  if (unatt > 0) {
+    const pct = ((unatt / summary.total_commits) * 100).toFixed(1);
+    warn.textContent = `⚠ ${unatt} commit (${pct}%) hiçbir model regex'ine uymadı.`;
+    warn.classList.add('show');
+  } else {
+    warn.classList.remove('show');
+  }
+  document.getElementById('meta').textContent = `generated ${summary.generated_at}`;
+
+  const ctx = document.getElementById('pie').getContext('2d');
+  if (pieChart) pieChart.destroy();
+  pieChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: colours, borderColor: '#0e1117', borderWidth: 2 }] },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#c9d1d9', boxWidth: 12, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function renderBars(timeline) {
+  const buckets = timeline.buckets;
+  const labels = buckets.map((b) => b.bucket);
+  const models = new Set();
+  for (const b of buckets) for (const m of Object.keys(b.by_model)) models.add(m);
+
+  const datasets = [...models].map((m) => ({
+    label: m,
+    data: buckets.map((b) => (b.by_model[m] || {}).lines_added || 0),
+    backgroundColor: colourFor(m),
+    stack: 'lines',
+  }));
+
+  const ctx = document.getElementById('bars').getContext('2d');
+  if (barsChart) barsChart.destroy();
+  barsChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      maintainAspectRatio: false,
+      scales: {
+        x: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+        y: { stacked: true, ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: '#21262d' } },
+      },
+      plugins: {
+        legend: { labels: { color: '#c9d1d9', boxWidth: 12, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function renderHeatmap(byModule) {
+  const modules = Object.keys(byModule.modules).sort();
+  const allModels = new Set();
+  for (const m of modules) for (const mdl of Object.keys(byModule.modules[m])) allModels.add(mdl);
+  const models = [...allModels].sort();
+
+  const thead = document.querySelector('#heatmap thead');
+  const tbody = document.querySelector('#heatmap tbody');
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+
+  let max = 0;
+  for (const md of modules) for (const ml of models) {
+    const v = ((byModule.modules[md] || {})[ml] || {}).commits || 0;
+    if (v > max) max = v;
+  }
+
+  const trh = document.createElement('tr');
+  trh.innerHTML = '<th>module</th>' + models.map((m) => `<th style="color:${colourFor(m)}">${m}</th>`).join('');
+  thead.appendChild(trh);
+
+  for (const md of modules) {
+    const tr = document.createElement('tr');
+    let row = `<td>${md}</td>`;
+    for (const ml of models) {
+      const v = ((byModule.modules[md] || {})[ml] || {}).commits || 0;
+      const intensity = max > 0 ? v / max : 0;
+      const bg = v > 0 ? `rgba(88,166,255,${0.08 + 0.5 * intensity})` : 'transparent';
+      row += `<td class="heat" style="background:${bg}">${v || ''}</td>`;
+    }
+    tr.innerHTML = row;
+    tbody.appendChild(tr);
+  }
+}
+
+async function refresh() {
+  try {
+    const granularity = document.getElementById('granularity').value;
+    const [summary, timeline, byModule] = await Promise.all([
+      fetchJson('/api/portal/attribution/summary'),
+      fetchJson(`/api/portal/attribution/timeline?granularity=${granularity}`),
+      fetchJson('/api/portal/attribution/by-module'),
+    ]);
+    renderPie(summary);
+    renderBars(timeline);
+    renderHeatmap(byModule);
+  } catch (e) {
+    document.getElementById('meta').textContent = `error: ${e.message}`;
+  }
+}
+
+document.getElementById('granularity').addEventListener('change', refresh);
+refresh();
+setInterval(refresh, 5 * 60 * 1000);
+</script>
+</body>
+</html>
