@@ -1,0 +1,19 @@
+{
+  "title": "cave-iceberg",
+  "uid": "cave-iceberg",
+  "tags": ["cave", "data-persistence", "iceberg", "lakehouse"],
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {"id": 1, "title": "Catalog ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_iceberg_ops_total[5m])"}]},
+    {"id": 2, "title": "Commit conflicts/min", "type": "stat", "targets": [{"expr": "rate(cave_iceberg_commit_conflicts_total[1m])"}]},
+    {"id": 3, "title": "Snapshots created/h", "type": "graph", "targets": [{"expr": "rate(cave_iceberg_snapshots_total[1h]) * 3600"}]},
+    {"id": 4, "title": "Table count", "type": "stat", "targets": [{"expr": "cave_iceberg_tables_total"}]},
+    {"id": 5, "title": "Namespace count", "type": "stat", "targets": [{"expr": "cave_iceberg_namespaces_total"}]},
+    {"id": 6, "title": "REST latency p99 (ms)", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(cave_iceberg_request_duration_seconds_bucket[5m]))) * 1000"}]},
+    {"id": 7, "title": "REST errors/sec", "type": "graph", "targets": [{"expr": "rate(cave_iceberg_errors_total[5m])"}]},
+    {"id": 8, "title": "Manifest size avg (bytes)", "type": "graph", "targets": [{"expr": "avg(cave_iceberg_manifest_bytes)"}]},
+    {"id": 9, "title": "Partitioned tables ratio", "type": "stat", "targets": [{"expr": "cave_iceberg_tables_partitioned / cave_iceberg_tables_total"}]},
+    {"id": 10, "title": "Optimistic concurrency retries/min", "type": "graph", "targets": [{"expr": "rate(cave_iceberg_concurrency_retries_total[1m])"}]}
+  ]
+}

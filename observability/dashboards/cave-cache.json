@@ -1,0 +1,19 @@
+{
+  "title": "cave-cache",
+  "uid": "cave-cache",
+  "tags": ["cave", "data-persistence", "cache", "valkey", "redis"],
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {"id": 1, "title": "Ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_cache_commands_total[5m])"}]},
+    {"id": 2, "title": "Hit ratio", "type": "stat", "targets": [{"expr": "cave_cache_keyspace_hits / (cave_cache_keyspace_hits + cave_cache_keyspace_misses)"}]},
+    {"id": 3, "title": "Memory used (bytes)", "type": "graph", "targets": [{"expr": "cave_cache_memory_used_bytes"}]},
+    {"id": 4, "title": "Evictions/sec", "type": "graph", "targets": [{"expr": "rate(cave_cache_evicted_keys_total[5m])"}]},
+    {"id": 5, "title": "Expired/sec", "type": "graph", "targets": [{"expr": "rate(cave_cache_expired_keys_total[5m])"}]},
+    {"id": 6, "title": "Connected clients", "type": "stat", "targets": [{"expr": "cave_cache_connected_clients"}]},
+    {"id": 7, "title": "Blocked clients", "type": "stat", "targets": [{"expr": "cave_cache_blocked_clients"}]},
+    {"id": 8, "title": "Replication offset lag (bytes)", "type": "graph", "targets": [{"expr": "cave_cache_replication_offset_lag"}]},
+    {"id": 9, "title": "Latency p99 (ms)", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(cave_cache_command_duration_seconds_bucket[5m]))) * 1000"}]},
+    {"id": 10, "title": "Command errors/sec", "type": "graph", "targets": [{"expr": "rate(cave_cache_command_errors_total[5m])"}]}
+  ]
+}

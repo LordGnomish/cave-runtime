@@ -1,0 +1,43 @@
+groups:
+  - name: cave-datafusion.rules
+    rules:
+      - alert: CaveDatafusionDown
+        expr: up{job="cave-datafusion"} == 0
+        for: 2m
+        labels: { severity: critical, module: cave-datafusion }
+        annotations: { summary: "cave-datafusion instance down" }
+      - alert: CaveDatafusionQueryP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_datafusion_query_duration_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels: { severity: warning, module: cave-datafusion }
+        annotations: { summary: "Query p99 > 5s" }
+      - alert: CaveDatafusionErrorRate
+        expr: rate(cave_datafusion_errors_total[5m]) / rate(cave_datafusion_queries_total[5m]) > 0.05
+        for: 5m
+        labels: { severity: warning, module: cave-datafusion }
+        annotations: { summary: "Query error ratio > 5%" }
+      - alert: CaveDatafusionMemoryHigh
+        expr: cave_datafusion_memory_used_bytes / cave_datafusion_memory_max_bytes > 0.85
+        for: 10m
+        labels: { severity: warning, module: cave-datafusion }
+        annotations: { summary: "Memory > 85%" }
+      - alert: CaveDatafusionPlanSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_datafusion_plan_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels: { severity: info, module: cave-datafusion }
+        annotations: { summary: "Plan compile p99 > 1s" }
+      - alert: CaveDatafusionScanThroughputDrop
+        expr: rate(cave_datafusion_scan_rows_total[5m]) < 1000
+        for: 10m
+        labels: { severity: info, module: cave-datafusion }
+        annotations: { summary: "Scan throughput < 1k rows/s — verify expected" }
+      - alert: CaveDatafusionCacheHitRatioLow
+        expr: rate(cave_datafusion_cache_hits_total[5m]) / rate(cave_datafusion_cache_lookups_total[5m]) < 0.5
+        for: 15m
+        labels: { severity: info, module: cave-datafusion }
+        annotations: { summary: "Cache hit ratio < 0.5" }
+      - alert: CaveDatafusionOptimizerStalled
+        expr: rate(cave_datafusion_optimizer_rule_hits_total[5m]) == 0 and rate(cave_datafusion_queries_total[5m]) > 0
+        for: 5m
+        labels: { severity: warning, module: cave-datafusion }
+        annotations: { summary: "Optimizer rules not firing on active queries" }

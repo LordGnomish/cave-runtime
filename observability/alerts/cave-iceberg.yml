@@ -1,0 +1,43 @@
+groups:
+  - name: cave-iceberg.rules
+    rules:
+      - alert: CaveIcebergDown
+        expr: up{job="cave-iceberg"} == 0
+        for: 2m
+        labels: { severity: critical, module: cave-iceberg }
+        annotations: { summary: "cave-iceberg instance down" }
+      - alert: CaveIcebergCommitConflictRate
+        expr: rate(cave_iceberg_commit_conflicts_total[5m]) > 0.1
+        for: 10m
+        labels: { severity: warning, module: cave-iceberg }
+        annotations: { summary: "Commit conflict rate > 0.1/s" }
+      - alert: CaveIcebergRESTLatencyHigh
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_iceberg_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels: { severity: warning, module: cave-iceberg }
+        annotations: { summary: "REST p99 > 500 ms" }
+      - alert: CaveIcebergErrorRateHigh
+        expr: rate(cave_iceberg_errors_total[5m]) / rate(cave_iceberg_ops_total[5m]) > 0.05
+        for: 5m
+        labels: { severity: warning, module: cave-iceberg }
+        annotations: { summary: "REST error ratio > 5%" }
+      - alert: CaveIcebergSnapshotStalled
+        expr: time() - cave_iceberg_last_snapshot_timestamp > 86400
+        for: 30m
+        labels: { severity: info, module: cave-iceberg }
+        annotations: { summary: "No new snapshots in > 24h" }
+      - alert: CaveIcebergManifestSizeHigh
+        expr: max(cave_iceberg_manifest_bytes) > 100 * 1024 * 1024
+        for: 30m
+        labels: { severity: info, module: cave-iceberg }
+        annotations: { summary: "Some manifest > 100 MiB — consider rewrite" }
+      - alert: CaveIcebergConcurrencyRetriesHigh
+        expr: rate(cave_iceberg_concurrency_retries_total[5m]) > 1
+        for: 5m
+        labels: { severity: warning, module: cave-iceberg }
+        annotations: { summary: "Optimistic-concurrency retries > 1/s" }
+      - alert: CaveIcebergCatalogStorageDown
+        expr: cave_iceberg_catalog_storage_up == 0
+        for: 2m
+        labels: { severity: critical, module: cave-iceberg }
+        annotations: { summary: "Catalog storage backend unreachable" }

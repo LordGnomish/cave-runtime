@@ -1,0 +1,19 @@
+{
+  "title": "cave-blob",
+  "uid": "cave-blob",
+  "tags": ["cave", "data-persistence", "blob", "s3", "minio"],
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {"id": 1, "title": "Requests/sec", "type": "graph", "targets": [{"expr": "rate(cave_blob_requests_total[5m])"}]},
+    {"id": 2, "title": "Latency p99 (ms)", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum by (le, op) (rate(cave_blob_request_duration_seconds_bucket[5m]))) * 1000"}]},
+    {"id": 3, "title": "Errors/sec", "type": "graph", "targets": [{"expr": "rate(cave_blob_errors_total[5m])"}]},
+    {"id": 4, "title": "Throughput (bytes/s)", "type": "graph", "targets": [{"expr": "rate(cave_blob_bytes_total[5m])"}]},
+    {"id": 5, "title": "In-flight multiparts", "type": "stat", "targets": [{"expr": "cave_blob_multipart_inflight"}]},
+    {"id": 6, "title": "Replication lag (s)", "type": "graph", "targets": [{"expr": "cave_blob_replication_lag_seconds"}]},
+    {"id": 7, "title": "KMS ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_blob_kms_ops_total[5m])"}]},
+    {"id": 8, "title": "Bucket count", "type": "stat", "targets": [{"expr": "cave_blob_buckets_total"}]},
+    {"id": 9, "title": "Object count", "type": "stat", "targets": [{"expr": "cave_blob_objects_total"}]},
+    {"id": 10, "title": "Disk usage (bytes)", "type": "graph", "targets": [{"expr": "cave_blob_disk_used_bytes"}]}
+  ]
+}

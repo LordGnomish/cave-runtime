@@ -1,0 +1,43 @@
+groups:
+  - name: cave-cache.rules
+    rules:
+      - alert: CaveCacheDown
+        expr: up{job="cave-cache"} == 0
+        for: 2m
+        labels: { severity: critical, module: cave-cache }
+        annotations: { summary: "cave-cache instance down" }
+      - alert: CaveCacheMemoryHigh
+        expr: cave_cache_memory_used_bytes / cave_cache_memory_max_bytes > 0.9
+        for: 5m
+        labels: { severity: warning, module: cave-cache }
+        annotations: { summary: "Memory > 90% of maxmemory" }
+      - alert: CaveCacheHitRatioLow
+        expr: cave_cache_keyspace_hits / (cave_cache_keyspace_hits + cave_cache_keyspace_misses) < 0.7
+        for: 10m
+        labels: { severity: info, module: cave-cache }
+        annotations: { summary: "Hit ratio < 0.7" }
+      - alert: CaveCacheEvictionsSpike
+        expr: rate(cave_cache_evicted_keys_total[5m]) > 100
+        for: 5m
+        labels: { severity: warning, module: cave-cache }
+        annotations: { summary: "Eviction rate > 100/s" }
+      - alert: CaveCacheReplicationLag
+        expr: cave_cache_replication_offset_lag > 10485760
+        for: 5m
+        labels: { severity: warning, module: cave-cache }
+        annotations: { summary: "Replication lag > 10 MiB" }
+      - alert: CaveCacheLatencyP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_cache_command_duration_seconds_bucket[5m]))) > 0.05
+        for: 5m
+        labels: { severity: warning, module: cave-cache }
+        annotations: { summary: "Command p99 > 50 ms" }
+      - alert: CaveCacheBlockedClients
+        expr: cave_cache_blocked_clients > 10
+        for: 5m
+        labels: { severity: info, module: cave-cache }
+        annotations: { summary: "More than 10 blocked clients" }
+      - alert: CaveCacheCommandErrorsHigh
+        expr: rate(cave_cache_command_errors_total[5m]) > 1
+        for: 5m
+        labels: { severity: warning, module: cave-cache }
+        annotations: { summary: "Command error rate > 1/s" }

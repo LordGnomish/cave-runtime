@@ -1,0 +1,43 @@
+groups:
+  - name: cave-docdb.rules
+    rules:
+      - alert: CaveDocdbDown
+        expr: up{job="cave-docdb"} == 0
+        for: 2m
+        labels: { severity: critical, module: cave-docdb }
+        annotations: { summary: "cave-docdb instance down" }
+      - alert: CaveDocdbReplicaNotPrimary
+        expr: cave_docdb_replica_state != 1
+        for: 10m
+        labels: { severity: warning, module: cave-docdb }
+        annotations: { summary: "Replica state is not PRIMARY" }
+      - alert: CaveDocdbOplogLagHigh
+        expr: cave_docdb_oplog_lag_seconds > 60
+        for: 5m
+        labels: { severity: warning, module: cave-docdb }
+        annotations: { summary: "Oplog lag > 60s" }
+      - alert: CaveDocdbCursorsHigh
+        expr: cave_docdb_cursors_open > 1000
+        for: 10m
+        labels: { severity: info, module: cave-docdb }
+        annotations: { summary: "Open cursors > 1000" }
+      - alert: CaveDocdbConnectionsHigh
+        expr: cave_docdb_connections_active > 500
+        for: 5m
+        labels: { severity: warning, module: cave-docdb }
+        annotations: { summary: "Active connections > 500" }
+      - alert: CaveDocdbOpP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_docdb_op_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels: { severity: warning, module: cave-docdb }
+        annotations: { summary: "Op p99 > 500 ms" }
+      - alert: CaveDocdbErrorsHigh
+        expr: rate(cave_docdb_errors_total[5m]) > 1
+        for: 5m
+        labels: { severity: warning, module: cave-docdb }
+        annotations: { summary: "Error rate > 1/s" }
+      - alert: CaveDocdbWriteRateAnomaly
+        expr: rate(cave_docdb_insert_total[5m]) > 10000
+        for: 5m
+        labels: { severity: info, module: cave-docdb }
+        annotations: { summary: "Insert rate > 10k/s — verify expected" }

@@ -1,0 +1,43 @@
+groups:
+  - name: cave-pg.rules
+    rules:
+      - alert: CavePgDown
+        expr: up{job="cave-pg"} == 0
+        for: 2m
+        labels: { severity: critical, module: cave-pg }
+        annotations: { summary: "cave-pg instance down", runbook: "https://cave/runbooks/pg-down" }
+      - alert: CavePgConnectionsHigh
+        expr: cave_pg_connections_active / cave_pg_connections_max > 0.85
+        for: 5m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Connection saturation > 85%" }
+      - alert: CavePgReplicationLagHigh
+        expr: cave_pg_replication_lag_bytes > 100 * 1024 * 1024
+        for: 5m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Replication lag > 100 MiB" }
+      - alert: CavePgDeadlocksSpike
+        expr: rate(cave_pg_deadlocks_total[5m]) > 0.1
+        for: 5m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Deadlock rate > 0.1/s" }
+      - alert: CavePgBufferCacheHitLow
+        expr: cave_pg_buffer_cache_hit_ratio < 0.95
+        for: 15m
+        labels: { severity: info, module: cave-pg }
+        annotations: { summary: "Buffer cache hit ratio < 0.95" }
+      - alert: CavePgTxnP99High
+        expr: histogram_quantile(0.99, sum by (le) (rate(cave_pg_txn_duration_seconds_bucket[5m]))) > 1
+        for: 5m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Txn p99 > 1s" }
+      - alert: CavePgErrorRateHigh
+        expr: rate(cave_pg_errors_total[5m]) > 1
+        for: 5m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Error rate > 1/s" }
+      - alert: CavePgAutovacuumStalled
+        expr: time() - cave_pg_autovacuum_last_run_timestamp > 86400
+        for: 10m
+        labels: { severity: warning, module: cave-pg }
+        annotations: { summary: "Autovacuum hasn't run in > 24h" }

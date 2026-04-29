@@ -4,6 +4,7 @@ use colored::Colorize;
 use serde_json::json;
 
 mod client;
+mod compat;
 use client::ApiClient;
 
 // ── Root CLI ──────────────────────────────────────────────────────────────────
@@ -212,6 +213,11 @@ enum Commands {
     LocalLlm {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
+    },
+    /// Upstream-CLI compatibility shims (psql, redis-cli, mongosh, mc, ...)
+    Compat {
+        #[command(subcommand)]
+        cmd: compat::CompatCmd,
     },
 }
 
@@ -1377,6 +1383,7 @@ source_root = "src"
                 Ok(())
             }
         },
+        Commands::Compat { cmd } => compat::run(cmd, &c).await,
     }
 }
 

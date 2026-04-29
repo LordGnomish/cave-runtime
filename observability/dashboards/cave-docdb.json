@@ -1,0 +1,19 @@
+{
+  "title": "cave-docdb",
+  "uid": "cave-docdb",
+  "tags": ["cave", "data-persistence", "docdb", "mongo"],
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {"id": 1, "title": "Find ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_docdb_find_total[5m])"}]},
+    {"id": 2, "title": "Insert ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_docdb_insert_total[5m])"}]},
+    {"id": 3, "title": "Update ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_docdb_update_total[5m])"}]},
+    {"id": 4, "title": "Delete ops/sec", "type": "graph", "targets": [{"expr": "rate(cave_docdb_delete_total[5m])"}]},
+    {"id": 5, "title": "Replica state", "type": "stat", "targets": [{"expr": "cave_docdb_replica_state"}]},
+    {"id": 6, "title": "Oplog lag (s)", "type": "graph", "targets": [{"expr": "cave_docdb_oplog_lag_seconds"}]},
+    {"id": 7, "title": "Active cursors", "type": "stat", "targets": [{"expr": "cave_docdb_cursors_open"}]},
+    {"id": 8, "title": "Connected clients", "type": "stat", "targets": [{"expr": "cave_docdb_connections_active"}]},
+    {"id": 9, "title": "Op latency p99 (ms)", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(cave_docdb_op_duration_seconds_bucket[5m]))) * 1000"}]},
+    {"id": 10, "title": "Errors/sec", "type": "graph", "targets": [{"expr": "rate(cave_docdb_errors_total[5m])"}]}
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "title": "cave-pg",
+  "uid": "cave-pg",
+  "tags": ["cave", "data-persistence", "postgres", "cnpg"],
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "panels": [
+    {"id": 1, "title": "Active connections", "type": "stat", "targets": [{"expr": "cave_pg_connections_active"}]},
+    {"id": 2, "title": "Queries/sec", "type": "graph", "targets": [{"expr": "rate(cave_pg_queries_total[5m])"}]},
+    {"id": 3, "title": "Replication lag (bytes)", "type": "graph", "targets": [{"expr": "cave_pg_replication_lag_bytes"}]},
+    {"id": 4, "title": "Buffer cache hit ratio", "type": "stat", "targets": [{"expr": "cave_pg_buffer_cache_hit_ratio"}]},
+    {"id": 5, "title": "WAL write rate (bytes/s)", "type": "graph", "targets": [{"expr": "rate(cave_pg_wal_bytes_total[5m])"}]},
+    {"id": 6, "title": "Deadlocks/min", "type": "stat", "targets": [{"expr": "rate(cave_pg_deadlocks_total[1m])"}]},
+    {"id": 7, "title": "Transaction duration p99 (s)", "type": "graph", "targets": [{"expr": "histogram_quantile(0.99, sum by (le) (rate(cave_pg_txn_duration_seconds_bucket[5m])))"}]},
+    {"id": 8, "title": "Dead tuples", "type": "stat", "targets": [{"expr": "cave_pg_dead_tuples"}]},
+    {"id": 9, "title": "Autovacuum runs/h", "type": "graph", "targets": [{"expr": "rate(cave_pg_autovacuum_runs_total[1h]) * 3600"}]},
+    {"id": 10, "title": "Errors/sec", "type": "graph", "targets": [{"expr": "rate(cave_pg_errors_total[5m])"}]}
+  ]
+}

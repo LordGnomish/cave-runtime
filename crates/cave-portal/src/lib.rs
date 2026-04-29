@@ -6,6 +6,7 @@ pub mod engine;
 pub mod models;
 pub mod routes;
 pub mod ui;
+pub mod wraps;
 
 use axum::Router;
 use cave_kernel::parity::ParityReport;
