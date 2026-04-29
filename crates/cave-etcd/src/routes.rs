@@ -218,9 +218,23 @@ async fn kv_delete_range(
 
 async fn kv_txn(
     State(store): State<Arc<KvStore>>,
-    Json(req): Json<TxnRequest>,
-) -> Json<TxnResponse> {
-    Json(store.txn(&req))
+    Json(mut req): Json<TxnRequest>,
+) -> Result<Json<TxnResponse>, (StatusCode, String)> {
+    // Decode base64-encoded compare keys/values.
+    for cmp in &mut req.compare {
+        cmp.key = String::from_utf8_lossy(&b64::decode(&cmp.key)).to_string();
+        if let Some(ref v) = cmp.value {
+            cmp.value = Some(String::from_utf8_lossy(&b64::decode(v)).to_string());
+        }
+    }
+    // Decode base64 in success and failure ops.
+    for op in req.success.iter_mut().chain(req.failure.iter_mut()) {
+        decode_request_op(op);
+    }
+    // Enforce upstream MaxOpsPerTxn limit (etcd v3 default = 128).
+    crate::store::validate_txn(&req)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+    Ok(Json(store.txn(&req)))
 }
 
 async fn kv_compaction(

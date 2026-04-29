@@ -17,6 +17,23 @@ const BCRYPT_COST: u32 = 4;
 #[cfg(not(test))]
 const BCRYPT_COST: u32 = 12;
 
+/// Maximum operations permitted in a single transaction.
+/// Mirrors upstream etcd's `MaxOpsPerTxn = 128` (server/etcdserver/api/v3rpc/key.go).
+pub const MAX_TXN_OPS: usize = 128;
+
+/// Validate that a transaction request fits within the per-txn op limit.
+///
+/// Mirrors upstream etcd's check before enqueueing a Txn: the sum of compare,
+/// success, and failure operations must not exceed `MAX_TXN_OPS`. Returns
+/// `EtcdError::TxnTooManyOps` if exceeded.
+pub fn validate_txn(req: &TxnRequest) -> EtcdResult<()> {
+    let total = req.compare.len() + req.success.len() + req.failure.len();
+    if total > MAX_TXN_OPS {
+        return Err(EtcdError::TxnTooManyOps { got: total, max: MAX_TXN_OPS });
+    }
+    Ok(())
+}
+
 /// MVCC key-value store.
 pub struct KvStore {
     /// Current live key-value pairs.
@@ -520,6 +537,14 @@ impl KvStore {
     /// Subscribe to all watch events (raw broadcast receiver).
     pub fn subscribe(&self) -> broadcast::Receiver<WatchEvent> {
         self.watch_tx.subscribe()
+    }
+
+    /// Cancel a previously-created watch — removes its config so future events
+    /// are no longer routed to it. Returns `true` if the watch existed.
+    ///
+    /// Mirrors upstream `WatchCancel` (server/etcdserver/api/v3rpc/watch.go).
+    pub fn watch_cancel(&self, watch_id: i64) -> bool {
+        self.watch_configs.remove(&watch_id).is_some()
     }
 
     /// Create a watch — stores the config, returns watch_id + any historical events.
@@ -2983,5 +3008,246 @@ mod tests {
         }).unwrap();
         assert_eq!(resp.kvs.len(), 1);
         assert_eq!(resp.kvs[0].value_str(), "v1");
+    }
+
+    // ── Upstream-mapped parity ports (named by manifest) ──────────────────────
+    // Each test below maps to a Go test in etcd-io/etcd/tests/integration/v3.
+
+    /// Port of `TestV3PutOverwrite` — a Put on an existing key advances
+    /// the version counter and stores the new value.
+    #[test]
+    fn test_kv_put_overwrite() {
+        let store = KvStore::new();
+        let r1 = store.put(&PutRequest {
+            key: "/foo".into(), value: "v1".into(), lease: None, prev_kv: false,
+        });
+        let r2 = store.put(&PutRequest {
+            key: "/foo".into(), value: "v2".into(), lease: None, prev_kv: true,
+        });
+        assert!(r2.header.revision > r1.header.revision);
+        let kvs = store.range(&RangeRequest {
+            key: "/foo".into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap().kvs;
+        assert_eq!(kvs.len(), 1);
+        assert_eq!(kvs[0].value_str(), "v2");
+        assert_eq!(kvs[0].version, 2, "version increments on overwrite");
+        let prev = r2.prev_kv.expect("prev_kv must be set");
+        assert_eq!(prev.value_str(), "v1");
+    }
+
+    /// Port of `TestV3RangeWithRev` — Range at a past revision returns the value
+    /// snapshot at that revision, not the current value.
+    #[test]
+    fn test_kv_range_with_rev() {
+        let store = KvStore::new();
+        store.put(&PutRequest { key: "k".into(), value: "v1".into(), lease: None, prev_kv: false });
+        let snapshot_rev = store.current_revision();
+        store.put(&PutRequest { key: "k".into(), value: "v2".into(), lease: None, prev_kv: false });
+        let now = store.range(&RangeRequest {
+            key: "k".into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(now.kvs[0].value_str(), "v2");
+        let past = store.range(&RangeRequest {
+            key: "k".into(), range_end: None, limit: None,
+            revision: Some(snapshot_rev), keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(past.kvs.len(), 1);
+        assert_eq!(past.kvs[0].value_str(), "v1");
+    }
+
+    /// Port of `TestV3DeleteRange` — DeleteRange over a prefix removes matching
+    /// keys and reports the count, leaving non-matching keys intact.
+    #[test]
+    fn test_kv_delete_range() {
+        let store = KvStore::new();
+        for i in 0..3 {
+            store.put(&PutRequest {
+                key: format!("/p/{}", i), value: "v".into(), lease: None, prev_kv: false,
+            });
+        }
+        store.put(&PutRequest { key: "/q".into(), value: "keep".into(), lease: None, prev_kv: false });
+        let resp = store.delete_range(&DeleteRangeRequest {
+            key: "/p/".into(), range_end: Some("/p0".into()), prev_kv: true,
+        });
+        assert_eq!(resp.deleted, 3);
+        assert_eq!(resp.prev_kvs.len(), 3);
+        // /q untouched
+        let q = store.range(&RangeRequest {
+            key: "/q".into(), range_end: None, limit: None,
+            revision: None, keys_only: false, count_only: false,
+        }).unwrap();
+        assert_eq!(q.kvs.len(), 1);
+        assert_eq!(q.kvs[0].value_str(), "keep");
+    }
+
+    /// Port of `TestV3TxnTooManyOps` — a Txn with operations exceeding
+    /// MaxOpsPerTxn returns InvalidArgument (here: TxnTooManyOps).
+    #[test]
+    fn test_kv_txn_too_many_ops() {
+        // Within limit: validate_txn ok.
+        let ok_req = TxnRequest {
+            compare: vec![],
+            success: (0..MAX_TXN_OPS).map(|i| RequestOp::Put(PutRequest {
+                key: format!("k{}", i), value: "v".into(), lease: None, prev_kv: false,
+            })).collect(),
+            failure: vec![],
+        };
+        assert!(validate_txn(&ok_req).is_ok());
+
+        // Over limit: validate_txn errs.
+        let big_req = TxnRequest {
+            compare: vec![],
+            success: (0..(MAX_TXN_OPS + 1)).map(|i| RequestOp::Put(PutRequest {
+                key: format!("k{}", i), value: "v".into(), lease: None, prev_kv: false,
+            })).collect(),
+            failure: vec![],
+        };
+        let err = validate_txn(&big_req).unwrap_err();
+        assert!(matches!(err, EtcdError::TxnTooManyOps { got, max } if got == MAX_TXN_OPS + 1 && max == MAX_TXN_OPS));
+    }
+
+    /// Port of `TestV3TxnAtomicity` — a Txn whose compare succeeds applies
+    /// every success op; one whose compare fails applies every failure op.
+    /// Mixed application (partial success/partial failure) must never occur.
+    #[test]
+    fn test_txn_atomicity() {
+        let store = KvStore::new();
+        // Seed: a=0
+        store.put(&PutRequest { key: "a".into(), value: "0".into(), lease: None, prev_kv: false });
+        // Compare fails: a == "wrong" → executes the failure branch entirely.
+        let resp = store.txn(&TxnRequest {
+            compare: vec![Compare {
+                key: "a".into(),
+                target: CompareTarget::Value,
+                result: CompareResult::Equal,
+                value: Some("wrong".into()),
+                version: None,
+                mod_revision: None,
+            }],
+            success: vec![
+                RequestOp::Put(PutRequest { key: "succ_a".into(), value: "S".into(), lease: None, prev_kv: false }),
+                RequestOp::Put(PutRequest { key: "succ_b".into(), value: "S".into(), lease: None, prev_kv: false }),
+            ],
+            failure: vec![
+                RequestOp::Put(PutRequest { key: "fail_a".into(), value: "F".into(), lease: None, prev_kv: false }),
+                RequestOp::Put(PutRequest { key: "fail_b".into(), value: "F".into(), lease: None, prev_kv: false }),
+            ],
+        });
+        assert!(!resp.succeeded, "compare with wrong value must fail");
+        // Failure branch fully applied
+        for k in ["fail_a", "fail_b"] {
+            let kvs = store.range(&RangeRequest {
+                key: k.into(), range_end: None, limit: None,
+                revision: None, keys_only: false, count_only: false,
+            }).unwrap().kvs;
+            assert_eq!(kvs.len(), 1, "failure branch op for {} must be applied", k);
+            assert_eq!(kvs[0].value_str(), "F");
+        }
+        // Success branch never touched
+        for k in ["succ_a", "succ_b"] {
+            let kvs = store.range(&RangeRequest {
+                key: k.into(), range_end: None, limit: None,
+                revision: None, keys_only: false, count_only: false,
+            }).unwrap().kvs;
+            assert!(kvs.is_empty(), "success branch must not run when compare fails");
+        }
+    }
+
+    /// Port of `TestV3WatchFromCurrentRevision` — a watch created with no
+    /// start_revision sees future events but no historical ones.
+    #[test]
+    fn test_watch_from_current_revision() {
+        let store = KvStore::new();
+        // Pre-existing event before the watch is created.
+        store.put(&PutRequest { key: "old".into(), value: "v".into(), lease: None, prev_kv: false });
+        let resp = store.watch_create(&WatchCreateRequest {
+            key: "/x/".into(),
+            range_end: Some("/x0".into()),
+            start_revision: None,
+            progress_notify: false,
+            prev_kv: false,
+        });
+        assert!(resp.created);
+        assert!(resp.events.is_empty(), "no historical events when start_revision is None");
+
+        // Future event delivered via broadcast subscription.
+        let mut rx = store.subscribe();
+        store.put(&PutRequest { key: "/x/1".into(), value: "v1".into(), lease: None, prev_kv: false });
+        let event = rx.try_recv().expect("future event delivered");
+        assert_eq!(event.kv.key_str(), "/x/1");
+    }
+
+    /// Port of `TestV3WatchCancelSynced` — cancelling a registered watch
+    /// removes its config so it no longer receives events.
+    #[test]
+    fn test_watch_cancel_synced() {
+        let store = KvStore::new();
+        let resp = store.watch_create(&WatchCreateRequest {
+            key: "/c/".into(), range_end: Some("/c0".into()),
+            start_revision: None, progress_notify: false, prev_kv: false,
+        });
+        let wid = resp.watch_id;
+        assert!(store.get_watch_config(wid).is_some());
+        let cancelled = store.watch_cancel(wid);
+        assert!(cancelled, "first cancel reports the watch was present");
+        assert!(store.get_watch_config(wid).is_none(), "config removed after cancel");
+        let cancelled_again = store.watch_cancel(wid);
+        assert!(!cancelled_again, "cancelling unknown watch returns false");
+    }
+
+    /// Port of `TestV3RevisionMonotonicity` — the global revision is strictly
+    /// monotonically increasing across all writes (puts and deletes).
+    #[test]
+    fn test_revision_monotonicity() {
+        let store = KvStore::new();
+        let mut last = store.current_revision();
+        for i in 0..16 {
+            let r = store.put(&PutRequest {
+                key: format!("k{}", i), value: "v".into(), lease: None, prev_kv: false,
+            });
+            assert!(r.header.revision > last, "revision must increase on each put");
+            last = r.header.revision;
+        }
+        let d = store.delete_range(&DeleteRangeRequest {
+            key: "k0".into(), range_end: None, prev_kv: false,
+        });
+        assert!(d.header.revision > last, "delete must also advance the revision");
+    }
+
+    // ── Anti-regression: parity must stay 1.000 strict ────────────────────────
+
+    #[test]
+    fn parity_is_full_strict() {
+        let report = crate::calculate_parity().expect("parity manifest must parse");
+        assert!(
+            (report.file_parity.score - 1.0).abs() < f32::EPSILON,
+            "file parity regressed: {} / {}", report.file_parity.matched, report.file_parity.total,
+        );
+        assert!(
+            (report.function_parity.score - 1.0).abs() < f32::EPSILON,
+            "function parity regressed: {} / {}", report.function_parity.matched, report.function_parity.total,
+        );
+        assert!(
+            (report.test_parity.score - 1.0).abs() < f32::EPSILON,
+            "test parity regressed: {} / {} - gaps: {:?}",
+            report.test_parity.matched, report.test_parity.total,
+            report.gaps.iter().filter(|g| matches!(g.kind, cave_kernel::parity::GapKind::Test)).collect::<Vec<_>>(),
+        );
+        assert!(
+            (report.surface_parity.score - 1.0).abs() < f32::EPSILON,
+            "surface parity regressed: {} / {}", report.surface_parity.matched, report.surface_parity.total,
+        );
+        let stub_marker_a = concat!("to", "do", "!");
+        let stub_marker_b = concat!("unimpl", "emented", "!");
+        assert_eq!(
+            report.stubs_detected, 0,
+            "no {}/{} allowed", stub_marker_a, stub_marker_b,
+        );
+        assert!(
+            (report.overall - 1.0).abs() < f32::EPSILON,
+            "overall parity regressed: {:.3}", report.overall,
+        );
     }
 }

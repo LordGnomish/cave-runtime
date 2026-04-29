@@ -167,18 +167,84 @@ impl RegistryClient {
             });
         }
 
-        // Pull config blob
-        let _config_path = self.pull_blob(&image_ref, &manifest.config).await?;
+        // Pull and parse the config blob (OCI image-spec config schema).
+        let config_path = self.pull_blob(&image_ref, &manifest.config).await?;
+        let config = parse_oci_config(&config_path)?;
 
         Ok(OciImage {
             reference: reference.to_string(),
             digest: manifest.config.digest.clone(),
             layers,
-            config: ImageConfig::default(), // TODO: parse from config blob
+            config,
             size_bytes: total_size,
             pulled_at: Utc::now(),
         })
     }
+}
+
+/// Parse an OCI image config JSON file (image-spec/specs-go/v1/config.go) into
+/// our internal `ImageConfig`. Falls back to defaults for missing fields.
+pub(crate) fn parse_oci_config(path: &std::path::Path) -> CriResult<ImageConfig> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| CriError::Registry(format!("config blob read: {}", e)))?;
+    let v: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|e| CriError::Registry(format!("config blob parse: {}", e)))?;
+
+    let cfg = v.get("config").cloned().unwrap_or(serde_json::Value::Null);
+    let str_vec = |key: &str| -> Vec<String> {
+        cfg.get(key)
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+            .unwrap_or_default()
+    };
+    let opt_str = |key: &str| -> Option<String> {
+        cfg.get(key)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+    };
+
+    // Env arrives as ["KEY=VALUE", ...]; flatten to a HashMap.
+    let env: std::collections::HashMap<String, String> = cfg
+        .get("Env")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|s| s.as_str())
+                .filter_map(|kv| {
+                    let mut parts = kv.splitn(2, '=');
+                    Some((parts.next()?.to_string(), parts.next().unwrap_or("").to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // ExposedPorts arrives as { "80/tcp": {}, ... }; we collapse to keys.
+    let exposed_ports: Vec<String> = cfg
+        .get("ExposedPorts")
+        .and_then(|v| v.as_object())
+        .map(|map| map.keys().cloned().collect())
+        .unwrap_or_default();
+
+    let labels: std::collections::HashMap<String, String> = cfg
+        .get("Labels")
+        .and_then(|v| v.as_object())
+        .map(|map| {
+            map.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    Ok(ImageConfig {
+        entrypoint: str_vec("Entrypoint"),
+        cmd: str_vec("Cmd"),
+        env,
+        working_dir: opt_str("WorkingDir"),
+        user: opt_str("User"),
+        exposed_ports,
+        labels,
+    })
 }
 
 #[cfg(test)]
@@ -278,5 +344,55 @@ mod tests {
         };
         assert_eq!(image.layers.len(), 0);
         assert_eq!(image.size_bytes, 0);
+    }
+
+    #[test]
+    fn test_parse_oci_config_full_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let payload = serde_json::json!({
+            "architecture": "amd64",
+            "config": {
+                "Entrypoint": ["/bin/sh", "-c"],
+                "Cmd": ["echo", "hi"],
+                "Env": ["PATH=/usr/bin", "NAME=foo"],
+                "WorkingDir": "/app",
+                "User": "1000",
+                "ExposedPorts": { "80/tcp": {}, "443/tcp": {} },
+                "Labels": { "maintainer": "team@example.com" }
+            }
+        });
+        std::fs::write(&path, serde_json::to_vec(&payload).unwrap()).unwrap();
+
+        let cfg = parse_oci_config(&path).expect("parse ok");
+        assert_eq!(cfg.entrypoint, vec!["/bin/sh", "-c"]);
+        assert_eq!(cfg.cmd, vec!["echo", "hi"]);
+        assert_eq!(cfg.env.get("PATH").map(|s| s.as_str()), Some("/usr/bin"));
+        assert_eq!(cfg.env.get("NAME").map(|s| s.as_str()), Some("foo"));
+        assert_eq!(cfg.working_dir.as_deref(), Some("/app"));
+        assert_eq!(cfg.user.as_deref(), Some("1000"));
+        assert_eq!(cfg.exposed_ports.len(), 2);
+        assert!(cfg.exposed_ports.iter().any(|p| p == "80/tcp"));
+        assert_eq!(cfg.labels.get("maintainer").map(|s| s.as_str()), Some("team@example.com"));
+    }
+
+    #[test]
+    fn test_parse_oci_config_missing_fields_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, b"{\"architecture\":\"amd64\"}").unwrap();
+        let cfg = parse_oci_config(&path).expect("parse ok");
+        assert!(cfg.entrypoint.is_empty());
+        assert!(cfg.cmd.is_empty());
+        assert!(cfg.env.is_empty());
+        assert!(cfg.working_dir.is_none());
+    }
+
+    #[test]
+    fn test_parse_oci_config_invalid_json_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        std::fs::write(&path, b"not json").unwrap();
+        assert!(parse_oci_config(&path).is_err());
     }
 }

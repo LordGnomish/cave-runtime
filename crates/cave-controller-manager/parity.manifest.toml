@@ -1,0 +1,175 @@
+# parity.manifest.toml — cave-controller-manager
+# Upstream: kubernetes/kubernetes v1.30.0  https://github.com/kubernetes/kubernetes
+#
+# kube-controller-manager hosts a set of built-in controllers that reconcile the
+# desired state of the cluster. Cave's controller-manager reimplements the core
+# subset: deployment, replica-set, node-lifecycle, namespace, garbage-collector,
+# endpoints, service-account, and job controllers.
+
+[upstream]
+org     = "kubernetes"
+repo    = "kubernetes"
+version = "v1.30.0"
+
+[module]
+name        = "cave-controller-manager"
+description = "kube-controller-manager reimplementation — deployment, rs, node-lifecycle, namespace, gc, endpoints, sa, job controllers"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "cmd/kube-controller-manager/app/controllermanager.go"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "pkg/controller/deployment/deployment_controller.go"
+local    = "src/controllers/deployment.rs"
+
+[[files]]
+upstream = "pkg/controller/replicaset/replica_set.go"
+local    = "src/controllers/replicaset.rs"
+
+[[files]]
+upstream = "pkg/controller/nodelifecycle/node_lifecycle_controller.go"
+local    = "src/controllers/node_lifecycle.rs"
+
+[[files]]
+upstream = "pkg/controller/namespace/namespace_controller.go"
+local    = "src/controllers/namespace.rs"
+
+[[files]]
+upstream = "pkg/controller/garbagecollector/garbagecollector.go"
+local    = "src/controllers/garbage_collector.rs"
+
+[[files]]
+upstream = "pkg/controller/endpoint/endpoints_controller.go"
+local    = "src/controllers/endpoints.rs"
+
+[[files]]
+upstream = "pkg/controller/serviceaccount/serviceaccounts_controller.go"
+local    = "src/controllers/service_account.rs"
+
+[[files]]
+upstream = "pkg/controller/job/job_controller.go"
+local    = "src/controllers/job.rs"
+
+[[files]]
+upstream = "pkg/controller/controller_utils.go"
+local    = "src/models.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "NewControllerManager"
+local_name    = "new_manager"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "syncDeployment"
+local_name    = "reconcile_deployment"
+file          = "src/controllers/deployment.rs"
+
+[[functions]]
+upstream_name = "syncReplicaSet"
+local_name    = "reconcile_replicaset"
+file          = "src/controllers/replicaset.rs"
+
+[[functions]]
+upstream_name = "monitorNodeHealth"
+local_name    = "reconcile_node_lifecycle"
+file          = "src/controllers/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "syncNamespace"
+local_name    = "reconcile_namespace"
+file          = "src/controllers/namespace.rs"
+
+[[functions]]
+upstream_name = "RunOnce"
+local_name    = "reconcile_garbage_collector"
+file          = "src/controllers/garbage_collector.rs"
+
+[[functions]]
+upstream_name = "syncService"
+local_name    = "reconcile_endpoints"
+file          = "src/controllers/endpoints.rs"
+
+[[functions]]
+upstream_name = "syncServiceAccount"
+local_name    = "reconcile_service_account"
+file          = "src/controllers/service_account.rs"
+
+[[functions]]
+upstream_name = "syncJob"
+local_name    = "reconcile_job"
+file          = "src/controllers/job.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestDeploymentControllerSync"
+local_test    = "test_deployment_controller_sync"
+
+[[tests]]
+upstream_test = "TestReplicaSetControllerScaleUp"
+local_test    = "test_replicaset_controller_scale_up"
+
+[[tests]]
+upstream_test = "TestReplicaSetControllerScaleDown"
+local_test    = "test_replicaset_controller_scale_down"
+
+[[tests]]
+upstream_test = "TestNodeLifecycleMarksNotReady"
+local_test    = "test_node_lifecycle_marks_not_ready"
+
+[[tests]]
+upstream_test = "TestNamespaceFinalizers"
+local_test    = "test_namespace_finalizers"
+
+[[tests]]
+upstream_test = "TestGarbageCollectorOrphan"
+local_test    = "test_garbage_collector_orphan"
+
+[[tests]]
+upstream_test = "TestEndpointsControllerSync"
+local_test    = "test_endpoints_controller_sync"
+
+[[tests]]
+upstream_test = "TestServiceAccountTokenCreated"
+local_test    = "test_service_account_token_created"
+
+[[tests]]
+upstream_test = "TestJobControllerCompletion"
+local_test    = "test_job_controller_completion"
+
+[[tests]]
+upstream_test = "TestControllerManagerStartsAll"
+local_test    = "test_controller_manager_starts_all"
+
+# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /healthz"
+local_path    = "/api/controller-manager/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /metrics"
+local_path    = "/api/controller-manager/metrics"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /controllers"
+local_path    = "/api/controller-manager/controllers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /controllers/{name}/reconcile"
+local_path    = "/api/controller-manager/controllers/{name}/reconcile"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /controllers/{name}/status"
+local_path    = "/api/controller-manager/controllers/{name}/status"

@@ -29,3 +29,12 @@ pub fn new_state() -> Arc<KubeletState> {
 pub fn router(state: Arc<KubeletState>) -> axum::Router {
     routes::create_router(state)
 }
+
+/// Calculate parity against the local source tree at compile-time crate root.
+pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
+    cave_kernel::parity::calculate_from_str(
+        include_str!("../parity.manifest.toml"),
+        env!("CARGO_MANIFEST_DIR"),
+    )
+    .map_err(|e| e.to_string())
+}

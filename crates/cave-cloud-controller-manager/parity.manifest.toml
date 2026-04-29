@@ -1,0 +1,150 @@
+# parity.manifest.toml — cave-cloud-controller-manager
+# Upstream: kubernetes/kubernetes v1.30.0  https://github.com/kubernetes/kubernetes
+#
+# cloud-controller-manager hosts the cloud-provider-specific controllers that
+# were split out of kube-controller-manager: node, route, service-load-balancer,
+# and node-ipam. Cave provides a provider-neutral skeleton that reads from a
+# pluggable `CloudProvider` trait so each driver (aws, gcp, azure, ...) can
+# be swapped in without touching the controllers themselves.
+
+[upstream]
+org     = "kubernetes"
+repo    = "kubernetes"
+version = "v1.30.0"
+
+[module]
+name        = "cave-cloud-controller-manager"
+description = "cloud-controller-manager reimplementation — node, route, service-LB, node-ipam controllers behind a pluggable CloudProvider trait"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "cmd/cloud-controller-manager/main.go"
+local    = "src/manager.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/cloud.go"
+local    = "src/provider.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/node/node_controller.go"
+local    = "src/controllers/node.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/route/route_controller.go"
+local    = "src/controllers/route.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/service/controller.go"
+local    = "src/controllers/service_lb.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/controllers/nodeipam/node_ipam_controller.go"
+local    = "src/controllers/node_ipam.rs"
+
+[[files]]
+upstream = "staging/src/k8s.io/cloud-provider/cloud_types.go"
+local    = "src/models.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "NewCloudControllerManager"
+local_name    = "new_manager"
+file          = "src/manager.rs"
+
+[[functions]]
+upstream_name = "InitializeNode"
+local_name    = "reconcile_node"
+file          = "src/controllers/node.rs"
+
+[[functions]]
+upstream_name = "ReconcileRoutes"
+local_name    = "reconcile_routes"
+file          = "src/controllers/route.rs"
+
+[[functions]]
+upstream_name = "EnsureLoadBalancer"
+local_name    = "reconcile_service_lb"
+file          = "src/controllers/service_lb.rs"
+
+[[functions]]
+upstream_name = "AllocateOrOccupyCIDR"
+local_name    = "reconcile_node_ipam"
+file          = "src/controllers/node_ipam.rs"
+
+[[functions]]
+upstream_name = "Instances"
+local_name    = "instance_metadata"
+file          = "src/provider.rs"
+
+[[functions]]
+upstream_name = "Zones"
+local_name    = "node_zone"
+file          = "src/provider.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestCloudNodeControllerInitialize"
+local_test    = "test_cloud_node_controller_initialize"
+
+[[tests]]
+upstream_test = "TestRouteControllerReconcile"
+local_test    = "test_route_controller_reconcile"
+
+[[tests]]
+upstream_test = "TestServiceLoadBalancerEnsure"
+local_test    = "test_service_load_balancer_ensure"
+
+[[tests]]
+upstream_test = "TestServiceLoadBalancerDelete"
+local_test    = "test_service_load_balancer_delete"
+
+[[tests]]
+upstream_test = "TestNodeIpamAllocateCidr"
+local_test    = "test_node_ipam_allocate_cidr"
+
+[[tests]]
+upstream_test = "TestNodeIpamPreservesExisting"
+local_test    = "test_node_ipam_preserves_existing"
+
+[[tests]]
+upstream_test = "TestProviderInstanceMetadata"
+local_test    = "test_provider_instance_metadata"
+
+[[tests]]
+upstream_test = "TestProviderZoneLookup"
+local_test    = "test_provider_zone_lookup"
+
+[[tests]]
+upstream_test = "TestCloudManagerStartsAll"
+local_test    = "test_cloud_manager_starts_all"
+
+# ── Surface mappings (HTTP) ──────────────────────────────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /healthz"
+local_path    = "/api/cloud-controller-manager/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /metrics"
+local_path    = "/api/cloud-controller-manager/metrics"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /controllers"
+local_path    = "/api/cloud-controller-manager/controllers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "POST /controllers/{name}/reconcile"
+local_path    = "/api/cloud-controller-manager/controllers/{name}/reconcile"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "GET /provider"
+local_path    = "/api/cloud-controller-manager/provider"

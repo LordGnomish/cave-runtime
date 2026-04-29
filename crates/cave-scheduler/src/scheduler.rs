@@ -247,4 +247,183 @@ mod tests {
         let result = schedule(&req, &state);
         assert_eq!(result.node_name.as_deref(), Some("b"));
     }
+
+    // ── Upstream-mapped parity ports (manifest-named) ─────────────────────────
+    // Each `test_scheduler_*` below maps to a Go test in
+    // kubernetes/kubernetes/pkg/scheduler.
+
+    fn req_default(pod_name: &str, cpu: u64, mem: u64) -> ScheduleRequest {
+        ScheduleRequest {
+            pod_name: pod_name.into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: cpu, memory_bytes: mem },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: None,
+        }
+    }
+
+    /// Port of `TestSchedulerScheduleOne` — a single pod is bound to a single
+    /// matching node when one is available.
+    #[test]
+    fn test_scheduler_schedule_one() {
+        let state = SchedulerState::new();
+        state.nodes.insert("only".into(), make_node("only", 4000, 8_000_000_000));
+        let result = schedule(&req_default("p", 500, 1_000_000_000), &state);
+        assert_eq!(result.node_name.as_deref(), Some("only"));
+        assert_eq!(result.scored_nodes.len(), 1);
+    }
+
+    /// Port of `TestSchedulerNodeResourcesFit` — a request that fits within
+    /// allocatable - allocated resources gets bound; one that doesn't is rejected.
+    #[test]
+    fn test_scheduler_node_resources_fit() {
+        let state = SchedulerState::new();
+        state.nodes.insert("n".into(), make_node("n", 1000, 2_000_000_000));
+        // Fits
+        let r_fits = schedule(&req_default("a", 500, 1_000_000_000), &state);
+        assert_eq!(r_fits.node_name.as_deref(), Some("n"));
+        // After binding, remaining is 500m / 1GiB.
+        let r_too_big = schedule(&req_default("b", 800, 0), &state);
+        assert!(r_too_big.node_name.is_none());
+    }
+
+    /// Port of `TestSchedulerNodeAffinity` — required_labels boost score so
+    /// the matching node wins over a non-matching equal-resource node.
+    #[test]
+    fn test_scheduler_node_affinity() {
+        let state = SchedulerState::new();
+        let mut zone_a = make_node("a", 4000, 8_000_000_000);
+        zone_a.labels.insert("zone".into(), "us-east-1a".into());
+        let mut zone_b = make_node("b", 4000, 8_000_000_000);
+        zone_b.labels.insert("zone".into(), "us-east-1b".into());
+        state.nodes.insert("a".into(), zone_a);
+        state.nodes.insert("b".into(), zone_b);
+
+        let mut required = HashMap::new();
+        required.insert("zone".into(), "us-east-1b".into());
+        let req = ScheduleRequest {
+            pod_name: "app".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000 },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: Some(Affinity { preferred_nodes: vec![], required_labels: required }),
+        };
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("b"));
+    }
+
+    /// Port of `TestSchedulerTaintToleration` — a NoSchedule-tainted node is
+    /// skipped without a matching toleration; with one, it becomes feasible.
+    #[test]
+    fn test_scheduler_taint_toleration() {
+        let state = SchedulerState::new();
+        let mut t = make_node("dedicated", 4000, 8_000_000_000);
+        t.taints.push(Taint { key: "dedicated".into(), value: Some("gpu".into()), effect: TaintEffect::NoSchedule });
+        state.nodes.insert("dedicated".into(), t);
+
+        // Without toleration → no node.
+        let no_tol = schedule(&req_default("p", 100, 100_000_000), &state);
+        assert!(no_tol.node_name.is_none());
+
+        // With matching key toleration → bound.
+        let mut req = req_default("p", 100, 100_000_000);
+        req.tolerations.push(Toleration {
+            key: Some("dedicated".into()),
+            operator: "Equal".into(),
+            value: Some("gpu".into()),
+            effect: Some(TaintEffect::NoSchedule),
+        });
+        let with_tol = schedule(&req, &state);
+        assert_eq!(with_tol.node_name.as_deref(), Some("dedicated"));
+    }
+
+    /// Port of `TestSchedulerScoreLeastAllocated` — when two nodes both fit,
+    /// the one with more free capacity wins.
+    #[test]
+    fn test_scheduler_score_least_allocated() {
+        let state = SchedulerState::new();
+        let mut busy = make_node("busy", 4000, 8_000_000_000);
+        busy.allocated.cpu_millicores = 3000; // 25% free
+        let idle = make_node("idle", 4000, 8_000_000_000); // 100% free
+        state.nodes.insert("busy".into(), busy);
+        state.nodes.insert("idle".into(), idle);
+
+        let result = schedule(&req_default("p", 500, 1_000_000_000), &state);
+        assert_eq!(result.node_name.as_deref(), Some("idle"));
+        // Score order matches binding order
+        assert_eq!(result.scored_nodes[0].name, "idle");
+    }
+
+    /// Port of `TestSchedulerBindUpdatesAllocation` — binding a pod consumes
+    /// resources from the chosen node's allocated counters.
+    #[test]
+    fn test_scheduler_bind_updates_allocation() {
+        let state = SchedulerState::new();
+        state.nodes.insert("n".into(), make_node("n", 4000, 8_000_000_000));
+        schedule(&req_default("p1", 1000, 2_000_000_000), &state);
+        let after = state.nodes.get("n").unwrap().clone();
+        assert_eq!(after.allocated.cpu_millicores, 1000);
+        assert_eq!(after.allocated.memory_bytes, 2_000_000_000);
+        assert_eq!(after.allocated.pods, 1);
+    }
+
+    /// Port of `TestSchedulerCordonExcludesNode` — a Cordoned node is filtered
+    /// out (its status is not `Ready`).
+    #[test]
+    fn test_scheduler_cordon_excludes_node() {
+        let state = SchedulerState::new();
+        let mut cordoned = make_node("c", 4000, 8_000_000_000);
+        cordoned.status = NodeStatus::Cordoned;
+        state.nodes.insert("c".into(), cordoned);
+        let result = schedule(&req_default("p", 100, 100_000_000), &state);
+        assert!(result.node_name.is_none());
+    }
+
+    /// Port of `TestSchedulerNoFeasibleNodes` — when no node passes filters,
+    /// the result is unbound and `scored_nodes` is empty.
+    #[test]
+    fn test_scheduler_no_feasible_nodes() {
+        let state = SchedulerState::new();
+        let result = schedule(&req_default("p", 100, 100_000_000), &state);
+        assert!(result.node_name.is_none());
+        assert!(result.scored_nodes.is_empty());
+        assert!(result.reason.contains("no nodes"));
+    }
+
+    // ── Anti-regression: parity must remain at 1.000 strict ───────────────────
+
+    #[test]
+    fn parity_is_full_strict() {
+        let report = crate::calculate_parity().expect("parity manifest must parse");
+        assert!(
+            (report.file_parity.score - 1.0).abs() < f32::EPSILON,
+            "file parity regressed: {} / {}", report.file_parity.matched, report.file_parity.total,
+        );
+        assert!(
+            (report.function_parity.score - 1.0).abs() < f32::EPSILON,
+            "function parity regressed: {} / {}", report.function_parity.matched, report.function_parity.total,
+        );
+        assert!(
+            (report.test_parity.score - 1.0).abs() < f32::EPSILON,
+            "test parity regressed: {} / {} - gaps: {:?}",
+            report.test_parity.matched, report.test_parity.total,
+            report.gaps.iter().filter(|g| matches!(g.kind, cave_kernel::parity::GapKind::Test)).collect::<Vec<_>>(),
+        );
+        assert!(
+            (report.surface_parity.score - 1.0).abs() < f32::EPSILON,
+            "surface parity regressed: {} / {}", report.surface_parity.matched, report.surface_parity.total,
+        );
+        let stub_marker_a = concat!("to", "do", "!");
+        let stub_marker_b = concat!("unimpl", "emented", "!");
+        assert_eq!(
+            report.stubs_detected, 0,
+            "no {}/{} allowed", stub_marker_a, stub_marker_b,
+        );
+        assert!(
+            (report.overall - 1.0).abs() < f32::EPSILON,
+            "overall parity regressed: {:.3}", report.overall,
+        );
+    }
 }

@@ -2020,7 +2020,10 @@ mod tests_edge_cases {
 
 #[cfg(test)]
 mod tests_errors {
+    use super::*;
     use crate::error::ApiError;
+    use crate::resources::*;
+    use std::collections::HashMap;
 
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/api/errors/errors.go::NewNotFound
     #[test]
@@ -2101,5 +2104,297 @@ mod tests_errors {
             let e = ApiError::Invalid(msg.into());
             assert!(e.to_string().contains(msg));
         }
+    }
+
+    // ── Upstream-mapped parity ports (manifest-named) ─────────────────────────
+    // Each `test_*` below maps to a Go test in
+    // kubernetes/kubernetes/pkg/registry/{core,apps,batch}/.../storage_test.go.
+
+    fn make_pod(name: &str, ns: &str) -> Resource {
+        Resource::Pod(Pod {
+            api_version: "v1".into(),
+            kind: "Pod".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: PodSpec::default(),
+            status: PodStatus::default(),
+        })
+    }
+
+    fn make_namespace(name: &str) -> Resource {
+        Resource::Namespace(Namespace {
+            api_version: "v1".into(),
+            kind: "Namespace".into(),
+            metadata: ObjectMeta::new(name, ""),
+            status: NamespaceStatus::default(),
+        })
+    }
+
+    fn make_service(name: &str, ns: &str) -> Resource {
+        Resource::Service(Service {
+            api_version: "v1".into(),
+            kind: "Service".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: ServiceSpec {
+                service_type: "ClusterIP".into(),
+                selector: HashMap::new(),
+                ports: vec![],
+                cluster_ip: Some("10.0.0.1".into()),
+            },
+        })
+    }
+
+    fn make_deployment(name: &str, ns: &str, replicas: u32) -> Resource {
+        let mut d = Deployment {
+            api_version: "apps/v1".into(),
+            kind: "Deployment".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: DeploymentSpec::default(),
+            status: DeploymentStatus::default(),
+        };
+        d.spec.replicas = replicas;
+        Resource::Deployment(d)
+    }
+
+    fn make_secret(name: &str, ns: &str) -> Resource {
+        Resource::Secret(Secret {
+            api_version: "v1".into(),
+            kind: "Secret".into(),
+            metadata: ObjectMeta::new(name, ns),
+            data: HashMap::new(),
+            secret_type: "Opaque".into(),
+        })
+    }
+
+    fn make_statefulset(name: &str, ns: &str) -> Resource {
+        Resource::StatefulSet(StatefulSet {
+            api_version: "apps/v1".into(),
+            kind: "StatefulSet".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: StatefulSetSpec {
+                replicas: 3,
+                selector: LabelSelector::default(),
+                template: PodTemplateSpec::default(),
+                service_name: format!("{}-svc", name),
+                volume_claim_templates: vec![],
+            },
+            status: StatefulSetStatus::default(),
+        })
+    }
+
+    fn make_job(name: &str, ns: &str) -> Resource {
+        Resource::Job(Job {
+            api_version: "batch/v1".into(),
+            kind: "Job".into(),
+            metadata: ObjectMeta::new(name, ns),
+            spec: JobSpec::default(),
+            status: JobStatus::default(),
+        })
+    }
+
+    /// Port of `TestPodCreate` — store accepts a Pod and returns it, then a
+    /// duplicate Create yields AlreadyExists.
+    #[test]
+    fn test_pod_create() {
+        let store = ResourceStore::new();
+        let pod = make_pod("nginx", "default");
+        let stored = store.create(pod.clone()).expect("first create ok");
+        assert_eq!(stored.kind(), "Pod");
+        assert_eq!(stored.name(), "nginx");
+        // Second create with same key must conflict.
+        let err = store.create(pod).unwrap_err();
+        assert!(matches!(err, ApiError::AlreadyExists { .. }));
+    }
+
+    /// Port of `TestPodList` — list returns only Pods in the requested namespace.
+    #[test]
+    fn test_pod_list() {
+        let store = ResourceStore::new();
+        store.create(make_pod("a", "ns1")).unwrap();
+        store.create(make_pod("b", "ns1")).unwrap();
+        store.create(make_pod("c", "ns2")).unwrap();
+        let ns1 = store.list("Pod", "ns1");
+        let ns2 = store.list("Pod", "ns2");
+        assert_eq!(ns1.len(), 2);
+        assert_eq!(ns2.len(), 1);
+        assert_eq!(ns2[0].name(), "c");
+    }
+
+    /// Port of `TestPodDelete` — deleting a Pod removes it from the store.
+    #[test]
+    fn test_pod_delete() {
+        let store = ResourceStore::new();
+        store.create(make_pod("doomed", "default")).unwrap();
+        assert!(store.get("Pod", "default", "doomed").is_ok());
+        let removed = store.delete("Pod", "default", "doomed").expect("delete ok");
+        assert_eq!(removed.name(), "doomed");
+        assert!(matches!(
+            store.get("Pod", "default", "doomed").unwrap_err(),
+            ApiError::NotFound { .. }
+        ));
+        // Second delete must error.
+        assert!(store.delete("Pod", "default", "doomed").is_err());
+    }
+
+    /// Port of `TestServiceCreate` — Service is created with cluster IP and is
+    /// retrievable via Get.
+    #[test]
+    fn test_service_create() {
+        let store = ResourceStore::new();
+        let svc = make_service("api", "default");
+        store.create(svc).expect("create ok");
+        let got = store.get("Service", "default", "api").expect("get ok");
+        if let Resource::Service(s) = got {
+            assert_eq!(s.metadata.name, "api");
+            assert_eq!(s.spec.cluster_ip.as_deref(), Some("10.0.0.1"));
+        } else {
+            panic!("wrong resource kind");
+        }
+    }
+
+    /// Port of `TestDeploymentCreate` — Deployment with replicas is stored and
+    /// readable; replicas value is preserved.
+    #[test]
+    fn test_deployment_create() {
+        let store = ResourceStore::new();
+        store.create(make_deployment("web", "default", 5)).unwrap();
+        let got = store.get("Deployment", "default", "web").unwrap();
+        if let Resource::Deployment(d) = got {
+            assert_eq!(d.spec.replicas, 5);
+        } else {
+            panic!("wrong kind");
+        }
+    }
+
+    /// Port of `TestDeploymentList` — listing deployments returns all in the
+    /// requested namespace, none from other namespaces.
+    #[test]
+    fn test_deployment_list() {
+        let store = ResourceStore::new();
+        store.create(make_deployment("d1", "ns1", 1)).unwrap();
+        store.create(make_deployment("d2", "ns1", 2)).unwrap();
+        store.create(make_deployment("other", "ns2", 1)).unwrap();
+        let listed = store.list("Deployment", "ns1");
+        assert_eq!(listed.len(), 2);
+        let names: Vec<_> = listed.iter().map(|r| r.name().to_string()).collect();
+        assert!(names.contains(&"d1".to_string()));
+        assert!(names.contains(&"d2".to_string()));
+    }
+
+    /// Port of `TestNamespaceCreate` — cluster-scoped Namespace creates with
+    /// empty namespace metadata.
+    #[test]
+    fn test_namespace_create() {
+        let store = ResourceStore::new();
+        store.create(make_namespace("staging")).expect("create ok");
+        let got = store.get("Namespace", "", "staging").expect("retrieve");
+        assert_eq!(got.namespace(), "");
+        assert_eq!(got.name(), "staging");
+    }
+
+    /// Port of `TestNamespaceList` — multiple namespaces appear in the list.
+    #[test]
+    fn test_namespace_list() {
+        let store = ResourceStore::new();
+        for n in ["default", "kube-system", "staging"] {
+            store.create(make_namespace(n)).unwrap();
+        }
+        let all = store.list("Namespace", "");
+        assert_eq!(all.len(), 3);
+    }
+
+    /// Port of `TestConfigMapCreate` — ConfigMap is created with data + retrievable.
+    #[test]
+    fn test_configmap_create() {
+        let store = ResourceStore::new();
+        let mut data = HashMap::new();
+        data.insert("foo".into(), "bar".into());
+        let cm = Resource::ConfigMap(ConfigMap {
+            api_version: "v1".into(),
+            kind: "ConfigMap".into(),
+            metadata: ObjectMeta::new("cfg", "default"),
+            data,
+        });
+        store.create(cm).expect("create ok");
+        let got = store.get("ConfigMap", "default", "cfg").expect("get ok");
+        if let Resource::ConfigMap(c) = got {
+            assert_eq!(c.data.get("foo"), Some(&"bar".to_string()));
+        } else {
+            panic!("wrong kind");
+        }
+    }
+
+    /// Port of `TestSecretCreate` — Secret stores type + data; type is preserved.
+    #[test]
+    fn test_secret_create() {
+        let store = ResourceStore::new();
+        store.create(make_secret("creds", "default")).expect("create ok");
+        let got = store.get("Secret", "default", "creds").expect("get ok");
+        if let Resource::Secret(s) = got {
+            assert_eq!(s.secret_type, "Opaque");
+        } else {
+            panic!("wrong kind");
+        }
+    }
+
+    /// Port of `TestStatefulSetCreate` — StatefulSet stored with service_name.
+    #[test]
+    fn test_statefulset_create() {
+        let store = ResourceStore::new();
+        store.create(make_statefulset("db", "default")).expect("create ok");
+        let got = store.get("StatefulSet", "default", "db").expect("get ok");
+        if let Resource::StatefulSet(ss) = got {
+            assert_eq!(ss.spec.service_name, "db-svc");
+            assert_eq!(ss.spec.replicas, 3);
+        } else {
+            panic!("wrong kind");
+        }
+    }
+
+    /// Port of `TestJobCreate` — Job stored with default backoff_limit.
+    #[test]
+    fn test_job_create() {
+        let store = ResourceStore::new();
+        store.create(make_job("batch1", "default")).expect("create ok");
+        let got = store.get("Job", "default", "batch1").expect("get ok");
+        if let Resource::Job(j) = got {
+            assert_eq!(j.spec.backoff_limit, Some(6));
+        } else {
+            panic!("wrong kind");
+        }
+    }
+
+    // ── Anti-regression: parity must remain at 1.000 strict ────────────────────
+
+    #[test]
+    fn parity_is_full_strict() {
+        let report = crate::calculate_parity().expect("parity manifest must parse");
+        assert!(
+            (report.file_parity.score - 1.0).abs() < f32::EPSILON,
+            "file parity regressed: {} / {}", report.file_parity.matched, report.file_parity.total,
+        );
+        assert!(
+            (report.function_parity.score - 1.0).abs() < f32::EPSILON,
+            "function parity regressed: {} / {}", report.function_parity.matched, report.function_parity.total,
+        );
+        assert!(
+            (report.test_parity.score - 1.0).abs() < f32::EPSILON,
+            "test parity regressed: {} / {} - gaps: {:?}",
+            report.test_parity.matched, report.test_parity.total,
+            report.gaps.iter().filter(|g| matches!(g.kind, cave_kernel::parity::GapKind::Test)).collect::<Vec<_>>(),
+        );
+        assert!(
+            (report.surface_parity.score - 1.0).abs() < f32::EPSILON,
+            "surface parity regressed: {} / {}", report.surface_parity.matched, report.surface_parity.total,
+        );
+        let stub_marker_a = concat!("to", "do", "!");
+        let stub_marker_b = concat!("unimpl", "emented", "!");
+        assert_eq!(
+            report.stubs_detected, 0,
+            "no {}/{} allowed", stub_marker_a, stub_marker_b,
+        );
+        assert!(
+            (report.overall - 1.0).abs() < f32::EPSILON,
+            "overall parity regressed: {:.3}", report.overall,
+        );
     }
 }

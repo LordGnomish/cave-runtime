@@ -98,6 +98,8 @@ members = [
     "crates/cave-scheduler",
     "crates/cave-etcd",
     "crates/cave-crossplane",
+    "crates/cave-controller-manager",
+    "crates/cave-cloud-controller-manager",
     # === New crates (this session) ===
     "crates/cave-oncall",
     "crates/cave-container-scan",
