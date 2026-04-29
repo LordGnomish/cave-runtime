@@ -1,0 +1,2046 @@
+# parity.manifest.toml — cave-datafusion
+# Upstream: apache/datafusion v53.1.0  https://github.com/apache/datafusion
+#
+# Honest accounting against upstream's logical plan, physical plan, optimizer
+# rules, and built-in function library. The local crate (~3.4k LOC) ships a
+# subset (Scan/Projection/Filter/Limit/Aggregate) with 5 aggregates and a
+# 5-rule logical optimizer. Vast majority of upstream surface is unmapped.
+
+[upstream]
+org     = "apache"
+repo    = "datafusion"
+version = "53.1.0"
+url     = "https://github.com/apache/datafusion"
+
+[module]
+name        = "cave-datafusion"
+description = "Embedded query engine — DataFusion-style logical + physical plan layering with SQL frontend"
+source_root = "src"
+files       = [
+  "context.rs",
+  "sql.rs",
+  "logical_plan.rs",
+  "execution_plan.rs",
+  "expr.rs",
+  "optimizer.rs",
+  "batch.rs",
+  "statistics.rs",
+  "tenant.rs",
+  "error.rs",
+]
+
+[summary]
+total            = 366
+mapped           = 21
+partial          = 26
+unmapped         = 312
+skipped          = 7
+skipped_cli      = 1   # datafusion-cli
+skipped_runtime  = 6   # sqllogictest, substrait, proto, ffi, spark, wasmtest — outside this embedded library's scope
+notes = """
+Local crate is a tiny educational subset of DataFusion: enum-based
+LogicalPlan + ExecutionPlan, sqlparser frontend, BTreeMap group-by, no Arrow,
+no async streams, no joins, no window functions, no DDL/DML. Mapping is
+strict — only items with a real implementation in src/ are marked `mapped`
+or `partial`. Heaviest gaps are joins (all kinds), window functions, and the
+~80 builtin scalar functions.
+"""
+
+# ════════════════════════════════════════════════════════════════════════════
+# Public API surface
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "public-api"
+upstream = "SessionContext"
+mapped   = "partial"
+local    = "src/context.rs::SqlContext"
+note     = "Holds tables, runs SQL. Parking_lot RwLock-guarded BTreeMap; no SessionState/runtime/config/UDFs."
+
+[[items]]
+kind     = "public-api"
+upstream = "SessionState"
+mapped   = "no"
+note     = "No session-level state, config, runtime, or UDF registry."
+
+[[items]]
+kind     = "public-api"
+upstream = "SessionConfig"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "DataFrame"
+mapped   = "no"
+note     = "No DataFrame builder API. Only execute_sql + register_table."
+
+[[items]]
+kind     = "public-api"
+upstream = "TableProvider"
+mapped   = "no"
+note     = "Tables registered as RecordBatch directly; no trait."
+
+[[items]]
+kind     = "public-api"
+upstream = "MemTable"
+mapped   = "partial"
+local    = "src/batch.rs::RecordBatch"
+note     = "RecordBatch acts as both batch and in-memory table. No partitioning."
+
+[[items]]
+kind     = "public-api"
+upstream = "RecordBatch (re-export from arrow-rs)"
+mapped   = "partial"
+local    = "src/batch.rs::RecordBatch"
+note     = "Local row-major Vec<Vec<Value>> with 5 scalar types (Null, Bool, Int64, Float64, Utf8). No Arrow buffer/schema/types."
+
+[[items]]
+kind     = "public-api"
+upstream = "CatalogProvider"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "SchemaProvider"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "CsvReadOptions"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "ParquetReadOptions"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "NdJsonReadOptions"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "ListingTable"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "ListingTableConfig"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "FileFormat"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "ExecutionProps"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "TaskContext"
+mapped   = "no"
+
+[[items]]
+kind     = "public-api"
+upstream = "RuntimeEnv"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# LogicalPlan variants  (datafusion/expr/src/logical_plan/plan.rs::LogicalPlan)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::TableScan"
+mapped   = "yes"
+local    = "src/logical_plan.rs::LogicalPlan::Scan"
+note     = "scan/scan_for_tenant constructors; carries optional column projection + tenant_id."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Projection"
+mapped   = "yes"
+local    = "src/logical_plan.rs::LogicalPlan::Projection"
+note     = "Vec<String> column list. No projected expressions (only column refs)."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Filter"
+mapped   = "yes"
+local    = "src/logical_plan.rs::LogicalPlan::Filter"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Limit"
+mapped   = "yes"
+local    = "src/logical_plan.rs::LogicalPlan::Limit"
+note     = "skip + Option<fetch>."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Aggregate"
+mapped   = "partial"
+local    = "src/logical_plan.rs::LogicalPlan::Aggregate"
+note     = "Group-by columns are Vec<String> (column refs only). 5 aggregate funcs."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Sort"
+mapped   = "no"
+note     = "ORDER BY parsed but not represented in plan tree."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Window"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Join"
+mapped   = "no"
+note     = "Single-table FROM only. No joins of any kind."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::CrossJoin"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Repartition"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Union"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::EmptyRelation"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Subquery"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::SubqueryAlias"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Statement"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Values"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Explain"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Analyze"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Distinct"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Prepare"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Execute"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::DescribeTable"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Dml::Insert"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Dml::Update"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Dml::Delete"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::CreateExternalTable"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::CreateMemoryTable"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::CreateView"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::CreateCatalog"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::CreateCatalogSchema"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::DropTable"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::DropView"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Ddl::DropCatalogSchema"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Extension"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Unnest"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::RecursiveQuery"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "LogicalPlan::Copy"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Expression tree (datafusion/expr/src/expr.rs::Expr)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Column"
+mapped   = "yes"
+local    = "src/expr.rs::Expr::Column"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Literal"
+mapped   = "yes"
+local    = "src/expr.rs::Expr::Literal"
+note     = "5 scalar types only."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::BinaryExpr"
+mapped   = "partial"
+local    = "src/expr.rs::Expr::Binary"
+note     = "Eq, NotEq, Lt, LtEq, Gt, GtEq, And, Or only. No arithmetic ops, no LIKE/REGEX, no IS NULL."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Alias"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::ScalarFunction"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::AggregateFunction"
+mapped   = "partial"
+local    = "src/logical_plan.rs::AggregateExpr"
+note     = "AggregateExpr struct with func + column + output_name; not a general Expr variant."
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::WindowFunction"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Case"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Cast"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::TryCast"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Not"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::IsNull / IsNotNull"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Between"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::InList / InSubquery"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Like / SimilarTo"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Negative"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::Sort"
+mapped   = "no"
+
+[[items]]
+kind     = "logical-plan"
+upstream = "Expr::ScalarSubquery / Exists"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# ExecutionPlan implementations (datafusion/physical-plan/src/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "physical-plan"
+upstream = "ProjectionExec  (physical-plan/src/projection.rs)"
+mapped   = "yes"
+local    = "src/execution_plan.rs::ExecutionPlan::Projection"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "FilterExec  (physical-plan/src/filter.rs)"
+mapped   = "yes"
+local    = "src/execution_plan.rs::ExecutionPlan::Filter"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "GlobalLimitExec  (physical-plan/src/limit.rs)"
+mapped   = "yes"
+local    = "src/execution_plan.rs::ExecutionPlan::Limit"
+note     = "Supports skip+fetch. Single-pass — no partition awareness."
+
+[[items]]
+kind     = "physical-plan"
+upstream = "LocalLimitExec  (physical-plan/src/limit.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "AggregateExec — Hash  (physical-plan/src/aggregates/row_hash.rs)"
+mapped   = "partial"
+local    = "src/execution_plan.rs::ExecutionPlan::Aggregate"
+note     = "BTreeMap-based group-by; not arrow-row-hash. Single partition."
+
+[[items]]
+kind     = "physical-plan"
+upstream = "AggregateExec — NoGrouping  (physical-plan/src/aggregates/no_grouping.rs)"
+mapped   = "partial"
+local    = "src/execution_plan.rs::aggregate"
+note     = "Empty group_by path covered by same Aggregate variant."
+
+[[items]]
+kind     = "physical-plan"
+upstream = "AggregateExec — PartialAggregate / Final"
+mapped   = "no"
+note     = "No partial/final split. Single-pass aggregation."
+
+[[items]]
+kind     = "physical-plan"
+upstream = "MemoryExec  (physical-plan/src/memory.rs)"
+mapped   = "partial"
+local    = "src/execution_plan.rs::ExecutionPlan::Source"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "SortExec  (physical-plan/src/sorts/sort.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "SortPreservingMergeExec  (sorts/sort_preserving_merge.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "PartialSortExec  (sorts/partial_sort.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "RepartitionExec  (physical-plan/src/repartition/mod.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "CoalescePartitionsExec  (coalesce_partitions.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "CoalesceBatchesExec  (coalesce_batches.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "HashJoinExec  (joins/hash_join/)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "NestedLoopJoinExec  (joins/nested_loop_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "SortMergeJoinExec  (joins/sort_merge_join/)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "CrossJoinExec  (joins/cross_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "SymmetricHashJoinExec  (joins/symmetric_hash_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "PiecewiseMergeJoinExec  (joins/piecewise_merge_join/)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "UnionExec  (union.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "InterleaveExec  (union.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "ValuesExec  (memory.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "EmptyExec  (empty.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "PlaceholderRowExec  (placeholder_row.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "AnalyzeExec  (analyze.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "ExplainExec  (explain.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "CsvExec  (datasource-csv)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "ParquetExec  (datasource-parquet)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "JsonExec  (datasource-json)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "AvroExec  (datasource-avro)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "ArrowExec  (datasource-arrow)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "StreamingTableExec  (streaming.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "BoundedWindowAggExec  (windows/bounded_window_agg_exec.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "WindowAggExec  (windows/window_agg_exec.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "RecursiveQueryExec  (recursive_query.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "UnnestExec  (unnest.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "WorkTableExec  (work_table.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "DataSinkExec  (insert.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "DistinctOnExec"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-plan"
+upstream = "TopK / SortedTopKExec  (sorts/partitioned_topk.rs)"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Optimizer rules — logical (datafusion/optimizer/src/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "PushDownFilter  (push_down_filter.rs)"
+mapped   = "partial"
+local    = "src/optimizer.rs::PredicatePushdown"
+note     = "Pushes Filter through Projection only. No join, union, or scan-level pushdown."
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "PushDownLimit  (push_down_limit.rs)"
+mapped   = "partial"
+local    = "src/optimizer.rs::LimitPushdown"
+note     = "Pushes Limit past Projection. No across joins/unions."
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "OptimizeProjections / ProjectionPushdown  (optimize_projections/)"
+mapped   = "partial"
+local    = "src/optimizer.rs::ProjectionPushdown"
+note     = "Folds Projection into Scan.projection (with predicate cols carried). No cross-node analysis."
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "SimplifyExpressions / Const-folding  (simplify_expressions/)"
+mapped   = "partial"
+local    = "src/optimizer.rs::ConstantFolding"
+note     = "Folds binary ops over two Literals (Eq/NotEq/Lt/Gt/And/Or). No CSE, no full simplification, no boolean algebra."
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateProjection (redundant projection)"
+mapped   = "yes"
+local    = "src/optimizer.rs::EliminateRedundantProjection"
+note     = "Drops Projection that selects every column already present."
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateLimit  (eliminate_limit.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateOuterJoin  (eliminate_outer_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateOneUnion / EliminateNestedUnion  (optimize_unions.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateGroupByConstant  (eliminate_group_by_constant.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateDuplicatedExpr  (eliminate_duplicated_expr.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateFilter  (eliminate_filter.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateCrossJoin  (eliminate_cross_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "EliminateJoin  (eliminate_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "FilterNullJoinKeys  (filter_null_join_keys.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "RewriteDisjunctivePredicate / SetComparison  (rewrite_set_comparison.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "ScalarSubqueryToJoin  (scalar_subquery_to_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "CommonSubexprEliminate  (common_subexpr_eliminate.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "DecorrelatePredicateSubquery  (decorrelate_predicate_subquery.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "DecorrelateLateralJoin  (decorrelate_lateral_join.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "ExtractEquijoinPredicate  (extract_equijoin_predicate.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "ReplaceDistinctWithAggregate  (replace_distinct_aggregate.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "SingleDistinctToGroupBy  (single_distinct_to_groupby.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "PropagateEmptyRelation  (propagate_empty_relation.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "RewriteRecursiveCte"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "ResolveGroupingFunction"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "UnwrapCastInComparison (analyzer)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "TypeCoercion (analyzer)"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "AnalyzerRule trait + analyzer/ pipeline"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "MergeProjection"
+mapped   = "no"
+
+[[items]]
+kind     = "optimizer-rule"
+upstream = "PushDownProjectionThroughFilter"
+mapped   = "partial"
+local    = "src/optimizer.rs::ProjectionPushdown"
+note     = "Embedded inside ProjectionPushdown: Projection→Filter→Scan path collapses to Scan with merged columns."
+
+# ════════════════════════════════════════════════════════════════════════════
+# Optimizer rules — physical (datafusion/physical-optimizer/src/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "AggregateStatistics  (aggregate_statistics.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "JoinSelection  (join_selection.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "EnforceDistribution  (enforce_distribution.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "EnforceSorting  (enforce_sorting/)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "OutputRequirements  (output_requirements.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "ProjectionPushdown — physical  (projection_pushdown.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "CombinePartialFinalAggregate  (combine_partial_final_agg.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "LimitedDistinctAggregation  (limited_distinct_aggregation.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "OptimizeAggregateOrder / UpdateAggrExprs  (update_aggr_exprs.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "ReplaceWithSortPreservingVariants  (enforce_sorting/)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "SanityCheckPlan  (sanity_checker.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "CoalesceBatches  (no rule — operator only)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "PipelineChecker / EnsureCoop  (ensure_coop.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "TopKAggregation  (topk_aggregation.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "TopKRepartition  (topk_repartition.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "WindowTopN  (window_topn.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "FilterPushdown — physical  (filter_pushdown.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "LimitPushdown — physical  (limit_pushdown.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "LimitPushdownPastWindow"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "PushdownSort  (pushdown_sort.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "physical-optimizer-rule"
+upstream = "HashJoinBuffering  (hash_join_buffering.rs)"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Aggregate functions (datafusion/functions-aggregate/src/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "count"
+mapped   = "yes"
+local    = "src/logical_plan.rs::AggregateFunc::Count"
+note     = "COUNT(*) and COUNT(col) — non-null filter implemented."
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "sum"
+mapped   = "partial"
+local    = "src/logical_plan.rs::AggregateFunc::Sum"
+note     = "Int64 only with saturating arithmetic. No Float64/Decimal path."
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "min  (functions-aggregate/src/min_max.rs)"
+mapped   = "partial"
+local    = "src/logical_plan.rs::AggregateFunc::Min"
+note     = "Int64 only."
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "max  (functions-aggregate/src/min_max.rs)"
+mapped   = "partial"
+local    = "src/logical_plan.rs::AggregateFunc::Max"
+note     = "Int64 only."
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "avg / mean  (functions-aggregate/src/average.rs)"
+mapped   = "partial"
+local    = "src/logical_plan.rs::AggregateFunc::Avg"
+note     = "Int64-input → Float64 output. No Decimal/timestamp path."
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "count_distinct  (count.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "approx_distinct  (approx_distinct.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "approx_median  (approx_median.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "approx_percentile_cont  (approx_percentile_cont.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "approx_percentile_cont_with_weight"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "array_agg  (array_agg.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "bit_and / bit_or / bit_xor  (bit_and_or_xor.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "bool_and / bool_or  (bool_and_or.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "corr / correlation  (correlation.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "covar / covar_pop / covar_samp  (covariance.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "first_value (agg)  (first_last.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "last_value (agg)  (first_last.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "grouping  (grouping.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "median  (median.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "percentile_cont  (percentile_cont.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "regr_avgx / regr_avgy / regr_count / regr_intercept / regr_r2 / regr_slope / regr_sxx / regr_sxy / regr_syy  (regr.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "stddev / stddev_pop / stddev_samp  (stddev.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "string_agg  (string_agg.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "var_pop / var_samp / variance  (variance.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "aggregate-fn"
+upstream = "nth_value (agg)  (nth_value.rs)"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Window functions (datafusion/functions-window/src/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "window-fn"
+upstream = "row_number  (row_number.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "rank  (rank.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "dense_rank  (rank.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "percent_rank  (rank.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "cume_dist  (cume_dist.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "ntile  (ntile.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "lag  (lead_lag.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "lead  (lead_lag.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "first_value (window)  (nth_value.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "last_value (window)  (nth_value.rs)"
+mapped   = "no"
+
+[[items]]
+kind     = "window-fn"
+upstream = "nth_value (window)  (nth_value.rs)"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Scalar functions — math (datafusion/functions/src/math/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "abs"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "acos / asin / atan / atan2"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ceil"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "cos / sin / tan / cot"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "exp"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "floor"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ln / log / log2 / log10"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "pow / power"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "round"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "signum"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "sqrt"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "trunc"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "factorial / gcd / lcm"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "isnan / iszero / nanvl"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "pi / random"
+mapped   = "no"
+
+# ─── Scalar functions — string  (datafusion/functions/src/string/) ──────────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ascii"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "bit_length"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "btrim"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "chr"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "concat"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "concat_ws"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "contains"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ends_with"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "levenshtein"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "lower"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ltrim / rtrim / trim"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "octet_length"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "overlay"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "repeat"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "replace"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "split_part"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "starts_with"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_hex"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "upper"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "uuid"
+mapped   = "no"
+
+# ─── Scalar functions — unicode  (datafusion/functions/src/unicode/) ─────────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "character_length / char_length / length"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "find_in_set"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "initcap"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "left"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "lpad / rpad"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "reverse"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "right"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "strpos"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "substr / substring"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "substr_index"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "translate"
+mapped   = "no"
+
+# ─── Scalar functions — datetime  (datafusion/functions/src/datetime/) ──────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "current_date / today"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "current_time"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "current_timestamp / now"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "date_part / datepart"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "date_trunc / datetrunc"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "date_bin"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "from_unixtime"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "make_date / make_time"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_char"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_date"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_local_time"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_time"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_timestamp"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_timestamp_seconds"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_timestamp_millis"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_timestamp_micros"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_timestamp_nanos"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "to_unixtime"
+mapped   = "no"
+
+# ─── Scalar functions — regex  (datafusion/functions/src/regex/) ────────────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "regexp_count"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "regexp_instr"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "regexp_like"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "regexp_match"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "regexp_replace"
+mapped   = "no"
+
+# ─── Scalar functions — crypto  (datafusion/functions/src/crypto/) ──────────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "digest"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "md5"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "sha224 / sha256 / sha384 / sha512"
+mapped   = "no"
+
+# ─── Scalar functions — encoding  (datafusion/functions/src/encoding/) ──────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "decode"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "encode"
+mapped   = "no"
+
+# ─── Scalar functions — core  (datafusion/functions/src/core/) ──────────────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "coalesce"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "nullif"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "ifnull / nvl"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "nvl2"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "greatest"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "least"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "struct"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "named_struct"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "get_field"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "arrow_cast / cast_to_type / try_cast_to_type"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "arrow_typeof"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "version"
+mapped   = "no"
+
+# ─── Scalar functions — nested arrays  (datafusion/functions-nested/) ───────
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "make_array"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "array_append / array_prepend / array_concat"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "array_position / array_remove / array_replace"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "array_to_string"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "cardinality"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "range"
+mapped   = "no"
+
+[[items]]
+kind     = "scalar-fn"
+upstream = "current_setting"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# Data sources (datafusion/datasource*/)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "data-source"
+upstream = "Parquet  (datasource-parquet/)"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "CSV  (datasource-csv/)"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "JSON  (datasource-json/)"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "Avro  (datasource-avro/)"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "Arrow IPC  (datasource-arrow/)"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "ArrowFlight"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "ListingTable"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "MemoryTable / MemTable"
+mapped   = "partial"
+local    = "src/context.rs::SqlContext::register_table"
+note     = "In-memory only, single batch per table, no partitioning."
+
+[[items]]
+kind     = "data-source"
+upstream = "ViewTable"
+mapped   = "no"
+
+[[items]]
+kind     = "data-source"
+upstream = "StreamingTable"
+mapped   = "no"
+
+# ════════════════════════════════════════════════════════════════════════════
+# SQL features (datafusion/sql/ — uses sqlparser-rs upstream)
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "sql-feature"
+upstream = "SELECT projection (columns)"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query"
+note     = "SELECT col, ... and SELECT * supported. ExprWithAlias for aggregates only."
+
+[[items]]
+kind     = "sql-feature"
+upstream = "SELECT *"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query (has_star branch)"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "FROM (single table)"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query"
+note     = "Single-table only. No subqueries in FROM, no joins, no lateral."
+
+[[items]]
+kind     = "sql-feature"
+upstream = "WHERE"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query (selection)"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "GROUP BY"
+mapped   = "partial"
+local    = "src/sql.rs::plan_query (group_by)"
+note     = "Column refs only; no GROUP BY ALL, no GROUP BY expression."
+
+[[items]]
+kind     = "sql-feature"
+upstream = "HAVING"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "ORDER BY"
+mapped   = "no"
+note     = "Parser accepts; ignored (no Sort in plan)."
+
+[[items]]
+kind     = "sql-feature"
+upstream = "LIMIT"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query (q.limit)"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "OFFSET"
+mapped   = "yes"
+local    = "src/sql.rs::plan_query (q.offset)"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "INNER JOIN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "LEFT / RIGHT / FULL OUTER JOIN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "CROSS JOIN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "LATERAL JOIN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "UNION / UNION ALL"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "INTERSECT"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "EXCEPT"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "WITH (CTE — non-recursive)"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "WITH RECURSIVE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "CASE WHEN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "Window functions (OVER)"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "Scalar subqueries"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "Correlated subqueries"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "Aliases (AS) for aggregates"
+mapped   = "yes"
+local    = "src/sql.rs::ExprWithAlias arm"
+note     = "Alias supported only for aggregate output_name; identifier alias accepted but ignored."
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DISTINCT"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DDL: CREATE TABLE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DDL: CREATE VIEW"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DDL: DROP TABLE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DDL: CREATE EXTERNAL TABLE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DDL: CREATE SCHEMA / CREATE CATALOG"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DML: INSERT INTO ... VALUES"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DML: INSERT INTO ... SELECT"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DML: UPDATE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DML: DELETE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DML: COPY"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "VALUES (top-level)"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "EXPLAIN"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "ANALYZE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "PREPARE / EXECUTE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "DESCRIBE"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "SET / RESET"
+mapped   = "no"
+
+[[items]]
+kind     = "sql-feature"
+upstream = "PostgreSQL dialect via sqlparser-rs"
+mapped   = "yes"
+local    = "src/sql.rs::parse_sql"
+note     = "Uses PostgreSqlDialect for parsing."
+
+# ════════════════════════════════════════════════════════════════════════════
+# Subsystems
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "subsystem"
+upstream = "Query planner (SQL → LogicalPlan)"
+mapped   = "partial"
+local    = "src/sql.rs"
+note     = "Subset planner: SELECT/WHERE/GROUP BY/LIMIT/OFFSET only."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Logical optimizer (rule loop)"
+mapped   = "partial"
+local    = "src/optimizer.rs::Optimizer"
+note     = "Fixed-point loop with 5 rules, max_passes=5."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Expression simplifier"
+mapped   = "partial"
+local    = "src/optimizer.rs::ConstantFolding"
+note     = "Folds binary ops over two literals only."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Type coercion"
+mapped   = "no"
+
+[[items]]
+kind     = "subsystem"
+upstream = "Physical planner (LogicalPlan → ExecutionPlan)"
+mapped   = "yes"
+local    = "src/execution_plan.rs::compile"
+note     = "Direct 1:1 enum mapping, no costing or rule-based selection."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Async runtime (Tokio)"
+mapped   = "no"
+note     = "Local execute() is synchronous."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Vectorized execution (Arrow kernels)"
+mapped   = "no"
+note     = "Row-at-a-time evaluation over Vec<Value>."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Memory pool / disk-spill"
+mapped   = "no"
+
+[[items]]
+kind     = "subsystem"
+upstream = "Partitioning / parallel execution"
+mapped   = "no"
+
+[[items]]
+kind     = "subsystem"
+upstream = "Statistics propagation"
+mapped   = "partial"
+local    = "src/statistics.rs::TableStat"
+note     = "Standalone TableStat / ColumnStat with selectivity + join-size estimators. NOT wired into optimizer or planner."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Cost-based optimizer (CBO)"
+mapped   = "no"
+
+[[items]]
+kind     = "subsystem"
+upstream = "Plan validation / invariants"
+mapped   = "partial"
+local    = "src/logical_plan.rs::LogicalPlan::validate"
+note     = "Validates tenant_id, table_name, projection cols, fetch≥1, aggregate completeness."
+
+[[items]]
+kind     = "subsystem"
+upstream = "Tenant isolation / multi-tenant query guard"
+mapped   = "yes"
+local    = "src/tenant.rs + src/logical_plan.rs::tenant_id"
+note     = "Cave-specific addition (no upstream equivalent). Plan walks reject mixed-tenant trees."
+
+[[items]]
+kind     = "subsystem"
+upstream = "TreeNode visitor framework"
+mapped   = "partial"
+local    = "src/logical_plan.rs::children"
+note     = "Children accessor only; no rewrite/transform/visit DAG."
+
+# ════════════════════════════════════════════════════════════════════════════
+# Tools
+# ════════════════════════════════════════════════════════════════════════════
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-cli"
+mapped   = "skipped"
+note     = "skipped (CLI). Not in scope for embedded library."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-sqllogictest"
+mapped   = "skipped"
+note     = "skipped (test harness)."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-substrait"
+mapped   = "skipped"
+note     = "skipped (cross-engine plan format)."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-proto"
+mapped   = "skipped"
+note     = "skipped (protobuf serialization). Local uses serde_json on LogicalPlan/Expr/RecordBatch."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-ffi"
+mapped   = "skipped"
+note     = "skipped (C ABI)."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-spark (compatibility shim)"
+mapped   = "skipped"
+note     = "skipped (Spark-specific dialect)."
+
+[[items]]
+kind     = "tool"
+upstream = "datafusion-wasmtest"
+mapped   = "skipped"
+note     = "skipped (WASM build target)."

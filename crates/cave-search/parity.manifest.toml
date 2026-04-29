@@ -1,0 +1,2171 @@
+[upstream]
+name = "opensearch-project/OpenSearch"
+url = "https://github.com/opensearch-project/OpenSearch"
+local_clone = "/tmp/cave-parity-upstream/opensearch/"
+language = "Java"
+notes = """
+REST endpoints enumerated from rest-api-spec/src/main/resources/rest-api-spec/api/*.json (167 files).
+Query DSL enumerated from server/src/main/java/org/opensearch/index/query/*QueryBuilder.java.
+Aggregations enumerated from server/src/main/java/org/opensearch/search/aggregations/**/*AggregationBuilder.java.
+Mapping types enumerated from server/src/main/java/org/opensearch/index/mapper/**/*FieldMapper.java.
+"""
+
+[module]
+name = "cave-search"
+crate_path = "crates/cave-search"
+src_root = "crates/cave-search/src"
+loc_approx = 1950
+files = ["dsl.rs", "index.rs", "aggregation.rs", "mapping.rs", "cluster.rs", "server.rs", "lib.rs", "error.rs"]
+
+[summary]
+scope = """
+cave-search is a wire-compatible OpenSearch surrogate for embedded/test use:
+JSON Query DSL evaluator, in-memory inverted index, basic mappings, a small
+aggregation set, single-node cluster state, and an axum HTTP server that mirrors
+a small core of the OpenSearch REST API. It is not a Lucene reimplementation —
+no segment storage, no sharding, no replication, no persistence, no distributed
+coordination, no scripting, no security/RBAC, no plugin SPI.
+"""
+goal = """
+Cover the highest-leverage surface for opensearch-py / opensearch-js clients
+running ad-hoc smoke tests against an embedded server: index lifecycle,
+indexing/get/delete, _bulk, _search with bool/term/range/match queries, a
+handful of metric/bucket aggregations, _cluster/health, _cat/indices.
+"""
+non_goals = [
+  "Lucene segment storage / merge / refresh semantics",
+  "sharding, replication, peer recovery, segment-replication",
+  "snapshot/restore (S3, FS, GCS, Azure repositories)",
+  "ingest pipelines, scripting (Painless), templates",
+  "security plugin, RBAC, TLS, audit logging",
+  "ML / k-NN / neural-search / anomaly-detection plugins",
+  "cross-cluster search/replication, remote stores",
+  "data streams, ILM, rollover policies",
+  "geo queries beyond geo_point field acceptance",
+  "Lucene scoring (BM25), highlighting, suggesters, reranking",
+]
+
+# ── REST API ────────────────────────────────────────────────────────────────
+# Enumerated from /tmp/cave-parity-upstream/opensearch/rest-api-spec/src/main/resources/rest-api-spec/api/*.json (167 files).
+
+# ---- root-level document/search APIs ----
+[[items]]
+kind = "rest-api"
+name = "search"
+status = "partial"
+local = "crates/cave-search/src/server.rs:46 (POST/GET /:index/_search)"
+notes = "Per-index _search supported with query, size, from, aggs. Multi-index, _all, search_type, scroll, sort, _source, highlight, suggest, rescore, post_filter, track_total_hits all unsupported."
+
+[[items]]
+kind = "rest-api"
+name = "msearch"
+status = "missing"
+notes = "Multi-search ndjson endpoint not implemented; clients that batch queries fall back individually."
+
+[[items]]
+kind = "rest-api"
+name = "bulk"
+status = "missing"
+notes = "_bulk ndjson is heavily used by every loader/exporter and not implemented. Highest-leverage gap after search."
+
+[[items]]
+kind = "rest-api"
+name = "count"
+status = "missing"
+notes = "GET /:index/_count not implemented."
+
+[[items]]
+kind = "rest-api"
+name = "index"
+status = "partial"
+local = "crates/cave-search/src/server.rs:42-44 (POST /:index/_doc, PUT /:index/_doc/:id)"
+notes = "PUT/POST /:index/_doc[/id] supported. op_type, refresh, version, if_seq_no, if_primary_term, routing, pipeline params not honored."
+
+[[items]]
+kind = "rest-api"
+name = "create"
+status = "partial"
+local = "crates/cave-search/src/server.rs:42 (POST /:index/_doc)"
+notes = "Auto-id create works; PUT /:index/_create/:id explicit-create endpoint not wired."
+
+[[items]]
+kind = "rest-api"
+name = "get"
+status = "partial"
+local = "crates/cave-search/src/server.rs:44 (GET /:index/_doc/:id)"
+notes = "Basic get works. _source filtering, stored_fields, version, preference unsupported."
+
+[[items]]
+kind = "rest-api"
+name = "exists"
+status = "missing"
+notes = "HEAD /:index/_doc/:id not routed."
+
+[[items]]
+kind = "rest-api"
+name = "exists_source"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "get_source"
+status = "missing"
+notes = "GET /:index/_source/:id not implemented."
+
+[[items]]
+kind = "rest-api"
+name = "update"
+status = "missing"
+notes = "POST /:index/_update/:id (partial doc / script update) not implemented."
+
+[[items]]
+kind = "rest-api"
+name = "delete"
+status = "partial"
+local = "crates/cave-search/src/server.rs:44 (DELETE /:index/_doc/:id)"
+notes = "Basic delete works. version, if_seq_no, if_primary_term, refresh not honored."
+
+[[items]]
+kind = "rest-api"
+name = "delete_by_query"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "delete_by_query_rethrottle"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "update_by_query"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "update_by_query_rethrottle"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "reindex"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "reindex_rethrottle"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "mget"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "mtermvectors"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "termvectors"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "explain"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "field_caps"
+status = "missing"
+notes = "Heavily used by Kibana/dashboards for field discovery."
+
+[[items]]
+kind = "rest-api"
+name = "search_shards"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "search_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "msearch_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "render_search_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "rank_eval"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "scroll"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "clear_scroll"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "create_pit"
+status = "missing"
+notes = "Point-in-time API."
+
+[[items]]
+kind = "rest-api"
+name = "delete_pit"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "delete_all_pits"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "get_all_pits"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "info"
+status = "missing"
+notes = "GET / — root cluster info ping returning version. Many clients call this at startup."
+
+[[items]]
+kind = "rest-api"
+name = "ping"
+status = "missing"
+notes = "HEAD / — clients use this for liveness checks."
+
+# ---- scripting ----
+[[items]]
+kind = "rest-api"
+name = "put_script"
+status = "skipped (out of scope: no scripting engine)"
+
+[[items]]
+kind = "rest-api"
+name = "get_script"
+status = "skipped (out of scope: no scripting engine)"
+
+[[items]]
+kind = "rest-api"
+name = "delete_script"
+status = "skipped (out of scope: no scripting engine)"
+
+[[items]]
+kind = "rest-api"
+name = "get_script_context"
+status = "skipped (out of scope: no scripting engine)"
+
+[[items]]
+kind = "rest-api"
+name = "get_script_languages"
+status = "skipped (out of scope: no scripting engine)"
+
+[[items]]
+kind = "rest-api"
+name = "scripts_painless_execute"
+status = "skipped (out of scope: no Painless)"
+
+# ---- indices.* ----
+[[items]]
+kind = "rest-api"
+name = "indices.create"
+status = "partial"
+local = "crates/cave-search/src/server.rs:40 (PUT /:index)"
+notes = "Mappings.properties accepted. Settings (number_of_shards/replicas), aliases, wait_for_active_shards ignored."
+
+[[items]]
+kind = "rest-api"
+name = "indices.delete"
+status = "partial"
+local = "crates/cave-search/src/server.rs:40 (DELETE /:index)"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get"
+status = "partial"
+local = "crates/cave-search/src/server.rs:40 (GET /:index)"
+notes = "Returns mappings + creation_date setting only; aliases, full settings not echoed."
+
+[[items]]
+kind = "rest-api"
+name = "indices.exists"
+status = "missing"
+notes = "HEAD /:index not routed."
+
+[[items]]
+kind = "rest-api"
+name = "indices.put_mapping"
+status = "missing"
+notes = "PUT /:index/_mapping for adding fields after create."
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_mapping"
+status = "missing"
+notes = "GET /:index/_mapping (mapping is reachable via GET /:index, but not at the /_mapping path clients expect)."
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_field_mapping"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.put_settings"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_settings"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.put_alias"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.delete_alias"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_alias"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.exists_alias"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.update_aliases"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.put_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.delete_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.exists_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.put_index_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_index_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.delete_index_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.exists_index_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.simulate_index_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.simulate_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.analyze"
+status = "missing"
+notes = "POST /:index/_analyze — would expose the local tokenizer in index.rs."
+
+[[items]]
+kind = "rest-api"
+name = "indices.refresh"
+status = "missing"
+notes = "No-op acceptable since cave-search has no async refresh, but route is missing."
+
+[[items]]
+kind = "rest-api"
+name = "indices.flush"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.forcemerge"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.clear_cache"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.open"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.close"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.add_block"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.clone"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.shrink"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.split"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.rollover"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.recovery"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.segments"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.shard_stores"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.stats"
+status = "missing"
+notes = "Doc count is tracked on cluster_state; could be exposed."
+
+[[items]]
+kind = "rest-api"
+name = "indices.upgrade"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_upgrade"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.validate_query"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.resolve_index"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "indices.create_data_stream"
+status = "skipped (out of scope: no data streams)"
+
+[[items]]
+kind = "rest-api"
+name = "indices.delete_data_stream"
+status = "skipped (out of scope: no data streams)"
+
+[[items]]
+kind = "rest-api"
+name = "indices.get_data_stream"
+status = "skipped (out of scope: no data streams)"
+
+[[items]]
+kind = "rest-api"
+name = "indices.data_streams_stats"
+status = "skipped (out of scope: no data streams)"
+
+# ---- cluster.* ----
+[[items]]
+kind = "rest-api"
+name = "cluster.health"
+status = "partial"
+local = "crates/cave-search/src/server.rs:38 (GET /_cluster/health), crates/cave-search/src/cluster.rs"
+notes = "Returns the standard health document. Index/shard-level health, level=indices/shards, wait_for_status not implemented."
+
+[[items]]
+kind = "rest-api"
+name = "cluster.stats"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.state"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.pending_tasks"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.allocation_explain"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.get_settings"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.put_settings"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.reroute"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.remote_info"
+status = "skipped (out of scope: no cross-cluster)"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.get_component_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.put_component_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.delete_component_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.exists_component_template"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cluster.voting-config-and-routing-group"
+status = "skipped (out of scope: single-node)"
+notes = "Group: cluster.post_voting_config_exclusions, cluster.delete_voting_config_exclusions, cluster.{get,put,delete}_decommission_awareness, cluster.{get,put,delete}_weighted_routing. Eight endpoints — irrelevant in a single-node deployment."
+
+# ---- cat.* ----
+[[items]]
+kind = "rest-api"
+name = "cat.indices"
+status = "partial"
+local = "crates/cave-search/src/server.rs:39 (GET /_cat/indices)"
+notes = "Returns JSON with index/pri/rep/docs.count. The classic plain-text columnar 'cat' format is NOT produced; many CLI tools assume text/tab-separated output."
+
+[[items]]
+kind = "rest-api"
+name = "cat.aliases"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.allocation"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.cluster_manager"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.count"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.fielddata"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.health"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.help"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.nodeattrs"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.nodes"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.pending_tasks"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.plugins"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.recovery"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.repositories"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.segment_replication"
+status = "skipped (out of scope: no replication)"
+
+[[items]]
+kind = "rest-api"
+name = "cat.segments"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.shards"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.snapshots"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "cat.tasks"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.templates"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "cat.thread_pool"
+status = "missing"
+
+# ---- nodes.* ----
+[[items]]
+kind = "rest-api"
+name = "nodes.info"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "nodes.stats"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "nodes.usage"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "nodes.hot_threads"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "nodes.reload_secure_settings"
+status = "skipped (out of scope: no secure settings)"
+
+# ---- ingest.* ----
+[[items]]
+kind = "rest-api"
+name = "ingest.put_pipeline"
+status = "skipped (out of scope: no ingest pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "ingest.get_pipeline"
+status = "skipped (out of scope: no ingest pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "ingest.delete_pipeline"
+status = "skipped (out of scope: no ingest pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "ingest.simulate"
+status = "skipped (out of scope: no ingest pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "ingest.processor_grok"
+status = "skipped (out of scope: no ingest pipelines)"
+
+# ---- snapshot.* ----
+# Group: cave-search has no persistence, so the entire snapshot/repository surface is out of scope.
+[[items]]
+kind = "rest-api"
+name = "snapshot.create"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.delete"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.get"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.restore"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.status"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.clone"
+status = "skipped (out of scope: no snapshot/restore)"
+
+[[items]]
+kind = "rest-api"
+name = "snapshot.repository-group"
+status = "skipped (out of scope: no snapshot/restore)"
+notes = "Group: snapshot.cleanup_repository, snapshot.create_repository, snapshot.delete_repository, snapshot.get_repository, snapshot.verify_repository. Five repository-management endpoints."
+
+# ---- tasks.* ----
+[[items]]
+kind = "rest-api"
+name = "tasks.list"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "tasks.get"
+status = "missing"
+
+[[items]]
+kind = "rest-api"
+name = "tasks.cancel"
+status = "missing"
+
+# ---- search_pipeline.* / dangling_indices.* / remote_store.* / wlm ----
+[[items]]
+kind = "rest-api"
+name = "search_pipeline.put"
+status = "skipped (out of scope: no search pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "search_pipeline.get"
+status = "skipped (out of scope: no search pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "search_pipeline.delete"
+status = "skipped (out of scope: no search pipelines)"
+
+[[items]]
+kind = "rest-api"
+name = "dangling_indices.list_dangling_indices"
+status = "skipped (out of scope: no on-disk indices)"
+
+[[items]]
+kind = "rest-api"
+name = "dangling_indices.import_dangling_index"
+status = "skipped (out of scope: no on-disk indices)"
+
+[[items]]
+kind = "rest-api"
+name = "dangling_indices.delete_dangling_index"
+status = "skipped (out of scope: no on-disk indices)"
+
+[[items]]
+kind = "rest-api"
+name = "remote_store.restore"
+status = "skipped (out of scope: no remote store)"
+
+[[items]]
+kind = "rest-api"
+name = "remote_store.stats"
+status = "skipped (out of scope: no remote store)"
+
+[[items]]
+kind = "rest-api"
+name = "wlm_stats_list"
+status = "skipped (out of scope: no workload management)"
+
+# ── Query DSL ──────────────────────────────────────────────────────────────
+# Enumerated from server/src/main/java/org/opensearch/index/query/*QueryBuilder.java.
+
+[[items]]
+kind = "query-dsl"
+name = "match_all"
+status = "mapped"
+local = "crates/cave-search/src/dsl.rs:11 (Query::MatchAll)"
+
+[[items]]
+kind = "query-dsl"
+name = "match_none"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "term"
+status = "mapped"
+local = "crates/cave-search/src/dsl.rs:12 (Query::Term)"
+
+[[items]]
+kind = "query-dsl"
+name = "terms"
+status = "mapped"
+local = "crates/cave-search/src/dsl.rs:13 (Query::Terms)"
+
+[[items]]
+kind = "query-dsl"
+name = "terms_set"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "match"
+status = "partial"
+local = "crates/cave-search/src/dsl.rs:14 (Query::Match)"
+notes = "Single-token match against inverted index; multi-token AND/OR operator, fuzziness, analyzer override, minimum_should_match, zero_terms_query not supported."
+
+[[items]]
+kind = "query-dsl"
+name = "match_phrase"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "match_phrase_prefix"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "match_bool_prefix"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "multi_match"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "combined_fields"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "common_terms"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "range"
+status = "partial"
+local = "crates/cave-search/src/dsl.rs:15 (Query::Range)"
+notes = "Numeric f64 only; date math, format, time_zone, relation, boost not supported."
+
+[[items]]
+kind = "query-dsl"
+name = "exists"
+status = "mapped"
+local = "crates/cave-search/src/dsl.rs:28 (Query::Exists)"
+
+[[items]]
+kind = "query-dsl"
+name = "prefix"
+status = "mapped"
+local = "crates/cave-search/src/dsl.rs:29 (Query::Prefix)"
+
+[[items]]
+kind = "query-dsl"
+name = "wildcard"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "regexp"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "fuzzy"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "ids"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "bool"
+status = "partial"
+local = "crates/cave-search/src/dsl.rs:16 (Query::Bool)"
+notes = "must / should / must_not / filter / minimum_should_match supported. boost, adjust_pure_negative not honored. Scoring is constant 1.0."
+
+[[items]]
+kind = "query-dsl"
+name = "constant_score"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "dis_max"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "function_score"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "boosting"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "script_score"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "query-dsl"
+name = "script"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "query-dsl"
+name = "query_string"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "simple_query_string"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "more_like_this"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "nested"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "has_child"
+status = "skipped (out of scope: no parent/child)"
+
+[[items]]
+kind = "query-dsl"
+name = "has_parent"
+status = "skipped (out of scope: no parent/child)"
+
+[[items]]
+kind = "query-dsl"
+name = "parent_id"
+status = "skipped (out of scope: no parent/child)"
+
+[[items]]
+kind = "query-dsl"
+name = "intervals"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "distance_feature"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "geo_bounding_box"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "query-dsl"
+name = "geo_distance"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "query-dsl"
+name = "geo_polygon"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "query-dsl"
+name = "geo_shape"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "query-dsl"
+name = "knn"
+status = "skipped (out of scope: k-NN plugin)"
+
+[[items]]
+kind = "query-dsl"
+name = "template"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "wrapper"
+status = "missing"
+
+[[items]]
+kind = "query-dsl"
+name = "span-queries-group"
+status = "skipped (out of scope: low-leverage; full Lucene Span feature)"
+notes = "Group: span_term, span_first, span_near, span_or, span_not, span_containing, span_within, span_multi, field_masking_span. Implementing requires positional postings — out of scope."
+
+# ── Aggregations ───────────────────────────────────────────────────────────
+# Enumerated from server/src/main/java/org/opensearch/search/aggregations/**/*AggregationBuilder.java.
+
+# Metric aggregations
+[[items]]
+kind = "aggregation"
+name = "sum"
+status = "mapped"
+local = "crates/cave-search/src/aggregation.rs:14 (Aggregation::Sum)"
+
+[[items]]
+kind = "aggregation"
+name = "avg"
+status = "mapped"
+local = "crates/cave-search/src/aggregation.rs:15 (Aggregation::Avg)"
+
+[[items]]
+kind = "aggregation"
+name = "min"
+status = "mapped"
+local = "crates/cave-search/src/aggregation.rs:16 (Aggregation::Min)"
+
+[[items]]
+kind = "aggregation"
+name = "max"
+status = "mapped"
+local = "crates/cave-search/src/aggregation.rs:17 (Aggregation::Max)"
+
+[[items]]
+kind = "aggregation"
+name = "value_count"
+status = "mapped"
+local = "crates/cave-search/src/aggregation.rs:18 (Aggregation::ValueCount)"
+
+[[items]]
+kind = "aggregation"
+name = "cardinality"
+status = "partial"
+local = "crates/cave-search/src/aggregation.rs:19 (Aggregation::Cardinality)"
+notes = "Exact via HashSet rather than HyperLogLog++; precision_threshold / rehash params ignored."
+
+[[items]]
+kind = "aggregation"
+name = "stats"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "extended_stats"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "percentiles"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "percentile_ranks"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "weighted_avg"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "median_absolute_deviation"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "top_hits"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "scripted_metric"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "aggregation"
+name = "geo_centroid"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "aggregation"
+name = "geo_bounds"
+status = "skipped (out of scope: no geo eval)"
+
+# Bucket aggregations
+[[items]]
+kind = "aggregation"
+name = "terms"
+status = "partial"
+local = "crates/cave-search/src/aggregation.rs:13 (Aggregation::Terms)"
+notes = "Field + size only; min_doc_count, order, include/exclude, missing, show_term_doc_count_error not supported."
+
+[[items]]
+kind = "aggregation"
+name = "multi_terms"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "rare_terms"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "significant_terms"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "significant_text"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "histogram"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "date_histogram"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "auto_date_histogram"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "variable_width_histogram"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "range"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "date_range"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "ip_range"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "geo_distance"
+status = "skipped (out of scope: no geo eval)"
+
+[[items]]
+kind = "aggregation"
+name = "filter"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "filters"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "missing"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "global"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "nested"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "reverse_nested"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "sampler"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "diversified_sampler"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "adjacency_matrix"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "composite"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "children"
+status = "skipped (out of scope: no parent/child)"
+
+[[items]]
+kind = "aggregation"
+name = "parent"
+status = "skipped (out of scope: no parent/child)"
+
+# Pipeline aggregations
+[[items]]
+kind = "aggregation"
+name = "avg_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "sum_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "min_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "max_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "stats_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "extended_stats_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "percentiles_bucket"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "bucket_script"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "aggregation"
+name = "bucket_selector"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "aggregation"
+name = "bucket_sort"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "cumulative_sum"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "derivative"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "moving_avg"
+status = "missing"
+
+[[items]]
+kind = "aggregation"
+name = "moving_fn"
+status = "skipped (out of scope: no scripting)"
+
+[[items]]
+kind = "aggregation"
+name = "serial_diff"
+status = "missing"
+
+# ── Mapping field types ────────────────────────────────────────────────────
+# Enumerated from server/src/main/java/org/opensearch/index/mapper/**/*FieldMapper.java.
+
+[[items]]
+kind = "mapping-type"
+name = "text"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:11 (FieldType::Text)"
+notes = "Tokenization is fixed (split-on-non-alnum + lowercase). No analyzer config, no norms, no positions, no term_vector."
+
+[[items]]
+kind = "mapping-type"
+name = "keyword"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:12 (FieldType::Keyword)"
+
+[[items]]
+kind = "mapping-type"
+name = "constant_keyword"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "wildcard"
+status = "missing"
+notes = "Wildcard FIELD type (distinct from wildcard query)."
+
+[[items]]
+kind = "mapping-type"
+name = "match_only_text"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "long"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:13 (FieldType::Long)"
+
+[[items]]
+kind = "mapping-type"
+name = "integer"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:14 (FieldType::Integer)"
+
+[[items]]
+kind = "mapping-type"
+name = "short"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:15 (FieldType::Short)"
+
+[[items]]
+kind = "mapping-type"
+name = "byte"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:16 (FieldType::Byte)"
+
+[[items]]
+kind = "mapping-type"
+name = "double"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:17 (FieldType::Double)"
+
+[[items]]
+kind = "mapping-type"
+name = "float"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:18 (FieldType::Float)"
+
+[[items]]
+kind = "mapping-type"
+name = "half_float"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "scaled_float"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "unsigned_long"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "date"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:19 (FieldType::Date)"
+notes = "Accepts string or epoch on validation but no parsing/format/time_zone — no actual date value handling."
+
+[[items]]
+kind = "mapping-type"
+name = "date_nanos"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "boolean"
+status = "mapped"
+local = "crates/cave-search/src/mapping.rs:20 (FieldType::Boolean)"
+
+[[items]]
+kind = "mapping-type"
+name = "binary"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "object"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:21 (FieldType::Object)"
+notes = "Validated as object/array; no nested property mapping walked, no dynamic mapping."
+
+[[items]]
+kind = "mapping-type"
+name = "nested"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:22 (FieldType::Nested)"
+notes = "Type tag accepted but no nested-doc query semantics."
+
+[[items]]
+kind = "mapping-type"
+name = "flat_object"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "flattened"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "ip"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:23 (FieldType::Ip)"
+notes = "Stored as string; no IP/CIDR query semantics."
+
+[[items]]
+kind = "mapping-type"
+name = "geo_point"
+status = "partial"
+local = "crates/cave-search/src/mapping.rs:24 (FieldType::GeoPoint)"
+notes = "Validation only — accepts object/string/array forms but no spatial indexing or query."
+
+[[items]]
+kind = "mapping-type"
+name = "geo_shape"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "completion"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "search_as_you_type"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "token_count"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "percolator"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "join"
+status = "skipped (out of scope: no parent/child)"
+
+[[items]]
+kind = "mapping-type"
+name = "alias"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "rank_feature"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "rank_features"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "dense_vector"
+status = "skipped (out of scope: k-NN plugin)"
+
+[[items]]
+kind = "mapping-type"
+name = "sparse_vector"
+status = "skipped (out of scope: k-NN plugin)"
+
+[[items]]
+kind = "mapping-type"
+name = "knn_vector"
+status = "skipped (out of scope: k-NN plugin)"
+
+[[items]]
+kind = "mapping-type"
+name = "histogram"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "integer_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "long_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "float_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "double_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "date_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "ip_range"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "version"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "semantic_version"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "doc_count"
+status = "missing"
+
+[[items]]
+kind = "mapping-type"
+name = "derived"
+status = "missing"
+
+# Metadata field mappers (skipped en bloc — internal _id/_source/_seq_no/_index/_routing/_field_names/_ignored)
+[[items]]
+kind = "mapping-type"
+name = "metadata-fields-group"
+status = "partial"
+local = "crates/cave-search/src/index.rs:12 (StoredDoc surfaces id/seq_no/primary_term/version)"
+notes = "Group: _id, _index, _seq_no, _primary_term, _version, _source, _routing, _field_names, _ignored, _data_stream, _doc_count. cave-search exposes _id, _index, _version, _seq_no, _primary_term, _source. Others not modeled."
+
+# ── Analyzers / Tokenizers / Token filters ─────────────────────────────────
+# Built-ins from server/src/main/java/org/opensearch/index/analysis. Grouped because cave-search has only one fixed pipeline.
+
+[[items]]
+kind = "analyzer"
+name = "standard"
+status = "partial"
+local = "crates/cave-search/src/index.rs:175 (tokenize)"
+notes = "Closest match: split-on-non-alnum + lowercase. No stop words, no Unicode normalization."
+
+[[items]]
+kind = "analyzer"
+name = "simple"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "whitespace"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "stop"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "keyword"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "pattern"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "fingerprint"
+status = "missing"
+
+[[items]]
+kind = "analyzer"
+name = "language-analyzers-group"
+status = "missing"
+notes = "Group: english, french, german, spanish, italian, portuguese, russian, dutch, danish, swedish, norwegian, arabic, chinese, japanese, korean, thai, etc. ~30 language-specific analyzers — none implemented."
+
+[[items]]
+kind = "analyzer"
+name = "custom"
+status = "missing"
+notes = "User-defined analyzer composition (char_filter + tokenizer + filter chain) not supported."
+
+[[items]]
+kind = "tokenizer"
+name = "standard"
+status = "partial"
+local = "crates/cave-search/src/index.rs:175 (tokenize)"
+notes = "Approximated by split-on-non-alphanumeric."
+
+[[items]]
+kind = "tokenizer"
+name = "letter"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "lowercase"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "whitespace"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "uax_url_email"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "classic"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "thai"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "ngram"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "edge_ngram"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "keyword"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "pattern"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "simple_pattern"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "simple_pattern_split"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "char_group"
+status = "missing"
+
+[[items]]
+kind = "tokenizer"
+name = "path_hierarchy"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "lowercase"
+status = "partial"
+local = "crates/cave-search/src/index.rs:179 (tokenize lowercases each token)"
+
+[[items]]
+kind = "token-filter"
+name = "uppercase"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "stop"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "snowball"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "stemmer"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "kstem"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "porter_stem"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "asciifolding"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "length"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "ngram"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "edge_ngram"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "shingle"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "synonym"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "synonym_graph"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "word_delimiter"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "word_delimiter_graph"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "hunspell"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "trim"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "reverse"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "unique"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "limit"
+status = "missing"
+
+[[items]]
+kind = "token-filter"
+name = "char-filter-group"
+status = "missing"
+notes = "Group: html_strip, mapping, pattern_replace — character filters not implemented."
+
+# ── Subsystems ─────────────────────────────────────────────────────────────
+
+[[items]]
+kind = "subsystem"
+name = "lucene-segment-storage"
+status = "missing"
+notes = "Storage is in-memory BTreeMap<id, StoredDoc>. No segments, no FST, no codecs, no merge policy."
+
+[[items]]
+kind = "subsystem"
+name = "translog"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "refresh"
+status = "missing"
+notes = "Documents are immediately visible — no near-real-time semantics, no _refresh, no refresh_interval setting."
+
+[[items]]
+kind = "subsystem"
+name = "merge-policy"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "shard-allocation"
+status = "missing"
+notes = "ClusterState records primary/replica counts in cluster.rs but no allocator runs."
+
+[[items]]
+kind = "subsystem"
+name = "peer-recovery"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "segment-replication"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "cross-cluster-replication"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "snapshot-restore"
+status = "missing"
+notes = "No FS, S3, GCS, Azure, HDFS repositories."
+
+[[items]]
+kind = "subsystem"
+name = "ingest-pipelines"
+status = "missing"
+notes = "No processors (set, remove, gsub, grok, geoip, user_agent, etc.)."
+
+[[items]]
+kind = "subsystem"
+name = "search-pipelines"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "query-cache"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "request-cache"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "fielddata-cache"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "circuit-breaker"
+status = "missing"
+
+[[items]]
+kind = "subsystem"
+name = "thread-pools"
+status = "missing"
+notes = "Async via tokio shared with rest of cave-runtime; no per-pool sizing/queue/rejected counters."
+
+[[items]]
+kind = "subsystem"
+name = "gateway-recovery"
+status = "missing"
+notes = "No persistence, so no recovery on restart."
+
+[[items]]
+kind = "subsystem"
+name = "transport-layer"
+status = "missing"
+notes = "No internal transport — only external HTTP/REST via axum."
+
+# ── Cluster coordination ───────────────────────────────────────────────────
+
+[[items]]
+kind = "cluster-coordination"
+name = "cluster-state"
+status = "partial"
+local = "crates/cave-search/src/cluster.rs:31 (ClusterState)"
+notes = "Single-node in-memory state with index/shard counts and recomputed health. No state versioning, no publication, no master."
+
+[[items]]
+kind = "cluster-coordination"
+name = "discovery-zen2"
+status = "skipped (out of scope: single-node)"
+
+[[items]]
+kind = "cluster-coordination"
+name = "master-election"
+status = "skipped (out of scope: single-node)"
+
+[[items]]
+kind = "cluster-coordination"
+name = "voting-config"
+status = "skipped (out of scope: single-node)"
+
+[[items]]
+kind = "cluster-coordination"
+name = "follower-checker"
+status = "skipped (out of scope: single-node)"
+
+[[items]]
+kind = "cluster-coordination"
+name = "shard-allocation-deciders"
+status = "missing"
+
+[[items]]
+kind = "cluster-coordination"
+name = "persistent-vs-transient-settings"
+status = "missing"
+notes = "No /_cluster/settings endpoint; settings model not implemented."
+
+[[items]]
+kind = "cluster-coordination"
+name = "decommission-awareness"
+status = "skipped (out of scope: single-node)"
+
+[[items]]
+kind = "cluster-coordination"
+name = "weighted-routing"
+status = "skipped (out of scope: single-node)"
+
+# ── Tools ──────────────────────────────────────────────────────────────────
+
+[[items]]
+kind = "tool"
+name = "opensearch-cli"
+status = "skipped (CLI)"
+
+[[items]]
+kind = "tool"
+name = "opensearch (daemon binary)"
+status = "partial"
+local = "crates/cave-search/src/server.rs:50 (bind)"
+notes = "Embedded axum server replaces the standalone JVM daemon for cave-runtime use."
+
+# ── Plugins ────────────────────────────────────────────────────────────────
+
+[[items]]
+kind = "plugin"
+name = "plugin-spi"
+status = "skipped (UI/out of scope: no plugin loading)"
+
+[[items]]
+kind = "plugin"
+name = "security"
+status = "skipped (UI/out of scope: handled at cave-runtime layer)"
+
+[[items]]
+kind = "plugin"
+name = "k-nn"
+status = "skipped (UI/out of scope: vector search via separate crate)"
+
+[[items]]
+kind = "plugin"
+name = "neural-search"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "ml-commons"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "anomaly-detection"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "observability"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "alerting"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "asynchronous-search"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "sql"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "index-management"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "cross-cluster-replication-plugin"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "geospatial"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "ingest-attachment"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "analysis-icu"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "analysis-kuromoji"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "analysis-smartcn"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "repository-s3"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "repository-gcs"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "repository-azure"
+status = "skipped (UI/out of scope)"
+
+[[items]]
+kind = "plugin"
+name = "repository-hdfs"
+status = "skipped (UI/out of scope)"

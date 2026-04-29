@@ -1,0 +1,1068 @@
+# Parity manifest for cave-iceberg vs apache/iceberg.
+# This file enumerates the upstream surface (REST endpoints + Java API)
+# and records, for each item, whether the local Rust crate implements it.
+# Source-of-truth surfaces consulted:
+#   - open-api/rest-catalog-open-api.yaml          (REST endpoints)
+#   - api/src/main/java/org/apache/iceberg/        (Table, Catalog, expressions)
+#   - format-spec.md / iceberg.apache.org/spec     (manifests, schemas, partitions)
+
+[upstream]
+org    = "apache"
+repo   = "iceberg"
+commit = "c81534fba6a521f70dd1c054c4f688622c04c09d"
+
+[module]
+name  = "cave-iceberg"
+path  = "crates/cave-iceberg"
+loc   = 3900
+
+[summary]
+items_total       = 167
+mapped            = 45
+partial           = 19
+unmapped          = 95
+skipped_cli       = 1
+skipped_ui        = 3
+skipped_engine    = 4
+notes             = "Local crate is an in-memory REST catalog skeleton + spec types. It implements 7 of ~32 REST endpoints (config + namespace CRUD + table CRUD + commit + rename) and the static spec types (Schema, PartitionSpec, Snapshot, TableMetadata, ManifestEntry). No file I/O (Avro/Parquet/Puffin), no scan/plan, no views, no OAuth, no transactions, no expressions, no schema/partition evolution mutators (the deep/* modules carry struct shells but no mutator API)."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST endpoints — every (path, method) from rest-catalog-open-api.yaml.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/config"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:47"
+notes  = "Returns ConfigResponse{overrides,defaults}; route bound on router."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/oauth/tokens"
+status = "unmapped"
+notes  = "OAuth2 token exchange — required by clients using SigV4/credential-vending; no auth layer in cave-iceberg."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:48"
+notes  = "Local route is /v1/namespaces (no {prefix} multi-tenant segment); list_namespaces handler."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:48"
+notes  = "create_namespace handler; accepts {namespace, properties}."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:50"
+notes  = "get_namespace returns properties."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "HEAD /v1/{prefix}/namespaces/{namespace}"
+status = "unmapped"
+notes  = "namespaceExists probe — clients use this for cheap existence checks; only GET implemented."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "DELETE /v1/{prefix}/namespaces/{namespace}"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:50"
+notes  = "drop_namespace handler — rejects non-empty."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/properties"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:53"
+notes  = "update_properties (updates+removals)."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/tables"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:55"
+notes  = "list_tables handler."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:55"
+notes  = "create_table handler — accepts metadata_location only; no schema/spec/sort-order body fields."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan"
+status = "unmapped"
+notes  = "Server-side scan planning (returns plan-id) — the modern read path; absence forces clients to fall back to local planning over manifests."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan/{plan-id}"
+status = "unmapped"
+notes  = "Poll a submitted scan plan."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "DELETE /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan/{plan-id}"
+status = "unmapped"
+notes  = "Cancel a scan plan."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks"
+status = "unmapped"
+notes  = "Fetch file-scan-tasks for a plan — read-path."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/register"
+status = "unmapped"
+notes  = "registerTable — adopt an existing metadata.json without rewriting; common for migrations between catalogs."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/tables/{table}"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:59"
+notes  = "load_table — but local response is TableEntry, not the spec's LoadTableResponse{metadata,metadata-location,config}."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}"
+status = "partial"
+local  = "crates/cave-iceberg/src/server.rs:59"
+notes  = "commit_table — local commit takes (expected_metadata_location,new_metadata_location); upstream takes a CommitTableRequest with requirements[] + updates[] (UpdateTable spec). Optimistic-concurrency idea is correct but request body shape diverges."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "DELETE /v1/{prefix}/namespaces/{namespace}/tables/{table}"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:59"
+notes  = "drop_table; query param purgeRequested not honoured."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "HEAD /v1/{prefix}/namespaces/{namespace}/tables/{table}"
+status = "unmapped"
+notes  = "tableExists probe — only GET implemented."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/tables/{table}/credentials"
+status = "unmapped"
+notes  = "Vended-credentials endpoint — required for AWS/GCS/Azure clients that use catalog-managed STS."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/sign"
+status = "unmapped"
+notes  = "S3 request signer (PyIceberg/Spark uses this when S3.signer-uri points at the catalog)."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/tables/rename"
+status = "mapped"
+local  = "crates/cave-iceberg/src/server.rs:62"
+notes  = "rename_table; accepts {source, destination} TableIdentifier pairs."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/metrics"
+status = "unmapped"
+notes  = "ReportMetricsRequest — scan/commit metrics telemetry; clients quietly skip if 404 but engines lose observability."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/transactions/commit"
+status = "unmapped"
+notes  = "Multi-table atomic commit — required for cross-table writes (e.g. CTAS+INSERT pairs)."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/views"
+status = "unmapped"
+notes  = "listViews — no view subsystem in cave-iceberg."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/views"
+status = "unmapped"
+notes  = "createView."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "GET /v1/{prefix}/namespaces/{namespace}/views/{view}"
+status = "unmapped"
+notes  = "loadView."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/views/{view}"
+status = "unmapped"
+notes  = "replaceView / commit-view."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "DELETE /v1/{prefix}/namespaces/{namespace}/views/{view}"
+status = "unmapped"
+notes  = "dropView."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "HEAD /v1/{prefix}/namespaces/{namespace}/views/{view}"
+status = "unmapped"
+notes  = "viewExists."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/views/rename"
+status = "unmapped"
+notes  = "renameView."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "POST /v1/{prefix}/namespaces/{namespace}/register-view"
+status = "unmapped"
+notes  = "registerView — adopt existing view metadata."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Catalog interface — org.apache.iceberg.catalog.Catalog & friends.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.listTables(Namespace)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:208"
+notes  = "RestCatalog::list_tables."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.createTable(...)"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:135"
+notes  = "Local create_table stores name+metadata_location only; upstream signature carries Schema, PartitionSpec, SortOrder, location, properties."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.TableBuilder (withSchema/withSpec/withSortOrder/withProperty)"
+status = "unmapped"
+notes  = "Builder API absent."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.newCreateTableTransaction"
+status = "unmapped"
+notes  = "Create-as-transaction not implemented."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.newReplaceTableTransaction"
+status = "unmapped"
+notes  = "Replace/CTAS transaction."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.dropTable(TableIdentifier, boolean purge)"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:166"
+notes  = "drop_table — does not honour purge=true (no FS deletion)."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.renameTable"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:174"
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.loadTable"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:200"
+notes  = "Returns TableEntry (catalog stub) not Table (no Schema/Snapshot loading)."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.tableExists"
+status = "unmapped"
+notes  = "Could be derived but no explicit method."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.registerTable"
+status = "unmapped"
+notes  = "Adopt foreign metadata.json — see also REST /register endpoint."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Catalog.invalidateTable"
+status = "unmapped"
+notes  = "Cache invalidation hook."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.createNamespace"
+status   = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:68"
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.listNamespaces(parent)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:95"
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.loadNamespaceMetadata"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:109"
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.dropNamespace"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:82"
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.setProperties / removeProperties"
+status = "mapped"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:116"
+notes  = "Combined into update_namespace_properties(updates, removals)."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SupportsNamespaces.namespaceExists"
+status = "unmapped"
+notes  = "No HEAD-like probe."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "ViewCatalog.listViews/loadView/createView/replaceView/dropView/renameView"
+status = "unmapped"
+notes  = "Whole view subsystem absent."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "SessionCatalog (multi-session context)"
+status = "unmapped"
+notes  = "Per-session contexts (auth, user) not modelled; tenant_id field exists in spec types but is unwired in catalog ops."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "TableIdentifier"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:36"
+notes  = "Represented as (namespace, name) tuple — no dedicated TableIdentifier type."
+
+[[items]]
+kind   = "catalog-interface"
+name   = "Namespace"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:258"
+notes  = "Stored as dot-joined String; upstream is String[] levels."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Table API (org.apache.iceberg.Table) — runtime accessors and mutators.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "table-op"
+name   = "Table.refresh"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.schema / schemas"
+status = "partial"
+local  = "crates/cave-iceberg/src/table_metadata.rs:60"
+notes  = "current_schema()/schemas exposed via TableMetadata struct, but no live Table abstraction."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.spec / specs"
+status = "partial"
+local  = "crates/cave-iceberg/src/table_metadata.rs:66"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.sortOrder / sortOrders"
+status = "unmapped"
+notes  = "No SortOrder type at all."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.properties"
+status = "partial"
+local  = "crates/cave-iceberg/src/rest_catalog.rs:42"
+notes  = "Table-level properties carried on TableEntry; but TableMetadata struct has no properties field."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.location"
+status = "mapped"
+local  = "crates/cave-iceberg/src/table_metadata.rs:22"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.currentSnapshot"
+status = "mapped"
+local  = "crates/cave-iceberg/src/table_metadata.rs:72"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.snapshots"
+status = "mapped"
+local  = "crates/cave-iceberg/src/table_metadata.rs:30"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.snapshot(id)"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.history"
+status = "unmapped"
+notes  = "snapshot-log / metadata-log not modelled."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.refs (branches+tags)"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/time_travel.rs:40"
+notes  = "deep/time_travel has SnapshotRef shell types; not wired to TableMetadata."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.io / FileIO"
+status = "unmapped"
+notes  = "No FileIO abstraction; no Parquet/Avro file reading."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.encryption / EncryptionManager"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.locationProvider"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newScan"
+status = "unmapped"
+notes  = "No scan API — read path entirely absent."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newAppend"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newFastAppend"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newOverwrite"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newRowDelta"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newReplacePartitions"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newDelete"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newRewrite"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Table.newTransaction"
+status = "unmapped"
+notes  = "No Transaction abstraction (multi-update grouping)."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.updateSchema/updateSpec/updateLocation/updateProperties/replaceSortOrder"
+status = "unmapped"
+notes  = "Pending-update builders absent."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.manageSnapshots"
+status = "unmapped"
+notes  = "Branch/tag/cherrypick management."
+
+[[items]]
+kind   = "table-op"
+name   = "Table.expireSnapshots"
+status = "unmapped"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Manifest spec — the on-disk Avro structures.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestEntry (status, snapshot_id, data_file)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/manifest.rs:73"
+notes  = "Status enum (Existing/Added/Deleted) with codes 0/1/2."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestEntry.sequence_number"
+status = "mapped"
+local  = "crates/cave-iceberg/src/manifest.rs:77"
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestEntry.data_sequence_number / file_sequence_number (v2)"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/manifest_v2.rs:26"
+notes  = "Distinct fields exist in deep/manifest_v2.rs but not in canonical manifest.rs."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataFile (path, format, partition_spec_id, content, record_count, file_size)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/manifest.rs:62"
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataFile.column_sizes / value_counts / null_value_counts / lower_bounds / upper_bounds"
+status = "unmapped"
+notes  = "Per-column stats absent — required for predicate pushdown / metrics-based pruning."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataFile.partition (partition tuple)"
+status = "unmapped"
+notes  = "Concrete partition values per file not stored."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataFile.split_offsets / sort_order_id / equality_ids / key_metadata"
+status = "unmapped"
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataContent (DATA / POSITION_DELETES / EQUALITY_DELETES)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/manifest.rs:43"
+
+[[items]]
+kind   = "manifest-spec"
+name   = "DataFileFormat (PARQUET/ORC/AVRO)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/manifest.rs:13"
+notes  = "Type only; no reader/writer."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestFile (path, length, partition_spec_id, sequence_number, snapshot_id, ...)"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/manifest_v2.rs:52"
+notes  = "Struct shell only; no Avro encode/decode."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestList (Avro list-of-ManifestFile)"
+status = "unmapped"
+notes  = "Snapshot.manifest_list is just a String path; no parser/writer."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "Manifest v1 vs v2 dispatch"
+status = "partial"
+notes  = "TableMetadata pins format_version=2; v1 not supported."
+
+[[items]]
+kind   = "manifest-spec"
+name   = "ManifestReader / ManifestWriter (Avro IO)"
+status = "unmapped"
+notes  = "No Avro library wiring."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Snapshot operations.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "snapshot-op"
+name   = "Snapshot type (id, parent, sequence, timestamp, manifest_list, summary)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/snapshot.rs:73"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "SnapshotSummary (operation + key/values)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/snapshot.rs:36"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "SnapshotOperation enum (append/overwrite/replace/delete)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/snapshot.rs:15"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "fastAppend"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "mergeAppend"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "overwrite (newOverwrite)"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "rowDelta (RowDelta)"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "replacePartitions (ReplacePartitions)"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "deleteFiles (DeleteFiles)"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "expireSnapshots"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "rollbackToSnapshot"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "rollbackToTimestamp"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/time_travel.rs:1"
+notes  = "Time-travel lookup-by-timestamp is sketched in deep/time_travel.rs but not connected to a rollback mutator."
+
+[[items]]
+kind   = "snapshot-op"
+name   = "cherrypick (ManageSnapshots.cherrypick)"
+status = "unmapped"
+
+[[items]]
+kind   = "snapshot-op"
+name   = "Branch/Tag refs (createBranch/createTag/replaceBranch)"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/time_travel.rs:40"
+notes  = "Ref types modelled, mutators incomplete."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Schema evolution.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Schema (fields, schema_id)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/schema.rs:1"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Field (id, name, required, type, doc)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/schema.rs:52"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "PrimitiveType set (boolean/int/long/float/double/string/binary/uuid/date/time/timestamp/timestamptz)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/schema.rs:14"
+notes  = "Decimal(p,s) and Fixed(L) not supported."
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Decimal(p,s) / Fixed(L) primitives"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Nested types: Struct / List / Map"
+status = "unmapped"
+notes  = "Schema is flat — only primitive fields."
+
+[[items]]
+kind   = "schema-evolution"
+name   = "addColumn"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "dropColumn"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "renameColumn"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "updateColumn type promotion (int→long, float→double, decimal precision↑)"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "reorderColumns / moveBefore / moveAfter / moveFirst"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "makeColumnOptional / makeColumnRequired"
+status = "unmapped"
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Identifier fields (PK)"
+status = "unmapped"
+notes  = "Schema has no identifier_field_ids."
+
+[[items]]
+kind   = "schema-evolution"
+name   = "Schema versioning (multiple schema_ids in TableMetadata)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/table_metadata.rs:26"
+notes  = "schemas: Vec<Schema> + current_schema_id present."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Partition spec.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "partition-spec"
+name   = "PartitionSpec (spec_id, fields)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:1"
+
+[[items]]
+kind   = "partition-spec"
+name   = "Unpartitioned tables (empty spec)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:1"
+notes  = "Empty fields list permitted."
+
+[[items]]
+kind   = "partition-spec"
+name   = "Partition spec evolution: addField"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/partition_evolution.rs:1"
+notes  = "Spec-level type modelled in deep/partition_evolution.rs, no fluent UpdatePartitionSpec API."
+
+[[items]]
+kind   = "partition-spec"
+name   = "Partition spec evolution: dropField / renameField"
+status = "partial"
+local  = "crates/cave-iceberg/src/deep/partition_evolution.rs:1"
+
+[[items]]
+kind   = "partition-spec"
+name   = "PartitionField (source_id, field_id, name, transform)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:1"
+
+[[items]]
+kind   = "partition-spec"
+name   = "Multiple specs by spec_id (TableMetadata.partition_specs)"
+status = "mapped"
+local  = "crates/cave-iceberg/src/table_metadata.rs:28"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sort order.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "sort-order"
+name   = "SortOrder (order_id, fields)"
+status = "unmapped"
+
+[[items]]
+kind   = "sort-order"
+name   = "SortField (transform, source_id, direction, null_order)"
+status = "unmapped"
+
+[[items]]
+kind   = "sort-order"
+name   = "Direction (ASC/DESC) and NullOrder (NULLS_FIRST/LAST)"
+status = "unmapped"
+
+[[items]]
+kind   = "sort-order"
+name   = "TableMetadata.sort_orders / default_sort_order_id"
+status = "unmapped"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Transforms (partition + sort).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "transform"
+name   = "identity"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:15"
+
+[[items]]
+kind   = "transform"
+name   = "year"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:18"
+
+[[items]]
+kind   = "transform"
+name   = "month"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:19"
+
+[[items]]
+kind   = "transform"
+name   = "day"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:20"
+
+[[items]]
+kind   = "transform"
+name   = "hour"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:21"
+
+[[items]]
+kind   = "transform"
+name   = "bucket[N]"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:16"
+
+[[items]]
+kind   = "transform"
+name   = "truncate[N]"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:17"
+
+[[items]]
+kind   = "transform"
+name   = "void"
+status = "mapped"
+local  = "crates/cave-iceberg/src/partition.rs:22"
+
+[[items]]
+kind   = "transform"
+name   = "Transform application (apply to value at scan/write time)"
+status = "unmapped"
+notes  = "Variants exist as enum tags only; no apply()/hash/bucket implementation."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# File formats.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "file-format"
+name   = "Parquet reader/writer"
+status = "unmapped"
+notes  = "Format enum tag exists in DataFileFormat; no Parquet I/O."
+
+[[items]]
+kind   = "file-format"
+name   = "ORC reader/writer"
+status = "unmapped"
+
+[[items]]
+kind   = "file-format"
+name   = "Avro reader/writer (manifest + manifest-list)"
+status = "unmapped"
+notes  = "Whole on-disk manifest layer is missing."
+
+[[items]]
+kind   = "file-format"
+name   = "Puffin (statistics file)"
+status = "unmapped"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Expressions (filtering).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "expression"
+name   = "Expression hierarchy (AlwaysTrue/AlwaysFalse/And/Or/Not/Predicate)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Term constructors (ref, lit)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Comparison predicates (equal, notEqual, lt, lte, gt, gte)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Set predicates (in, notIn)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Null predicates (isNull, notNull)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "NaN predicates (isNaN, notNaN)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "String predicates (startsWith, notStartsWith)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Aggregate expressions (min/max/count/countStar)"
+status = "unmapped"
+
+[[items]]
+kind   = "expression"
+name   = "Expression bind/visitor framework"
+status = "unmapped"
+notes  = "Grouped — no binder, rewriter, or visitor present."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tooling / engine integrations — out of scope for the catalog crate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "tool"
+name   = "iceberg-cli"
+status = "skipped (CLI)"
+notes  = "CLI is a separate consumer; not part of catalog parity."
+
+[[items]]
+kind   = "tool"
+name   = "spark-iceberg integration"
+status = "skipped (engine)"
+notes  = "Engine binding."
+
+[[items]]
+kind   = "tool"
+name   = "flink-iceberg integration"
+status = "skipped (engine)"
+notes  = "Engine binding."
+
+[[items]]
+kind   = "tool"
+name   = "hive-iceberg integration"
+status = "skipped (engine)"
+notes  = "Engine binding."
+
+[[items]]
+kind   = "tool"
+name   = "trino/presto-iceberg integration"
+status = "skipped (engine)"
+notes  = "Engine binding."
+
+[[items]]
+kind   = "tool"
+name   = "iceberg web UI / dashboards"
+status = "skipped (UI)"
+notes  = "No upstream UI; placeholder."
+
+[[items]]
+kind   = "tool"
+name   = "REST catalog reference server (iceberg-rest-fixture)"
+status = "skipped (UI)"
+notes  = "Test fixture — engines, not catalog parity."
+
+[[items]]
+kind   = "tool"
+name   = "iceberg-aws / iceberg-gcp / iceberg-azure (FileIO)"
+status = "skipped (UI)"
+notes  = "Cloud FileIO providers — out of scope without FileIO."
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cross-cutting items (auth, OAuth, error model, multi-tenancy, encryption).
+# ─────────────────────────────────────────────────────────────────────────────
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "Bearer / OAuth2 auth (Authorization header)"
+status = "unmapped"
+notes  = "No auth middleware — server is open."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "{prefix} multi-tenant path segment"
+status = "partial"
+local  = "crates/cave-iceberg/src/tenant.rs:1"
+notes  = "tenant_id field exists on TableMetadata/Schema/Snapshot but server.rs routes do not include {prefix} or extract a tenant per request."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "ErrorModel JSON response shape"
+status = "partial"
+local  = "crates/cave-iceberg/src/server.rs:1"
+notes  = "Error mapping uses StatusCode strings; not the spec's {error:{message,type,code}} envelope."
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "Pagination (pageToken / pageSize) on list endpoints"
+status = "unmapped"
+
+[[items]]
+kind   = "rest-endpoint"
+name   = "If-Match / ETag concurrency on commits"
+status = "unmapped"
+notes  = "Local commit uses expected_metadata_location body field; not HTTP ETag."
+
+[[items]]
+kind   = "table-op"
+name   = "Encryption / key-management (KMS, key_metadata)"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Statistics files (StatisticsFile / PartitionStatisticsFile)"
+status = "unmapped"
+
+[[items]]
+kind   = "table-op"
+name   = "Metadata-log retention / metadata file cleanup"
+status = "unmapped"
