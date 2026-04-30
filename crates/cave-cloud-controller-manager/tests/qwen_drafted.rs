@@ -320,3 +320,6 @@ mod cycle_1777493136_a2 {
         let _ = next_phase(LbPhase::Pending);
     }
 }
+
+// === cycle 1777565969 (qwen success at retry 1; ollama_calls=1; ollama_secs=513) ===
+
