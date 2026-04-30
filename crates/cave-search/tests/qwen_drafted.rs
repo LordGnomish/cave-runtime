@@ -384,3 +384,6 @@ mod tests {
         assert!(score > 0.0);
     }
 }
+
+// === cycle 1777531871 (qwen success at retry 1; ollama_calls=1; ollama_secs=510) ===
+
