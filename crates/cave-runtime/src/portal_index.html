@@ -359,6 +359,13 @@ const MODS = {
   // Operations
   backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null,loc:440,relatedAdrs:[46,80],github:'https://github.com/vmware-tanzu/velero'},
   cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null,loc:400,relatedAdrs:[96],github:'https://github.com/opencost/opencost'},
+  // Kubernetes Core
+  apiserver:{id:'apiserver',name:'API Server',cat:'k8s',desc:'kube-apiserver replacement — REST surface for core/v1, apps/v1, batch/v1, networking.k8s.io/v1',up:'kube-apiserver',phase:1,status:'healthy',icon:'🛂',features:['core/v1 resources','apps/v1 (Deployments, StatefulSets, DaemonSets, ReplicaSets)','batch/v1 (Jobs, CronJobs)','networking.k8s.io/v1 (Ingresses)','healthz / readyz','kubectl-compatible REST'],ep:'/api/apiserver/health',loc:6941,relatedAdrs:[],github:'https://github.com/kubernetes/kubernetes'},
+  etcd:{id:'etcd',name:'etcd',cat:'k8s',desc:'Distributed key-value store — etcd v3 wire-compatible (KV, watch, lease, auth, cluster, maintenance)',up:'etcd',phase:1,status:'healthy',icon:'🗝️',features:['MVCC store','Watch streams (SSE)','Lease grant/keepalive/revoke','Auth (users, roles, RBAC)','Cluster member ops','Maintenance (defrag, snapshot, hash, compact)'],ep:'/api/etcd/health',loc:5244,relatedAdrs:[],github:'https://github.com/etcd-io/etcd'},
+  cri:{id:'cri',name:'CRI',cat:'k8s',desc:'Container Runtime Interface — containerd/crun replacement (containers, sandboxes, images, snapshots, network)',up:'containerd',phase:1,status:'healthy',icon:'📦',features:['Container lifecycle (create/start/stop/exec/attach)','Sandbox (pod) lifecycle','Image pull/list/inspect/tag','Snapshot management','Network attach/detach','Linux namespace + cgroup v2 isolation'],ep:'/api/cri/health',loc:5709,relatedAdrs:[],github:'https://github.com/containerd/containerd'},
+  kubelet:{id:'kubelet',name:'Kubelet',cat:'k8s',desc:'Node agent — admits, starts, stops, and removes pods on the local node',up:'kubelet',phase:1,status:'healthy',icon:'🧑‍🔧',features:['Pod admission','Pod lifecycle (start/stop/remove)','Node status (capacity, allocatable, conditions)','Health probe'],ep:'/api/kubelet/health',loc:342,relatedAdrs:[],github:'https://github.com/kubernetes/kubernetes'},
+  scheduler:{id:'scheduler',name:'Scheduler',cat:'k8s',desc:'Pod scheduler — node registration, cordon, and resource-aware pod placement',up:'kube-scheduler',phase:1,status:'healthy',icon:'🗓️',features:['Node registration','Cordon / uncordon','Resource-aware scheduling (cpu_milli, memory_bytes)','Health probe'],ep:'/api/scheduler/health',loc:489,relatedAdrs:[],github:'https://github.com/kubernetes/kubernetes'},
+  net:{id:'net',name:'Network',cat:'k8s',desc:'Pod networking and service routing — kube-proxy + CNI replacement (IPAM, ClusterIP, NetworkPolicy, flows)',up:'kube-proxy / Cilium',phase:1,status:'healthy',icon:'🌐',features:['Pod IP allocation','ClusterIP services','NetworkPolicy enforcement','Flow logging','Policy check (src→dst:port)'],ep:'/api/net/health',loc:569,relatedAdrs:[],github:'https://github.com/kubernetes/kubernetes'},
 };
 
 const NAV=[
@@ -367,6 +374,7 @@ const NAV=[
   {type:'link',id:'upstream',label:'Upstream',icon:'📡'},
   {type:'link',id:'adrs',label:'Decisions',icon:'📋'},
   {type:'sec',id:'core',label:'Core Infrastructure',mods:['db','auth','upstream']},
+  {type:'sec',id:'k8s',label:'Kubernetes Core',mods:['apiserver','etcd','cri','kubelet','scheduler','net']},
   {type:'sec',id:'security',label:'Security',mods:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
   {type:'sec',id:'observability',label:'Observability',mods:['status','uptime','incidents','ai-obs','profiler','forensics']},
   {type:'sec',id:'cicd',label:'CI / CD',mods:['lint','changelog','docs','registry','chaos']},
@@ -374,7 +382,7 @@ const NAV=[
   {type:'sec',id:'operations',label:'Operations',mods:['backup','cost']},
 ];
 
-const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
+const CAT_LABELS={core:'Core Infrastructure',k8s:'Kubernetes Core',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
 
 // 66 tracked OSS projects
 const UPSTREAM_PROJECTS=[
