@@ -247,4 +247,187 @@ mod tests {
         let result = schedule(&req, &state);
         assert_eq!(result.node_name.as_deref(), Some("b"));
     }
+
+    #[test]
+    fn test_schedule_toleration_matches_taint_by_key() {
+        // A toleration with the same key as a NoSchedule taint must allow the pod
+        // through the filter. Mirrors kube-scheduler behavior: at least one
+        // toleration covers the taint key (Equal-style match without value
+        // checking is enough for the filter pass per the current impl).
+        let state = SchedulerState::new();
+        let mut tainted = make_node("gpu", 8000, 16_000_000_000);
+        tainted.taints.push(Taint {
+            key: "dedicated".into(),
+            value: Some("gpu".into()),
+            effect: TaintEffect::NoSchedule,
+        });
+        state.nodes.insert("gpu".into(), tainted);
+
+        let req = ScheduleRequest {
+            pod_name: "ml".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![Toleration {
+                key: Some("dedicated".into()),
+                operator: "Equal".into(),
+                value: Some("gpu".into()),
+                effect: Some(TaintEffect::NoSchedule),
+            }],
+            affinity: None,
+        };
+
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("gpu"));
+    }
+
+    #[test]
+    fn test_schedule_toleration_exists_operator_covers_any_taint() {
+        // A toleration with operator="Exists" and no key must match every taint.
+        let state = SchedulerState::new();
+        let mut tainted = make_node("locked", 8000, 16_000_000_000);
+        tainted.taints.push(Taint {
+            key: "anykey".into(),
+            value: None,
+            effect: TaintEffect::NoSchedule,
+        });
+        state.nodes.insert("locked".into(), tainted);
+
+        let req = ScheduleRequest {
+            pod_name: "tolerant".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![Toleration {
+                key: None,
+                operator: "Exists".into(),
+                value: None,
+                effect: None,
+            }],
+            affinity: None,
+        };
+
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("locked"));
+    }
+
+    #[test]
+    fn test_schedule_filters_not_ready_nodes() {
+        // A node in NotReady must be filtered out even if it has plenty of capacity.
+        let state = SchedulerState::new();
+        let mut bad = make_node("dead", 32_000, 64_000_000_000);
+        bad.status = NodeStatus::NotReady;
+        state.nodes.insert("dead".into(), bad);
+        state.nodes.insert("alive".into(), make_node("alive", 4000, 8_000_000_000));
+
+        let req = ScheduleRequest {
+            pod_name: "app".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 500, memory_bytes: 1_000_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: None,
+        };
+
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("alive"));
+        // Only one candidate survived the filter.
+        assert_eq!(result.scored_nodes.len(), 1);
+    }
+
+    #[test]
+    fn test_schedule_least_allocated_wins_among_equals() {
+        // Two same-size nodes; the one with lower existing allocation should win
+        // (higher cpu_free_pct -> higher score).
+        let state = SchedulerState::new();
+        let mut busy = make_node("busy", 4000, 8_000_000_000);
+        busy.allocated.cpu_millicores = 3000;
+        let idle = make_node("idle", 4000, 8_000_000_000);
+        state.nodes.insert("busy".into(), busy);
+        state.nodes.insert("idle".into(), idle);
+
+        let req = ScheduleRequest {
+            pod_name: "balanced".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: None,
+        };
+
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("idle"));
+    }
+
+    #[test]
+    fn test_schedule_empty_cluster_returns_reason() {
+        // No registered nodes — must return None with an explanatory reason
+        // (not panic, not silently succeed).
+        let state = SchedulerState::new();
+        let req = ScheduleRequest {
+            pod_name: "lonely".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: None,
+        };
+        let result = schedule(&req, &state);
+        assert!(result.node_name.is_none());
+        assert!(result.scored_nodes.is_empty());
+        assert!(result.reason.contains("no nodes available"));
+    }
+
+    #[test]
+    fn test_schedule_decrements_winner_allocatable_budget() {
+        // After a successful schedule the winning node's allocated counters
+        // must reflect the request (otherwise capacity accounting drifts).
+        let state = SchedulerState::new();
+        state.nodes.insert("only".into(), make_node("only", 4000, 8_000_000_000));
+
+        let req = ScheduleRequest {
+            pod_name: "consumer".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 1500, memory_bytes: 2_000_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: None,
+        };
+
+        let _ = schedule(&req, &state);
+        let n = state.nodes.get("only").unwrap();
+        assert_eq!(n.allocated.cpu_millicores, 1500);
+        assert_eq!(n.allocated.memory_bytes, 2_000_000_000);
+        assert_eq!(n.allocated.pods, 1);
+    }
+
+    #[test]
+    fn test_schedule_affinity_required_labels_score_each() {
+        // Each matching label adds a small score bonus; node with more matches wins
+        // even when both pass the filter.
+        let state = SchedulerState::new();
+        let mut a = make_node("a", 4000, 8_000_000_000);
+        a.labels.insert("zone".into(), "us-west".into());
+        let mut b = make_node("b", 4000, 8_000_000_000);
+        b.labels.insert("zone".into(), "us-west".into());
+        b.labels.insert("rack".into(), "r5".into());
+        state.nodes.insert("a".into(), a);
+        state.nodes.insert("b".into(), b);
+
+        let mut required = HashMap::new();
+        required.insert("zone".into(), "us-west".into());
+        required.insert("rack".into(), "r5".into());
+
+        let req = ScheduleRequest {
+            pod_name: "rackaware".into(),
+            namespace: "default".into(),
+            resources: ResourceRequest { cpu_millicores: 100, memory_bytes: 100_000_000, ..Default::default() },
+            node_selector: HashMap::new(),
+            tolerations: vec![],
+            affinity: Some(Affinity { preferred_nodes: vec![], required_labels: required }),
+        };
+
+        let result = schedule(&req, &state);
+        assert_eq!(result.node_name.as_deref(), Some("b"));
+    }
 }

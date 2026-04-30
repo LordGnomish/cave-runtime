@@ -134,4 +134,79 @@ mod tests {
         assert_eq!(status.pod_count, 2);
         assert!(status.ready);
     }
+
+    #[test]
+    fn test_start_pod_unknown_uid_returns_none() {
+        // Starting a pod that was never assigned must return None, not panic
+        // and not create a phantom pod entry.
+        let state = KubeletState::new("test-node");
+        let bogus = Uuid::new_v4();
+        assert!(start_pod(&state, &bogus).is_none());
+        assert_eq!(state.pods.len(), 0);
+    }
+
+    #[test]
+    fn test_assign_pod_initial_container_state_is_waiting() {
+        // A freshly assigned pod's containers must start in Waiting/ContainerCreating
+        // — the lifecycle invariant that mirrors kubelet.
+        let state = KubeletState::new("test-node");
+        let pod = assign_pod(&state, "p", "ns", vec![("c".into(), "img:1".into())]);
+        match &pod.containers[0].state {
+            ContainerState::Waiting { reason } => {
+                assert_eq!(reason, "ContainerCreating");
+            }
+            other => panic!("expected Waiting, got {:?}", other),
+        }
+        assert!(!pod.containers[0].ready);
+        assert!(pod.containers[0].container_id.is_none());
+        assert!(pod.started_at.is_none());
+    }
+
+    #[test]
+    fn test_start_pod_assigns_container_id() {
+        // After start_pod every container must have a non-None container_id —
+        // this is what cave-cri later uses to address each container.
+        let state = KubeletState::new("test-node");
+        let pod = assign_pod(
+            &state, "multi", "ns",
+            vec![("c1".into(), "img1".into()), ("c2".into(), "img2".into())],
+        );
+        let started = start_pod(&state, &pod.uid).unwrap();
+        assert!(started.containers.iter().all(|c| c.container_id.is_some()));
+        assert!(started.containers.iter().all(|c| c.ready));
+        assert!(started.started_at.is_some());
+    }
+
+    #[test]
+    fn test_remove_unknown_pod_is_noop() {
+        // Removing a UID we don't have must not panic and must not affect
+        // existing pods.
+        let state = KubeletState::new("n");
+        let alive = assign_pod(&state, "alive", "ns", vec![("c".into(), "i".into())]);
+        let bogus = Uuid::new_v4();
+        assert!(remove_pod(&state, &bogus).is_none());
+        // alive pod still there.
+        assert!(state.pods.get(&alive.uid).is_some());
+    }
+
+    #[test]
+    fn test_stop_pod_zero_exit_code() {
+        // After stop_pod, every container must be Terminated with exit_code 0
+        // (graceful path) — this is what propagates up to the apiserver as
+        // PodPhase::Succeeded.
+        let state = KubeletState::new("n");
+        let pod = assign_pod(&state, "p", "ns", vec![("c".into(), "i".into())]);
+        start_pod(&state, &pod.uid);
+        let stopped = stop_pod(&state, &pod.uid).unwrap();
+        for c in &stopped.containers {
+            match &c.state {
+                ContainerState::Terminated { exit_code, reason, .. } => {
+                    assert_eq!(*exit_code, 0);
+                    assert_eq!(reason, "Stopped");
+                }
+                other => panic!("expected Terminated, got {:?}", other),
+            }
+            assert!(!c.ready);
+        }
+    }
 }

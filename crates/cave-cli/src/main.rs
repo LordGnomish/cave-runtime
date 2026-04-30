@@ -223,6 +223,36 @@ enum Commands {
         #[command(subcommand)]
         cmd: LocalLlmCmd,
     },
+    /// Distributed key-value store (etcd v3 replacement; etcdctl parity)
+    Etcd {
+        #[command(subcommand)]
+        cmd: EtcdCmd,
+    },
+    /// Container Runtime Interface (containerd/crun replacement; crictl parity)
+    Cri {
+        #[command(subcommand)]
+        cmd: CriCmd,
+    },
+    /// Kubernetes API server (kube-apiserver replacement; kubectl parity)
+    Apiserver {
+        #[command(subcommand)]
+        cmd: ApiserverCmd,
+    },
+    /// Node agent (kubelet replacement)
+    Kubelet {
+        #[command(subcommand)]
+        cmd: KubeletCmd,
+    },
+    /// Pod scheduler (kube-scheduler replacement)
+    Scheduler {
+        #[command(subcommand)]
+        cmd: SchedulerCmd,
+    },
+    /// Pod networking & service routing (kube-proxy/CNI replacement)
+    Net {
+        #[command(subcommand)]
+        cmd: NetCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -950,6 +980,411 @@ enum StatusCmd {
     Health,
 }
 
+// ── etcd (etcdctl parity) ─────────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum EtcdCmd {
+    /// Get a key (or a key range with --prefix)
+    Get {
+        /// Key to fetch
+        key: String,
+        /// Treat <key> as a prefix and return all matching keys
+        #[arg(long)]
+        prefix: bool,
+    },
+    /// Put a value at <key>
+    Put {
+        /// Key
+        key: String,
+        /// Value
+        value: String,
+        /// Attach to existing lease ID (optional)
+        #[arg(long)]
+        lease: Option<i64>,
+    },
+    /// Delete a key (or a range with --prefix)
+    Del {
+        /// Key to delete
+        key: String,
+        /// Delete all keys matching the prefix
+        #[arg(long)]
+        prefix: bool,
+    },
+    /// Compact key history at the given revision
+    Compact {
+        /// Revision to compact at
+        revision: i64,
+    },
+    /// Watch for changes on a key (registers a watch and returns its id)
+    Watch {
+        /// Key to watch
+        key: String,
+        /// Watch a prefix range
+        #[arg(long)]
+        prefix: bool,
+    },
+    /// Lease management
+    Lease {
+        #[command(subcommand)]
+        cmd: EtcdLeaseCmd,
+    },
+    /// Cluster member management
+    Member {
+        #[command(subcommand)]
+        cmd: EtcdMemberCmd,
+    },
+    /// Trigger a backend snapshot
+    Snapshot,
+    /// Defragment the backend store
+    Defrag,
+    /// Show backend status (raft, db_size, leader, etc.)
+    Status,
+    /// Show etcd version
+    Version,
+    /// Show parity vs upstream etcd
+    Parity,
+}
+
+#[derive(Subcommand)]
+enum EtcdLeaseCmd {
+    /// Grant a new lease with the given TTL (seconds)
+    Grant {
+        /// TTL in seconds
+        #[arg(long)]
+        ttl: i64,
+    },
+    /// Revoke a lease by ID
+    Revoke {
+        /// Lease ID
+        id: i64,
+    },
+    /// Refresh lease TTL (keepalive single-shot)
+    Keepalive {
+        /// Lease ID
+        id: i64,
+    },
+    /// Show remaining TTL for a lease
+    Ttl {
+        /// Lease ID
+        id: i64,
+    },
+    /// List all active leases
+    List,
+}
+
+#[derive(Subcommand)]
+enum EtcdMemberCmd {
+    /// List cluster members
+    List,
+    /// Add a new member with the given peer URL
+    Add {
+        /// Peer URL (e.g. http://10.0.0.1:2380)
+        #[arg(long)]
+        peer_url: String,
+    },
+    /// Remove a member by ID
+    Remove {
+        /// Member ID
+        id: u64,
+    },
+}
+
+// ── CRI (crictl parity) ───────────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum CriCmd {
+    /// List containers (crictl ps)
+    Ps {
+        /// Show all containers, including stopped ones
+        #[arg(long, short = 'a')]
+        all: bool,
+    },
+    /// Inspect a container by ID (crictl inspect)
+    Inspect {
+        /// Container ID
+        id: String,
+    },
+    /// Start a container (crictl start)
+    Start {
+        /// Container ID
+        id: String,
+    },
+    /// Stop a container (crictl stop)
+    Stop {
+        /// Container ID
+        id: String,
+    },
+    /// Kill a container (crictl rm -f)
+    Kill {
+        /// Container ID
+        id: String,
+    },
+    /// Remove a container (crictl rm)
+    Rm {
+        /// Container ID
+        id: String,
+    },
+    /// Show container logs (crictl logs)
+    Logs {
+        /// Container ID
+        id: String,
+    },
+    /// Show container stats (crictl stats)
+    Stats {
+        /// Container ID; omit for node-wide stats
+        id: Option<String>,
+    },
+    /// List images (crictl images)
+    Images,
+    /// Pull an image from a registry (crictl pull)
+    Pull {
+        /// Image reference (e.g. docker.io/library/nginx:latest)
+        image: String,
+    },
+    /// Remove an image (crictl rmi)
+    Rmi {
+        /// Image reference
+        image: String,
+    },
+    /// List pod sandboxes (crictl pods)
+    Pods,
+    /// Remove a pod sandbox
+    Rmp {
+        /// Sandbox ID
+        id: String,
+    },
+    /// Show CRI runtime status (crictl info)
+    Info,
+    /// Show CRI runtime version (crictl version)
+    Version,
+    /// Show parity vs upstream containerd CRI
+    Parity,
+}
+
+// ── apiserver (kubectl parity) ────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum ApiserverCmd {
+    /// Get a resource or list resources (kubectl get)
+    Get {
+        /// Resource type: pods, nodes, namespaces, deployments, services, configmaps, secrets, ingresses, jobs, cronjobs, daemonsets, statefulsets, replicasets, pvcs, pvs, events, endpoints
+        resource: String,
+        /// Resource name (omit to list)
+        name: Option<String>,
+        /// Namespace
+        #[arg(long, short = 'n')]
+        namespace: Option<String>,
+    },
+    /// Delete a resource (kubectl delete)
+    Delete {
+        /// Resource type
+        resource: String,
+        /// Resource name
+        name: String,
+        /// Namespace
+        #[arg(long, short = 'n')]
+        namespace: Option<String>,
+    },
+    /// Create a namespace (kubectl create namespace)
+    CreateNamespace {
+        /// Namespace name
+        name: String,
+    },
+    /// List API groups (kubectl api-versions)
+    ApiVersions,
+    /// List core v1 API resources (kubectl api-resources --api-group="")
+    ApiResources,
+    /// Show API server version (kubectl version --short --client=false)
+    Version,
+    /// Liveness probe (/healthz)
+    Healthz,
+    /// Readiness probe (/readyz)
+    Readyz,
+    /// Show parity vs upstream kube-apiserver
+    Parity,
+}
+
+// ── kubelet ───────────────────────────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum KubeletCmd {
+    /// Show node status (capacity, allocatable, conditions)
+    Status,
+    /// List pods assigned to this kubelet
+    Pods,
+    /// Assign a pod to the kubelet (admission)
+    Assign {
+        /// Pod UID
+        #[arg(long)]
+        uid: String,
+        /// Pod name
+        #[arg(long)]
+        name: String,
+        /// Namespace
+        #[arg(long, default_value = "default")]
+        namespace: String,
+    },
+    /// Start a pod by UID
+    Start {
+        /// Pod UID
+        uid: String,
+    },
+    /// Stop a pod by UID
+    Stop {
+        /// Pod UID
+        uid: String,
+    },
+    /// Remove a pod by UID
+    Remove {
+        /// Pod UID
+        uid: String,
+    },
+    /// Liveness probe (/api/kubelet/health)
+    Health,
+}
+
+// ── scheduler (kube-scheduler parity) ─────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum SchedulerCmd {
+    /// List nodes registered with the scheduler
+    Nodes,
+    /// Show a single node's state (capacity, allocatable, taints)
+    Node {
+        /// Node name
+        name: String,
+    },
+    /// Register a new node
+    Register {
+        /// Node name
+        #[arg(long)]
+        name: String,
+        /// CPU capacity (millicores)
+        #[arg(long, default_value_t = 4000)]
+        cpu_milli: u64,
+        /// Memory capacity (bytes)
+        #[arg(long, default_value_t = 8_000_000_000)]
+        memory_bytes: u64,
+    },
+    /// Unregister a node
+    Unregister {
+        /// Node name
+        name: String,
+    },
+    /// Cordon a node (mark unschedulable)
+    Cordon {
+        /// Node name
+        name: String,
+    },
+    /// Uncordon a node (mark schedulable)
+    Uncordon {
+        /// Node name
+        name: String,
+    },
+    /// Schedule a pod (returns chosen node)
+    Schedule {
+        /// Pod UID
+        #[arg(long)]
+        uid: String,
+        /// Pod name
+        #[arg(long)]
+        name: String,
+        /// Namespace
+        #[arg(long, default_value = "default")]
+        namespace: String,
+        /// CPU request (millicores)
+        #[arg(long, default_value_t = 100)]
+        cpu_milli: u64,
+        /// Memory request (bytes)
+        #[arg(long, default_value_t = 128_000_000)]
+        memory_bytes: u64,
+    },
+    /// Liveness probe (/api/scheduler/health)
+    Health,
+}
+
+// ── net (kube-proxy / CNI parity) ─────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum NetCmd {
+    /// List allocated pod IPs
+    Pods,
+    /// Allocate a pod IP from the cluster CIDR
+    Alloc {
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Pod name
+        #[arg(long)]
+        name: String,
+    },
+    /// Release a pod IP
+    Release {
+        /// Namespace
+        namespace: String,
+        /// Pod name
+        name: String,
+    },
+    /// List ClusterIP services
+    Services,
+    /// Register a ClusterIP service
+    RegisterService {
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Service name
+        #[arg(long)]
+        name: String,
+        /// Service port
+        #[arg(long)]
+        port: u16,
+        /// Target port on backing pods
+        #[arg(long)]
+        target_port: u16,
+    },
+    /// Remove a service
+    RemoveService {
+        /// Namespace
+        namespace: String,
+        /// Service name
+        name: String,
+    },
+    /// List NetworkPolicies
+    Policies,
+    /// Apply a default-deny ingress NetworkPolicy
+    DenyIngress {
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// Policy name
+        #[arg(long)]
+        name: String,
+    },
+    /// Remove a NetworkPolicy
+    RemovePolicy {
+        /// Namespace
+        namespace: String,
+        /// Policy name
+        name: String,
+    },
+    /// List recent network flows
+    Flows,
+    /// Check whether traffic from src to dst is allowed by policy
+    Check {
+        /// Source pod (namespace/name)
+        #[arg(long)]
+        src: String,
+        /// Destination pod (namespace/name)
+        #[arg(long)]
+        dst: String,
+        /// Destination port
+        #[arg(long)]
+        port: u16,
+    },
+    /// Liveness probe (/api/net/health)
+    Health,
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Minimal RFC-3986 unreserved-character percent-encoder for path/query segments.
@@ -1552,6 +1987,272 @@ source_root = "src"
                 Ok(())
             }
         },
+
+        // ── etcd ──────────────────────────────────────────────────────────────
+        Commands::Etcd { cmd } => match cmd {
+            EtcdCmd::Get { key, prefix } => {
+                let mut body = json!({ "key": b64encode(key.as_bytes()) });
+                if prefix {
+                    body["range_end"] = json!(b64encode(&prefix_range_end(key.as_bytes())));
+                }
+                c.post("/api/etcd/v3/kv/range", body).await
+            }
+            EtcdCmd::Put { key, value, lease } => {
+                let mut body = json!({
+                    "key": b64encode(key.as_bytes()),
+                    "value": b64encode(value.as_bytes()),
+                });
+                if let Some(id) = lease {
+                    body["lease"] = json!(id);
+                }
+                c.post("/api/etcd/v3/kv/put", body).await
+            }
+            EtcdCmd::Del { key, prefix } => {
+                let mut body = json!({ "key": b64encode(key.as_bytes()) });
+                if prefix {
+                    body["range_end"] = json!(b64encode(&prefix_range_end(key.as_bytes())));
+                }
+                c.post("/api/etcd/v3/kv/deleterange", body).await
+            }
+            EtcdCmd::Compact { revision } => {
+                c.post("/api/etcd/v3/kv/compaction", json!({ "revision": revision })).await
+            }
+            EtcdCmd::Watch { key, prefix } => {
+                let mut body = json!({ "key": b64encode(key.as_bytes()) });
+                if prefix {
+                    body["range_end"] = json!(b64encode(&prefix_range_end(key.as_bytes())));
+                }
+                c.post("/api/etcd/v3/watch", body).await
+            }
+            EtcdCmd::Lease { cmd } => match cmd {
+                EtcdLeaseCmd::Grant { ttl } => {
+                    c.post("/api/etcd/v3/lease/grant", json!({ "TTL": ttl })).await
+                }
+                EtcdLeaseCmd::Revoke { id } => {
+                    c.post("/api/etcd/v3/lease/revoke", json!({ "ID": id })).await
+                }
+                EtcdLeaseCmd::Keepalive { id } => {
+                    c.post("/api/etcd/v3/lease/keepalive", json!({ "ID": id })).await
+                }
+                EtcdLeaseCmd::Ttl { id } => {
+                    c.post("/api/etcd/v3/lease/timetolive", json!({ "ID": id })).await
+                }
+                EtcdLeaseCmd::List => c.get("/api/etcd/v3/lease/leases").await,
+            },
+            EtcdCmd::Member { cmd } => match cmd {
+                EtcdMemberCmd::List => {
+                    c.post("/api/etcd/v3/cluster/member/list", json!({})).await
+                }
+                EtcdMemberCmd::Add { peer_url } => {
+                    c.post(
+                        "/api/etcd/v3/cluster/member/add",
+                        json!({ "peerURLs": [peer_url] }),
+                    )
+                    .await
+                }
+                EtcdMemberCmd::Remove { id } => {
+                    c.post(
+                        "/api/etcd/v3/cluster/member/remove",
+                        json!({ "ID": id }),
+                    )
+                    .await
+                }
+            },
+            EtcdCmd::Snapshot => {
+                c.post("/api/etcd/v3/maintenance/snapshot", json!({})).await
+            }
+            EtcdCmd::Defrag => {
+                c.post("/api/etcd/v3/maintenance/defragment", json!({})).await
+            }
+            EtcdCmd::Status => c.get("/api/etcd/status").await,
+            EtcdCmd::Version => c.get("/api/etcd/v3/version").await,
+            EtcdCmd::Parity => c.get("/api/etcd/parity").await,
+        },
+
+        // ── CRI ───────────────────────────────────────────────────────────────
+        Commands::Cri { cmd } => match cmd {
+            CriCmd::Ps { all } => {
+                let path = if all { "/api/cri/containers?all=true" } else { "/api/cri/containers" };
+                c.get(path).await
+            }
+            CriCmd::Inspect { id } => c.get(&format!("/api/cri/containers/{id}")).await,
+            CriCmd::Start { id } => {
+                c.post(&format!("/api/cri/containers/{id}/start"), json!({})).await
+            }
+            CriCmd::Stop { id } => {
+                c.post(&format!("/api/cri/containers/{id}/stop"), json!({})).await
+            }
+            CriCmd::Kill { id } => {
+                c.post(&format!("/api/cri/containers/{id}/kill"), json!({})).await
+            }
+            CriCmd::Rm { id } => c.delete(&format!("/api/cri/containers/{id}")).await,
+            CriCmd::Logs { id } => c.get(&format!("/api/cri/containers/{id}/logs")).await,
+            CriCmd::Stats { id } => match id {
+                Some(id) => c.get(&format!("/api/cri/containers/{id}/stats")).await,
+                None => c.get("/api/cri/stats").await,
+            },
+            CriCmd::Images => c.get("/api/cri/images").await,
+            CriCmd::Pull { image } => {
+                c.post("/api/cri/images/pull", json!({ "image": image })).await
+            }
+            CriCmd::Rmi { image } => c.delete(&format!("/api/cri/images/{image}")).await,
+            CriCmd::Pods => c.get("/api/cri/sandboxes").await,
+            CriCmd::Rmp { id } => c.delete(&format!("/api/cri/sandboxes/{id}")).await,
+            CriCmd::Info => c.get("/api/cri/status").await,
+            CriCmd::Version => c.get("/api/cri/version").await,
+            CriCmd::Parity => c.get("/api/cri/parity").await,
+        },
+
+        // ── apiserver ─────────────────────────────────────────────────────────
+        Commands::Apiserver { cmd } => match cmd {
+            ApiserverCmd::Get { resource, name, namespace } => {
+                let path = apiserver_resource_path(&resource, name.as_deref(), namespace.as_deref())?;
+                c.get(&path).await
+            }
+            ApiserverCmd::Delete { resource, name, namespace } => {
+                let path = apiserver_resource_path(&resource, Some(&name), namespace.as_deref())?;
+                c.delete(&path).await
+            }
+            ApiserverCmd::CreateNamespace { name } => {
+                c.post(
+                    "/api/v1/namespaces",
+                    json!({
+                        "apiVersion": "v1",
+                        "kind": "Namespace",
+                        "metadata": { "name": name }
+                    }),
+                )
+                .await
+            }
+            ApiserverCmd::ApiVersions => c.get("/apis").await,
+            ApiserverCmd::ApiResources => c.get("/api/v1").await,
+            ApiserverCmd::Version => c.get("/version").await,
+            ApiserverCmd::Healthz => c.get("/healthz").await,
+            ApiserverCmd::Readyz => c.get("/readyz").await,
+            ApiserverCmd::Parity => c.get("/api/apiserver/parity").await,
+        },
+
+        // ── kubelet ───────────────────────────────────────────────────────────
+        Commands::Kubelet { cmd } => match cmd {
+            KubeletCmd::Status => c.get("/api/kubelet/status").await,
+            KubeletCmd::Pods => c.get("/api/kubelet/pods").await,
+            KubeletCmd::Assign { uid, name, namespace } => {
+                c.post(
+                    "/api/kubelet/pods",
+                    json!({
+                        "uid": uid,
+                        "name": name,
+                        "namespace": namespace,
+                    }),
+                )
+                .await
+            }
+            KubeletCmd::Start { uid } => {
+                c.post(&format!("/api/kubelet/pods/{uid}/start"), json!({})).await
+            }
+            KubeletCmd::Stop { uid } => {
+                c.post(&format!("/api/kubelet/pods/{uid}/stop"), json!({})).await
+            }
+            KubeletCmd::Remove { uid } => {
+                c.delete(&format!("/api/kubelet/pods/{uid}")).await
+            }
+            KubeletCmd::Health => c.get("/api/kubelet/health").await,
+        },
+
+        // ── scheduler ─────────────────────────────────────────────────────────
+        Commands::Scheduler { cmd } => match cmd {
+            SchedulerCmd::Nodes => c.get("/api/scheduler/nodes").await,
+            SchedulerCmd::Node { name } => c.get(&format!("/api/scheduler/nodes/{name}")).await,
+            SchedulerCmd::Register { name, cpu_milli, memory_bytes } => {
+                c.post(
+                    "/api/scheduler/nodes",
+                    json!({
+                        "name": name,
+                        "cpu_milli": cpu_milli,
+                        "memory_bytes": memory_bytes,
+                    }),
+                )
+                .await
+            }
+            SchedulerCmd::Unregister { name } => {
+                c.delete(&format!("/api/scheduler/nodes/{name}")).await
+            }
+            SchedulerCmd::Cordon { name } => {
+                c.post(&format!("/api/scheduler/nodes/{name}/cordon"), json!({})).await
+            }
+            SchedulerCmd::Uncordon { name } => {
+                c.post(&format!("/api/scheduler/nodes/{name}/uncordon"), json!({})).await
+            }
+            SchedulerCmd::Schedule { uid, name, namespace, cpu_milli, memory_bytes } => {
+                c.post(
+                    "/api/scheduler/schedule",
+                    json!({
+                        "uid": uid,
+                        "name": name,
+                        "namespace": namespace,
+                        "cpu_milli": cpu_milli,
+                        "memory_bytes": memory_bytes,
+                    }),
+                )
+                .await
+            }
+            SchedulerCmd::Health => c.get("/api/scheduler/health").await,
+        },
+
+        // ── net ───────────────────────────────────────────────────────────────
+        Commands::Net { cmd } => match cmd {
+            NetCmd::Pods => c.get("/api/net/pods").await,
+            NetCmd::Alloc { namespace, name } => {
+                c.post(
+                    "/api/net/pods",
+                    json!({ "namespace": namespace, "name": name }),
+                )
+                .await
+            }
+            NetCmd::Release { namespace, name } => {
+                c.delete(&format!("/api/net/pods/{namespace}/{name}")).await
+            }
+            NetCmd::Services => c.get("/api/net/services").await,
+            NetCmd::RegisterService { namespace, name, port, target_port } => {
+                c.post(
+                    "/api/net/services",
+                    json!({
+                        "namespace": namespace,
+                        "name": name,
+                        "port": port,
+                        "target_port": target_port,
+                    }),
+                )
+                .await
+            }
+            NetCmd::RemoveService { namespace, name } => {
+                c.delete(&format!("/api/net/services/{namespace}/{name}")).await
+            }
+            NetCmd::Policies => c.get("/api/net/policies").await,
+            NetCmd::DenyIngress { namespace, name } => {
+                c.post(
+                    "/api/net/policies",
+                    json!({
+                        "namespace": namespace,
+                        "name": name,
+                        "kind": "deny_ingress",
+                    }),
+                )
+                .await
+            }
+            NetCmd::RemovePolicy { namespace, name } => {
+                c.delete(&format!("/api/net/policies/{namespace}/{name}")).await
+            }
+            NetCmd::Flows => c.get("/api/net/flows").await,
+            NetCmd::Check { src, dst, port } => {
+                c.post(
+                    "/api/net/check",
+                    json!({ "src": src, "dst": dst, "port": port }),
+                )
+                .await
+            }
+            NetCmd::Health => c.get("/api/net/health").await,
+        },
     }
 }
 
@@ -1565,5 +2266,206 @@ async fn resolve_content(content: Option<String>, file: Option<String>) -> Resul
             .await
             .map_err(|e| anyhow::anyhow!("Failed to read {f}: {e}")),
         (None, None) => anyhow::bail!("Provide --content <text> or --file <path>"),
+    }
+}
+
+/// Base64-encode bytes using the standard alphabet (etcd v3 wire format).
+fn b64encode(bytes: &[u8]) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    STANDARD.encode(bytes)
+}
+
+/// Compute the etcd v3 prefix range_end: increment the last byte of the prefix.
+/// If the prefix ends in 0xff bytes those are stripped; an empty result means
+/// "to the end of keyspace".
+fn prefix_range_end(prefix: &[u8]) -> Vec<u8> {
+    let mut end = prefix.to_vec();
+    while let Some(&last) = end.last() {
+        if last < 0xff {
+            *end.last_mut().unwrap() = last + 1;
+            return end;
+        }
+        end.pop();
+    }
+    // All-0xff prefix → from-prefix-to-end-of-keyspace, encoded as a single \0.
+    vec![0]
+}
+
+/// Map a kubectl-style resource short name + namespace + optional name into an
+/// apiserver REST path. Returns Err for unsupported resources (rather than
+/// silently mis-routing).
+fn apiserver_resource_path(
+    resource: &str,
+    name: Option<&str>,
+    namespace: Option<&str>,
+) -> Result<String> {
+    // Cluster-scoped core/v1.
+    let cluster_core = match resource {
+        "ns" | "namespace" | "namespaces" => Some("namespaces"),
+        "no" | "node" | "nodes" => Some("nodes"),
+        "pv" | "persistentvolume" | "persistentvolumes" => Some("persistentvolumes"),
+        _ => None,
+    };
+    if let Some(plural) = cluster_core {
+        return Ok(match name {
+            Some(n) => format!("/api/v1/{plural}/{n}"),
+            None => format!("/api/v1/{plural}"),
+        });
+    }
+
+    // Namespaced core/v1.
+    let ns_core = match resource {
+        "po" | "pod" | "pods" => Some("pods"),
+        "svc" | "service" | "services" => Some("services"),
+        "cm" | "configmap" | "configmaps" => Some("configmaps"),
+        "secret" | "secrets" => Some("secrets"),
+        "sa" | "serviceaccount" | "serviceaccounts" => Some("serviceaccounts"),
+        "ev" | "event" | "events" => Some("events"),
+        "ep" | "endpoint" | "endpoints" => Some("endpoints"),
+        "pvc" | "persistentvolumeclaim" | "persistentvolumeclaims" => Some("persistentvolumeclaims"),
+        "quota" | "resourcequota" | "resourcequotas" => Some("resourcequotas"),
+        "limits" | "limitrange" | "limitranges" => Some("limitranges"),
+        _ => None,
+    };
+    if let Some(plural) = ns_core {
+        let ns = namespace.unwrap_or("default");
+        return Ok(match name {
+            Some(n) => format!("/api/v1/namespaces/{ns}/{plural}/{n}"),
+            None => format!("/api/v1/namespaces/{ns}/{plural}"),
+        });
+    }
+
+    // Namespaced apps/v1.
+    let ns_apps = match resource {
+        "deploy" | "deployment" | "deployments" => Some("deployments"),
+        "sts" | "statefulset" | "statefulsets" => Some("statefulsets"),
+        "ds" | "daemonset" | "daemonsets" => Some("daemonsets"),
+        "rs" | "replicaset" | "replicasets" => Some("replicasets"),
+        _ => None,
+    };
+    if let Some(plural) = ns_apps {
+        let ns = namespace.unwrap_or("default");
+        return Ok(match name {
+            Some(n) => format!("/apis/apps/v1/namespaces/{ns}/{plural}/{n}"),
+            None => format!("/apis/apps/v1/namespaces/{ns}/{plural}"),
+        });
+    }
+
+    // Namespaced batch/v1.
+    let ns_batch = match resource {
+        "job" | "jobs" => Some("jobs"),
+        "cj" | "cronjob" | "cronjobs" => Some("cronjobs"),
+        _ => None,
+    };
+    if let Some(plural) = ns_batch {
+        let ns = namespace.unwrap_or("default");
+        return Ok(match name {
+            Some(n) => format!("/apis/batch/v1/namespaces/{ns}/{plural}/{n}"),
+            None => format!("/apis/batch/v1/namespaces/{ns}/{plural}"),
+        });
+    }
+
+    // Namespaced networking.k8s.io/v1.
+    if matches!(resource, "ing" | "ingress" | "ingresses") {
+        let ns = namespace.unwrap_or("default");
+        return Ok(match name {
+            Some(n) => format!("/apis/networking.k8s.io/v1/namespaces/{ns}/ingresses/{n}"),
+            None => format!("/apis/networking.k8s.io/v1/namespaces/{ns}/ingresses"),
+        });
+    }
+
+    anyhow::bail!(
+        "unsupported resource '{resource}' — supported: pods, nodes, namespaces, services, \
+         configmaps, secrets, deployments, statefulsets, daemonsets, replicasets, jobs, \
+         cronjobs, ingresses, persistentvolumes, persistentvolumeclaims, serviceaccounts, \
+         events, endpoints, resourcequotas, limitranges (plus common short names)"
+    )
+}
+
+#[cfg(test)]
+mod helpers_tests {
+    use super::*;
+
+    #[test]
+    fn b64encode_matches_standard_alphabet() {
+        assert_eq!(b64encode(b"foo"), "Zm9v");
+        assert_eq!(b64encode(b""), "");
+        assert_eq!(b64encode(&[0xff, 0xff]), "//8=");
+    }
+
+    #[test]
+    fn prefix_range_end_increments_last_byte() {
+        assert_eq!(prefix_range_end(b"foo"), b"fop");
+        assert_eq!(prefix_range_end(b"a"), b"b");
+    }
+
+    #[test]
+    fn prefix_range_end_strips_trailing_ff_bytes() {
+        // "a\xff" → "b" (drop trailing 0xff, increment 'a').
+        assert_eq!(prefix_range_end(&[b'a', 0xff]), b"b");
+    }
+
+    #[test]
+    fn prefix_range_end_all_ff_uses_zero_sentinel() {
+        // All 0xff → "from prefix to end of keyspace" sentinel.
+        assert_eq!(prefix_range_end(&[0xff, 0xff]), &[0u8]);
+    }
+
+    #[test]
+    fn apiserver_path_namespaced_pods_default_ns() {
+        assert_eq!(
+            apiserver_resource_path("pods", None, None).unwrap(),
+            "/api/v1/namespaces/default/pods"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_pods_named_with_ns() {
+        assert_eq!(
+            apiserver_resource_path("po", Some("nginx"), Some("kube-system")).unwrap(),
+            "/api/v1/namespaces/kube-system/pods/nginx"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_cluster_scoped_nodes() {
+        assert_eq!(
+            apiserver_resource_path("nodes", None, None).unwrap(),
+            "/api/v1/nodes"
+        );
+        assert_eq!(
+            apiserver_resource_path("no", Some("worker-1"), None).unwrap(),
+            "/api/v1/nodes/worker-1"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_apps_v1_deployments() {
+        assert_eq!(
+            apiserver_resource_path("deploy", Some("api"), Some("prod")).unwrap(),
+            "/apis/apps/v1/namespaces/prod/deployments/api"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_batch_v1_cronjobs() {
+        assert_eq!(
+            apiserver_resource_path("cj", None, Some("etl")).unwrap(),
+            "/apis/batch/v1/namespaces/etl/cronjobs"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_networking_ingress() {
+        assert_eq!(
+            apiserver_resource_path("ingress", Some("web"), Some("edge")).unwrap(),
+            "/apis/networking.k8s.io/v1/namespaces/edge/ingresses/web"
+        );
+    }
+
+    #[test]
+    fn apiserver_path_unknown_resource_errors() {
+        let err = apiserver_resource_path("widgets", None, None).unwrap_err();
+        assert!(err.to_string().contains("unsupported resource"));
     }
 }
