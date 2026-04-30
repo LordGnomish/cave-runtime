@@ -1,0 +1,24 @@
+# parity.manifest.toml — cave-desktop
+# Upstream: zed-industries/zed (GPUI framework only — not the editor itself)
+
+[upstream]
+org     = "zed-industries"
+repo    = "zed"
+version = "main"
+
+[module]
+name        = "cave-desktop"
+description = "GPUI-based native admin shell — see ADR-PORTAL-DESKTOP-001"
+source_root = "src"
+
+# cave-desktop is not a parity reimplementation of an upstream product.
+# It consumes GPUI as a UI framework dependency (analogous to depending on
+# axum or tokio). Parity tracking here exists so the upstream-watch daemon
+# (`crates/cave-upstream`) can notify us when Zed publishes breaking GPUI
+# changes that we need to react to.
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# Intentionally empty — we don't mirror Zed source.
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# Intentionally empty.

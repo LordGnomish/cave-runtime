@@ -91,6 +91,8 @@ members = [
     "crates/cave-policy",
     # === Runtime Binary ===
     "crates/cave-runtime",
+    # === Native Admin Shell (ADR-PORTAL-DESKTOP-001) ===
+    "crates/cave-desktop",
     # === Upstream Tracker ===
     "crates/cave-upstream",
     # === Sovereign Ledger ===
