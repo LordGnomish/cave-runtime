@@ -359,6 +359,10 @@ const MODS = {
   // Operations
   backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null,loc:440,relatedAdrs:[46,80],github:'https://github.com/vmware-tanzu/velero'},
   cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null,loc:400,relatedAdrs:[96],github:'https://github.com/opencost/opencost'},
+  // Data persistence
+  pg:{id:'pg',name:'PostgreSQL',cat:'data',desc:'PostgreSQL management — instance registry, pool stats, slow-query log, pg_dump/pg_restore, replication health',up:'CloudNativePG',phase:2,status:'healthy',icon:'🐘',features:['Instance lifecycle','PgBouncer-style pooling','pg_stat_statements','pg_dump / pg_restore','Replication & PITR'],ep:'/api/pg/health',loc:1900,relatedAdrs:[47,43],github:'https://github.com/cloudnative-pg/cloudnative-pg'},
+  docdb:{id:'docdb',name:'DocDB',cat:'data',desc:'MongoDB-compatible document database — wire protocol + BSON + aggregation, fully in-memory Rust engine',up:'MongoDB CE',phase:2,status:'healthy',icon:'📄',features:['MongoDB wire protocol','BSON encode/decode','Query operators ($eq/$gt/$in/$or)','Update operators ($set/$inc/$push)','Aggregation pipeline'],ep:'/api/docdb/health',loc:2400,relatedAdrs:[],github:'https://github.com/mongodb/mongo'},
+  cache:{id:'cache',name:'Cache',cat:'data',desc:'Redis/Valkey-compatible cache — RESP3, all data types, pub/sub, transactions, Lua scripting, persistence',up:'Valkey',phase:2,status:'healthy',icon:'⚡',features:['RESP2 / RESP3 protocol','Strings, Lists, Sets, ZSets, Hashes, Streams','Pub/Sub & pattern subscribe','MULTI/EXEC transactions','EVAL / EVALSHA scripting','RDB & AOF persistence'],ep:'/api/cache/health',loc:4000,relatedAdrs:[],github:'https://github.com/valkey-io/valkey'},
 };
 
 const NAV=[
@@ -372,9 +376,10 @@ const NAV=[
   {type:'sec',id:'cicd',label:'CI / CD',mods:['lint','changelog','docs','registry','chaos']},
   {type:'sec',id:'platform',label:'Platform',mods:['flags','portal','chat','workflows','devlake']},
   {type:'sec',id:'operations',label:'Operations',mods:['backup','cost']},
+  {type:'sec',id:'data',label:'Data Persistence',mods:['pg','docdb','cache']},
 ];
 
-const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations'};
+const CAT_LABELS={core:'Core Infrastructure',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations',data:'Data Persistence'};
 
 // 66 tracked OSS projects
 const UPSTREAM_PROJECTS=[

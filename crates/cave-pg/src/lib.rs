@@ -14,9 +14,17 @@
 //! - User / role management
 //! - Database size monitoring and threshold alerts
 
+pub mod backup;
+pub mod error;
+pub mod ha;
+pub mod lifecycle;
 pub mod manager;
 pub mod models;
+pub mod monitoring;
+pub mod pool;
 pub mod routes;
+pub mod types;
+pub mod user;
 
 use axum::Router;
 use models::{BackupJob, ConnectionPool, DatabaseInstance, DbSizeRecord, DbUser, MigrationRecord, QueryStat, ReplicationStatus, TableStat};

@@ -83,6 +83,7 @@ cave-profiler = { path = "../cave-profiler" }
 cave-workflows = { path = "../cave-workflows" }
 cave-scan = { path = "../cave-scan" }
 cave-portal = { path = "../cave-portal" }
+cave-portal-api = { path = "../cave-portal-api" }
 cave-scaffold = { path = "../cave-scaffold" }
 cave-chaos = { path = "../cave-chaos" }
 cave-policy = { path = "../cave-policy" }

@@ -10,6 +10,7 @@ description = "Cave Portal HTTP API — attribution, telemetry, dashboard endpoi
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+cave-upstream = { path = "../cave-upstream" }
 chrono.workspace = true
 prometheus-client.workspace = true
 serde.workspace = true

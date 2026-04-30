@@ -156,6 +156,8 @@ async fn main() -> anyhow::Result<()> {
         // API
         .route("/api/modules", get(api_modules))
         .route("/api/health", get(api_health))
+        // cave-cache is a standalone RESP server — surface a small admin health here.
+        .route("/api/cache/health", get(api_cache_health))
         // Phase 1 module routers
         .merge(cave_net::router(net_state))
         .merge(cave_kubelet::router(kubelet_state))
@@ -323,6 +325,20 @@ async fn api_modules() -> axum::Json<serde_json::Value> {
     }))
 }
 
+async fn api_cache_health() -> axum::Json<serde_json::Value> {
+    // cave-cache runs out-of-process as a RESP3 server.
+    // This admin endpoint reports its in-tree presence and default port.
+    let cfg = cave_cache::Config::default();
+    axum::Json(serde_json::json!({
+        "status": "healthy",
+        "module": "cave-cache",
+        "protocol": "RESP3 / RESP2",
+        "bind": cfg.bind,
+        "default_port": cfg.port,
+        "default_databases": cfg.databases,
+    }))
+}
+
 async fn api_health() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
         "runtime": {
@@ -337,6 +353,9 @@ async fn api_health() -> axum::Json<serde_json::Value> {
             "changelog":{ "status": "healthy", "endpoint": "/api/changelog/health" },
             "certs":   { "status": "healthy", "endpoint": "/api/certs/health" },
             "portal":  { "status": "healthy", "endpoint": "/api/portal/health" },
+            "pg":      { "status": "healthy", "endpoint": "/api/pg/health" },
+            "docdb":   { "status": "healthy", "endpoint": "/api/docdb/health" },
+            "cache":   { "status": "healthy", "endpoint": "/api/cache/health" },
         },
         "upstream_tracked": cave_upstream::TRACKED_PROJECTS.len(),
     }))

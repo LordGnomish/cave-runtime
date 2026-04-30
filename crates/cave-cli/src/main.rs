@@ -86,6 +86,16 @@ enum Commands {
         #[command(subcommand)]
         cmd: PgCmd,
     },
+    /// Document database (MongoDB-compatible) management
+    Docdb {
+        #[command(subcommand)]
+        cmd: DocdbCmd,
+    },
+    /// Cache (Redis/Valkey-compatible) management
+    Cache {
+        #[command(subcommand)]
+        cmd: CacheCmd,
+    },
     /// Kafka management
     Kafka {
         #[command(subcommand)]
@@ -381,6 +391,91 @@ enum PgCmd {
         /// Database name
         #[arg(long)]
         database: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum DocdbCmd {
+    /// Health check (mongosh `db.adminCommand({ping:1})` parity)
+    Health,
+    /// List databases (mongosh `show dbs` parity)
+    Databases,
+    /// List collections in a database (mongosh `show collections` parity)
+    Collections {
+        /// Database name
+        #[arg(long)]
+        db: String,
+    },
+    /// Show engine-wide statistics (mongosh `db.serverStatus()` subset)
+    Stats,
+    /// Show collection statistics (mongosh `db.<col>.stats()`)
+    CollStats {
+        #[arg(long)]
+        db: String,
+        #[arg(long)]
+        collection: String,
+    },
+    /// Run a find query (mongosh `db.<col>.find(filter)`)
+    Find {
+        #[arg(long)]
+        db: String,
+        #[arg(long)]
+        collection: String,
+        /// JSON filter document
+        #[arg(long, default_value = "{}")]
+        filter: String,
+    },
+    /// List indexes on a collection (mongosh `db.<col>.getIndexes()`)
+    Indexes {
+        #[arg(long)]
+        db: String,
+        #[arg(long)]
+        collection: String,
+    },
+    /// Show wire-protocol server info (mongosh `db.runCommand({hello:1})`)
+    Info,
+}
+
+#[derive(Subcommand)]
+enum CacheCmd {
+    /// Health check (redis-cli PING parity)
+    Health,
+    /// List keys matching a pattern (redis-cli KEYS pattern)
+    Keys {
+        /// Glob pattern (default `*`)
+        #[arg(long, default_value = "*")]
+        pattern: String,
+    },
+    /// Get a value (redis-cli GET key)
+    Get {
+        /// Key
+        key: String,
+    },
+    /// Set a value (redis-cli SET key value [EX seconds])
+    Set {
+        /// Key
+        key: String,
+        /// Value (JSON-encoded)
+        value: String,
+        /// Optional TTL in seconds
+        #[arg(long)]
+        ttl: Option<u64>,
+    },
+    /// Delete a key (redis-cli DEL key)
+    Del {
+        /// Key
+        key: String,
+    },
+    /// Show server stats (redis-cli INFO subset)
+    Stats,
+    /// List active pub/sub channels (redis-cli PUBSUB CHANNELS)
+    Pubsub,
+    /// Publish a message (redis-cli PUBLISH channel message)
+    Publish {
+        /// Channel name
+        channel: String,
+        /// Message body
+        message: String,
     },
 }
 
@@ -855,6 +950,22 @@ enum StatusCmd {
     Health,
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Minimal RFC-3986 unreserved-character percent-encoder for path/query segments.
+fn urlencode(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for byte in input.as_bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(*byte as char);
+            }
+            _ => out.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    out
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -956,6 +1067,70 @@ async fn run(cli: Cli) -> Result<()> {
             PgCmd::Queries => c.get("/api/pg/queries").await,
             PgCmd::Backup { database } => {
                 c.post("/api/pg/backup", json!({ "database": database })).await
+            }
+        },
+
+        // ── Docdb ─────────────────────────────────────────────────────────────
+        Commands::Docdb { cmd } => match cmd {
+            DocdbCmd::Health => c.get("/api/docdb/health").await,
+            DocdbCmd::Databases => c.get("/api/docdb/databases").await,
+            DocdbCmd::Collections { db } => {
+                c.get(&format!("/api/docdb/databases/{db}/collections")).await
+            }
+            DocdbCmd::Stats => c.get("/api/docdb/stats").await,
+            DocdbCmd::CollStats { db, collection } => {
+                c.get(&format!(
+                    "/api/docdb/databases/{db}/collections/{collection}/stats"
+                ))
+                .await
+            }
+            DocdbCmd::Find { db, collection, filter } => {
+                let filter_json: serde_json::Value =
+                    serde_json::from_str(&filter).unwrap_or(json!({}));
+                c.post(
+                    &format!("/api/docdb/databases/{db}/collections/{collection}/find"),
+                    json!({ "filter": filter_json }),
+                )
+                .await
+            }
+            DocdbCmd::Indexes { db, collection } => {
+                c.get(&format!(
+                    "/api/docdb/databases/{db}/collections/{collection}/indexes"
+                ))
+                .await
+            }
+            DocdbCmd::Info => c.get("/api/docdb/server/info").await,
+        },
+
+        // ── Cache ─────────────────────────────────────────────────────────────
+        Commands::Cache { cmd } => match cmd {
+            CacheCmd::Health => c.get("/api/cache/health").await,
+            CacheCmd::Keys { pattern } => {
+                c.get(&format!("/api/cache/keys?pattern={}", urlencode(&pattern))).await
+            }
+            CacheCmd::Get { key } => {
+                c.get(&format!("/api/cache/keys/{}", urlencode(&key))).await
+            }
+            CacheCmd::Set { key, value, ttl } => {
+                let parsed: serde_json::Value =
+                    serde_json::from_str(&value).unwrap_or_else(|_| json!(value));
+                c.post(
+                    "/api/cache/keys",
+                    json!({ "key": key, "value": parsed, "ttl": ttl }),
+                )
+                .await
+            }
+            CacheCmd::Del { key } => {
+                c.delete(&format!("/api/cache/keys/{}", urlencode(&key))).await
+            }
+            CacheCmd::Stats => c.get("/api/cache/stats").await,
+            CacheCmd::Pubsub => c.get("/api/cache/pubsub").await,
+            CacheCmd::Publish { channel, message } => {
+                c.post(
+                    "/api/cache/pubsub/publish",
+                    json!({ "channel": channel, "message": message }),
+                )
+                .await
             }
         },
 
