@@ -359,3 +359,6 @@ mod tests {
         assert_eq!(sink.metadata.annotations.get("knative.dev/creator"), Some(&tenant_id.to_string()));
     }
 }
+
+// === cycle 1777515642 (qwen success at retry 1; ollama_calls=1; ollama_secs=515) ===
+
