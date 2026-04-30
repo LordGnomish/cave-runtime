@@ -490,6 +490,9 @@ const S={
   moduleHealth:{},
   upstreamCat:'All',
   upstreamQuery:'',
+  parityLive:{},
+  parityLoading:true,
+  parityError:null,
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -559,10 +562,43 @@ async function fetchModuleHealth(){
   }catch{/* silently ignore */}
 }
 
+// Live parity from backend — replaces hardcoded UPSTREAM_PROJECTS.parity values.
+// Backend computes file/function/test/surface parity in cave-kernel and exposes
+// the weighted `overall` field (0.0–1.0). On failure we silently fall back to
+// the hardcoded estimates so the UI still renders.
+async function fetchLiveParity(){
+  try{
+    const r=await fetch('/api/portal/parity');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const next={};
+    for(const m of (d.modules||[])){
+      if(m&&typeof m.module==='string'&&typeof m.overall==='number'){
+        // Backend keys are "cave-<id>" (e.g. cave-cri); UPSTREAM_PROJECTS[].cave
+        // uses the bare id ("cri"). Index by both so renderUpstream can look up
+        // either form without further normalization.
+        const pct=Math.round(m.overall*100);
+        next[m.module]=pct;
+        const bare=m.module.replace(/^cave-/,'');
+        if(bare!==m.module)next[bare]=pct;
+      }
+    }
+    S.parityLive=next;
+    S.parityError=null;
+  }catch(e){
+    S.parityError=e.message||'fetch failed';
+  }finally{
+    S.parityLoading=false;
+    if(S.page==='upstream')renderPage();
+  }
+}
+
 fetchHealth();
 fetchModuleHealth();
+fetchLiveParity();
 setInterval(fetchHealth,30000);
 setInterval(fetchModuleHealth,10000);
+setInterval(fetchLiveParity,60000);
 
 // ── Router ───────────────────────────────────────────────────────────────────
 
@@ -939,19 +975,32 @@ function renderUpstream(){
 
   const catBtns=cats.map(c=>`<button class="scope-btn${c===cat?' active':''}" onclick="setUpstreamCat('${c}')">${c}</button>`).join('');
   const rows=filtered.map(p=>{
-    const pc=parityColor(p.parity);
+    const live=S.parityLive[p.cave];
+    const isLive=typeof live==='number';
+    const parity=isLive?live:p.parity;
+    const pc=parityColor(parity);
+    const liveTag=isLive
+      ?`<span class="parity-pct" style="color:var(--green);font-size:9px;margin-left:4px" title="Live from /api/portal/parity">●</span>`
+      :'';
     return`<tr>
       <td><a class="gh-link" href="${p.gh}" target="_blank" rel="noopener">${esc(p.name)}</a></td>
       <td><span class="cave-mod-tag">${esc(p.cave)}</span></td>
       <td>${esc(p.cat)}</td>
       <td><span class="pbadge p${Math.min(p.phase,4)}">Phase ${p.phase}</span></td>
-      <td><div class="parity-bar"><div class="parity-track"><div class="parity-fill" style="width:${p.parity}%;background:${pc}"></div></div><span class="parity-pct" style="color:${pc}">${p.parity}%</span></div></td>
+      <td><div class="parity-bar"><div class="parity-track"><div class="parity-fill" style="width:${parity}%;background:${pc}"></div></div><span class="parity-pct" style="color:${pc}">${parity}%</span>${liveTag}</div></td>
     </tr>`;
   }).join('');
+
+  const parityStatus=S.parityLoading
+    ?`<span style="color:var(--text-muted);font-size:11px">⟳ loading live parity…</span>`
+    :S.parityError
+      ?`<span style="color:var(--yellow);font-size:11px" title="${esc(S.parityError)}">⚠ live parity unavailable — showing hardcoded estimates</span>`
+      :`<span style="color:var(--green);font-size:11px">● ${Object.keys(S.parityLive).length} module(s) live from /api/portal/parity</span>`;
 
   return`<div class="page-hdr">
     <div class="page-title">Upstream Tracker</div>
     <div class="page-sub">73 OSS projects monitored for releases, CVEs, and breaking changes</div>
+    <div style="margin-top:6px">${parityStatus}</div>
   </div>
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
     <input class="upstream-search" type="text" placeholder="Search projects…"
