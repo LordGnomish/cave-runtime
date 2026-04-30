@@ -16,6 +16,8 @@ cave-apiserver = { path = "../cave-apiserver" }
 cave-net = { path = "../cave-net" }
 cave-kubelet = { path = "../cave-kubelet" }
 cave-scheduler = { path = "../cave-scheduler" }
+cave-controller-manager = { path = "../cave-controller-manager" }
+cave-cloud-controller-manager = { path = "../cave-cloud-controller-manager" }
 cave-cri = { path = "../cave-cri" }
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }

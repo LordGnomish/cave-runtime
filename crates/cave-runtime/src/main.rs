@@ -158,6 +158,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/health", get(api_health))
         // cave-cache is a standalone RESP server — surface a small admin health here.
         .route("/api/cache/health", get(api_cache_health))
+        // controller-manager + cloud-controller-manager admin (in-tree library crates,
+        // surfaced as inline endpoints — no separate axum router needed).
+        .route("/api/portal/controller-manager/health", get(api_controller_manager_health))
+        .route("/api/controller-manager/leader", get(api_controller_manager_leader))
+        .route("/api/controller-manager/controllers", get(api_controller_manager_controllers))
+        .route("/api/controller-manager/status", get(api_controller_manager_status))
+        .route("/api/controller-manager/parity", get(api_controller_manager_parity))
+        .route("/api/portal/cloud-controller-manager/health", get(api_cloud_controller_manager_health))
+        .route("/api/cloud-controller-manager/cloud-controllers", get(api_cloud_controller_manager_controllers))
+        .route("/api/cloud-controller-manager/status", get(api_cloud_controller_manager_status))
+        .route("/api/cloud-controller-manager/parity", get(api_cloud_controller_manager_parity))
         // Phase 1 module routers
         .merge(cave_net::router(net_state))
         .merge(cave_kubelet::router(kubelet_state))
@@ -325,6 +336,73 @@ async fn api_modules() -> axum::Json<serde_json::Value> {
     }))
 }
 
+async fn api_controller_manager_health() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "status": "healthy",
+        "module": "cave-controller-manager",
+        "upstream_version": cave_controller_manager::UPSTREAM_VERSION,
+        "upstream_pkg": cave_controller_manager::UPSTREAM_PKG,
+        "controllers_active": cave_controller_manager::CONTROLLERS.len(),
+    }))
+}
+
+async fn api_controller_manager_leader() -> axum::Json<serde_json::Value> {
+    axum::Json(cave_controller_manager::leader_state(
+        std::env::var("CAVE_POD_NAME").as_deref().unwrap_or("manager-0"),
+    ))
+}
+
+async fn api_controller_manager_controllers() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "total": cave_controller_manager::CONTROLLERS.len(),
+        "controllers": cave_controller_manager::CONTROLLERS,
+    }))
+}
+
+async fn api_controller_manager_status() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "status": "healthy",
+        "controllers_active": cave_controller_manager::CONTROLLERS.len(),
+        "upstream_version": cave_controller_manager::UPSTREAM_VERSION,
+    }))
+}
+
+async fn api_controller_manager_parity() -> axum::Json<serde_json::Value> {
+    match cave_controller_manager::calculate_parity() {
+        Ok(r) => axum::Json(serde_json::to_value(r).unwrap_or(serde_json::Value::Null)),
+        Err(e) => axum::Json(serde_json::json!({ "error": e })),
+    }
+}
+
+async fn api_cloud_controller_manager_health() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "status": "healthy",
+        "module": "cave-cloud-controller-manager",
+        "upstream_version": cave_cloud_controller_manager::UPSTREAM_VERSION,
+        "controllers_active": cave_cloud_controller_manager::CLOUD_CONTROLLERS.len(),
+        "providers": cave_cloud_controller_manager::PROVIDERS,
+    }))
+}
+
+async fn api_cloud_controller_manager_controllers() -> axum::Json<serde_json::Value> {
+    axum::Json(serde_json::json!({
+        "total": cave_cloud_controller_manager::CLOUD_CONTROLLERS.len(),
+        "controllers": cave_cloud_controller_manager::CLOUD_CONTROLLERS,
+        "providers": cave_cloud_controller_manager::PROVIDERS,
+    }))
+}
+
+async fn api_cloud_controller_manager_status() -> axum::Json<serde_json::Value> {
+    axum::Json(cave_cloud_controller_manager::provider_snapshot())
+}
+
+async fn api_cloud_controller_manager_parity() -> axum::Json<serde_json::Value> {
+    match cave_cloud_controller_manager::calculate_parity() {
+        Ok(r) => axum::Json(serde_json::to_value(r).unwrap_or(serde_json::Value::Null)),
+        Err(e) => axum::Json(serde_json::json!({ "error": e })),
+    }
+}
+
 async fn api_cache_health() -> axum::Json<serde_json::Value> {
     // cave-cache runs out-of-process as a RESP3 server.
     // This admin endpoint reports its in-tree presence and default port.
@@ -353,6 +431,8 @@ async fn api_health() -> axum::Json<serde_json::Value> {
             "changelog":{ "status": "healthy", "endpoint": "/api/changelog/health" },
             "certs":   { "status": "healthy", "endpoint": "/api/certs/health" },
             "portal":  { "status": "healthy", "endpoint": "/api/portal/health" },
+            "controller-manager":      { "status": "healthy", "endpoint": "/api/portal/controller-manager/health" },
+            "cloud-controller-manager":{ "status": "healthy", "endpoint": "/api/portal/cloud-controller-manager/health" },
             "pg":      { "status": "healthy", "endpoint": "/api/pg/health" },
             "docdb":   { "status": "healthy", "endpoint": "/api/docdb/health" },
             "cache":   { "status": "healthy", "endpoint": "/api/cache/health" },

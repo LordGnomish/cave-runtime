@@ -107,3 +107,102 @@ pub mod root_ca_deeper;
 pub mod deeper;
 
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
+
+#[cfg(test)]
+mod tests_crosscut;
+
+// ── Admin surface used by cave-runtime portal/cavectl ────────────────────────
+
+/// Stable list of controller loops this crate provides. Mirrors the upstream
+/// `--controllers` flag of `kube-controller-manager`. Order matches the
+/// `pkg/controller/*` package layout.
+pub const CONTROLLERS: &[&str] = &[
+    "deployment",
+    "replicaset",
+    "statefulset",
+    "daemonset",
+    "job",
+    "cronjob",
+    "hpa",
+    "pdb",
+    "endpointslice",
+    "endpointslice-topology",
+    "endpointslice-multiport",
+    "service",
+    "garbage-collector",
+    "podgc",
+    "ttl-after-finished",
+    "node-lease",
+    "node-lifecycle",
+    "root-ca-publisher",
+    "serviceaccount",
+    "serviceaccount-token",
+    "csr-signer",
+    "csr-approver",
+    "rbac-aggregation",
+    "pv-binder",
+    "pv-attach-detach",
+    "pv-protection",
+    "resource-quota",
+    "namespace-controller",
+    "bootstrap-signer",
+];
+
+/// Stable identifier of the in-process leader. We do not yet run a real
+/// LeaseLock election (that's [`node_lease_deeper`]'s job for the kube-side
+/// API); for the manager binary itself we report the pod identity that owns
+/// the embedded reconciler loop.
+pub fn leader_state(holder: &str) -> serde_json::Value {
+    serde_json::json!({
+        "holder_identity": holder,
+        "lease_kind": "single-process-embedded",
+        "controllers_active": CONTROLLERS.len(),
+        "upstream_version": UPSTREAM_VERSION,
+        "upstream_pkg": UPSTREAM_PKG,
+    })
+}
+
+/// Calculate parity against the local source tree at compile-time crate root.
+pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
+    cave_kernel::parity::calculate_from_str(
+        include_str!("../parity.manifest.toml"),
+        env!("CARGO_MANIFEST_DIR"),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod admin_surface_tests {
+    use super::*;
+
+    #[test]
+    fn controllers_list_is_non_empty_and_unique() {
+        assert!(!CONTROLLERS.is_empty());
+        let mut seen = std::collections::HashSet::new();
+        for c in CONTROLLERS {
+            assert!(seen.insert(*c), "duplicate controller: {c}");
+        }
+    }
+
+    #[test]
+    fn controllers_list_includes_workload_core() {
+        for must in ["deployment", "replicaset", "statefulset", "daemonset", "job", "cronjob"] {
+            assert!(CONTROLLERS.contains(&must), "missing core controller: {must}");
+        }
+    }
+
+    #[test]
+    fn leader_state_carries_holder_and_version() {
+        let v = leader_state("manager-0");
+        assert_eq!(v["holder_identity"], "manager-0");
+        assert_eq!(v["upstream_version"], UPSTREAM_VERSION);
+        assert_eq!(v["controllers_active"], CONTROLLERS.len());
+    }
+
+    #[test]
+    fn calculate_parity_succeeds_on_pinned_manifest() {
+        let report = calculate_parity().expect("parity calculation must succeed");
+        // Some files are mapped, even if the percentage is partial.
+        assert!(report.surface_parity.total > 0 || report.file_parity.total > 0);
+    }
+}

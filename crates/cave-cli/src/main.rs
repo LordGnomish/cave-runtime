@@ -253,6 +253,18 @@ enum Commands {
         #[command(subcommand)]
         cmd: NetCmd,
     },
+    /// Workload controllers (kube-controller-manager replacement)
+    #[command(name = "controller-manager")]
+    ControllerManager {
+        #[command(subcommand)]
+        cmd: ControllerManagerCmd,
+    },
+    /// Cloud-provider controllers (cloud-controller-manager replacement)
+    #[command(name = "cloud-controller-manager")]
+    CloudControllerManager {
+        #[command(subcommand)]
+        cmd: CloudControllerManagerCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -1385,6 +1397,36 @@ enum NetCmd {
     Health,
 }
 
+// ── controller-manager (kube-controller-manager parity) ──────────────────────
+
+#[derive(Subcommand)]
+enum ControllerManagerCmd {
+    /// Show the current leader (LeaseLock holder identity).
+    GetLeader,
+    /// List all controller loops compiled into the manager binary.
+    ListControllers,
+    /// Show controller-manager status (active controllers, version).
+    Status,
+    /// Print the upstream parity report.
+    Parity,
+    /// Liveness probe (/api/portal/controller-manager/health).
+    Health,
+}
+
+// ── cloud-controller-manager parity ──────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum CloudControllerManagerCmd {
+    /// List cloud-provider-specific controllers (node, service, route, ...).
+    ListCloudControllers,
+    /// Show cloud-controller-manager status (active controllers, providers).
+    Status,
+    /// Print the upstream parity report.
+    Parity,
+    /// Liveness probe (/api/portal/cloud-controller-manager/health).
+    Health,
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /// Minimal RFC-3986 unreserved-character percent-encoder for path/query segments.
@@ -2252,6 +2294,27 @@ source_root = "src"
                 .await
             }
             NetCmd::Health => c.get("/api/net/health").await,
+        },
+
+        // ── controller-manager ────────────────────────────────────────────────
+        Commands::ControllerManager { cmd } => match cmd {
+            ControllerManagerCmd::GetLeader => c.get("/api/controller-manager/leader").await,
+            ControllerManagerCmd::ListControllers => c.get("/api/controller-manager/controllers").await,
+            ControllerManagerCmd::Status => c.get("/api/controller-manager/status").await,
+            ControllerManagerCmd::Parity => c.get("/api/controller-manager/parity").await,
+            ControllerManagerCmd::Health => c.get("/api/portal/controller-manager/health").await,
+        },
+
+        // ── cloud-controller-manager ──────────────────────────────────────────
+        Commands::CloudControllerManager { cmd } => match cmd {
+            CloudControllerManagerCmd::ListCloudControllers => {
+                c.get("/api/cloud-controller-manager/cloud-controllers").await
+            }
+            CloudControllerManagerCmd::Status => c.get("/api/cloud-controller-manager/status").await,
+            CloudControllerManagerCmd::Parity => c.get("/api/cloud-controller-manager/parity").await,
+            CloudControllerManagerCmd::Health => {
+                c.get("/api/portal/cloud-controller-manager/health").await
+            }
         },
     }
 }

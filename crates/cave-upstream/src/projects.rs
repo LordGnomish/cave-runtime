@@ -69,6 +69,24 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "Kubernetes Core",
         phase: 1,
     },
+    TrackedProject {
+        name: "kube-controller-manager",
+        github_repo: "kubernetes/kubernetes",
+        cave_module: "cave-controller-manager",
+        track_features: "Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, GC, NodeLifecycle, SA, CSR, RBAC, PV",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
+    TrackedProject {
+        name: "cloud-controller-manager",
+        github_repo: "kubernetes/cloud-provider",
+        cave_module: "cave-cloud-controller-manager",
+        track_features: "CloudProvider trait, Node/Service/Route controllers, Hetzner + Azure providers",
+        check_frequency: "weekly",
+        category: "Kubernetes Core",
+        phase: 1,
+    },
 
     // ============================================================
     // PROVIDER-ABSTRACTED: Kubernetes
