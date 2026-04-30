@@ -25,7 +25,6 @@ futures = { workspace = true }
 rand = { workspace = true }
 uuid = { workspace = true }
 toml = { workspace = true }
-axum = { workspace = true }
 # Used by daemon for ~/Library/Application Support resolution
 dirs = "5"
 
