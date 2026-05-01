@@ -1299,4 +1299,616 @@ mod tests {
         let fmt = telemetry::AccessLogFormat::default_json();
         assert!(fmt.fields.len() >= 20);
     }
+
+    // ═══════════════════════════════════════════════════════
+    // 15 — Deep parity: xDS validation, delta, snapshot builder
+    // ═══════════════════════════════════════════════════════
+
+    #[test]
+    fn xds_validate_detects_missing_eds_endpoint() {
+        let mut snap = xds::XdsSnapshot::empty();
+        snap.clusters.insert(
+            "orders_svc".to_string(),
+            xds::XdsCluster {
+                name: "orders_svc".to_string(),
+                cluster_type: xds::XdsClusterType::Eds,
+                eds_cluster_config: Some(xds::XdsEdsClusterConfig {
+                    eds_config: xds::XdsConfigSource {
+                        resource_api_version: "V3".to_string(),
+                        api_type: xds::XdsApiType::Ads,
+                        cluster_name: None,
+                    },
+                    service_name: Some("orders.svc".to_string()),
+                }),
+                load_assignment: None,
+                connect_timeout_ms: 1_000,
+                lb_policy: xds::XdsLbPolicy::RoundRobin,
+                circuit_breakers: None,
+                outlier_detection: None,
+                http2_protocol_options: None,
+                transport_socket: None,
+                upstream_http_protocol_options: None,
+            },
+        );
+        let errors = xds::XdsManager::validate_snapshot(&snap);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].resource_type, xds::XdsResourceType::Cds);
+        assert!(errors[0].message.contains("orders.svc"));
+    }
+
+    #[test]
+    fn xds_delta_state_acknowledge_updates_versions() {
+        let mut state = xds::DeltaXdsState::default();
+        let nonce = state.new_nonce();
+        let mut acks = HashMap::new();
+        acks.insert("listener1".to_string(), "v1".to_string());
+        state.acknowledge(&nonce, acks);
+        assert_eq!(
+            state.acknowledged_versions.get("listener1"),
+            Some(&"v1".to_string())
+        );
+        // Nonce is consumed — replay should be a no-op
+        let mut acks2 = HashMap::new();
+        acks2.insert("listener2".to_string(), "v2".to_string());
+        state.acknowledge(&nonce, acks2);
+        assert!(!state.acknowledged_versions.contains_key("listener2"));
+    }
+
+    #[test]
+    fn xds_delta_state_subscription_wildcard_vs_explicit() {
+        let mut state = xds::DeltaXdsState::default();
+        // Empty subscribed set = wildcard
+        assert!(state.is_subscribed("anything"));
+        state.subscribed.insert("explicit-1".to_string());
+        assert!(state.is_subscribed("explicit-1"));
+        assert!(!state.is_subscribed("explicit-2"));
+    }
+
+    #[test]
+    fn xds_compute_delta_marks_resources_updated_after_snapshot_change() {
+        let mgr = XdsManager::new();
+        let mut snap = xds::XdsSnapshot::empty();
+        snap.clusters.insert("c1".to_string(), xds::XdsCluster {
+            name: "c1".to_string(),
+            cluster_type: xds::XdsClusterType::Static,
+            eds_cluster_config: None, load_assignment: None,
+            connect_timeout_ms: 1000, lb_policy: xds::XdsLbPolicy::RoundRobin,
+            circuit_breakers: None, outlier_detection: None, http2_protocol_options: None,
+            transport_socket: None, upstream_http_protocol_options: None,
+        });
+        mgr.set_snapshot("group1", snap);
+        // wildcard subscription
+        let delta = mgr.compute_delta("nodeA", xds::XdsResourceType::Cds, "group1");
+        assert_eq!(delta.updated_resources, vec!["c1"]);
+        assert!(delta.removed_resources.is_empty());
+    }
+
+    #[test]
+    fn xds_compute_delta_marks_removed_resources() {
+        let mgr = XdsManager::new();
+        let mut state = xds::DeltaXdsState::default();
+        // Already acknowledged a resource that no longer exists
+        state.acknowledged_versions.insert("c-old".to_string(), "v1".to_string());
+        mgr.update_delta_state("nodeA", xds::XdsResourceType::Cds, state);
+        mgr.set_snapshot("group1", xds::XdsSnapshot::empty());
+        let delta = mgr.compute_delta("nodeA", xds::XdsResourceType::Cds, "group1");
+        assert!(delta.removed_resources.contains(&"c-old".to_string()));
+    }
+
+    #[test]
+    fn xds_mark_ack_updates_sync_status() {
+        let mgr = XdsManager::new();
+        let node = xds::NodeInfo {
+            id: "node-1".to_string(), cluster: "c".to_string(),
+            locality: None, metadata: serde_json::Value::Null,
+            user_agent_name: None, user_agent_version: None,
+        };
+        mgr.register_node(node);
+        mgr.mark_ack("node-1", "v42");
+        let statuses = mgr.list_sync_status();
+        let me = statuses.iter().find(|s| s.node_id == "node-1").unwrap();
+        assert_eq!(me.last_ack_version, Some("v42".to_string()));
+        assert!(me.synced);
+    }
+
+    #[test]
+    fn xds_mark_nack_unmarks_synced() {
+        let mgr = XdsManager::new();
+        let node = xds::NodeInfo {
+            id: "node-2".to_string(), cluster: "c".to_string(),
+            locality: None, metadata: serde_json::Value::Null,
+            user_agent_name: None, user_agent_version: None,
+        };
+        mgr.register_node(node);
+        mgr.mark_ack("node-2", "v1");
+        mgr.mark_nack("node-2", "boom");
+        let s = mgr.list_sync_status().into_iter().find(|s| s.node_id == "node-2").unwrap();
+        assert!(!s.synced);
+    }
+
+    #[test]
+    fn xds_default_snapshot_returns_empty_when_unset() {
+        let mgr = XdsManager::new();
+        let snap = mgr.default_snapshot();
+        assert_eq!(snap.resource_count(), 0);
+    }
+
+    #[test]
+    fn xds_node_groups_lists_set_snapshots() {
+        let mgr = XdsManager::new();
+        mgr.set_snapshot("group-a", xds::XdsSnapshot::empty());
+        mgr.set_snapshot("group-b", xds::XdsSnapshot::empty());
+        let mut groups = mgr.node_groups();
+        groups.sort();
+        assert_eq!(groups, vec!["group-a", "group-b"]);
+    }
+
+    #[test]
+    fn xds_build_snapshot_from_resources_creates_clusters_and_routes() {
+        let dr = DestinationRule {
+            name: "dr".to_string(), namespace: "default".to_string(),
+            host: "payments.svc".to_string(),
+            traffic_policy: None, subsets: vec![], export_to: vec![],
+            created_at: Utc::now(), updated_at: Utc::now(),
+        };
+        let vs = make_vs("vs", "payments.svc", vec![HttpRoute {
+            name: None, match_rules: vec![],
+            route: vec![route_dest("payments.svc", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        let snap = xds::XdsManager::build_snapshot_from_resources(&[vs], &[dr], &[], &[]);
+        assert!(snap.clusters.contains_key("payments_svc"));
+        // route key uses namespace + host with dots replaced
+        assert!(snap.routes.keys().any(|k| k.contains("payments_svc")));
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 16 — Deep parity: Multi-cluster service discovery
+    // ═══════════════════════════════════════════════════════
+
+    #[test]
+    fn multicluster_export_to_local_only_filters_others() {
+        let reg = MultiClusterRegistry::new("clusterA");
+        reg.register_cluster(multicluster::RemoteCluster::new("remote", "net", "remote.local"));
+        let svc = multicluster::CrossClusterService {
+            name: "internal-only".to_string(), namespace: "ns".to_string(),
+            source_cluster: "remote".to_string(),
+            host_fqdn: "internal-only.ns.svc".to_string(),
+            ports: vec![], endpoints: vec![],
+            export_to: vec!["clusterB".to_string()], // not exported to clusterA
+            registered_at: Utc::now(), updated_at: Utc::now(),
+        };
+        reg.export_service(svc);
+        // clusterA cannot see it
+        assert!(reg.visible_services().is_empty());
+    }
+
+    #[test]
+    fn multicluster_export_to_wildcard_visible_everywhere() {
+        let reg = MultiClusterRegistry::new("clusterA");
+        reg.register_cluster(multicluster::RemoteCluster::new("remote", "net", "remote.local"));
+        let svc = multicluster::CrossClusterService {
+            name: "public".to_string(), namespace: "ns".to_string(),
+            source_cluster: "remote".to_string(),
+            host_fqdn: "public.ns.svc".to_string(),
+            ports: vec![], endpoints: vec![],
+            export_to: vec!["*".to_string()],
+            registered_at: Utc::now(), updated_at: Utc::now(),
+        };
+        reg.export_service(svc);
+        assert_eq!(reg.visible_services().len(), 1);
+    }
+
+    #[test]
+    fn multicluster_services_from_cluster_returns_only_that_clusters_services() {
+        let reg = MultiClusterRegistry::new("local");
+        reg.register_cluster(multicluster::RemoteCluster::new("east", "net1", "east.local"));
+        reg.register_cluster(multicluster::RemoteCluster::new("west", "net2", "west.local"));
+        for cluster in ["east", "west"] {
+            reg.export_service(multicluster::CrossClusterService {
+                name: format!("svc-{cluster}"), namespace: "n".to_string(),
+                source_cluster: cluster.to_string(),
+                host_fqdn: format!("svc-{cluster}.n.svc"),
+                ports: vec![], endpoints: vec![],
+                export_to: vec!["*".to_string()],
+                registered_at: Utc::now(), updated_at: Utc::now(),
+            });
+        }
+        let east = reg.services_from_cluster("east");
+        assert_eq!(east.len(), 1);
+        assert_eq!(east[0].name, "svc-east");
+    }
+
+    #[test]
+    fn multicluster_export_service_upserts_existing() {
+        let reg = MultiClusterRegistry::new("local");
+        reg.register_cluster(multicluster::RemoteCluster::new("r", "n", "r.local"));
+        let mk = |port: u16| multicluster::CrossClusterService {
+            name: "svc".to_string(), namespace: "ns".to_string(),
+            source_cluster: "r".to_string(),
+            host_fqdn: "svc.ns.svc".to_string(),
+            ports: vec![multicluster::CrossClusterPort {
+                port, protocol: "HTTP".to_string(), name: "http".to_string(),
+            }],
+            endpoints: vec![], export_to: vec!["*".to_string()],
+            registered_at: Utc::now(), updated_at: Utc::now(),
+        };
+        reg.export_service(mk(80));
+        reg.export_service(mk(8080)); // upsert
+        let svcs = reg.services_from_cluster("r");
+        assert_eq!(svcs.len(), 1);
+        assert_eq!(svcs[0].ports[0].port, 8080);
+    }
+
+    #[test]
+    fn multicluster_remove_exported_service_only_removes_target() {
+        let reg = MultiClusterRegistry::new("local");
+        reg.register_cluster(multicluster::RemoteCluster::new("r", "n", "r.local"));
+        for name in ["a", "b"] {
+            reg.export_service(multicluster::CrossClusterService {
+                name: name.to_string(), namespace: "ns".to_string(),
+                source_cluster: "r".to_string(),
+                host_fqdn: format!("{name}.ns.svc"),
+                ports: vec![], endpoints: vec![],
+                export_to: vec!["*".to_string()],
+                registered_at: Utc::now(), updated_at: Utc::now(),
+            });
+        }
+        reg.remove_exported_service("r", "ns", "a");
+        let svcs = reg.services_from_cluster("r");
+        assert_eq!(svcs.len(), 1);
+        assert_eq!(svcs[0].name, "b");
+    }
+
+    #[test]
+    fn multicluster_get_federation_returns_specific_pair() {
+        let reg = MultiClusterRegistry::new("local");
+        let fed = multicluster::TrustDomainFederation::new("local", "remote.org", "CA");
+        reg.federate(fed);
+        assert!(reg.get_federation("local", "remote.org").is_some());
+        assert!(reg.get_federation("local", "other.org").is_none());
+    }
+
+    #[test]
+    fn multicluster_list_federations_count_matches_inserts() {
+        let reg = MultiClusterRegistry::new("local");
+        for r in ["r1.org", "r2.org", "r3.org"] {
+            reg.federate(multicluster::TrustDomainFederation::new("local", r, "CA"));
+        }
+        assert_eq!(reg.list_federations().len(), 3);
+    }
+
+    #[test]
+    fn multicluster_federation_snapshot_counts_cross_cluster_services() {
+        let reg = MultiClusterRegistry::new("hub");
+        reg.register_cluster(multicluster::RemoteCluster::new("spoke1", "n", "s1.local"));
+        reg.update_cluster_status("spoke1", multicluster::RemoteClusterStatus::Connected);
+        for n in ["s1", "s2"] {
+            reg.export_service(multicluster::CrossClusterService {
+                name: n.to_string(), namespace: "ns".to_string(),
+                source_cluster: "spoke1".to_string(),
+                host_fqdn: format!("{n}.ns.svc"),
+                ports: vec![], endpoints: vec![],
+                export_to: vec!["*".to_string()],
+                registered_at: Utc::now(), updated_at: Utc::now(),
+            });
+        }
+        reg.federate(multicluster::TrustDomainFederation::new("hub", "s1.local", "CA"));
+        let snap = reg.federation_snapshot();
+        assert_eq!(snap.local_cluster, "hub");
+        assert_eq!(snap.connected_clusters, 1);
+        assert_eq!(snap.total_cross_cluster_services, 2);
+        assert_eq!(snap.total_federations, 1);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 17 — Deep parity: Telemetry behavior
+    // ═══════════════════════════════════════════════════════
+
+    #[test]
+    fn telemetry_access_logging_disabled_short_circuits() {
+        let mgr = TelemetryManager::new();
+        mgr.upsert(Telemetry {
+            name: "t".to_string(), namespace: "ns".to_string(),
+            selector: None,
+            tracing: vec![], metrics: vec![],
+            access_logging: vec![AccessLogging {
+                providers: vec![ProviderRef { name: "otel".to_string() }],
+                disabled: Some(true),
+                filter: None,
+            }],
+            created_at: Utc::now(), updated_at: Utc::now(),
+        });
+        assert!(!mgr.access_logging_enabled("ns", &HashMap::new()));
+    }
+
+    #[test]
+    fn telemetry_access_logging_no_providers_returns_false() {
+        let mgr = TelemetryManager::new();
+        mgr.upsert(Telemetry {
+            name: "t".to_string(), namespace: "ns".to_string(),
+            selector: None, tracing: vec![], metrics: vec![],
+            access_logging: vec![AccessLogging {
+                providers: vec![], disabled: None, filter: None,
+            }],
+            created_at: Utc::now(), updated_at: Utc::now(),
+        });
+        assert!(!mgr.access_logging_enabled("ns", &HashMap::new()));
+    }
+
+    #[test]
+    fn telemetry_access_logging_enabled_with_providers() {
+        let mgr = TelemetryManager::new();
+        mgr.upsert(Telemetry {
+            name: "t".to_string(), namespace: "ns".to_string(),
+            selector: None, tracing: vec![], metrics: vec![],
+            access_logging: vec![AccessLogging {
+                providers: vec![ProviderRef { name: "stdout".to_string() }],
+                disabled: None, filter: None,
+            }],
+            created_at: Utc::now(), updated_at: Utc::now(),
+        });
+        assert!(mgr.access_logging_enabled("ns", &HashMap::new()));
+    }
+
+    #[test]
+    fn telemetry_snapshot_lists_namespaces_and_count() {
+        let mgr = TelemetryManager::new();
+        mgr.upsert(make_telemetry("a", "ns1", None));
+        mgr.upsert(make_telemetry("b", "ns2", None));
+        let snap = mgr.snapshot();
+        assert_eq!(snap.total_resources, 2);
+        let mut ns = snap.namespaces;
+        ns.sort();
+        assert_eq!(ns, vec!["ns1", "ns2"]);
+    }
+
+    #[test]
+    fn telemetry_get_returns_specific_resource() {
+        let mgr = TelemetryManager::new();
+        mgr.upsert(make_telemetry("custom", "ns", None));
+        let got = mgr.get("ns", "custom").unwrap();
+        assert_eq!(got.name, "custom");
+        assert!(mgr.get("ns", "missing").is_none());
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 18 — Deep parity: Sidecar / WorkloadGroup
+    // ═══════════════════════════════════════════════════════
+
+    #[test]
+    fn sidecar_accessible_hosts_aggregates_all_egress() {
+        let mgr = SidecarManager::new();
+        let sc = Sidecar {
+            name: "sc".to_string(), namespace: "ns".to_string(),
+            selector: None, ingress: vec![],
+            egress: vec![
+                IstioEgressListener {
+                    port: None, bind: None,
+                    capture_mode: CaptureMode::Default,
+                    hosts: vec!["./payments.svc".to_string()],
+                },
+                IstioEgressListener {
+                    port: None, bind: None,
+                    capture_mode: CaptureMode::Default,
+                    hosts: vec!["./orders.svc".to_string(), "./catalog.svc".to_string()],
+                },
+            ],
+            outbound_traffic_policy: OutboundTrafficPolicy::AllowAny,
+            created_at: Utc::now(), updated_at: Utc::now(),
+        };
+        mgr.upsert(sc);
+        let hosts = mgr.accessible_hosts("ns", &HashMap::new());
+        assert_eq!(hosts.len(), 3);
+    }
+
+    #[test]
+    fn workload_group_get_and_remove() {
+        let mgr = WorkloadGroupManager::new();
+        let g = WorkloadGroup {
+            name: "g".to_string(), namespace: "ns".to_string(),
+            selector: None,
+            metadata: WorkloadGroupMetadata::default(),
+            template: WorkloadEntryTemplate {
+                address: None, labels: HashMap::new(),
+                service_account: None, network: None, locality: None,
+                weight: 100, ports: HashMap::new(),
+            },
+            probe: None,
+            created_at: Utc::now(), updated_at: Utc::now(),
+        };
+        mgr.upsert_group(g);
+        assert!(mgr.get_group("ns", "g").is_some());
+        mgr.remove_group("ns", "g");
+        assert!(mgr.get_group("ns", "g").is_none());
+    }
+
+    #[test]
+    fn workload_entry_get_and_remove() {
+        let mgr = WorkloadGroupManager::new();
+        let e = WorkloadEntry {
+            name: Some("vm-1".to_string()), namespace: Some("ns".to_string()),
+            address: "10.0.0.1".to_string(),
+            labels: HashMap::new(), ports: HashMap::new(),
+            service_account: None, network: None, locality: None, weight: 100u32,
+            created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
+        };
+        mgr.upsert_entry(e);
+        assert!(mgr.get_entry("ns", "vm-1").is_some());
+        mgr.remove_entry("ns", "vm-1");
+        assert!(mgr.get_entry("ns", "vm-1").is_none());
+    }
+
+    #[test]
+    fn workload_group_snapshot_counts() {
+        let mgr = WorkloadGroupManager::new();
+        for i in 0..3 {
+            mgr.upsert_group(WorkloadGroup {
+                name: format!("g{i}"), namespace: "ns".to_string(),
+                selector: None,
+                metadata: WorkloadGroupMetadata::default(),
+                template: WorkloadEntryTemplate {
+                    address: None, labels: HashMap::new(),
+                    service_account: None, network: None, locality: None,
+                    weight: 100, ports: HashMap::new(),
+                },
+                probe: None,
+                created_at: Utc::now(), updated_at: Utc::now(),
+            });
+        }
+        for i in 0..2 {
+            mgr.upsert_entry(WorkloadEntry {
+                name: Some(format!("e{i}")), namespace: Some("ns".to_string()),
+                address: format!("10.0.0.{i}"),
+                labels: HashMap::new(), ports: HashMap::new(),
+                service_account: None, network: None, locality: None, weight: 100u32,
+                created_at: Some(Utc::now()), updated_at: Some(Utc::now()),
+            });
+        }
+        let snap = mgr.snapshot();
+        assert_eq!(snap.total_groups, 3);
+        assert_eq!(snap.total_entries, 2);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // 19 — Deep parity: Traffic L7 matching
+    // ═══════════════════════════════════════════════════════
+
+    fn match_uri(uri: StringMatch) -> HttpMatchRequest {
+        HttpMatchRequest {
+            name: None, headers: HashMap::new(),
+            uri: Some(uri), method: None, authority: None,
+            query_params: HashMap::new(), gateways: vec![],
+            source_namespace: None, without_headers: HashMap::new(),
+            port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn traffic_uri_prefix_match() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "h", vec![HttpRoute {
+            name: None,
+            match_rules: vec![match_uri(StringMatch::Prefix("/api/v1".to_string()))],
+            route: vec![route_dest("v1", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        assert!(tm.resolve_route("h", &make_req("/api/v1/users", "GET")).is_some());
+        assert!(tm.resolve_route("h", &make_req("/api/v2/users", "GET")).is_none());
+    }
+
+    #[test]
+    fn traffic_uri_regex_match() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "h", vec![HttpRoute {
+            name: None,
+            match_rules: vec![match_uri(StringMatch::Regex(r"^/users/\d+$".to_string()))],
+            route: vec![route_dest("users", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        assert!(tm.resolve_route("h", &make_req("/users/42", "GET")).is_some());
+        assert!(tm.resolve_route("h", &make_req("/users/abc", "GET")).is_none());
+    }
+
+    #[test]
+    fn traffic_method_match() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "h", vec![HttpRoute {
+            name: None,
+            match_rules: vec![HttpMatchRequest {
+                name: None, headers: HashMap::new(),
+                uri: None, method: Some(StringMatch::Exact("POST".to_string())),
+                authority: None, query_params: HashMap::new(), gateways: vec![],
+                source_namespace: None, without_headers: HashMap::new(),
+                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+            }],
+            route: vec![route_dest("writer", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        assert!(tm.resolve_route("h", &make_req("/", "POST")).is_some());
+        assert!(tm.resolve_route("h", &make_req("/", "GET")).is_none());
+    }
+
+    #[test]
+    fn traffic_query_param_match() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "h", vec![HttpRoute {
+            name: None,
+            match_rules: vec![HttpMatchRequest {
+                name: None, headers: HashMap::new(),
+                uri: None, method: None, authority: None,
+                query_params: {
+                    let mut q = HashMap::new();
+                    q.insert("v".to_string(), StringMatch::Exact("2".to_string()));
+                    q
+                },
+                gateways: vec![],
+                source_namespace: None, without_headers: HashMap::new(),
+                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+            }],
+            route: vec![route_dest("v2", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        let mut req = make_req("/", "GET");
+        req.query_params.insert("v".to_string(), "2".to_string());
+        assert!(tm.resolve_route("h", &req).is_some());
+        assert!(tm.resolve_route("h", &make_req("/", "GET")).is_none());
+    }
+
+    #[test]
+    fn traffic_source_namespace_match() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "h", vec![HttpRoute {
+            name: None,
+            match_rules: vec![HttpMatchRequest {
+                name: None, headers: HashMap::new(),
+                uri: None, method: None, authority: None,
+                query_params: HashMap::new(),
+                gateways: vec![],
+                source_namespace: Some("trusted".to_string()),
+                without_headers: HashMap::new(),
+                port: None, ignore_uri_case: false, source_labels: HashMap::new(),
+            }],
+            route: vec![route_dest("internal", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        let mut req = make_req("/", "GET");
+        req.source_namespace = Some("trusted".to_string());
+        assert!(tm.resolve_route("h", &req).is_some());
+        let req2 = make_req("/", "GET");
+        assert!(tm.resolve_route("h", &req2).is_none());
+    }
+
+    #[test]
+    fn traffic_remove_virtual_service_clears_routing() {
+        let tm = TrafficManager::new();
+        let vs = make_vs("vs", "rm.svc", vec![HttpRoute {
+            name: None, match_rules: vec![],
+            route: vec![route_dest("backend", 100)],
+            timeout_ms: None, retries: None, fault: None,
+            mirror: None, mirror_percentage: None, headers: None,
+            redirect: None, direct_response: None, rewrite: None, cors_policy: None,
+        }]);
+        tm.upsert_virtual_service(vs);
+        assert!(tm.resolve_route("rm.svc", &make_req("/", "GET")).is_some());
+        tm.remove_virtual_service("vs");
+        assert!(tm.resolve_route("rm.svc", &make_req("/", "GET")).is_none());
+    }
 }
