@@ -226,7 +226,7 @@ mod tests {
     use crate::test_ctx;
 
     fn key(tenant: &str, name: &str) -> ObjectKey {
-        ObjectKey::new(TenantId::new(tenant), "Deployment", "default", name)
+        ObjectKey::new(TenantId::new(tenant).expect("test fixture"), "Deployment", "default", name)
     }
 
     #[test]
@@ -290,7 +290,7 @@ mod tests {
         src.push(Event::Add(key("evil", "b")));
         src.push(Event::Update(key("acme", "c")));
         let mut q = Workqueue::new();
-        src.drain_into(&mut q, &TenantId::new("acme"));
+        src.drain_into(&mut q, &TenantId::new("acme").expect("test fixture"));
         assert_eq!(q.len(), 2);
     }
 
@@ -305,7 +305,7 @@ mod tests {
         q.add(key("acme", "a"));
         q.add(key("evil", "b"));
         q.add(key("acme", "c"));
-        let mut ctrl = SyncController::new(TenantId::new("acme"), ConstReconciler::new(Reconcile::NoOp));
+        let mut ctrl = SyncController::new(TenantId::new("acme").expect("test fixture"), ConstReconciler::new(Reconcile::NoOp));
         let dispatched = ctrl.run_until_idle(&mut q);
         assert_eq!(dispatched, 2);
         assert_eq!(ctrl.processed, 2);
@@ -329,7 +329,7 @@ mod tests {
         }
         let mut q = Workqueue::new();
         q.add(key("acme", "a"));
-        let mut ctrl = SyncController::new(TenantId::new("acme"), ErrorReconciler);
+        let mut ctrl = SyncController::new(TenantId::new("acme").expect("test fixture"), ErrorReconciler);
         ctrl.run_until_idle(&mut q);
         assert_eq!(ctrl.processed, 0);
         assert_eq!(ctrl.errored, 1);
@@ -342,7 +342,7 @@ mod tests {
             "Run",
             "tenant-mgr-e2e"
         );
-        let owner = TenantId::new("acme");
+        let owner = TenantId::new("acme").expect("test fixture");
         let mut src = EventSource::new();
         for n in ["a", "b", "c", "a"] {
             src.push(Event::Add(key("acme", n)));

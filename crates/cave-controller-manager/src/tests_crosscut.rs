@@ -593,7 +593,7 @@ fn manager_loop_workqueue_dedups_repeated_adds() {
     );
     use crate::deeper::manager::{ObjectKey, Workqueue};
     let mut q = Workqueue::new();
-    let k = ObjectKey::new(TenantId::new("acme"), "Deployment", "default", "web");
+    let k = ObjectKey::new(TenantId::new("acme").expect("test fixture"), "Deployment", "default", "web");
     q.add(k.clone());
     q.add(k.clone());
     q.add(k);
@@ -610,9 +610,9 @@ fn manager_loop_drops_cross_tenant_keys_at_drain() {
     use crate::deeper::manager::{
         ConstReconciler, Event, EventSource, ObjectKey, SyncController, Workqueue,
     };
-    let owner = TenantId::new("acme");
+    let owner = TenantId::new("acme").expect("test fixture");
     let mut src = EventSource::new();
-    src.push(Event::Add(ObjectKey::new(TenantId::new("evil"), "Deployment", "default", "x")));
+    src.push(Event::Add(ObjectKey::new(TenantId::new("evil").expect("test fixture"), "Deployment", "default", "x")));
     src.push(Event::Add(ObjectKey::new(owner.clone(), "Deployment", "default", "y")));
     let mut q = Workqueue::new();
     src.drain_into(&mut q, &owner);

@@ -111,7 +111,7 @@ mod tests {
         PodSummary {
             name: name.into(),
             namespace: "default".into(),
-            tenant: TenantId::new("t1"),
+            tenant: TenantId::new("t1").expect("test fixture"),
             phase,
             created_sec: 0,
             node_name: Some("n1".into()),
@@ -257,7 +257,7 @@ mod tests {
         let d = DisruptedPod {
             name: "p".into(),
             namespace: "default".into(),
-            tenant: TenantId::new("t1"),
+            tenant: TenantId::new("t1").expect("test fixture"),
             reason: DisruptionReason::Stuck,
             force_delete: true,
         };

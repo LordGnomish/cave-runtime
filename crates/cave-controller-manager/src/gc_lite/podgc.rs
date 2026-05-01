@@ -93,7 +93,7 @@ mod tests {
         PodSummary {
             name: name.into(),
             namespace: "default".into(),
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             phase,
             created_sec: age,
             node_name: Some("node-a".into()),
@@ -125,7 +125,7 @@ mod tests {
             pod("a", PodPhase::Succeeded, 1, "t1"),
             pod("b", PodPhase::Failed, 2, "t1"),
         ];
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 5);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 5);
         assert!(got.is_empty());
     }
 
@@ -141,7 +141,7 @@ mod tests {
             pod("middle", PodPhase::Failed, 5, "t1"),
             pod("newest", PodPhase::Succeeded, 10, "t1"),
         ];
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 1);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 1);
         // Threshold 1, three terminated → remove the two oldest.
         assert!(got.contains(&"oldest".to_string()));
         assert!(got.contains(&"middle".to_string()));
@@ -159,7 +159,7 @@ mod tests {
             .map(|i| pod(&format!("p{i}"), PodPhase::Running, i as u64, "t1"))
             .collect();
         // Threshold 0 — but everything is Running, nothing to GC.
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 0);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 0);
         assert!(got.is_empty());
     }
 
@@ -175,7 +175,7 @@ mod tests {
             pod("t1-b", PodPhase::Succeeded, 2, "t1"),
             pod("t2-a", PodPhase::Succeeded, 1, "t2"),
         ];
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 1);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 1);
         assert!(got.contains(&"t1-a".to_string()));
         assert!(!got.iter().any(|n| n.starts_with("t2")));
     }
@@ -192,7 +192,7 @@ mod tests {
             pod("p2", PodPhase::Pending, 2, "t1"),
         ];
         pods[0].orphaned = true;
-        let got = select_orphaned_for_gc(&pods, &TenantId::new("t1"));
+        let got = select_orphaned_for_gc(&pods, &TenantId::new("t1").expect("test fixture"));
         assert_eq!(got, vec!["p1"]);
     }
 
@@ -207,7 +207,7 @@ mod tests {
         p.node_name = None;
         p.orphaned = true;
         // Pod was never bound — orphan-by-node-removal doesn't apply.
-        let got = select_orphaned_for_gc(&[p], &TenantId::new("t1"));
+        let got = select_orphaned_for_gc(&[p], &TenantId::new("t1").expect("test fixture"));
         assert!(got.is_empty());
     }
 
@@ -223,7 +223,7 @@ mod tests {
             pod("b", PodPhase::Failed, 2, "t1"),
             pod("c", PodPhase::Running, 3, "t1"),
         ];
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 0);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 0);
         assert_eq!(got.len(), 2);
         assert!(!got.contains(&"c".to_string()));
     }
@@ -271,7 +271,7 @@ mod tests {
             pod("b", PodPhase::Failed, 5, "t1"),
             pod("c", PodPhase::Succeeded, 5, "t1"),
         ];
-        let got = select_terminated_for_gc(&pods, &TenantId::new("t1"), 1);
+        let got = select_terminated_for_gc(&pods, &TenantId::new("t1").expect("test fixture"), 1);
         // Exactly 2 should be removed.
         assert_eq!(got.len(), 2);
     }

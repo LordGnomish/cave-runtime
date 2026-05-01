@@ -184,7 +184,7 @@ mod tests {
     fn ds(rev: u64, max_unavail: u32, sel: &[(&str, &str)], tols: Vec<Toleration>) -> DaemonSetSpec {
         DaemonSetSpec {
             name: "node-exporter".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             node_selector: sel.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
             tolerations: tols,
             revision: rev,

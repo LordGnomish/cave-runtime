@@ -107,7 +107,7 @@ mod tests {
         ResourceQuotaSpec {
             name: "q".into(),
             namespace: "default".into(),
-            tenant: TenantId::new("t"),
+            tenant: TenantId::new("t").expect("test fixture"),
             hard: hard.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
             scopes: vec![],
         }

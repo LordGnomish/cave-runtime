@@ -342,7 +342,7 @@ mod tests {
         );
         let spec = CronJobSpec {
             name: "report".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             schedule: "* * * * *".into(),
             concurrency: ConcurrencyPolicy::Forbid,
             suspended: false,
@@ -361,7 +361,7 @@ mod tests {
         );
         let spec = CronJobSpec {
             name: "report".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             schedule: "* * * * *".into(),
             concurrency: ConcurrencyPolicy::Replace,
             suspended: false,
@@ -386,7 +386,7 @@ mod tests {
         );
         let spec = CronJobSpec {
             name: "report".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             schedule: "* * * * *".into(),
             concurrency: ConcurrencyPolicy::Allow,
             suspended: true,
@@ -404,7 +404,7 @@ mod tests {
         );
         let spec = CronJobSpec {
             name: "report".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             schedule: "* * * * *".into(),
             concurrency: ConcurrencyPolicy::Allow,
             suspended: false,

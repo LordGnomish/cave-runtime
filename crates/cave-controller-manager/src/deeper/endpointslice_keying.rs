@@ -126,7 +126,7 @@ mod tests {
     use crate::test_ctx;
 
     fn svc(name: &str, tenant: &str) -> ServiceSpec {
-        ServiceSpec { name: name.into(), namespace: "default".into(), tenant: TenantId::new(tenant) }
+        ServiceSpec { name: name.into(), namespace: "default".into(), tenant: TenantId::new(tenant).expect("test fixture") }
     }
 
     fn ep(addr: &str, ports: &[(&'static str, u16)]) -> EndpointAddr {

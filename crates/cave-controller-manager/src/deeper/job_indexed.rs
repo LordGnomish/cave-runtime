@@ -152,7 +152,7 @@ mod tests {
     fn spec(completions: u32, parallelism: u32, backoff: u32, suspended: bool) -> IndexedJobSpec {
         IndexedJobSpec {
             name: "build".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             completions,
             parallelism,
             backoff_limit_per_index: backoff,

@@ -221,7 +221,7 @@ mod tests {
     use crate::test_ctx;
 
     fn world(desired: u32) -> StatefulSetWorld {
-        StatefulSetWorld::new(TenantId::new("acme"), "db", desired)
+        StatefulSetWorld::new(TenantId::new("acme").expect("test fixture"), "db", desired)
     }
 
     fn bound(o: u32) -> PodSlot {

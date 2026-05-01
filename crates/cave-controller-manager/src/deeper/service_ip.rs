@@ -209,7 +209,7 @@ mod tests {
         ServiceObject {
             name: name.into(),
             namespace: "default".into(),
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             service_type: t,
             cluster_ip: None,
             external_ip: None,

@@ -16,26 +16,11 @@ pub const UPSTREAM_VERSION: &str = "v1.36.0";
 /// Stable upstream module path for kube-controller-manager.
 pub const UPSTREAM_PKG: &str = "k8s.io/kubernetes/pkg/controller";
 
-/// A multi-tenant identifier. Controllers MUST scope all reconciliation,
-/// metrics, and audit log entries to the tenant that owns the workload.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TenantId(pub String);
-
-impl TenantId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Display for TenantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+/// Multi-tenant identifier — re-exported from `cave_kernel::ns` (sweep-002
+/// F2-G adoption, 2026-05-01). Controllers MUST scope all reconciliation,
+/// metrics, and audit log entries to the tenant that owns the workload; the
+/// kernel newtype provides the single DNS-1123-validated surface.
+pub use cave_kernel::ns::TenantId;
 
 /// A citation pointing at the upstream Kubernetes symbol or test that a piece
 /// of local code is a parity port of.
@@ -113,7 +98,7 @@ pub enum ControllerError {
 macro_rules! test_ctx {
     ($path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::types::Cite::new($path, $symbol);
-        let tenant = $crate::types::TenantId::new($tenant);
+        let tenant = $crate::types::TenantId::new($tenant).expect("test fixture");
         // sanity: cite must point at the pinned upstream tag
         assert_eq!(cite.version, $crate::types::UPSTREAM_VERSION);
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
