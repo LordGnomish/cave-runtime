@@ -120,7 +120,7 @@ impl RequestCtx {
         grants.insert(tenant.to_string());
         Self {
             principal: format!("spiffe://cluster.local/ns/{tenant}/sa/dev"),
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             has_webauthn: true,
             tenant_grants: grants,
             permissions: perms.iter().copied().collect(),
@@ -158,7 +158,7 @@ mod tests {
         );
         let mut ctx = RequestCtx::developer("acme", &[Permission::EtcdRead]);
         // Caller asks to operate as `evil` but only holds the `acme` grant.
-        ctx.tenant = TenantId::new("evil");
+        ctx.tenant = TenantId::new("evil").expect("test fixture");
         let err = ctx.authorise(Permission::EtcdRead).unwrap_err();
         assert!(matches!(err, AuthError::TenantMismatch { .. }));
     }

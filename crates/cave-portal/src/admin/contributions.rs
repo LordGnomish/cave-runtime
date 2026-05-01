@@ -873,7 +873,12 @@ mod tests {
         assert!(p1 < p_opus, "rank #1 must be rendered before opus row");
     }
 
-    /// cite: render — html escape on tenant_id (defence-in-depth)
+    /// cite: render — tenant_id is now validated at the boundary
+    /// (sweep-002 F2-G adoption made TenantId DNS-1123-only). The previous
+    /// version of this test exercised the downstream HTML escape as a
+    /// defence-in-depth layer; with the canonical newtype the malicious
+    /// value cannot construct in the first place. Assert the rejection
+    /// directly.
     #[test]
     fn contributions_html_escape_blocks_tenant_injection() {
         let (_cite, _t) = portal_test_ctx!(
@@ -881,12 +886,8 @@ mod tests {
             "Page",
             "acme"
         );
-        let mut ctx = admin_ctx("evil<script>");
-        // Tenant grants must be expanded so authorise passes
-        ctx.tenant_grants.insert("evil<script>".to_string());
-        let html = render_overview(&[], &ctx).unwrap();
-        assert!(!html.contains("<script>"));
-        assert!(html.contains("&lt;script&gt;"));
+        assert!(TenantId::new("evil<script>").is_err(),
+            "TenantId must reject HTML-injection-shaped input at construction");
     }
 
     /// cite: detail — worker_kind() helper returns the same enum as static fn

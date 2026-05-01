@@ -197,8 +197,8 @@ impl AdminState {
     /// `evil` tenant so cross-tenant tests can verify the filter.
     pub fn seeded() -> Self {
         let s = Self::empty();
-        let acme = TenantId::new("acme");
-        let evil = TenantId::new("evil");
+        let acme = TenantId::new("acme").expect("test fixture");
+        let evil = TenantId::new("evil").expect("test fixture");
         s.etcd_kv.write().unwrap().extend([
             EtcdKv { tenant: acme.clone(), key: "/cfg/feature_x".into(), value: "on".into(), revision: 7, lease_id: None },
             EtcdKv { tenant: acme.clone(), key: "/state/leader".into(), value: "node-a".into(), revision: 8, lease_id: Some(1001) },

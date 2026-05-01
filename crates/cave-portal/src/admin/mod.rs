@@ -151,7 +151,7 @@ async fn tenant_dashboard_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    let path_tenant = TenantId::new(tenant);
+    let path_tenant = TenantId::new(tenant).expect("test fixture");
     tenant_dashboard::render(&state, &ctx, &path_tenant)
         .map(Html)
         .map_err(err_to_response)

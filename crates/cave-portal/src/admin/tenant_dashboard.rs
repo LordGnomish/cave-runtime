@@ -187,7 +187,7 @@ mod tests {
         let err = render(
             &state,
             &ctx(&[Permission::DashboardRead]),
-            &TenantId::new("evil"),
+            &TenantId::new("evil").expect("test fixture"),
         )
         .unwrap_err();
         assert!(matches!(err, DashboardError::PathTenantMismatch { .. }));
@@ -204,7 +204,7 @@ mod tests {
         let html = render(
             &state,
             &ctx(&[Permission::DashboardRead]),
-            &TenantId::new("acme"),
+            &TenantId::new("acme").expect("test fixture"),
         )
         .unwrap();
         assert!(html.contains("Summary"));
