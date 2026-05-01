@@ -230,7 +230,7 @@ mod tests {
     }
 
     fn proxy(tenant: &str, strict: bool) -> L7Proxy {
-        let mut p = L7Proxy::new(TenantId::new(tenant), "cluster.local");
+        let mut p = L7Proxy::new(TenantId::new(tenant).expect("test fixture"), "cluster.local");
         p.strict_mtls = strict;
         p
     }

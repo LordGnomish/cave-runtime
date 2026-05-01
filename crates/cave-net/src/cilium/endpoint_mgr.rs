@@ -186,7 +186,7 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/endpointmanager/endpointsynchronizer.go", "Errors", "tenant-em-er");
         let e = EndpointMgrError::NotFound(7);
         assert!(format!("{}", e).contains("7"));
-        let e = EndpointMgrError::TenantDenied { tenant: TenantId::new("t") };
+        let e = EndpointMgrError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
         assert!(format!("{}", e).contains("t"));
     }
 }

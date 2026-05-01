@@ -172,7 +172,7 @@ mod tests {
     fn cluster(name: &str, tenant: &str, ids: &[(u32, &[(&str, &str)])]) -> RemoteCluster {
         RemoteCluster {
             name: name.into(),
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             identities: ids
                 .iter()
                 .map(|(id, labels)| {

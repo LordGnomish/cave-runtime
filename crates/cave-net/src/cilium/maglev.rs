@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn maglev_default_table_size_is_16381_and_prime() {
-        let (_c, _t) = cilium_test_ctx!("pkg/maglev/maglev.go", "DefaultTableSize", "tenant-mg-M");
+        let (_c, _t) = cilium_test_ctx!("pkg/maglev/maglev.go", "DefaultTableSize", "tenant-mg-m");
         assert_eq!(DEFAULT_M, 16381);
         assert!(is_prime(DEFAULT_M));
     }

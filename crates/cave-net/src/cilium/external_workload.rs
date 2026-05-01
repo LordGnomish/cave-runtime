@@ -238,7 +238,7 @@ mod tests {
     fn ew_register_cross_tenant_rejected() {
         let (_c, tenant) = cilium_test_ctx!("pkg/clustermesh/externalworkloads/manager.go", "Register.Tenant", "tenant-ew-xt");
         let mut m = mgr(tenant);
-        let other = TenantId::new("tenant-ew-xt-other");
+        let other = TenantId::new("tenant-ew-xt-other").expect("test fixture");
         let err = m.register(spec("vm-1", other.clone(), Some(ip(192, 168, 1, 10)))).unwrap_err();
         assert!(matches!(err, ExternalWorkloadError::TenantDenied { .. }));
     }

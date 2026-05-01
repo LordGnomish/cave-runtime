@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn trace_cross_tenant_repository_rejected() {
         let (_c, tenant) = cilium_test_ctx!("pkg/policy/trace.go", "Trace.TenantDenied", "tenant-pt-td");
-        let other = TenantId::new("tenant-pt-other");
+        let other = TenantId::new("tenant-pt-other").expect("test fixture");
         let mut repo = PolicyRepository::new();
         repo.add(Rule::new("foreign", other, EndpointSelector::empty()));
         let map = PolicyMap::new();

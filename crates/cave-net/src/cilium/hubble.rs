@@ -199,7 +199,7 @@ mod tests {
         bytes: u64,
     ) -> FlowLog {
         FlowLog {
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             time: DateTime::parse_from_rfc3339("2026-04-26T10:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),

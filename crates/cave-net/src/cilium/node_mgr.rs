@@ -179,7 +179,7 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/node/types/node.go", "Errors", "tenant-nm-err");
         let e = NodeError::NotFound("x".into());
         assert!(format!("{}", e).contains("x"));
-        let e = NodeError::TenantDenied { tenant: TenantId::new("t") };
+        let e = NodeError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
         assert!(format!("{}", e).contains("t"));
     }
 }

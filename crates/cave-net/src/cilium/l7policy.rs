@@ -355,7 +355,7 @@ mod tests {
     use crate::cilium_test_ctx;
 
     fn rule(tenant: &str, port: PortRule) -> CnpRule {
-        CnpRule { name: "policy-1".into(), tenant: TenantId::new(tenant), port }
+        CnpRule { name: "policy-1".into(), tenant: TenantId::new(tenant).expect("test fixture"), port }
     }
 
     #[test]

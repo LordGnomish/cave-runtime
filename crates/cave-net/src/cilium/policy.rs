@@ -961,7 +961,7 @@ mod tests {
     fn repository_add_and_remove() {
         let (_c, _t) = cilium_test_ctx!("pkg/policy/repository.go", "PolicyRepository", "tenant-pol-repo");
         let mut repo = PolicyRepository::new();
-        let rule = Rule::new("allow-all", TenantId::new("tenant-pol-repo"), EndpointSelector::empty());
+        let rule = Rule::new("allow-all", TenantId::new("tenant-pol-repo").expect("test fixture"), EndpointSelector::empty());
         repo.add(rule);
         assert_eq!(repo.len(), 1);
         assert!(repo.remove("allow-all"));
@@ -1208,7 +1208,7 @@ mod tests {
 
     #[test]
     fn distill_rejects_cross_tenant_rule() {
-        let other = TenantId::new("tenant-pol-dist-other");
+        let other = TenantId::new("tenant-pol-dist-other").expect("test fixture");
         let (_c, mine) = cilium_test_ctx!("pkg/policy/distillery.go", "distillPolicy.TenantIsolation", "tenant-pol-dist-mine");
         let mut repo = PolicyRepository::new();
         repo.add(Rule::new("foreign", other, EndpointSelector::empty()));

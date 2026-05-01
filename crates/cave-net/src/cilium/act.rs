@@ -185,7 +185,7 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/act/act.go", "Errors", "tenant-act-err");
         let e = ActError::SeriesLimit(501, 500);
         assert!(format!("{}", e).contains("501"));
-        let e = ActError::TenantDenied { tenant: TenantId::new("t-x") };
+        let e = ActError::TenantDenied { tenant: TenantId::new("t-x").expect("test fixture") };
         assert!(format!("{}", e).contains("t-x"));
     }
 

@@ -85,7 +85,7 @@ fn endpoint_sel(pairs: &[(&str, &str)]) -> EndpointSelector {
 
 #[test]
 fn e2e_identity_allocation_drives_policy_verdict() {
-    let tenant = TenantId::new("e2e-1");
+    let tenant = TenantId::new("e2e-1").expect("test fixture");
     let mut cache = LocalIdentityCache::new(tenant.clone());
     let client_id = cache.lookup_or_allocate(&ls(&[("app", "client")])).unwrap();
     let web_id = cache.lookup_or_allocate(&ls(&[("app", "web")])).unwrap();
@@ -120,7 +120,7 @@ fn e2e_identity_allocation_drives_policy_verdict() {
 
 #[test]
 fn e2e_service_lb_and_conntrack_round_trip() {
-    let tenant = TenantId::new("e2e-2");
+    let tenant = TenantId::new("e2e-2").expect("test fixture");
     let mut reg = ServiceRegistry::new();
     let mut svc = Service::cluster_ip("api", "default", tenant.clone(), ip4(10, 96, 0, 1), 80);
     svc.algorithm = Algorithm::RoundRobin;
@@ -149,7 +149,7 @@ fn e2e_service_lb_and_conntrack_round_trip() {
 
 #[test]
 fn e2e_maglev_consistent_under_backend_addition() {
-    let tenant = TenantId::new("e2e-3");
+    let tenant = TenantId::new("e2e-3").expect("test fixture");
     let backs_before: Vec<MaglevBackend> = (0..5).map(|i| MaglevBackend::new(format!("b-{i}"), 1)).collect();
     let backs_after: Vec<MaglevBackend> = (0..6).map(|i| MaglevBackend::new(format!("b-{i}"), 1)).collect();
     let m = 1009usize;
@@ -171,7 +171,7 @@ fn e2e_maglev_consistent_under_backend_addition() {
 #[test]
 fn e2e_maglev_default_table_size_is_prime() {
     assert_eq!(DEFAULT_M, 16381);
-    let tenant = TenantId::new("e2e-3b");
+    let tenant = TenantId::new("e2e-3b").expect("test fixture");
     let backs = vec![MaglevBackend::new("only", 1)];
     let table = MaglevTable::build(tenant, DEFAULT_M, backs).unwrap();
     let h = hash_5tuple(0x0a000001, 0x0a600001, 1234, 80, 6);
@@ -182,7 +182,7 @@ fn e2e_maglev_default_table_size_is_prime() {
 
 #[test]
 fn e2e_nat_snat_dnat_round_trip() {
-    let tenant = TenantId::new("e2e-4");
+    let tenant = TenantId::new("e2e-4").expect("test fixture");
     let mut snat = SnatTable::new(tenant.clone(), ip4(192, 168, 1, 1));
     let key = SnatKey { src_ip: ip4(10, 0, 0, 1), src_port: 1234, dst_ip: ip4(8, 8, 8, 8), dst_port: 53 };
     let entry = snat.allocate(key, 100).unwrap();
@@ -200,7 +200,7 @@ fn e2e_nat_snat_dnat_round_trip() {
 
 #[test]
 fn e2e_ipam_cluster_pool_idempotent_per_owner() {
-    let tenant = TenantId::new("e2e-5");
+    let tenant = TenantId::new("e2e-5").expect("test fixture");
     let mut ipam = Ipam::new(IpamMode::ClusterPool);
     ipam.upsert_pool(PodIpPool::ipv4("default", tenant, "10.0.0.0/24")).unwrap();
     let ip_a = ipam.allocate_v4("default", "ns/p1").unwrap();
@@ -215,7 +215,7 @@ fn e2e_ipam_cluster_pool_idempotent_per_owner() {
 
 #[test]
 fn e2e_ipcache_source_priority_resolution() {
-    let tenant = TenantId::new("e2e-6");
+    let tenant = TenantId::new("e2e-6").expect("test fixture");
     let mut cache = Ipcache::new(tenant);
     let kv_entry = IpcacheEntry { identity: 999, source: IpcacheSource::Kvstore, encryption_key: 0, tunnel_endpoint: None };
     let local_entry = IpcacheEntry { identity: 256, source: IpcacheSource::Local, encryption_key: 0, tunnel_endpoint: None };
@@ -231,7 +231,7 @@ fn e2e_ipcache_source_priority_resolution() {
 
 #[test]
 fn e2e_hubble_observer_relay_aggregation() {
-    let tenant = TenantId::new("e2e-7");
+    let tenant = TenantId::new("e2e-7").expect("test fixture");
     let mut a = Observer::new(tenant.clone(), 100, 0);
     let mut b = Observer::new(tenant.clone(), 100, 0);
     let make_flow = |src_ns: &str, verdict: HubbleVerdict| FlowLog {
@@ -269,7 +269,7 @@ fn e2e_hubble_observer_relay_aggregation() {
 
 #[test]
 fn e2e_auth_full_mtls_handshake() {
-    let tenant = TenantId::new("e2e-8");
+    let tenant = TenantId::new("e2e-8").expect("test fixture");
     let mut m = AuthManager::new(tenant, "cluster.local");
     let svid_a = Svid::new("spiffe://cluster.local/client", "cluster.local", 100, 3600);
     let svid_b = Svid::new("spiffe://cluster.local/api", "cluster.local", 100, 3600);
@@ -289,7 +289,7 @@ fn e2e_auth_full_mtls_handshake() {
 
 #[test]
 fn e2e_bgp_full_session_lifecycle() {
-    let tenant = TenantId::new("e2e-9");
+    let tenant = TenantId::new("e2e-9").expect("test fixture");
     let mut bgp = BgpInstance::new(tenant, 65000, ip4(10, 0, 0, 1));
     bgp.upsert_peer(BgpPeerConfig::defaults("ext", ip4(10, 0, 0, 2), 64999, 65000));
     assert_eq!(bgp.peer_status("ext").unwrap().state, PeerState::Idle);
@@ -306,7 +306,7 @@ fn e2e_bgp_full_session_lifecycle() {
 
 #[test]
 fn e2e_l2_announcer_with_arp_burst() {
-    let tenant = TenantId::new("e2e-10");
+    let tenant = TenantId::new("e2e-10").expect("test fixture");
     let mut l2 = L2Announcer::new(tenant.clone(), "node-a", 60);
     l2.upsert_policy(L2AnnouncementPolicy {
         name: "lb".into(), tenant: tenant.clone(),
@@ -339,7 +339,7 @@ fn e2e_l2_announcer_with_arp_burst() {
 
 #[test]
 fn e2e_tunnel_native_routing_overrides_endpoint() {
-    let tenant = TenantId::new("e2e-11");
+    let tenant = TenantId::new("e2e-11").expect("test fixture");
     let mut m = TunnelManager::new(tenant, TunnelMode::Vxlan, Some("10.244.0.0/16".into())).unwrap();
     m.upsert_endpoint(TunnelEndpoint {
         node_name: "node-a".into(),
@@ -355,7 +355,7 @@ fn e2e_tunnel_native_routing_overrides_endpoint() {
 
 #[test]
 fn e2e_sock_lb_connect_recv_roundtrip() {
-    let tenant = TenantId::new("e2e-12");
+    let tenant = TenantId::new("e2e-12").expect("test fixture");
     let mut m = SockLbManager::new(tenant, SockLbConfig::default());
     let id = m.register_service(
         ServiceFrontend { cluster_ip: ip4(10, 96, 0, 1), port: 80, protocol: 6 },
@@ -378,7 +378,7 @@ fn e2e_sock_lb_connect_recv_roundtrip() {
 
 #[test]
 fn e2e_clustermesh_kvstore_watch() {
-    let tenant = TenantId::new("e2e-13");
+    let tenant = TenantId::new("e2e-13").expect("test fixture");
     let mut kv = KvStore::new(tenant);
     let w = kv.watch("/cilium/identities/");
     kv.put("/cilium/identities/256", b"client".to_vec(), None);
@@ -403,7 +403,7 @@ fn e2e_clustermesh_local_affinity_falls_through_to_remote() {
 
 #[test]
 fn e2e_egress_gateway_ha_failover() {
-    let tenant = TenantId::new("e2e-15");
+    let tenant = TenantId::new("e2e-15").expect("test fixture");
     let mut mgr = EgressManager::new();
     let mut p = EgressGatewayPolicy::new(
         "egw", tenant,
@@ -426,7 +426,7 @@ fn e2e_egress_gateway_ha_failover() {
 
 #[test]
 fn e2e_lrp_node_local_dns_redirect() {
-    let tenant = TenantId::new("e2e-16");
+    let tenant = TenantId::new("e2e-16").expect("test fixture");
     let mut m = LrpManager::new();
     m.upsert_policy(make_node_local_dns_lrp(tenant)).unwrap();
     m.upsert_backend(LocalBackend {
@@ -445,7 +445,7 @@ fn e2e_lrp_node_local_dns_redirect() {
 
 #[test]
 fn e2e_dns_proxy_intercept_updates_resolved() {
-    let tenant = TenantId::new("e2e-17");
+    let tenant = TenantId::new("e2e-17").expect("test fixture");
     let mut p = DnsProxy::new(tenant.clone(), DnsMode::Intercept);
     p.set_allow_list(1, AllowList { patterns: vec!["*.example.com".into()] });
     let q = DnsQuestion { qname: "api.example.com".into(), qtype: QType::A };
@@ -471,7 +471,7 @@ fn e2e_dns_proxy_intercept_updates_resolved() {
 
 #[test]
 fn e2e_wireguard_keypair_and_peer_registry() {
-    let tenant = TenantId::new("e2e-18");
+    let tenant = TenantId::new("e2e-18").expect("test fixture");
     let mut a = WgAgent::new(tenant, "node-a", WgMode::PerNode, 1);
     assert_ne!(a.private_key, a.public_key);
     let s = a.public_key.to_base64();
@@ -492,7 +492,7 @@ fn e2e_wireguard_keypair_and_peer_registry() {
 
 #[test]
 fn e2e_key_rotation_drain_then_switch() {
-    let tenant = TenantId::new("e2e-19");
+    let tenant = TenantId::new("e2e-19").expect("test fixture");
     let mut c = KeyRotationController::new(tenant, 30, 100);
     c.install_initial("node-a", vec![1, 2, 3], 0);
     let new_spi = c.begin_rotation("node-a", vec![4, 5, 6], 100).unwrap();
@@ -525,7 +525,7 @@ fn e2e_kpr_traffic_policy_and_source_range() {
 
 #[test]
 fn e2e_srv6_locator_longest_prefix() {
-    let tenant = TenantId::new("e2e-21");
+    let tenant = TenantId::new("e2e-21").expect("test fixture");
     let mut m = Srv6Manager::new(tenant);
     m.upsert_locator(Locator {
         prefix: "fd00::".parse().unwrap(),
@@ -546,7 +546,7 @@ fn e2e_srv6_locator_longest_prefix() {
 #[test]
 fn e2e_bgp_no_export_filter() {
     use cave_net::cilium::bgp::{Advertisement, AdvertisementKind, PathAttributes, PathOrigin, COMMUNITY_NO_EXPORT};
-    let tenant = TenantId::new("e2e-22");
+    let tenant = TenantId::new("e2e-22").expect("test fixture");
     let mut bgp = BgpInstance::new(tenant, 65000, ip4(10, 0, 0, 1));
     bgp.upsert_peer(BgpPeerConfig::defaults("ext", ip4(10, 0, 0, 2), 65001, 65000));
     let attrs = PathAttributes {
@@ -570,7 +570,7 @@ fn e2e_bgp_no_export_filter() {
 
 #[test]
 fn e2e_hubble_metrics_drop_aggregation() {
-    let tenant = TenantId::new("e2e-23");
+    let tenant = TenantId::new("e2e-23").expect("test fixture");
     let mut r = MetricRegistry::new();
     let make_flow = |verdict: HubbleVerdict, reason: DropReason| FlowLog {
         tenant: tenant.clone(),
@@ -595,7 +595,7 @@ fn e2e_hubble_metrics_drop_aggregation() {
 
 #[test]
 fn e2e_operator_identity_gc_sweeps_unreferenced() {
-    let tenant = TenantId::new("e2e-24");
+    let tenant = TenantId::new("e2e-24").expect("test fixture");
     let mut gc = IdentityGc::new(tenant, MIN_LOCAL_IDENTITY, 60);
     gc.add_reference(256, 0).unwrap();
     gc.release_reference(256, 0).unwrap();
@@ -608,7 +608,7 @@ fn e2e_operator_identity_gc_sweeps_unreferenced() {
 
 #[test]
 fn e2e_operator_ces_batching() {
-    let tenant = TenantId::new("e2e-25");
+    let tenant = TenantId::new("e2e-25").expect("test fixture");
     let mut m = CesManager::new(tenant, 3);
     for i in 0..7u32 {
         m.upsert(CiliumEndpoint {
@@ -624,7 +624,7 @@ fn e2e_operator_ces_batching() {
 
 #[test]
 fn e2e_selector_cache_membership_update() {
-    let tenant = TenantId::new("e2e-26");
+    let tenant = TenantId::new("e2e-26").expect("test fixture");
     let mut sc = SelectorCache::new(tenant);
     let sid = sc.intern(endpoint_sel(&[("app", "web")]));
     sc.update_identity(256, ls(&[("app", "web")]));
@@ -643,7 +643,7 @@ fn e2e_selector_cache_membership_update() {
 
 #[test]
 fn e2e_kv_identity_with_lock_coordinator() {
-    let tenant = TenantId::new("e2e-27");
+    let tenant = TenantId::new("e2e-27").expect("test fixture");
     let mut alloc = KvIdentityAllocator::new(tenant.clone(), 60);
     let mut lock = IdentityLockCoordinator::new(tenant, 30);
     let labels = ls(&[("app", "web"), ("env", "prod")]);
@@ -677,7 +677,7 @@ fn e2e_reserved_identity_table() {
 
 #[test]
 fn e2e_cluster_pool_refill_lifecycle() {
-    let tenant = TenantId::new("e2e-29");
+    let tenant = TenantId::new("e2e-29").expect("test fixture");
     let mut c = RefillController::new(tenant);
     c.seed_pool(vec!["10.244.0.0/24".into(), "10.244.1.0/24".into(), "10.244.2.0/24".into()]);
     c.upsert_node(NodeWatermarkSpec {
@@ -698,7 +698,7 @@ fn e2e_bandwidth_edt_paces_packets() {
     assert_eq!(parse_bandwidth_annotation("10M").unwrap(), 10_000_000);
     assert_eq!(parse_bandwidth_annotation("1Gi").unwrap(), 1024 * 1024 * 1024);
 
-    let tenant = TenantId::new("e2e-30");
+    let tenant = TenantId::new("e2e-30").expect("test fixture");
     let mut m = BandwidthManager::new(tenant, CongestionControl::Bbr);
     m.set_bandwidth(7, 1_000);
     let now = 0u64;
@@ -715,7 +715,7 @@ fn e2e_bandwidth_edt_paces_packets() {
 
 #[test]
 fn e2e_policy_trace_explains_allow() {
-    let tenant = TenantId::new("e2e-31");
+    let tenant = TenantId::new("e2e-31").expect("test fixture");
     let mut repo = PolicyRepository::new();
     let mut rule = Rule::new("allow-client", tenant.clone(), endpoint_sel(&[("app", "web")]));
     rule.ingress.push(IngressRule {
@@ -739,7 +739,7 @@ fn e2e_policy_trace_explains_allow() {
 
 #[test]
 fn e2e_config_watcher_restart_required_signal() {
-    let tenant = TenantId::new("e2e-32");
+    let tenant = TenantId::new("e2e-32").expect("test fixture");
     let mut w = ConfigWatcher::new(tenant);
     let mut cfg = BTreeMap::new();
     cfg.insert("enable-ipsec".into(), "false".into());
@@ -792,7 +792,7 @@ fn e2e_k8s_endpoint_slice_ready_backends() {
 
 #[test]
 fn e2e_bpf_map_registry_dump_lifecycle() {
-    let tenant = TenantId::new("e2e-34");
+    let tenant = TenantId::new("e2e-34").expect("test fixture");
     let mut r = BpfMapRegistry::new(tenant);
     r.register("cilium_ipcache", BpfMapKind::Ipcache, 65536);
     r.upsert_entry("cilium_ipcache",
@@ -835,7 +835,7 @@ fn e2e_bpf_generic_maps_behaviour() {
 
 #[test]
 fn e2e_external_workload_lifecycle() {
-    let tenant = TenantId::new("e2e-36");
+    let tenant = TenantId::new("e2e-36").expect("test fixture");
     let mut m = ExternalWorkloadManager::new(tenant.clone(), 30);
     m.register(ExternalWorkloadSpec {
         name: "vm-1".into(), tenant,
@@ -855,7 +855,7 @@ fn e2e_external_workload_lifecycle() {
 
 #[test]
 fn e2e_cilium_node_crd_and_cidr_alloc() {
-    let tenant = TenantId::new("e2e-37");
+    let tenant = TenantId::new("e2e-37").expect("test fixture");
     let mut store = CiliumNodeStore::new(tenant.clone());
     store.configure_cluster_pool("10.244.0.0/16", 24).unwrap();
     store.register(CiliumNodeSpec {
@@ -877,7 +877,7 @@ fn e2e_cilium_node_crd_and_cidr_alloc() {
 
 #[test]
 fn e2e_status_board_worst_state_wins() {
-    let tenant = TenantId::new("e2e-38");
+    let tenant = TenantId::new("e2e-38").expect("test fixture");
     let mut b = StatusBoard::new(tenant, 30);
     b.report(ComponentName::Kvstore, ComponentStatus::ok("connected"), 100);
     b.report(ComponentName::IPAM, ComponentStatus::degraded("low pool"), 100);
@@ -892,7 +892,7 @@ fn e2e_status_board_worst_state_wins() {
 
 #[test]
 fn e2e_endpoint_regen_coalesce_and_pipeline() {
-    let tenant = TenantId::new("e2e-39");
+    let tenant = TenantId::new("e2e-39").expect("test fixture");
     let mut c = RegenController::new(tenant);
     c.enqueue(RegenRequest { endpoint_id: 1, level: RegenLevel::Maps, reason: "ip change".into(), enqueued_ns: 0 });
     let merged = c.enqueue(RegenRequest { endpoint_id: 1, level: RegenLevel::PolicyRecompute, reason: "policy".into(), enqueued_ns: 100 });
@@ -907,7 +907,7 @@ fn e2e_endpoint_regen_coalesce_and_pipeline() {
 
 #[test]
 fn e2e_recorder_5tuple_capture() {
-    let tenant = TenantId::new("e2e-40");
+    let tenant = TenantId::new("e2e-40").expect("test fixture");
     let mut r = Recorder::new(tenant, 100);
     r.upsert_policy(RecorderPolicy {
         id: 1, priority: 100,
@@ -928,7 +928,7 @@ fn e2e_recorder_5tuple_capture() {
 
 #[test]
 fn e2e_maps_gc_dispatch() {
-    let tenant = TenantId::new("e2e-41");
+    let tenant = TenantId::new("e2e-41").expect("test fixture");
     let mut c = MapsGcController::new(tenant);
     c.schedule(GcTarget::Conntrack, 60).unwrap();
     c.schedule(GcTarget::Nat, 30).unwrap();
@@ -943,7 +943,7 @@ fn e2e_maps_gc_dispatch() {
 
 #[test]
 fn e2e_proxy_health_failure_threshold() {
-    let tenant = TenantId::new("e2e-42");
+    let tenant = TenantId::new("e2e-42").expect("test fixture");
     let mut c = ProxyHealthChecker::new(tenant, 3);
     c.register("envoy");
     for ts in 0..2u64 {
@@ -960,7 +960,7 @@ fn e2e_proxy_health_failure_threshold() {
 
 #[test]
 fn e2e_readiness_gate_flip_to_ready() {
-    let tenant = TenantId::new("e2e-43");
+    let tenant = TenantId::new("e2e-43").expect("test fixture");
     let mut g = ReadinessGateController::new(tenant);
     g.register("default", "p1", 100);
     assert_eq!(g.status("default", "p1").unwrap().status, GateStatus::Pending);
@@ -983,7 +983,7 @@ fn e2e_remote_cluster_stale_detection() {
 
 #[test]
 fn e2e_connectivity_test_suite_report() {
-    let tenant = TenantId::new("e2e-45");
+    let tenant = TenantId::new("e2e-45").expect("test fixture");
     let mut s = ConnectivitySuite::new(tenant, "default-suite");
     s.add(CtTest {
         name: "client→api allowed".into(), kind: TestKind::PodToPod,
@@ -1007,7 +1007,7 @@ fn e2e_connectivity_test_suite_report() {
 
 #[test]
 fn e2e_endpoint_lifecycle_with_canonical_program_chain() {
-    let tenant = TenantId::new("e2e-46");
+    let tenant = TenantId::new("e2e-46").expect("test fixture");
     let mut mgr = EndpointManager::new();
     let id = mgr.create(tenant, "client", "default", ip4(10, 0, 1, 5));
     mgr.transition(id, EndpointState::WaitingForIdentity).unwrap();
@@ -1024,7 +1024,7 @@ fn e2e_endpoint_lifecycle_with_canonical_program_chain() {
 
 #[test]
 fn e2e_hubble_topology_graph() {
-    let tenant = TenantId::new("e2e-47");
+    let tenant = TenantId::new("e2e-47").expect("test fixture");
     let flows: Vec<FlowLog> = (0..5).map(|_| FlowLog {
         tenant: tenant.clone(),
         time: chrono::Utc::now(),
@@ -1045,7 +1045,7 @@ fn e2e_hubble_topology_graph() {
 
 #[test]
 fn e2e_hubble_node_aggregator_filters_cross_tenant() {
-    let tenant = TenantId::new("e2e-48");
+    let tenant = TenantId::new("e2e-48").expect("test fixture");
     let mut agg = NodeAggregator::new(tenant.clone());
     agg.ingest("node-a", &FlowLog {
         tenant: tenant.clone(), time: chrono::Utc::now(),
@@ -1055,7 +1055,7 @@ fn e2e_hubble_node_aggregator_filters_cross_tenant() {
         drop_reason: DropReason::None, bytes: 100,
     });
     agg.ingest("node-a", &FlowLog {
-        tenant: TenantId::new("other"), time: chrono::Utc::now(),
+        tenant: TenantId::new("other").expect("test fixture"), time: chrono::Utc::now(),
         source_identity: 1, destination_identity: 2,
         source_pod: "ns/a".into(), destination_pod: "ns/b".into(),
         verdict: HubbleVerdict::Forwarded,
@@ -1100,7 +1100,7 @@ fn e2e_sock_lb_cgroup_hook_names() {
 
 #[test]
 fn e2e_service_nodeport_out_of_range_rejected() {
-    let tenant = TenantId::new("e2e-52");
+    let tenant = TenantId::new("e2e-52").expect("test fixture");
     let mut reg = ServiceRegistry::new();
     let mut svc = Service::cluster_ip("svc", "default", tenant, ip4(10, 96, 0, 5), 80);
     svc.service_type = ServiceType::NodePort;
@@ -1114,7 +1114,7 @@ fn e2e_service_nodeport_out_of_range_rejected() {
 
 #[test]
 fn e2e_egress_decision_has_distinct_egress_ip() {
-    let tenant = TenantId::new("e2e-53");
+    let tenant = TenantId::new("e2e-53").expect("test fixture");
     let mut mgr = EgressManager::new();
     let mut p = EgressGatewayPolicy::new("p", tenant, endpoint_sel(&[("app", "web")]), ip4(192, 0, 2, 1));
     p.destination_cidrs = vec!["1.0.0.0/8".into()];
@@ -1129,7 +1129,7 @@ fn e2e_egress_decision_has_distinct_egress_ip() {
 
 #[test]
 fn e2e_snat_idempotent_for_same_5tuple() {
-    let tenant = TenantId::new("e2e-54");
+    let tenant = TenantId::new("e2e-54").expect("test fixture");
     let mut t = SnatTable::new(tenant, ip4(192, 168, 1, 1));
     let key = SnatKey { src_ip: ip4(10, 0, 0, 1), src_port: 12345, dst_ip: ip4(8, 8, 8, 8), dst_port: 53 };
     let a = t.allocate(key, 100).unwrap();
@@ -1141,7 +1141,7 @@ fn e2e_snat_idempotent_for_same_5tuple() {
 
 #[test]
 fn e2e_conntrack_purge_idle_udp() {
-    let tenant = TenantId::new("e2e-55");
+    let tenant = TenantId::new("e2e-55").expect("test fixture");
     let mut ct = ConntrackTable::new(tenant, 1024);
     let tup = Tuple::new(ip4(10, 0, 0, 1), 5353, ip4(10, 96, 0, 10), 53, L4Protocol::UDP);
     ct.upsert(tup, CtDirection::Egress, 0, 64, None);

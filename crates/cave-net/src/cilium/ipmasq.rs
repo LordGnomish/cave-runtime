@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn ipmasq_error_renders_with_inputs() {
         let (_c, _t) = cilium_test_ctx!("pkg/ipmasq/ipmasq.go", "Error.Display", "tenant-imm-err");
-        let e = IpMasqError::TenantDenied { tenant: TenantId::new("t") };
+        let e = IpMasqError::TenantDenied { tenant: TenantId::new("t").expect("test fixture") };
         assert!(format!("{}", e).contains("ipmasq"));
         let e = IpMasqError::InvalidCidr("x".into());
         assert!(format!("{}", e).contains("invalid CIDR"));

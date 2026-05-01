@@ -423,7 +423,7 @@ mod tests {
 
     fn flow(tenant: &str, src_pod: &str, dst_pod: &str, src_id: u32, dst_id: u32, v: Verdict, dr: DropReason, bytes: u64) -> FlowLog {
         FlowLog {
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             time: Utc::now(),
             source_identity: src_id,
             destination_identity: dst_id,

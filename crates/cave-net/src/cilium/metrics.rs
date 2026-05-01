@@ -463,7 +463,7 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/metrics/metrics.go", "Errors", "tenant-met-err");
         let e = MetricsError::NotInRegistry("foo".into());
         assert!(format!("{}", e).contains("foo"));
-        let e = MetricsError::TenantDenied { tenant: TenantId::new("t1") };
+        let e = MetricsError::TenantDenied { tenant: TenantId::new("t1").expect("test fixture") };
         assert!(format!("{}", e).contains("t1"));
     }
 

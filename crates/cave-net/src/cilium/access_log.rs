@@ -159,7 +159,7 @@ mod tests {
 
     fn http_req(tenant: &str, status: u16, verdict: AccessLogVerdict) -> AccessLogEntry {
         AccessLogEntry {
-            tenant: TenantId::new(tenant), time: Utc::now(),
+            tenant: TenantId::new(tenant).expect("test fixture"), time: Utc::now(),
             flow_type: FlowType::Request, verdict,
             protocol: AccessLogProtocol::Http,
             source_identity: 256, destination_identity: 257,
@@ -176,7 +176,7 @@ mod tests {
 
     fn dns_req(tenant: &str) -> AccessLogEntry {
         AccessLogEntry {
-            tenant: TenantId::new(tenant), time: Utc::now(),
+            tenant: TenantId::new(tenant).expect("test fixture"), time: Utc::now(),
             flow_type: FlowType::Request, verdict: AccessLogVerdict::Allowed,
             protocol: AccessLogProtocol::Dns,
             source_identity: 256, destination_identity: 2 /* world */,

@@ -13,25 +13,10 @@ pub const UPSTREAM_VERSION: &str = "v1.19.3";
 /// Upstream repo (without the leading `https://github.com/`).
 pub const UPSTREAM_REPO: &str = "cilium/cilium";
 
-/// Multi-tenant identifier. Every Cilium-side object — identity, L7 rule,
+/// Multi-tenant identifier — re-exported from `cave_kernel::ns` (sweep-002
+/// F2-G adoption, 2026-05-01). Every Cilium-side object — identity, L7 rule,
 /// flow log, ClusterMesh announcement — is scoped to a tenant.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TenantId(pub String);
-
-impl TenantId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Display for TenantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+pub use cave_kernel::ns::TenantId;
 
 /// Citation pointing at the upstream Cilium symbol a piece of local code is
 /// a parity port of.
@@ -67,7 +52,7 @@ impl fmt::Display for Cite {
 macro_rules! cilium_test_ctx {
     ($path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::cilium::types::Cite::cilium($path, $symbol);
-        let tenant = $crate::cilium::types::TenantId::new($tenant);
+        let tenant = $crate::cilium::types::TenantId::new($tenant).expect("test fixture");
         assert_eq!(cite.version, $crate::cilium::types::UPSTREAM_VERSION);
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         (cite, tenant)
