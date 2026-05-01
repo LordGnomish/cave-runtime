@@ -21,6 +21,7 @@ pub mod auth_routes;
 pub mod claims;
 pub mod jwks;
 pub mod jwt_middleware;
+pub mod keycloak;
 pub mod middleware;
 pub mod okta;
 pub mod rbac;
