@@ -162,14 +162,15 @@ mod tests {
             ..TsdbConfig::default()
         });
         let labels = Labels::from_pairs([("__name__", "x")]);
-        db.append(labels.clone(), Sample::new(0, 1.0));
-        db.append(labels.clone(), Sample::new(10_000_000, 2.0)); // far future (stays)
+        // "Far future" is now() in milliseconds — the sample must be inside the
+        // retention window. Use an absolute wall-clock timestamp.
+        let now_ms = chrono::Utc::now().timestamp_millis();
+        db.append(labels.clone(), Sample::new(now_ms - 10, 1.0)); // recent
+        db.append(labels.clone(), Sample::new(now_ms + 10_000, 2.0)); // future (always stays)
 
-        // Manually enforce retention with current time simulation
-        // (In a real test you'd mock time; here we just verify the API works)
         db.enforce_retention();
         let result = db.select(&[LabelMatcher::equal("__name__", "x")], 0, i64::MAX);
-        assert!(!result.is_empty()); // future sample should still be there
+        assert!(!result.is_empty()); // future sample must still be present
     }
 
     // ─── PromQL parser tests ──────────────────────────────────────────────
@@ -784,5 +785,446 @@ req_duration_sum 25.3
         assert_eq!(m.len(), 3);
         assert_eq!(m[1].value, 2.0);
         assert_eq!(m[2].value, 3.5); // b wins
+    }
+
+    // ─── Deep parity: PromQL functions (rate / irate / increase / deriv) ──
+
+    #[test]
+    fn parity_rate_handles_counter_reset() {
+        use crate::promql::functions::rate;
+        // Counter resets to 0 between samples — rate should still be positive.
+        let samples = vec![
+            Sample::new(0,    100.0),
+            Sample::new(1000, 110.0),
+            Sample::new(2000,   5.0), // reset
+            Sample::new(3000,  20.0),
+        ];
+        let r = rate(&samples, 3000).unwrap();
+        // Without the reset, total would be 20-100 = -80 (nonsense).
+        // With the reset, we add 110 (the pre-reset peak) so delta = (20-100) + 110 = 30.
+        assert!(r > 0.0);
+    }
+
+    #[test]
+    fn parity_irate_uses_only_last_two_samples() {
+        use crate::promql::functions::irate;
+        let samples = vec![
+            Sample::new(0, 0.0),
+            Sample::new(1000, 5.0),
+            Sample::new(3000, 25.0), // gap of 2 seconds, +20
+        ];
+        let r = irate(&samples).unwrap();
+        // 20 / 2s = 10/s
+        assert!((r - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn parity_increase_scales_with_range() {
+        use crate::promql::functions::{increase, rate};
+        let samples = vec![
+            Sample::new(0, 0.0),
+            Sample::new(2000, 10.0),
+        ];
+        let r = rate(&samples, 2000).unwrap();
+        let i = increase(&samples, 2000).unwrap();
+        // increase = rate * range_seconds
+        assert!((i - r * 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn parity_deriv_returns_slope_per_second() {
+        use crate::promql::functions::deriv;
+        // Linear y = 2x (in seconds): values at t=0,1000,2000 → 0,2,4
+        let samples = vec![
+            Sample::new(0, 0.0),
+            Sample::new(1000, 2.0),
+            Sample::new(2000, 4.0),
+        ];
+        let d = deriv(&samples).unwrap();
+        assert!((d - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn parity_predict_linear_extrapolates_future_value() {
+        use crate::promql::functions::predict_linear;
+        let samples = vec![
+            Sample::new(0, 0.0),
+            Sample::new(1000, 1.0),
+            Sample::new(2000, 2.0),
+        ];
+        let pred = predict_linear(&samples, 5.0).unwrap();
+        // slope=1/s, last_t=2s, last_v=2, predict at t=2+5=7 → value=7
+        assert!((pred - 7.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn parity_resets_counts_counter_resets() {
+        use crate::promql::functions::resets;
+        let samples = vec![
+            Sample::new(0,   10.0),
+            Sample::new(100, 20.0),
+            Sample::new(200,  5.0), // reset
+            Sample::new(300, 30.0),
+            Sample::new(400,  1.0), // reset
+        ];
+        assert_eq!(resets(&samples), 2.0);
+    }
+
+    #[test]
+    fn parity_changes_counts_value_changes() {
+        use crate::promql::functions::changes;
+        let samples = vec![
+            Sample::new(0, 1.0),
+            Sample::new(1, 1.0),
+            Sample::new(2, 2.0),
+            Sample::new(3, 2.0),
+            Sample::new(4, 3.0),
+        ];
+        assert_eq!(changes(&samples), 2.0);
+    }
+
+    #[test]
+    fn parity_avg_over_time_correct() {
+        use crate::promql::functions::avg_over_time;
+        let samples = vec![Sample::new(0, 1.0), Sample::new(1, 2.0), Sample::new(2, 3.0)];
+        assert_eq!(avg_over_time(&samples), Some(2.0));
+    }
+
+    #[test]
+    fn parity_quantile_over_time_p95() {
+        use crate::promql::functions::quantile_over_time;
+        let samples: Vec<Sample> = (0..=100)
+            .map(|i| Sample::new(i as i64, i as f64))
+            .collect();
+        let q = quantile_over_time(0.95, &samples).unwrap();
+        // 95th percentile of 0..=100 should be ~95
+        assert!((q - 95.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn parity_stddev_over_time_correct() {
+        use crate::promql::functions::stddev_over_time;
+        // [1, 2, 3, 4, 5] → mean=3, variance=2, stddev≈1.414
+        let samples: Vec<Sample> = (1..=5).map(|i| Sample::new(i, i as f64)).collect();
+        let s = stddev_over_time(&samples).unwrap();
+        assert!((s - 2f64.sqrt()).abs() < 0.01);
+    }
+
+    // ─── Deep parity: TSDB head series + select ───────────────────────────
+
+    #[test]
+    fn parity_tsdb_head_series_samples_in_range_filters_correctly() {
+        use crate::tsdb::HeadSeries;
+        let labels = Labels::from_pairs([("__name__", "x")]);
+        let mut hs = HeadSeries::new(labels);
+        hs.append(Sample::new(100, 1.0));
+        hs.append(Sample::new(200, 2.0));
+        hs.append(Sample::new(300, 3.0));
+        let in_range = hs.samples_in_range(150, 250);
+        assert_eq!(in_range.len(), 1);
+        assert_eq!(in_range[0].timestamp_ms, 200);
+    }
+
+    #[test]
+    fn parity_tsdb_select_at_returns_latest_in_lookback() {
+        let db = Tsdb::default();
+        let labels = Labels::from_pairs([("__name__", "x"), ("job", "api")]);
+        db.append(labels.clone(), Sample::new(900, 0.9));
+        db.append(labels.clone(), Sample::new(950, 0.95));
+        db.append(labels, Sample::new(1000, 1.0));
+        let result = db.select_at(&[LabelMatcher::equal("__name__", "x")], 1000, 100);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].1.value, 1.0);
+    }
+
+    #[test]
+    fn parity_tsdb_label_values_filtered_by_matchers() {
+        let db = Tsdb::default();
+        db.append(Labels::from_pairs([("__name__", "cpu"), ("env", "prod")]), Sample::new(1000, 1.0));
+        db.append(Labels::from_pairs([("__name__", "cpu"), ("env", "dev")]), Sample::new(1000, 1.0));
+        db.append(Labels::from_pairs([("__name__", "mem"), ("env", "prod")]), Sample::new(1000, 1.0));
+        let cpu_envs = db.label_values("env", &[LabelMatcher::equal("__name__", "cpu")]);
+        assert!(cpu_envs.contains(&"prod".to_string()));
+        assert!(cpu_envs.contains(&"dev".to_string()));
+        assert_eq!(cpu_envs.len(), 2);
+    }
+
+    #[test]
+    fn parity_tsdb_series_for_returns_distinct_label_sets() {
+        let db = Tsdb::default();
+        db.append(Labels::from_pairs([("__name__", "cpu"), ("inst", "a")]), Sample::new(1000, 1.0));
+        db.append(Labels::from_pairs([("__name__", "cpu"), ("inst", "b")]), Sample::new(1000, 2.0));
+        let series = db.series_for(&[LabelMatcher::equal("__name__", "cpu")]);
+        assert_eq!(series.len(), 2);
+    }
+
+    #[test]
+    fn parity_tsdb_append_many_via_timeseries() {
+        let db = Tsdb::default();
+        let ts = TimeSeries {
+            labels: Labels::from_pairs([("__name__", "y")]),
+            samples: vec![Sample::new(100, 1.0), Sample::new(200, 2.0), Sample::new(300, 3.0)],
+        };
+        db.append_many(&ts);
+        let r = db.select(&[LabelMatcher::equal("__name__", "y")], 0, i64::MAX);
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].1.len(), 3);
+    }
+
+    // ─── Deep parity: Block + WAL ─────────────────────────────────────────
+
+    #[test]
+    fn parity_block_writer_reader_roundtrip() {
+        use crate::tsdb::block::{ChunkWriter, ChunkReader};
+        let mut enc = ChunkWriter::new();
+        let pairs = vec![(1000i64, 1.0f64), (2000, 2.5), (3000, 3.7), (4000, 4.2)];
+        for (t, v) in &pairs {
+            enc.append(*t, *v);
+        }
+        let (count, data) = enc.finish();
+        assert_eq!(count, 4);
+        let dec = ChunkReader::new(count, &data);
+        let decoded = dec.decode_all();
+        assert_eq!(decoded.len(), 4);
+        for (i, (t, v)) in pairs.iter().enumerate() {
+            assert_eq!(decoded[i].0, *t);
+            assert!((decoded[i].1 - v).abs() < 0.0001);
+        }
+    }
+
+    #[test]
+    fn parity_wal_record_serializable() {
+        use crate::tsdb::wal::WalRecord;
+        let rec = WalRecord::Sample {
+            labels: std::collections::BTreeMap::from([
+                ("__name__".to_string(), "cpu".to_string()),
+            ]),
+            timestamp_ms: 1000,
+            value: 0.5,
+        };
+        let json = serde_json::to_string(&rec).unwrap();
+        assert!(json.contains("\"cpu\""));
+        let parsed: WalRecord = serde_json::from_str(&json).unwrap();
+        match parsed {
+            WalRecord::Sample { timestamp_ms, value, .. } => {
+                assert_eq!(timestamp_ms, 1000);
+                assert_eq!(value, 0.5);
+            }
+            _ => panic!("expected Sample"),
+        }
+    }
+
+    // ─── Deep parity: Multi-tenant + remote write ─────────────────────────
+
+    #[test]
+    fn parity_multitenant_enforce_filter_idempotent() {
+        use crate::multitenant::{enforce_tenant_filter, TENANT_LABEL};
+        let m1 = enforce_tenant_filter(vec![LabelMatcher::equal("__name__", "x")], "acme");
+        let m2 = enforce_tenant_filter(m1.clone(), "acme");
+        let count = m2.iter().filter(|m| m.name == TENANT_LABEL).count();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn parity_multitenant_federation_relabel_external_only_label() {
+        use crate::multitenant::federation_relabel;
+        let src = Labels::default();
+        let ext = Labels::from_pairs([("k8s_cluster", "us-east-1")]);
+        let out = federation_relabel(&src, &ext, false);
+        assert_eq!(out.get("k8s_cluster"), Some("us-east-1"));
+    }
+
+    #[test]
+    fn parity_remote_write_protobuf_roundtrip() {
+        use crate::ingestion::remote_write::{
+            batch_to_write_request, encode_write_request, decode_write_request,
+            write_request_to_batch,
+        };
+        let batch: Vec<TimeSeries> = vec![TimeSeries {
+            labels: Labels::from_pairs([("__name__", "cpu"), ("job", "api")]),
+            samples: vec![Sample::new(1000, 0.5), Sample::new(2000, 0.6)],
+        }];
+        let req = batch_to_write_request(batch);
+        let bytes = encode_write_request(&req).unwrap();
+        let decoded_req = decode_write_request(&bytes).unwrap();
+        let decoded_batch = write_request_to_batch(decoded_req);
+        assert_eq!(decoded_batch.len(), 1);
+        assert_eq!(decoded_batch[0].samples.len(), 2);
+        assert_eq!(decoded_batch[0].labels.get("__name__"), Some("cpu"));
+    }
+
+    // ─── Deep parity: Recording + alerting rules ──────────────────────────
+
+    #[test]
+    fn parity_recording_rule_evaluates_and_writes_to_tsdb() {
+        let db = Arc::new(Tsdb::default());
+        let labels = Labels::from_pairs([("__name__", "raw"), ("job", "api")]);
+        db.append(labels, Sample::new(1000, 5.0));
+
+        let engine = Engine::new(db.clone());
+        let rule = RecordingRule::new("raw_aggregated", "raw")
+            .with_labels(Labels::from_pairs([("derived", "true")]));
+        rule.evaluate(&engine, &db, 1100).unwrap();
+
+        let recorded = db.select(
+            &[LabelMatcher::equal("__name__", "raw_aggregated")],
+            0, i64::MAX,
+        );
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].0.get("derived"), Some("true"));
+    }
+
+    #[test]
+    fn parity_alert_rule_pending_then_firing_after_for_window() {
+        let db = Arc::new(Tsdb::default());
+        let labels = Labels::from_pairs([("__name__", "errors")]);
+        for ts in (1000..=5000).step_by(1000) {
+            db.append(labels.clone(), Sample::new(ts, 10.0));
+        }
+        let engine = Engine::new(db.clone());
+        // for=2000ms (2s)
+        let mut rule = AlertRule::new("HighErrors", "errors", 2000);
+
+        let firing_at_t1000 = rule.evaluate(&engine, 1000).unwrap();
+        // First evaluation reports the alert in Pending state
+        assert_eq!(firing_at_t1000.len(), 1);
+        assert_eq!(firing_at_t1000[0].state, AlertState::Pending);
+
+        let firing_at_t4000 = rule.evaluate(&engine, 4000).unwrap();
+        // 3000ms past pending start → firing
+        assert_eq!(firing_at_t4000.len(), 1);
+        assert_eq!(firing_at_t4000[0].state, AlertState::Firing);
+    }
+
+    #[test]
+    fn parity_alert_rule_clears_active_when_expression_no_longer_matches() {
+        let db = Arc::new(Tsdb::default());
+        let labels = Labels::from_pairs([("__name__", "live")]);
+        db.append(labels.clone(), Sample::new(1000, 10.0));
+        let engine = Engine::new(db.clone());
+        let mut rule = AlertRule::new("Active", "live", 0);
+        let alerts = rule.evaluate(&engine, 1000).unwrap();
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].state, AlertState::Firing);
+        // Empty TSDB → expression no longer matches → alerts evicted
+        let db2 = Arc::new(Tsdb::default());
+        let engine2 = Engine::new(db2);
+        let after = rule.evaluate(&engine2, 2000).unwrap();
+        assert!(after.is_empty());
+        assert!(rule.active.is_empty());
+    }
+
+    // ─── Deep parity: AlertManager silence store ──────────────────────────
+
+    #[test]
+    fn parity_silence_store_create_get_list() {
+        use crate::alertmgr::silence::SilenceStore;
+        use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        let store = SilenceStore::new();
+        let s = Silence {
+            id: String::new(), // auto-assigned
+            matchers: vec![SilenceMatcher {
+                name: "alertname".to_string(), value: "Foo".to_string(),
+                is_regex: false, is_equal: true,
+            }],
+            starts_at: "2026-01-01T00:00:00Z".to_string(),
+            ends_at: "2030-01-01T00:00:00Z".to_string(),
+            created_by: "test".to_string(),
+            comment: "test".to_string(),
+            status: SilenceStatus { state: "active".to_string() },
+        };
+        let id = store.create(s);
+        assert!(!id.is_empty());
+        assert!(store.get(&id).is_some());
+        assert_eq!(store.list().len(), 1);
+    }
+
+    #[test]
+    fn parity_silence_matches_active_window_and_labels() {
+        use crate::alertmgr::silence::SilenceStore;
+        use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        let store = SilenceStore::new();
+        store.create(Silence {
+            id: String::new(),
+            matchers: vec![SilenceMatcher {
+                name: "alertname".to_string(), value: "Foo".to_string(),
+                is_regex: false, is_equal: true,
+            }],
+            starts_at: "2026-01-01T00:00:00Z".to_string(),
+            ends_at: "2030-01-01T00:00:00Z".to_string(),
+            created_by: "x".to_string(), comment: "x".to_string(),
+            status: SilenceStatus { state: "active".to_string() },
+        });
+        let foo_labels = Labels::from_pairs([("alertname", "Foo")]);
+        let bar_labels = Labels::from_pairs([("alertname", "Bar")]);
+        assert!(store.is_silenced(&foo_labels, "2026-06-01T00:00:00Z"));
+        assert!(!store.is_silenced(&bar_labels, "2026-06-01T00:00:00Z"));
+        // outside the window
+        assert!(!store.is_silenced(&foo_labels, "2025-01-01T00:00:00Z"));
+        assert!(!store.is_silenced(&foo_labels, "2031-01-01T00:00:00Z"));
+    }
+
+    #[test]
+    fn parity_silence_expire_drops_to_expired_state() {
+        use crate::alertmgr::silence::SilenceStore;
+        use crate::alertmgr::model::{Silence, SilenceMatcher, SilenceStatus};
+        let store = SilenceStore::new();
+        let id = store.create(Silence {
+            id: String::new(), matchers: vec![SilenceMatcher {
+                name: "x".to_string(), value: "y".to_string(),
+                is_regex: false, is_equal: true,
+            }],
+            starts_at: "2020-01-01T00:00:00Z".to_string(),
+            ends_at: "2030-01-01T00:00:00Z".to_string(),
+            created_by: "x".to_string(), comment: "x".to_string(),
+            status: SilenceStatus { state: "active".to_string() },
+        });
+        assert!(store.expire(&id));
+        let s = store.get(&id).unwrap();
+        assert_eq!(s.status.state, "expired");
+        // Expired silence no longer silences
+        let labels = Labels::from_pairs([("x", "y")]);
+        assert!(!store.is_silenced(&labels, "2026-06-01T00:00:00Z"));
+    }
+
+    // ─── Deep parity: ingestion formats ───────────────────────────────────
+
+    #[test]
+    fn parity_ingestion_statsd_parses_counter_with_sample_rate() {
+        // statsd format: "name:value|c|@rate"
+        let pkt = statsd::parse_packet("api.requests:42|c|@0.5").unwrap();
+        // sample_rate = 0.5 means observed value 42 was at 50% sampling →
+        // accumulated value should reflect the rate.
+        assert_eq!(pkt.name, "api.requests");
+        assert!((pkt.sample_rate - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn parity_ingestion_graphite_handles_dotted_metric_name() {
+        let ts = graphite::parse_line("servers.web01.cpu 0.5 1620000000").unwrap();
+        assert_eq!(ts.samples[0].value, 0.5);
+        // Graphite dot-paths usually become __name__ joined with underscores
+        assert!(ts.labels.get("__name__").is_some());
+    }
+
+    #[test]
+    fn parity_ingestion_influx_line_protocol_multi_tags() {
+        let series = influx::parse_line("cpu,host=web01,region=us value=0.5 1620000000000000000");
+        assert!(!series.is_empty());
+        assert!(series[0].labels.get("host").is_some());
+        assert!(series[0].labels.get("region").is_some());
+    }
+
+    #[test]
+    fn parity_ingestion_exposition_handles_inf_nan() {
+        let body = "# HELP weird metric\n# TYPE weird gauge\nweird +Inf\nweird_nan NaN\n";
+        let batch = exposition::parse(body).unwrap();
+        // Both lines should parse — Inf and NaN are valid Prometheus values
+        let any_inf = batch.iter().any(|ts|
+            ts.samples.iter().any(|s| s.value.is_infinite()));
+        let any_nan = batch.iter().any(|ts|
+            ts.samples.iter().any(|s| s.value.is_nan()));
+        assert!(any_inf, "expected an infinity sample");
+        assert!(any_nan, "expected a NaN sample");
     }
 }
