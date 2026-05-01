@@ -7,6 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+cave-kernel = { path = "../cave-kernel" }
 serde = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }

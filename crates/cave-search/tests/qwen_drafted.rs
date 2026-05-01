@@ -17,7 +17,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_tokenize_basic() {
         let text = "The quick brown fox jumps over the lazy dog.";
-        let tenant_id = TenantId::new("tenant_001");
+        let tenant_id = TenantId::new("tenant-001").expect("valid tenant id");
         let tokens = tokenize(&text, &tenant_id);
         assert_eq!(tokens, vec!["quick", "brown", "fox", "jumps", "over", "lazy", "dog"]);
     }
@@ -27,7 +27,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_stop_word_filter() {
         let tokens = vec!["the", "quick", "and", "lazy"];
-        let tenant_id = TenantId::new("tenant_002");
+        let tenant_id = TenantId::new("tenant-002").expect("valid tenant id");
         let filtered = filter_stop_words(tokens, &tenant_id);
         assert_eq!(filtered, vec!["quick", "lazy"]);
     }
@@ -36,7 +36,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_and() {
-        let tenant_id = TenantId::new("tenant_003");
+        let tenant_id = TenantId::new("tenant-003").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::and(vec![
             Query::Term("apple".to_string()),
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_or() {
-        let tenant_id = TenantId::new("tenant_004");
+        let tenant_id = TenantId::new("tenant-004").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::or(vec![
             Query::Term("apple".to_string()),
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_not() {
-        let tenant_id = TenantId::new("tenant_005");
+        let tenant_id = TenantId::new("tenant-005").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::not(Query::Term("excluded".to_string()));
         let results = query.execute(&index);
@@ -75,7 +75,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_posting_list_add_and_retrieve() {
-        let tenant_id = TenantId::new("tenant_006");
+        let tenant_id = TenantId::new("tenant-006").expect("valid tenant id");
         let mut pl = PostingList::new();
         pl.add_doc(1, 3);
         pl.add_doc(2, 5);
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_bm25_scoring() {
-        let tenant_id = TenantId::new("tenant_007");
+        let tenant_id = TenantId::new("tenant-007").expect("valid tenant id");
         let doc_freq = 10;
         let num_docs = 1000;
         let term_freq = 2;
@@ -122,7 +122,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_compute_embedding() {
         let text = "hello world";
-        let tenant_id = TenantId::new("tenant_008");
+        let tenant_id = TenantId::new("tenant-008").expect("valid tenant id");
         let embedding = compute_embedding(&text, &tenant_id);
         assert_eq!(embedding.len(), 3); // stub dimension
     }
@@ -131,8 +131,8 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_tenant_index_isolation() {
-        let tenant_a = TenantId::new("tenant_a");
-        let tenant_b = TenantId::new("tenant_b");
+        let tenant_a = TenantId::new("tenant-a").expect("valid tenant id");
+        let tenant_b = TenantId::new("tenant-b").expect("valid tenant id");
         let index_a = Index::new(&tenant_a);
         let index_b = Index::new(&tenant_b);
         assert_ne!(index_a.id(), index_b.id());
@@ -143,7 +143,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_tokenize_case_insensitive() {
         let text = "HELLO World";
-        let tenant_id = TenantId::new("tenant_009");
+        let tenant_id = TenantId::new("tenant-009").expect("valid tenant id");
         let tokens = tokenize(&text, &tenant_id);
         assert_eq!(tokens, vec!["hello", "world"]);
     }
@@ -153,7 +153,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_stop_word_filter_custom() {
         let tokens = vec!["the", "a", "an", "quick"];
-        let tenant_id = TenantId::new("tenant_010");
+        let tenant_id = TenantId::new("tenant-010").expect("valid tenant id");
         let filtered = filter_stop_words(tokens, &tenant_id);
         assert_eq!(filtered, vec!["quick"]);
     }
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_mixed() {
-        let tenant_id = TenantId::new("tenant_011");
+        let tenant_id = TenantId::new("tenant-011").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::or(vec![
             BooleanQuery::and(vec![
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_with_empty_subqueries() {
-        let tenant_id = TenantId::new("tenant_012");
+        let tenant_id = TenantId::new("tenant-012").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::and(vec![]);
         let results = query.execute(&index);
@@ -202,7 +202,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_bm25_scoring_zero_doc_freq() {
-        let tenant_id = TenantId::new("tenant_013");
+        let tenant_id = TenantId::new("tenant-013").expect("valid tenant id");
         let doc_freq = 0;
         let num_docs = 1000;
         let term_freq = 1;
@@ -236,8 +236,8 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_tenant_index_isolation_write() {
-        let tenant_a = TenantId::new("tenant_a");
-        let tenant_b = TenantId::new("tenant_b");
+        let tenant_a = TenantId::new("tenant-a").expect("valid tenant id");
+        let tenant_b = TenantId::new("tenant-b").expect("valid tenant id");
         let mut index_a = Index::new(&tenant_a);
         let mut index_b = Index::new(&tenant_b);
         index_a.add_document(1, "apple");
@@ -251,7 +251,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_tokenize_unicode() {
         let text = "Café résumé naïve";
-        let tenant_id = TenantId::new("tenant_014");
+        let tenant_id = TenantId::new("tenant-014").expect("valid tenant id");
         let tokens = tokenize(&text, &tenant_id);
         assert_eq!(tokens, vec!["café", "résumé", "naïve"]);
     }
@@ -261,7 +261,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_stop_word_filter_empty() {
         let tokens: Vec<&str> = vec![];
-        let tenant_id = TenantId::new("tenant_015");
+        let tenant_id = TenantId::new("tenant-015").expect("valid tenant id");
         let filtered = filter_stop_words(tokens, &tenant_id);
         assert!(filtered.is_empty());
     }
@@ -270,7 +270,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_not_empty() {
-        let tenant_id = TenantId::new("tenant_016");
+        let tenant_id = TenantId::new("tenant-016").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::not(Query::Term("nonexistent".to_string()));
         let results = query.execute(&index);
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_bm25_scoring_high_doc_freq() {
-        let tenant_id = TenantId::new("tenant_017");
+        let tenant_id = TenantId::new("tenant-017").expect("valid tenant id");
         let doc_freq = 999;
         let num_docs = 1000;
         let term_freq = 1;
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_tenant_index_isolation_delete() {
-        let tenant_a = TenantId::new("tenant_a");
+        let tenant_a = TenantId::new("tenant-a").expect("valid tenant id");
         let mut index_a = Index::new(&tenant_a);
         index_a.add_document(1, "apple");
         index_a.delete_document(1);
@@ -327,7 +327,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_tokenize_empty_string() {
         let text = "";
-        let tenant_id = TenantId::new("tenant_018");
+        let tenant_id = TenantId::new("tenant-018").expect("valid tenant id");
         let tokens = tokenize(&text, &tenant_id);
         assert!(tokens.is_empty());
     }
@@ -337,7 +337,7 @@ mod tests {
     #[ignore = "impl pending"]
     fn test_stop_word_filter_all_stop_words() {
         let tokens = vec!["the", "and", "or", "but"];
-        let tenant_id = TenantId::new("tenant_019");
+        let tenant_id = TenantId::new("tenant-019").expect("valid tenant id");
         let filtered = filter_stop_words(tokens, &tenant_id);
         assert!(filtered.is_empty());
     }
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_boolean_query_nested() {
-        let tenant_id = TenantId::new("tenant_020");
+        let tenant_id = TenantId::new("tenant-020").expect("valid tenant id");
         let index = Index::new(&tenant_id);
         let query = BooleanQuery::and(vec![
             BooleanQuery::or(vec![
@@ -374,7 +374,7 @@ mod tests {
     #[test]
     #[ignore = "impl pending"]
     fn test_bm25_scoring_variable_doc_len() {
-        let tenant_id = TenantId::new("tenant_021");
+        let tenant_id = TenantId::new("tenant-021").expect("valid tenant id");
         let doc_freq = 50;
         let num_docs = 1000;
         let term_freq = 3;
