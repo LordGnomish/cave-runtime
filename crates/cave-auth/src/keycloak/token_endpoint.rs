@@ -756,4 +756,188 @@ mod tests {
         ).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     }
+
+    // ─── RFC 7662 introspection conformance ──────────────────────────────────
+
+    async fn introspect_with(svc: KeycloakTokenService, body: &str) -> (StatusCode, Value) {
+        let app = router(svc);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/myrealm/protocol/openid-connect/token/introspect")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(body.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = resp.status();
+        (status, body_json(resp).await)
+    }
+
+    // upstream: rfc7662 §2.2 — inactive token responses MUST contain only
+    // `active: false`; no sub / exp / username / client_id / scope leaks.
+    #[tokio::test]
+    async fn introspect_inactive_token_omits_all_other_claims() {
+        let (_, svc) = setup().await;
+        let (status, body) = introspect_with(svc, "token=junk.junk.junk").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["active"], false);
+        // RFC 7662 §2.2: serialization MUST NOT include other claims for
+        // inactive tokens. Our IntrospectionResponse uses
+        // `skip_serializing_if = Option::is_none` for sub/exp/username/
+        // client_id/scope, so they should be absent (Value::Null in JSON
+        // means "key was present with null"; absent is checked via .get).
+        assert!(body.get("sub").is_none(), "sub leak on inactive: {body}");
+        assert!(body.get("exp").is_none(), "exp leak on inactive");
+        assert!(body.get("username").is_none(), "username leak on inactive");
+        assert!(body.get("client_id").is_none(), "client_id leak on inactive");
+        assert!(body.get("scope").is_none(), "scope leak on inactive");
+    }
+
+    // upstream: rfc7662 §2.2 — active tokens populate sub, exp, username,
+    // client_id, scope.
+    #[tokio::test]
+    async fn introspect_active_token_populates_required_fields() {
+        let (_, svc) = setup().await;
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let (status, body) = introspect_with(svc, &format!("token={}", tokens.access_token)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["active"], true);
+        assert!(body["sub"].is_string());
+        assert!(body["exp"].is_number(), "exp must be a numeric epoch");
+        assert_eq!(body["username"], "testuser");
+        assert_eq!(body["client_id"], "test-client");
+        assert!(body["scope"].is_string());
+    }
+
+    // upstream: rfc7662 §2.1 — empty token field returns active=false, not
+    // a 4xx (the request itself is well-formed).
+    #[tokio::test]
+    async fn introspect_empty_token_returns_inactive_not_error() {
+        let (_, svc) = setup().await;
+        let (status, body) = introspect_with(svc, "token=").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["active"], false);
+    }
+
+    // upstream: rfc7662 §2.1 — a token from a foreign issuer must be
+    // reported inactive (the resource server only trusts tokens issued by
+    // the realm it asks for).
+    #[tokio::test]
+    async fn introspect_token_from_wrong_issuer_is_inactive() {
+        let (_, svc) = setup().await;
+        // Mint a token under "myrealm", then introspect it via a request
+        // whose realm path is forged-realm — `/realms/forged-realm/...`.
+        // The introspect impl checks `claims.iss == issuer(realm)`.
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        // Inject the access token but ask the introspect endpoint for a
+        // different realm by routing through a separate path.
+        let app = router(svc);
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/realms/other-realm/protocol/openid-connect/token/introspect")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!("token={}", tokens.access_token)))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let body = body_json(resp).await;
+        assert_eq!(body["active"], false, "foreign-issuer token must be inactive: {body}");
+    }
+
+    // upstream: rfc7662 §2.2 — the `exp` claim, when present, MUST be a
+    // NumericDate (seconds since epoch) per JWT/RFC 7519 §2. Sanity-check
+    // that the value is plausibly a recent epoch (post-2020-01-01) so a
+    // future stringly-typed regression is caught.
+    #[tokio::test]
+    async fn introspect_active_token_exp_is_plausible_epoch() {
+        let (_, svc) = setup().await;
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let (_, body) = introspect_with(svc, &format!("token={}", tokens.access_token)).await;
+        let exp = body["exp"].as_i64().expect("exp must be i64");
+        assert!(exp > 1_577_836_800, "exp={exp} not a post-2020 epoch");
+        // Realm default access_token_lifespan is short (minutes/hours),
+        // so exp shouldn't be more than a year in the future either.
+        let one_year_secs: i64 = 366 * 86_400;
+        let now_secs = chrono::Utc::now().timestamp();
+        assert!(exp - now_secs < one_year_secs, "exp={exp} too far in the future");
+    }
+
+    // upstream: rfc7662 §2.1 — request without `token` parameter returns
+    // 400 Bad Request (the request itself is malformed).
+    #[tokio::test]
+    async fn introspect_missing_token_param_is_client_error() {
+        let (_, svc) = setup().await;
+        let (status, _body) = introspect_with(svc, "wrong_param=value").await;
+        // The endpoint extracts `token` from the form; missing field
+        // surfaces as a 4xx from axum's Form extractor.
+        assert!(
+            status.is_client_error(),
+            "missing token param must be 4xx, got {status}"
+        );
+    }
+
+    // upstream: rfc7662 §4 — privacy: `username` value, when emitted,
+    // matches the user's preferred_username — never an email or sub.
+    #[tokio::test]
+    async fn introspect_active_username_is_preferred_username() {
+        let (_, svc) = setup().await;
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let (_, body) = introspect_with(svc, &format!("token={}", tokens.access_token)).await;
+        assert_eq!(body["username"], "testuser");
+        // Must NOT be an email shape.
+        let s = body["username"].as_str().unwrap();
+        assert!(!s.contains('@'), "username leaked email: {s}");
+    }
+
+    // upstream: rfc7662 §2.2 — `scope` is space-delimited, not a JSON
+    // array. Catches a regression where someone serialises Vec<String>.
+    #[tokio::test]
+    async fn introspect_active_scope_is_string_not_array() {
+        let (_, svc) = setup().await;
+        let tokens = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let (_, body) = introspect_with(svc, &format!("token={}", tokens.access_token)).await;
+        assert!(body["scope"].is_string(), "scope must be string per RFC 7662 §2.2");
+    }
+
+    // upstream: rfc7662 §2.2 — confidential clients MAY rotate access
+    // tokens via the password grant; the second introspection of an
+    // earlier token MUST still be valid until exp (we don't denylist on
+    // re-issue). Sanity-check both tokens introspect active.
+    #[tokio::test]
+    async fn introspect_two_tokens_from_same_user_both_active() {
+        let (_, svc) = setup().await;
+        let t1 = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let t2 = svc
+            .password_grant("myrealm", "testuser", "correctpassword", "test-client")
+            .await
+            .unwrap();
+        let (_, b1) = introspect_with(svc.clone(), &format!("token={}", t1.access_token)).await;
+        let (_, b2) = introspect_with(svc, &format!("token={}", t2.access_token)).await;
+        assert_eq!(b1["active"], true);
+        assert_eq!(b2["active"], true);
+    }
 }
