@@ -53,7 +53,7 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
         .route("/connectors/{name}/tasks/{task_id}/restart", post(restart_task))
         .route("/connector-plugins", get(list_plugins))
 
-        // ── Broker management ──────────────────────────────────────────────
+        // ── Broker management (Kafka) ──────────────────────────────────────
         .route("/api/streams/topics", get(list_topics).post(create_topic_rest))
         .route("/api/streams/topics/{name}", delete(delete_topic_rest))
         .route("/api/streams/topics/{name}/config", get(get_topic_config).put(alter_topic_config))
@@ -62,16 +62,56 @@ pub fn create_router(state: Arc<StreamsState>) -> Router {
         .route("/api/streams/quotas", get(list_quotas).post(set_quota_rest))
         .route("/api/streams/mirror", get(list_mirror_flows))
 
+        // ── Pulsar admin (pulsar-admin REST parity) ────────────────────────
+        .route("/api/streams/pulsar/tenants",
+               get(pulsar_list_tenants).post(pulsar_create_tenant))
+        .route("/api/streams/pulsar/tenants/{tenant}",
+               delete(pulsar_delete_tenant))
+        .route("/api/streams/pulsar/namespaces/{tenant}",
+               get(pulsar_list_namespaces).post(pulsar_create_namespace))
+        .route("/api/streams/pulsar/namespaces/{tenant}/{namespace}",
+               delete(pulsar_delete_namespace))
+        .route("/api/streams/pulsar/namespaces/{tenant}/{namespace}/retention",
+               post(pulsar_set_retention))
+        .route("/api/streams/pulsar/namespaces/{tenant}/{namespace}/messageTTL",
+               post(pulsar_set_ttl))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}",
+               get(pulsar_list_topics))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}",
+               post(pulsar_create_topic).delete(pulsar_delete_topic))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/stats",
+               get(pulsar_topic_stats))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscriptions",
+               get(pulsar_list_subscriptions))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{sub}",
+               post(pulsar_create_subscription).delete(pulsar_delete_subscription))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{sub}/skipAll",
+               post(pulsar_skip_all))
+        .route("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{sub}/resetCursor",
+               post(pulsar_reset_cursor))
+
         .with_state((state, connect))
 }
 
 type AppState = (Arc<StreamsState>, Arc<ConnectCluster>);
 
-async fn health() -> Json<serde_json::Value> {
+async fn health(State((s, _)): State<AppState>) -> Json<serde_json::Value> {
+    let kafka_topics = s.broker.list_topics().len();
+    let kafka_groups = s.broker.groups.list_groups().len();
+    let pulsar_tenants = s.pulsar_admin.list_tenants().len();
     Json(json!({
         "module": "cave-streams",
         "status": "ok",
-        "upstream": "apache-kafka"
+        "upstreams": ["apache-kafka", "apache-pulsar"],
+        "kafka": {
+            "port": crate::KAFKA_PORT,
+            "topics": kafka_topics,
+            "consumer_groups": kafka_groups,
+        },
+        "pulsar": {
+            "port": crate::PULSAR_PORT,
+            "tenants": pulsar_tenants,
+        },
     }))
 }
 
@@ -393,6 +433,258 @@ async fn set_quota_rest(
 
 async fn list_mirror_flows() -> Json<Vec<serde_json::Value>> {
     Json(vec![]) // Mirror flows are managed separately
+}
+
+// ── Pulsar admin handlers ─────────────────────────────────────────────────────
+
+async fn pulsar_list_tenants(State((s, _)): State<AppState>) -> Json<Vec<serde_json::Value>> {
+    Json(s.pulsar_admin.list_tenants().into_iter().map(|t| json!({
+        "name": t.name,
+        "admin_roles": t.admin_roles,
+        "allowed_clusters": t.allowed_clusters,
+    })).collect())
+}
+
+async fn pulsar_create_tenant(
+    State((s, _)): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let name = body["name"].as_str().unwrap_or("").to_string();
+    if name.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": "name required"}))).into_response();
+    }
+    let t = s.pulsar_admin.create_tenant(&name);
+    (StatusCode::CREATED, Json(json!({"name": t.name}))).into_response()
+}
+
+async fn pulsar_delete_tenant(
+    State((s, _)): State<AppState>,
+    Path(tenant): Path<String>,
+) -> impl IntoResponse {
+    match s.pulsar_admin.delete_tenant(&tenant) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_list_namespaces(
+    State((s, _)): State<AppState>,
+    Path(tenant): Path<String>,
+) -> Json<Vec<String>> {
+    Json(s.pulsar_admin.list_namespaces(&tenant))
+}
+
+async fn pulsar_create_namespace(
+    State((s, _)): State<AppState>,
+    Path(tenant): Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let name = body["namespace"].as_str().unwrap_or("").to_string();
+    if name.is_empty() {
+        return (StatusCode::BAD_REQUEST, Json(json!({"error": "namespace required"}))).into_response();
+    }
+    match s.pulsar_admin.create_namespace(&tenant, &name) {
+        Ok(ns) => (StatusCode::CREATED, Json(json!({"fqn": ns.fqn()}))).into_response(),
+        Err(e) => (StatusCode::NOT_FOUND, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn pulsar_delete_namespace(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let fqn = format!("{tenant}/{namespace}");
+    match s.pulsar_admin.delete_namespace(&fqn) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_set_retention(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace)): Path<(String, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let fqn = format!("{tenant}/{namespace}");
+    let minutes = body["retentionTimeInMinutes"].as_u64().unwrap_or(0);
+    let size_mb = body["retentionSizeInMB"].as_u64().unwrap_or(0);
+    match s.pulsar_admin.set_namespace_retention(&fqn, minutes, size_mb) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_set_ttl(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace)): Path<(String, String)>,
+    Json(body): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    let fqn = format!("{tenant}/{namespace}");
+    let ttl = body["messageTTL"].as_u64().unwrap_or(0);
+    match s.pulsar_admin.set_namespace_ttl(&fqn, ttl) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_list_topics(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace)): Path<(String, String)>,
+) -> Json<Vec<String>> {
+    let fqn = format!("{tenant}/{namespace}");
+    Json(s.pulsar_admin.list_topics(&fqn))
+}
+
+#[derive(serde::Deserialize, Default)]
+struct PulsarTopicQuery {
+    domain: Option<String>,
+    partitions: Option<u32>,
+}
+
+async fn pulsar_create_topic(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic)): Path<(String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    let partitions = q.partitions.unwrap_or(0);
+    match s.pulsar_admin.create_topic(&fqn, partitions) {
+        Ok(t) => (StatusCode::CREATED, Json(json!({"fqn": t.fqn()}))).into_response(),
+        Err(e) => (StatusCode::CONFLICT, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn pulsar_delete_topic(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic)): Path<(String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    match s.pulsar_admin.delete_topic(&fqn) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_topic_stats(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic)): Path<(String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    match s.pulsar_admin.topic_stats(&fqn) {
+        Ok(st) => Json(st).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_list_subscriptions(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic)): Path<(String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    match s.pulsar_admin.list_subscriptions(&fqn) {
+        Ok(subs) => Json(subs.into_iter().map(|s| s.name).collect::<Vec<_>>()).into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+#[derive(serde::Deserialize, Default)]
+struct PulsarSubBody {
+    #[serde(default)]
+    sub_type: Option<String>,
+    #[serde(default)]
+    initial_position: Option<String>,
+}
+
+fn parse_sub_type(s: Option<&str>) -> crate::pulsar_admin::SubscriptionType {
+    match s.unwrap_or("Exclusive") {
+        "Shared" | "shared" => crate::pulsar_admin::SubscriptionType::Shared,
+        "Failover" | "failover" => crate::pulsar_admin::SubscriptionType::Failover,
+        "KeyShared" | "key_shared" => crate::pulsar_admin::SubscriptionType::KeyShared,
+        _ => crate::pulsar_admin::SubscriptionType::Exclusive,
+    }
+}
+
+fn parse_initial_position(s: Option<&str>) -> crate::pulsar_admin::InitialPosition {
+    match s.unwrap_or("earliest") {
+        "latest" => crate::pulsar_admin::InitialPosition::Latest,
+        _ => crate::pulsar_admin::InitialPosition::Earliest,
+    }
+}
+
+async fn pulsar_create_subscription(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic, sub)): Path<(String, String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+    Json(body): Json<PulsarSubBody>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    let sub_type = parse_sub_type(body.sub_type.as_deref());
+    let pos = parse_initial_position(body.initial_position.as_deref());
+    match s.pulsar_admin.create_subscription(&fqn, &sub, sub_type, pos) {
+        Ok(_) => StatusCode::CREATED.into_response(),
+        Err(e) => (StatusCode::CONFLICT, Json(json!({"error": e.to_string()}))).into_response(),
+    }
+}
+
+async fn pulsar_delete_subscription(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic, sub)): Path<(String, String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    match s.pulsar_admin.delete_subscription(&fqn, &sub) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn pulsar_skip_all(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic, sub)): Path<(String, String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    match s.pulsar_admin.skip_all(&fqn, &sub) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+#[derive(serde::Deserialize, Default)]
+struct ResetCursorBody {
+    position: Option<String>, // "earliest", "latest", or numeric offset string
+}
+
+async fn pulsar_reset_cursor(
+    State((s, _)): State<AppState>,
+    Path((tenant, namespace, topic, sub)): Path<(String, String, String, String)>,
+    axum::extract::Query(q): axum::extract::Query<PulsarTopicQuery>,
+    Json(body): Json<ResetCursorBody>,
+) -> impl IntoResponse {
+    let scheme = q.domain.as_deref().unwrap_or("persistent");
+    let fqn = format!("{scheme}://{tenant}/{namespace}/{topic}");
+    let pos = match body.position.as_deref() {
+        Some("earliest") | None => crate::pulsar_admin::MessageId::EARLIEST,
+        Some("latest") => crate::pulsar_admin::MessageId::LATEST,
+        Some(other) => match other.parse::<u64>() {
+            Ok(n) => crate::pulsar_admin::MessageId::from_offset(n),
+            Err(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid position"}))).into_response(),
+        },
+    };
+    match s.pulsar_admin.reset_cursor(&fqn, &sub, pos) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

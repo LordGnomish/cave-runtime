@@ -96,10 +96,15 @@ enum Commands {
         #[command(subcommand)]
         cmd: CacheCmd,
     },
-    /// Kafka management
+    /// Kafka management (legacy alias of `streams kafka`)
     Kafka {
         #[command(subcommand)]
         cmd: KafkaCmd,
+    },
+    /// Streaming platform — Kafka + Pulsar parity (cave-streams)
+    Streams {
+        #[command(subcommand)]
+        cmd: StreamsCmd,
     },
     /// Infrastructure as code (Terraform/Pulumi replacement)
     Infra {
@@ -531,6 +536,172 @@ enum KafkaCmd {
     Schemas,
     /// List connectors
     Connectors,
+}
+
+#[derive(Subcommand)]
+enum StreamsCmd {
+    /// Combined liveness/health summary (Kafka + Pulsar)
+    Health,
+    /// Kafka subset — topics, consumer groups, schemas, connectors
+    Kafka {
+        #[command(subcommand)]
+        cmd: KafkaCmd,
+    },
+    /// Pulsar subset — tenants, namespaces, topics, subscriptions
+    Pulsar {
+        #[command(subcommand)]
+        cmd: PulsarCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum PulsarCmd {
+    /// List tenants (pulsar-admin tenants list)
+    Tenants,
+    /// Create a tenant
+    CreateTenant {
+        /// Tenant name
+        name: String,
+    },
+    /// Delete a tenant (cascades to namespaces and topics)
+    DeleteTenant {
+        /// Tenant name
+        name: String,
+    },
+    /// List namespaces in a tenant
+    Namespaces {
+        /// Tenant name
+        tenant: String,
+    },
+    /// Create a namespace
+    CreateNamespace {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+    },
+    /// Delete a namespace
+    DeleteNamespace {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+    },
+    /// Set retention on a namespace
+    SetRetention {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Retention in minutes
+        #[arg(long)]
+        minutes: u64,
+        /// Retention size limit in MiB
+        #[arg(long)]
+        size_mb: u64,
+    },
+    /// List topics in a namespace
+    Topics {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+    },
+    /// Create a topic
+    CreateTopic {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+        /// "persistent" (default) or "non-persistent"
+        #[arg(long)]
+        domain: Option<String>,
+        /// Number of partitions (0 = non-partitioned, default)
+        #[arg(long)]
+        partitions: Option<u32>,
+    },
+    /// Delete a topic
+    DeleteTopic {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+    },
+    /// Show topic statistics
+    TopicStats {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+    },
+    /// List subscriptions on a topic
+    Subscriptions {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+    },
+    /// Create a subscription
+    CreateSubscription {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+        /// Subscription name
+        subscription: String,
+        /// Subscription type: Exclusive | Shared | Failover | KeyShared
+        #[arg(long, default_value = "Exclusive")]
+        sub_type: String,
+        /// Initial position: earliest | latest
+        #[arg(long, default_value = "earliest")]
+        initial_position: String,
+    },
+    /// Delete a subscription
+    DeleteSubscription {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+        /// Subscription name
+        subscription: String,
+    },
+    /// Skip all backlog on a subscription
+    SkipAll {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+        /// Subscription name
+        subscription: String,
+    },
+    /// Reset the subscription cursor
+    ResetCursor {
+        /// Tenant name
+        tenant: String,
+        /// Namespace name
+        namespace: String,
+        /// Topic name
+        topic: String,
+        /// Subscription name
+        subscription: String,
+        /// Position: "earliest", "latest", or numeric offset
+        #[arg(long, default_value = "earliest")]
+        position: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1456,6 +1627,15 @@ async fn main() {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
+async fn dispatch_kafka(c: &ApiClient, cmd: KafkaCmd) -> Result<()> {
+    match cmd {
+        KafkaCmd::Topics => c.get("/api/streams/topics").await,
+        KafkaCmd::Consumers => c.get("/api/streams/groups").await,
+        KafkaCmd::Schemas => c.get("/subjects").await,
+        KafkaCmd::Connectors => c.get("/connectors").await,
+    }
+}
+
 async fn run(cli: Cli) -> Result<()> {
     let c = ApiClient::new(cli.server, cli.token, cli.format);
 
@@ -1611,12 +1791,83 @@ async fn run(cli: Cli) -> Result<()> {
             }
         },
 
-        // ── Kafka ─────────────────────────────────────────────────────────────
-        Commands::Kafka { cmd } => match cmd {
-            KafkaCmd::Topics => c.get("/api/kafka/topics").await,
-            KafkaCmd::Consumers => c.get("/api/kafka/consumers").await,
-            KafkaCmd::Schemas => c.get("/api/kafka/schemas").await,
-            KafkaCmd::Connectors => c.get("/api/kafka/connectors").await,
+        // ── Kafka (legacy alias of `streams kafka`) ───────────────────────────
+        Commands::Kafka { cmd } => dispatch_kafka(&c, cmd).await,
+
+        // ── Streams (Kafka + Pulsar) ──────────────────────────────────────────
+        Commands::Streams { cmd } => match cmd {
+            StreamsCmd::Health => c.get("/api/streams/health").await,
+            StreamsCmd::Kafka { cmd } => dispatch_kafka(&c, cmd).await,
+            StreamsCmd::Pulsar { cmd } => match cmd {
+                PulsarCmd::Tenants => c.get("/api/streams/pulsar/tenants").await,
+                PulsarCmd::CreateTenant { name } => {
+                    c.post("/api/streams/pulsar/tenants", json!({ "name": name })).await
+                }
+                PulsarCmd::DeleteTenant { name } => {
+                    c.delete(&format!("/api/streams/pulsar/tenants/{name}")).await
+                }
+                PulsarCmd::Namespaces { tenant } => {
+                    c.get(&format!("/api/streams/pulsar/namespaces/{tenant}")).await
+                }
+                PulsarCmd::CreateNamespace { tenant, namespace } => {
+                    c.post(
+                        &format!("/api/streams/pulsar/namespaces/{tenant}"),
+                        json!({ "namespace": namespace }),
+                    ).await
+                }
+                PulsarCmd::DeleteNamespace { tenant, namespace } => {
+                    c.delete(&format!("/api/streams/pulsar/namespaces/{tenant}/{namespace}")).await
+                }
+                PulsarCmd::SetRetention { tenant, namespace, minutes, size_mb } => {
+                    c.post(
+                        &format!("/api/streams/pulsar/namespaces/{tenant}/{namespace}/retention"),
+                        json!({ "retentionTimeInMinutes": minutes, "retentionSizeInMB": size_mb }),
+                    ).await
+                }
+                PulsarCmd::Topics { tenant, namespace } => {
+                    c.get(&format!("/api/streams/pulsar/topics/{tenant}/{namespace}")).await
+                }
+                PulsarCmd::CreateTopic { tenant, namespace, topic, domain, partitions } => {
+                    let mut q = vec![];
+                    if let Some(d) = domain { q.push(format!("domain={d}")); }
+                    if let Some(p) = partitions { q.push(format!("partitions={p}")); }
+                    let qs = if q.is_empty() { String::new() } else { format!("?{}", q.join("&")) };
+                    c.post(
+                        &format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}{qs}"),
+                        json!({}),
+                    ).await
+                }
+                PulsarCmd::DeleteTopic { tenant, namespace, topic } => {
+                    c.delete(&format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}")).await
+                }
+                PulsarCmd::TopicStats { tenant, namespace, topic } => {
+                    c.get(&format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/stats")).await
+                }
+                PulsarCmd::Subscriptions { tenant, namespace, topic } => {
+                    c.get(&format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscriptions")).await
+                }
+                PulsarCmd::CreateSubscription { tenant, namespace, topic, subscription, sub_type, initial_position } => {
+                    c.post(
+                        &format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{subscription}"),
+                        json!({ "sub_type": sub_type, "initial_position": initial_position }),
+                    ).await
+                }
+                PulsarCmd::DeleteSubscription { tenant, namespace, topic, subscription } => {
+                    c.delete(&format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{subscription}")).await
+                }
+                PulsarCmd::SkipAll { tenant, namespace, topic, subscription } => {
+                    c.post(
+                        &format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{subscription}/skipAll"),
+                        json!({}),
+                    ).await
+                }
+                PulsarCmd::ResetCursor { tenant, namespace, topic, subscription, position } => {
+                    c.post(
+                        &format!("/api/streams/pulsar/topics/{tenant}/{namespace}/{topic}/subscription/{subscription}/resetCursor"),
+                        json!({ "position": position }),
+                    ).await
+                }
+            },
         },
 
         // ── Infra ─────────────────────────────────────────────────────────────

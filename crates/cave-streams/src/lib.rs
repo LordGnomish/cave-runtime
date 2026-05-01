@@ -37,6 +37,7 @@ pub mod log_compaction;
 pub mod mirror;
 pub mod partitioned_topic;
 pub mod protocol;
+pub mod pulsar_admin;
 pub mod pulsar_dispatch;
 pub mod pulsar_topic;
 pub mod pulsar_wire;
@@ -56,6 +57,7 @@ use std::sync::Arc;
 
 pub use broker::Broker;
 pub use error::{StreamsError, StreamsResult};
+pub use pulsar_admin::PulsarAdminCluster;
 
 pub const MODULE_NAME: &str = "streams";
 /// Default Kafka wire protocol port
@@ -68,12 +70,14 @@ pub const SCHEMA_REGISTRY_PORT: u16 = 8081;
 /// Shared application state for the streams module.
 pub struct StreamsState {
     pub broker: Arc<Broker>,
+    pub pulsar_admin: Arc<PulsarAdminCluster>,
 }
 
 impl Default for StreamsState {
     fn default() -> Self {
         Self {
             broker: Arc::new(Broker::new(broker::BrokerConfig::default())),
+            pulsar_admin: PulsarAdminCluster::new(),
         }
     }
 }
