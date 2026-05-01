@@ -20,6 +20,12 @@
 
 pub mod types;
 
+/// sweep-002 F2-D: per-controller adoption of `cave_kernel::reconcile::run_reconciler`.
+/// Exposes `run_<controller>` factories that bridge each pure
+/// `reconcile(spec, status, tenant)` decision function onto the shared kernel
+/// loop with bounded queue, configurable backoff, and cancellation support.
+pub mod runtime;
+
 pub mod cronjob;
 pub mod daemonset;
 pub mod deployment;
