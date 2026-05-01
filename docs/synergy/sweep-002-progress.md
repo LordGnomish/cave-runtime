@@ -1,4 +1,47 @@
-# Sweep-002 Progress — Faz 1 Landed
+# Sweep-002 Progress — Faz 1 Landed + Faz 2 Partial
+
+**Status:** Faz 1 cherry-picked + Faz 2 partial adoption (TenantId across 6 crates) — main on 2026-05-01.
+
+## 2026-05-01 Faz 2 batch (this session)
+
+`cave_kernel::ns::TenantId` now adopted by 6 crates (was 8 local duplicates → 6 absorbed; 2 deferred with cause). Cumulative impact:
+
+| Crate | Commit | Sites | Tests after | Duplicate LOC removed |
+|---|---|---|---|---|
+| cave-search | `da49a80` | 0 src + 26 test fixtures | n/a (no inline) | 11 |
+| cave-cloud-controller-manager | `945302d` | 11 (4 src + 7 provider tests) | 623 / 0 | 16 |
+| cave-controller-manager | `e62eca3` | 30 (gc_lite, deeper, resource_quota, tests_crosscut) | 714 / 0 | 19 |
+| cave-portal (admin) | `8431cc6` | 8 + 1 test rewritten (defence-in-depth → boundary validation) | 534 / 0 | 19 |
+| cave-net (cilium) | `7caffaa` | 18 src + 48 e2e + 1 fixture lowercased | 1705 / 0 | 16 |
+| cave-mesh (ambient) | `a1246f9` | 11 ambient | 131 / 0 | 16 |
+| **Total** | — | **~115 .expect() / fixture sites** | **3707 passing** | **97 LOC** |
+
+Each commit does the same shape: `pub struct TenantId(pub String)` + `impl new/as_str` + `impl fmt::Display` deleted, replaced with `pub use cave_kernel::ns::TenantId;`. `TenantId::new(...)` call sites get `.expect("test fixture")` since the kernel newtype is fallible (DNS-1123 validated). Underscore-bearing test fixtures (`tenant_001` → `tenant-001`, `tenant-mg-M` → `tenant-mg-m`) corrected to satisfy validation.
+
+### Faz 2 deferred — honest reasons
+
+| Crate / target | Why deferred |
+|---|---|
+| **cave-portal-web** TenantId | Genuinely different abstraction: 6 error variants (Empty, TooLong, InvalidChar, HyphenBoundary, **Unknown**, **Missing**), allows underscore in slugs, max length 64 (vs kernel's 63), `TenantContext::set_current/require/clear` flow with a `Missing` default-deny variant the kernel doesn't model. Migration would either lose functionality or fork the kernel API; neither is honest "adoption". |
+| **cave-logs** TenantId | `pub type TenantId = String;` (type alias, not a newtype) — the call-site impact of converting `String` → `TenantId` newtype is a wide-touch migration. Worth its own focused PR with the multi-tenant reviewer in the loop. |
+| **cave-mesh** SpiffeId (F2-F) | API mismatch with `cave_kernel::identity::SpiffeId`: pub fields vs accessor methods, `parse(uri) -> Option<Self>` vs `new(td, path) -> Result<Self, SpiffeError>`, path-with-leading-slash vs path-without-leading-slash. Migration is invasive (every `.trust_domain` / `.path` access becomes a method call, plus path convention shift). Not a drop-in. |
+| **cave-auth** SpiffeId (F2-F) | No SPIFFE surface in cave-auth — zero hits for `SpiffeId` / `spiffe::`. Nothing to adopt. |
+| **F2-C cave-portal SSE** → EventBus | No SSE / `broadcast::Sender` / `text/event-stream` in any cave-portal* crate. Reflex Engine target was aspirational at sweep-002 plan time; no surface yet. |
+| **F2-E cave-cri reconcile** → Reconciler | Zero `Reconciler` / `reconcile_loop` / `fn reconcile` hits in cave-cri. No surface. |
+| **F2-B cave-apiserver::watch_cache** → EventBus | watch_cache.rs uses a tenant-scoped ring buffer, not `broadcast::Sender`. EventBus<T> is a different abstraction; "adoption" would be a redesign, not a refactor. Defer to a focused PR that picks one of the two contracts. |
+| **F2-D cave-controller-manager reconcile** → run_reconciler | 10+ controller files, each with its own bespoke loop. Each adoption is a real test-and-port; doing all 10 in one batch breaks the "small reviewable diff" principle. Faz 2 leaves it as-is for per-controller adoption. |
+| **F2-A cave-ha::raft → consensus** | HIGH risk per author's own note; cave-ha doesn't yet depend on cave-kernel. Adopt by `impl LogStore for cave_ha::raft::Log; impl StateMachine for cave_ha::raft::Node` in a focused PR with extra review on the consensus path. |
+
+### Constraint compliance
+
+- **No stubs**: all 6 commits delete real duplicate code; no `todo!()` / `unimplemented!()` introduced.
+- **Compile green**: `cargo check --workspace` after every commit, plus `cargo test -p <crate> --lib` 3707/0 cumulative.
+- **Conventional commits + ff merges**: every commit is `refactor(<crate>): adopt cave_kernel::ns::TenantId (sweep-002 F2-G)`.
+- **One genuine semantic shift**: cave-portal `contributions_html_escape_blocks_tenant_injection` test rewritten — the canonical newtype rejects `<script>` at construction, so the test asserts the boundary rejection rather than the downstream HTML escape. Documented in the commit message.
+
+---
+
+## Original Faz 1 (2026-05-01 cherry-pick)
 
 **Status:** Faz 1 cherry-picked from `claude/eager-jennings-ab6961` (commit `bc50d6b`) into main on 2026-05-01.
 
