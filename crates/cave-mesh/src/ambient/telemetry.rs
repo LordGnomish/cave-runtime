@@ -163,7 +163,7 @@ mod tests {
 
     fn rec(method: &str, code: u16, with_trace: bool) -> RequestRecord {
         RequestRecord {
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             timestamp: DateTime::parse_from_rfc3339("2026-04-26T10:00:00Z")
                 .unwrap()
                 .with_timezone(&Utc),

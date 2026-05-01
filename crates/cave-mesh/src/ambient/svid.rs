@@ -147,7 +147,7 @@ mod tests {
         IssuerPolicy {
             trust_domain: "cluster.local".into(),
             max_ttl_seconds: 3600,
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
         }
     }
 

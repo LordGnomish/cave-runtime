@@ -160,7 +160,7 @@ mod tests {
     use crate::ambient_test_ctx;
 
     fn conn(tenant: &str) -> ZtunnelConn {
-        ZtunnelConn::new(TenantId::new(tenant), format!("spiffe://cluster.local/ns/{tenant}/"))
+        ZtunnelConn::new(TenantId::new(tenant).expect("test fixture"), format!("spiffe://cluster.local/ns/{tenant}/"))
     }
 
     fn good_headers() -> Vec<(&'static str, &'static str)> {

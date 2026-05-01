@@ -176,7 +176,7 @@ mod tests {
         AuthorizationPolicy {
             name: name.into(),
             namespace: "acme".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             action,
             rules,
         }
@@ -331,7 +331,7 @@ mod tests {
             vec![Rule::default()],
         );
         // Reassign ownership to a different tenant.
-        p.tenant = TenantId::new("evil");
+        p.tenant = TenantId::new("evil").expect("test fixture");
         // The acme tenant sees an empty policy set → default ALLOW.
         assert_eq!(evaluate(&[p], &owner, &req()), Decision::Allow);
     }

@@ -13,26 +13,10 @@ pub const UPSTREAM_VERSION: &str = "1.29.2";
 /// Upstream repo (without the leading `https://github.com/`).
 pub const UPSTREAM_REPO: &str = "istio/istio";
 
-/// Multi-tenant identifier. Every Ambient-mode object (HBONE tunnel,
-/// AuthorizationPolicy, VirtualService, …) is scoped to a tenant, and every
-/// per-request decision must check it.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TenantId(pub String);
-
-impl TenantId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Display for TenantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
+/// Multi-tenant identifier — re-exported from `cave_kernel::ns` (sweep-002
+/// F2-G adoption, 2026-05-01). Every Ambient-mode object (HBONE tunnel,
+/// AuthorizationPolicy, VirtualService, …) is scoped to a tenant.
+pub use cave_kernel::ns::TenantId;
 
 /// Citation pointing at an upstream Istio symbol. `repo` defaults to
 /// `istio/istio`; `version` defaults to [`UPSTREAM_VERSION`]. The `Cite::ext`
@@ -78,14 +62,14 @@ impl fmt::Display for Cite {
 macro_rules! ambient_test_ctx {
     ($path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::ambient::types::Cite::istio($path, $symbol);
-        let tenant = $crate::ambient::types::TenantId::new($tenant);
+        let tenant = $crate::ambient::types::TenantId::new($tenant).expect("test fixture");
         assert_eq!(cite.version, $crate::ambient::types::UPSTREAM_VERSION);
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         (cite, tenant)
     }};
     (ext: $repo:expr, $version:expr, $path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::ambient::types::Cite::ext($repo, $path, $symbol, $version);
-        let tenant = $crate::ambient::types::TenantId::new($tenant);
+        let tenant = $crate::ambient::types::TenantId::new($tenant).expect("test fixture");
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         // Istio uses both tag versions ("1.29.2") and release branches
         // ("release-1.29") for the ztunnel sibling repo — accept either.

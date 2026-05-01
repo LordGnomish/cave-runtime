@@ -162,7 +162,7 @@ mod tests {
         DestinationRule {
             name: "web-dr".into(),
             namespace: "acme".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             host: "web.acme.svc.cluster.local".into(),
             lb,
             subsets,

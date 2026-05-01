@@ -8,8 +8,9 @@ rust-version.workspace = true
 description = "CAVE Service Mesh — full Istio-parity control plane (traffic, security, observability, xDS, SPIFFE, multi-cluster)"
 
 [dependencies]
-cave-core = { path = "../cave-core" }
-cave-db   = { path = "../cave-db" }
+cave-core   = { path = "../cave-core" }
+cave-db     = { path = "../cave-db" }
+cave-kernel = { path = "../cave-kernel" }
 
 axum              = { workspace = true }
 tokio             = { workspace = true }

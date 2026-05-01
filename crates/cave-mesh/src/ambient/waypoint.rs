@@ -146,7 +146,7 @@ mod tests {
         WaypointConfig {
             name: format!("{tenant}-wp"),
             namespace: tenant.into(),
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             routes,
         }
     }

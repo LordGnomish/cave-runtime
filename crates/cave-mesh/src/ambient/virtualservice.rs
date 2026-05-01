@@ -96,7 +96,7 @@ mod tests {
         VirtualService {
             name: "web-vs".into(),
             namespace: "acme".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             hosts: vec!["web.acme.svc.cluster.local".into()],
             http,
         }
@@ -216,7 +216,7 @@ mod tests {
         let cfg = crate::ambient::waypoint::WaypointConfig {
             name: "acme-wp".into(),
             namespace: "acme".into(),
-            tenant: TenantId::new("acme"),
+            tenant: TenantId::new("acme").expect("test fixture"),
             routes: table,
         };
         let r = cfg
