@@ -7,6 +7,8 @@
 //! configure which plugins are enabled per scheduler name.
 
 pub mod bind;
+// sweep-001 — assume/finish/forget cache (mirrors pkg/scheduler/internal/cache).
+pub mod cache;
 pub mod cycle_state;
 pub mod default_preemption;
 pub mod dra;
