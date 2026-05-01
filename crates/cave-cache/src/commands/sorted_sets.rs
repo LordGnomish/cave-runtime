@@ -759,3 +759,267 @@ pub fn cmd_zrandmember(args: &[Vec<u8>], db: &mut Db) -> CacheResult<Resp> {
         None => Ok(if count.is_some() { Resp::Array(Some(vec![])) } else { Resp::nil() }),
     }
 }
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+//
+// Behaviour parity against Redis/Valkey 8 sorted-set semantics.  Every test
+// drives the public `cmd_z*` functions against a fresh `Db` so the assertion
+// covers the full parse → mutate → respond path.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Build an arg vector from `&str` literals — RESP arguments are bytes.
+    fn args(parts: &[&str]) -> Vec<Vec<u8>> {
+        parts.iter().map(|s| s.as_bytes().to_vec()).collect()
+    }
+
+    fn unwrap_int(r: Resp) -> i64 {
+        match r {
+            Resp::Integer(n) => n,
+            other => panic!("expected Integer, got {other:?}"),
+        }
+    }
+
+    fn unwrap_bulk(r: Resp) -> Vec<u8> {
+        match r {
+            Resp::BulkString(Some(b)) => b,
+            other => panic!("expected BulkString(Some), got {other:?}"),
+        }
+    }
+
+    fn unwrap_array(r: Resp) -> Vec<Resp> {
+        match r {
+            Resp::Array(Some(items)) => items,
+            other => panic!("expected Array(Some), got {other:?}"),
+        }
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZADD with no flags returns the
+    /// number of NEW members; updates to existing members count 0.
+    #[test]
+    fn zadd_returns_new_member_count_only() {
+        let mut db = Db::new();
+        let added = unwrap_int(cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap());
+        assert_eq!(added, 2, "two new members");
+
+        // Updating an existing member's score returns 0 (no NEW members).
+        let added2 = unwrap_int(cmd_zadd(&args(&["ZADD", "k", "5", "a"]), &mut db).unwrap());
+        assert_eq!(added2, 0, "updating existing member is not a new add");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c:zaddCommand — ZADD ... CH counts
+    /// changed (added or score-updated) members instead of just added.
+    #[test]
+    fn zadd_ch_flag_counts_score_updates() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap();
+        // CH: re-score "a" (changed) + add "c" new → CH=2
+        let n = unwrap_int(
+            cmd_zadd(&args(&["ZADD", "k", "CH", "5", "a", "3", "c"]), &mut db).unwrap(),
+        );
+        assert_eq!(n, 2, "CH counts both score-updates and new adds");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZADD NX only adds if member does
+    /// not exist; existing-member score is NOT updated.
+    #[test]
+    fn zadd_nx_does_not_overwrite_existing_score() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "1", "a"]), &mut db).unwrap();
+        cmd_zadd(&args(&["ZADD", "k", "NX", "99", "a"]), &mut db).unwrap();
+        let s = unwrap_bulk(cmd_zscore(&args(&["ZSCORE", "k", "a"]), &mut db).unwrap());
+        assert_eq!(&s, b"1", "NX must preserve original score");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZADD XX only updates existing
+    /// members; missing members are NOT added.
+    #[test]
+    fn zadd_xx_does_not_create_missing() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "1", "a"]), &mut db).unwrap();
+        cmd_zadd(&args(&["ZADD", "k", "XX", "5", "newkey"]), &mut db).unwrap();
+        // newkey must not appear
+        let card = unwrap_int(cmd_zcard(&args(&["ZCARD", "k"]), &mut db).unwrap());
+        assert_eq!(card, 1, "XX must not create the missing member");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZADD GT only updates when the new
+    /// score is strictly greater than the existing score.
+    #[test]
+    fn zadd_gt_only_raises_score() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "5", "a"]), &mut db).unwrap();
+        // Lower score: must NOT take effect
+        cmd_zadd(&args(&["ZADD", "k", "GT", "3", "a"]), &mut db).unwrap();
+        let s1 = unwrap_bulk(cmd_zscore(&args(&["ZSCORE", "k", "a"]), &mut db).unwrap());
+        assert_eq!(&s1, b"5", "GT must reject lower score");
+        // Higher score: must take effect
+        cmd_zadd(&args(&["ZADD", "k", "GT", "9", "a"]), &mut db).unwrap();
+        let s2 = unwrap_bulk(cmd_zscore(&args(&["ZSCORE", "k", "a"]), &mut db).unwrap());
+        assert_eq!(&s2, b"9", "GT must accept higher score");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZADD LT only updates when the new
+    /// score is strictly less than the existing score.
+    #[test]
+    fn zadd_lt_only_lowers_score() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "5", "a"]), &mut db).unwrap();
+        cmd_zadd(&args(&["ZADD", "k", "LT", "9", "a"]), &mut db).unwrap();
+        let s1 = unwrap_bulk(cmd_zscore(&args(&["ZSCORE", "k", "a"]), &mut db).unwrap());
+        assert_eq!(&s1, b"5", "LT must reject higher score");
+        cmd_zadd(&args(&["ZADD", "k", "LT", "2", "a"]), &mut db).unwrap();
+        let s2 = unwrap_bulk(cmd_zscore(&args(&["ZSCORE", "k", "a"]), &mut db).unwrap());
+        assert_eq!(&s2, b"2", "LT must accept lower score");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZINCRBY adds the increment and
+    /// returns the new score as a bulk string.
+    #[test]
+    fn zincrby_increments_and_returns_new_score() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "10", "a"]), &mut db).unwrap();
+        let new_score =
+            unwrap_bulk(cmd_zincrby(&args(&["ZINCRBY", "k", "5", "a"]), &mut db).unwrap());
+        assert_eq!(&new_score, b"15", "ZINCRBY returns the post-increment score");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZINCRBY on a missing member
+    /// creates it at the increment value (treats absent as 0).
+    #[test]
+    fn zincrby_creates_missing_member() {
+        let mut db = Db::new();
+        let s = unwrap_bulk(cmd_zincrby(&args(&["ZINCRBY", "k", "7", "fresh"]), &mut db).unwrap());
+        assert_eq!(&s, b"7");
+        let card = unwrap_int(cmd_zcard(&args(&["ZCARD", "k"]), &mut db).unwrap());
+        assert_eq!(card, 1);
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZRANGEBYSCORE returns members
+    /// with scores in the inclusive range [min, max], ordered by score.
+    #[test]
+    fn zrangebyscore_inclusive_range_in_order() {
+        let mut db = Db::new();
+        cmd_zadd(
+            &args(&["ZADD", "k", "1", "a", "5", "b", "10", "c", "15", "d"]),
+            &mut db,
+        )
+        .unwrap();
+        let arr = unwrap_array(
+            cmd_zrangebyscore(&args(&["ZRANGEBYSCORE", "k", "5", "10"]), &mut db).unwrap(),
+        );
+        let names: Vec<Vec<u8>> = arr
+            .into_iter()
+            .map(|r| match r {
+                Resp::BulkString(Some(b)) => b,
+                other => panic!("expected bulk, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(names, vec![b"b".to_vec(), b"c".to_vec()],
+            "inclusive [5,10] keeps b(5) and c(10)");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZRANGEBYSCORE supports `(` for
+    /// exclusive bounds; `(5 (10` excludes both endpoints.
+    #[test]
+    fn zrangebyscore_exclusive_bounds() {
+        let mut db = Db::new();
+        cmd_zadd(
+            &args(&["ZADD", "k", "1", "a", "5", "b", "10", "c", "15", "d"]),
+            &mut db,
+        )
+        .unwrap();
+        let arr = unwrap_array(
+            cmd_zrangebyscore(&args(&["ZRANGEBYSCORE", "k", "(5", "(15"]), &mut db).unwrap(),
+        );
+        // c(10) only
+        assert_eq!(arr.len(), 1, "(5,(15) keeps only c(10), got {arr:?}");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZPOPMIN removes and returns the
+    /// member with the lowest score.
+    #[test]
+    fn zpopmin_returns_lowest_score_member() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]), &mut db).unwrap();
+        let popped = unwrap_array(cmd_zpopmin(&args(&["ZPOPMIN", "k"]), &mut db).unwrap());
+        // [member, score]
+        assert_eq!(popped.len(), 2);
+        assert_eq!(popped[0], Resp::BulkString(Some(b"a".to_vec())));
+        assert_eq!(popped[1], Resp::BulkString(Some(b"1".to_vec())));
+        let card = unwrap_int(cmd_zcard(&args(&["ZCARD", "k"]), &mut db).unwrap());
+        assert_eq!(card, 2, "popped member must be removed");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZPOPMAX returns the member with
+    /// the highest score.
+    #[test]
+    fn zpopmax_returns_highest_score_member() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "5", "b", "1", "a", "10", "c"]), &mut db).unwrap();
+        let popped = unwrap_array(cmd_zpopmax(&args(&["ZPOPMAX", "k"]), &mut db).unwrap());
+        assert_eq!(popped[0], Resp::BulkString(Some(b"c".to_vec())));
+        assert_eq!(popped[1], Resp::BulkString(Some(b"10".to_vec())));
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZCOUNT returns the cardinality of
+    /// the score range; supports `(` for exclusive bounds.
+    #[test]
+    fn zcount_counts_inclusive_and_exclusive() {
+        let mut db = Db::new();
+        cmd_zadd(
+            &args(&["ZADD", "k", "1", "a", "5", "b", "10", "c", "15", "d"]),
+            &mut db,
+        )
+        .unwrap();
+        let inclusive =
+            unwrap_int(cmd_zcount(&args(&["ZCOUNT", "k", "5", "10"]), &mut db).unwrap());
+        assert_eq!(inclusive, 2, "[5,10] → b,c");
+        let exclusive =
+            unwrap_int(cmd_zcount(&args(&["ZCOUNT", "k", "(5", "(15"]), &mut db).unwrap());
+        assert_eq!(exclusive, 1, "(5,(15) → c only");
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZRANGEBYLEX requires `[` or `(`
+    /// prefixes plus `-` / `+` infinities; returns members lexicographically
+    /// when all scores are equal.
+    #[test]
+    fn zrangebylex_equal_scores_returns_lex_range() {
+        let mut db = Db::new();
+        // Equal scores → ordering is by member bytes.
+        cmd_zadd(
+            &args(&["ZADD", "k", "0", "a", "0", "b", "0", "c", "0", "d"]),
+            &mut db,
+        )
+        .unwrap();
+        let arr = unwrap_array(
+            cmd_zrangebylex(&args(&["ZRANGEBYLEX", "k", "[b", "[c"]), &mut db).unwrap(),
+        );
+        let names: Vec<Vec<u8>> = arr
+            .into_iter()
+            .map(|r| match r {
+                Resp::BulkString(Some(b)) => b,
+                other => panic!("expected bulk, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(names, vec![b"b".to_vec(), b"c".to_vec()]);
+    }
+
+    /// upstream: redis 8.0/src/t_zset.c — ZMSCORE returns one bulk per
+    /// member; missing members surface as nil bulk.
+    #[test]
+    fn zmscore_returns_per_member_with_nil_for_missing() {
+        let mut db = Db::new();
+        cmd_zadd(&args(&["ZADD", "k", "1", "a", "2", "b"]), &mut db).unwrap();
+        let arr =
+            unwrap_array(cmd_zmscore(&args(&["ZMSCORE", "k", "a", "ghost", "b"]), &mut db).unwrap());
+        assert_eq!(arr.len(), 3);
+        assert_eq!(arr[0], Resp::BulkString(Some(b"1".to_vec())));
+        // ghost → nil bulk
+        assert!(matches!(arr[1], Resp::BulkString(None)),
+            "ghost member must surface as nil bulk, got {:?}", arr[1]);
+        assert_eq!(arr[2], Resp::BulkString(Some(b"2".to_vec())));
+    }
+}
