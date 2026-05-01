@@ -1,39 +1,74 @@
 //! Knative Revision — immutable snapshot of code + config.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/revision_types.go
 
-use crate::meta::{ObjectMeta, RevisionTemplateSpec, TrafficTarget};
+use crate::meta::{validate_template, ObjectMeta, RevisionTemplateSpec, TrafficTarget};
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct Revision {
     pub metadata: ObjectMeta,
     pub spec: RevisionSpec,
     pub status: RevisionStatus,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct RevisionSpec {
     pub containerConcurrency: Option<i32>,
     pub timeoutSeconds: Option<i32>,
     pub template: RevisionTemplateSpec,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct RevisionStatus {
     pub actualReplicas: Option<i32>,
     pub desiredReplicas: Option<i32>,
     pub traffic: Vec<TrafficTarget>,
+    pub observed_generation: i64,
 }
 
 impl Revision {
-    pub fn new(_tenant_id: &str) -> Self {
-        unimplemented!("cave-knative::revision::Revision::new")
+    pub fn new(tenant_id: &str) -> Self {
+        Self {
+            metadata: ObjectMeta::with_creator(tenant_id),
+            spec: RevisionSpec::default(),
+            status: RevisionStatus::default(),
+        }
     }
 
+    /// Drop desired replica count to 0 (the cornerstone of scale-to-zero).
     pub fn scale_to_zero(&mut self) {
-        unimplemented!("cave-knative::revision::Revision::scale_to_zero")
+        self.status.desiredReplicas = Some(0);
     }
 
     pub fn name(&self) -> String {
-        unimplemented!("cave-knative::revision::Revision::name")
+        self.metadata.name.clone()
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(c) = self.spec.containerConcurrency {
+            if c < 0 {
+                return Err("containerConcurrency must be >= 0".to_string());
+            }
+        }
+        if let Some(t) = self.spec.timeoutSeconds {
+            if t <= 0 {
+                return Err("timeoutSeconds must be > 0".to_string());
+            }
+        }
+        validate_template(&self.spec.template)?;
+        Ok(())
+    }
+
+    /// Set desired replica count (called by the autoscaler).
+    pub fn set_desired_replicas(&mut self, replicas: i32) {
+        self.status.desiredReplicas = Some(replicas.max(0));
+    }
+
+    /// Mark actual replica count (called when the underlying Deployment reports status).
+    pub fn set_actual_replicas(&mut self, replicas: i32) {
+        self.status.actualReplicas = Some(replicas.max(0));
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.status.desiredReplicas.unwrap_or(0) > 0
     }
 }
