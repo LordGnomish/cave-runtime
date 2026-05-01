@@ -2,17 +2,23 @@
 
 use crate::error::{ApiError, ApiResult};
 use crate::resources::Resource;
+use cave_kernel::eventbus::{EventBus, Subscription};
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tokio::sync::broadcast;
 
 type ResourceKey = (String, String, String); // (kind, namespace, name)
+
+/// Watch fan-out capacity. Lagged subscribers receive `EventBusError::Lagged(n)`
+/// per kernel EventBus contract; producer (the store mutator) never blocks.
+/// Mirrors upstream `apiserver/pkg/server/options/server_run_options.go::WatchCacheSize`
+/// default sizing (4096 events).
+const WATCH_BUS_CAPACITY: usize = 4096;
 
 /// K8s-compatible resource store with watch support.
 pub struct ResourceStore {
     resources: DashMap<ResourceKey, Resource>,
     revision: AtomicU64,
-    watch_tx: broadcast::Sender<WatchEvent>,
+    watch_bus: EventBus<WatchEvent>,
 }
 
 #[derive(Debug, Clone)]
@@ -30,11 +36,10 @@ pub enum WatchEventType {
 
 impl ResourceStore {
     pub fn new() -> Self {
-        let (watch_tx, _) = broadcast::channel(4096);
         Self {
             resources: DashMap::new(),
             revision: AtomicU64::new(1),
-            watch_tx,
+            watch_bus: EventBus::new(WATCH_BUS_CAPACITY),
         }
     }
 
@@ -49,7 +54,7 @@ impl ResourceStore {
             return Err(ApiError::AlreadyExists { kind: key.0, name: key.2 });
         }
         self.resources.insert(key, resource.clone());
-        let _ = self.watch_tx.send(WatchEvent { event_type: WatchEventType::Added, resource: resource.clone() });
+        let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Added, resource: resource.clone() });
         Ok(resource)
     }
 
@@ -73,7 +78,7 @@ impl ResourceStore {
             return Err(ApiError::NotFound { kind: key.0, name: key.2 });
         }
         self.resources.insert(key, resource.clone());
-        let _ = self.watch_tx.send(WatchEvent { event_type: WatchEventType::Modified, resource: resource.clone() });
+        let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Modified, resource: resource.clone() });
         Ok(resource)
     }
 
@@ -81,14 +86,18 @@ impl ResourceStore {
         let key = (kind.to_string(), namespace.to_string(), name.to_string());
         self.resources.remove(&key)
             .map(|(_, r)| {
-                let _ = self.watch_tx.send(WatchEvent { event_type: WatchEventType::Deleted, resource: r.clone() });
+                let _ = self.watch_bus.publish(WatchEvent { event_type: WatchEventType::Deleted, resource: r.clone() });
                 r
             })
             .ok_or(ApiError::NotFound { kind: kind.to_string(), name: name.to_string() })
     }
 
-    pub fn subscribe(&self) -> broadcast::Receiver<WatchEvent> {
-        self.watch_tx.subscribe()
+    /// Subscribe to live watch events. Backpressure is delegated to
+    /// `cave_kernel::eventbus::EventBus`: subscribers that fall behind receive
+    /// `EventBusError::Lagged(n)` and may resync via store list + RV-scoped
+    /// replay.
+    pub fn subscribe(&self) -> Subscription<WatchEvent> {
+        self.watch_bus.subscribe()
     }
 
     pub fn count(&self, kind: &str) -> usize {
@@ -154,7 +163,7 @@ mod tests {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_configmap("w", "default")).unwrap();
-        let event = rx.try_recv().unwrap();
+        let event = rx.try_recv().unwrap().expect("event");
         assert!(matches!(event.event_type, WatchEventType::Added));
     }
 
@@ -1279,7 +1288,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_cm("w1")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.name(), "w1");
     }
@@ -1291,7 +1300,7 @@ mod tests_watch {
         store.create(make_cm("w2")).unwrap();
         let mut rx = store.subscribe();
         store.update(make_cm("w2")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Modified));
         assert_eq!(ev.resource.name(), "w2");
     }
@@ -1303,7 +1312,7 @@ mod tests_watch {
         store.create(make_cm("w3")).unwrap();
         let mut rx = store.subscribe();
         store.delete("ConfigMap", TENANT, "w3").unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Deleted));
         assert_eq!(ev.resource.name(), "w3");
     }
@@ -1314,7 +1323,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_pod("pod-w")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.kind(), "Pod");
     }
@@ -1326,7 +1335,7 @@ mod tests_watch {
         store.create(make_pod("pod-x")).unwrap();
         let mut rx = store.subscribe();
         store.update(make_pod("pod-x")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Modified));
         assert_eq!(ev.resource.kind(), "Pod");
     }
@@ -1338,7 +1347,7 @@ mod tests_watch {
         store.create(make_pod("pod-z")).unwrap();
         let mut rx = store.subscribe();
         store.delete("Pod", TENANT, "pod-z").unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Deleted));
     }
 
@@ -1348,7 +1357,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_deployment("dep-w")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.kind(), "Deployment");
     }
@@ -1360,7 +1369,7 @@ mod tests_watch {
         store.create(make_deployment("dep-y")).unwrap();
         let mut rx = store.subscribe();
         store.update(make_deployment("dep-y")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Modified));
     }
 
@@ -1370,7 +1379,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_secret("sec-w")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.kind(), "Secret");
     }
@@ -1381,7 +1390,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_service("svc-w")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.kind(), "Service");
     }
@@ -1392,7 +1401,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_statefulset("sts-w")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev.event_type, WatchEventType::Added));
         assert_eq!(ev.resource.kind(), "StatefulSet");
     }
@@ -1404,8 +1413,8 @@ mod tests_watch {
         let mut rx = store.subscribe();
         store.create(make_cm("seq1")).unwrap();
         store.create(make_cm("seq2")).unwrap();
-        let ev1 = rx.try_recv().unwrap();
-        let ev2 = rx.try_recv().unwrap();
+        let ev1 = rx.try_recv().unwrap().expect("event");
+        let ev2 = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev1.event_type, WatchEventType::Added));
         assert!(matches!(ev2.event_type, WatchEventType::Added));
     }
@@ -1416,7 +1425,7 @@ mod tests_watch {
         let store = ResourceStore::new();
         let mut rx = store.subscribe();
         store.create(make_pod("event-pod")).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert_eq!(ev.resource.namespace(), TENANT);
     }
 
@@ -1429,7 +1438,7 @@ mod tests_watch {
         store.create(make_cm("c")).unwrap();
         store.create(make_service("s")).unwrap();
         let kinds: Vec<String> = (0..3)
-            .map(|_| rx.try_recv().unwrap().resource.kind().to_string())
+            .map(|_| rx.try_recv().unwrap().expect("event").resource.kind().to_string())
             .collect();
         assert!(kinds.contains(&"Pod".to_string()));
         assert!(kinds.contains(&"ConfigMap".to_string()));
@@ -1911,8 +1920,8 @@ mod tests_edge_cases {
         let mut rx1 = store.subscribe();
         let mut rx2 = store.subscribe();
         store.create(pod("multi-sub", TENANT)).unwrap();
-        assert!(rx1.try_recv().is_ok());
-        assert!(rx2.try_recv().is_ok());
+        assert!(matches!(rx1.try_recv(), Ok(Some(_))));
+        assert!(matches!(rx2.try_recv(), Ok(Some(_))));
     }
 
     // upstream: kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go::Watch
@@ -1923,7 +1932,7 @@ mod tests_edge_cases {
         let mut rx = store.subscribe(); // subscribe AFTER create
         // The event for pre-sub was already sent before rx was created
         store.create(pod("post-sub", TENANT)).unwrap();
-        let ev = rx.try_recv().unwrap();
+        let ev = rx.try_recv().unwrap().expect("event");
         assert_eq!(ev.resource.name(), "post-sub");
     }
 
@@ -1990,9 +1999,9 @@ mod tests_edge_cases {
         store.create(pod("seq", TENANT)).unwrap();
         store.update(pod("seq", TENANT)).unwrap();
         store.delete("Pod", TENANT, "seq").unwrap();
-        let ev1 = rx.try_recv().unwrap();
-        let ev2 = rx.try_recv().unwrap();
-        let ev3 = rx.try_recv().unwrap();
+        let ev1 = rx.try_recv().unwrap().expect("event");
+        let ev2 = rx.try_recv().unwrap().expect("event");
+        let ev3 = rx.try_recv().unwrap().expect("event");
         assert!(matches!(ev1.event_type, WatchEventType::Added));
         assert!(matches!(ev2.event_type, WatchEventType::Modified));
         assert!(matches!(ev3.event_type, WatchEventType::Deleted));
@@ -2139,9 +2148,9 @@ mod tests_generic_storage {
         store.create(r.clone()).unwrap();
         store.update(r.clone()).unwrap();
         store.delete("ConfigMap", "acme", "c").unwrap();
-        let added = rx.try_recv().unwrap();
-        let modified = rx.try_recv().unwrap();
-        let deleted = rx.try_recv().unwrap();
+        let added = rx.try_recv().unwrap().expect("event");
+        let modified = rx.try_recv().unwrap().expect("event");
+        let deleted = rx.try_recv().unwrap().expect("event");
         assert!(matches!(added.event_type,    WatchEventType::Added));
         assert!(matches!(modified.event_type, WatchEventType::Modified));
         assert!(matches!(deleted.event_type,  WatchEventType::Deleted));
