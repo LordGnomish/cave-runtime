@@ -20,6 +20,7 @@ cave-controller-manager = { path = "../cave-controller-manager" }
 cave-cloud-controller-manager = { path = "../cave-cloud-controller-manager" }
 cave-cri = { path = "../cave-cri" }
 cave-core = { path = "../cave-core" }
+cave-kernel = { path = "../cave-kernel" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 cave-upstream = { path = "../cave-upstream" }

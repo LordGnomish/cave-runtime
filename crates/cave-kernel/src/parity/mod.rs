@@ -14,10 +14,12 @@
 //! actual file-system to produce a `ParityReport`.
 
 pub mod calculator;
+pub mod discover;
 pub mod manifest;
 pub mod types;
 
 pub use calculator::{FsResolver, ParityCalculator};
+pub use discover::{discover_workspace, DiscoveredReport};
 pub use manifest::ParityManifest;
 pub use types::{GapItem, GapKind, ParityMetric, ParityReport};
 

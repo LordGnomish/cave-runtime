@@ -133,18 +133,16 @@ async fn main() -> anyhow::Result<()> {
     // Start background tasks
     metrics_state.start_background_tasks();
 
-    // Populate parity cache at startup
+    // Populate parity cache at startup by discovering every crate that ships a
+    // `parity.manifest.toml`. The workspace root is taken from
+    // `CAVE_WORKSPACE_ROOT` (defaults to the current working directory).
     {
+        let workspace_root = std::env::var("CAVE_WORKSPACE_ROOT").unwrap_or_else(|_| ".".into());
         let mut cache = portal_state.parity_cache.write().await;
-        if let Ok(r) = cave_etcd::calculate_parity() {
-            cache.insert("etcd".to_string(), r);
+        for d in cave_kernel::parity::discover_workspace(&workspace_root) {
+            cache.insert(d.report.module.clone(), d.report);
         }
-        if let Ok(r) = cave_cri::calculate_parity() {
-            cache.insert("cri".to_string(), r);
-        }
-        if let Ok(r) = cave_apiserver::calculate_parity() {
-            cache.insert("apiserver".to_string(), r);
-        }
+        info!(modules = cache.len(), "parity cache populated from manifests");
     }
 
     let app = Router::new()
