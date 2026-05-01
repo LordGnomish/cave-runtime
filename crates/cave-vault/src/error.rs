@@ -30,6 +30,8 @@ pub enum VaultError {
     Internal(String),
     #[error("lease not found")]
     LeaseNotFound,
+    #[error("lease expired")]
+    LeaseExpired,
     #[error("key not found: {0}")]
     KeyNotFound(String),
     #[error("mount not found: {0}")]

@@ -6,6 +6,21 @@ pub mod error;
 pub mod response;
 pub mod token;
 
+// Earlier-generation top-level modules — the newer subdir versions
+// (`core::*`, `engines::*`) are the active path. These four expose unit
+// tests that previously didn't run; they're kept compileable but are not
+// the canonical surface.
+//
+// Excluded (intentionally left orphan):
+//   * `transit`, `pki`, `database`  — re-exported under `engines::` already
+//     (would collide as top-level mods)
+//   * `routes`                      — references removed `SharedVaultStore` /
+//                                     `VaultStore` / `TransitStore` symbols
+//   * `kv`, `audit`, `models`       — zero unit tests, no activation value
+pub mod lease;
+pub mod policy;
+pub mod shamir;
+
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::sync::RwLock;

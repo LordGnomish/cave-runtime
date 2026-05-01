@@ -192,18 +192,22 @@ impl PolicyEngine {
                 let caps = policy.capabilities_for(path);
                 // Explicit deny overrides everything
                 if caps.contains(&&Capability::Deny) {
-                    return Err(VaultError::PermissionDenied(format!(
-                        "policy '{name}' denies '{cap}' on '{path}'"
-                    )));
+                    // detail in tracing; the canonical VaultError::PermissionDenied
+                    // is a unit variant (sweep-002 cleanup; orphan policy.rs
+                    // assumed the older tuple shape).
+                    tracing::debug!(
+                        policy = %name, capability = %cap, path = %path,
+                        "policy denied"
+                    );
+                    return Err(VaultError::PermissionDenied);
                 }
                 if caps.contains(&cap) || caps.contains(&&Capability::Sudo) {
                     return Ok(());
                 }
             }
         }
-        Err(VaultError::PermissionDenied(format!(
-            "no policy grants '{cap}' on '{path}'"
-        )))
+        tracing::debug!(capability = %cap, path = %path, "no policy grants capability");
+        Err(VaultError::PermissionDenied)
     }
 }
 
