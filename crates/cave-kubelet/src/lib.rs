@@ -42,6 +42,9 @@ pub mod plugin_watcher;
 pub mod topology_manager;
 pub mod volume_reconciler;
 
+// sweep-001 — node-side pod GC (mirrors upstream pkg/kubelet/pod/pod_gc.go).
+pub mod pod_gc;
+
 use agent::KubeletState;
 use std::sync::Arc;
 
