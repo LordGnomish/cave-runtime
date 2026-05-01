@@ -209,7 +209,7 @@ mod tests {
 
     fn cfg(tenant: &str) -> CloudConfig {
         CloudConfig {
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             provider: ProviderName::Azure,
             region: "westeurope".into(),
             credential_ref: "vault://kv/azure-sp".into(),

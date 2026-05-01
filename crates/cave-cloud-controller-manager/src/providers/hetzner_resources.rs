@@ -958,7 +958,7 @@ mod tests {
     #[test]
     fn ssh_key_cross_tenant_register_is_refused() {
         let tenant = tenant_ctx("acme", "hcloud/ssh_key.go", "Create");
-        let attacker = TenantId::new("attacker");
+        let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = HetznerInventory::for_tenant(tenant);
         let err = inv
             .register_ssh_key(&attacker, "deploy", "ssh-ed25519 AAAA")
@@ -1070,7 +1070,7 @@ mod tests {
     #[test]
     fn cross_tenant_network_create_is_refused() {
         let tenant = tenant_ctx("acme", "hcloud/network.go", "Create");
-        let attacker = TenantId::new("attacker");
+        let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = HetznerInventory::for_tenant(tenant);
         let err = inv.create_network(&attacker, "k8s", "10.0.0.0/16").unwrap_err();
         assert!(matches!(err, CloudError::TenantDenied { .. }));
@@ -1121,7 +1121,7 @@ mod tests {
     #[test]
     fn floating_ip_cross_tenant_assign_is_refused() {
         let tenant = tenant_ctx("acme", "hcloud/floating_ip.go", "Assign");
-        let attacker = TenantId::new("attacker");
+        let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = HetznerInventory::for_tenant(tenant.clone());
         let id = inv.allocate_floating_ip(&tenant, FloatingIpType::V4, Location::Fsn1).unwrap();
         let err = inv.assign_floating_ip(&attacker, id, 7).unwrap_err();

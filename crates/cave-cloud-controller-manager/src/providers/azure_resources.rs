@@ -970,7 +970,7 @@ mod tests {
     #[test]
     fn resource_group_cross_tenant_create_is_refused() {
         let tenant = tenant_ctx("acme", "pkg/provider/azure_resourcegroupclient.go", "CreateOrUpdate");
-        let attacker = TenantId::new("attacker");
+        let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = AzureInventory::for_tenant(tenant);
         let err = inv
             .create_resource_group(&attacker, "rg-aks", "westeurope", BTreeMap::new())
@@ -1024,7 +1024,7 @@ mod tests {
     #[test]
     fn managed_identity_cross_tenant_create_is_refused() {
         let tenant = tenant_ctx("acme", "pkg/provider/azure_identity.go", "UserAssignedIdentity");
-        let attacker = TenantId::new("attacker");
+        let attacker = TenantId::new("attacker").expect("test fixture");
         let mut inv = AzureInventory::for_tenant(tenant);
         let err = inv
             .create_user_identity(&attacker, "uami", "rid", "cid")

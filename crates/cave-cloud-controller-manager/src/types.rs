@@ -1,36 +1,18 @@
 //! Shared types for cave-cloud-controller-manager.
 //!
-//! `TenantId` and `Cite` mirror the conventions in `cave-controller-manager`,
-//! but this crate keeps its own copies so it can ship without a kernel
-//! dependency. The intent is identical: every test asserts both, so the
-//! parity audit trail is explicit.
+//! `TenantId` is re-exported from `cave_kernel::ns` (sweep-002 F2-G adoption,
+//! 2026-05-01) — the local copy used to mirror conventions in
+//! `cave-controller-manager`, but the kernel newtype now provides a single
+//! DNS-1123-validated surface across the platform. `Cite` stays local.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+pub use cave_kernel::ns::TenantId;
+
 /// Pinned upstream Kubernetes release this scaffold tracks. The matching
 /// out-of-tree provider versions live in `providers::*::PROVIDER_VERSION`.
 pub const UPSTREAM_VERSION: &str = "v1.36.0";
-
-/// Multi-tenant identifier. Cloud configs, controllers, and providers must
-/// scope every API call and label they write to a tenant.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TenantId(pub String);
-
-impl TenantId {
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl fmt::Display for TenantId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
 
 /// Citation pointing at the upstream source a piece of local code is a parity
 /// port of. `repo` defaults to kubernetes/kubernetes; out-of-tree providers
@@ -127,7 +109,7 @@ macro_rules! test_ctx {
     // k8s upstream
     ($path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::types::Cite::k8s($path, $symbol);
-        let tenant = $crate::types::TenantId::new($tenant);
+        let tenant = $crate::types::TenantId::new($tenant).expect("test fixture: tenant id must be DNS-1123");
         assert_eq!(cite.version, $crate::types::UPSTREAM_VERSION);
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         (cite, tenant)
@@ -135,7 +117,7 @@ macro_rules! test_ctx {
     // out-of-tree provider
     (ext: $repo:expr, $version:expr, $path:expr, $symbol:expr, $tenant:expr) => {{
         let cite = $crate::types::Cite::ext($repo, $path, $symbol, $version);
-        let tenant = $crate::types::TenantId::new($tenant);
+        let tenant = $crate::types::TenantId::new($tenant).expect("test fixture: tenant id must be DNS-1123");
         assert!(!tenant.as_str().is_empty(), "tenant_id must not be empty");
         assert!(cite.version.starts_with('v'), "version must look like a tag");
         (cite, tenant)

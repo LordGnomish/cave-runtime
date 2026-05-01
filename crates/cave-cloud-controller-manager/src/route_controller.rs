@@ -211,7 +211,7 @@ mod tests {
         fn new(tenant: &str, initial: Vec<&str>) -> Self {
             Self {
                 cfg: CloudConfig {
-                    tenant: TenantId::new(tenant),
+                    tenant: TenantId::new(tenant).expect("test fixture"),
                     provider: ProviderName::Hetzner,
                     region: "fsn1".into(),
                     credential_ref: "vault://kv/hcloud".into(),

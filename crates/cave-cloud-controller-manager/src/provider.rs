@@ -226,7 +226,7 @@ mod tests {
 
     fn cfg(tenant: &str, region: &str, cred: &str) -> CloudConfig {
         CloudConfig {
-            tenant: TenantId::new(tenant),
+            tenant: TenantId::new(tenant).expect("test fixture"),
             provider: ProviderName::Hetzner,
             region: region.into(),
             credential_ref: cred.into(),

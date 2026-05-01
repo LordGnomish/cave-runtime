@@ -259,7 +259,7 @@ mod tests {
     fn tenant_denied_is_permanent() {
         ctx("acme", "staging/src/k8s.io/client-go/util/retry/util.go", "IsErrorRetryable");
         let err = CloudError::TenantDenied {
-            tenant: crate::types::TenantId::new("attacker"),
+            tenant: crate::types::TenantId::new("attacker").expect("test fixture"),
             kind: "Service",
             name: "web".into(),
         };
