@@ -1,3 +1,4 @@
+pub mod kernel_bridge;
 pub mod log;
 pub mod membership;
 pub mod messages;

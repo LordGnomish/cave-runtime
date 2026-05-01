@@ -1,19 +1,21 @@
+//! State machine surface — adopted onto `cave_kernel::consensus` (sweep-002 F2-A).
+//!
+//! The local `StateMachine` trait that previously lived here was a structural
+//! duplicate of `cave_kernel::consensus::StateMachine`. It has been removed
+//! and the kernel trait is re-exported as the canonical surface. Concrete
+//! implementations in this module (`NoopStateMachine`, `KvStateMachine`) now
+//! implement the kernel trait directly — apply receives a
+//! `cave_kernel::consensus::LogEntry`, errors are mapped to
+//! `ConsensusError::Storage`, and the cave-ha `LogEntry` (with `entry_type`)
+//! is converted to the kernel projection by the node loop before invocation.
+
 use async_trait::async_trait;
-use crate::error::HaResult;
-use crate::raft::log::LogEntry;
+use cave_kernel::consensus::{ConsensusError, ConsensusResult, LogEntry};
 
-/// Application state machine driven by Raft log entries.
-#[async_trait]
-pub trait StateMachine: Send + Sync + 'static {
-    /// Apply a committed log entry; return the response bytes (may be empty).
-    async fn apply(&self, entry: &LogEntry) -> HaResult<Vec<u8>>;
-
-    /// Serialize the entire state for snapshotting.
-    async fn snapshot(&self) -> HaResult<Vec<u8>>;
-
-    /// Restore state from snapshot data.
-    async fn restore(&self, data: &[u8]) -> HaResult<()>;
-}
+/// State machine trait re-exported from `cave_kernel::consensus`. This was
+/// previously a duplicate trait local to cave-ha; sweep-002 F2-A removed
+/// the duplicate and aligned downstream code on the kernel surface.
+pub use cave_kernel::consensus::StateMachine;
 
 /// A no-op state machine for testing and bootstrapping.
 #[derive(Default)]
@@ -21,15 +23,15 @@ pub struct NoopStateMachine;
 
 #[async_trait]
 impl StateMachine for NoopStateMachine {
-    async fn apply(&self, _entry: &LogEntry) -> HaResult<Vec<u8>> {
+    async fn apply(&self, _entry: &LogEntry) -> ConsensusResult<Vec<u8>> {
         Ok(vec![])
     }
 
-    async fn snapshot(&self) -> HaResult<Vec<u8>> {
+    async fn snapshot(&self) -> ConsensusResult<Vec<u8>> {
         Ok(vec![])
     }
 
-    async fn restore(&self, _data: &[u8]) -> HaResult<()> {
+    async fn restore(&self, _data: &[u8]) -> ConsensusResult<()> {
         Ok(())
     }
 }
@@ -61,11 +63,12 @@ enum KvCommand {
 
 #[async_trait]
 impl StateMachine for KvStateMachine {
-    async fn apply(&self, entry: &LogEntry) -> HaResult<Vec<u8>> {
+    async fn apply(&self, entry: &LogEntry) -> ConsensusResult<Vec<u8>> {
         if entry.data.is_empty() {
             return Ok(vec![]);
         }
-        let cmd: KvCommand = serde_json::from_slice(&entry.data)?;
+        let cmd: KvCommand = serde_json::from_slice(&entry.data)
+            .map_err(|e| ConsensusError::Storage(format!("kv decode: {e}")))?;
         let mut store = self.inner.write().await;
         match cmd {
             KvCommand::Set { key, value } => { store.insert(key, value); }
@@ -74,13 +77,15 @@ impl StateMachine for KvStateMachine {
         Ok(vec![])
     }
 
-    async fn snapshot(&self) -> HaResult<Vec<u8>> {
+    async fn snapshot(&self) -> ConsensusResult<Vec<u8>> {
         let store = self.inner.read().await;
-        Ok(serde_json::to_vec(&*store)?)
+        serde_json::to_vec(&*store)
+            .map_err(|e| ConsensusError::Storage(format!("kv encode: {e}")))
     }
 
-    async fn restore(&self, data: &[u8]) -> HaResult<()> {
-        let map: std::collections::HashMap<String, String> = serde_json::from_slice(data)?;
+    async fn restore(&self, data: &[u8]) -> ConsensusResult<()> {
+        let map: std::collections::HashMap<String, String> = serde_json::from_slice(data)
+            .map_err(|e| ConsensusError::Storage(format!("kv restore: {e}")))?;
         *self.inner.write().await = map;
         Ok(())
     }

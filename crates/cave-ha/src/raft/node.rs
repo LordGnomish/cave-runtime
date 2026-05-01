@@ -1000,7 +1000,8 @@ impl RaftNode {
             };
             match entry.entry_type {
                 EntryType::Normal | EntryType::Barrier => {
-                    if let Err(e) = self.state_machine.apply(&entry).await {
+                    let kernel_entry = crate::raft::kernel_bridge::to_kernel_entry(&entry);
+                    if let Err(e) = self.state_machine.apply(&kernel_entry).await {
                         warn!(id = self.id, index = self.last_applied, "apply error: {e}");
                     }
                 }
