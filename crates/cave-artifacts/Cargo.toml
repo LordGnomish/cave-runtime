@@ -27,3 +27,6 @@ base64 = { workspace = true }
 regex = { workspace = true }
 futures = { workspace = true }
 url = "2"
+
+[dev-dependencies]
+tower = { workspace = true }

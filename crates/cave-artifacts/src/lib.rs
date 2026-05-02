@@ -1,16 +1,19 @@
 //! cave-artifacts — consolidated artifact repository platform.
 //!
 //! Bundles best-of-breed upstream parities under one crate, mirroring the
-//! cave-streams pattern of merging Kafka + Pulsar surfaces:
+//! cave-streams pattern of merging multiple upstream surfaces:
 //! - `harbor` — container registry (Harbor v2 + Docker Registry V2 + OCI)
 //! - `pulp`   — multi-format artifact repository (Pulp v3 — RPM/Deb/PyPI/etc.)
-//! - `nexus`  — universal binary repository (Sonatype Nexus 3) [Faz 2]
+//! - `nexus`  — universal binary repository (Sonatype Nexus 3) — initial
+//!              port: repository/component/asset/cleanup/routing + raw
+//!              format end-to-end; remaining format adapters land later
 //!
 //! Surfaces:
 //! - [`ArtifactsState`] — combined module state graph
 //! - [`router`]         — combined axum Router merging all sub-modules
 
 pub mod harbor;
+pub mod nexus;
 pub mod pulp;
 
 use axum::{routing::get, Json, Router};
@@ -24,6 +27,7 @@ use std::sync::Arc;
 pub struct ArtifactsState {
     pub harbor: Arc<harbor::RegistryState>,
     pub pulp: Arc<pulp::ArtifactsState>,
+    pub nexus: Arc<nexus::NexusState>,
 }
 
 impl Default for ArtifactsState {
@@ -31,14 +35,16 @@ impl Default for ArtifactsState {
         Self {
             harbor: Arc::new(harbor::RegistryState::default()),
             pulp: Arc::new(pulp::ArtifactsState::default()),
+            nexus: Arc::new(nexus::NexusState::default()),
         }
     }
 }
 
-/// Build the combined axum router (harbor ∪ pulp ∪ /api/artifacts/health).
+/// Build the combined axum router (harbor ∪ pulp ∪ nexus ∪ /api/artifacts/health).
 pub fn router(state: Arc<ArtifactsState>) -> Router {
     harbor::router(Arc::clone(&state.harbor))
         .merge(pulp::router(Arc::clone(&state.pulp)))
+        .merge(nexus::router(Arc::clone(&state.nexus)))
         .merge(health_router())
 }
 
@@ -54,6 +60,7 @@ fn health_router() -> Router {
                 "subsystems": {
                     "harbor": harbor::MODULE_NAME,
                     "pulp":   pulp::MODULE_NAME,
+                    "nexus":  nexus::MODULE_NAME,
                 }
             }))
         }),
