@@ -421,6 +421,25 @@ enum GatewayCmd {
     Plugins,
     /// Show gateway traffic stats
     Stats,
+    /// Gravitee API / plan / application / subscription management
+    Gravitee {
+        #[command(subcommand)]
+        cmd: GraviteeCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum GraviteeCmd {
+    /// List Gravitee APIs
+    Apis,
+    /// List Gravitee plans
+    Plans,
+    /// List Gravitee applications
+    Applications,
+    /// List Gravitee subscriptions
+    Subscriptions,
+    /// List Portal-visible (Public + Published) APIs
+    Portal,
 }
 
 #[derive(Subcommand)]
@@ -1714,6 +1733,13 @@ async fn run(cli: Cli) -> Result<()> {
             GatewayCmd::Services => c.get("/api/gateway/services").await,
             GatewayCmd::Plugins => c.get("/api/gateway/plugins").await,
             GatewayCmd::Stats => c.get("/api/gateway/stats").await,
+            GatewayCmd::Gravitee { cmd } => match cmd {
+                GraviteeCmd::Apis => c.get("/api/gateway/gravitee/apis").await,
+                GraviteeCmd::Plans => c.get("/api/gateway/gravitee/plans").await,
+                GraviteeCmd::Applications => c.get("/api/gateway/gravitee/applications").await,
+                GraviteeCmd::Subscriptions => c.get("/api/gateway/gravitee/subscriptions").await,
+                GraviteeCmd::Portal => c.get("/api/gateway/gravitee/portal/apis").await,
+            },
         },
 
         // ── Pg ────────────────────────────────────────────────────────────────

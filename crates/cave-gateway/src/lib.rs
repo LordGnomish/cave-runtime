@@ -123,10 +123,17 @@ pub fn admin_router(state: Arc<GatewayState>) -> Router {
         // .nest("", admin::admin_router(state.store.clone()))
 }
 
+/// Build the Gravitee API/plan/application/subscription router.
+pub fn gravitee_router(state: Arc<GatewayState>) -> Router {
+    gravitee::apis::router(state.store.clone())
+}
+
 /// Create a unified router with all gateway components merged.
-/// In production, Admin and proxy planes typically run on separate ports.
+/// In production, Admin / Gravitee / proxy planes typically run on
+/// separate ports.
 pub fn router(state: Arc<GatewayState>) -> Router {
     Router::new()
         .merge(admin_router(state.clone()))
+        .merge(gravitee_router(state.clone()))
         .merge(proxy_router(state))
 }
