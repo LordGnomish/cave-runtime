@@ -1,27 +1,11 @@
 [package]
 name = "cave-registry"
-description = "Docker/OCI/Harbor-compatible container registry — compatible with Harbor"
+description = "Container registry — Harbor-compatible (alias for cave_artifacts::harbor)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core  = { path = "../cave-core" }
-cave-auth  = { path = "../cave-auth" }
-cave-db    = { path = "../cave-db" }
-axum       = { workspace = true }
-serde      = { workspace = true }
-serde_json = { workspace = true }
-tokio      = { workspace = true }
-tracing    = { workspace = true }
-uuid       = { workspace = true }
-chrono     = { workspace = true }
-thiserror  = { workspace = true }
-sha2       = "0.10"
-hex        = "0.4"
-bytes      = "1"
-base64     = "0.22"
-reqwest    = { workspace = true }
-futures    = { workspace = true }
-url        = "2"
-regex      = { workspace = true }
+# As of the multi-upstream consolidation, all logic lives in cave-artifacts.
+# This crate now exists as a thin alias re-exporting cave_artifacts::harbor.
+cave-artifacts = { path = "../cave-artifacts" }

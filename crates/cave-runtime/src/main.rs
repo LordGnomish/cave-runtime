@@ -69,7 +69,8 @@ async fn main() -> anyhow::Result<()> {
     let profiler_state = Arc::new(cave_profiler::State::default());
 
     // Phase 4 states
-    let registry_state = Arc::new(cave_registry::RegistryState::default());
+    // (cave_registry::RegistryState lives inside cave_artifacts::harbor as of the
+    //  multi-upstream consolidation; mounted via cave_artifacts::router below.)
     let workflows_state = Arc::new(cave_workflows::State::default());
     let scan_state = Arc::new(cave_scan::State::default());
     let portal_state = Arc::new(cave_portal::PortalState::default());
@@ -198,7 +199,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_alerts::router(alerts_state))
         .merge(cave_profiler::router(profiler_state))
         // Phase 4
-        .merge(cave_registry::router(registry_state))
+        // cave_registry routes are now served by cave_artifacts::router (harbor sub-module).
         .merge(cave_workflows::router(workflows_state))
         .merge(cave_scan::router(scan_state))
         .merge(cave_portal::router(portal_state))

@@ -1,6 +1,6 @@
 [package]
 name = "cave-artifacts"
-description = "Artifact repository — compatible with Pulp (v3 API)"
+description = "Consolidated artifact platform — Harbor + Pulp + Nexus parity (best-of-breed)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -19,3 +19,11 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 reqwest = { workspace = true }
+# Harbor / OCI / Docker V2 deps (moved from cave-registry on consolidation)
+sha2 = { workspace = true }
+hex = { workspace = true }
+bytes = { workspace = true }
+base64 = { workspace = true }
+regex = { workspace = true }
+futures = { workspace = true }
+url = "2"

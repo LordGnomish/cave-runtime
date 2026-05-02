@@ -1,53 +1,61 @@
-//! CAVE Artifacts — Pulp v3-compatible artifact repository engine.
+//! cave-artifacts — consolidated artifact repository platform.
 //!
-//! Compatible with: Pulp
-//! Implements: Repository CRUD, versions, content types (RPM/Debian/PyPI/OCI/
-//! File/Ansible/Maven), remotes, distributions, publications, content guards,
-//! chunked upload, async task queue, import/export, signing, RBAC, repair.
+//! Bundles best-of-breed upstream parities under one crate, mirroring the
+//! cave-streams pattern of merging Kafka + Pulsar surfaces:
+//! - `harbor` — container registry (Harbor v2 + Docker Registry V2 + OCI)
+//! - `pulp`   — multi-format artifact repository (Pulp v3 — RPM/Deb/PyPI/etc.)
+//! - `nexus`  — universal binary repository (Sonatype Nexus 3) [Faz 2]
+//!
+//! Surfaces:
+//! - [`ArtifactsState`] — combined module state graph
+//! - [`router`]         — combined axum Router merging all sub-modules
 
-pub mod content;
-pub mod distribution;
-pub mod models;
-pub mod rbac;
-pub mod repair;
-pub mod repository;
-pub mod routes;
-pub mod signing;
-pub mod tasks;
-pub mod upload;
+pub mod harbor;
+pub mod pulp;
 
-use axum::Router;
-use cave_db::CavePool;
+use axum::{routing::get, Json, Router};
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
-pub use models::*;
-
+/// Combined state graph composing one Arc per upstream sub-module.
+///
+/// Each field is independently constructible and exposed publicly so callers
+/// that only need one upstream (e.g. `cave-registry` alias re-export of harbor)
+/// can build it in isolation without paying for the others.
 pub struct ArtifactsState {
-    pub pool: Arc<CavePool>,
-    pub task_queue: Arc<tasks::TaskQueue>,
-}
-
-impl ArtifactsState {
-    pub fn new(pool: Arc<CavePool>) -> Arc<Self> {
-        Arc::new(Self {
-            pool,
-            task_queue: Arc::new(tasks::TaskQueue::new()),
-        })
-    }
+    pub harbor: Arc<harbor::RegistryState>,
+    pub pulp: Arc<pulp::ArtifactsState>,
 }
 
 impl Default for ArtifactsState {
     fn default() -> Self {
         Self {
-            pool: Arc::new(cave_db::CavePool::mock()),
-            task_queue: Arc::new(tasks::TaskQueue::new()),
+            harbor: Arc::new(harbor::RegistryState::default()),
+            pulp: Arc::new(pulp::ArtifactsState::default()),
         }
     }
 }
 
+/// Build the combined axum router (harbor ∪ pulp ∪ /api/artifacts/health).
 pub fn router(state: Arc<ArtifactsState>) -> Router {
-    routes::create_router(state)
+    harbor::router(Arc::clone(&state.harbor))
+        .merge(pulp::router(Arc::clone(&state.pulp)))
+        .merge(health_router())
 }
 
 pub const MODULE_NAME: &str = "artifacts";
+
+fn health_router() -> Router {
+    Router::new().route(
+        "/api/artifacts/health",
+        get(|| async {
+            Json(serde_json::json!({
+                "status": "ok",
+                "module": MODULE_NAME,
+                "subsystems": {
+                    "harbor": harbor::MODULE_NAME,
+                    "pulp":   pulp::MODULE_NAME,
+                }
+            }))
+        }),
+    )
+}
