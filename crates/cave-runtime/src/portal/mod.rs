@@ -7,13 +7,13 @@
 //! wiring; each sub-module owns its routes and inline tests.
 
 pub mod auth;
+pub mod upstream;
 
 use axum::Router;
 
-/// Build the combined portal router (auth-only at this point;
-/// tracker / ADR / attribution land in follow-up commits).
+/// Build the combined portal router (auth + upstream tracker).
 pub fn router() -> Router {
-    Router::new().merge(auth::router())
+    Router::new().merge(auth::router()).merge(upstream::router())
 }
 
 /// Resolve the workspace root used by upstream/ADR/attribution handlers.
