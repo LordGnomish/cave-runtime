@@ -595,3 +595,327 @@ category      = "CLI"
 reason        = "codegen + spec tools"
 
 # ─── Unmapped (acknowledged port gaps) ───────────────────────────────────────
+
+# ── Calculator-format mappings (for cave-kernel parity calculator) ──────────
+# The [[mapped]] / [[skipped]] sections above use a sprint-internal contract.
+# The sections below feed the workspace `ParityCalculator` (file/function/
+# test/surface dimensions) so cave-net registers on the parity dashboard.
+
+[[files]]
+upstream = "daemon/cmd/daemon_main.go"
+local    = "src/lib.rs"
+
+[[files]]
+upstream = "pkg/datapath/types/datapath.go"
+local    = "src/dataplane.rs"
+
+[[files]]
+upstream = "pkg/policy/api/types.go"
+local    = "src/models.rs"
+
+[[files]]
+upstream = "api/v1/server/server.go"
+local    = "src/routes.rs"
+
+[[files]]
+upstream = "api/v1/server/restapi/cilium_api.go"
+local    = "src/cilium/agent_api.rs"
+
+[[files]]
+upstream = "pkg/ipam/manager.go"
+local    = "src/cilium/ipam.rs"
+
+[[files]]
+upstream = "pkg/auth/manager.go"
+local    = "src/cilium/auth.rs"
+
+[[files]]
+upstream = "pkg/policy/repository.go"
+local    = "src/cilium/policy.rs"
+
+[[files]]
+upstream = "pkg/identity/cache.go"
+local    = "src/cilium/identity.rs"
+
+[[files]]
+upstream = "pkg/endpoint/endpoint.go"
+local    = "src/cilium/endpoint.rs"
+
+[[files]]
+upstream = "pkg/endpointmanager/manager.go"
+local    = "src/cilium/endpoint_mgr.rs"
+
+[[files]]
+upstream = "pkg/clustermesh/clustermesh.go"
+local    = "src/cilium/clustermesh.rs"
+
+[[files]]
+upstream = "pkg/hubble/observer/observer.go"
+local    = "src/cilium/hubble.rs"
+
+[[files]]
+upstream = "pkg/health/health.go"
+local    = "src/cilium/health.rs"
+
+[[files]]
+upstream = "pkg/bgp/manager.go"
+local    = "src/cilium/bgp.rs"
+
+[[files]]
+upstream = "pkg/envoy/envoy.go"
+local    = "src/cilium/envoy.rs"
+
+[[files]]
+upstream = "pkg/fqdn/proxy/proxy.go"
+local    = "src/cilium/dns_proxy.rs"
+
+[[files]]
+upstream = "pkg/ipcache/ipcache.go"
+local    = "src/cilium/ipcache.rs"
+
+[[files]]
+upstream = "pkg/maps/ctmap/ctmap.go"
+local    = "src/cilium/conntrack.rs"
+
+[[files]]
+upstream = "pkg/maps/nat/nat.go"
+local    = "src/cilium/nat.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "AllocateNext"
+local_name    = "allocate_pod_ip"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "Release"
+local_name    = "release_pod_ip"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "UpsertService"
+local_name    = "register_service"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "DeleteService"
+local_name    = "remove_service"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "UpdateBackendsState"
+local_name    = "update_endpoints"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "AddListLocked"
+local_name    = "apply_policy"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "DeleteByLabelsLocked"
+local_name    = "remove_policy"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "ResolvePolicyLocked"
+local_name    = "check_policy"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "OnDecodedFlow"
+local_name    = "record_flow"
+file          = "src/dataplane.rs"
+
+[[functions]]
+upstream_name = "NewServer"
+local_name    = "create_router"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "Routes"
+local_name    = "canonical_routes"
+file          = "src/cilium/agent_api.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestPodEvent"
+local_test    = "test_pod_network"
+
+[[tests]]
+upstream_test = "TestServiceEntry"
+local_test    = "test_service_entry"
+
+[[tests]]
+upstream_test = "TestPolicyDefaultDeny"
+local_test    = "test_network_policy_default_deny"
+
+[[tests]]
+upstream_test = "TestFlowRecord"
+local_test    = "test_flow_record"
+
+[[tests]]
+upstream_test = "TestAllocateIP"
+local_test    = "test_allocate_pod_ip"
+
+[[tests]]
+upstream_test = "TestReleaseIP"
+local_test    = "test_release_pod_ip"
+
+[[tests]]
+upstream_test = "TestServiceUpsert"
+local_test    = "test_service_registration"
+
+[[tests]]
+upstream_test = "TestNoPoliciesAllow"
+local_test    = "test_default_allow_no_policies"
+
+[[tests]]
+upstream_test = "TestEmptyIngressDeny"
+local_test    = "test_default_deny_with_empty_ingress"
+
+[[tests]]
+upstream_test = "TestFlowParse"
+local_test    = "test_flow_recording"
+
+[[tests]]
+upstream_test = "TestIPAllocationStride"
+local_test    = "test_pod_ip_allocation_crosses_third_octet"
+
+[[tests]]
+upstream_test = "TestDeleteServiceDropsEntry"
+local_test    = "test_remove_service_drops_entry"
+
+[[tests]]
+upstream_test = "TestEndpointsReplace"
+local_test    = "test_update_endpoints_replaces_set"
+
+[[tests]]
+upstream_test = "TestPolicyRoundTrip"
+local_test    = "test_apply_then_remove_policy_round_trip"
+
+[[tests]]
+upstream_test = "TestSelectorScopesMatch"
+local_test    = "test_check_policy_pod_selector_scopes_match"
+
+[[tests]]
+upstream_test = "TestSelectorScopesDeny"
+local_test    = "test_check_policy_pod_selector_match_denies"
+
+[[tests]]
+upstream_test = "TestPolicyNamespaceIsolation"
+local_test    = "test_check_policy_isolated_per_namespace"
+
+[[tests]]
+upstream_test = "TestReleaseNamespaceScoped"
+local_test    = "test_release_pod_ip_is_namespace_scoped"
+
+[[tests]]
+upstream_test = "TestEndpointKindLabels"
+local_test    = "test_kind_labels_match_cli_output"
+
+[[tests]]
+upstream_test = "TestSerdeRoundTrip"
+local_test    = "test_serde_round_trip"
+
+[[tests]]
+upstream_test = "TestAuthModeDisabled"
+local_test    = "auth_mode_disabled_resolves_to_not_required"
+
+[[tests]]
+upstream_test = "TestAuthModeAlwaysFail"
+local_test    = "auth_mode_always_fail_resolves_to_denied"
+
+[[tests]]
+upstream_test = "TestSpireSVIDRegister"
+local_test    = "svid_register_valid_succeeds"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# Cilium agent v1 REST routes (declared in src/cilium/agent_api.rs).
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/healthz"
+local_path    = "/v1/healthz"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/endpoint"
+local_path    = "/v1/endpoint"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/endpoint/{id}"
+local_path    = "/v1/endpoint/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/policy"
+local_path    = "/v1/policy"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/service"
+local_path    = "/v1/service"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/service/{id}"
+local_path    = "/v1/service/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/identity"
+local_path    = "/v1/identity"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/identity/{id}"
+local_path    = "/v1/identity/{id}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/cluster/nodes"
+local_path    = "/v1/cluster/nodes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/fqdn/cache"
+local_path    = "/v1/fqdn/cache"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/ipam"
+local_path    = "/v1/ipam"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/config"
+local_path    = "/v1/config"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/metrics"
+local_path    = "/v1/metrics"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/map"
+local_path    = "/v1/map"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/healthz"
+local_path    = "/api/net/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/endpoint (POST)"
+local_path    = "/api/net/pods"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/policy/check"
+local_path    = "/api/net/check"
