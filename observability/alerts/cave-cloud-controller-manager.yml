@@ -1,144 +1,97 @@
-# Alerts for cave-cloud-controller-manager (cloud-provider integration).
-#
-# Each alert references a runbook under `docs/runbooks/cave-cloud-controller-manager/`
-# and is annotated with `tenant_scoped: "true"` where the metric is keyed by
-# tenant — Alertmanager fan-out routes by that label.
-
+# Cloud reconciler
 groups:
-  - name: cave-cloud-controller-manager-cloud-api
+  - name: cave-cloud-controller-manager-slo
     interval: 30s
     rules:
-      - alert: CloudApiLatencyHigh
-        expr: |
-          histogram_quantile(
-            0.99,
-            sum(rate(cloud_controller_manager_cloud_api_duration_seconds_bucket{job="cave-cloud-controller-manager"}[5m])) by (le, provider, api)
-          ) > 5
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "ccm: {{ $labels.provider }}/{{ $labels.api }} p99 > 5s"
-          description: "p99 latency for {{ $labels.api }} on {{ $labels.provider }} stayed > 5s for 10m — provider SDK is degraded."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/cloud-api-latency.md"
-
-      - alert: CloudApiErrorRateHigh
-        expr: |
-          sum(rate(cloud_controller_manager_cloud_api_errors_total{job="cave-cloud-controller-manager"}[5m])) by (provider)
-          /
-          (sum(rate(cloud_controller_manager_cloud_api_calls_total{job="cave-cloud-controller-manager"}[5m])) by (provider) + 1e-9)
-          > 0.1
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "ccm: {{ $labels.provider }} error rate > 10%"
-          description: "More than 10% of cloud SDK calls to {{ $labels.provider }} errored in the last 5m."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/cloud-api-errors.md"
-
-  - name: cave-cloud-controller-manager-node-sync
-    interval: 30s
-    rules:
-      - alert: NodeSyncStalled
+      - alert: CloudControllerManagerSloBurnRateFast
         expr: |
           (
-            sum(cloud_controller_manager_instances_tracked{job="cave-cloud-controller-manager"}) > 0
-          ) and (
-            sum(rate(cloud_controller_manager_node_sync_total{job="cave-cloud-controller-manager"}[10m])) < 0.001
-          )
+            sum(rate(ccm_total{job="cave-cloud-controller-manager",code=~"5.."}[1h]))
+            /
+            sum(rate(ccm_total{job="cave-cloud-controller-manager"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-cloud-controller-manager fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/slo-burn-fast.md"
+      - alert: CloudControllerManagerSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(ccm_total{job="cave-cloud-controller-manager",code=~"5.."}[6h]))
+            /
+            sum(rate(ccm_total{job="cave-cloud-controller-manager"}[6h]))
+          ) > (6 * 0.001)
         for: 15m
         labels:
           severity: warning
+          tenant_scoped: "true"
         annotations:
-          summary: "ccm node sync stalled"
-          description: "Cloud node controller has not run a sync pass in 15m although instances are tracked — controller may be stuck."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/node-sync-stalled.md"
-
-      - alert: InstanceStateMismatch
+          summary: "cave-cloud-controller-manager slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/slo-burn-slow.md"
+      - alert: CloudControllerManagerErrorBudgetLow
         expr: |
-          sum(cloud_controller_manager_instance_state_mismatch{job="cave-cloud-controller-manager"}) > 0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "ccm: instance state mismatches present"
-          description: "{{ $value }} node(s) report a cloud state ≠ kube state for > 10m — Shutdown / Unreachable / NotFound nodes are being deferred."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/instance-state-mismatch.md"
-
-  - name: cave-cloud-controller-manager-loadbalancer
-    interval: 30s
-    rules:
-      - alert: LbSyncFailures
-        expr: |
-          sum(rate(cloud_controller_manager_lb_sync_errors_total{job="cave-cloud-controller-manager"}[5m])) by (provider, phase) > 0.1
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: "ccm LB sync failing — {{ $labels.provider }} {{ $labels.phase }}"
-          description: "{{ $labels.provider }} EnsureLoadBalancer/Update/Delete (phase={{ $labels.phase }}) failed > 0.1/s for 10m."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/lb-sync.md"
-
-  - name: cave-cloud-controller-manager-routes
-    interval: 30s
-    rules:
-      - alert: RouteBlackholePersistent
-        expr: |
-          max(cloud_controller_manager_route_blackhole_count{job="cave-cloud-controller-manager"}) > 0
+          (
+            1 -
+            (sum(rate(ccm_total{job="cave-cloud-controller-manager",code=~"5.."}[7d]))
+              / sum(rate(ccm_total{job="cave-cloud-controller-manager"}[7d])))
+          ) < 0.999
         for: 30m
         labels:
           severity: warning
         annotations:
-          summary: "ccm route blackhole persistent"
-          description: "{{ $value }} cloud route(s) without a live node remained for 30m — pod traffic blackholed."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/route-blackhole.md"
-
-  - name: cave-cloud-controller-manager-iam
-    interval: 30s
-    rules:
-      - alert: IamTokenExpiring
+          summary: "cave-cloud-controller-manager 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/error-budget.md"
+      - alert: CloudControllerManagerLatencyP99High
         expr: |
-          (cloud_controller_manager_iam_token_expires_at{job="cave-cloud-controller-manager"} - time()) < 300
-        for: 1m
+          histogram_quantile(
+            0.99,
+            sum(rate(ccm_duration_seconds_bucket{job="cave-cloud-controller-manager"}[5m])) by (le)
+          ) > 1
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "ccm: {{ $labels.provider }} IAM token < 5min remaining"
-          description: "{{ $labels.provider }} cloud IAM token expires in < 5m — refresh path may be broken."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/iam-token-expiring.md"
-
-      - alert: CloudCredentialsInvalid
-        expr: |
-          sum(rate(cloud_controller_manager_iam_token_refresh_total{job="cave-cloud-controller-manager",status="failed"}[10m])) by (provider) > 0
+          summary: "cave-cloud-controller-manager p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/latency.md"
+      - alert: CloudControllerManagerSaturationHigh
+        expr: 'sum(ccm_inflight_requests{job="cave-cloud-controller-manager"}) > 400'
         for: 5m
         labels:
-          severity: critical
+          severity: warning
         annotations:
-          summary: "ccm: {{ $labels.provider }} credentials invalid"
-          description: "{{ $labels.provider }} IAM token refresh failing > 0/s for 5m — cloud credentials likely revoked or rotated."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/cloud-credentials.md"
-
-  - name: cave-cloud-controller-manager-region
-    interval: 30s
-    rules:
-      - alert: RegionUnreachable
-        expr: |
-          sum(rate(cloud_controller_manager_cloud_api_errors_total{job="cave-cloud-controller-manager",code=~"5.."}[5m])) by (provider, region) > 1
+          summary: "cave-cloud-controller-manager inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/saturation.md"
+      - alert: CloudControllerManagerMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-cloud-controller-manager"} > 4 * 1024 * 1024 * 1024'
         for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cloud-controller-manager RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/memory.md"
+      - alert: CloudControllerManagerCardinalityExplosion
+        expr: 'count(count by (tenant_id) (ccm_total{job="cave-cloud-controller-manager"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-cloud-controller-manager tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/cardinality.md"
+      - alert: CloudControllerManagerHealthProbeFailing
+        expr: 'min(up{job="cave-cloud-controller-manager"}) < 1'
+        for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "ccm: {{ $labels.provider }} region {{ $labels.region }} unreachable"
-          description: "5xx error rate from {{ $labels.region }} > 1/s for 10m — region likely degraded; expect failover."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/region-unreachable.md"
-
-      - alert: RegionFailoverFlapping
-        expr: |
-          sum(increase(cloud_controller_manager_region_failover_total{job="cave-cloud-controller-manager"}[1h])) > 3
-        for: 10m
-        labels:
-          severity: critical
-        annotations:
-          summary: "ccm region failover flapping"
-          description: "More than 3 region failovers in the last 1h — cluster ping-ponging between providers/regions."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/region-flapping.md"
+          summary: "cave-cloud-controller-manager health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cloud-controller-manager/health.md"

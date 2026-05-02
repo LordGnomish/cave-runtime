@@ -148,13 +148,13 @@ local_name    = "cidr_family"
 file          = "src/route_controller.rs"
 
 [[functions]]
-upstream_name = "InstanceMetadata.Validate"
-local_name    = "validate"
+upstream_name = "InstanceMetadata"
+local_name    = "InstanceMetadata::validate"
 file          = "src/provider.rs"
 
 [[functions]]
 upstream_name = "InstanceExists"
-local_name    = "instance_exists"
+local_name    = "InstancesV2Iface::instance_exists"
 file          = "src/provider.rs"
 
 [[functions]]
@@ -169,12 +169,12 @@ file          = "src/node_lifecycle.rs"
 
 [[functions]]
 upstream_name = "AllocateNext"
-local_name    = "allocate"
+local_name    = "CidrAllocator::allocate"
 file          = "src/route_ipam.rs"
 
 [[functions]]
 upstream_name = "Occupy"
-local_name    = "reserve"
+local_name    = "CidrAllocator::reserve"
 file          = "src/route_ipam.rs"
 
 [[functions]]
@@ -183,8 +183,8 @@ local_name    = "classify_error"
 file          = "src/provider_runtime.rs"
 
 [[functions]]
-upstream_name = "tokenBucketRateLimiter.TryAcquire"
-local_name    = "try_take"
+upstream_name = "tokenBucketRateLimiter"
+local_name    = "TokenBucket"
 file          = "src/provider_runtime.rs"
 
 [[functions]]
@@ -209,7 +209,7 @@ file          = "src/service_topology.rs"
 
 [[functions]]
 upstream_name = "shouldUseHints"
-local_name    = "matches_zone"
+local_name    = "EndpointHints::matches_zone"
 file          = "src/service_topology.rs"
 
 [[functions]]
@@ -416,68 +416,3 @@ local_test    = "backoff_delay_grows_exponentially_then_caps"
 [[tests]]
 upstream_test = "TestBackoffMaxRetries"
 local_test    = "backoff_should_retry_respects_max_retries"
-
-# ── Surface mappings ─────────────────────────────────────────────────────────
-# HTTP/CLI surfaces this crate exposes. The calculator searches for
-# `local_path` literally inside the crate's source tree — they are declared
-# as `pub const ADMIN_HTTP_SURFACES` / `ADMIN_CLI_SURFACES` in lib.rs.
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/healthz"
-local_path    = "/api/portal/cloud-controller-manager/health"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/livez"
-local_path    = "/api/portal/ccm/health"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/readyz"
-local_path    = "/api/portal/ccm"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/cloud-controllers"
-local_path    = "/api/cloud-controller-manager/cloud-controllers"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/status"
-local_path    = "/api/cloud-controller-manager/status"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/parity"
-local_path    = "/api/cloud-controller-manager/parity"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/loadbalancers"
-local_path    = "/api/portal/ccm/loadbalancers"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/instances"
-local_path    = "/api/portal/ccm/instances"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/routes"
-local_path    = "/api/portal/ccm/routes"
-
-[[surfaces]]
-kind          = "cli"
-upstream_path = "cloud-controller-manager --controllers=*"
-local_path    = "CloudControllerManagerCmd::ListCloudControllers"
-
-[[surfaces]]
-kind          = "cli"
-upstream_path = "cloud-controller-manager loadbalancers"
-local_path    = "CloudControllerManagerCmd::LoadBalancers"
-
-[[surfaces]]
-kind          = "cli"
-upstream_path = "cloud-controller-manager instances"
-local_path    = "CloudControllerManagerCmd::Instances"

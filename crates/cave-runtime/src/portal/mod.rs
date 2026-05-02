@@ -9,26 +9,17 @@
 pub mod adr;
 pub mod attribution;
 pub mod auth;
-pub mod cloud_controller_manager;
-pub mod controller_manager;
 pub mod upstream;
 
 use axum::Router;
-use std::sync::Arc;
 
-/// Build the combined portal router (auth + upstream + ADR + attribution +
-/// controller-manager + cloud-controller-manager).
-pub fn router(
-    cm_state: Arc<controller_manager::ControllerManagerPortal>,
-    ccm_state: Arc<cloud_controller_manager::CcmPortal>,
-) -> Router {
+/// Build the combined portal router (auth + upstream + ADR + attribution).
+pub fn router() -> Router {
     Router::new()
         .merge(auth::router())
         .merge(upstream::router())
         .merge(adr::router())
         .merge(attribution::router())
-        .merge(controller_manager::router(cm_state))
-        .merge(cloud_controller_manager::router(ccm_state))
 }
 
 /// Resolve the workspace root used by upstream/ADR/attribution handlers.

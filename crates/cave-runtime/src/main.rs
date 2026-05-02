@@ -133,11 +133,6 @@ async fn main() -> anyhow::Result<()> {
     let rdbms_state = cave_rdbms::new_state();
     let kamaji_state = Arc::new(cave_kamaji::KamajiState::default());
 
-    // controller-manager portal — owns per-controller workqueues + bounded event ring.
-    let cm_portal_state = Arc::new(portal::controller_manager::ControllerManagerPortal::new());
-    // cloud-controller-manager portal — owns LB / instance / route inventories.
-    let ccm_portal_state = Arc::new(portal::cloud_controller_manager::CcmPortal::new());
-
     // Start background tasks
     metrics_state.start_background_tasks();
 
@@ -267,9 +262,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_kamaji::router(kamaji_state))
         // Auth endpoints
         .merge(cave_auth::auth_routes::router())
-        // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution,
-        // controller-manager + cloud-controller-manager admin (in-process state).
-        .merge(portal::router(cm_portal_state, ccm_portal_state))
+        // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution
+        .merge(portal::router())
         // JWT auth middleware
         .layer(axum::middleware::from_fn(|mut req: axum::extract::Request, next: axum::middleware::Next| async move {
             let state = req.extensions().get::<Arc<cave_auth::jwt_middleware::AuthState>>().cloned();

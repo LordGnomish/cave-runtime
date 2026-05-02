@@ -1672,15 +1672,6 @@ enum ControllerManagerCmd {
     Parity,
     /// Liveness probe (/api/portal/controller-manager/health).
     Health,
-    /// Inspect per-controller workqueue depth + retries. Pass `--controller`
-    /// to drill into one controller, omit for the per-controller summary.
-    QueuesInspect {
-        /// Controller name (e.g. `deployment`, `replicaset`, `hpa`).
-        #[arg(long)]
-        controller: Option<String>,
-    },
-    /// Tail the bounded reflector→workqueue event ring (Add/Update/Delete).
-    EventsTail,
 }
 
 // ── cloud-controller-manager parity ──────────────────────────────────────────
@@ -1695,18 +1686,6 @@ enum CloudControllerManagerCmd {
     Parity,
     /// Liveness probe (/api/portal/cloud-controller-manager/health).
     Health,
-    /// Cloud LoadBalancer inventory (lifecycle phase + ingress IP per service).
-    LoadBalancers,
-    /// Cloud instance state per node (Running / Shutdown / Terminated / NotFound / Unreachable).
-    Instances {
-        /// Drill into a single node by name. Omit for the full inventory.
-        #[arg(long)]
-        node: Option<String>,
-    },
-    /// Cloud route-table sync state (desired vs current, blackhole list).
-    Routes,
-    /// Sync-status summary (counts per controller + last error).
-    SyncStatus,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -2759,11 +2738,6 @@ source_root = "src"
             ControllerManagerCmd::Status => c.get("/api/controller-manager/status").await,
             ControllerManagerCmd::Parity => c.get("/api/controller-manager/parity").await,
             ControllerManagerCmd::Health => c.get("/api/portal/controller-manager/health").await,
-            ControllerManagerCmd::QueuesInspect { controller } => match controller {
-                Some(name) => c.get(&format!("/api/portal/cm/queues/{name}")).await,
-                None => c.get("/api/portal/cm/queues").await,
-            },
-            ControllerManagerCmd::EventsTail => c.get("/api/portal/cm/events").await,
         },
 
         // ── cloud-controller-manager ──────────────────────────────────────────
@@ -2776,13 +2750,6 @@ source_root = "src"
             CloudControllerManagerCmd::Health => {
                 c.get("/api/portal/cloud-controller-manager/health").await
             }
-            CloudControllerManagerCmd::LoadBalancers => c.get("/api/portal/ccm/loadbalancers").await,
-            CloudControllerManagerCmd::Instances { node } => match node {
-                Some(name) => c.get(&format!("/api/portal/ccm/instances/{name}")).await,
-                None => c.get("/api/portal/ccm/instances").await,
-            },
-            CloudControllerManagerCmd::Routes => c.get("/api/portal/ccm/routes").await,
-            CloudControllerManagerCmd::SyncStatus => c.get("/api/portal/ccm").await,
         },
     }
 }
