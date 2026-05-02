@@ -1695,6 +1695,18 @@ enum CloudControllerManagerCmd {
     Parity,
     /// Liveness probe (/api/portal/cloud-controller-manager/health).
     Health,
+    /// Cloud LoadBalancer inventory (lifecycle phase + ingress IP per service).
+    LoadBalancers,
+    /// Cloud instance state per node (Running / Shutdown / Terminated / NotFound / Unreachable).
+    Instances {
+        /// Drill into a single node by name. Omit for the full inventory.
+        #[arg(long)]
+        node: Option<String>,
+    },
+    /// Cloud route-table sync state (desired vs current, blackhole list).
+    Routes,
+    /// Sync-status summary (counts per controller + last error).
+    SyncStatus,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -2764,6 +2776,13 @@ source_root = "src"
             CloudControllerManagerCmd::Health => {
                 c.get("/api/portal/cloud-controller-manager/health").await
             }
+            CloudControllerManagerCmd::LoadBalancers => c.get("/api/portal/ccm/loadbalancers").await,
+            CloudControllerManagerCmd::Instances { node } => match node {
+                Some(name) => c.get(&format!("/api/portal/ccm/instances/{name}")).await,
+                None => c.get("/api/portal/ccm/instances").await,
+            },
+            CloudControllerManagerCmd::Routes => c.get("/api/portal/ccm/routes").await,
+            CloudControllerManagerCmd::SyncStatus => c.get("/api/portal/ccm").await,
         },
     }
 }

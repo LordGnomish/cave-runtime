@@ -1,454 +1,350 @@
 {
-  "title": "Cave / cave-cloud-controller-manager",
+  "title": "Cave / cave-cloud-controller-manager (cloud-provider integration)",
   "uid": "cave-cloud-controller-manager",
-  "tags": [
-    "cave",
-    "observability",
-    "cave-cloud-controller-manager"
-  ],
+  "tags": ["cave", "observability", "cave-cloud-controller-manager", "k8s", "cloud"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "time": { "from": "now-1h", "to": "now" },
   "templating": {
     "list": [
       {
         "name": "DS_PROMETHEUS",
         "type": "datasource",
         "query": "prometheus",
-        "current": {
-          "text": "Prometheus",
-          "value": "Prometheus"
-        },
+        "current": { "text": "Prometheus", "value": "Prometheus" },
         "hide": 0
       },
       {
-        "name": "tenant",
+        "name": "provider",
         "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": "label_values(ccm_total{job=\"cave-cloud-controller-manager\"}, tenant_id)",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "multi": true,
-        "refresh": 2
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(cloud_controller_manager_cloud_api_calls_total{job=\"cave-cloud-controller-manager\"}, provider)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true, "multi": true, "refresh": 2
+      },
+      {
+        "name": "api",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(cloud_controller_manager_cloud_api_calls_total{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"}, api)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true, "multi": true, "refresh": 2
+      },
+      {
+        "name": "region",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(cloud_controller_manager_node_sync_total{job=\"cave-cloud-controller-manager\"}, region)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true, "multi": true, "refresh": 2
       }
     ]
   },
   "panels": [
     {
       "id": 1,
-      "title": "Request rate by route",
+      "title": "Cloud API call latency p50 / p95 / p99 (by api)",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(ccm_total{job=\"cave-cloud-controller-manager\"}[5m])) by (route)",
-          "legendFormat": "{{route}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.50, sum(rate(cloud_controller_manager_cloud_api_duration_seconds_bucket{job=\"cave-cloud-controller-manager\",provider=~\"$provider\",api=~\"$api\"}[5m])) by (le, api))",
+          "legendFormat": "p50 {{api}}", "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.95, sum(rate(cloud_controller_manager_cloud_api_duration_seconds_bucket{job=\"cave-cloud-controller-manager\",provider=~\"$provider\",api=~\"$api\"}[5m])) by (le, api))",
+          "legendFormat": "p95 {{api}}", "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.99, sum(rate(cloud_controller_manager_cloud_api_duration_seconds_bucket{job=\"cave-cloud-controller-manager\",provider=~\"$provider\",api=~\"$api\"}[5m])) by (le, api))",
+          "legendFormat": "p99 {{api}}", "refId": "C"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Cloud reconciler \u2014 request throughput."
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "description": "Latency for outbound cloud SDK calls (Hetzner / Azure)."
     },
     {
       "id": 2,
-      "title": "Error rate (4xx + 5xx)",
+      "title": "Cloud API call rate by provider",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(ccm_total{job=\"cave-cloud-controller-manager\",code=~\"4..|5..\"}[5m])) by (code)",
-          "legendFormat": "{{code}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_cloud_api_calls_total{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"}[5m])) by (provider, api)",
+          "legendFormat": "{{provider}} · {{api}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Errors broken down by HTTP class."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Outbound cloud API throughput."
     },
     {
       "id": 3,
-      "title": "Latency p50 / p95 / p99",
+      "title": "Cloud API error rate by provider/code",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.50, sum(rate(ccm_duration_seconds_bucket{job=\"cave-cloud-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p50",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(ccm_duration_seconds_bucket{job=\"cave-cloud-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.99, sum(rate(ccm_duration_seconds_bucket{job=\"cave-cloud-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p99",
-          "refId": "C"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_cloud_api_errors_total{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"}[5m])) by (provider, code)",
+          "legendFormat": "{{provider}} {{code}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "RED triad \u2014 duration percentiles."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Errors broken down by HTTP/SDK code."
     },
     {
       "id": 4,
-      "title": "Inflight requests (saturation)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Node sync rate (init / address-sync / taint)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(ccm_inflight_requests{job=\"cave-cloud-controller-manager\"})",
-          "legendFormat": "",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_node_sync_total{job=\"cave-cloud-controller-manager\",region=~\"$region\"}[5m])) by (op)",
+          "legendFormat": "{{op}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Concurrent in-progress requests."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Cloud-side node controller sync operations."
     },
     {
       "id": 5,
-      "title": "CPU utilization",
+      "title": "LoadBalancer sync errors",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "rate(process_cpu_seconds_total{job=\"cave-cloud-controller-manager\"}[5m])",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_lb_sync_errors_total{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"}[5m])) by (provider, phase)",
+          "legendFormat": "{{provider}} · {{phase}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Per-instance CPU."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Errors during EnsureLoadBalancer / Update / Delete phases."
     },
     {
       "id": 6,
-      "title": "Memory (RSS)",
+      "title": "Instance state mismatches",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "process_resident_memory_bytes{job=\"cave-cloud-controller-manager\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(cloud_controller_manager_instance_state_mismatch{job=\"cave-cloud-controller-manager\"}) by (state)",
+          "legendFormat": "{{state}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Resident set size."
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "description": "Nodes whose cloud state ≠ kube state (Shutdown / NotFound / Unreachable)."
     },
     {
       "id": 7,
-      "title": "Active goroutines / tasks",
+      "title": "Route plan: creates / deletes / blackhole",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "go_goroutines{job=\"cave-cloud-controller-manager\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_route_plan_total{job=\"cave-cloud-controller-manager\"}[5m])) by (op)",
+          "legendFormat": "{{op}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Goroutine count proxies for backpressure."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Per-pass route operations emitted by plan_routes()."
     },
     {
       "id": 8,
-      "title": "Tenant cardinality",
+      "title": "Route blackhole count",
       "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 24, "w": 6, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "count(count by (tenant_id) (ccm_total{job=\"cave-cloud-controller-manager\"}))",
-          "legendFormat": "",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(cloud_controller_manager_route_blackhole_count{job=\"cave-cloud-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Number of distinct tenants emitting traffic."
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Routes with no live node — should drain to 0."
     },
     {
       "id": 9,
-      "title": "Top-10 tenants by request volume",
-      "type": "table",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Region failover events",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 18, "y": 24, "w": 6, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "topk(10, sum(rate(ccm_total{job=\"cave-cloud-controller-manager\"}[5m])) by (tenant_id))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(increase(cloud_controller_manager_region_failover_total{job=\"cave-cloud-controller-manager\"}[15m])) by (region)",
+          "legendFormat": "{{region}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {},
-      "description": "Hot-tenant table \u2014 feeds throttle / inhibit decisions."
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "description": "Region failovers detected by hetzner failover module."
     },
     {
       "id": 10,
-      "title": "Health probe (up)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "title": "IAM token TTL remaining (per provider)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "min(up{job=\"cave-cloud-controller-manager\"})",
-          "legendFormat": "",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "(cloud_controller_manager_iam_token_expires_at{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"} - time()) / 60",
+          "legendFormat": "{{provider}} (min)", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+      "fieldConfig": { "defaults": { "unit": "m" }, "overrides": [] },
+      "description": "Minutes until each provider's IAM token expires."
+    },
+    {
+      "id": 11,
+      "title": "IAM token refresh rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cloud_controller_manager_iam_token_refresh_total{job=\"cave-cloud-controller-manager\",provider=~\"$provider\"}[15m])) by (provider, status)",
+          "legendFormat": "{{provider}} · {{status}}", "refId": "A"
         }
-      },
-      "description": "0 = at least one instance failing the scrape."
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Token refresh rate by status (ok / failed)."
+    },
+    {
+      "id": 12,
+      "title": "Active cloud LBs",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(cloud_controller_manager_loadbalancers_active{job=\"cave-cloud-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Cloud LBs ensured by this controller."
+    },
+    {
+      "id": 13,
+      "title": "Cloud instances tracked",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 6, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(cloud_controller_manager_instances_tracked{job=\"cave-cloud-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Cloud instance entries indexed by node name."
+    },
+    {
+      "id": 14,
+      "title": "Parity overall",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(parity_overall{job=\"cave-cloud-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Manifest-driven parity score (0.0 – 1.0)."
+    },
+    {
+      "id": 15,
+      "title": "CPU utilization",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 18, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(process_cpu_seconds_total{job=\"cave-cloud-controller-manager\"}[5m])",
+          "legendFormat": "cores", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "description": "Process CPU."
+    },
+    {
+      "id": 16,
+      "title": "Memory (RSS)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 46, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "process_resident_memory_bytes{job=\"cave-cloud-controller-manager\"}",
+          "legendFormat": "RSS", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "description": "Resident set size."
+    },
+    {
+      "id": 17,
+      "title": "Health probe (up)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 46, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "min(up{job=\"cave-cloud-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bool" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "1 = the /api/portal/ccm/health probe is responding."
+    },
+    {
+      "id": 18,
+      "title": "Top tenants by LB count",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 18, "y": 46, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "topk(10, sum(cloud_controller_manager_loadbalancers_active{job=\"cave-cloud-controller-manager\"}) by (tenant_id))",
+          "legendFormat": "{{tenant_id}}", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "description": "Tenants with the most active cloud LBs."
     }
-  ],
-  "annotations": {
-    "list": []
-  },
-  "editable": true,
-  "graphTooltip": 1,
-  "description": "Cloud reconciler"
+  ]
 }

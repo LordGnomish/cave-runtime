@@ -72,6 +72,33 @@ pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
     .map_err(|e| e.to_string())
 }
 
+/// Admin HTTP surfaces this crate is responsible for. Mounted by
+/// `cave-runtime`'s portal router; declared here so the parity manifest's
+/// `[[surfaces]]` can verify each one is documented at the ccm boundary.
+pub const ADMIN_HTTP_SURFACES: &[&str] = &[
+    "/api/portal/cloud-controller-manager/health",
+    "/api/portal/ccm/health",
+    "/api/portal/ccm",
+    "/api/cloud-controller-manager/cloud-controllers",
+    "/api/cloud-controller-manager/status",
+    "/api/cloud-controller-manager/parity",
+    "/api/portal/ccm/loadbalancers",
+    "/api/portal/ccm/instances",
+    "/api/portal/ccm/routes",
+];
+
+/// cavectl subcommand surfaces this crate is mirrored by.
+pub const ADMIN_CLI_SURFACES: &[&str] = &[
+    "CloudControllerManagerCmd::ListCloudControllers",
+    "CloudControllerManagerCmd::Status",
+    "CloudControllerManagerCmd::Parity",
+    "CloudControllerManagerCmd::Health",
+    "CloudControllerManagerCmd::LoadBalancers",
+    "CloudControllerManagerCmd::Instances",
+    "CloudControllerManagerCmd::Routes",
+    "CloudControllerManagerCmd::SyncStatus",
+];
+
 /// Snapshot of cloud-provider state used by the portal health endpoint.
 pub fn provider_snapshot() -> serde_json::Value {
     serde_json::json!({
