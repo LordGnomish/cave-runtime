@@ -27,6 +27,11 @@ base64 = { workspace = true }
 regex = { workspace = true }
 futures = { workspace = true }
 url = "2"
+# Cosign module: reuse cave-certs hybrid container (Ed25519 + ML-DSA-65 fixture).
+cave-certs = { path = "../cave-certs" }
+ed25519-dalek = { workspace = true }
+p256 = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true }
