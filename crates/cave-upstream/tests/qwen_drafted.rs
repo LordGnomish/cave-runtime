@@ -16,3 +16,6 @@ fn placeholder_4() {}
 #[test]
 #[ignore = "qwen scaffold pending"]
 fn placeholder_5() {}
+
+// === cycle 1777743930 (qwen success at retry 2; ollama_calls=2; ollama_secs=1137) ===
+
