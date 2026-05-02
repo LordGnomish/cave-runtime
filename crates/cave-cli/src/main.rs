@@ -96,6 +96,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: CacheCmd,
     },
+    /// Lakehouse (Iceberg + DataFusion) management
+    Lakehouse {
+        #[command(subcommand)]
+        cmd: LakehouseCmd,
+    },
     /// Kafka management (legacy alias of `streams kafka`)
     Kafka {
         #[command(subcommand)]
@@ -542,6 +547,72 @@ enum CacheCmd {
         channel: String,
         /// Message body
         message: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum LakehouseCmd {
+    /// Health check (Iceberg REST `GET /v1/config` + DataFusion ping parity)
+    Health,
+    /// List catalogs (Iceberg `GET /v1/catalogs`)
+    Catalogs,
+    /// List namespaces in a catalog (Iceberg `GET /v1/{prefix}/namespaces`)
+    Namespaces {
+        #[arg(long)]
+        catalog: String,
+    },
+    /// List tables in a namespace
+    Tables {
+        #[arg(long)]
+        catalog: String,
+        #[arg(long)]
+        namespace: String,
+    },
+    /// Show table metadata (current schema, partition spec, current snapshot)
+    Describe {
+        #[arg(long)]
+        catalog: String,
+        #[arg(long)]
+        namespace: String,
+        #[arg(long)]
+        table: String,
+    },
+    /// List snapshots (time-travel candidates)
+    Snapshots {
+        #[arg(long)]
+        catalog: String,
+        #[arg(long)]
+        namespace: String,
+        #[arg(long)]
+        table: String,
+    },
+    /// Run a DataFusion SQL query
+    Query {
+        /// SQL string; use single quotes around the whole arg
+        sql: String,
+        /// Logical-plan-only — do not execute
+        #[arg(long)]
+        explain: bool,
+    },
+    /// Trigger compaction (small-file consolidation)
+    Compact {
+        #[arg(long)]
+        catalog: String,
+        #[arg(long)]
+        namespace: String,
+        #[arg(long)]
+        table: String,
+    },
+    /// Expire snapshots older than `--older-than-days` (Iceberg `expire_snapshots`)
+    ExpireSnapshots {
+        #[arg(long)]
+        catalog: String,
+        #[arg(long)]
+        namespace: String,
+        #[arg(long)]
+        table: String,
+        #[arg(long, default_value = "7")]
+        older_than_days: u32,
     },
 }
 
@@ -1812,6 +1883,93 @@ async fn run(cli: Cli) -> Result<()> {
                 c.post(
                     "/api/cache/pubsub/publish",
                     json!({ "channel": channel, "message": message }),
+                )
+                .await
+            }
+        },
+
+        // ── Lakehouse (Iceberg + DataFusion) ──────────────────────────────────
+        Commands::Lakehouse { cmd } => match cmd {
+            LakehouseCmd::Health => c.get("/api/lakehouse/health").await,
+            LakehouseCmd::Catalogs => c.get("/api/lakehouse/catalogs").await,
+            LakehouseCmd::Namespaces { catalog } => {
+                c.get(&format!(
+                    "/api/lakehouse/catalogs/{}/namespaces",
+                    urlencode(&catalog)
+                ))
+                .await
+            }
+            LakehouseCmd::Tables { catalog, namespace } => {
+                c.get(&format!(
+                    "/api/lakehouse/catalogs/{}/namespaces/{}/tables",
+                    urlencode(&catalog),
+                    urlencode(&namespace)
+                ))
+                .await
+            }
+            LakehouseCmd::Describe {
+                catalog,
+                namespace,
+                table,
+            } => {
+                c.get(&format!(
+                    "/api/lakehouse/catalogs/{}/namespaces/{}/tables/{}",
+                    urlencode(&catalog),
+                    urlencode(&namespace),
+                    urlencode(&table)
+                ))
+                .await
+            }
+            LakehouseCmd::Snapshots {
+                catalog,
+                namespace,
+                table,
+            } => {
+                c.get(&format!(
+                    "/api/lakehouse/catalogs/{}/namespaces/{}/tables/{}/snapshots",
+                    urlencode(&catalog),
+                    urlencode(&namespace),
+                    urlencode(&table)
+                ))
+                .await
+            }
+            LakehouseCmd::Query { sql, explain } => {
+                c.post(
+                    "/api/lakehouse/query",
+                    json!({ "sql": sql, "explain": explain }),
+                )
+                .await
+            }
+            LakehouseCmd::Compact {
+                catalog,
+                namespace,
+                table,
+            } => {
+                c.post(
+                    &format!(
+                        "/api/lakehouse/catalogs/{}/namespaces/{}/tables/{}/compact",
+                        urlencode(&catalog),
+                        urlencode(&namespace),
+                        urlencode(&table)
+                    ),
+                    json!({}),
+                )
+                .await
+            }
+            LakehouseCmd::ExpireSnapshots {
+                catalog,
+                namespace,
+                table,
+                older_than_days,
+            } => {
+                c.post(
+                    &format!(
+                        "/api/lakehouse/catalogs/{}/namespaces/{}/tables/{}/expire-snapshots",
+                        urlencode(&catalog),
+                        urlencode(&namespace),
+                        urlencode(&table)
+                    ),
+                    json!({ "older_than_days": older_than_days }),
                 )
                 .await
             }
