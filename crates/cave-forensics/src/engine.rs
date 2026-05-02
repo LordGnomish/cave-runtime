@@ -111,4 +111,76 @@ mod tests {
         let ev = make_evidence(None);
         assert!(!has_valid_evidence(&ev));
     }
+
+    // ─── extended coverage ───────────────────────────────────────────────
+
+    #[test]
+    fn test_severity_rank_values() {
+        assert_eq!(severity_rank(&ForensicSeverity::Low), 0);
+        assert_eq!(severity_rank(&ForensicSeverity::Medium), 1);
+        assert_eq!(severity_rank(&ForensicSeverity::High), 2);
+        assert_eq!(severity_rank(&ForensicSeverity::Critical), 3);
+    }
+
+    #[test]
+    fn test_open_cases_excludes_closed_and_archived() {
+        let cases = vec![
+            make_case(ForensicSeverity::Low, CaseStatus::Closed),
+            make_case(ForensicSeverity::Low, CaseStatus::Archived),
+        ];
+        assert!(open_cases(&cases).is_empty());
+    }
+
+    #[test]
+    fn test_open_cases_empty_input() {
+        let cases: Vec<ForensicCase> = vec![];
+        assert!(open_cases(&cases).is_empty());
+    }
+
+    #[test]
+    fn test_highest_severity_empty_input_none() {
+        let cases: Vec<ForensicCase> = vec![];
+        assert!(highest_severity(&cases).is_none());
+    }
+
+    #[test]
+    fn test_highest_severity_single_case() {
+        let cases = vec![make_case(ForensicSeverity::Medium, CaseStatus::Open)];
+        let h = highest_severity(&cases).unwrap();
+        assert_eq!(h.severity, ForensicSeverity::Medium);
+    }
+
+    #[test]
+    fn test_evidence_count_zero_for_new_case() {
+        let case = make_case(ForensicSeverity::Low, CaseStatus::Open);
+        assert_eq!(evidence_count(&case), 0);
+    }
+
+    #[test]
+    fn test_has_valid_evidence_invalid_hex_chars() {
+        let ev = make_evidence(Some(
+            "ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ",
+        ));
+        assert!(!has_valid_evidence(&ev));
+    }
+
+    #[test]
+    fn test_has_valid_evidence_too_short() {
+        let ev = make_evidence(Some("abcdef")); // 6 chars, not 64
+        assert!(!has_valid_evidence(&ev));
+    }
+
+    #[test]
+    fn test_has_valid_evidence_too_long() {
+        let ev = make_evidence(Some(&"a".repeat(65)));
+        assert!(!has_valid_evidence(&ev));
+    }
+
+    #[test]
+    fn test_has_valid_evidence_uppercase_hex_accepted() {
+        let ev = make_evidence(Some(
+            "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890",
+        ));
+        assert!(has_valid_evidence(&ev));
+    }
 }
