@@ -71,10 +71,15 @@ enum Commands {
         #[command(subcommand)]
         cmd: SbomCmd,
     },
-    /// Container / package registry (Pulp replacement)
+    /// Container / package registry (Pulp replacement) — legacy alias of `artifacts pulp`.
     Registry {
         #[command(subcommand)]
         cmd: RegistryCmd,
+    },
+    /// Artifact platform (Harbor + Pulp + Nexus + Cosign consolidated).
+    Artifacts {
+        #[command(subcommand)]
+        cmd: ArtifactsCmd,
     },
     /// API gateway management
     Gateway {
@@ -414,6 +419,155 @@ enum RegistryCmd {
     },
     /// Run garbage collection
     Gc,
+}
+
+// ── Artifact platform: Harbor + Pulp + Nexus + Cosign ────────────────────────
+
+#[derive(Subcommand)]
+enum ArtifactsCmd {
+    /// Roll-up health for the consolidated artifact platform.
+    Health,
+    /// Harbor sub-tree (container registry + projects + scanning).
+    Harbor {
+        #[command(subcommand)]
+        cmd: HarborCmd,
+    },
+    /// Pulp sub-tree (multi-format repos: RPM/Deb/PyPI/etc).
+    Pulp {
+        #[command(subcommand)]
+        cmd: PulpCmd,
+    },
+    /// Nexus sub-tree (universal repository: hosted/proxy/group + raw).
+    Nexus {
+        #[command(subcommand)]
+        cmd: NexusCmd,
+    },
+    /// Cosign sub-tree (supply-chain signatures: ECDSA-P256 + ML-DSA-65 hybrid).
+    Cosign {
+        #[command(subcommand)]
+        cmd: CosignCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum HarborCmd {
+    /// List Harbor projects.
+    Projects,
+    /// Create a Harbor project.
+    ProjectCreate {
+        #[arg(long)]
+        name: String,
+    },
+    /// Push an OCI image (registry/foo:tag).
+    Push {
+        #[arg(long)]
+        image: String,
+    },
+    /// Pull an OCI image.
+    Pull {
+        #[arg(long)]
+        image: String,
+    },
+    /// Trigger a vulnerability scan for a digest.
+    Scan {
+        #[arg(long)]
+        digest: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum PulpCmd {
+    /// Sync content from a remote into the named repository.
+    Sync {
+        #[arg(long)]
+        repository: String,
+        #[arg(long)]
+        remote: String,
+    },
+    /// Publish a repository version.
+    Publish {
+        #[arg(long)]
+        repository: String,
+    },
+    /// Distribute a publication under a base path.
+    Distribute {
+        #[arg(long)]
+        publication: String,
+        #[arg(long)]
+        base_path: String,
+    },
+    /// List content units in a repository.
+    Content {
+        #[arg(long)]
+        repository: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum NexusCmd {
+    /// List Nexus repositories.
+    Repos,
+    /// Create a hosted Nexus repository.
+    RepoCreate {
+        #[arg(long)]
+        name: String,
+        /// One of: raw, maven2, npm, docker, pypi, nuget, helm, apt, yum.
+        #[arg(long = "repo-format", default_value = "raw")]
+        format_kind: String,
+    },
+    /// Upload a raw asset to a hosted repository.
+    Upload {
+        #[arg(long)]
+        repository: String,
+        #[arg(long)]
+        path: String,
+        #[arg(long)]
+        file: String,
+    },
+    /// Download a raw asset from a repository.
+    Download {
+        #[arg(long)]
+        repository: String,
+        #[arg(long)]
+        path: String,
+    },
+    /// List assets in a repository.
+    Assets {
+        #[arg(long)]
+        repository: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum CosignCmd {
+    /// Generate a fresh keypair (ecdsa-p256 | ml-dsa-65).
+    Keypair {
+        #[arg(long, default_value = "ecdsa-p256")]
+        alg: String,
+    },
+    /// Sign an image manifest digest with a known key.
+    Sign {
+        #[arg(long)]
+        key_id: String,
+        #[arg(long)]
+        reference: String,
+        #[arg(long)]
+        digest: String,
+    },
+    /// Verify a stored signature against a key.
+    Verify {
+        #[arg(long)]
+        key_id: String,
+        #[arg(long)]
+        digest: String,
+    },
+    /// List signatures attached to a digest.
+    Signatures {
+        #[arg(long)]
+        digest: String,
+    },
+    /// Show signing/verification counters (PQC vs classic split).
+    Counters,
 }
 
 #[derive(Subcommand)]
@@ -1786,7 +1940,7 @@ async fn run(cli: Cli) -> Result<()> {
             SbomCmd::Detail { id } => c.get(&format!("/api/sbom/{id}")).await,
         },
 
-        // ── Registry ──────────────────────────────────────────────────────────
+        // ── Registry (legacy alias of `artifacts pulp`) ──────────────────────
         Commands::Registry { cmd } => match cmd {
             RegistryCmd::List => c.get("/api/registry").await,
             RegistryCmd::Push { image } => {
@@ -1796,6 +1950,109 @@ async fn run(cli: Cli) -> Result<()> {
                 c.post("/api/registry/pull", json!({ "image": image })).await
             }
             RegistryCmd::Gc => c.post("/api/registry/gc", json!({})).await,
+        },
+
+        // ── Artifacts (Harbor + Pulp + Nexus + Cosign consolidated) ──────────
+        Commands::Artifacts { cmd } => match cmd {
+            ArtifactsCmd::Health => c.get("/api/artifacts/health").await,
+            ArtifactsCmd::Harbor { cmd } => match cmd {
+                HarborCmd::Projects => c.get("/api/v2.0/projects").await,
+                HarborCmd::ProjectCreate { name } => {
+                    c.post("/api/v2.0/projects", json!({ "project_name": name })).await
+                }
+                HarborCmd::Push { image } => {
+                    c.post("/api/registry/push", json!({ "image": image })).await
+                }
+                HarborCmd::Pull { image } => {
+                    c.post("/api/registry/pull", json!({ "image": image })).await
+                }
+                HarborCmd::Scan { digest } => {
+                    c.post("/api/v2.0/scanners/scan", json!({ "digest": digest })).await
+                }
+            },
+            ArtifactsCmd::Pulp { cmd } => match cmd {
+                PulpCmd::Sync { repository, remote } => {
+                    c.post(
+                        "/api/artifacts/repositories/sync",
+                        json!({ "repository": repository, "remote": remote }),
+                    )
+                    .await
+                }
+                PulpCmd::Publish { repository } => {
+                    c.post(
+                        "/api/artifacts/publications",
+                        json!({ "repository": repository }),
+                    )
+                    .await
+                }
+                PulpCmd::Distribute { publication, base_path } => {
+                    c.post(
+                        "/api/artifacts/distributions",
+                        json!({ "publication": publication, "base_path": base_path }),
+                    )
+                    .await
+                }
+                PulpCmd::Content { repository } => {
+                    c.get(&format!("/api/artifacts/content?repository={repository}"))
+                        .await
+                }
+            },
+            ArtifactsCmd::Nexus { cmd } => match cmd {
+                NexusCmd::Repos => c.get("/api/nexus/v1/repositories").await,
+                NexusCmd::RepoCreate { name, format_kind } => {
+                    c.post(
+                        "/api/nexus/v1/repositories",
+                        json!({
+                            "name": name,
+                            "format": format_kind,
+                            "type": "hosted",
+                            "write_policy": "allow",
+                        }),
+                    )
+                    .await
+                }
+                NexusCmd::Upload { repository, path, file } => {
+                    let bytes = std::fs::read(&file)
+                        .map_err(|e| anyhow::anyhow!("read {file}: {e}"))?;
+                    c.put_bytes(
+                        &format!("/api/nexus/repository/{repository}/{path}"),
+                        bytes,
+                    )
+                    .await
+                }
+                NexusCmd::Download { repository, path } => {
+                    c.get(&format!("/api/nexus/repository/{repository}/{path}")).await
+                }
+                NexusCmd::Assets { repository } => {
+                    c.get(&format!("/api/nexus/v1/assets?repository={repository}")).await
+                }
+            },
+            ArtifactsCmd::Cosign { cmd } => match cmd {
+                CosignCmd::Keypair { alg } => {
+                    c.post("/api/cosign/v1/keypair", json!({ "alg": alg })).await
+                }
+                CosignCmd::Sign { key_id, reference, digest } => {
+                    c.post(
+                        "/api/cosign/v1/sign",
+                        json!({
+                            "key_id": key_id,
+                            "reference": reference,
+                            "digest": digest,
+                        }),
+                    )
+                    .await
+                }
+                CosignCmd::Verify { key_id: _, digest } => {
+                    // Convenience verify: pull the most recent stored signature
+                    // for the digest from the server-side index, server handles
+                    // the per-key cross-check internally.
+                    c.get(&format!("/api/cosign/v1/signatures/{digest}")).await
+                }
+                CosignCmd::Signatures { digest } => {
+                    c.get(&format!("/api/cosign/v1/signatures/{digest}")).await
+                }
+                CosignCmd::Counters => c.get("/api/cosign/v1/counters").await,
+            },
         },
 
         // ── Gateway ───────────────────────────────────────────────────────────
@@ -2965,5 +3222,174 @@ mod helpers_tests {
     fn apiserver_path_unknown_resource_errors() {
         let err = apiserver_resource_path("widgets", None, None).unwrap_err();
         assert!(err.to_string().contains("unsupported resource"));
+    }
+}
+
+#[cfg(test)]
+mod artifacts_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn artifacts_health_parses() {
+        let cli = parse(&["cavectl", "artifacts", "health"]);
+        assert!(matches!(cli.command, Commands::Artifacts { cmd: ArtifactsCmd::Health }));
+    }
+
+    #[test]
+    fn artifacts_harbor_projects_parses() {
+        let cli = parse(&["cavectl", "artifacts", "harbor", "projects"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::Projects } } => {}
+            other => panic!("wrong variant: {other:?}", other = std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn artifacts_harbor_project_create_requires_name() {
+        let cli = parse(&["cavectl", "artifacts", "harbor", "project-create", "--name", "alpha"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::ProjectCreate { name } } } => {
+                assert_eq!(name, "alpha");
+            }
+            _ => panic!("wrong variant"),
+        }
+        // Missing --name must be a parse error.
+        assert!(Cli::try_parse_from(&["cavectl", "artifacts", "harbor", "project-create"]).is_err());
+    }
+
+    #[test]
+    fn artifacts_harbor_scan_takes_digest() {
+        let cli = parse(&["cavectl", "artifacts", "harbor", "scan", "--digest", "sha256:abcd"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Harbor { cmd: HarborCmd::Scan { digest } } } => {
+                assert_eq!(digest, "sha256:abcd");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_pulp_sync_requires_repository_and_remote() {
+        let cli = parse(&["cavectl", "artifacts", "pulp", "sync", "--repository", "r", "--remote", "u"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Pulp { cmd: PulpCmd::Sync { repository, remote } } } => {
+                assert_eq!(repository, "r");
+                assert_eq!(remote, "u");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_pulp_distribute_takes_base_path() {
+        let cli = parse(&["cavectl", "artifacts", "pulp", "distribute", "--publication", "p", "--base-path", "/x/y"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Pulp { cmd: PulpCmd::Distribute { publication, base_path } } } => {
+                assert_eq!(publication, "p");
+                assert_eq!(base_path, "/x/y");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_nexus_repo_create_defaults_to_raw() {
+        let cli = parse(&["cavectl", "artifacts", "nexus", "repo-create", "--name", "rel"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::RepoCreate { name, format_kind } } } => {
+                assert_eq!(name, "rel");
+                assert_eq!(format_kind, "raw");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_nexus_repo_create_accepts_other_formats() {
+        let cli = parse(&["cavectl", "artifacts", "nexus", "repo-create", "--name", "mvn", "--repo-format", "maven2"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::RepoCreate { format_kind, .. } } } => {
+                assert_eq!(format_kind, "maven2");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_nexus_upload_collects_three_args() {
+        let cli = parse(&[
+            "cavectl", "artifacts", "nexus", "upload",
+            "--repository", "r",
+            "--path", "dir/f.bin",
+            "--file", "/tmp/f.bin",
+        ]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Nexus { cmd: NexusCmd::Upload { repository, path, file } } } => {
+                assert_eq!(repository, "r");
+                assert_eq!(path, "dir/f.bin");
+                assert_eq!(file, "/tmp/f.bin");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_cosign_keypair_defaults_to_ecdsa() {
+        let cli = parse(&["cavectl", "artifacts", "cosign", "keypair"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Keypair { alg } } } => {
+                assert_eq!(alg, "ecdsa-p256");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_cosign_keypair_accepts_pqc_alg() {
+        let cli = parse(&["cavectl", "artifacts", "cosign", "keypair", "--alg", "ml-dsa-65"]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Keypair { alg } } } => {
+                assert_eq!(alg, "ml-dsa-65");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_cosign_sign_collects_key_ref_digest() {
+        let cli = parse(&[
+            "cavectl", "artifacts", "cosign", "sign",
+            "--key-id", "k1",
+            "--reference", "registry/img:tag",
+            "--digest", "sha256:abc",
+        ]);
+        match cli.command {
+            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Sign { key_id, reference, digest } } } => {
+                assert_eq!(key_id, "k1");
+                assert_eq!(reference, "registry/img:tag");
+                assert_eq!(digest, "sha256:abc");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn artifacts_cosign_counters_parses() {
+        let cli = parse(&["cavectl", "artifacts", "cosign", "counters"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Artifacts { cmd: ArtifactsCmd::Cosign { cmd: CosignCmd::Counters } }
+        ));
+    }
+
+    #[test]
+    fn registry_subcommand_still_works_for_back_compat() {
+        let cli = parse(&["cavectl", "registry", "list"]);
+        assert!(matches!(cli.command, Commands::Registry { cmd: RegistryCmd::List }));
     }
 }

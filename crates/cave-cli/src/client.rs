@@ -96,6 +96,17 @@ impl ApiClient {
         self.finish(resp).await
     }
 
+    /// PUT raw bytes (used for Nexus raw asset upload).
+    pub async fn put_bytes(&self, path: &str, body: Vec<u8>) -> Result<()> {
+        let resp = self
+            .build(Method::PUT, path)
+            .body(body)
+            .send()
+            .await
+            .with_context(|| format!("Failed to connect to {}{}", self.base_url, path))?;
+        self.finish(resp).await
+    }
+
     fn print(&self, value: &Value) {
         match &self.format {
             Format::Json => println!("{}", serde_json::to_string_pretty(value).unwrap_or_default()),
