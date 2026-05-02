@@ -355,3 +355,129 @@ pub fn router(state: Arc<VaultState>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "vault";
+
+#[cfg(test)]
+mod lib_tests {
+    use super::*;
+
+    fn make_entry(path: &str, ns: &str) -> MountEntry {
+        MountEntry {
+            path: path.to_string(),
+            mount_type: "kv".to_string(),
+            description: String::new(),
+            config: MountConfig::default(),
+            local: false,
+            seal_wrap: false,
+            uuid: uuid::Uuid::new_v4().to_string(),
+            accessor: uuid::Uuid::new_v4().to_string(),
+            namespace_id: ns.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_mount_table_register_lookup() {
+        let mut t = MountTable::default();
+        t.register(make_entry("secret/", ""));
+        assert!(t.lookup("secret/").is_some());
+        assert!(t.lookup("notmounted/").is_none());
+    }
+
+    #[test]
+    fn test_mount_table_longest_prefix_picks_specific() {
+        let mut t = MountTable::default();
+        t.register(make_entry("kv/", ""));
+        t.register(make_entry("kv/special/", ""));
+        let m = t.longest_prefix("kv/special/foo").unwrap();
+        assert_eq!(m.path, "kv/special/");
+    }
+
+    #[test]
+    fn test_mount_table_unregister_removes() {
+        let mut t = MountTable::default();
+        t.register(make_entry("kv/", ""));
+        let removed = t.unregister("kv/").unwrap();
+        assert_eq!(removed.path, "kv/");
+        assert!(t.lookup("kv/").is_none());
+    }
+
+    #[test]
+    fn test_mount_table_list_sorted() {
+        let mut t = MountTable::default();
+        t.register(make_entry("zeta/", ""));
+        t.register(make_entry("alpha/", ""));
+        t.register(make_entry("beta/", ""));
+        let list = t.list();
+        assert_eq!(list, vec!["alpha/", "beta/", "zeta/"]);
+    }
+
+    #[test]
+    fn test_mount_table_for_namespace_filter() {
+        let mut t = MountTable::default();
+        t.register(make_entry("a/", "ns-1"));
+        t.register(make_entry("b/", "ns-1"));
+        t.register(make_entry("c/", "ns-2"));
+        assert_eq!(t.for_namespace("ns-1").len(), 2);
+        assert_eq!(t.for_namespace("ns-2").len(), 1);
+        assert_eq!(t.for_namespace("nope").len(), 0);
+    }
+
+    #[test]
+    fn test_namespace_new_canonicalises_path() {
+        let ns = Namespace::new("id-1", "tenant-a", "t-1");
+        assert_eq!(ns.path, "tenant-a/");
+        let ns2 = Namespace::new("id-2", "tenant-b/", "t-1");
+        assert_eq!(ns2.path, "tenant-b/");
+        let ns_empty = Namespace::new("id-3", "", "t-1");
+        assert_eq!(ns_empty.path, "");
+    }
+
+    #[test]
+    fn test_namespace_validate_rejects_reserved() {
+        let bad = Namespace::new("id", "sys/", "t-1");
+        assert!(bad.validate().is_err());
+        let bad2 = Namespace::new("id", "auth/", "t-1");
+        assert!(bad2.validate().is_err());
+        let bad3 = Namespace::new("id", "root", "t-1");
+        assert!(bad3.validate().is_err());
+        let ok = Namespace::new("id", "team-a/", "t-1");
+        assert!(ok.validate().is_ok());
+    }
+
+    #[test]
+    fn test_namespace_store_create_get() {
+        let mut s = NamespaceStore::default();
+        let ns = Namespace::new("ns-1", "tenant-a", "t-1");
+        s.create(ns).unwrap();
+        assert!(s.get("ns-1").is_some());
+        assert!(s.get_by_path("tenant-a").is_some());
+        assert!(s.get_by_path("tenant-a/").is_some()); // canonicalised either way
+    }
+
+    #[test]
+    fn test_namespace_store_for_tenant_sorted() {
+        let mut s = NamespaceStore::default();
+        s.create(Namespace::new("ns-z", "z-team", "tenant-1")).unwrap();
+        s.create(Namespace::new("ns-a", "a-team", "tenant-1")).unwrap();
+        s.create(Namespace::new("ns-other", "x", "tenant-2")).unwrap();
+        let listed = s.for_tenant("tenant-1");
+        assert_eq!(listed.len(), 2);
+        assert_eq!(listed[0].path, "a-team/");
+        assert_eq!(listed[1].path, "z-team/");
+    }
+
+    #[test]
+    fn test_namespace_store_delete() {
+        let mut s = NamespaceStore::default();
+        s.create(Namespace::new("ns-1", "team", "t-1")).unwrap();
+        assert!(s.delete("ns-1"));
+        assert!(!s.delete("ns-1"));
+        assert!(s.get("ns-1").is_none());
+    }
+
+    #[test]
+    fn test_namespace_store_create_validates_reserved() {
+        let mut s = NamespaceStore::default();
+        let bad = Namespace::new("ns-x", "sys/", "t-1");
+        assert!(s.create(bad).is_err());
+    }
+}
