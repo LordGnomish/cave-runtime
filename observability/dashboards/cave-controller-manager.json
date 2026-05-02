@@ -1,454 +1,314 @@
 {
-  "title": "Cave / cave-controller-manager",
+  "title": "Cave / cave-controller-manager (kube-controller-manager)",
   "uid": "cave-controller-manager",
-  "tags": [
-    "cave",
-    "observability",
-    "cave-controller-manager"
-  ],
+  "tags": ["cave", "observability", "cave-controller-manager", "k8s"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
+  "time": { "from": "now-1h", "to": "now" },
   "templating": {
     "list": [
       {
         "name": "DS_PROMETHEUS",
         "type": "datasource",
         "query": "prometheus",
-        "current": {
-          "text": "Prometheus",
-          "value": "Prometheus"
-        },
+        "current": { "text": "Prometheus", "value": "Prometheus" },
         "hide": 0
+      },
+      {
+        "name": "controller",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(controller_manager_reconcile_total{job=\"cave-controller-manager\"}, controller)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true, "multi": true, "refresh": 2
       },
       {
         "name": "tenant",
         "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": "label_values(controller_manager_total{job=\"cave-controller-manager\"}, tenant_id)",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "multi": true,
-        "refresh": 2
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "query": "label_values(controller_manager_reconcile_total{job=\"cave-controller-manager\"}, tenant_id)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true, "multi": true, "refresh": 2
       }
     ]
   },
   "panels": [
     {
       "id": 1,
-      "title": "Request rate by route",
+      "title": "Reconcile rate by controller",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(controller_manager_total{job=\"cave-controller-manager\"}[5m])) by (route)",
-          "legendFormat": "{{route}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_reconcile_total{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (controller)",
+          "legendFormat": "{{controller}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Built-in controllers \u2014 request throughput."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Reconcile loop throughput per controller."
     },
     {
       "id": 2,
-      "title": "Error rate (4xx + 5xx)",
+      "title": "Reconcile errors by controller",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(controller_manager_total{job=\"cave-controller-manager\",code=~\"4..|5..\"}[5m])) by (code)",
-          "legendFormat": "{{code}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_reconcile_errors_total{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (controller)",
+          "legendFormat": "{{controller}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Errors broken down by HTTP class."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Errors emitted by Reconciler::reconcile per controller."
     },
     {
       "id": 3,
-      "title": "Latency p50 / p95 / p99",
+      "title": "Reconcile latency p50 / p95 / p99",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.50, sum(rate(controller_manager_duration_seconds_bucket{job=\"cave-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p50",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.50, sum(rate(controller_manager_reconcile_duration_seconds_bucket{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (le))",
+          "legendFormat": "p50", "refId": "A"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(controller_manager_duration_seconds_bucket{job=\"cave-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.95, sum(rate(controller_manager_reconcile_duration_seconds_bucket{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (le))",
+          "legendFormat": "p95", "refId": "B"
         },
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.99, sum(rate(controller_manager_duration_seconds_bucket{job=\"cave-controller-manager\"}[5m])) by (le))",
-          "legendFormat": "p99",
-          "refId": "C"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.99, sum(rate(controller_manager_reconcile_duration_seconds_bucket{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (le))",
+          "legendFormat": "p99", "refId": "C"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "RED triad \u2014 duration percentiles."
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "description": "Per-pass reconcile duration percentiles."
     },
     {
       "id": 4,
-      "title": "Inflight requests (saturation)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Workqueue depth by controller",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(controller_manager_inflight_requests{job=\"cave-controller-manager\"})",
-          "legendFormat": "",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(controller_manager_workqueue_depth{job=\"cave-controller-manager\",controller=~\"$controller\"}) by (controller)",
+          "legendFormat": "{{controller}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Concurrent in-progress requests."
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "description": "Bounded workqueue backlog per controller (matches Workqueue::len())."
     },
     {
       "id": 5,
-      "title": "CPU utilization",
+      "title": "Workqueue requeue rate by controller",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "rate(process_cpu_seconds_total{job=\"cave-controller-manager\"}[5m])",
-          "legendFormat": "{{instance}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_workqueue_requeues_total{job=\"cave-controller-manager\",controller=~\"$controller\"}[5m])) by (controller)",
+          "legendFormat": "{{controller}}",
           "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Per-instance CPU."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Dirty-bit re-enqueues per controller (Workqueue::requeue_count delta)."
     },
     {
       "id": 6,
-      "title": "Memory (RSS)",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Leader-election state",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 16, "w": 6, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "process_resident_memory_bytes{job=\"cave-controller-manager\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(controller_manager_leader_elected{job=\"cave-controller-manager\"})",
+          "legendFormat": "elected", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "bytes"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Resident set size."
+      "fieldConfig": { "defaults": { "unit": "bool" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "1 = this pod holds the lease, 0 = does not."
     },
     {
       "id": 7,
-      "title": "Active goroutines / tasks",
+      "title": "Leader-election transitions",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 18, "y": 16, "w": 6, "h": 8 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "go_goroutines{job=\"cave-controller-manager\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_leader_transitions_total{job=\"cave-controller-manager\"}[15m]))",
+          "legendFormat": "transitions/15m", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Goroutine count proxies for backpressure."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Lease holder changes — sustained > 0 implies flapping."
     },
     {
       "id": 8,
-      "title": "Tenant cardinality",
+      "title": "Active controllers",
       "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 24, "w": 6, "h": 6 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "count(count by (tenant_id) (controller_manager_total{job=\"cave-controller-manager\"}))",
-          "legendFormat": "",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(controller_manager_controllers_active{job=\"cave-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Number of distinct tenants emitting traffic."
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Total reconcile loops compiled in (CONTROLLERS.len())."
     },
     {
       "id": 9,
-      "title": "Top-10 tenants by request volume",
-      "type": "table",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Per-tenant reconcile volume",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 6, "y": 24, "w": 12, "h": 6 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "topk(10, sum(rate(controller_manager_total{job=\"cave-controller-manager\"}[5m])) by (tenant_id))",
-          "format": "table",
-          "instant": true,
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "topk(10, sum(rate(controller_manager_reconcile_total{job=\"cave-controller-manager\",tenant_id=~\"$tenant\"}[5m])) by (tenant_id))",
+          "legendFormat": "{{tenant_id}}", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {},
-      "description": "Hot-tenant table \u2014 feeds throttle / inhibit decisions."
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Top-10 tenants by reconcile pass volume."
     },
     {
       "id": 10,
-      "title": "Health probe (up)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Cross-tenant denied keys",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 18, "y": 24, "w": 6, "h": 6 },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "min(up{job=\"cave-controller-manager\"})",
-          "legendFormat": "",
-          "refId": "A"
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_cross_tenant_denied_total{job=\"cave-controller-manager\"}[5m]))",
+          "legendFormat": "denied/s", "refId": "A"
         }
       ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Keys that hit a controller owned by a different tenant — should be flat zero."
+    },
+    {
+      "id": 11,
+      "title": "Stubs detected (parity)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 30, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(parity_stubs_detected{job=\"cave-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
         }
-      },
-      "description": "0 = at least one instance failing the scrape."
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "todo!() / unimplemented!() count in src tree — golden rule 1 watchdog."
+    },
+    {
+      "id": 12,
+      "title": "Parity overall",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 6, "y": 30, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(parity_overall{job=\"cave-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Manifest-driven parity score (0.0 – 1.0)."
+    },
+    {
+      "id": 13,
+      "title": "Event-stream rate (Add / Update / Delete)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(controller_manager_events_total{job=\"cave-controller-manager\"}[5m])) by (kind)",
+          "legendFormat": "{{kind}}", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "description": "Add/Update/Delete events flowing through the reflector→workqueue pipeline."
+    },
+    {
+      "id": 14,
+      "title": "CPU utilization",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 36, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "rate(process_cpu_seconds_total{job=\"cave-controller-manager\"}[5m])",
+          "legendFormat": "cores", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] },
+      "description": "Process CPU."
+    },
+    {
+      "id": 15,
+      "title": "Memory (RSS)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 8, "y": 36, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "process_resident_memory_bytes{job=\"cave-controller-manager\"}",
+          "legendFormat": "RSS", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "description": "Resident set size."
+    },
+    {
+      "id": 16,
+      "title": "Health probe (up)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 16, "y": 36, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "min(up{job=\"cave-controller-manager\"})",
+          "legendFormat": "", "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bool" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "1 = the /api/portal/cm/health probe is responding."
     }
-  ],
-  "annotations": {
-    "list": []
-  },
-  "editable": true,
-  "graphTooltip": 1,
-  "description": "Built-in controllers"
+  ]
 }

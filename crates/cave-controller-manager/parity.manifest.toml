@@ -9,10 +9,11 @@ version = "v1.36.0"
 
 [module]
 name        = "cave-controller-manager"
-description = "Workload controllers — Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service"
+description = "Workload controllers — Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service, GC, NodeLifecycle, SA/Token, CSR, RBAC, PV, Quota, Namespace, BootstrapToken"
 source_root = "src"
 
 # ── File mappings ────────────────────────────────────────────────────────────
+
 [[files]]
 upstream = "pkg/controller/deployment/deployment_controller.go"
 local    = "src/deployment.rs"
@@ -52,3 +53,562 @@ local    = "src/endpointslice.rs"
 [[files]]
 upstream = "pkg/controller/service/controller.go"
 local    = "src/service.rs"
+
+[[files]]
+upstream = "pkg/controller/garbagecollector/garbagecollector.go"
+local    = "src/gc/cascade.rs"
+
+[[files]]
+upstream = "pkg/controller/garbagecollector/dependencygraph.go"
+local    = "src/gc/owner_ref.rs"
+
+[[files]]
+upstream = "pkg/controller/podgc/gc_controller.go"
+local    = "src/gc_lite/podgc.rs"
+
+[[files]]
+upstream = "pkg/controller/ttlafterfinished/ttlafterfinished_controller.go"
+local    = "src/gc_lite/ttl_after_finished.rs"
+
+[[files]]
+upstream = "pkg/controller/nodelifecycle/node_lifecycle_controller.go"
+local    = "src/node_lifecycle/mod.rs"
+
+[[files]]
+upstream = "pkg/controller/nodelifecycle/scheduler/taint_manager.go"
+local    = "src/node_lifecycle/taints.rs"
+
+[[files]]
+upstream = "pkg/controller/nodelifecycle/scheduler/timed_workers.go"
+local    = "src/node_lifecycle/evictor.rs"
+
+[[files]]
+upstream = "pkg/controller/nodelifecycle/zone_state.go"
+local    = "src/node_lifecycle/zone_state.rs"
+
+[[files]]
+upstream = "pkg/controller/nodeipam/node_ipam_controller.go"
+local    = "src/node_lease.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/rootcacertpublisher/publisher.go"
+local    = "src/root_ca_publisher.rs"
+
+[[files]]
+upstream = "pkg/controller/serviceaccount/serviceaccounts_controller.go"
+local    = "src/sa/sa_controller.rs"
+
+[[files]]
+upstream = "pkg/controller/serviceaccount/tokens_controller.go"
+local    = "src/sa/token_controller.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/signer/signer.go"
+local    = "src/csr_signer.rs"
+
+[[files]]
+upstream = "pkg/controller/certificates/approver/sarapprove.go"
+local    = "src/csr_auto_approver.rs"
+
+[[files]]
+upstream = "pkg/controller/clusterroleaggregation/clusterroleaggregation_controller.go"
+local    = "src/rbac/cluster_role_aggregation.rs"
+
+[[files]]
+upstream = "pkg/controller/volume/persistentvolume/pv_controller.go"
+local    = "src/pv/binder.rs"
+
+[[files]]
+upstream = "pkg/controller/volume/attachdetach/attach_detach_controller.go"
+local    = "src/pv/attach_detach.rs"
+
+[[files]]
+upstream = "pkg/controller/resourcequota/resource_quota_controller.go"
+local    = "src/resource_quota.rs"
+
+[[files]]
+upstream = "pkg/controller/namespace/namespace_controller.go"
+local    = "src/namespace_controller.rs"
+
+[[files]]
+upstream = "pkg/controller/bootstrap/bootstrapsigner.go"
+local    = "src/bootstrap_signer.rs"
+
+[[files]]
+upstream = "pkg/controller/endpointslice/topologycache/topologycache.go"
+local    = "src/endpointslice_topology.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "syncDeployment"
+local_name    = "reconcile"
+file          = "src/deployment.rs"
+
+[[functions]]
+upstream_name = "MaxSurge"
+local_name    = "max_pods_during_surge"
+file          = "src/deployment.rs"
+
+[[functions]]
+upstream_name = "rollback"
+local_name    = "rollback"
+file          = "src/deployment.rs"
+
+[[functions]]
+upstream_name = "reconcileNewReplicaSet"
+local_name    = "plan_rolling_step"
+file          = "src/deployment.rs"
+
+[[functions]]
+upstream_name = "manageReplicas"
+local_name    = "reconcile"
+file          = "src/replicaset.rs"
+
+[[functions]]
+upstream_name = "BurstReplicas"
+local_name    = "clamp_burst"
+file          = "src/replicaset.rs"
+
+[[functions]]
+upstream_name = "claimPods"
+local_name    = "adopt_orphans"
+file          = "src/replicaset.rs"
+
+[[functions]]
+upstream_name = "releasePod"
+local_name    = "release_mismatched"
+file          = "src/replicaset.rs"
+
+[[functions]]
+upstream_name = "getPodName"
+local_name    = "pod_identity"
+file          = "src/statefulset.rs"
+
+[[functions]]
+upstream_name = "updateStatefulSet"
+local_name    = "reconcile"
+file          = "src/statefulset.rs"
+
+[[functions]]
+upstream_name = "getPersistentVolumeClaimName"
+local_name    = "pvc_name_for"
+file          = "src/statefulset.rs"
+
+[[functions]]
+upstream_name = "getStartOrdinal"
+local_name    = "ordinal_range"
+file          = "src/statefulset.rs"
+
+[[functions]]
+upstream_name = "ShouldRunDaemonPodOnNode"
+local_name    = "node_should_run"
+file          = "src/daemonset.rs"
+
+[[functions]]
+upstream_name = "manage"
+local_name    = "reconcile"
+file          = "src/daemonset.rs"
+
+[[functions]]
+upstream_name = "TolerationsTolerateTaint"
+local_name    = "tolerates"
+file          = "src/daemonset.rs"
+
+[[functions]]
+upstream_name = "FindMatchingUntoleratedTaint"
+local_name    = "tolerates_all"
+file          = "src/daemonset.rs"
+
+[[functions]]
+upstream_name = "rollingUpdate"
+local_name    = "rolling_update"
+file          = "src/daemonset.rs"
+
+[[functions]]
+upstream_name = "IsJobFinished"
+local_name    = "is_complete"
+file          = "src/job.rs"
+
+[[functions]]
+upstream_name = "pastBackoffLimitOnFailure"
+local_name    = "past_backoff"
+file          = "src/job.rs"
+
+[[functions]]
+upstream_name = "manageJob"
+local_name    = "reconcile"
+file          = "src/job.rs"
+
+[[functions]]
+upstream_name = "ParseSchedule"
+local_name    = "validate_schedule"
+file          = "src/cronjob.rs"
+
+[[functions]]
+upstream_name = "syncCronJob"
+local_name    = "reconcile"
+file          = "src/cronjob.rs"
+
+[[functions]]
+upstream_name = "GetResourceReplicas"
+local_name    = "desired_replicas"
+file          = "src/hpa.rs"
+
+[[functions]]
+upstream_name = "reconcileAutoscaler"
+local_name    = "reconcile"
+file          = "src/hpa.rs"
+
+[[functions]]
+upstream_name = "applyHPABehavior"
+local_name    = "apply_behavior"
+file          = "src/hpa.rs"
+
+[[functions]]
+upstream_name = "trySetPDBStatus"
+local_name    = "disruptions_allowed"
+file          = "src/pdb.rs"
+
+[[functions]]
+upstream_name = "syncPdb"
+local_name    = "reconcile"
+file          = "src/pdb.rs"
+
+[[functions]]
+upstream_name = "getExpectedScale"
+local_name    = "resolve_scale_target"
+file          = "src/pdb.rs"
+
+[[functions]]
+upstream_name = "Eviction.Create"
+local_name    = "admit_eviction"
+file          = "src/pdb.rs"
+
+[[functions]]
+upstream_name = "syncEndpointSlices"
+local_name    = "reconcile"
+file          = "src/endpointslice.rs"
+
+[[functions]]
+upstream_name = "ServiceWantsLoadBalancer"
+local_name    = "wants_load_balancer"
+file          = "src/service.rs"
+
+[[functions]]
+upstream_name = "syncService"
+local_name    = "reconcile"
+file          = "src/service.rs"
+
+[[functions]]
+upstream_name = "computeCascadePlan"
+local_name    = "compute_cascade_plan"
+file          = "src/gc/cascade.rs"
+
+[[functions]]
+upstream_name = "ValidateOwnerReferences"
+local_name    = "validate_owner_refs"
+file          = "src/gc/owner_ref.rs"
+
+[[functions]]
+upstream_name = "GetControllerOf"
+local_name    = "controller_of"
+file          = "src/gc/owner_ref.rs"
+
+[[functions]]
+upstream_name = "evaluateTtl"
+local_name    = "evaluate"
+file          = "src/gc_lite/ttl_after_finished.rs"
+
+[[functions]]
+upstream_name = "selectTerminatedForGC"
+local_name    = "select_terminated_for_gc"
+file          = "src/gc_lite/podgc.rs"
+
+[[functions]]
+upstream_name = "selectOrphanedForGC"
+local_name    = "select_orphaned_for_gc"
+file          = "src/gc_lite/podgc.rs"
+
+[[functions]]
+upstream_name = "isLeaseExpired"
+local_name    = "is_lease_expired"
+file          = "src/node_lease.rs"
+
+[[functions]]
+upstream_name = "renewalInterval"
+local_name    = "renewal_interval_sec"
+file          = "src/node_lease_deeper.rs"
+
+[[functions]]
+upstream_name = "leaderElectionStep"
+local_name    = "leader_step"
+file          = "src/node_lease_deeper.rs"
+
+[[functions]]
+upstream_name = "syncSignerCertificate"
+local_name    = "evaluate"
+file          = "src/csr_signer.rs"
+
+[[functions]]
+upstream_name = "isNodeClientCert"
+local_name    = "is_bootstrap_node_client"
+file          = "src/csr_auto_approver.rs"
+
+[[functions]]
+upstream_name = "isSelfNodeClient"
+local_name    = "is_self_node_client"
+file          = "src/csr_auto_approver.rs"
+
+[[functions]]
+upstream_name = "computeAggregatedRules"
+local_name    = "aggregate_rules"
+file          = "src/rbac/cluster_role_aggregation.rs"
+
+[[functions]]
+upstream_name = "compactRules"
+local_name    = "compact_rules"
+file          = "src/rbac/aggregation_conflict.rs"
+
+[[functions]]
+upstream_name = "ProvisionableForBound"
+local_name    = "pv_satisfies"
+file          = "src/pv/binder.rs"
+
+[[functions]]
+upstream_name = "selectPV"
+local_name    = "pick_pv"
+file          = "src/pv/binder.rs"
+
+[[functions]]
+upstream_name = "syncResourceQuotaStatus"
+local_name    = "reconcile"
+file          = "src/resource_quota.rs"
+
+[[functions]]
+upstream_name = "syncNamespace"
+local_name    = "evaluate"
+file          = "src/namespace_controller.rs"
+
+[[functions]]
+upstream_name = "TopologyHints"
+local_name    = "compute_hints"
+file          = "src/endpointslice_topology.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "TestSyncDeployment"
+local_test    = "deployment_paused_short_circuits_to_noop"
+
+[[tests]]
+upstream_test = "TestScaleDeployment"
+local_test    = "deployment_scale_up_emits_create_decision"
+
+[[tests]]
+upstream_test = "TestScaleDeploymentDown"
+local_test    = "deployment_scale_down_emits_delete_decision"
+
+[[tests]]
+upstream_test = "TestRevisionHistory"
+local_test    = "deployment_revision_history_evicts_oldest_past_limit"
+
+[[tests]]
+upstream_test = "TestMaxSurge"
+local_test    = "deployment_max_pods_during_surge_caps_at_replicas_for_recreate"
+
+[[tests]]
+upstream_test = "TestSyncReplicaSet"
+local_test    = "replicaset_reconcile_at_target_is_noop"
+
+[[tests]]
+upstream_test = "TestManageReplicasUnderReplicated"
+local_test    = "replicaset_under_replicated_creates"
+
+[[tests]]
+upstream_test = "TestValidateSelector"
+local_test    = "replicaset_empty_selector_is_invalid_spec"
+
+[[tests]]
+upstream_test = "TestBurstReplicas"
+local_test    = "replicaset_burst_clamps_create_decision"
+
+[[tests]]
+upstream_test = "TestPodIdentity"
+local_test    = "statefulset_pod_identity_uses_zero_indexed_ordinals"
+
+[[tests]]
+upstream_test = "TestOrdinalRange"
+local_test    = "statefulset_ordinal_range_matches_replica_count"
+
+[[tests]]
+upstream_test = "TestUpdateStatefulSetOrdered"
+local_test    = "statefulset_ordered_policy_steps_one_pod_per_pass"
+
+[[tests]]
+upstream_test = "TestUpdateStatefulSetParallel"
+local_test    = "statefulset_parallel_policy_fans_out_in_one_pass"
+
+[[tests]]
+upstream_test = "TestShouldRunDaemonPodOnNode"
+local_test    = "daemonset_node_should_run_when_no_node_selector_and_schedulable"
+
+[[tests]]
+upstream_test = "TestSkipUnschedulable"
+local_test    = "daemonset_node_skipped_when_unschedulable"
+
+[[tests]]
+upstream_test = "TestTolerationsTolerateTaint"
+local_test    = "daemonset_toleration_equal_matches_taint_by_key_and_value"
+
+[[tests]]
+upstream_test = "TestFindMatchingUntoleratedTaint"
+local_test    = "daemonset_tolerates_all_only_considers_noschedule_and_noexecute"
+
+[[tests]]
+upstream_test = "TestIsJobFinished"
+local_test    = "job_is_complete_when_succeeded_meets_completions"
+
+[[tests]]
+upstream_test = "TestPastBackoffLimit"
+local_test    = "job_past_backoff_when_failed_exceeds_limit"
+
+[[tests]]
+upstream_test = "TestSuspendedJobDelete"
+local_test    = "job_suspended_with_active_pods_emits_delete"
+
+[[tests]]
+upstream_test = "TestParallelism"
+local_test    = "job_clamps_creates_to_parallelism_remaining"
+
+[[tests]]
+upstream_test = "TestSyncCronJob"
+local_test    = "cronjob_reconcile_emits_create_when_allow_and_no_active"
+
+[[tests]]
+upstream_test = "TestCronJobSuspended"
+local_test    = "cronjob_reconcile_suspended_is_noop"
+
+[[tests]]
+upstream_test = "TestForbidConcurrency"
+local_test    = "cronjob_forbid_with_active_run_skips_new_fire"
+
+[[tests]]
+upstream_test = "TestParseSchedule"
+local_test    = "cronjob_invalid_schedule_string_errors"
+
+[[tests]]
+upstream_test = "TestReconcileAutoscaler"
+local_test    = "hpa_reconcile_inside_band_is_noop"
+
+[[tests]]
+upstream_test = "TestHPAScaleUp"
+local_test    = "hpa_reconcile_above_target_scales_up_within_max"
+
+[[tests]]
+upstream_test = "TestHPAInvalidTarget"
+local_test    = "hpa_target_zero_is_invalid_spec"
+
+[[tests]]
+upstream_test = "TestPDBMinAvailable"
+local_test    = "pdb_disruptions_allowed_uses_min_available_count"
+
+[[tests]]
+upstream_test = "TestEvictionDeny"
+local_test    = "pdb_admit_eviction_denies_when_no_budget"
+
+[[tests]]
+upstream_test = "TestEvictionDryRun"
+local_test    = "pdb_admit_eviction_dry_run_always_allows"
+
+[[tests]]
+upstream_test = "TestWorkqueueDedup"
+local_test    = "manager_loop_workqueue_dedups_repeated_adds"
+
+[[tests]]
+upstream_test = "TestCrossTenantIsolation"
+local_test    = "manager_loop_drops_cross_tenant_keys_at_drain"
+
+[[tests]]
+upstream_test = "TestNewControllerInitializers"
+local_test    = "admin_controllers_surface_includes_all_workload_kinds"
+
+[[tests]]
+upstream_test = "TestLifecycleControllers"
+local_test    = "admin_controllers_surface_includes_lifecycle_set"
+
+[[tests]]
+upstream_test = "TestLeaderElectorRun"
+local_test    = "admin_leader_state_carries_holder_and_active_count"
+
+[[tests]]
+upstream_test = "TestParityReport"
+local_test    = "admin_parity_report_returns_module_metadata"
+
+[[tests]]
+upstream_test = "TestUpstreamPkgPin"
+local_test    = "upstream_pkg_pins_to_canonical_path"
+
+[[tests]]
+upstream_test = "TestUpstreamVersionPin"
+local_test    = "upstream_version_pinned_to_release"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# HTTP surfaces that cave-runtime exposes for the controller-manager admin.
+# The `local_path` field must appear literally in cave-runtime/src/main.rs or
+# in the cave-runtime portal module.
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/healthz"
+local_path    = "/api/portal/controller-manager/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/livez"
+local_path    = "/api/portal/cm/health"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/readyz"
+local_path    = "/api/portal/cm"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/debug/controllers"
+local_path    = "/api/controller-manager/controllers"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/leader"
+local_path    = "/api/controller-manager/leader"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/status"
+local_path    = "/api/controller-manager/status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/parity"
+local_path    = "/api/controller-manager/parity"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/queues"
+local_path    = "/api/portal/cm/queues"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/events"
+local_path    = "/api/portal/cm/events"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kube-controller-manager --controllers=*"
+local_path    = "ControllerManagerCmd::ListControllers"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "kube-controller-manager --leader-elect"
+local_path    = "ControllerManagerCmd::GetLeader"

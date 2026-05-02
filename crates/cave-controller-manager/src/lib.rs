@@ -177,6 +177,35 @@ pub fn calculate_parity() -> Result<cave_kernel::parity::ParityReport, String> {
     .map_err(|e| e.to_string())
 }
 
+/// Admin HTTP surfaces this crate is responsible for.
+///
+/// These paths are mounted by `cave-runtime`'s portal/router; we declare them
+/// here so the parity manifest's `[[surfaces]]` mappings can verify each
+/// surface is documented at the controller-manager boundary.
+pub const ADMIN_HTTP_SURFACES: &[&str] = &[
+    "/api/portal/controller-manager/health",
+    "/api/portal/cm/health",
+    "/api/portal/cm",
+    "/api/controller-manager/controllers",
+    "/api/controller-manager/leader",
+    "/api/controller-manager/status",
+    "/api/controller-manager/parity",
+    "/api/portal/cm/queues",
+    "/api/portal/cm/events",
+];
+
+/// cavectl subcommand surfaces this crate is mirrored by. Used by the parity
+/// manifest's `[[surfaces]]` section with `kind="cli"`.
+pub const ADMIN_CLI_SURFACES: &[&str] = &[
+    "ControllerManagerCmd::ListControllers",
+    "ControllerManagerCmd::GetLeader",
+    "ControllerManagerCmd::Status",
+    "ControllerManagerCmd::Parity",
+    "ControllerManagerCmd::Health",
+    "ControllerManagerCmd::QueuesInspect",
+    "ControllerManagerCmd::EventsTail",
+];
+
 #[cfg(test)]
 mod admin_surface_tests {
     use super::*;

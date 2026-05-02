@@ -1,97 +1,140 @@
-# Built-in controllers
+# Alerts for cave-controller-manager (kube-controller-manager parity).
+#
+# Each alert references a runbook under `docs/runbooks/cave-controller-manager/`
+# and is annotated with `tenant_scoped: "true"` where the metric is keyed by
+# tenant — Alertmanager fan-out routes by that label.
+
 groups:
-  - name: cave-controller-manager-slo
+  - name: cave-controller-manager-leader
     interval: 30s
     rules:
-      - alert: ControllerManagerSloBurnRateFast
+      - alert: ControllerLeaderElectionFlapping
         expr: |
-          (
-            sum(rate(controller_manager_total{job="cave-controller-manager",code=~"5.."}[1h]))
-            /
-            sum(rate(controller_manager_total{job="cave-controller-manager"}[1h]))
-          ) > (14.4 * 0.001)
-        for: 2m
+          sum(rate(controller_manager_leader_transitions_total{job="cave-controller-manager"}[15m])) > 0.05
+        for: 10m
         labels:
           severity: critical
-          tenant_scoped: "true"
         annotations:
-          summary: "cave-controller-manager fast burn-rate (1h)"
-          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/slo-burn-fast.md"
-      - alert: ControllerManagerSloBurnRateSlow
+          summary: "cave-controller-manager leader flapping"
+          description: "Lease holder churned > 0.05/s over 15m — controllers will run twice or never."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/leader-flapping.md"
+
+      - alert: ControllerLeaderLost
         expr: |
-          (
-            sum(rate(controller_manager_total{job="cave-controller-manager",code=~"5.."}[6h]))
-            /
-            sum(rate(controller_manager_total{job="cave-controller-manager"}[6h]))
-          ) > (6 * 0.001)
-        for: 15m
-        labels:
-          severity: warning
-          tenant_scoped: "true"
-        annotations:
-          summary: "cave-controller-manager slow burn-rate (6h)"
-          description: "Sustained 5xx fraction over 6h."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/slo-burn-slow.md"
-      - alert: ControllerManagerErrorBudgetLow
-        expr: |
-          (
-            1 -
-            (sum(rate(controller_manager_total{job="cave-controller-manager",code=~"5.."}[7d]))
-              / sum(rate(controller_manager_total{job="cave-controller-manager"}[7d])))
-          ) < 0.999
-        for: 30m
-        labels:
-          severity: warning
-        annotations:
-          summary: "cave-controller-manager 7-day availability < 99.9%"
-          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/error-budget.md"
-      - alert: ControllerManagerLatencyP99High
-        expr: |
-          histogram_quantile(
-            0.99,
-            sum(rate(controller_manager_duration_seconds_bucket{job="cave-controller-manager"}[5m])) by (le)
-          ) > 1
+          max_over_time(controller_manager_leader_elected{job="cave-controller-manager"}[10m]) == 0
+          and on() (sum(up{job="cave-controller-manager"}) > 0)
         for: 5m
         labels:
-          severity: warning
+          severity: critical
         annotations:
-          summary: "cave-controller-manager p99 latency > 1s"
-          description: "p99 = {{ $value }}s."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/latency.md"
-      - alert: ControllerManagerSaturationHigh
-        expr: 'sum(controller_manager_inflight_requests{job="cave-controller-manager"}) > 400'
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "cave-controller-manager inflight requests > 400"
-          description: "Concurrent requests = {{ $value }}."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/saturation.md"
-      - alert: ControllerManagerMemoryPressure
-        expr: 'process_resident_memory_bytes{job="cave-controller-manager"} > 4 * 1024 * 1024 * 1024'
+          summary: "cave-controller-manager has no leader"
+          description: "No pod has held the LeaseLock for the last 10m although replicas are running — reconciliation is paused."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/leader-lost.md"
+
+  - name: cave-controller-manager-queues
+    interval: 30s
+    rules:
+      - alert: ControllerQueueDepthHigh
+        expr: |
+          max(controller_manager_workqueue_depth{job="cave-controller-manager"}) by (controller) > 10000
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "cave-controller-manager RSS > 4 GiB"
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/memory.md"
-      - alert: ControllerManagerCardinalityExplosion
-        expr: 'count(count by (tenant_id) (controller_manager_total{job="cave-controller-manager"})) > 5000'
-        for: 30m
+          summary: "cave-controller-manager workqueue depth high — {{ $labels.controller }}"
+          description: "Workqueue for {{ $labels.controller }} has stayed above 10k entries for 10m — backlog draining slower than ingest."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/queue-depth.md"
+
+      - alert: ControllerReconcileRateLow
+        expr: |
+          (
+            sum(rate(controller_manager_workqueue_depth{job="cave-controller-manager"}[5m])) by (controller) > 0
+          ) and (
+            sum(rate(controller_manager_reconcile_total{job="cave-controller-manager"}[5m])) by (controller) < 0.01
+          )
+        for: 15m
         labels:
           severity: warning
         annotations:
-          summary: "cave-controller-manager tenant cardinality > 5000"
-          description: "Count = {{ $value }}."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/cardinality.md"
-      - alert: ControllerManagerHealthProbeFailing
-        expr: 'min(up{job="cave-controller-manager"}) < 1'
-        for: 1m
+          summary: "cave-controller-manager reconcile rate near zero — {{ $labels.controller }}"
+          description: "{{ $labels.controller }} has a non-empty queue but is reconciling < 0.01/s — controller may be stuck."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/reconcile-stalled.md"
+
+      - alert: ControllerRequeueStorm
+        expr: |
+          sum(rate(controller_manager_workqueue_requeues_total{job="cave-controller-manager"}[5m])) by (controller) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-controller-manager requeue storm — {{ $labels.controller }}"
+          description: "{{ $labels.controller }} re-enqueued > 50 keys/s for 5m — reconciler is failing fast and retrying."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/requeue-storm.md"
+
+  - name: cave-controller-manager-quality
+    interval: 30s
+    rules:
+      - alert: ControllerCrashLooping
+        expr: |
+          rate(controller_manager_reconcile_errors_total{job="cave-controller-manager"}[5m])
+          /
+          (rate(controller_manager_reconcile_total{job="cave-controller-manager"}[5m]) + 1e-9)
+          > 0.5
+        for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "cave-controller-manager health probe failing"
-          description: "At least one instance reports up == 0."
-          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/health.md"
+          summary: "cave-controller-manager error fraction > 50% — {{ $labels.controller }}"
+          description: "Over half of reconcile passes errored for {{ $labels.controller }} in the last 5m — investigate the controller body."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/crash-looping.md"
+
+      - alert: ControllerEventStorm
+        expr: |
+          sum(rate(controller_manager_events_total{job="cave-controller-manager"}[1m])) > 1000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-controller-manager event storm"
+          description: "Reflector observed > 1000 events/s for 3m — apiserver may be bouncing or watch is over-subscribed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/event-storm.md"
+
+      - alert: ControllerLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(controller_manager_reconcile_duration_seconds_bucket{job="cave-controller-manager"}[5m])) by (le, controller)
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-controller-manager p99 reconcile latency > 5s — {{ $labels.controller }}"
+          description: "p99 reconcile duration for {{ $labels.controller }} stayed > 5s for 10m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/reconcile-latency.md"
+
+  - name: cave-controller-manager-tenancy
+    interval: 30s
+    rules:
+      - alert: ControllerCrossTenantKeysObserved
+        expr: |
+          sum(rate(controller_manager_cross_tenant_denied_total{job="cave-controller-manager"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-controller-manager observed cross-tenant keys"
+          description: "The manager loop saw a key whose tenant did not match the controller owner — possible authz bypass attempt or tenant-router misconfiguration."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/cross-tenant.md"
+
+      - alert: ControllerStubsDetected
+        expr: |
+          max(parity_stubs_detected{job="cave-controller-manager"}) > 0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "cave-controller-manager has unimplemented!() stubs"
+          description: "{{ $value }} todo!()/unimplemented!() call site(s) remain in src — golden rule 1 violation if value > 0 in shipping build."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-controller-manager/stubs-detected.md"

@@ -1672,6 +1672,15 @@ enum ControllerManagerCmd {
     Parity,
     /// Liveness probe (/api/portal/controller-manager/health).
     Health,
+    /// Inspect per-controller workqueue depth + retries. Pass `--controller`
+    /// to drill into one controller, omit for the per-controller summary.
+    QueuesInspect {
+        /// Controller name (e.g. `deployment`, `replicaset`, `hpa`).
+        #[arg(long)]
+        controller: Option<String>,
+    },
+    /// Tail the bounded reflector→workqueue event ring (Add/Update/Delete).
+    EventsTail,
 }
 
 // ── cloud-controller-manager parity ──────────────────────────────────────────
@@ -2738,6 +2747,11 @@ source_root = "src"
             ControllerManagerCmd::Status => c.get("/api/controller-manager/status").await,
             ControllerManagerCmd::Parity => c.get("/api/controller-manager/parity").await,
             ControllerManagerCmd::Health => c.get("/api/portal/controller-manager/health").await,
+            ControllerManagerCmd::QueuesInspect { controller } => match controller {
+                Some(name) => c.get(&format!("/api/portal/cm/queues/{name}")).await,
+                None => c.get("/api/portal/cm/queues").await,
+            },
+            ControllerManagerCmd::EventsTail => c.get("/api/portal/cm/events").await,
         },
 
         // ── cloud-controller-manager ──────────────────────────────────────────
