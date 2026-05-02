@@ -80,7 +80,7 @@ file          = "src/query.rs"
 [[functions]]
 upstream_name = "JQLParser.parse"
 local_name    = "parse_jql"
-file          = "src/jql.rs"
+file          = "src/query.rs"
 
 [[functions]]
 upstream_name = "CustomField.create"
