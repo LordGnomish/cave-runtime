@@ -95,3 +95,67 @@ groups:
           summary: "cave-rdbms-operator health probe failing"
           description: "At least one instance reports up == 0."
           runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/health.md"
+
+  - name: cave-rdbms-operator-deep
+    interval: 30s
+    rules:
+      - alert: PgReplicationLagBytesHigh
+        expr: 'max(rdbms_operator_replication_lag_bytes{job="cave-rdbms-operator"}) > 100 * 1024 * 1024'
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Replica lag > 100 MiB on at least one replica"
+          description: "max lag = {{ $value | humanize1024 }}B — primary write rate exceeds replica apply rate."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/replication-lag.md"
+      - alert: PgReplicationLagSecondsHigh
+        expr: 'max(rdbms_operator_replication_lag_seconds{job="cave-rdbms-operator"}) > 30'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Replica time lag > 30s"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/replication-lag.md"
+      - alert: PgFailoverEventBurst
+        expr: 'increase(rdbms_operator_failover_events_total{job="cave-rdbms-operator"}[1h]) >= 2'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "≥ 2 failovers in the last hour for one cluster"
+          description: "Cluster {{ $labels.cluster }} has flapped — investigate primary stability."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/failover-burst.md"
+      - alert: PgBackupFailureRate
+        expr: |
+          sum(rate(rdbms_operator_backup_status_total{job="cave-rdbms-operator",status="failed"}[1h]))
+          /
+          clamp_min(sum(rate(rdbms_operator_backup_status_total{job="cave-rdbms-operator"}[1h])), 1)
+          > 0.1
+        for: 30m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backup failure rate > 10% over 1h"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/backup-failures.md"
+      - alert: PgPoolSaturationCritical
+        expr: |
+          (sum by (pool) (rdbms_operator_pool_active_connections{job="cave-rdbms-operator"})
+            /
+           sum by (pool) (rdbms_operator_pool_max_size{job="cave-rdbms-operator"}))
+          > 0.95
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Pool {{ $labels.pool }} > 95% saturated"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/pool-saturation.md"
+      - alert: PgConnectionExhaustion
+        expr: 'sum by (cluster) (rdbms_operator_pool_waiting_clients{job="cave-rdbms-operator"}) > 50'
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cluster {{ $labels.cluster }} has > 50 waiting clients"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/connection-exhaustion.md"

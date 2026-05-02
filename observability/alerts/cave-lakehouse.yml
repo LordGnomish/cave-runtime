@@ -95,3 +95,75 @@ groups:
           summary: "cave-lakehouse health probe failing"
           description: "At least one instance reports up == 0."
           runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/health.md"
+
+  - name: cave-lakehouse-deep
+    interval: 30s
+    rules:
+      - alert: LakehouseManifestReadSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(lakehouse_manifest_read_seconds_bucket{job="cave-lakehouse"}[5m])) by (le)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Iceberg manifest read p95 > 2s"
+          description: "Cold object-store reads or oversized manifests."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/manifest-read-slow.md"
+      - alert: LakehouseQueryP99High
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(lakehouse_query_duration_seconds_bucket{job="cave-lakehouse"}[5m])) by (le)
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "DataFusion query p99 > 30s"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/query-latency.md"
+      - alert: LakehouseCompactionStalled
+        expr: |
+          sum(rate(lakehouse_compaction_runs_total{job="cave-lakehouse"}[1h])) == 0
+          and
+          sum(lakehouse_table_pending_compactions{job="cave-lakehouse"}) > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Compactor stalled with pending work"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/compaction-stalled.md"
+      - alert: LakehouseTooManySnapshots
+        expr: 'max(lakehouse_table_snapshots_total{job="cave-lakehouse"}) > 1000'
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Table {{ $labels.table }} has > 1000 snapshots"
+          description: "Run `cavectl lakehouse expire-snapshots`."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/snapshot-bloat.md"
+      - alert: LakehouseTimeTravelTooOld
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(lakehouse_time_travel_age_seconds_bucket{job="cave-lakehouse"}[1h])) by (le)
+          ) > 7 * 24 * 3600
+        for: 1h
+        labels:
+          severity: info
+        annotations:
+          summary: "Median time-travel target > 7 days"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/time-travel-age.md"
+      - alert: LakehouseCompactionEffectivenessLow
+        expr: |
+          (1 -
+            sum(rate(lakehouse_compaction_files_output_total{job="cave-lakehouse"}[1h]))
+            /
+            clamp_min(sum(rate(lakehouse_compaction_files_input_total{job="cave-lakehouse"}[1h])), 1)
+          ) < 0.3
+        for: 6h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Compaction reduces files by < 30%"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-lakehouse/compaction-effectiveness.md"
