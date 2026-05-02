@@ -203,6 +203,40 @@ upstream_name = "Ensemble.write"
 local_name    = "Ensemble::write_entry"
 file          = "src/segment_log.rs"
 
+# Compression — Kafka producer-side message codec (Snappy, LZ4, ZSTD, GZIP)
+[[functions]]
+upstream_name = "CompressionType.compress"
+local_name    = "compress"
+file          = "src/compression.rs"
+
+[[functions]]
+upstream_name = "CompressionType.decompress"
+local_name    = "decompress"
+file          = "src/compression.rs"
+
+# Log compaction (Kafka core/src/main/scala/kafka/log/Cleaner.scala)
+[[functions]]
+upstream_name = "LogCleaner.clean"
+local_name    = "compact_log"
+file          = "src/log_compaction.rs"
+
+[[functions]]
+upstream_name = "LogManager.applyRetention"
+local_name    = "apply_retention"
+file          = "src/log_compaction.rs"
+
+# Schema Registry compatibility (apicurio/confluent SR semantics)
+[[functions]]
+upstream_name = "AvroCompatibilityChecker.checkCompatibility"
+local_name    = "check_compatibility"
+file          = "src/schema_evolution.rs"
+
+# Incremental cooperative rebalance (KIP-429)
+[[functions]]
+upstream_name = "CooperativeStickyAssignor.assign"
+local_name    = "compute_incremental_plan"
+file          = "src/incremental_rebalance.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
 
 # Kafka wire
@@ -283,3 +317,25 @@ local_path    = "cave-streams:9092"
 kind          = "tcp"
 upstream_path = "pulsar:6650"
 local_path    = "cave-streams:6650"
+
+# Schema Registry — Confluent-compatible REST surface (cave-streams native impl)
+[[surfaces]]
+kind          = "http"
+upstream_path = "/subjects/{subject}/versions"
+local_path    = "/subjects/{subject}/versions"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/schemas/ids/{id}"
+local_path    = "/schemas/ids/{id}"
+
+# Kafka Connect admin
+[[surfaces]]
+kind          = "http"
+upstream_path = "/connectors"
+local_path    = "/connectors"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/connectors/{name}/status"
+local_path    = "/connectors/{name}/status"
