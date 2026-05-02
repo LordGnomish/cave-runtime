@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "cave_module": "cave-store",
+  "upstream_repo": "minio/minio",
+  "old_tag": "RELEASE.2024-01-01",
+  "new_tag": "RELEASE.2025-10-15T17-29-55Z",
+  "release_url": "https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z",
+  "release_name": null,
+  "release_body": null,
+  "published_at": null,
+  "surfaces_added": [],
+  "surfaces_removed": [],
+  "surfaces_changed": [],
+  "priority": "high",
+  "created_at": "2026-05-02T17:03:51Z",
+  "origin": {
+    "daemon": "version-audit-2026-05-02",
+    "run_id": "manual-burak-bump-plan"
+  },
+  "audit_status": "STALE",
+  "audit_note": "1.+0",
+  "audit_action_recommendation": "Bump manifest [upstream].version to latest, regenerate parity port, open draft PR. Block on human review (no auto-merge)."
+}
