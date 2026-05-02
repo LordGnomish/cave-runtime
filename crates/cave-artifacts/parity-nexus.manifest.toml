@@ -1,0 +1,209 @@
+# parity-nexus.manifest.toml — cave-artifacts/nexus sub-module
+#
+# Companion manifest for the nexus sub-module of cave-artifacts. cave-
+# kernel's discover_workspace currently only reads parity.manifest.toml
+# (one upstream per crate). This file is therefore read documentation /
+# future-tool input today — extending discovery to walk per-sub-module
+# manifests is a tracked follow-up.
+
+[upstream]
+org     = "sonatype"
+repo    = "nexus-public"
+version = "release-3.69.0-02"
+
+[module]
+name        = "cave-artifacts-nexus"
+description = "Universal binary repository sub-module — Sonatype Nexus 3"
+source_root = "src/nexus"
+
+# ── File mappings ────────────────────────────────────────────────────────
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/Format.java"
+local    = "src/nexus/format.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/Repository.java"
+local    = "src/nexus/models.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/storage/Component.java"
+local    = "src/nexus/models.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/storage/Asset.java"
+local    = "src/nexus/models.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/manager/RepositoryManager.java"
+local    = "src/nexus/store.rs"
+
+[[files]]
+upstream = "plugins/nexus-coreui-plugin/src/main/java/org/sonatype/nexus/coreui/RepositoryComponent.groovy"
+local    = "src/nexus/routes.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/raw/RawFormat.java"
+local    = "src/nexus/format.rs"
+
+[[files]]
+upstream = "components/nexus-cleanup/src/main/java/org/sonatype/nexus/cleanup/internal/task/CleanupServiceImpl.java"
+local    = "src/nexus/cleanup.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/routing/RoutingRule.java"
+local    = "src/nexus/routing.rs"
+
+[[files]]
+upstream = "components/nexus-repository/src/main/java/org/sonatype/nexus/repository/manager/RepositoryNotFoundException.java"
+local    = "src/nexus/error.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────
+[[functions]]
+upstream_name = "RepositoryManagerImpl.create"
+local_name    = "create_repository"
+file          = "src/nexus/store.rs"
+
+[[functions]]
+upstream_name = "RepositoryManagerImpl.get"
+local_name    = "get_repository"
+file          = "src/nexus/store.rs"
+
+[[functions]]
+upstream_name = "RepositoryManagerImpl.delete"
+local_name    = "delete_repository"
+file          = "src/nexus/store.rs"
+
+[[functions]]
+upstream_name = "RawContentFacetImpl.put"
+local_name    = "upload_raw"
+file          = "src/nexus/routes.rs"
+
+[[functions]]
+upstream_name = "RawContentFacetImpl.get"
+local_name    = "download_raw"
+file          = "src/nexus/routes.rs"
+
+[[functions]]
+upstream_name = "CleanupServiceImpl.findEligibleAssets"
+local_name    = "evaluate"
+file          = "src/nexus/cleanup.rs"
+
+[[functions]]
+upstream_name = "CleanupServiceImpl.deleteFromRepository"
+local_name    = "apply"
+file          = "src/nexus/cleanup.rs"
+
+[[functions]]
+upstream_name = "RoutingRuleHelper.isAllowed"
+local_name    = "evaluate"
+file          = "src/nexus/routing.rs"
+
+[[functions]]
+upstream_name = "FormatRegistry.byName"
+local_name    = "FormatRegistry::get"
+file          = "src/nexus/format.rs"
+
+[[functions]]
+upstream_name = "BlobStoreImpl.create"
+local_name    = "store_blob"
+file          = "src/nexus/store.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────
+[[tests]]
+upstream_test = "RepositoryManagerImplTest#testCreateRepository"
+local_test    = "store_create_and_get_repository"
+
+[[tests]]
+upstream_test = "RepositoryManagerImplTest#testCreateDuplicate"
+local_test    = "store_create_repository_rejects_duplicate"
+
+[[tests]]
+upstream_test = "RepositoryManagerImplTest#testGroupMemberValidation"
+local_test    = "store_group_repo_requires_existing_members"
+
+[[tests]]
+upstream_test = "RepositoryManagerImplTest#testDeleteCascades"
+local_test    = "store_delete_repository_cascades_components_and_assets"
+
+[[tests]]
+upstream_test = "BlobStoreImplTest#testDeduplicateBlob"
+local_test    = "store_blob_dedupe_across_assets"
+
+[[tests]]
+upstream_test = "BlobStoreImplTest#testDeleteUnreferencedBlob"
+local_test    = "store_blob_decref_drops_when_last_asset_deleted"
+
+[[tests]]
+upstream_test = "RawContentFacetImplTest#testRoundTrip"
+local_test    = "http::upload_then_download_raw_e2e"
+
+[[tests]]
+upstream_test = "RawContentFacetImplTest#testDelete"
+local_test    = "http::delete_raw_removes_asset"
+
+[[tests]]
+upstream_test = "RawContentFacetImplTest#testPathTraversalRejected"
+local_test    = "raw_validate_rejects_path_traversal"
+
+[[tests]]
+upstream_test = "CleanupServiceImplTest#testOlderThanCriteria"
+local_test    = "cleanup_older_than_matches_aged_assets"
+
+[[tests]]
+upstream_test = "CleanupServiceImplTest#testRegexCriteria"
+local_test    = "cleanup_regex_filters_paths"
+
+[[tests]]
+upstream_test = "CleanupServiceImplTest#testFormatScoping"
+local_test    = "cleanup_format_scoped_skips_mismatched_repo"
+
+[[tests]]
+upstream_test = "RoutingRuleHelperTest#testAllowMode"
+local_test    = "routing_allow_passes_matching_path"
+
+[[tests]]
+upstream_test = "RoutingRuleHelperTest#testBlockMode"
+local_test    = "routing_block_blocks_matching_path"
+
+[[tests]]
+upstream_test = "RoutingRuleHelperTest#testBlockOverridesAllow"
+local_test    = "routing_block_takes_precedence_over_allow"
+
+[[tests]]
+upstream_test = "FormatRegistryTest#testGetRaw"
+local_test    = "format_registry_returns_raw_adapter"
+
+[[tests]]
+upstream_test = "FormatRegistryTest#testUnsupportedFormat"
+local_test    = "format_registry_reports_unimplemented_format"
+
+# ── Surface mappings ─────────────────────────────────────────────────────
+[[surfaces]]
+kind          = "http"
+upstream_path = "/service/rest/v1/repositories"
+local_path    = "/api/nexus/v1/repositories"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/service/rest/v1/components"
+local_path    = "/api/nexus/v1/components"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/service/rest/v1/assets"
+local_path    = "/api/nexus/v1/assets"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/service/rest/v1/cleanup-policies"
+local_path    = "/api/nexus/v1/cleanup-policies"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/service/rest/v1/routing-rules"
+local_path    = "/api/nexus/v1/routing-rules"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/repository/{name}/{path}"
+local_path    = "/api/nexus/repository/{name}/{*path}"
