@@ -211,4 +211,130 @@ mod tests {
         assert_eq!(result.files_scanned, 10);
         assert_eq!(result.findings.len(), 2);
     }
+
+    #[test]
+    fn test_keyword_match_unicode_pattern() {
+        let rule = make_keyword_rule("şifre", FindingSeverity::Critical, true);
+        let content = "let şifre = \"gizli\";";
+        let findings = match_keyword(&rule, content, "src/tr.rs");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].line_number, 1);
+    }
+
+    #[test]
+    fn test_keyword_match_empty_content() {
+        let rule = make_keyword_rule("password", FindingSeverity::Major, true);
+        let findings = match_keyword(&rule, "", "src/empty.rs");
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_keyword_match_pattern_substring() {
+        // Pattern "auth" should match "authenticate", "auth_token", etc.
+        let rule = make_keyword_rule("auth", FindingSeverity::Minor, true);
+        let content = "fn authenticate() {}\nlet auth_token = ();";
+        let findings = match_keyword(&rule, content, "src/auth.rs");
+        assert_eq!(findings.len(), 2);
+    }
+
+    #[test]
+    fn test_keyword_match_message_contains_pattern() {
+        let rule = make_keyword_rule("TODO", FindingSeverity::Info, true);
+        let content = "// TODO: implement";
+        let findings = match_keyword(&rule, content, "src/x.rs");
+        assert_eq!(findings.len(), 1);
+        assert!(findings[0].message.contains("TODO"));
+    }
+
+    #[test]
+    fn test_keyword_match_severity_propagated() {
+        let rule = make_keyword_rule("danger", FindingSeverity::Critical, true);
+        let content = "danger here";
+        let findings = match_keyword(&rule, content, "src/d.rs");
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].severity, FindingSeverity::Critical);
+    }
+
+    #[test]
+    fn test_scan_content_keyword_rule_runs() {
+        let rule = make_keyword_rule("secret", FindingSeverity::Major, true);
+        let findings = scan_content(&[rule], "let secret = 1;", "src/m.rs");
+        assert_eq!(findings.len(), 1);
+    }
+
+    #[test]
+    fn test_scan_content_disabled_rules_skipped() {
+        let rule = make_keyword_rule("secret", FindingSeverity::Major, false);
+        let findings = scan_content(&[rule], "let secret = 1;", "src/m.rs");
+        assert!(findings.is_empty());
+    }
+
+    #[test]
+    fn test_scan_content_multiple_rules_combined() {
+        let r1 = make_keyword_rule("api_key", FindingSeverity::Critical, true);
+        let r2 = make_keyword_rule("token", FindingSeverity::Major, true);
+        let content = "let api_key = \"k\";\nlet token = \"t\";";
+        let findings = scan_content(&[r1, r2], content, "src/c.rs");
+        assert_eq!(findings.len(), 2);
+    }
+
+    #[test]
+    fn test_filter_min_severity_info_passes_all() {
+        let f = vec![
+            make_finding(FindingSeverity::Critical),
+            make_finding(FindingSeverity::Major),
+            make_finding(FindingSeverity::Minor),
+            make_finding(FindingSeverity::Info),
+        ];
+        assert_eq!(filter_by_min_severity(&f, &FindingSeverity::Info).len(), 4);
+    }
+
+    #[test]
+    fn test_filter_min_severity_critical_only() {
+        let f = vec![
+            make_finding(FindingSeverity::Critical),
+            make_finding(FindingSeverity::Major),
+            make_finding(FindingSeverity::Minor),
+        ];
+        let kept = filter_by_min_severity(&f, &FindingSeverity::Critical);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].severity, FindingSeverity::Critical);
+    }
+
+    #[test]
+    fn test_build_result_zero_findings() {
+        let result = build_result("clean-project", vec![], 0, 0);
+        assert!(result.findings.is_empty());
+        assert_eq!(result.rules_applied, 0);
+        assert_eq!(result.files_scanned, 0);
+    }
+
+    #[test]
+    fn test_build_result_unique_scan_id() {
+        let r1 = build_result("p", vec![], 0, 0);
+        let r2 = build_result("p", vec![], 0, 0);
+        assert_ne!(r1.scan_id, r2.scan_id);
+    }
+
+    #[test]
+    fn test_build_result_scanned_at_recent() {
+        let before = chrono::Utc::now();
+        let r = build_result("t", vec![], 0, 0);
+        let after = chrono::Utc::now();
+        assert!(r.scanned_at >= before && r.scanned_at <= after);
+    }
+
+    #[test]
+    fn test_severity_rank_total_ordering() {
+        // Critical=3, Major=2, Minor=1, Info=0 — strictly increasing.
+        let ordered = [
+            FindingSeverity::Info,
+            FindingSeverity::Minor,
+            FindingSeverity::Major,
+            FindingSeverity::Critical,
+        ];
+        for i in 1..ordered.len() {
+            assert!(severity_rank(&ordered[i]) > severity_rank(&ordered[i - 1]));
+        }
+    }
 }
