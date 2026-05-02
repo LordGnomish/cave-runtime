@@ -4,6 +4,7 @@
 //! Pre-commit and CI secret scanning. Regex + entropy-based detection.
 
 pub mod detector;
+pub mod models;
 pub mod routes;
 
 use axum::Router;

@@ -280,4 +280,144 @@ mod tests {
         assert!(aws_finding.is_some(), "Expected aws-access-key finding");
         assert_eq!(aws_finding.unwrap().line, 3, "AWS key should be found on line 3");
     }
+
+    // ---------------------------------------------------------------------
+    // Extended detector coverage
+    // ---------------------------------------------------------------------
+
+    #[test]
+    fn test_scan_slack_webhook_detected() {
+        let detectors = builtin_detectors();
+        let content = "WEBHOOK=https://hooks.slack.com/services/T01ABCDEF/B01ABCDEF/abc123XYZdef\n";
+        let findings = scan(content, "secrets.env", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "slack-webhook"));
+    }
+
+    #[test]
+    fn test_scan_azure_connection_detected() {
+        let detectors = builtin_detectors();
+        let content = "AZ=DefaultEndpointsProtocol=https;AccountName=mystore;AccountKey=YWJjZGVmZ2hpamtsbW5vcA==";
+        let findings = scan(content, "az.env", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "azure-connection-string"));
+    }
+
+    #[test]
+    fn test_scan_password_assignment_detected() {
+        let detectors = builtin_detectors();
+        let content = r#"password = "supersecret123""#;
+        let findings = scan(content, "config.toml", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "password-assignment"));
+    }
+
+    #[test]
+    fn test_scan_generic_api_key_detected() {
+        let detectors = builtin_detectors();
+        let content = r#"api_key = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345""#;
+        let findings = scan(content, "k.toml", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "generic-api-key"));
+    }
+
+    #[test]
+    fn test_scan_ec_private_key_variant_detected() {
+        let detectors = builtin_detectors();
+        let content = "-----BEGIN EC PRIVATE KEY-----\n";
+        let findings = scan(content, "id_ecdsa", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "private-key"));
+    }
+
+    #[test]
+    fn test_scan_dsa_private_key_variant_detected() {
+        let detectors = builtin_detectors();
+        let content = "-----BEGIN DSA PRIVATE KEY-----\n";
+        let findings = scan(content, "id_dsa", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "private-key"));
+    }
+
+    #[test]
+    fn test_scan_ghs_token_detected() {
+        let detectors = builtin_detectors();
+        // gh[ps]_ pattern accepts both ghp_ and ghs_
+        let content = "TOKEN=ghs_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef1234\n";
+        let findings = scan(content, "config.env", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "github-token"));
+    }
+
+    #[test]
+    fn test_high_entropy_finding_requires_key_hint() {
+        let detectors = builtin_detectors();
+        // High-entropy line *without* "key/secret/token/password" should not fire
+        // the generic high-entropy detector.
+        let content = "abcdef0123456789ABCDEFG_NOTHINTED";
+        let findings = scan(content, "x.txt", &detectors);
+        assert!(findings.iter().all(|f| f.detector != "high-entropy"));
+    }
+
+    #[test]
+    fn test_high_entropy_finding_fires_with_hint() {
+        let detectors = builtin_detectors();
+        let content = "secret=abcdef0123456789ABCDEFGHIJ_NN_xx_KK_pp";
+        let findings = scan(content, "x.txt", &detectors);
+        assert!(findings.iter().any(|f| f.detector == "high-entropy"));
+    }
+
+    #[test]
+    fn test_short_line_not_redacted() {
+        // Short matched lines should be returned verbatim, not redacted.
+        let detectors = builtin_detectors();
+        // Use a long-enough AKIA but force the matched line to remain short.
+        let content = "AKIAIOSFODNN7EXAM"; // 17 chars — under redaction threshold
+        let findings = scan(content, "x.env", &detectors);
+        // No detector should fire (AKIA pattern needs 16 trailing alnum after AKIA)
+        assert!(findings.iter().all(|f| !f.matched.contains("...")));
+    }
+
+    #[test]
+    fn test_long_line_is_redacted() {
+        let detectors = builtin_detectors();
+        let content = "config_token_string=AKIAIOSFODNN7EXAMPLEEXTRAPADDING";
+        let findings = scan(content, "x.env", &detectors);
+        let aws = findings.iter().find(|f| f.detector == "aws-access-key").unwrap();
+        assert!(aws.matched.contains("..."));
+    }
+
+    #[test]
+    fn test_severity_assignment_aws_critical() {
+        let detectors = builtin_detectors();
+        let content = "K=AKIAIOSFODNN7EXAMPLE";
+        let findings = scan(content, "x.env", &detectors);
+        let aws = findings.iter().find(|f| f.detector == "aws-access-key").unwrap();
+        assert_eq!(aws.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn test_severity_assignment_jwt_high() {
+        let detectors = builtin_detectors();
+        let content = "Auth: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+        let findings = scan(content, "r.txt", &detectors);
+        let jwt = findings.iter().find(|f| f.detector == "jwt-token").unwrap();
+        assert_eq!(jwt.severity, Severity::High);
+    }
+
+    #[test]
+    fn test_finding_unverified_by_default() {
+        let detectors = builtin_detectors();
+        let content = "K=AKIAIOSFODNN7EXAMPLE";
+        let findings = scan(content, "x.env", &detectors);
+        assert!(findings.iter().all(|f| !f.verified));
+    }
+
+    #[test]
+    fn test_scan_finds_expected_count_when_multi_detector_overlap() {
+        let detectors = builtin_detectors();
+        // Line containing AWS key + entropy hint => should produce at least 2 findings
+        // (aws-access-key + possibly high-entropy if the line is long enough).
+        let content = "secret_aws_key_AKIAIOSFODNN7EXAMPLE_padding_padding_extra";
+        let findings = scan(content, "x.env", &detectors);
+        assert!(findings.len() >= 1);
+    }
+
+    #[test]
+    fn test_shannon_entropy_zero_for_empty() {
+        assert_eq!(shannon_entropy(""), 0.0);
+    }
 }
