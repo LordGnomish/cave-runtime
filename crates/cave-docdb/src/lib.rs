@@ -6,6 +6,7 @@
 //! mongoose, Java driver) without modification on port 27017.
 
 pub mod bson;
+pub mod codec;
 pub mod commands;
 pub mod cursor;
 pub mod engine;

@@ -5,6 +5,7 @@
 
 pub mod acl;
 pub mod cluster;
+pub mod codec;
 pub mod commands;
 pub mod config;
 pub mod db;
