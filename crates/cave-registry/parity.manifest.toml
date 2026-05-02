@@ -1,0 +1,40 @@
+# parity.manifest.toml — cave-registry
+# Upstream: distribution/distribution v3.1.1
+#   https://github.com/distribution/distribution
+#
+# CNCF Distribution is the reference implementation of the OCI
+# Registry HTTP API; cave-registry reimplements it. goharbor/harbor
+# (v2.15.0) is a secondary surface to track for the auth/RBAC and
+# replication layers built on top.
+#
+# Stubbed 2026-05-02 — was missing despite cave-registry being on the
+# kernel HIGH_PRIORITY_MODULES list in cave-upstream. Function/test
+# mappings to be filled in pre-OSS-launch (see post-launch port plan).
+
+[upstream]
+org     = "distribution"
+repo    = "distribution"
+version = "v3.1.1"
+
+[module]
+name        = "cave-registry"
+description = "OCI image registry — distribution/distribution reimplementation"
+source_root = "src"
+priority    = "high"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "registry/handlers/manifests.go"
+# local    = "src/manifests.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "manifestHandler.GetManifest"
+# local_name    = "get_manifest"
+# file          = "src/manifests.rs"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/v2/{name}/manifests/{reference}"
+# local_path    = "/v2/{name}/manifests/{reference}"

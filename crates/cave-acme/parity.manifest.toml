@@ -1,0 +1,19 @@
+# parity.manifest.toml — cave-acme
+# Upstream: smallstep/certificates v0.30.2
+#   https://github.com/smallstep/certificates
+#
+# step-ca is a private ACME (RFC 8555) certificate authority. cave-acme
+# reimplements the ACME server side. cert-manager (already tracked in
+# cave-certs) is the consumer.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "smallstep"
+repo    = "certificates"
+version = "v0.30.2"
+
+[module]
+name        = "cave-acme"
+description = "ACME RFC 8555 certificate authority — step-ca reimplementation"
+source_root = "src"

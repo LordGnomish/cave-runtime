@@ -1,0 +1,16 @@
+# parity.manifest.toml — cave-portal-web
+# Upstream tracked via parent crate cave-portal (backstage/backstage).
+# This sub-crate tracks the *frontend / web UI* surface only.
+#
+# Stubbed 2026-05-02. Bump dispatch happens against cave-portal.
+
+[upstream]
+org     = "backstage"
+repo    = "backstage"
+version = "v1.50.4"
+
+[module]
+name        = "cave-portal-web"
+description = "Backstage frontend / web surface — sub-crate of cave-portal"
+source_root = "src"
+parent_module = "cave-portal"

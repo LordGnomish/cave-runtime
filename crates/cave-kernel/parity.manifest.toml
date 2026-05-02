@@ -1,0 +1,17 @@
+# parity.manifest.toml — cave-kernel
+# First-party primitives crate. No external upstream — these are the
+# shared infrastructure types (event bus, scheduler hooks, supervisor
+# trees) consumed by every cave-* module.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "cave-runtime"
+repo    = "cave-runtime"
+version = "v0.1.0"
+
+[module]
+name        = "cave-kernel"
+description = "Shared kernel primitives — first-party infrastructure"
+source_root = "src"
+first_party = true
