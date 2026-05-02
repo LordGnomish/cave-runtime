@@ -320,3 +320,99 @@ local    = "src/providers/azure_advanced.rs"
 [[providers.azure.files]]
 upstream = "pkg/provider/azure_vnet_peering.go"
 local    = "src/providers/azure_advanced.rs"
+
+# ── Function mappings (additions for Tier A close-out 2026-05-02) ───────────
+[[functions]]
+upstream_name = "ServiceController.shouldManage"
+local_name    = "should_manage"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "ServiceController.specDrift"
+local_name    = "lb_spec_drifted"
+file          = "src/service_controller.rs"
+
+[[functions]]
+upstream_name = "RouteController.cidrsOverlap"
+local_name    = "cidrs_overlap"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "RouteController.validateMaskSize"
+local_name    = "validate_mask_size"
+file          = "src/route_ipam.rs"
+
+[[functions]]
+upstream_name = "NodeLifecycle.isOutOfService"
+local_name    = "is_out_of_service"
+file          = "src/node_lifecycle.rs"
+
+[[functions]]
+upstream_name = "NodeLifecycle.evaluateEviction"
+local_name    = "evaluate_eviction"
+file          = "src/node_lifecycle.rs"
+
+# ── Test mappings (audit-flagged 0 → 16) ────────────────────────────────────
+[[tests]]
+upstream_test = "TestDefaultMasksMatchKubeFlags"
+local_test    = "default_node_cidr_masks_match_upstream_flags"
+
+[[tests]]
+upstream_test = "TestValidateMaskAcceptsV4Default"
+local_test    = "validate_mask_size_accepts_v4_default"
+
+[[tests]]
+upstream_test = "TestValidateMaskRejectsV4Above30"
+local_test    = "validate_mask_size_rejects_v4_node_mask_above_30"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapIdentical"
+local_test    = "cidrs_overlap_detects_identical_cidrs"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapSupernetSubnet"
+local_test    = "cidrs_overlap_detects_supernet_subnet"
+
+[[tests]]
+upstream_test = "TestCidrsOverlapDisjoint"
+local_test    = "cidrs_overlap_returns_false_for_disjoint"
+
+[[tests]]
+upstream_test = "TestAllocatorCapacityMatches"
+local_test    = "allocator_capacity_matches_2_to_the_diff"
+
+[[tests]]
+upstream_test = "TestAllocatorEmitsConsecutive"
+local_test    = "allocator_emits_distinct_consecutive_cidrs"
+
+[[tests]]
+upstream_test = "TestAllocatorReleaseReturnsCidr"
+local_test    = "allocator_release_returns_cidr_to_pool"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsDoubleAlloc"
+local_test    = "allocator_reserve_rejects_double_allocation"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsWrongMask"
+local_test    = "allocator_reserve_rejects_wrong_mask"
+
+[[tests]]
+upstream_test = "TestAllocatorRejectsOutsideParent"
+local_test    = "allocator_reserve_rejects_outside_parent"
+
+[[tests]]
+upstream_test = "TestAllocatorExhaustionError"
+local_test    = "allocator_exhaustion_returns_upstream_error"
+
+[[tests]]
+upstream_test = "TestBackoffScheduleValidates"
+local_test    = "default_backoff_schedule_validates"
+
+[[tests]]
+upstream_test = "TestBackoffExponentialGrowth"
+local_test    = "backoff_delay_grows_exponentially_then_caps"
+
+[[tests]]
+upstream_test = "TestBackoffMaxRetries"
+local_test    = "backoff_should_retry_respects_max_retries"
