@@ -111,7 +111,7 @@ file          = "src/lib.rs"
         let mut tmp = NamedTempFile::new().unwrap();
         tmp.write_all(sample_toml().as_bytes()).unwrap();
         let manifest = parse_manifest_file(tmp.path()).unwrap();
-        assert_eq!(manifest.upstream.org, "trufflesecurity");
+        assert_eq!(manifest.primary_upstream().unwrap().org, "trufflesecurity");
         assert_eq!(manifest.module.name, "cave-secrets-test");
         assert_eq!(manifest.functions.len(), 1);
         assert_eq!(manifest.functions[0].local_name, "scan_file");

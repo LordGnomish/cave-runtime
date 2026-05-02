@@ -108,8 +108,10 @@ async fn run(cli: Cli) -> Result<()> {
                 );
             }
 
-            let upstream_repo =
-                format!("{}/{}", manifest.upstream.org, manifest.upstream.repo);
+            let upstream_repo = match manifest.primary_upstream() {
+                Some(u) => format!("{}/{}", u.org, u.repo),
+                None => "(no-upstream-declared)".to_string(),
+            };
 
             let prompt = build_ollama_prompt(
                 &crate_name,

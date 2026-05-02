@@ -17,9 +17,10 @@ fn load_test_manifest() -> ParityManifest {
 #[test]
 fn test_manifest_upstream_fields() {
     let m = load_test_manifest();
-    assert_eq!(m.upstream.org, "trufflesecurity");
-    assert_eq!(m.upstream.repo, "trufflehog");
-    assert_eq!(m.upstream.version, "v3.63.0");
+    let primary = m.primary_upstream().unwrap();
+    assert_eq!(primary.org, "trufflesecurity");
+    assert_eq!(primary.repo, "trufflehog");
+    assert_eq!(primary.version, "v3.63.0");
 }
 
 #[test]

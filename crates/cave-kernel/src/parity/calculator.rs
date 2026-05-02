@@ -14,6 +14,12 @@ pub trait FileResolver: Send + Sync {
     /// Returns `true` if any `.rs` file under `source_root` (relative to the module root)
     /// contains `pattern`.
     fn source_contains(&self, source_root: &str, pattern: &str) -> bool;
+    /// Returns `true` if any `.rs` file under either `source_root` or the
+    /// sibling `tests/` directory contains `pattern`. Used for test parity so
+    /// integration tests living outside `src/` are still discoverable.
+    fn source_or_tests_contains(&self, source_root: &str, pattern: &str) -> bool {
+        self.source_contains(source_root, pattern) || self.source_contains("tests", pattern)
+    }
     /// Returns the number of lines containing `todo!` or `unimplemented!` in the source tree.
     fn count_stubs(&self, source_root: &str) -> u32;
 }
@@ -126,12 +132,13 @@ impl<R: FileResolver> ParityCalculator<R> {
 
         let gaps = self.collect_gaps(manifest, source_root);
 
+        let upstream_ref = match manifest.primary_upstream() {
+            Some(u) => format!("{}/{} @ {}", u.org, u.repo, u.version),
+            None => "(no upstream declared)".to_string(),
+        };
         ParityReport {
             module: manifest.module.name.clone(),
-            upstream_ref: format!(
-                "{}/{} @ {}",
-                manifest.upstream.org, manifest.upstream.repo, manifest.upstream.version
-            ),
+            upstream_ref,
             measured_at: chrono::Utc::now(),
             file_parity,
             function_parity,
@@ -182,7 +189,7 @@ impl<R: FileResolver> ParityCalculator<R> {
             .iter()
             .filter(|t| {
                 self.resolver
-                    .source_contains(source_root, &format!("fn {}", t.local_test))
+                    .source_or_tests_contains(source_root, &format!("fn {}", t.local_test))
             })
             .count() as u32;
         ParityMetric { score: matched as f32 / total as f32, matched, total }
@@ -340,11 +347,12 @@ mod tests {
 
     fn sample_manifest() -> ParityManifest {
         ParityManifest {
-            upstream: UpstreamInfo {
+            upstream: Some(UpstreamInfo {
                 org: "upstream-org".into(),
                 repo: "upstream-repo".into(),
                 version: "v1.0.0".into(),
-            },
+            }),
+            upstreams: Vec::new(),
             module: ModuleInfo {
                 name: "test-module".into(),
                 description: None,
@@ -703,9 +711,10 @@ local_path = "/api/foo"
 "#;
         let manifest: crate::parity::manifest::ParityManifest =
             toml::from_str(toml).unwrap();
-        assert_eq!(manifest.upstream.org, "test-org");
-        assert_eq!(manifest.upstream.repo, "test-repo");
-        assert_eq!(manifest.upstream.version, "v1.0");
+        let primary = manifest.primary_upstream().unwrap();
+        assert_eq!(primary.org, "test-org");
+        assert_eq!(primary.repo, "test-repo");
+        assert_eq!(primary.version, "v1.0");
         assert_eq!(manifest.module.name, "test-mod");
         assert_eq!(manifest.files.len(), 1);
         assert_eq!(manifest.functions.len(), 1);
