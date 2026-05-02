@@ -46,6 +46,7 @@ fn all_modules() -> Vec<ModuleMeta> {
         ("flags",     "Feature Flags",        "platform",      "LaunchDarkly"),
         ("cost",      "Cost Analytics",       "platform",      "Kubecost"),
         ("registry",  "Artifact Registry",    "platform",      "Harbor"),
+        ("gateway",   "API Gateway",          "platform",      "Kong + Gravitee"),
         ("chat",      "Team Chat",            "platform",      "Slack"),
         ("chaos",     "Chaos Engineering",    "platform",      "Chaos Monkey"),
         ("backup",    "Backup & Restore",     "platform",      "Velero"),
@@ -121,6 +122,46 @@ pub fn get_dashboard() -> DashboardData {
     }
 }
 
+/// Per-module curated stats payload. Most modules return the default
+/// active/requests/errors triple; gateway carries the canonical Kong +
+/// Gravitee feature list per ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001.
+fn module_stats(module_id: &str) -> serde_json::Value {
+    match module_id {
+        "gateway" => serde_json::json!({
+            "active": true,
+            "requests_today": 0,
+            "errors_today": 0,
+            "upstreams": ["Kong v3.5", "Gravitee v4.x"],
+            "kong_features": [
+                "Admin API (services / routes / upstreams / consumers)",
+                "Plugin chain: rate-limiting, key-auth, jwt, oauth2, basic-auth, hmac-auth",
+                "ACL, IP restriction, bot detection, proxy cache",
+                "Request/response transformer, request size limiting, request termination",
+                "Prometheus + Zipkin observability, gRPC gateway",
+                "Load balancer (round-robin / least-conn / consistent-hash / latency-aware)",
+                "Active + passive healthchecks, circuit breaker",
+                "TLS / SNI resolver, ACME HTTP-01 challenge"
+            ],
+            "gravitee_features": [
+                "API definition (path / methods / policy chain) + lifecycle (Created / Published / Unpublished / Deprecated / Archived)",
+                "Plan registry (KeyLess / ApiKey / JWT / OAuth2 security types)",
+                "Application registry (Simple / WebApp / Browser / Native / BackendToBackend, OAuth2 client credentials)",
+                "Subscription state machine (Pending → Accepted / Rejected; Accepted ↔ Paused / Resumed → Closed)",
+                "API-key minting + indexed lookup for data-path enforcement",
+                "Portal: read-only Public + Published view, category + tag filters",
+                "Developer portal pages, catalog versioning, debug mode",
+                "Design-time governance (OpenAPI linting + quality gates)",
+                "Federation gateway, analytics dimensions"
+            ]
+        }),
+        _ => serde_json::json!({
+            "active": true,
+            "requests_today": 0,
+            "errors_today": 0,
+        }),
+    }
+}
+
 /// Return a summary for a single module by its slug.
 pub fn get_module_summary(module_id: &str) -> Option<ModuleSummary> {
     all_modules()
@@ -132,11 +173,7 @@ pub fn get_module_summary(module_id: &str) -> Option<ModuleSummary> {
             health: HealthStatus::Healthy,
             upstream_replacement: upstream.to_string(),
             category: category.to_string(),
-            stats: serde_json::json!({
-                "active": true,
-                "requests_today": 0,
-                "errors_today": 0,
-            }),
+            stats: module_stats(id),
         })
 }
 
@@ -150,11 +187,7 @@ pub fn list_modules() -> Vec<ModuleSummary> {
             health: HealthStatus::Healthy,
             upstream_replacement: upstream.to_string(),
             category: category.to_string(),
-            stats: serde_json::json!({
-                "active": true,
-                "requests_today": 0,
-                "errors_today": 0,
-            }),
+            stats: module_stats(id),
         })
         .collect()
 }
