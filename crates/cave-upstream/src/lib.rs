@@ -22,6 +22,7 @@ pub mod engine;
 pub mod models;
 pub mod store;
 pub mod routes;
+pub mod adr_links;
 
 // ── Watch daemon ────────────────────────────────────────────────────────────
 
