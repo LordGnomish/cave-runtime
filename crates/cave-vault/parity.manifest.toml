@@ -132,10 +132,146 @@ upstream_name = "Combine"
 local_name    = "combine_shares"
 file          = "src/core/seal.rs"
 
+# Transit engine — encryption + signing
+[[functions]]
+upstream_name = "pathEncryptWrite"
+local_name    = "encrypt"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathDecryptWrite"
+local_name    = "decrypt"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathSignWrite"
+local_name    = "sign"
+file          = "src/engines/transit.rs"
+
+[[functions]]
+upstream_name = "pathRotate"
+local_name    = "rotate_key"
+file          = "src/engines/transit.rs"
+
+# PKI engine — root + role-based issuance
+[[functions]]
+upstream_name = "pathGenerateRoot"
+local_name    = "generate_root"
+file          = "src/engines/pki.rs"
+
+[[functions]]
+upstream_name = "pathSignIntermediate"
+local_name    = "sign_intermediate"
+file          = "src/engines/pki.rs"
+
+[[functions]]
+upstream_name = "pathFetchCRL"
+local_name    = "get_crl_pem"
+file          = "src/engines/pki.rs"
+
 # ── Test mappings ────────────────────────────────────────────────────────────
-# Test files live under crates/cave-vault/tests/. Each test cites its upstream
-# anchor (file:line) inline as a doc-comment so reviewers can audit parity
-# against the openbao v2.5.3 source.
+# Each entry maps an upstream openbao test (Go source) to an actual `fn`
+# in our crate; the calculator greps `fn {local_test}` under source_root, so
+# every name below resolves to a live #[test] in the listed file.
+
+# Shamir SSS — sealing
+[[tests]]
+upstream_test = "TestShamirCombine"
+local_test    = "test_split_combine_roundtrip"
+
+[[tests]]
+upstream_test = "TestShamirSplitThreshold"
+local_test    = "test_split_combine_threshold_2"
+
+[[tests]]
+upstream_test = "TestGFMul"
+local_test    = "test_gf_mul_identity"
+
+[[tests]]
+upstream_test = "TestGFInv"
+local_test    = "test_gf_inv"
+
+# Seal lifecycle
+[[tests]]
+upstream_test = "TestSealInitUnseal"
+local_test    = "test_seal_initialize_unseal"
+
+[[tests]]
+upstream_test = "TestShamir2of3"
+local_test    = "test_shamir_round_trip_2_of_3"
+
+[[tests]]
+upstream_test = "TestShamir3of5"
+local_test    = "test_shamir_round_trip_3_of_5"
+
+# ACL policy
+[[tests]]
+upstream_test = "TestACLAllow"
+local_test    = "test_policy_allows_matching_path"
+
+[[tests]]
+upstream_test = "TestACLDeny"
+local_test    = "test_policy_deny_overrides"
+
+[[tests]]
+upstream_test = "TestRootPolicy"
+local_test    = "test_root_policy_allows_all"
+
+[[tests]]
+upstream_test = "TestPolicyParse"
+local_test    = "test_policy_parse"
+
+# Token store
+[[tests]]
+upstream_test = "TestTokenCreate"
+local_test    = "test_create_lookup_token"
+
+[[tests]]
+upstream_test = "TestTokenRenew"
+local_test    = "test_renew_token"
+
+[[tests]]
+upstream_test = "TestTokenRevoke"
+local_test    = "test_revoke_token"
+
+[[tests]]
+upstream_test = "TestRootToken"
+local_test    = "test_root_token"
+
+# Lease store
+[[tests]]
+upstream_test = "TestLeaseCreate"
+local_test    = "test_lease_creation_and_lookup"
+
+[[tests]]
+upstream_test = "TestLeaseRenew"
+local_test    = "test_lease_renew"
+
+[[tests]]
+upstream_test = "TestLeaseRevoke"
+local_test    = "test_lease_revoke"
+
+# Database engine — credential issuance
+[[tests]]
+upstream_test = "TestPostgresCreds"
+local_test    = "test_db_generate_postgres_creds"
+
+[[tests]]
+upstream_test = "TestMysqlCreds"
+local_test    = "test_db_generate_mysql_creds"
+
+[[tests]]
+upstream_test = "TestDatabaseRevoke"
+local_test    = "test_db_revoke_credentials"
+
+# Transit — symmetric crypto round-trip
+[[tests]]
+upstream_test = "TestAES256GCM"
+local_test    = "test_aes256_gcm_round_trip"
+
+[[tests]]
+upstream_test = "TestChaCha20Poly1305"
+local_test    = "test_chacha20_round_trip"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 [[surfaces]]
@@ -157,3 +293,18 @@ local_path    = "/v1/auth/approle/login"
 kind          = "http"
 upstream_path = "/v1/sys/policy/{name}"
 local_path    = "/v1/sys/policies/acl/{name}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/seal-status"
+local_path    = "/v1/sys/seal-status"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/unseal"
+local_path    = "/v1/sys/unseal"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/v1/sys/health"
+local_path    = "/v1/sys/health"
