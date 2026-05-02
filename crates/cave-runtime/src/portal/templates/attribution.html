@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attribution — CAVE</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-card:#161b22;--bg-hover:#21262d;
+  --border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
+  --accent:#58a6ff;--accent-bg:#1f6feb;
+  --c-qwen:#a371f7;--c-sonnet:#f78166;--c-opus:#3fb950;--c-other:#8b949e;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;line-height:1.5}
+.topbar{display:flex;align-items:center;gap:12px;padding:10px 18px;background:var(--bg-card);border-bottom:1px solid var(--border)}
+.topbar a{color:var(--text-muted);text-decoration:none;font-size:13px}
+.topbar a:hover{color:var(--accent)}
+.brand{font-weight:700;color:var(--text)}
+.spacer{flex:1}
+.user{font-size:12px;color:var(--text-muted)}
+.layout{padding:18px 24px;max-width:1400px;margin:0 auto}
+h1{font-size:22px;font-weight:700;margin-bottom:3px}
+.sub{color:var(--text-muted);font-size:13px;margin-bottom:18px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:24px}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px}
+.card-bucket{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.card-bucket .dot{width:9px;height:9px;border-radius:50%}
+.dot.qwen{background:var(--c-qwen)}.dot.sonnet{background:var(--c-sonnet)}.dot.opus{background:var(--c-opus)}.dot.other{background:var(--c-other)}
+.card-name.qwen{color:var(--c-qwen)}.card-name.sonnet{color:var(--c-sonnet)}.card-name.opus{color:var(--c-opus)}.card-name.other{color:var(--c-other)}
+.card-name{font-size:18px;font-weight:700;margin-top:4px}
+.card-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;font-size:11px;color:var(--text-muted)}
+.card-stat-num{font-size:15px;font-weight:600;color:var(--text)}
+.section{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:18px}
+.section-title{font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px}
+.chart{position:relative;height:180px;width:100%}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600;cursor:pointer;user-select:none}
+tr:hover{background:var(--bg-hover)}
+.badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10.5px;font-weight:600}
+.badge.qwen{background:rgba(163,113,247,0.18);color:var(--c-qwen)}
+.badge.sonnet{background:rgba(247,129,102,0.18);color:var(--c-sonnet)}
+.badge.opus{background:rgba(63,185,80,0.18);color:var(--c-opus)}
+.badge.other{background:rgba(139,148,158,0.18);color:var(--c-other)}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--text-muted);margin-bottom:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend .dot{width:9px;height:9px;border-radius:50%}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="brand">CAVE</span>
+  <a href="/">Portal</a>
+  <a href="/upstream">Upstream Tracker</a>
+  <a href="/adr">ADR Browser</a>
+  <a href="/attribution">Attribution</a>
+  <span class="spacer"></span>
+  <span class="user" id="user">…</span>
+  <a href="/api/auth/logout">Logout</a>
+</div>
+
+<div class="layout">
+  <h1>Attribution</h1>
+  <div class="sub">Live <code>git log</code> analysis: who wrote what across cave-runtime. <span id="totals" style="color:var(--text-muted)">…</span></div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="section">
+    <div class="section-title">Daily commits — last 14 days</div>
+    <div class="legend" id="legend"></div>
+    <div class="chart"><canvas id="ts" width="1200" height="180"></canvas></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Per-module contribution (top 30 by LOC added)</div>
+    <table id="mod-tbl">
+      <thead><tr><th>Module</th><th>Bucket</th><th>Commits</th><th>LOC +</th><th>LOC −</th></tr></thead>
+      <tbody id="mod-tbody"><tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:30px">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function loadWho(){
+  try{const r=await fetch('/api/auth/whoami');const j=await r.json();
+    if(j.authenticated){document.getElementById('user').textContent=`${j.email} · ${(j.roles||[]).join(',')}`;}
+  }catch(e){}
+}
+async function loadAuthors(){
+  const r=await fetch('/api/v1/attribution/authors');const j=await r.json();
+  document.getElementById('totals').textContent=`Analysed ${j.total_commits_analysed||0} commits.`;
+  const buckets=j.buckets||['qwen','sonnet','opus','other'];
+  const cards=buckets.map(b=>{
+    const a=j.authors[b]||{};
+    return `<div class="card">
+      <div class="card-bucket"><span class="dot ${b}"></span>${b}</div>
+      <div class="card-name ${b}">${a.commits_all||0} commits</div>
+      <div class="card-stats">
+        <div><div class="card-stat-num">${a.commits_7d||0}</div>last 7d</div>
+        <div><div class="card-stat-num">${a.commits_30d||0}</div>last 30d</div>
+        <div><div class="card-stat-num">${a.modules_touched||0}</div>modules</div>
+      </div>
+      <div style="margin-top:8px;font-size:11.5px;color:var(--text-muted)">+${(a.loc_added||0).toLocaleString()} / −${(a.loc_removed||0).toLocaleString()} LOC</div>
+    </div>`;
+  }).join('');
+  document.getElementById('cards').innerHTML=cards;
+  document.getElementById('legend').innerHTML=buckets.map(b=>`<span><span class="dot ${b}"></span>${b}</span>`).join('');
+}
+async function loadTimeseries(){
+  const r=await fetch('/api/v1/attribution/timeseries?days=14');const j=await r.json();
+  drawChart(j);
+}
+function drawChart(data){
+  const cv=document.getElementById('ts');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const series=data.series||[];if(series.length===0)return;
+  const buckets=data.buckets;
+  const colors={qwen:'#a371f7',sonnet:'#f78166',opus:'#3fb950',other:'#8b949e'};
+  // Stacked bar chart
+  const maxTotal=Math.max(1,...series.map(s=>buckets.reduce((a,b)=>a+(s[b]||0),0)));
+  const padL=44,padB=22,padT=12,padR=12;
+  const barW=(W-padL-padR)/series.length*0.78;
+  const slotW=(W-padL-padR)/series.length;
+  // axis
+  ctx.fillStyle='#8b949e';ctx.font='10px -apple-system,Segoe UI,sans-serif';
+  ctx.textAlign='right';
+  const yLabels=4;
+  for(let i=0;i<=yLabels;i++){
+    const v=Math.round(maxTotal*i/yLabels);
+    const y=padT+(H-padT-padB)*(1-i/yLabels);
+    ctx.fillText(v,padL-6,y+3);
+    ctx.strokeStyle='#21262d';ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(W-padR,y);ctx.stroke();
+  }
+  ctx.textAlign='center';
+  series.forEach((s,i)=>{
+    let acc=0;
+    const x=padL+slotW*i+(slotW-barW)/2;
+    buckets.forEach(b=>{
+      const v=s[b]||0;if(!v)return;
+      const h=(H-padT-padB)*v/maxTotal;
+      const y=H-padB-acc-h;
+      ctx.fillStyle=colors[b]||'#8b949e';
+      ctx.fillRect(x,y,barW,h);
+      acc+=h;
+    });
+    if(i%2===0||series.length<=10){
+      ctx.fillStyle='#8b949e';
+      ctx.fillText(s.date.slice(5),x+barW/2,H-6);
+    }
+  });
+}
+async function loadByModule(){
+  const r=await fetch('/api/v1/attribution/by-module');const j=await r.json();
+  const rows=(j.rows||[]).slice(0,30);
+  if(rows.length===0){document.getElementById('mod-tbody').innerHTML='<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:30px">No data — workspace history empty?</td></tr>';return}
+  document.getElementById('mod-tbody').innerHTML=rows.map(r=>
+    `<tr><td>${r.module}</td><td><span class="badge ${r.bucket}">${r.bucket}</span></td><td>${r.commits}</td><td>+${r.loc_added.toLocaleString()}</td><td>−${r.loc_removed.toLocaleString()}</td></tr>`
+  ).join('');
+}
+loadWho();loadAuthors();loadTimeseries();loadByModule();
+</script>
+</body>
+</html>
