@@ -1,6 +1,6 @@
 [package]
 name = "cave-gateway"
-description = "API Gateway — full Kong/Envoy parity. Reverse proxy, plugin system, Admin API, xDS."
+description = "API Gateway — Kong + Gravitee parity. Reverse proxy, plugin chain, Admin API, Gravitee API/plan/application/subscription surface."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

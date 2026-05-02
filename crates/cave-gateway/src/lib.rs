@@ -1,4 +1,9 @@
-//! CAVE Gateway — full Kong/Envoy-parity API gateway.
+//! CAVE Gateway — Kong + Gravitee parity API gateway (charter-aligned).
+//!
+//! Per ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 the canonical upstream pair
+//! is Kong (proxy data path + plugin DSL) and Gravitee (Developer Portal +
+//! API lifecycle + IAM). Envoy was rejected in seven ADRs and the previous
+//! xDS surface was removed on 2026-05-02 to keep the crate charter-aligned.
 //!
 //! ## Architecture
 //!
@@ -7,10 +12,10 @@
 //! │                       cave-gateway                           │
 //! │                                                              │
 //! │  ┌─────────────┐  ┌──────────────┐  ┌──────────────────┐    │
-//! │  │  Admin API  │  │  Proxy       │  │  xDS API         │    │
+//! │  │  Admin API  │  │  Proxy       │  │  Gravitee API    │    │
 //! │  │  :8001      │  │  :8000       │  │  :8002           │    │
-//! │  │  Kong CRUD  │  │  HTTP/WS/    │  │  LDS/RDS/CDS/EDS │    │
-//! │  │             │  │  gRPC/TCP    │  │                  │    │
+//! │  │  Kong CRUD  │  │  HTTP/WS/    │  │  apis / plans /  │    │
+//! │  │             │  │  gRPC/TCP    │  │  apps / subs     │    │
 //! │  └──────┬──────┘  └──────┬───────┘  └────────┬─────────┘    │
 //! │         │                │                   │              │
 //! │         └────────────────┴───────────────────┘              │
@@ -25,10 +30,9 @@
 //! └──────────────────────────────────────────────────────────────┘
 //! ```
 //!
-//! ## Upstream tracking: Kong + Envoy
-//! - Kong: https://github.com/Kong/kong
-//! - Envoy: https://github.com/envoyproxy/envoy
-//! - Parity: Kong 3.x Admin API + Envoy v3 xDS
+//! ## Upstream tracking: Kong + Gravitee
+//! - Kong:     https://github.com/Kong/kong            (v3.5.0)
+//! - Gravitee: https://github.com/gravitee-io/gravitee-api-management (v4.x)
 
 pub mod admin;
 pub mod circuit_breaker;
@@ -42,7 +46,6 @@ pub mod plugins;
 pub mod proxy;
 pub mod store;
 pub mod tls;
-pub mod xds;
 
 use axum::{routing::any, Router};
 use handler::{proxy_handler, GatewayHandlerState};
@@ -120,16 +123,10 @@ pub fn admin_router(state: Arc<GatewayState>) -> Router {
         // .nest("", admin::admin_router(state.store.clone()))
 }
 
-/// Build the xDS router (Envoy control plane).
-pub fn xds_router(state: Arc<GatewayState>) -> Router {
-    xds::xds_router(state.store.clone())
-}
-
 /// Create a unified router with all gateway components merged.
-/// In production, Admin and xDS would typically run on separate ports.
+/// In production, Admin and proxy planes typically run on separate ports.
 pub fn router(state: Arc<GatewayState>) -> Router {
     Router::new()
         .merge(admin_router(state.clone()))
-        .merge(xds_router(state.clone()))
         .merge(proxy_router(state))
 }

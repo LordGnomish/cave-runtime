@@ -1,6 +1,11 @@
 //! Gravitee feature pack — adds developer portal, API analytics, debug mode,
-//! API design-time governance (linting + quality gates), and federation gateway
-//! on top of the existing Kong/Envoy core.
+//! design-time governance (linting + quality gates), and federation gateway
+//! on top of the Kong proxy core.
+//!
+//! After 2026-05-02 this is the Gravitee half of cave-gateway's two-upstream
+//! parity (Kong + Gravitee). The previous Envoy xDS surface is gone; the
+//! canonical Gravitee API/plan/application/subscription surface is added in
+//! a follow-up commit.
 
 pub mod analytics;
 pub mod catalog;
