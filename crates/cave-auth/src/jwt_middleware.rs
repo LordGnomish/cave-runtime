@@ -56,6 +56,21 @@ fn extract_bearer_token(req: &Request) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+/// Extract a JWT from the `cave_session` cookie (portal browser flow).
+/// Falls back when no `Authorization: Bearer …` header is present.
+fn extract_session_cookie(req: &Request) -> Option<String> {
+    let raw = req.headers().get(header::COOKIE)?.to_str().ok()?;
+    for kv in raw.split(';') {
+        let kv = kv.trim();
+        if let Some(value) = kv.strip_prefix("cave_session=") {
+            if !value.is_empty() {
+                return Some(value.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Create an auth middleware closure that captures the given AuthState.
 /// Use with `axum::middleware::from_fn(make_auth_middleware(state))`.
 pub fn make_auth_middleware(
@@ -80,12 +95,23 @@ pub async fn auth_middleware_inner(
         return next.run(req).await;
     }
 
-    let token = match extract_bearer_token(&req) {
+    let token = match extract_bearer_token(&req).or_else(|| extract_session_cookie(&req)) {
         Some(t) => t,
         None => {
+            // Browser navigations (Accept: text/html) get redirected to /login;
+            // API clients get a JSON 401 so they can refresh tokens cleanly.
+            let wants_html = req
+                .headers()
+                .get(header::ACCEPT)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.contains("text/html"))
+                .unwrap_or(false);
+            if wants_html {
+                return axum::response::Redirect::to("/login").into_response();
+            }
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({ "error": "Missing or invalid Authorization header" })),
+                Json(json!({ "error": "Missing or invalid Authorization header / session cookie" })),
             )
                 .into_response();
         }
@@ -258,6 +284,29 @@ mod tests {
         let mut v = Validation::new(Algorithm::HS256);
         v.required_spec_claims.clear();
         assert!(decode::<JwtClaims>(&token, &key, &v).is_err());
+    }
+
+    #[test]
+    fn cookie_extracted() {
+        let req = Request::builder()
+            .uri("/x")
+            .header(header::COOKIE, "other=foo; cave_session=abc.def.ghi; tail=zz")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert_eq!(
+            extract_session_cookie(&req).as_deref(),
+            Some("abc.def.ghi")
+        );
+    }
+
+    #[test]
+    fn cookie_absent_returns_none() {
+        let req = Request::builder()
+            .uri("/x")
+            .header(header::COOKIE, "other=foo")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        assert!(extract_session_cookie(&req).is_none());
     }
 
     #[test]
