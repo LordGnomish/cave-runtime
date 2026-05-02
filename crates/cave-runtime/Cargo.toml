@@ -129,3 +129,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 anyhow = { workspace = true }
+chrono = { workspace = true }
+jsonwebtoken = { workspace = true }
+pulldown-cmark = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }
+http-body-util = "0.1"

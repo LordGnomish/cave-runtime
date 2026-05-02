@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAVE Sign in</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-card:#161b22;--bg-input:#0d1117;
+  --border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
+  --accent:#58a6ff;--accent-bg:#1f6feb;--green:#3fb950;
+  --red:#f85149;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
+body{display:flex;align-items:center;justify-content:center;padding:24px}
+.card{width:100%;max-width:380px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:32px}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.logo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent-bg),var(--accent));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;letter-spacing:-0.5px}
+.brand-name{font-size:18px;font-weight:700}
+.title{font-size:16px;font-weight:600;margin-bottom:6px}
+.sub{color:var(--text-muted);font-size:12px;margin-bottom:20px}
+form{display:flex;flex-direction:column;gap:12px}
+label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600}
+input{width:100%;padding:8px 12px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.18s ease}
+input:focus{border-color:var(--accent)}
+.field{display:flex;flex-direction:column;gap:5px}
+button{margin-top:6px;padding:9px 16px;background:var(--accent-bg);color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.18s ease}
+button:hover{background:var(--accent)}
+.divider{margin:18px 0;display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
+.dev-hint{margin-top:18px;padding:10px 12px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:11px;line-height:1.6}
+.dev-hint code{background:#21262d;padding:1px 4px;border-radius:3px;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.error{padding:9px 12px;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.4);color:var(--red);border-radius:6px;font-size:12px;display:none;margin-bottom:8px}
+.error.show{display:block}
+.kc-btn{width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer;text-align:center;text-decoration:none;display:block}
+.kc-btn:hover{border-color:var(--accent);color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <div class="logo">CV</div>
+    <div class="brand-name">CAVE Platform</div>
+  </div>
+  <div class="title">CAVE Sign in</div>
+  <div class="sub">Authenticate to access the platform portal.</div>
+
+  <div class="error" id="err"></div>
+
+  <form id="lf" action="/api/auth/login" method="POST">
+    <div class="field">
+      <label for="username">Username</label>
+      <input id="username" name="username" required autocomplete="username" autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password">
+    </div>
+    <button type="submit">Sign in</button>
+  </form>
+
+  <div class="divider">or</div>
+  <a class="kc-btn" href="/api/auth/oidc/start">Sign in with Keycloak</a>
+
+  <div class="dev-hint">
+    <strong style="color:var(--text)">Dev mode personas</strong><br>
+    <code>admin@platform</code> / <code>admin</code> &nbsp;&nbsp;→&nbsp; platform_admin (sees everything)<br>
+    <code>admin@tenant1</code> / <code>admin</code> &nbsp;&nbsp;→&nbsp; tenant_admin (scoped to tenant1)
+  </div>
+</div>
+
+<script>
+// Surface the API error nicely instead of dumping raw JSON.
+document.getElementById('lf').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  const params = new URLSearchParams();
+  for (const [k,v] of fd.entries()) params.append(k, v);
+  const errEl = document.getElementById('err');
+  errEl.classList.remove('show');
+  let resp;
+  try {
+    resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'content-type':'application/x-www-form-urlencoded'},
+      body: params.toString(),
+      redirect: 'manual',
+      credentials: 'include',
+    });
+  } catch (e) {
+    errEl.textContent = 'Network error: ' + e.message;
+    errEl.classList.add('show');
+    return;
+  }
+  // 303 (manual mode reports as 'opaqueredirect' in fetch; success path)
+  if (resp.type === 'opaqueredirect' || (resp.status >= 300 && resp.status < 400)) {
+    window.location.href = '/';
+    return;
+  }
+  if (resp.status === 200) {
+    window.location.href = '/';
+    return;
+  }
+  let msg = 'Login failed';
+  try {
+    const j = await resp.json();
+    msg = j.error || msg;
+  } catch (_) {}
+  errEl.textContent = msg;
+  errEl.classList.add('show');
+});
+</script>
+</body>
+</html>

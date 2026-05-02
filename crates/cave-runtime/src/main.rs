@@ -15,6 +15,8 @@ use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
+mod portal;
+
 static PORTAL_HTML: &str = include_str!("portal_index.html");
 
 #[derive(Parser)]
@@ -260,6 +262,8 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_kamaji::router(kamaji_state))
         // Auth endpoints
         .merge(cave_auth::auth_routes::router())
+        // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution
+        .merge(portal::router())
         // JWT auth middleware
         .layer(axum::middleware::from_fn(|mut req: axum::extract::Request, next: axum::middleware::Next| async move {
             let state = req.extensions().get::<Arc<cave_auth::jwt_middleware::AuthState>>().cloned();
@@ -276,8 +280,9 @@ async fn main() -> anyhow::Result<()> {
                 "/health".into(), "/ready".into(),
                 "/api/modules".into(), "/api/health".into(),
                 "/portal/".into(), "/api/portal/".into(), "/api/auth/".into(),
-                "/api/upstream/".into(), "/v2/".into(),
-                "/api/v1/attribution".into(),
+                // Portal sign-in surface — must be reachable without a session.
+                "/login".into(),
+                "/v2/".into(),
                 "/loki/".into(), "/tempo/".into(),
                 "/api/registry/".into(),
             ],
