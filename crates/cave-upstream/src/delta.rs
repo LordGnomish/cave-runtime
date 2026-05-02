@@ -85,7 +85,7 @@ pub struct ReleaseDelta {
 }
 
 /// Outcome of a single release poll.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum PollOutcome {
     /// New release detected — caller should write a pump payload.
     NewRelease(ReleaseDelta),
