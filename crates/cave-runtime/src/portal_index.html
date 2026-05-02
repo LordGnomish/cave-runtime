@@ -239,6 +239,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
         <span class="search-btn-kbd">⌘K</span>
       </button>
     </div>
+    <div style="padding:6px 0 4px;border-bottom:1px solid var(--border)">
+      <div style="padding:4px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-muted);font-weight:600">Portal</div>
+      <a href="/upstream" class="nav-item" style="text-decoration:none">⇪ Upstream Tracker</a>
+      <a href="/adr" class="nav-item" style="text-decoration:none">📜 ADR Browser</a>
+      <a href="/attribution" class="nav-item" style="text-decoration:none">⌗ Attribution</a>
+    </div>
     <div class="sidebar-nav" id="sidebar-nav"></div>
     <div class="sidebar-footer">
       v<span id="rv">…</span> · <span id="ru">—</span>
@@ -255,6 +261,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       </div>
       <div class="topbar-right">
         <button class="btn-topbar" onclick="openScaffold()">＋ New Project</button>
+        <div class="hbadge" id="userbadge" title="Click to sign out" style="cursor:pointer" onclick="if(confirm('Sign out?'))location.href='/api/auth/logout'">
+          <span class="sdot" style="background:var(--text-muted)"></span>
+          <span id="userlabel">…</span>
+        </div>
         <div class="hbadge">
           <span class="sdot dm" id="gsdot"></span>
           <span id="gstext">Connecting…</span>
@@ -319,6 +329,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 </div>
 
 <script>
+// ── Persona session probe ────────────────────────────────────────────────────
+// Top-bar badge shows the signed-in user, or "sign in" if no session cookie.
+(async () => {
+  try {
+    const r = await fetch('/api/auth/whoami', { credentials: 'include' });
+    const j = await r.json();
+    const lab = document.getElementById('userlabel');
+    if (j.authenticated) {
+      lab.textContent = `${j.email} · ${(j.roles || []).join(',')}`;
+    } else {
+      lab.textContent = 'sign in';
+      document.getElementById('userbadge').onclick = () => location.href = '/login';
+    }
+  } catch (_) { /* offline mode — leave label blank */ }
+})();
+
 // ── Module Registry ──────────────────────────────────────────────────────────
 
 const MODS = {
