@@ -3,112 +3,333 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CAVE Sign in</title>
+<title>Sign in — CAVE Platform</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0d1117;--bg-card:#161b22;--bg-input:#0d1117;
-  --border:#30363d;--text:#e6edf3;--text-muted:#8b949e;
-  --accent:#58a6ff;--accent-bg:#1f6feb;--green:#3fb950;
-  --red:#f85149;
+  --bg-0:#070b14;
+  --bg-1:#0d1424;
+  --bg-card:rgba(22,30,48,0.78);
+  --bg-input:#0a1322;
+  --border:rgba(88,166,255,0.14);
+  --border-strong:rgba(88,166,255,0.32);
+  --text:#e8eef7;
+  --text-muted:#8a96b0;
+  --text-faint:#5a6478;
+  --accent:#5fb7ff;
+  --accent-strong:#3a8edd;
+  --accent-glow:rgba(95,183,255,0.22);
+  --teal:#3ad6c6;
+  --teal-glow:rgba(58,214,198,0.18);
+  --purple:#a784ff;
+  --purple-glow:rgba(167,132,255,0.20);
+  --red:#f97a7a;
+  --green:#5dd39e;
+  --radius:10px;
+  --transition:0.2s cubic-bezier(0.4,0,0.2,1);
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5}
-body{display:flex;align-items:center;justify-content:center;padding:24px}
-.card{width:100%;max-width:380px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:32px}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
-.logo{width:36px;height:36px;background:linear-gradient(135deg,var(--accent-bg),var(--accent));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;letter-spacing:-0.5px}
-.brand-name{font-size:18px;font-weight:700}
-.title{font-size:16px;font-weight:600;margin-bottom:6px}
-.sub{color:var(--text-muted);font-size:12px;margin-bottom:20px}
-form{display:flex;flex-direction:column;gap:12px}
-label{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);font-weight:600}
-input{width:100%;padding:8px 12px;background:var(--bg-input);color:var(--text);border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;outline:none;transition:border-color 0.18s ease}
-input:focus{border-color:var(--accent)}
+html,body{height:100%;background:var(--bg-0);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{
+  display:flex;align-items:center;justify-content:center;padding:24px;
+  background:
+    radial-gradient(ellipse 1100px 600px at 30% -10%, rgba(58,142,221,0.18), transparent 55%),
+    radial-gradient(ellipse 800px 500px at 80% 110%, rgba(167,132,255,0.13), transparent 55%),
+    radial-gradient(ellipse 600px 400px at 50% 50%, rgba(58,214,198,0.06), transparent 60%),
+    linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%);
+  background-attachment:fixed;
+  position:relative;overflow:hidden;
+}
+/* subtle dot grid */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;
+  background-image:radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0);
+  background-size:22px 22px;
+  mask-image:radial-gradient(ellipse 80% 80% at 50% 40%, black 30%, transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 80% 80% at 50% 40%, black 30%, transparent 75%);
+}
+.shell{
+  width:100%;max-width:440px;
+  background:var(--bg-card);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:34px 32px 26px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.04) inset,
+    0 30px 60px -20px rgba(0,0,0,0.55),
+    0 0 0 1px rgba(255,255,255,0.02);
+  position:relative;
+  z-index:1;
+}
+/* brand */
+.brand{display:flex;flex-direction:column;align-items:center;gap:14px;margin-bottom:22px}
+.logo{
+  width:56px;height:56px;border-radius:14px;
+  background:linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 45%, var(--teal) 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:900;font-size:20px;color:#fff;letter-spacing:-0.5px;
+  box-shadow:0 8px 22px -6px var(--accent-glow), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  position:relative;
+}
+.logo::after{
+  content:"";position:absolute;inset:-2px;border-radius:16px;
+  background:linear-gradient(135deg, var(--accent), var(--teal));
+  filter:blur(14px);opacity:0.35;z-index:-1;
+}
+.brand-name{font-size:17px;font-weight:700;letter-spacing:-0.2px}
+.brand-sub{font-size:12px;color:var(--text-muted);font-weight:500}
+.title{text-align:center;font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-0.3px}
+.sub{text-align:center;color:var(--text-muted);font-size:13px;margin-bottom:22px}
+
+/* persona cards */
+.section-label{
+  font-size:10.5px;text-transform:uppercase;letter-spacing:0.85px;
+  color:var(--text-faint);font-weight:600;margin:0 0 10px 2px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg, var(--border), transparent)}
+.personas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.persona{
+  position:relative;
+  background:rgba(13,20,36,0.55);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:14px 12px;
+  cursor:pointer;
+  text-align:left;
+  font-family:inherit;color:var(--text);
+  transition:transform var(--transition),border-color var(--transition),background var(--transition),box-shadow var(--transition);
+  display:flex;flex-direction:column;gap:8px;
+  overflow:hidden;
+}
+.persona::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:2px;
+  background:var(--accent-strong);opacity:0;transition:opacity var(--transition);
+}
+.persona.platform::before{background:linear-gradient(90deg, var(--purple), var(--accent))}
+.persona.tenant::before{background:linear-gradient(90deg, var(--teal), var(--accent))}
+.persona:hover{
+  transform:translateY(-2px);
+  border-color:var(--border-strong);
+  background:rgba(20,28,46,0.7);
+}
+.persona.platform:hover{box-shadow:0 10px 24px -10px var(--purple-glow)}
+.persona.tenant:hover{box-shadow:0 10px 24px -10px var(--teal-glow)}
+.persona:hover::before{opacity:1}
+.persona:active{transform:translateY(0)}
+.persona:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.persona-icon{
+  width:30px;height:30px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid var(--border);
+}
+.persona.platform .persona-icon{color:var(--purple);background:var(--purple-glow);border-color:rgba(167,132,255,0.35)}
+.persona.tenant   .persona-icon{color:var(--teal);background:var(--teal-glow);border-color:rgba(58,214,198,0.35)}
+.persona-name{font-size:13.5px;font-weight:600;letter-spacing:-0.1px}
+.persona-role{font-size:11px;color:var(--text-muted);line-height:1.4}
+.persona-email{font-size:11px;color:var(--text-faint);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:2px}
+
+/* form */
+form{display:flex;flex-direction:column;gap:13px;margin-bottom:18px}
 .field{display:flex;flex-direction:column;gap:5px}
-button{margin-top:6px;padding:9px 16px;background:var(--accent-bg);color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.18s ease}
-button:hover{background:var(--accent)}
-.divider{margin:18px 0;display:flex;align-items:center;gap:10px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px}
-.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
-.dev-hint{margin-top:18px;padding:10px 12px;background:#0d1117;border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-size:11px;line-height:1.6}
-.dev-hint code{background:#21262d;padding:1px 4px;border-radius:3px;color:var(--text);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-.error{padding:9px 12px;background:rgba(248,81,73,0.15);border:1px solid rgba(248,81,73,0.4);color:var(--red);border-radius:6px;font-size:12px;display:none;margin-bottom:8px}
+label{font-size:10.5px;text-transform:uppercase;letter-spacing:0.7px;color:var(--text-muted);font-weight:600;padding-left:2px}
+input{
+  width:100%;padding:10px 13px;
+  background:var(--bg-input);
+  color:var(--text);
+  border:1px solid var(--border);
+  border-radius:8px;
+  font-family:inherit;font-size:14px;
+  outline:none;
+  transition:border-color var(--transition),box-shadow var(--transition),background var(--transition);
+}
+input::placeholder{color:var(--text-faint)}
+input:hover{border-color:var(--border-strong)}
+input:focus{
+  border-color:var(--accent);
+  background:#0d1729;
+  box-shadow:0 0 0 3px var(--accent-glow);
+}
+.btn-primary{
+  margin-top:4px;padding:11px 16px;
+  background:linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color:#fff;border:none;border-radius:9px;
+  font-family:inherit;font-size:14px;font-weight:600;letter-spacing:-0.1px;
+  cursor:pointer;
+  box-shadow:0 6px 16px -8px var(--accent-glow), 0 1px 0 rgba(255,255,255,0.15) inset;
+  transition:transform var(--transition),box-shadow var(--transition),filter var(--transition);
+}
+.btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 10px 22px -8px var(--accent-glow), 0 1px 0 rgba(255,255,255,0.2) inset}
+.btn-primary:active{transform:translateY(0);filter:brightness(0.96)}
+
+.error{
+  padding:9px 12px;background:rgba(249,122,122,0.10);
+  border:1px solid rgba(249,122,122,0.32);
+  color:var(--red);border-radius:8px;font-size:12.5px;
+  display:none;margin-bottom:8px;
+  display:none;
+}
 .error.show{display:block}
-.kc-btn{width:100%;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer;text-align:center;text-decoration:none;display:block}
-.kc-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+.divider{
+  margin:6px 0 14px;display:flex;align-items:center;gap:10px;
+  color:var(--text-faint);font-size:10.5px;text-transform:uppercase;letter-spacing:0.85px;font-weight:600;
+}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--border)}
+
+.btn-keycloak{
+  width:100%;padding:9px 14px;
+  background:transparent;border:1px solid var(--border);
+  color:var(--text-muted);border-radius:8px;
+  font-family:inherit;font-size:12.5px;font-weight:500;
+  cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;
+  transition:border-color var(--transition),color var(--transition),background var(--transition);
+}
+.btn-keycloak:hover{
+  border-color:var(--border-strong);color:var(--text);background:rgba(95,183,255,0.04);
+}
+.btn-keycloak svg{width:14px;height:14px;opacity:0.7}
+
+.dev-note{
+  margin-top:18px;padding:10px 12px;
+  background:rgba(58,214,198,0.05);
+  border:1px solid rgba(58,214,198,0.15);
+  border-radius:8px;
+  color:var(--text-muted);font-size:11px;line-height:1.55;
+  display:flex;gap:8px;align-items:flex-start;
+}
+.dev-note .badge{
+  flex-shrink:0;
+  font-size:9.5px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;
+  background:var(--teal-glow);color:var(--teal);
+  padding:2px 6px;border-radius:4px;line-height:1.5;
+}
+.dev-note code{
+  background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:3px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.5px;color:var(--text);
+}
+.footer-meta{
+  text-align:center;font-size:10.5px;color:var(--text-faint);
+  margin-top:18px;letter-spacing:0.3px;
+}
+.footer-meta a{color:var(--text-muted);text-decoration:none}
+.footer-meta a:hover{color:var(--accent)}
+@media (max-width:480px){
+  .shell{padding:26px 22px 22px;border-radius:14px}
+  .personas{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
-<div class="card">
+<div class="shell">
   <div class="brand">
     <div class="logo">CV</div>
-    <div class="brand-name">CAVE Platform</div>
+    <div style="text-align:center">
+      <div class="brand-name">CAVE Platform</div>
+      <div class="brand-sub">Unified runtime · 67 modules · 149 ADRs</div>
+    </div>
   </div>
-  <div class="title">CAVE Sign in</div>
-  <div class="sub">Authenticate to access the platform portal.</div>
+
+  <div class="title">Sign in</div>
+  <div class="sub">Pick a persona to jump straight in, or use credentials.</div>
 
   <div class="error" id="err"></div>
 
-  <form id="lf" action="/api/auth/login" method="POST">
+  <div class="section-label">Quick sign-in</div>
+  <div class="personas">
+    <button type="button" class="persona platform" data-user="admin@platform" data-pw="admin">
+      <div class="persona-icon">◈</div>
+      <div>
+        <div class="persona-name">Platform Admin</div>
+        <div class="persona-role">Sees every tenant + all ADRs</div>
+        <div class="persona-email">admin@platform</div>
+      </div>
+    </button>
+    <button type="button" class="persona tenant" data-user="admin@tenant1" data-pw="admin">
+      <div class="persona-icon">◇</div>
+      <div>
+        <div class="persona-name">Tenant Admin</div>
+        <div class="persona-role">Scoped to tenant1 only</div>
+        <div class="persona-email">admin@tenant1</div>
+      </div>
+    </button>
+  </div>
+
+  <div class="section-label">Manual sign-in</div>
+  <form id="lf" action="/api/auth/login" method="POST" autocomplete="on">
     <div class="field">
       <label for="username">Username</label>
-      <input id="username" name="username" required autocomplete="username" autofocus>
+      <input id="username" name="username" required autocomplete="username" placeholder="you@cave">
     </div>
     <div class="field">
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" required autocomplete="current-password">
+      <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="••••••••">
     </div>
-    <button type="submit">Sign in</button>
+    <button type="submit" class="btn-primary">Sign in</button>
   </form>
 
   <div class="divider">or</div>
-  <a class="kc-btn" href="/api/auth/oidc/start">Sign in with Keycloak</a>
+  <a class="btn-keycloak" href="/api/auth/oidc/start">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    Continue with Keycloak
+  </a>
 
-  <div class="dev-hint">
-    <strong style="color:var(--text)">Dev mode personas</strong><br>
-    <code>admin@platform</code> / <code>admin</code> &nbsp;&nbsp;→&nbsp; platform_admin (sees everything)<br>
-    <code>admin@tenant1</code> / <code>admin</code> &nbsp;&nbsp;→&nbsp; tenant_admin (scoped to tenant1)
+  <div class="dev-note">
+    <span class="badge">Dev</span>
+    <div>
+      Two seeded personas — both passwords are <code>admin</code>.
+      Disable in production by unsetting <code>CAVE_DEV_MODE</code>.
+    </div>
+  </div>
+
+  <div class="footer-meta">
+    cave-runtime · <a href="/health">health</a> · <a href="https://github.com/cave-runtime/cave-runtime" target="_blank" rel="noopener">github</a>
   </div>
 </div>
 
 <script>
-// Surface the API error nicely instead of dumping raw JSON.
-document.getElementById('lf').addEventListener('submit', async (ev) => {
+const errEl = document.getElementById('err');
+function showErr(msg){errEl.textContent=msg;errEl.classList.add('show')}
+function clearErr(){errEl.classList.remove('show')}
+
+async function postLogin(username, password){
+  clearErr();
+  const params = new URLSearchParams();
+  params.append('username', username);
+  params.append('password', password);
+  let resp;
+  try{
+    resp = await fetch('/api/auth/login', {
+      method:'POST',
+      headers:{'content-type':'application/x-www-form-urlencoded'},
+      body:params.toString(),
+      redirect:'manual',
+      credentials:'include',
+    });
+  }catch(e){showErr('Network error: '+e.message);return}
+  if(resp.type === 'opaqueredirect' || (resp.status>=300 && resp.status<400) || resp.status===200){
+    location.href = '/';return;
+  }
+  let msg = `Login failed (${resp.status})`;
+  try{const j=await resp.json();if(j.error)msg=j.error}catch(_){}
+  showErr(msg);
+}
+
+document.querySelectorAll('.persona').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.style.opacity = '0.7';
+    postLogin(btn.dataset.user, btn.dataset.pw);
+  });
+});
+
+document.getElementById('lf').addEventListener('submit', ev => {
   ev.preventDefault();
   const fd = new FormData(ev.target);
-  const params = new URLSearchParams();
-  for (const [k,v] of fd.entries()) params.append(k, v);
-  const errEl = document.getElementById('err');
-  errEl.classList.remove('show');
-  let resp;
-  try {
-    resp = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: {'content-type':'application/x-www-form-urlencoded'},
-      body: params.toString(),
-      redirect: 'manual',
-      credentials: 'include',
-    });
-  } catch (e) {
-    errEl.textContent = 'Network error: ' + e.message;
-    errEl.classList.add('show');
-    return;
-  }
-  // 303 (manual mode reports as 'opaqueredirect' in fetch; success path)
-  if (resp.type === 'opaqueredirect' || (resp.status >= 300 && resp.status < 400)) {
-    window.location.href = '/';
-    return;
-  }
-  if (resp.status === 200) {
-    window.location.href = '/';
-    return;
-  }
-  let msg = 'Login failed';
-  try {
-    const j = await resp.json();
-    msg = j.error || msg;
-  } catch (_) {}
-  errEl.textContent = msg;
-  errEl.classList.add('show');
+  postLogin(fd.get('username'), fd.get('password'));
 });
 </script>
 </body>

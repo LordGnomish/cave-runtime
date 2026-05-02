@@ -257,7 +257,8 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let bytes = to_bytes(resp.into_body(), 1 << 20).await.unwrap();
         let body = String::from_utf8(bytes.to_vec()).unwrap();
-        assert!(body.contains("CAVE Sign in"));
+        assert!(body.contains("CAVE Platform"));
+        assert!(body.contains("Sign in"));
         assert!(body.contains("admin@platform"));
     }
 
