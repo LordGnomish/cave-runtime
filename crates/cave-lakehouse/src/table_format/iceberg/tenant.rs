@@ -2,7 +2,7 @@
 //!
 //! Mirrors the rules in cave-cri's `tenant.rs` (RFC 1123 DNS label).
 
-use crate::error::{IcebergError, IcebergResult};
+use crate::table_format::iceberg::error::{IcebergError, IcebergResult};
 
 pub const DEFAULT_TENANT_ID: &str = "default";
 

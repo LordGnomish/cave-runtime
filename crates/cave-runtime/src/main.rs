@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     let infra_state = Arc::new(cave_infra::InfraState::default());
 
     // Data & Storage
-    let pg_state = Arc::new(cave_pg::PgState::default());
+    let pg_state = Arc::new(cave_rdbms_operator::PgState::default());
     let store_state = cave_store::StoreState::in_memory();
     let streams_state = Arc::new(cave_streams::StreamsState::default());
 
@@ -220,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_cluster::router(cluster_state))
         .merge(cave_infra::router(infra_state))
         // Data & Storage
-        .merge(cave_pg::router(pg_state))
+        .merge(cave_rdbms_operator::router(pg_state))
         .merge(cave_store::router(store_state))
         .merge(cave_streams::router(streams_state))
         // Observability

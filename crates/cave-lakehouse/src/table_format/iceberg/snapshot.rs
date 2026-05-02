@@ -3,8 +3,8 @@
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/snapshot.rs and
 //! the spec at https://iceberg.apache.org/spec/#snapshots.
 
-use crate::error::{IcebergError, IcebergResult};
-use crate::tenant::{default_tenant_id, validate_tenant_id};
+use crate::table_format::iceberg::error::{IcebergError, IcebergResult};
+use crate::table_format::iceberg::tenant::{default_tenant_id, validate_tenant_id};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

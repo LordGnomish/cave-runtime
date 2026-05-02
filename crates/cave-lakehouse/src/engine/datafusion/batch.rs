@@ -3,8 +3,8 @@
 //! Mirrors apache/arrow-rs `RecordBatch` and apache/datafusion's use of it
 //! as the unit of streaming between physical operators.
 
-use crate::error::{DataFusionError, DfResult};
-use crate::tenant::{default_tenant_id, validate_tenant_id};
+use crate::engine::datafusion::error::{DataFusionError, DfResult};
+use crate::engine::datafusion::tenant::{default_tenant_id, validate_tenant_id};
 use serde::{Deserialize, Serialize};
 
 /// A single column value. Subset of arrow scalar types — int64, float64,

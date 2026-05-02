@@ -2,8 +2,8 @@
 //!
 //! Mirrors apache/datafusion datafusion-expr/src/expr.rs `Expr` enum (subset).
 
-use crate::batch::{RecordBatch, Value};
-use crate::error::{DataFusionError, DfResult};
+use crate::engine::datafusion::batch::{RecordBatch, Value};
+use crate::engine::datafusion::error::{DataFusionError, DfResult};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

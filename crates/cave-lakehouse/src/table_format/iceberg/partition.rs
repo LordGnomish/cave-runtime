@@ -3,8 +3,8 @@
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/partition.rs and
 //! the spec at https://iceberg.apache.org/spec/#partition-transforms.
 
-use crate::error::{IcebergError, IcebergResult};
-use crate::schema::Schema;
+use crate::table_format::iceberg::error::{IcebergError, IcebergResult};
+use crate::table_format::iceberg::schema::Schema;
 use serde::{Deserialize, Serialize};
 
 /// Partition transforms shipped here — identity, bucket, truncate, year,
@@ -161,7 +161,7 @@ impl PartitionSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::{Field, PrimitiveType, Schema};
+    use crate::table_format::iceberg::schema::{Field, PrimitiveType, Schema};
 
     fn ts_schema() -> Schema {
         Schema::new(

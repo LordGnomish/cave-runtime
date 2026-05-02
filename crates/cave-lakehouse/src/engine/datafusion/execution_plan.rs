@@ -4,10 +4,10 @@
 //! limit,aggregates}.rs (subset). Each operator takes an input `RecordBatch`
 //! and returns a new `RecordBatch`.
 
-use crate::batch::{RecordBatch, Value};
-use crate::error::{DataFusionError, DfResult};
-use crate::expr::Expr;
-use crate::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan};
+use crate::engine::datafusion::batch::{RecordBatch, Value};
+use crate::engine::datafusion::error::{DataFusionError, DfResult};
+use crate::engine::datafusion::expr::Expr;
+use crate::engine::datafusion::logical_plan::{AggregateExpr, AggregateFunc, LogicalPlan};
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -328,7 +328,7 @@ fn compile_inner(plan: &LogicalPlan, source: RecordBatch) -> ExecutionPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::batch::{RecordBatch, Value};
+    use crate::engine::datafusion::batch::{RecordBatch, Value};
 
     fn employees() -> RecordBatch {
         RecordBatch::new(

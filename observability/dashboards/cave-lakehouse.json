@@ -1,10 +1,10 @@
 {
-  "title": "Cave / cave-datafusion",
-  "uid": "cave-datafusion",
+  "title": "Cave / cave-lakehouse (Iceberg+DataFusion)",
+  "uid": "cave-lakehouse",
   "tags": [
     "cave",
     "observability",
-    "cave-datafusion"
+    "cave-lakehouse"
   ],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -33,7 +33,7 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "query": "label_values(datafusion_total{job=\"cave-datafusion\"}, tenant_id)",
+        "query": "label_values(iceberg_total{job=\"cave-lakehouse\"}, tenant_id)",
         "current": {
           "text": "All",
           "value": "$__all"
@@ -65,7 +65,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(datafusion_total{job=\"cave-datafusion\"}[5m])) by (route)",
+          "expr": "sum(rate(iceberg_total{job=\"cave-lakehouse\"}[5m])) by (route)",
           "legendFormat": "{{route}}",
           "refId": "A"
         }
@@ -81,7 +81,7 @@
           "showLegend": true
         }
       },
-      "description": "Query engine \u2014 request throughput."
+      "description": "Iceberg lake \u2014 request throughput."
     },
     {
       "id": 2,
@@ -103,7 +103,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(datafusion_total{job=\"cave-datafusion\",code=~\"4..|5..\"}[5m])) by (code)",
+          "expr": "sum(rate(iceberg_total{job=\"cave-lakehouse\",code=~\"4..|5..\"}[5m])) by (code)",
           "legendFormat": "{{code}}",
           "refId": "A"
         }
@@ -141,7 +141,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(datafusion_duration_seconds_bucket{job=\"cave-datafusion\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(iceberg_duration_seconds_bucket{job=\"cave-lakehouse\"}[5m])) by (le))",
           "legendFormat": "p50",
           "refId": "A"
         },
@@ -150,7 +150,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(datafusion_duration_seconds_bucket{job=\"cave-datafusion\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(iceberg_duration_seconds_bucket{job=\"cave-lakehouse\"}[5m])) by (le))",
           "legendFormat": "p95",
           "refId": "B"
         },
@@ -159,7 +159,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(datafusion_duration_seconds_bucket{job=\"cave-datafusion\"}[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(iceberg_duration_seconds_bucket{job=\"cave-lakehouse\"}[5m])) by (le))",
           "legendFormat": "p99",
           "refId": "C"
         }
@@ -197,7 +197,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(datafusion_inflight_requests{job=\"cave-datafusion\"})",
+          "expr": "sum(iceberg_inflight_requests{job=\"cave-lakehouse\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -237,7 +237,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "rate(process_cpu_seconds_total{job=\"cave-datafusion\"}[5m])",
+          "expr": "rate(process_cpu_seconds_total{job=\"cave-lakehouse\"}[5m])",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -275,7 +275,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "process_resident_memory_bytes{job=\"cave-datafusion\"}",
+          "expr": "process_resident_memory_bytes{job=\"cave-lakehouse\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -313,7 +313,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "go_goroutines{job=\"cave-datafusion\"}",
+          "expr": "go_goroutines{job=\"cave-lakehouse\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -351,7 +351,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "count(count by (tenant_id) (datafusion_total{job=\"cave-datafusion\"}))",
+          "expr": "count(count by (tenant_id) (iceberg_total{job=\"cave-lakehouse\"}))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -391,7 +391,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "topk(10, sum(rate(datafusion_total{job=\"cave-datafusion\"}[5m])) by (tenant_id))",
+          "expr": "topk(10, sum(rate(iceberg_total{job=\"cave-lakehouse\"}[5m])) by (tenant_id))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -424,7 +424,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "min(up{job=\"cave-datafusion\"})",
+          "expr": "min(up{job=\"cave-lakehouse\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -450,5 +450,5 @@
   },
   "editable": true,
   "graphTooltip": 1,
-  "description": "Query engine"
+  "description": "Iceberg lake"
 }

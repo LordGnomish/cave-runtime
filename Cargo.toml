@@ -54,10 +54,11 @@ members = [
     "crates/cave-ha",
     "crates/cave-infra",
     # === Data & Storage ===
-    "crates/cave-pg",
+    "crates/cave-rdbms-operator",
     "crates/cave-cache",
     "crates/cave-store",
     "crates/cave-streams",
+    "crates/cave-lakehouse",
     "crates/cave-cdc",
     # === Observability ===
     "crates/cave-metrics",
@@ -120,8 +121,6 @@ members = [
     "crates/cave-techdocs",
     "crates/cave-permission",
     # === Data Lake Foundation ===
-    "crates/cave-iceberg",
-    "crates/cave-datafusion",
     # === Kubernetes Controller Manager ===
     "crates/cave-controller-manager",
     # === Kubernetes Cloud Controller Manager ===

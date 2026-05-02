@@ -98,7 +98,7 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "CloudNativePG",
         github_repo: "cloudnative-pg/cloudnative-pg",
-        cave_module: "cave-pg",
+        cave_module: "cave-rdbms-operator",
         track_features: "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt",
         check_frequency: "biweekly",
         category: "database",
@@ -694,6 +694,27 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         check_frequency: "monthly",
         category: "serverless",
         phase: 3,
+    },
+    // ============================================================
+    // LAKEHOUSE (consolidated per ADR-147 — N upstreams → 1 cave-module)
+    // ============================================================
+    TrackedProject {
+        name: "Apache Iceberg",
+        github_repo: "apache/iceberg-rust",
+        cave_module: "cave-lakehouse",
+        track_features: "Table format — Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Apache DataFusion",
+        github_repo: "apache/datafusion",
+        cave_module: "cave-lakehouse",
+        track_features: "Query engine — SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
     },
 ];
 

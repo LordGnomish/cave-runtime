@@ -3,8 +3,8 @@
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/schema.rs and
 //! the spec at https://iceberg.apache.org/spec/#schemas.
 
-use crate::error::{IcebergError, IcebergResult};
-use crate::tenant::{default_tenant_id, validate_tenant_id};
+use crate::table_format::iceberg::error::{IcebergError, IcebergResult};
+use crate::table_format::iceberg::tenant::{default_tenant_id, validate_tenant_id};
 use serde::{Deserialize, Serialize};
 
 /// Iceberg primitive types (subset shipped here — bool/int/long/float/double/

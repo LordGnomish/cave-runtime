@@ -5,23 +5,23 @@
 //! e2e tests for HA failover & PITR base selection. These tests exercise the
 //! pure in-memory domain managers — no PostgreSQL daemon required.
 
-use cave_pg::backup::BackupManager;
-use cave_pg::ha::HaController;
-use cave_pg::lifecycle::InstanceManager;
-use cave_pg::manager::{
+use cave_rdbms_operator::backup::BackupManager;
+use cave_rdbms_operator::ha::HaController;
+use cave_rdbms_operator::lifecycle::InstanceManager;
+use cave_rdbms_operator::manager::{
     bloated_tables, needs_vacuum, pool_utilisation_pct, replication_healthy,
     size_alert_records, slow_queries,
 };
-use cave_pg::models::{
+use cave_rdbms_operator::models::{
     DbSizeRecord, QueryStat, ReplicationSlot, ReplicationStatus, TableStat,
 };
-use cave_pg::monitoring::Monitor;
-use cave_pg::pool::ConnectionPool;
-use cave_pg::types::{
+use cave_rdbms_operator::monitoring::Monitor;
+use cave_rdbms_operator::pool::ConnectionPool;
+use cave_rdbms_operator::types::{
     BackupStatus, BackupType, InstanceState, PgRole, PgStatActivity, PgStatTable, PitrTarget,
     PoolConfig, PoolMode, ReplicaInfo, ReplicationState, SyncState,
 };
-use cave_pg::user::{RoleUpdate, UserManager, UserOptions};
+use cave_rdbms_operator::user::{RoleUpdate, UserManager, UserOptions};
 use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;

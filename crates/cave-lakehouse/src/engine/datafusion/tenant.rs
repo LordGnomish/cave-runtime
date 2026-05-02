@@ -2,7 +2,7 @@
 //!
 //! Mirrors cave-iceberg/src/tenant.rs (RFC 1123 DNS label).
 
-use crate::error::{DataFusionError, DfResult};
+use crate::engine::datafusion::error::{DataFusionError, DfResult};
 
 pub const DEFAULT_TENANT_ID: &str = "default";
 

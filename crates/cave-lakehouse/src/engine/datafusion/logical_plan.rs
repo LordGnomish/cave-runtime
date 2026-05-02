@@ -3,9 +3,9 @@
 //! Mirrors apache/datafusion datafusion-expr/src/logical_plan/plan.rs `LogicalPlan` enum
 //! (subset of operators shipped here).
 
-use crate::error::{DataFusionError, DfResult};
-use crate::expr::Expr;
-use crate::tenant::{default_tenant_id, validate_tenant_id};
+use crate::engine::datafusion::error::{DataFusionError, DfResult};
+use crate::engine::datafusion::expr::Expr;
+use crate::engine::datafusion::tenant::{default_tenant_id, validate_tenant_id};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -219,7 +219,7 @@ impl LogicalPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::batch::Value;
+    use crate::engine::datafusion::batch::Value;
 
     // ── AggregateFunc ─────────────────────────────────────────────────────────
 

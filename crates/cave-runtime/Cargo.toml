@@ -97,7 +97,7 @@ cave-pam = { path = "../cave-pam" }
 # Infrastructure & Networking
 cave-gateway = { path = "../cave-gateway" }
 # Data & Storage
-cave-pg = { path = "../cave-pg" }
+cave-rdbms-operator = { path = "../cave-rdbms-operator" }
 cave-streams = { path = "../cave-streams" }
 # Observability
 # Security & Admission

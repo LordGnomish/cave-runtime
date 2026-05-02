@@ -3,11 +3,11 @@
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/table_metadata.rs and
 //! the spec at https://iceberg.apache.org/spec/#table-metadata.
 
-use crate::error::{IcebergError, IcebergResult};
-use crate::partition::PartitionSpec;
-use crate::schema::Schema;
-use crate::snapshot::Snapshot;
-use crate::tenant::{default_tenant_id, validate_tenant_id};
+use crate::table_format::iceberg::error::{IcebergError, IcebergResult};
+use crate::table_format::iceberg::partition::PartitionSpec;
+use crate::table_format::iceberg::schema::Schema;
+use crate::table_format::iceberg::snapshot::Snapshot;
+use crate::table_format::iceberg::tenant::{default_tenant_id, validate_tenant_id};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -160,9 +160,9 @@ impl TableMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::partition::PartitionSpec;
-    use crate::schema::{Field, PrimitiveType, Schema};
-    use crate::snapshot::{Snapshot, SnapshotOperation};
+    use crate::table_format::iceberg::partition::PartitionSpec;
+    use crate::table_format::iceberg::schema::{Field, PrimitiveType, Schema};
+    use crate::table_format::iceberg::snapshot::{Snapshot, SnapshotOperation};
 
     fn schema() -> Schema {
         Schema::new(

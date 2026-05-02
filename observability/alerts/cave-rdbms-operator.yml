@@ -1,0 +1,97 @@
+# Postgres-parity OLTP
+groups:
+  - name: cave-rdbms-operator-slo
+    interval: 30s
+    rules:
+      - alert: PgSloBurnRateFast
+        expr: |
+          (
+            sum(rate(pg_total{job="cave-rdbms-operator",code=~"5.."}[1h]))
+            /
+            sum(rate(pg_total{job="cave-rdbms-operator"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-rdbms-operator fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }} — burning the 99.9% budget 14.4× faster than allowed."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/slo-burn-fast.md"
+      - alert: PgSloBurnRateSlow
+        expr: |
+          (
+            sum(rate(pg_total{job="cave-rdbms-operator",code=~"5.."}[6h]))
+            /
+            sum(rate(pg_total{job="cave-rdbms-operator"}[6h]))
+          ) > (6 * 0.001)
+        for: 15m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-rdbms-operator slow burn-rate (6h)"
+          description: "Sustained 5xx fraction over 6h."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/slo-burn-slow.md"
+      - alert: PgErrorBudgetLow
+        expr: |
+          (
+            1 -
+            (sum(rate(pg_total{job="cave-rdbms-operator",code=~"5.."}[7d]))
+              / sum(rate(pg_total{job="cave-rdbms-operator"}[7d])))
+          ) < 0.999
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rdbms-operator 7-day availability < 99.9%"
+          description: "Trailing 7d availability = {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/error-budget.md"
+      - alert: PgLatencyP99High
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(pg_duration_seconds_bucket{job="cave-rdbms-operator"}[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rdbms-operator p99 latency > 1s"
+          description: "p99 = {{ $value }}s."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/latency.md"
+      - alert: PgSaturationHigh
+        expr: 'sum(pg_inflight_requests{job="cave-rdbms-operator"}) > 400'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rdbms-operator inflight requests > 400"
+          description: "Concurrent requests = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/saturation.md"
+      - alert: PgMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-rdbms-operator"} > 4 * 1024 * 1024 * 1024'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rdbms-operator RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/memory.md"
+      - alert: PgCardinalityExplosion
+        expr: 'count(count by (tenant_id) (pg_total{job="cave-rdbms-operator"})) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-rdbms-operator tenant cardinality > 5000"
+          description: "Count = {{ $value }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/cardinality.md"
+      - alert: PgHealthProbeFailing
+        expr: 'min(up{job="cave-rdbms-operator"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-rdbms-operator health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-rdbms-operator/health.md"

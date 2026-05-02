@@ -1,6 +1,6 @@
 [package]
-name = "cave-pg"
-description = "PostgreSQL management — compatible with pgAdmin/CloudNativePG"
+name = "cave-rdbms-operator"
+description = "RDBMS operator (CloudNativePG-style) — sibling to cave-rdbms (engine)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

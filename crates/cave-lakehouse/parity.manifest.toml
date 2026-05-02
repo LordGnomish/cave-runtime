@@ -1,0 +1,71 @@
+# parity.manifest.toml — cave-lakehouse
+# Consolidated per ADR-147. Multi-upstream form per ADR-RUNTIME-UPSTREAM-MIRROR-001.
+
+[module]
+name        = "cave-lakehouse"
+description = "Consolidated lakehouse — Iceberg table format + DataFusion engine"
+source_root = "src"
+
+[[upstreams]]
+org     = "apache"
+repo    = "iceberg-rust"
+version = "0.4.0"
+role    = "primary-table-format"
+notes   = "Table format — partition layout, snapshot isolation, time-travel."
+
+[[upstreams]]
+org     = "apache"
+repo    = "datafusion"
+version = "44.0.0"
+role    = "primary-engine"
+notes   = "Query engine — SQL planner, DataFrame, vectorized executor."
+
+[[upstreams]]
+org     = "delta-io"
+repo    = "delta-rs"
+version = "0.18.0"
+role    = "optional-table-format"
+notes   = "Optional second table format. Iceberg is the primary; Delta is opt-in for Databricks-aligned workflows."
+
+[[upstreams]]
+org     = "apache"
+repo    = "hudi-rs"
+version = "0.2.0"
+role    = "optional-table-format"
+notes   = "Optional third table format. Defer concrete impl until Iceberg + Delta are 100% parity."
+
+[[upstreams]]
+org     = "apache"
+repo    = "arrow-rs"
+version = "53.0.0"
+role    = "io-substrate"
+notes   = "Parquet columnar IO + Arrow in-memory representation. Shared between table-format read path and engine vectorized executor."
+
+[[upstreams]]
+org     = "minio"
+repo    = "minio"
+version = "RELEASE.2026-04-22"
+role    = "storage-substrate"
+notes   = "Object store substrate. Lakehouse calls go through cave-store which mirrors MinIO; this entry exists so the lakehouse audit trail names MinIO explicitly."
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "<repo>:<path>"
+# local    = "src/<path>"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "UpstreamFunc"
+# local_name    = "local_fn"
+# file          = "src/<path>"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "TestUpstreamFunc"
+# local_test    = "test_local_fn"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/api/upstream"
+# local_path    = "/api/lakehouse/endpoint"

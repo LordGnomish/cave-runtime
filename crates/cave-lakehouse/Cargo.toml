@@ -1,9 +1,9 @@
 [package]
-name = "cave-iceberg"
+name = "cave-lakehouse"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Apache Iceberg table format — TableMetadata, Snapshot, Manifest, Schema, PartitionSpec"
+description = "Lakehouse — Apache Iceberg table format + DataFusion query engine (consolidated per ADR-147)"
 
 [dependencies]
 serde = { workspace = true }
