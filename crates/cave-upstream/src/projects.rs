@@ -624,15 +624,10 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "operations",
         phase: 3,
     },
-    TrackedProject {
-        name: "vcluster",
-        github_repo: "loft-sh/vcluster",
-        cave_module: "cave-cluster",
-        track_features: "Syncer protocol, resource sync config, persistent vs ephemeral modes, pro features going OSS",
-        check_frequency: "biweekly",
-        category: "operations",
-        phase: 1,
-    },
+    // loft-sh/vcluster intentionally NOT tracked: Charter decision — `cave-cluster`
+    // multi-tenant control-plane uses clastix/kamaji, not vcluster. `cave-kamaji`
+    // is tracked separately (LATEST status). See version-audit-2026-05-02.md DROPPED
+    // section (lands with feat/cave-upstream-watchd-001 branch).
     TrackedProject {
         name: "k6",
         github_repo: "grafana/k6",
