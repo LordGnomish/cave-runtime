@@ -456,7 +456,7 @@ if [ "$SUCCESS_AT_RETRY" -gt 0 ]; then
 fi
 
 if [ "$SUCCESS_AT_RETRY" -lt 1 ]; then
-  log "all 3 retries failed — appending fallback stub (success_at_retry=-1)"
+  log "all qwen attempts failed (broke early on phantom strike or hit retry-3 ceiling) — appending fallback stub (success_at_retry=-1)"
   cp "$SNAPSHOT" "$RUST_OUT"
   cat >> "$RUST_OUT" <<EOF
 
