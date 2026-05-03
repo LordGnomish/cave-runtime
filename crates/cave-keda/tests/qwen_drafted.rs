@@ -326,3 +326,6 @@ mod tests {
 
 // === cycle 1777725543 (qwen success at retry 1; ollama_calls=1; ollama_secs=519) ===
 
+
+// === cycle 1777816099 (qwen success at retry 1; ollama_calls=1; ollama_secs=72) ===
+
