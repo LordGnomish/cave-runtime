@@ -1,5 +1,19 @@
 # Naming + Phantom Audit (2026-05-03)
 
+> ⚠️ **CORRECTION (2026-05-03 23:35Z):** Sections 1 & 2 were wrong about
+> ADR-147. The audit `find` ran against `/Users/gnomish/Code/cave-runtime/crates/`
+> while the main repo dir was checked out to `feat/cave-upstream-watchd-001`
+> (1478 commits behind main). On main HEAD, ADR-147 is **fully executed**:
+> `cave-rdbms-operator/` and `cave-lakehouse/` exist as real workspace
+> members; `cave-pg/` was deleted in commit `d7d6cb61`. Only
+> `cave-vector-search` remains a genuine phantom (tracker target with no
+> workspace crate). Section 1 still applies for `cave-vector-search`;
+> Section 2's ADR-147 status is obsolete.
+>
+> Lesson: when the parent repo dir is on a non-main branch, run audits
+> from a worktree that has main checked out, or use `git ls-tree -r main`
+> instead of `find`.
+
 Comprehensive cross-check of three sources of truth, after the cave-vcluster
 drop (commit `17eafb2c`).
 

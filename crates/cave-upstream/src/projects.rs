@@ -95,13 +95,15 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // PROVIDER-ABSTRACTED: Database
     // ============================================================
-    // ADR-147 phantom: target name `cave-rdbms-operator` has no workspace
-    // member yet (rename only landed on tracker side; cave-pg is still on
-    // disk pointing at pgbouncer/pgbouncer in its parity manifest).
-    // Re-enable this row when crates/cave-rdbms-operator/ exists. Until
-    // then, qwen-pump cargo-checks fail with "package ID specification
-    // did not match any packages". See docs/upstream/naming-audit-2026-05-03.md
-    // §1 + §2 for remediation options.
+    TrackedProject {
+        name: "CloudNativePG",
+        github_repo: "cloudnative-pg/cloudnative-pg",
+        cave_module: "cave-rdbms-operator",
+        track_features: "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt",
+        check_frequency: "biweekly",
+        category: "database",
+        phase: 2,
+    },
 
     // ============================================================
     // PROVIDER-ABSTRACTED: Object Storage
@@ -686,17 +688,24 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // LAKEHOUSE (consolidated per ADR-147 — N upstreams → 1 cave-module)
     // ============================================================
-    // ADR-147 phantom: target name `cave-lakehouse` has no workspace member yet.
-    // Old upstream-named crates `cave-iceberg/` and `cave-datafusion/` are
-    // still on disk as DEPRECATED ALIAS stubs (their parity.manifest.toml
-    // headers explicitly say "Bumps should go to cave-lakehouse, not here"),
-    // but `crates/cave-lakehouse/` itself was never created. Re-enable these
-    // two rows when the workspace catches up. See naming-audit-2026-05-03.md §2.
-    //
-    // Iceberg upstream:    apache/iceberg-rust
-    //                      Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel
-    // DataFusion upstream: apache/datafusion
-    //                      SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan
+    TrackedProject {
+        name: "Apache Iceberg",
+        github_repo: "apache/iceberg-rust",
+        cave_module: "cave-lakehouse",
+        track_features: "Table format — Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Apache DataFusion",
+        github_repo: "apache/datafusion",
+        cave_module: "cave-lakehouse",
+        track_features: "Query engine — SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
+    },
 ];
 
 #[cfg(test)]
