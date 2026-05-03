@@ -95,15 +95,13 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // PROVIDER-ABSTRACTED: Database
     // ============================================================
-    TrackedProject {
-        name: "CloudNativePG",
-        github_repo: "cloudnative-pg/cloudnative-pg",
-        cave_module: "cave-rdbms-operator",
-        track_features: "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt",
-        check_frequency: "biweekly",
-        category: "database",
-        phase: 2,
-    },
+    // ADR-147 phantom: target name `cave-rdbms-operator` has no workspace
+    // member yet (rename only landed on tracker side; cave-pg is still on
+    // disk pointing at pgbouncer/pgbouncer in its parity manifest).
+    // Re-enable this row when crates/cave-rdbms-operator/ exists. Until
+    // then, qwen-pump cargo-checks fail with "package ID specification
+    // did not match any packages". See docs/upstream/naming-audit-2026-05-03.md
+    // §1 + §2 for remediation options.
 
     // ============================================================
     // PROVIDER-ABSTRACTED: Object Storage
@@ -165,15 +163,10 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "search",
         phase: 2,
     },
-    TrackedProject {
-        name: "Qdrant",
-        github_repo: "qdrant/qdrant",
-        cave_module: "cave-vector-search",
-        track_features: "HNSW/IVFFlat indexing, gRPC API, quantization, multi-vector, hybrid search",
-        check_frequency: "biweekly",
-        category: "search",
-        phase: 2,
-    },
+    // Phantom: target name `cave-vector-search` has no workspace member.
+    // The OpenSearch/Qdrant/Faiss/Milvus split-out exists in tracker but
+    // workspace has only `cave-search/` (handles all four together).
+    // Re-enable when crates/cave-vector-search/ exists. See naming-audit-2026-05-03.md §1.
 
     // ============================================================
     // IDENTITY & SECRETS
@@ -693,24 +686,17 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // LAKEHOUSE (consolidated per ADR-147 — N upstreams → 1 cave-module)
     // ============================================================
-    TrackedProject {
-        name: "Apache Iceberg",
-        github_repo: "apache/iceberg-rust",
-        cave_module: "cave-lakehouse",
-        track_features: "Table format — Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel",
-        check_frequency: "biweekly",
-        category: "lakehouse",
-        phase: 2,
-    },
-    TrackedProject {
-        name: "Apache DataFusion",
-        github_repo: "apache/datafusion",
-        cave_module: "cave-lakehouse",
-        track_features: "Query engine — SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan",
-        check_frequency: "biweekly",
-        category: "lakehouse",
-        phase: 2,
-    },
+    // ADR-147 phantom: target name `cave-lakehouse` has no workspace member yet.
+    // Old upstream-named crates `cave-iceberg/` and `cave-datafusion/` are
+    // still on disk as DEPRECATED ALIAS stubs (their parity.manifest.toml
+    // headers explicitly say "Bumps should go to cave-lakehouse, not here"),
+    // but `crates/cave-lakehouse/` itself was never created. Re-enable these
+    // two rows when the workspace catches up. See naming-audit-2026-05-03.md §2.
+    //
+    // Iceberg upstream:    apache/iceberg-rust
+    //                      Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel
+    // DataFusion upstream: apache/datafusion
+    //                      SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan
 ];
 
 #[cfg(test)]
