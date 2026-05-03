@@ -8,9 +8,10 @@ repo    = "etcd"
 version = "v3.6.10"
 
 [module]
-name        = "cave-etcd"
-description = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
-source_root = "src"
+name          = "cave-etcd"
+description   = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — distributed KV foundation under cave-apiserver
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # upstream path (relative to etcd repo root) → local path (relative to this crate root)

@@ -18,9 +18,10 @@ version = "v1.4.2"
 notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/cgroups/fs2/."
 
 [module]
-name        = "cave-cri"
-description = "containerd CRI reimplementation — 42 endpoints covering container lifecycle, images, sandboxes, snapshots"
-source_root = "src"
+name          = "cave-cri"
+description   = "containerd CRI reimplementation — 42 endpoints covering container lifecycle, images, sandboxes, snapshots"
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — container runtime interface
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

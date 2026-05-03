@@ -71,6 +71,33 @@ if [ ! -s "$QUEUE" ]; then
   exit 0
 fi
 
+# Priority sort: read each queued crate's pump_priority from its
+# parity.manifest.toml (HIGH | MEDIUM | LOW; default LOW). Stable-sort the
+# queue so HIGH crates pop first, MEDIUM next, LOW last; FIFO order within
+# each priority is preserved. Charter-critical 7 (cave-net, cave-cri,
+# cave-vault, cave-apiserver, cave-etcd, cave-streams, cave-rdbms-operator)
+# carry pump_priority = "HIGH" in their manifests.
+sort_queue_by_priority() {
+  local q="$1" tmp="$1.tmp" main="$2" line k p m
+  : > "$tmp"
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    m="$main/crates/$line/parity.manifest.toml"
+    p="LOW"
+    if [ -f "$m" ]; then
+      p=$(grep -E '^[[:space:]]*pump_priority[[:space:]]*=' "$m" \
+          | head -1 \
+          | sed -E 's/.*=[[:space:]]*"([A-Z]+)".*/\1/')
+      [ -z "$p" ] && p="LOW"
+    fi
+    case "$p" in HIGH) k=0 ;; MEDIUM) k=1 ;; *) k=2 ;; esac
+    printf '%d\t%s\n' "$k" "$line" >> "$tmp"
+  done < "$q"
+  sort -s -k1,1n "$tmp" | cut -f2- > "$q"
+  rm -f "$tmp"
+}
+sort_queue_by_priority "$QUEUE" "$MAIN_WT"
+
 # Pop head atomically.
 crate="$(awk 'NF{print; exit}' "$QUEUE")"
 if [ -z "${crate:-}" ]; then

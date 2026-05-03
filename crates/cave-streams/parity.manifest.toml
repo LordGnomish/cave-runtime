@@ -24,9 +24,10 @@ version = "v4.2.0"
 notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressing."
 
 [module]
-name        = "cave-streams"
-description = "Event streaming — single Rust impl, two wire protocols (Kafka + Pulsar)"
-source_root = "src"
+name          = "cave-streams"
+description   = "Event streaming — single Rust impl, two wire protocols (Kafka + Pulsar)"
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — Kafka+Pulsar event streaming surface
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

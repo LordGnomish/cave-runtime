@@ -8,9 +8,10 @@ repo    = "openbao"
 version = "v2.5.3"
 
 [module]
-name        = "cave-vault"
-description = "Secrets management — OpenBao (HashiCorp Vault fork) parity"
-source_root = "src"
+name          = "cave-vault"
+description   = "Secrets management — OpenBao (HashiCorp Vault fork) parity"
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — secrets management surface
 
 # ── File mappings ────────────────────────────────────────────────────────────
 [[files]]

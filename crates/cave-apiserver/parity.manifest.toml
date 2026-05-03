@@ -8,9 +8,10 @@ repo    = "kubernetes"
 version = "v1.36.0"
 
 [module]
-name        = "cave-apiserver"
-description = "Kubernetes API server reimplementation — 24 resource types, full CRUD + watch"
-source_root = "src"
+name          = "cave-apiserver"
+description   = "Kubernetes API server reimplementation — 24 resource types, full CRUD + watch"
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — K8s control-plane primary entrypoint
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

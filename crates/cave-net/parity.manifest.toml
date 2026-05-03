@@ -24,9 +24,10 @@ upstream_pkg_dirs_total    = 118   # distinct pkg/<name>/ directories
 upstream_bpf_c_h_files     = 302   # bpf/**/*.{c,h}
 
 [module]
-name        = "cave-net"
-description = "Cilium parity port — agent-side state machines, CRDs, REST/gRPC surface, Prometheus metrics. Datapath is semantic; see PARITY_REPORT.md for wire-faithful exclusions."
-source_root = "src"
+name          = "cave-net"
+description   = "Cilium parity port — agent-side state machines, CRDs, REST/gRPC surface, Prometheus metrics. Datapath is semantic; see PARITY_REPORT.md for wire-faithful exclusions."
+source_root   = "src"
+pump_priority = "HIGH"  # charter-critical 7 — networking control plane
 rs_files          = 86    # crates/cave-net/src/cilium/*.rs
 rs_loc            = 35938
 tests_passing     = 1759
