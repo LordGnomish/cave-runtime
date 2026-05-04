@@ -139,16 +139,27 @@ if [ ! -d "$MAIN_WT/crates/$crate" ]; then
   exit 0
 fi
 
-# Bin-only crate detection: if the crate has [[bin]] but no [lib], the
-# qwen scaffold can't reach into the binary's private fns and the
-# "≥5 tests" gate is structurally impossible. Tolerate test-count 0 in
-# that case (cargo check still has to be green).
+# Bin-only / no-lib-surface detection: a crate's qwen scaffold can't
+# reach its surface in three cases:
+#   (a) [[bin]] without [lib] in Cargo.toml — explicit bin-only
+#   (b) Cargo.toml has neither [lib] nor [[bin]] declared, AND no
+#       src/lib.rs file — implicit-bin or scaffolding-pending crate
+#   (c) src/lib.rs exists but is so thin (< 5 pub items) that the qwen
+#       prompt's GROUND_TRUTH list is empty
+# In all three the "≥5 tests" gate is structurally impossible, so we
+# tolerate test-count 0 (cargo check still has to be green).
 BIN_ONLY=0
-if [ -f "$MAIN_WT/crates/$crate/Cargo.toml" ]; then
-  if ! grep -qE '^\[lib\]' "$MAIN_WT/crates/$crate/Cargo.toml" \
-     && grep -qE '^\[\[bin\]\]' "$MAIN_WT/crates/$crate/Cargo.toml"; then
+CARGO_TOML="$MAIN_WT/crates/$crate/Cargo.toml"
+LIB_RS="$MAIN_WT/crates/$crate/src/lib.rs"
+if [ -f "$CARGO_TOML" ]; then
+  has_lib_section=$(grep -cE '^\[lib\]' "$CARGO_TOML")
+  has_bin_section=$(grep -cE '^\[\[bin\]\]' "$CARGO_TOML")
+  if [ "$has_lib_section" -eq 0 ] && [ "$has_bin_section" -ge 1 ]; then
     BIN_ONLY=1
-    log "bin-only crate detected ($crate) — test threshold lowered to 0 for this cycle"
+    log "bin-only crate detected ($crate, [[bin]] without [lib]) — threshold=0"
+  elif [ "$has_lib_section" -eq 0 ] && [ "$has_bin_section" -eq 0 ] && [ ! -f "$LIB_RS" ]; then
+    BIN_ONLY=1
+    log "no-surface crate detected ($crate, no [lib]/[[bin]] section AND no src/lib.rs) — threshold=0"
   fi
 fi
 
