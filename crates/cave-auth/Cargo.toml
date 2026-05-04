@@ -1,6 +1,14 @@
 [package]
 name = "cave-auth"
 description = "Full Okta AuthN+AuthZ — OIDC, RBAC, ABAC, SCIM 2.0, PAT, sessions, multi-tenancy"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-auth"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["auth", "oidc", "rbac", "scim", "identity"]
+categories = ["authentication", "web-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
