@@ -1,6 +1,23 @@
+//! Worst-status aggregator for status pages.
+//!
+//! Computes the overall status of a page by taking the highest-rank
+//! component status. Empty inputs resolve to Operational.
+
 use crate::models::{ComponentStatus, StatusComponent, StatusPage};
 
-/// Compute overall status as the worst status among all components
+/// Compute overall status as the worst status among all components.
+///
+/// If the input slice is empty, returns `ComponentStatus::Operational`.
+/// Otherwise, iterates over all components, maps each to a numeric rank,
+/// and returns the status corresponding to the maximum rank found.
+///
+/// # Ranks
+///
+/// * `0` - Operational
+/// * `1` - DegradedPerformance
+/// * `2` - PartialOutage
+/// * `3` - UnderMaintenance
+/// * `4` - MajorOutage
 pub fn compute_overall_status(components: &[StatusComponent]) -> ComponentStatus {
     let worst = components.iter().map(|c| status_rank(&c.status)).max().unwrap_or(0);
     rank_to_status(worst)
@@ -26,7 +43,11 @@ fn rank_to_status(rank: u8) -> ComponentStatus {
     }
 }
 
-/// Count components in each status
+/// Count components in each status.
+///
+/// Returns a map where keys are the debug-formatted status names
+/// (e.g., "Operational", "MajorOutage") and values are the counts
+/// of components with that status.
 pub fn count_by_status(components: &[StatusComponent]) -> std::collections::HashMap<String, usize> {
     let mut counts = std::collections::HashMap::new();
     for c in components {
@@ -36,7 +57,11 @@ pub fn count_by_status(components: &[StatusComponent]) -> std::collections::Hash
     counts
 }
 
-/// Check if the status page has any non-operational components
+/// Check if the status page has any non-operational components.
+///
+/// Returns `true` if any component has a status other than
+/// `ComponentStatus::Operational`, indicating some form of issue
+/// or maintenance.
 pub fn has_issues(page: &StatusPage) -> bool {
     page.components.iter().any(|c| c.status != ComponentStatus::Operational)
 }
