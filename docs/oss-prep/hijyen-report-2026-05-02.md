@@ -25,9 +25,9 @@ Sample (first 10):
 
 ✓ No build artefacts tracked in git.
 
-## 4. Path leakage — `/Users/gnomish/`
+## 4. Path leakage — `/Users/dev/`
 
-Files containing `/Users/gnomish`: **10**
+Files containing `/Users/dev`: **10**
 
 Top 30 by file (path → line count):
 ```
@@ -47,7 +47,7 @@ docs/local-llm/README.md:1
 
 ## 5. Email leakage
 
-Files containing `btartan@gmail.com`: **2**
+Files containing `noreply@cave-runtime.org`: **2**
 
 All hits:
 ```
@@ -67,7 +67,7 @@ admin@tenant1.cave
 alice@acme.com
 alice@mycompany.com
 bob@techcorp.com
-btartan@gmail.com
+noreply@cave-runtime.org
 contributors@caveplatform.dev
 debian-glibc@lists.debian.org
 dev@cave.local
@@ -129,8 +129,8 @@ Top Co-Authored-By trailers (count → trailer):
 Breakdown:
 - .DS_Store files: 1
 - Build artefacts tracked: 0
-- Files with `/Users/gnomish`: 10
-- Files with `btartan@gmail.com`: 2
+- Files with `/Users/dev`: 10
+- Files with `noreply@cave-runtime.org`: 2
 - Compliance files missing: 4
 
 Per ADR-148, none of these block the orphan-launch strategy on the *history* side, but **all of them must be fixed in the working tree** during the Faz 1 hygiene sprint (2026-05-14 → 2026-05-19) before the launch commit is taken.

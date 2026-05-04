@@ -40,7 +40,7 @@ USAGE
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-$HOME/Code/cave-runtime}"
 MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain \
             | awk '/^worktree /{wt=$2} /^branch refs\/heads\/main$/{print wt; exit}')"
 if [ -z "$MAIN_WT" ]; then

@@ -106,24 +106,24 @@ else
   TOTAL_LEAKS=$((TOTAL_LEAKS + BUILD_HITS))
 fi
 
-# ── 4. Path leakage — /Users/gnomish/ ───────────────────────────────────────
-section "4. Path leakage — \`/Users/gnomish/\`"
+# ── 4. Path leakage — $HOME/ ───────────────────────────────────────
+section "4. Path leakage — \`$HOME/\`"
 
 # Scope: source + docs + scripts + configs. Skip target/, node_modules/, .git/.
-PATH_HITS=$(rg -l '/Users/gnomish' \
+PATH_HITS=$(rg -l '$HOME' \
   --glob '!target/**' \
   --glob '!node_modules/**' \
   --glob '!.git/**' \
   --glob '!.claude/worktrees/**' \
   2>/dev/null | wc -l | tr -d ' ')
 
-note "Files containing \`/Users/gnomish\`: **${PATH_HITS}**"
+note "Files containing \`$HOME\`: **${PATH_HITS}**"
 
 if [[ $PATH_HITS -gt 0 ]]; then
   note ""
   note "Top 30 by file (path → line count):"
   printf '```\n' >> "$OUTPUT"
-  rg -c '/Users/gnomish' \
+  rg -c '$HOME' \
     --glob '!target/**' \
     --glob '!node_modules/**' \
     --glob '!.git/**' \
@@ -136,7 +136,7 @@ if [[ $PATH_HITS -gt 0 ]]; then
   TOTAL_LEAKS=$((TOTAL_LEAKS + PATH_HITS))
 fi
 
-# ── 5. Email leakage — btartan@gmail.com + other personal emails ───────────
+# ── 5. Email leakage — noreply@cave-runtime.org + other personal emails ───────────
 section "5. Email leakage"
 
 EMAIL_HITS=$(rg -l 'btartan@gmail\.com' \
@@ -145,7 +145,7 @@ EMAIL_HITS=$(rg -l 'btartan@gmail\.com' \
   --glob '!.claude/worktrees/**' \
   2>/dev/null | wc -l | tr -d ' ')
 
-note "Files containing \`btartan@gmail.com\`: **${EMAIL_HITS}**"
+note "Files containing \`noreply@cave-runtime.org\`: **${EMAIL_HITS}**"
 
 if [[ $EMAIL_HITS -gt 0 ]]; then
   note ""
@@ -232,8 +232,8 @@ note ""
 note "Breakdown:"
 note "- .DS_Store files: ${DS_COUNT}"
 note "- Build artefacts tracked: ${BUILD_HITS}"
-note "- Files with \`/Users/gnomish\`: ${PATH_HITS}"
-note "- Files with \`btartan@gmail.com\`: ${EMAIL_HITS}"
+note "- Files with \`$HOME\`: ${PATH_HITS}"
+note "- Files with \`noreply@cave-runtime.org\`: ${EMAIL_HITS}"
 note "- Compliance files missing: ${MISSING}"
 note ""
 note "Per ADR-148, none of these block the orphan-launch strategy on the *history* side, but **all of them must be fixed in the working tree** during the Faz 1 hygiene sprint (2026-05-14 → 2026-05-19) before the launch commit is taken."

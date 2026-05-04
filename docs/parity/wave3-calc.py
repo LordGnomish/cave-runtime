@@ -17,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
-ROOT = Path('/Users/gnomish/Code/cave-runtime/.claude/worktrees/eager-proskuriakova-fe8ccf')
+ROOT = Path('$HOME/Code/cave-runtime/.claude/worktrees/eager-proskuriakova-fe8ccf')
 CRATES = ROOT / 'crates'
 
 

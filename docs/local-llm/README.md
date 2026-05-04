@@ -47,7 +47,7 @@ cave local-llm daemon start
 
 # Ya da cargo ile direkt
 cargo run -p cave-local-llm --bin cave-local-llm-daemon -- start \
-  --workspace-root /Users/gnomish/Documents/claude/platform/cave-runtime
+  --workspace-root /Users/dev/Documents/claude/platform/cave-runtime
 
 # Graceful durdurma (stop-signal dosyası yazar, sonraki tick'te durur)
 cave local-llm daemon stop

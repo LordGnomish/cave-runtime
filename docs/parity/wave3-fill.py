@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 
-REPO = Path('/Users/gnomish/Code/cave-runtime/.claude/worktrees/eager-proskuriakova-fe8ccf')
+REPO = Path('$HOME/Code/cave-runtime/.claude/worktrees/eager-proskuriakova-fe8ccf')
 CRATES = REPO / 'crates'
 
 # ── Upstream lookup: parse projects.rs + manual overrides from prior sweep ──

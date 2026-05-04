@@ -10,9 +10,9 @@
   <!-- ── Binary ───────────────────────────────────────────────────── -->
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/gnomish/Documents/claude/platform/cave-runtime/target/release/cave-local-llm-daemon</string>
+    <string>/Users/dev/Documents/claude/platform/cave-runtime/target/release/cave-local-llm-daemon</string>
     <string>--workspace-root</string>
-    <string>/Users/gnomish/Documents/claude/platform/cave-runtime</string>
+    <string>/Users/dev/Documents/claude/platform/cave-runtime</string>
     <string>start</string>
   </array>
 
@@ -42,24 +42,24 @@
     <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <!-- Workspace root (also passed as CLI arg above for explicitness). -->
     <key>CAVE_WORKSPACE_ROOT</key>
-    <string>/Users/gnomish/Documents/claude/platform/cave-runtime</string>
+    <string>/Users/dev/Documents/claude/platform/cave-runtime</string>
     <!-- Secondary repo: pipeline-platform-starter (weight 0.2). -->
     <key>CAVE_SECONDARY_REPO_PATH</key>
-    <string>/Users/gnomish/Documents/claude/pipeline-platform-starter</string>
+    <string>/Users/dev/Documents/claude/pipeline-platform-starter</string>
     <key>CAVE_SECONDARY_REPO_WEIGHT</key>
     <string>0.2</string>
     <!-- Tertiary repo: muleforge (weight 0.2). -->
     <key>CAVE_TERTIARY_REPO_PATH</key>
-    <string>/Users/gnomish/Documents/claude/platform/muleforge</string>
+    <string>/Users/dev/Documents/claude/platform/muleforge</string>
     <key>CAVE_TERTIARY_REPO_WEIGHT</key>
     <string>0.2</string>
   </dict>
 
   <!-- ── Logging ────────────────────────────────────────────────────── -->
   <key>StandardOutPath</key>
-  <string>/Users/gnomish/Library/Logs/cave-local-llm-daemon.log</string>
+  <string>/Users/dev/Library/Logs/cave-local-llm-daemon.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/gnomish/Library/Logs/cave-local-llm-daemon.error.log</string>
+  <string>/Users/dev/Library/Logs/cave-local-llm-daemon.error.log</string>
 
   <!-- ── Throttle rapid restart cycles ─────────────────────────────── -->
   <key>ThrottleInterval</key>
