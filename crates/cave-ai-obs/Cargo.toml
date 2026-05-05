@@ -1,6 +1,14 @@
 [package]
 name = "cave-ai-obs"
 description = "LLM observability — compatible with Langfuse"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-ai-obs"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["llm", "observability", "langfuse", "ai", "tracing"]
+categories = ["api-bindings", "asynchronous", "development-tools"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
