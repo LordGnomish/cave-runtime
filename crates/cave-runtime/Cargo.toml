@@ -1,6 +1,14 @@
 [package]
 name = "cave-runtime"
 description = "CAVE Unified Runtime — single binary hosting all platform modules"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-runtime"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["runtime", "kubernetes", "platform", "unified", "binary"]
+categories = ["api-bindings", "command-line-utilities", "network-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -56,7 +64,7 @@ cave-flags = { path = "../cave-flags" }
 cave-docs-site = { path = "../cave-docs-site" }
 cave-dns = { path = "../cave-dns" }
 # Observability stack (Prometheus / Loki / OTLP compat)
-cave-logs    = { path = "../cave-logs" }
+cave-logs     = { path = "../cave-logs" }
 cave-registry = { path = "../cave-registry" }
 # Phase 3 modules
 cave-llm-gateway = { path = "../cave-llm-gateway" }
