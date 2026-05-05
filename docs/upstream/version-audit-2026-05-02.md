@@ -22,13 +22,14 @@
 |---|---:|---|
 | 🟢 **LATEST** (gap = 0 minor)              | 13 | none — clean |
 | 🟡 **BEHIND** (1 minor behind)             |  3 | acceptable, post-launch bump |
-| 🔴 **STALE** (≥ 2 minor or ≥ 1 major)      | 61 | **HIGH — bump before 2026-05-21** |
+| 🔴 **STALE** (≥ 2 minor or ≥ 1 major)      | 60 | **HIGH — bump before 2026-05-21** |
+| ⛔ **DROPPED** (Charter decision, not OSS-launch blocker) | 1 | none — pump tracker entry removed |
 | 💀 **DEAD_UPSTREAM** (no tags / repo moved) |  4 | **HIGH — pick replacement upstream** |
 | 📌 **UNPINNED** (pinned to branch)         |  1 | **HIGH — pin to a real tag** |
 | ⚪ **INTERNAL** (cave-runtime self-ref)    |  6 | none |
 | **TOTAL parity manifests**                 | 88 | |
 
-**Bottom line**: 66 / 82 *external-upstream* modules need bump tasks before launch. 13 / 82 are clean. 3 / 82 can wait. Plus 15 cave-* crates have **no parity manifest at all** — including `cave-registry` which is on the kernel HIGH-priority list (see Manifest schema audit below).
+**Bottom line**: 65 / 82 *external-upstream* modules need bump tasks before launch (was 66; `cave-vcluster` dropped 2026-05-03 — Charter: kamaji is the runtime choice). 13 / 82 are clean. 3 / 82 can wait. Plus 15 cave-* crates have **no parity manifest at all** — including `cave-registry` which is on the kernel HIGH-priority list (see Manifest schema audit below).
 
 ---
 
@@ -123,13 +124,23 @@
 | `cave-upstream` | `cave-runtime/cave-runtime` | `v0.1.0` | `INTERNAL` | `internal/self-ref` | INTERNAL | LOW |  |
 | `cave-uptime` | `louislam/uptime-kuma` | `v1.23.0` | `2.3.0` | `1.-20` | STALE | HIGH |  |
 | `cave-vault` | `openbao/openbao` | `v2.5.3` | `v2.5.3` | `0.+0` | LATEST | LOW |  |
-| `cave-vcluster` | `loft-sh/vcluster` | `v0.19.0` | `v0.34.0` | `0.+15` | STALE | HIGH |  |
+| ~~`cave-vcluster`~~ | ~~`loft-sh/vcluster`~~ | — | — | — | **DROPPED** | — | Charter: kamaji is the runtime choice for multi-tenant K8s, not vcluster (see DROPPED section). |
 | `cave-vulns` | `DefectDojo/django-DefectDojo` | `v2.28.0` | `2.57.3` | `0.+29` | STALE | HIGH |  |
 | `cave-workflows` | `n8n-io/n8n` | `v1.0.0` | `2.19.2` | `1.+19` | STALE | HIGH |  |
 
 ---
 
-## 🔴 STALE — HIGH priority bump (61 modules, must land before 2026-05-21)
+## ⛔ DROPPED — Charter decision (not OSS-launch blocker)
+
+Modules whose upstream tracker was intentionally removed because the Cave runtime takes a different upstream than the original audit row implied. **Not a bug; not a STALE blocker; not pending bump.**
+
+| Module | Old upstream (audited) | Replacement | Rationale | Date |
+|---|---|---|---|---|
+| `cave-cluster` (multi-tenant CP) | `loft-sh/vcluster` | `clastix/kamaji` | Charter decision: kamaji is the runtime choice for multi-tenant K8s control planes. vcluster tracker entry removed from `crates/cave-upstream/src/projects.rs` and `queue.txt`; bump-task seed deleted. `cave-kamaji` already tracked separately (LATEST status, line above). | 2026-05-03 |
+
+---
+
+## 🔴 STALE — HIGH priority bump (60 modules, must land before 2026-05-21)
 
 OSS-launch blockers per Burak's kanon. Each row has a dispatch-ready bump-task seed in [`docs/upstream/bump-tasks-2026-05-02/`](bump-tasks-2026-05-02/) with the exact `PumpPayload` JSON the qwen pump consumes.
 
@@ -193,7 +204,6 @@ OSS-launch blockers per Burak's kanon. Each row has a dispatch-ready bump-task s
 | `cave-store` | `minio/minio` | `RELEASE.2024-01-01` -> `RELEASE.2025-10-15T17-29-55Z` | `1.+0` | [`cave-store-bump-minio-minio.json`](bump-tasks-2026-05-02/cave-store-bump-minio-minio.json) |
 | `cave-trace` | `jaegertracing/jaeger` | `v1.52.0` -> `v2.17.0` | `1.-35` | [`cave-trace-bump-jaegertracing-jaeger.json`](bump-tasks-2026-05-02/cave-trace-bump-jaegertracing-jaeger.json) |
 | `cave-uptime` | `louislam/uptime-kuma` | `v1.23.0` -> `2.3.0` | `1.-20` | [`cave-uptime-bump-louislam-uptime-kuma.json`](bump-tasks-2026-05-02/cave-uptime-bump-louislam-uptime-kuma.json) |
-| `cave-vcluster` | `loft-sh/vcluster` | `v0.19.0` -> `v0.34.0` | `0.+15` | [`cave-vcluster-bump-loft-sh-vcluster.json`](bump-tasks-2026-05-02/cave-vcluster-bump-loft-sh-vcluster.json) |
 | `cave-vulns` | `DefectDojo/django-DefectDojo` | `v2.28.0` -> `2.57.3` | `0.+29` | [`cave-vulns-bump-DefectDojo-django-DefectDojo.json`](bump-tasks-2026-05-02/cave-vulns-bump-DefectDojo-django-DefectDojo.json) |
 | `cave-workflows` | `n8n-io/n8n` | `v1.0.0` -> `2.19.2` | `1.+19` | [`cave-workflows-bump-n8n-io-n8n.json`](bump-tasks-2026-05-02/cave-workflows-bump-n8n-io-n8n.json) |
 
