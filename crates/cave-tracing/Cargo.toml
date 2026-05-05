@@ -1,6 +1,14 @@
 [package]
 name = "cave-tracing"
 description = "Sovereign OpenTelemetry-compatible tracing SDK — span SDK, batching, sampling, OTLP exporter, W3C propagation, multi-tenant"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-tracing"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["tracing", "opentelemetry", "telemetry", "observability", "sdk"]
+categories = ["api-bindings", "asynchronous", "development-tools"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
