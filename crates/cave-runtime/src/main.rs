@@ -129,6 +129,7 @@ async fn main() -> anyhow::Result<()> {
     let oncall_state = cave_oncall::new_state();
     let container_scan_state = cave_container_scan::new_state();
     let erp_state = cave_erp::new_state();
+    let crm_state = cave_crm::new_state();
     let docdb_state = cave_docdb::new_state();
     let rdbms_state = cave_rdbms::new_state();
     let kamaji_state = Arc::new(cave_kamaji::KamajiState::default());
@@ -257,6 +258,7 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_oncall::router(oncall_state))
         .merge(cave_container_scan::router(container_scan_state))
         .merge(cave_erp::router(erp_state))
+        .merge(cave_crm::router(crm_state))
         .merge(cave_docdb::router(docdb_state.clone()))
         .merge(cave_rdbms::router(rdbms_state.clone()))
         .merge(cave_kamaji::router(kamaji_state))
