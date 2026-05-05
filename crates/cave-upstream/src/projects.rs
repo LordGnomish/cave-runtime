@@ -706,6 +706,23 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "lakehouse",
         phase: 2,
     },
+
+    // ============================================================
+    // BUSINESS APPLICATIONS (CRM, ERP — standalone modules)
+    // ============================================================
+    // Twenty is the standalone CRM upstream (ADR-145). cave-crm is a
+    // function-based crate (ADR-147 naming pattern), independent from
+    // cave-erp's CRM submodule which is being deprecated.
+    // Latest stable at scaffold time: v2.2.0 (2026-05-04).
+    TrackedProject {
+        name: "Twenty",
+        github_repo: "twentyhq/twenty",
+        cave_module: "cave-crm",
+        track_features: "Person/Company/Opportunity/Activity data model, GraphQL + REST API, custom objects, workflow automation, AGPL-3.0 license",
+        check_frequency: "biweekly",
+        category: "crm",
+        phase: 4,
+    },
 ];
 
 #[cfg(test)]
