@@ -1,6 +1,14 @@
 [package]
 name = "cave-desktop"
 description = "CAVE native admin shell — GPUI-based desktop companion to the web portal (ADR-PORTAL-DESKTOP-001)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-desktop"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["cli", "admin", "desktop", "gpui", "native"]
+categories = ["command-line-utilities", "development-tools"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -18,8 +26,8 @@ serde_json = { workspace = true }
 # 0.10.1 (post a recent qwen-pump merge that pulled the newer version). Even
 # with `optional = true`, cargo resolves the lockfile workspace-wide and fails.
 # Reintroduce once we either:
-#   (a) pin Zed to a rev that uses core-foundation 0.10.1, or
-#   (b) move cave-desktop out of the workspace into its own Cargo.toml.
+#    (a) pin Zed to a rev that uses core-foundation 0.10.1, or
+#    (b) move cave-desktop out of the workspace into its own Cargo.toml.
 # See ADR-PORTAL-DESKTOP-001 Implementation status section.
 
 [features]
