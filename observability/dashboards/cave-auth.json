@@ -1,454 +1,282 @@
 {
-  "title": "Cave / cave-auth",
-  "uid": "cave-auth",
-  "tags": [
-    "cave",
-    "observability",
-    "cave-auth"
-  ],
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "30s",
-  "time": {
-    "from": "now-1h",
-    "to": "now"
-  },
-  "templating": {
+  "annotations": {
     "list": [
       {
-        "name": "DS_PROMETHEUS",
-        "type": "datasource",
-        "query": "prometheus",
-        "current": {
-          "text": "Prometheus",
-          "value": "Prometheus"
-        },
-        "hide": 0
-      },
-      {
-        "name": "tenant",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
-        "query": "label_values(auth_total{job=\"cave-auth\"}, tenant_id)",
-        "current": {
-          "text": "All",
-          "value": "$__all"
-        },
-        "includeAll": true,
-        "multi": true,
-        "refresh": 2
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
       }
     ]
   },
+  "description": "cave-auth — login flow health, token issuance, OIDC/Keycloak round-trips, passkey usage, security signals, mTLS, PQC. Source crate: cave-auth (keycloak module from feat/cave-auth-keycloak-mvp).",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": ["cave", "cave-auth", "security", "tier-1", "keycloak", "pqc"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": true, "text": "Prometheus", "value": "Prometheus" },
+        "label": "Datasource",
+        "name": "DS_PROM",
+        "query": "prometheus",
+        "type": "datasource"
+      },
+      {
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "definition": "label_values(cave_auth_login_total, realm)",
+        "includeAll": true,
+        "multi": true,
+        "name": "realm",
+        "query": { "query": "label_values(cave_auth_login_total, realm)", "refId": "Prom-realm" },
+        "refresh": 2,
+        "type": "query"
+      },
+      {
+        "current": { "selected": true, "text": "$__all", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+        "definition": "label_values(cave_auth_login_total, method)",
+        "includeAll": true,
+        "multi": true,
+        "name": "method",
+        "query": { "query": "label_values(cave_auth_login_total, method)", "refId": "Prom-method" },
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "cave-auth — Authentication & Authorization",
+  "uid": "cave-auth-overview",
+  "version": 1,
   "panels": [
     {
       "id": 1,
-      "title": "Request rate by route",
+      "title": "Login rate by method",
+      "description": "QPS of /protocol/openid-connect/token attempts split by auth method (token, userpass, oidc, cert, passkey). Source: cave_auth_login_total{method=…}.",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] } },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(auth_total{job=\"cave-auth\"}[5m])) by (route)",
-          "legendFormat": "{{route}}",
+          "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+          "expr": "sum by (method) (rate(cave_auth_login_total{realm=~\"$realm\", method=~\"$method\"}[1m]))",
+          "legendFormat": "{{method}}",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "reqps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Authentication \u2014 request throughput."
+      ]
     },
     {
       "id": 2,
-      "title": "Error rate (4xx + 5xx)",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(rate(auth_total{job=\"cave-auth\",code=~\"4..|5..\"}[5m])) by (code)",
-          "legendFormat": "{{code}}",
-          "refId": "A"
-        }
-      ],
+      "title": "Login success ratio (last 5m)",
+      "description": "Success / (success + failure) for the selected realm + method. Below 0.95 fires AuthHighFailureRate.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 },
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.9 },
+              { "color": "green", "value": 0.95 }
+            ]
+          }
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "showLegend": true
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        {
+          "expr": "sum(rate(cave_auth_login_total{outcome=\"success\", realm=~\"$realm\", method=~\"$method\"}[5m])) / clamp_min(sum(rate(cave_auth_login_total{realm=~\"$realm\", method=~\"$method\"}[5m])), 1e-9)",
+          "refId": "A"
         }
-      },
-      "description": "Errors broken down by HTTP class."
+      ]
     },
     {
       "id": 3,
-      "title": "Latency p50 / p95 / p99",
+      "title": "Failed login attempts (security signal)",
+      "description": "Per-minute count of failures grouped by reason (bad_credentials, locked, expired_credentials, mfa_failed). Spike ≥ AuthLockoutSpike alert.",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.50, sum(rate(auth_duration_seconds_bucket{job=\"cave-auth\"}[5m])) by (le))",
-          "legendFormat": "p50",
+          "expr": "sum by (reason) (rate(cave_auth_login_total{outcome=\"failure\", realm=~\"$realm\"}[1m]))",
+          "legendFormat": "{{reason}}",
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.95, sum(rate(auth_duration_seconds_bucket{job=\"cave-auth\"}[5m])) by (le))",
-          "legendFormat": "p95",
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "histogram_quantile(0.99, sum(rate(auth_duration_seconds_bucket{job=\"cave-auth\"}[5m])) by (le))",
-          "legendFormat": "p99",
-          "refId": "C"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "RED triad \u2014 duration percentiles."
+      ]
     },
     {
       "id": 4,
-      "title": "Inflight requests (saturation)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Token issuance rate",
+      "description": "Access tokens minted per second. Source: cave_auth_token_issued_total (incremented in cave-auth/keycloak/provider.rs:issue_tokens).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "sum(auth_inflight_requests{job=\"cave-auth\"})",
-          "legendFormat": "",
+          "expr": "sum by (token_type) (rate(cave_auth_token_issued_total{realm=~\"$realm\"}[1m]))",
+          "legendFormat": "{{token_type}}",
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Concurrent in-progress requests."
+      ]
     },
     {
       "id": 5,
-      "title": "CPU utilization",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Active token count",
+      "description": "Live access + refresh tokens (cave_auth_tokens_active gauge, scraped from RealmState.refresh_tokens cardinality).",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area" },
       "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "rate(process_cpu_seconds_total{job=\"cave-auth\"}[5m])",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Per-instance CPU."
+        { "expr": "sum(cave_auth_tokens_active{realm=~\"$realm\"})", "refId": "A" }
+      ]
     },
     {
       "id": 6,
-      "title": "Memory (RSS)",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 16,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "process_resident_memory_bytes{job=\"cave-auth\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
-        }
-      ],
+      "title": "Realm health (Keycloak admin ping)",
+      "description": "1 if /admin/realms/{realm} responded within 1s in the last scrape; 0 otherwise. Drives KeycloakRealmDown.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "mappings": [
+            { "options": { "0": { "text": "DOWN", "color": "red" } }, "type": "value" },
+            { "options": { "1": { "text": "UP", "color": "green" } }, "type": "value" }
+          ]
         },
         "overrides": []
       },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Resident set size."
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "targets": [
+        { "expr": "min by (realm) (cave_auth_realm_up{realm=~\"$realm\"})", "refId": "A" }
+      ]
     },
     {
       "id": 7,
-      "title": "Active goroutines / tasks",
+      "title": "OIDC round-trip latency (p50 / p95 / p99)",
+      "description": "End-to-end latency for /token, /userinfo, /logout. Histogram bucket: cave_auth_oidc_request_duration_seconds_bucket.",
       "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
       "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "go_goroutines{job=\"cave-auth\"}",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "showLegend": true
-        }
-      },
-      "description": "Goroutine count proxies for backpressure."
+        { "expr": "histogram_quantile(0.50, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p50 {{endpoint}}", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p95 {{endpoint}}", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum by (le, endpoint) (rate(cave_auth_oidc_request_duration_seconds_bucket{realm=~\"$realm\"}[5m])))", "legendFormat": "p99 {{endpoint}}", "refId": "C" }
+      ]
     },
     {
       "id": 8,
-      "title": "Tenant cardinality",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
+      "title": "Passkey / WebAuthn enrollment + use rate",
+      "description": "Top: enrollments per minute. Bottom: passkey-backed authentications.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
       "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "count(count by (tenant_id) (auth_total{job=\"cave-auth\"}))",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "Number of distinct tenants emitting traffic."
+        { "expr": "sum(rate(cave_auth_passkey_enrolled_total{realm=~\"$realm\"}[5m]))", "legendFormat": "enrollments", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_login_total{method=\"passkey\", outcome=\"success\", realm=~\"$realm\"}[5m]))", "legendFormat": "successful logins", "refId": "B" }
+      ]
     },
     {
       "id": 9,
-      "title": "Top-10 tenants by request volume",
+      "title": "Unauthorized attempts burst (HTTP 401/403)",
+      "description": "Per-second count of admin/OIDC requests that returned 401 or 403, by endpoint. UnauthorizedAttemptsBurst alert source.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (endpoint, status) (rate(cave_auth_http_requests_total{status=~\"401|403\", realm=~\"$realm\"}[1m]))", "legendFormat": "{{status}} {{endpoint}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Audit event volume by type",
+      "description": "Stacked rate of audit events from cave-auth/audit.rs: login, logout, role_assigned, password_reset, token_revoked, realm_changed, user_created, user_deleted.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (event) (rate(cave_auth_audit_events_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{event}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Session duration histogram",
+      "description": "Distribution of session lengths (seconds between login and logout/expiry). Heatmap of cave_auth_session_duration_seconds_bucket.",
+      "type": "heatmap",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "calculate": false, "yAxis": { "unit": "s" } },
+      "targets": [
+        { "expr": "sum by (le) (rate(cave_auth_session_duration_seconds_bucket{realm=~\"$realm\"}[5m]))", "format": "heatmap", "refId": "A" }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Top users by activity",
+      "description": "Top-10 users by /token + /userinfo request count over the panel time range.",
       "type": "table",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true },
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "topk(10, sum(rate(auth_total{job=\"cave-auth\"}[5m])) by (tenant_id))",
+          "expr": "topk(10, sum by (preferred_username, realm) (increase(cave_auth_user_requests_total{realm=~\"$realm\"}[$__range])))",
           "format": "table",
           "instant": true,
           "refId": "A"
         }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {},
-      "description": "Hot-tenant table \u2014 feeds throttle / inhibit decisions."
+      ]
     },
     {
-      "id": 10,
-      "title": "Health probe (up)",
-      "type": "stat",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 32,
-        "w": 12,
-        "h": 8
-      },
+      "id": 13,
+      "title": "mTLS handshake rate + failure %",
+      "description": "Rate of completed mTLS handshakes on the auth admin/OIDC ports + percentage that failed (cave_auth_mtls_handshake_total{outcome=…}).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
       "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "min(up{job=\"cave-auth\"})",
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ]
-        }
-      },
-      "description": "0 = at least one instance failing the scrape."
+        { "expr": "sum(rate(cave_auth_mtls_handshake_total[1m]))", "legendFormat": "handshakes/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_mtls_handshake_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(cave_auth_mtls_handshake_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "PQC keygen + sign rate (ML-DSA-65 / Ed25519)",
+      "description": "Counts post-quantum-hybrid signing operations from cave-auth/keycloak/pqc.rs::HybridSigner. ML-DSA-65 is 0 until the FIPS-204 backend lands; Ed25519 is the live primary.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
+        { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
+      ]
     }
-  ],
-  "annotations": {
-    "list": []
-  },
-  "editable": true,
-  "graphTooltip": 1,
-  "description": "Authentication"
+  ]
 }
