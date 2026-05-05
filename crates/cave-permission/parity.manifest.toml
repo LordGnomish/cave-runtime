@@ -1,0 +1,20 @@
+# parity.manifest.toml — cave-permission
+# Upstream: casbin/casbin v3.10.0
+#   https://github.com/casbin/casbin
+#
+# Casbin is the most-deployed OSS authorization library (Apache-2.0)
+# with first-class support for RBAC / ABAC / ReBAC models. cave-permission
+# reimplements the policy-evaluation surface in Rust. warrant-dev/warrant
+# (v1.15.1) is a secondary candidate for cloud-native multi-tenant RBAC.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "casbin"
+repo    = "casbin"
+version = "v3.10.0"
+
+[module]
+name        = "cave-permission"
+description = "Fine-grained authorization — Casbin reimplementation"
+source_root = "src"

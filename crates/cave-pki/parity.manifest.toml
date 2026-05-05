@@ -1,0 +1,20 @@
+# parity.manifest.toml — cave-pki
+# Upstream: smallstep/certificates v0.30.2
+#   https://github.com/smallstep/certificates
+#
+# Same upstream as cave-acme — step-ca is both an ACME server and a
+# general PKI / private-CA. cave-pki tracks the non-ACME issuance and
+# certificate-store surface (X.509 templates, JWT/OIDC provisioners,
+# device attestation).
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "smallstep"
+repo    = "certificates"
+version = "v0.30.2"
+
+[module]
+name        = "cave-pki"
+description = "Private PKI / internal CA — step-ca reimplementation"
+source_root = "src"

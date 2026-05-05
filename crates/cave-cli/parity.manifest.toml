@@ -1,0 +1,17 @@
+# parity.manifest.toml — cave-cli
+# First-party CLI (`cavectl`). No external upstream — though we mirror
+# the UX patterns of `kubectl` (kubernetes/kubernetes) and `step` CLI
+# (smallstep/cli) where it makes sense, the crate itself is sovereign.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "cave-runtime"
+repo    = "cave-runtime"
+version = "v0.1.0"
+
+[module]
+name        = "cave-cli"
+description = "cavectl — top-level CLI (first-party)"
+source_root = "src"
+first_party = true

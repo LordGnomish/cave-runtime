@@ -1,0 +1,20 @@
+# parity.manifest.toml — cave-iceberg  [DEPRECATED ALIAS]
+# Status: alias retained for dependent crates; primary upstream surface
+#         was merged into cave-lakehouse per ADR-147.
+#
+# Stubbed 2026-05-02 to make the crate visible to cave-upstream-watchd
+# and stop it from showing up in the "missing manifest" audit. No bump
+# task should be dispatched against this manifest — bumps go to
+# cave-lakehouse.
+
+[upstream]
+org     = "apache"
+repo    = "iceberg"
+version = "apache-iceberg-1.9.2"
+
+[module]
+name        = "cave-iceberg"
+description = "Iceberg table format — DEPRECATED ALIAS, see cave-lakehouse"
+source_root = "src"
+deprecated  = true
+deprecated_reason = "Merged into cave-lakehouse per ADR-147."

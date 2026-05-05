@@ -1,0 +1,20 @@
+# parity.manifest.toml — cave-cdc
+# Upstream: debezium/debezium-server v3.5.0.Final
+#   https://github.com/debezium/debezium-server
+#
+# Debezium is the de-facto OSS Change Data Capture stack; debezium-server
+# is its standalone runtime (without requiring a Kafka Connect cluster).
+# cave-cdc reimplements that surface so cave-pg / cave-rdbms / cave-docdb
+# can stream change events into cave-streams without a JVM dependency.
+#
+# Stubbed 2026-05-02.
+
+[upstream]
+org     = "debezium"
+repo    = "debezium-server"
+version = "v3.5.0.Final"
+
+[module]
+name        = "cave-cdc"
+description = "Change Data Capture — Debezium server reimplementation"
+source_root = "src"

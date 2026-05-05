@@ -37,6 +37,7 @@ Thumbs.db
 # Agent worktree debris
 .claude/worktrees/
 .claude/memory/
+.claude/qwen-pump-target/
 .claire/
 .claire-memory/
 
