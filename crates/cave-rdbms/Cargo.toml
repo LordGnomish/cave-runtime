@@ -1,6 +1,14 @@
 [package]
 name = "cave-rdbms"
 description = "PostgreSQL-wire-protocol compatible SQL database — pure Rust, Apache-2.0"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-rdbms"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["database", "postgresql", "sql", "rdbms", "wire-protocol"]
+categories = ["database-implementations", "api-bindings", "network-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
