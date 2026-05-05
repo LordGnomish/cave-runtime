@@ -1,9 +1,18 @@
 use anyhow::{Context, Result};
+use clap::ValueEnum;
 use colored::Colorize;
 use reqwest::{Client, Method, StatusCode};
 use serde_json::Value;
 
-use crate::Format;
+#[derive(ValueEnum, Clone, Debug)]
+pub enum Format {
+    /// ASCII table (default)
+    Table,
+    /// Pretty-printed JSON
+    Json,
+    /// YAML
+    Yaml,
+}
 
 // ── HTTP client ───────────────────────────────────────────────────────────────
 

@@ -1,10 +1,9 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use serde_json::json;
 
-mod client;
-use client::ApiClient;
+use cavectl::client::{ApiClient, Format};
 
 // ── Root CLI ──────────────────────────────────────────────────────────────────
 
@@ -30,16 +29,6 @@ struct Cli {
 
     #[command(subcommand)]
     command: Commands,
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-pub enum Format {
-    /// ASCII table (default)
-    Table,
-    /// Pretty-printed JSON
-    Json,
-    /// YAML
-    Yaml,
 }
 
 // ── Top-level subcommands ─────────────────────────────────────────────────────
@@ -270,6 +259,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: CloudControllerManagerCmd,
     },
+    /// Authentication & authorization (Keycloak/OIDC/PAT/mTLS)
+    Auth {
+        #[command(subcommand)]
+        cmd: cavectl::native::auth::AuthCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -421,6 +415,25 @@ enum GatewayCmd {
     Plugins,
     /// Show gateway traffic stats
     Stats,
+    /// Gravitee API / plan / application / subscription management
+    Gravitee {
+        #[command(subcommand)]
+        cmd: GraviteeCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum GraviteeCmd {
+    /// List Gravitee APIs
+    Apis,
+    /// List Gravitee plans
+    Plans,
+    /// List Gravitee applications
+    Applications,
+    /// List Gravitee subscriptions
+    Subscriptions,
+    /// List Portal-visible (Public + Published) APIs
+    Portal,
 }
 
 #[derive(Subcommand)]
@@ -1714,6 +1727,13 @@ async fn run(cli: Cli) -> Result<()> {
             GatewayCmd::Services => c.get("/api/gateway/services").await,
             GatewayCmd::Plugins => c.get("/api/gateway/plugins").await,
             GatewayCmd::Stats => c.get("/api/gateway/stats").await,
+            GatewayCmd::Gravitee { cmd } => match cmd {
+                GraviteeCmd::Apis => c.get("/api/gateway/gravitee/apis").await,
+                GraviteeCmd::Plans => c.get("/api/gateway/gravitee/plans").await,
+                GraviteeCmd::Applications => c.get("/api/gateway/gravitee/applications").await,
+                GraviteeCmd::Subscriptions => c.get("/api/gateway/gravitee/subscriptions").await,
+                GraviteeCmd::Portal => c.get("/api/gateway/gravitee/portal/apis").await,
+            },
         },
 
         // ── Pg ────────────────────────────────────────────────────────────────
@@ -2567,6 +2587,9 @@ source_root = "src"
                 c.get("/api/portal/cloud-controller-manager/health").await
             }
         },
+
+        // ── auth (Keycloak/OIDC/PAT/mTLS) ─────────────────────────────────────
+        Commands::Auth { cmd } => cmd.run(&c).await,
     }
 }
 

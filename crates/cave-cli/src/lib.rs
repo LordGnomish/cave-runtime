@@ -8,6 +8,7 @@
 pub mod approval;
 pub mod audit;
 pub mod chat;
+pub mod client;
 pub mod compat;
 pub mod env;
 pub mod native;

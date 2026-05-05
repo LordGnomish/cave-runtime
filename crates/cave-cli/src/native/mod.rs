@@ -8,6 +8,7 @@
 //!
 //! Compat shims under `crate::compat` delegate into this surface.
 
+pub mod auth;
 pub mod chaos;
 pub mod deploy;
 pub mod describe;
@@ -18,6 +19,6 @@ pub mod logs;
 pub mod secrets;
 pub mod topology;
 
-mod request;
+pub mod request;
 
 pub use request::{HttpVerb, PreparedRequest};
