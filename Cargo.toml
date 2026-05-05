@@ -111,6 +111,7 @@ members = [
     "crates/cave-oncall",
     "crates/cave-container-scan",
     "crates/cave-erp",
+    "crates/cave-crm",
     "crates/cave-docdb",
     "crates/cave-rdbms",
     # === Kubernetes Control Plane ===

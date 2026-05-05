@@ -123,6 +123,7 @@ cave-runbook = { path = "../cave-runbook" }
 cave-oncall = { path = "../cave-oncall" }
 cave-container-scan = { path = "../cave-container-scan" }
 cave-erp = { path = "../cave-erp" }
+cave-crm = { path = "../cave-crm" }
 cave-docdb = { path = "../cave-docdb" }
 cave-rdbms = { path = "../cave-rdbms" }
 cave-kamaji = { path = "../cave-kamaji" }
