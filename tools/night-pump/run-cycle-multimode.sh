@@ -128,8 +128,12 @@ LIB_RS="$CRATE_DIR/src/lib.rs"
 # Order of precedence (highest leverage first):
 #   I  if Cargo.toml has no `keywords` field
 #   H  if no README.md
-#   E  if src/lib.rs exists AND fewer than 30% of pub items have ///
-#   A  fallback (legacy scaffold)
+#   E  if ANY src/*.rs (top-level modules) has > 33% rustdoc gap on pub items
+#   DONE if all of the above are satisfied
+#
+# Mode E expand (2026-05-05): previously only looked at lib.rs. Now any
+# src/<module>.rs whose pub-item rustdoc coverage is below 67% triggers E.
+# run_mode_E() then picks the file with the biggest gap to pump this cycle.
 discover_mode() {
   # I — metadata
   if [ -f "$CARGO_TOML" ] && ! grep -qE '^[[:space:]]*keywords[[:space:]]*=' "$CARGO_TOML"; then
@@ -139,17 +143,18 @@ discover_mode() {
   if [ ! -f "$CRATE_DIR/README.md" ]; then
     echo "H"; return
   fi
-  # E — rustdoc on lib.rs
-  if [ -f "$LIB_RS" ]; then
-    local pubs; pubs=$(grep -cE '^pub (fn|struct|enum|trait|use|mod|const|static|type)' "$LIB_RS" 2>/dev/null)
-    local docs; docs=$(grep -cE '^[[:space:]]*///' "$LIB_RS" 2>/dev/null)
-    if [ "$pubs" -gt 5 ] && [ "$docs" -lt $((pubs / 3 + 1)) ]; then
+  # E — rustdoc gap on ANY top-level src/*.rs file (not just lib.rs).
+  # Threshold: pub-item count >= 3 AND fewer than 67% have a /// doc.
+  local f pubs docs
+  for f in "$CRATE_DIR/src"/*.rs; do
+    [ -f "$f" ] || continue
+    pubs=$(grep -cE '^pub (fn|struct|enum|trait|use|mod|const|static|type)' "$f" 2>/dev/null)
+    docs=$(grep -cE '^[[:space:]]*///' "$f" 2>/dev/null)
+    if [ "$pubs" -ge 3 ] && [ "$docs" -lt $((pubs * 2 / 3)) ]; then
       echo "E"; return
     fi
-  fi
+  done
   # All E/H/I satisfied — crate is "mature" wrt this script's scope.
-  # Don't spin Mode A scaffold; just signal DONE so we exit cleanly without
-  # re-queuing.
   echo "DONE"
 }
 
