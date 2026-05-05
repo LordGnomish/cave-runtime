@@ -1,8 +1,15 @@
-//! Registry of all 73 upstream OSS projects tracked by cave-runtime.
+//! Registry of all upstream OSS projects tracked by cave-runtime.
 //!
 //! Each component in the CAVE platform documentation has a corresponding
 //! upstream project that we track for API/protocol compatibility.
 //! The cave-runtime reimplements each project's functionality in Rust+eBPF.
+//!
+//! **Sovereign OSS only.** Every entry MUST be open-source under an
+//! OSI-approved license. Proprietary cloud SaaS (Azure AI Search,
+//! AWS DynamoDB, Google Bigtable, Databricks, etc.) is NOT tracked here —
+//! managed services are consumed via Crossplane XR composition on the
+//! Azure profile, not reimplemented. See ADR-002 (Azure profile) and
+//! ADR-049 / ADR-114 for dual-profile mappings.
 
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +26,7 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All 66 upstream projects tracked by cave-runtime.
+/// All upstream projects tracked by cave-runtime (sovereign OSS only).
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // KUBERNETES CORE (reimplemented as cave-* crates)
@@ -168,9 +175,36 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "Qdrant",
         github_repo: "qdrant/qdrant",
-        cave_module: "cave-vector-search",
+        cave_module: "cave-search",
         track_features: "HNSW/IVFFlat indexing, gRPC API, quantization, multi-vector, hybrid search",
         check_frequency: "biweekly",
+        category: "search",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Faiss",
+        github_repo: "facebookresearch/faiss",
+        cave_module: "cave-search",
+        track_features: "IVF/HNSW/PQ index types, GPU acceleration, ANN algorithms, batch search semantics",
+        check_frequency: "monthly",
+        category: "search",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Milvus",
+        github_repo: "milvus-io/milvus",
+        cave_module: "cave-search",
+        track_features: "Distributed vector DB, segment-based storage, multi-tenancy, scalar+vector hybrid filtering, gRPC API",
+        check_frequency: "monthly",
+        category: "search",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Weaviate",
+        github_repo: "weaviate/weaviate",
+        cave_module: "cave-search",
+        track_features: "GraphQL+REST API, modular vectorizer plugins, multi-tenancy, hybrid BM25+vector. Optional upstream — included for API parity reference.",
+        check_frequency: "monthly",
         category: "search",
         phase: 2,
     },

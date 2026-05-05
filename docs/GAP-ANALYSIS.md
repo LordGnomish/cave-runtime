@@ -23,10 +23,12 @@ Every component in the One-Prompt Component Map must have a corresponding Rust c
 | 8 | Confluent Cloud | cave-streams | (shared) | PARTIAL — managed Kafka client |
 | 9 | Valkey (Redis) | cave-cache | 11,602 | GOOD — Redis protocol reimplemented |
 | 10 | Azure Redis | cave-cache | (shared) | PARTIAL — Azure managed Redis paths |
-| 11 | OpenSearch | **MISSING** | 0 | NOT STARTED — need cave-search crate |
-| 12 | Azure AI Search | **MISSING** | 0 | NOT STARTED — same crate, Azure path |
-| 13 | Qdrant | **MISSING** | 0 | NOT STARTED — need cave-vector-search crate |
-| 14 | Azure AI Search (vector) | **MISSING** | 0 | NOT STARTED — same crate |
+| 11 | OpenSearch | **MISSING** | 0 | NOT STARTED — need cave-search crate (full-text BM25, inverted index) |
+| 12 | Qdrant | **MISSING** | 0 | NOT STARTED — folded into cave-search (HNSW, vector ANN) |
+| 13 | Faiss | **MISSING** | 0 | NOT STARTED — folded into cave-search (vector ANN library, IVF/PQ) |
+| 14 | Milvus | **MISSING** | 0 | NOT STARTED — folded into cave-search (distributed vector DB) |
+
+> **Note (sovereign profile):** cave-search reimplements sovereign OSS upstreams only (OpenSearch + Qdrant + Faiss + Milvus). Azure AI Search is NOT reimplemented — it is a Microsoft proprietary SaaS that the Azure profile *uses* via Crossplane XR composition (see ADR-049, ADR-114). The Cave Runtime sovereign profile must never depend on Azure AI Search.
 
 ### Self-Hosted Components — Identity & Secrets (7)
 
@@ -217,8 +219,7 @@ These 14 crates are real Rust reimplementations with significant logic, not just
 
 | New Crate | Reimplements | Priority |
 |-----------|-------------|----------|
-| cave-search | OpenSearch / Azure AI Search | HIGH (Phase 2) |
-| cave-vector-search | Qdrant / Azure AI Search vector | MEDIUM (Phase 2) |
+| cave-search | OpenSearch + Qdrant + Faiss + Milvus (sovereign OSS, full-text + vector/ANN) | HIGH (Phase 2) |
 | cave-thanos | Thanos (cross-cluster metrics) | MEDIUM (Phase 2) |
 | cave-opal | OPAL (real-time policy distribution) | HIGH (Phase 2) |
 | cave-hubble | Cilium Hubble (network observability) | MEDIUM (Phase 1) |

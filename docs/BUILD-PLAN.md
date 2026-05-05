@@ -100,8 +100,7 @@ New crates for components that have no Rust reimplementation yet.
 
 | New Crate | Upstream | Est. Lines | Key Capabilities |
 |-----------|----------|-----------|-----------------|
-| cave-search | OpenSearch | 6,000 | Inverted index, query DSL, BM25, analyzers |
-| cave-vector-search | Qdrant | 5,000 | HNSW index, vector storage, hybrid search |
+| cave-search | OpenSearch + Qdrant + Faiss + Milvus | 11,000 | Inverted index, BM25, analyzers (OpenSearch); HNSW + IVF/PQ vector ANN (Qdrant/Faiss/Milvus); hybrid lexical + vector search. Sovereign OSS only. |
 | cave-vcluster | vcluster | 4,000 | Virtual K8s control plane, resource sync |
 | cave-crossplane | Crossplane v2 | 5,000 | XRD engine, Composition Functions, MRAP |
 | cave-opal | OPAL | 3,000 | Real-time policy push, external data sources |
