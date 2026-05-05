@@ -4,6 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "Lakehouse — Apache Iceberg table format + DataFusion query engine (consolidated per ADR-147)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-lakehouse"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["iceberg", "datafusion", "lakehouse", "analytics", "database"]
+categories = ["database-implementations", "asynchronous", "api-bindings"]
 
 [dependencies]
 serde = { workspace = true }
