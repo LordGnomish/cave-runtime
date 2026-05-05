@@ -158,6 +158,12 @@ discover_mode() {
   echo "DONE"
 }
 
+# Sync MAIN_WT to current main HEAD BEFORE discover_mode so we don't read
+# stale Cargo.toml / src/ files (otherwise a recently-merged Mode I cycle
+# would re-trigger because MAIN_WT still shows pre-merge state).
+git -C "$MAIN_WT" reset --hard main >>"$CYCLE_LOG" 2>&1 || \
+  log "warn: pre-discover sync of MAIN_WT failed; mode may be stale"
+
 MODE="$(discover_mode)"
 log "mode: $MODE"
 
@@ -182,6 +188,22 @@ git -C "$REPO_ROOT" worktree add "$WT_DIR" -b "$WT_BR" main >>"$CYCLE_LOG" 2>&1 
 
 cleanup_failure() {
   local reason="$1"
+  # If the cycle log shows "did not match any packages" for this crate
+  # in the recent tail, treat as a cargo-side phantom strike (the crate
+  # dir exists on disk but workspace.members or Cargo.toml `name` doesn't
+  # match the queue entry — e.g. cave-cli has Cargo.toml `name = "cavectl"`).
+  # Auto-drop after 3 strikes to stop the loop.
+  if tail -50 "$CYCLE_LOG" 2>/dev/null | grep -q "package ID specification \`$crate\` did not match"; then
+    PCOUNT=$(inc_phantom_count "$crate")
+    log "cargo-phantom strike $PCOUNT/3 for $crate (cargo couldn't resolve package id)"
+    if [ "$PCOUNT" -ge 3 ]; then
+      log "PHANTOM AUTO-DROP: $crate hit 3 cargo-phantom strikes — NOT re-queuing"
+      clear_phantom_count "$crate"
+      git -C "$REPO_ROOT" worktree remove --force "$WT_DIR" 2>/dev/null || true
+      git -C "$REPO_ROOT" branch -D "$WT_BR" 2>/dev/null || true
+      return
+    fi
+  fi
   log "FAIL ($reason) — re-queue $crate at tail, drop worktree+branch"
   echo "$crate" >> "$QUEUE"
   git -C "$REPO_ROOT" worktree remove --force "$WT_DIR" 2>/dev/null || true
