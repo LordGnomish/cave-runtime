@@ -7,32 +7,48 @@
 use crate::types::{format_span_id, format_trace_id, parse_span_id, parse_trace_id, SpanContext};
 use thiserror::Error;
 
+/// The standard header name for the W3C traceparent.
 pub const TRACEPARENT: &str = "traceparent";
+
+/// The standard header name for the W3C tracestate.
 pub const TRACESTATE: &str = "tracestate";
 
+/// The current supported version of the traceparent header (0x00).
 pub const VERSION: u8 = 0x00;
+
+/// The sampled flag bit in the traceparent flags byte.
 pub const FLAG_SAMPLED: u8 = SpanContext::FLAG_SAMPLED;
 
+/// The maximum number of key-value pairs allowed in a tracestate header.
 pub const MAX_TRACESTATE_ENTRIES: usize = 32;
 
+/// Errors that can occur during trace context propagation.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PropagationError {
-    #[error("traceparent has wrong field count")]
+     /// The traceparent header did not contain exactly four fields.
+     #[error("traceparent has wrong field count")]
     WrongFieldCount,
-    #[error("traceparent version invalid: {0}")]
+     /// The traceparent version field is invalid.
+     #[error("traceparent version invalid: {0}")]
     InvalidVersion(String),
-    #[error("traceparent trace_id invalid: {0}")]
+     /// The traceparent trace_id field is invalid.
+     #[error("traceparent trace_id invalid: {0}")]
     InvalidTraceId(String),
-    #[error("traceparent span_id invalid: {0}")]
+     /// The traceparent span_id field is invalid.
+     #[error("traceparent span_id invalid: {0}")]
     InvalidSpanId(String),
-    #[error("traceparent flags invalid: {0}")]
+     /// The traceparent flags field is invalid.
+     #[error("traceparent flags invalid: {0}")]
     InvalidFlags(String),
-    #[error("traceparent trace_id is all zeros")]
+     /// The traceparent trace_id is all zeros.
+     #[error("traceparent trace_id is all zeros")]
     ZeroTraceId,
-    #[error("traceparent span_id is all zeros")]
+     /// The traceparent span_id is all zeros.
+     #[error("traceparent span_id is all zeros")]
     ZeroSpanId,
 }
 
+/// A result type for propagation operations.
 pub type PropagationResult<T> = std::result::Result<T, PropagationError>;
 
 /// Strict parser for the `traceparent` header. Returns `Err` for any
@@ -47,7 +63,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidVersion(parts[0].to_string()));
     }
     let version = u8::from_str_radix(parts[0], 16)
-        .map_err(|_| PropagationError::InvalidVersion(parts[0].to_string()))?;
+         .map_err(|_| PropagationError::InvalidVersion(parts[0].to_string()))?;
     if version == 0xff {
         return Err(PropagationError::InvalidVersion("ff".into()));
     }
@@ -56,7 +72,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidTraceId(parts[1].to_string()));
     }
     let trace_id = parse_trace_id(parts[1])
-        .ok_or_else(|| PropagationError::InvalidTraceId(parts[1].to_string()))?;
+         .ok_or_else(|| PropagationError::InvalidTraceId(parts[1].to_string()))?;
     if trace_id == 0 {
         return Err(PropagationError::ZeroTraceId);
     }
@@ -65,7 +81,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidSpanId(parts[2].to_string()));
     }
     let span_id = parse_span_id(parts[2])
-        .ok_or_else(|| PropagationError::InvalidSpanId(parts[2].to_string()))?;
+         .ok_or_else(|| PropagationError::InvalidSpanId(parts[2].to_string()))?;
     if span_id == 0 {
         return Err(PropagationError::ZeroSpanId);
     }
@@ -74,7 +90,7 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
         return Err(PropagationError::InvalidFlags(parts[3].to_string()));
     }
     let flags = u8::from_str_radix(parts[3], 16)
-        .map_err(|_| PropagationError::InvalidFlags(parts[3].to_string()))?;
+         .map_err(|_| PropagationError::InvalidFlags(parts[3].to_string()))?;
 
     Ok(SpanContext { trace_id, span_id, trace_flags: flags, is_remote: true })
 }
@@ -82,38 +98,44 @@ pub fn parse_traceparent(header: &str) -> PropagationResult<SpanContext> {
 /// Render a `traceparent` from a SpanContext.
 pub fn format_traceparent(ctx: &SpanContext) -> String {
     format!(
-        "{:02x}-{}-{}-{:02x}",
+         "{:02x}-{}-{}-{:02x}",
         VERSION,
         format_trace_id(ctx.trace_id),
         format_span_id(ctx.span_id),
         ctx.trace_flags
-    )
+     )
 }
 
+/// Represents the W3C TraceState header content.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct TraceState {
-    /// HEAD-of-list precedence: index 0 is the most-recent vendor.
+     /// HEAD-of-list precedence: index 0 is the most-recent vendor.
     pub entries: Vec<(String, String)>,
 }
 
 impl TraceState {
+    /// Creates a new, empty TraceState.
     pub fn new() -> Self { Default::default() }
 
+    /// Inserts or updates a key-value pair, enforcing the 32-entry limit.
     pub fn upsert(&mut self, key: &str, value: &str) {
         self.entries.retain(|(k, _)| k != key);
         self.entries.insert(0, (key.to_string(), value.to_string()));
         self.entries.truncate(MAX_TRACESTATE_ENTRIES);
     }
 
+    /// Retrieves the value for a given key.
     pub fn get(&self, key: &str) -> Option<&str> {
         self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
     }
 
+    /// Serializes the TraceState into a header string.
     pub fn to_header(&self) -> String {
         self.entries.iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(",")
-    }
+     }
 }
 
+/// Parses a `tracestate` header string into a TraceState struct.
 pub fn parse_tracestate(header: &str) -> TraceState {
     let mut entries = Vec::new();
     for raw in header.split(',') {
@@ -129,16 +151,18 @@ pub fn parse_tracestate(header: &str) -> TraceState {
     TraceState { entries }
 }
 
+/// Validates a tracestate key against W3C grammar rules.
 fn is_valid_key(k: &str) -> bool {
     if k.is_empty() || k.len() > 256 { return false; }
     let bytes = k.as_bytes();
     if !bytes[0].is_ascii_lowercase() && !bytes[0].is_ascii_digit() { return false; }
     bytes.iter().all(|b| {
         b.is_ascii_lowercase() || b.is_ascii_digit()
-            || matches!(b, b'_' | b'-' | b'*' | b'/' | b'@')
-    })
+             || matches!(b, b'_' | b'-' | b'*' | b'/' | b'@')
+     })
 }
 
+/// Validates a tracestate value against W3C grammar rules.
 fn is_valid_value(v: &str) -> bool {
     if v.is_empty() || v.len() > 256 { return false; }
     v.bytes().all(|b| (0x20..=0x7e).contains(&b) && b != b',' && b != b'=')
@@ -148,17 +172,18 @@ fn is_valid_value(v: &str) -> bool {
 /// or malformed. Used by SDK ingest paths that MUST always have a context.
 pub fn extract_or_new(traceparent: Option<&str>, tracestate: Option<&str>) -> (SpanContext, TraceState) {
     let ctx = traceparent
-        .and_then(|h| parse_traceparent(h).ok())
-        .unwrap_or_else(|| SpanContext {
+         .and_then(|h| parse_traceparent(h).ok())
+         .unwrap_or_else(|| SpanContext {
             trace_id: crate::id::new_trace_id(),
             span_id: crate::id::new_span_id(),
             trace_flags: FLAG_SAMPLED,
             is_remote: false,
-        });
+         });
     let state = tracestate.map(parse_tracestate).unwrap_or_default();
     (ctx, state)
 }
 
+/// Injects trace context into header strings.
 pub fn inject(ctx: &SpanContext, state: &TraceState) -> (String, String) {
     (format_traceparent(ctx), state.to_header())
 }
