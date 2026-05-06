@@ -11,6 +11,7 @@ version = "v2.5.3"
 name          = "cave-vault"
 description   = "Secrets management — OpenBao (HashiCorp Vault fork) parity"
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — secrets management surface
 
 # ── File mappings ────────────────────────────────────────────────────────────

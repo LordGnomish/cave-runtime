@@ -15,6 +15,8 @@ version = "7.2.0"
 name        = "cave-cache"
 description = "Redis 7.2 reimplementation — RESP wire + all data types + pub/sub + scripting + persistence + cluster slots + REST shim"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

@@ -27,6 +27,7 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 name          = "cave-streams"
 description   = "Event streaming — single Rust impl, two wire protocols (Kafka + Pulsar)"
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — Kafka+Pulsar event streaming surface
 
 # ── File mappings ────────────────────────────────────────────────────────────

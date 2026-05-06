@@ -11,6 +11,7 @@ version = "v3.6.10"
 name          = "cave-etcd"
 description   = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — distributed KV foundation under cave-apiserver
 
 # ── File mappings ────────────────────────────────────────────────────────────

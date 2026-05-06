@@ -11,6 +11,7 @@ version = "v1.36.0"
 name          = "cave-apiserver"
 description   = "Kubernetes API server reimplementation — 24 resource types, full CRUD + watch"
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — K8s control-plane primary entrypoint
 
 # ── File mappings ────────────────────────────────────────────────────────────

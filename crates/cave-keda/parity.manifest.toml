@@ -11,6 +11,8 @@ version = "v2.12.0"
 name        = "cave-keda"
 description = "Event-driven autoscaling — KEDA replacement"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # [[files]]

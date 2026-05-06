@@ -11,6 +11,8 @@ version = "v1.36.0"
 name        = "cave-controller-manager"
 description = "Workload controllers — Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 [[files]]

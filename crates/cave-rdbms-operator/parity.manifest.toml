@@ -17,6 +17,8 @@
 name        = "cave-rdbms-operator"
 description = "RDBMS operator (CloudNativePG-style) — sibling to cave-rdbms (engine)"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 [[upstreams]]
 org     = "cloudnative-pg"
