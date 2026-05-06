@@ -1,6 +1,14 @@
 [package]
 name = "cave-llm-gateway"
 description = "LLM router/proxy — multi-provider, OpenAI compat, rate limiting, cost tracking, guardrails"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-llm-gateway"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["llm", "proxy", "api", "routing", "rate-limiting"]
+categories = ["api-bindings", "network-programming", "web-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
