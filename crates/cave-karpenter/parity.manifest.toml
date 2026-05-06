@@ -11,6 +11,8 @@ version = "v1.12.0"
 name        = "cave-karpenter"
 description = "Node autoscaling — Karpenter replacement"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target
 
 # 4-track status (honest):
 #   Backend     : 1/4 — scaffold (this crate, models + store + scheduler stub)
