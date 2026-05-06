@@ -135,6 +135,35 @@ pub struct VaultAuditEntry {
     pub path: String,
 }
 
+// ── keda ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KedaScaledObject {
+    pub tenant: TenantId,
+    pub name: String,
+    /// Target Deployment / StatefulSet / Custom resource.
+    pub target_ref: String,
+    pub min_replicas: u32,
+    pub max_replicas: u32,
+    pub current_replicas: u32,
+    pub paused: bool,
+    /// Trigger types attached: `cpu`, `memory`, `kafka`, `prometheus`, `redis`, `cron`, `http`.
+    pub triggers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KedaScalerEvent {
+    pub tenant: TenantId,
+    pub when_unix: i64,
+    pub scaled_object: String,
+    /// e.g. `kafka:lag=120`, `cpu:75`, `prometheus:queue_depth=900`.
+    pub trigger: String,
+    pub from_replicas: u32,
+    pub to_replicas: u32,
+    /// `Scaled` | `NoChange` | `FallbackActive`.
+    pub verdict: &'static str,
+}
+
 // ── tenant dashboard recent activity ─────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -162,6 +191,8 @@ pub struct AdminState {
     pub pg_tables: RwLock<Vec<PgTable>>,
     pub vault_secrets: RwLock<Vec<VaultSecretMeta>>,
     pub vault_audit: RwLock<Vec<VaultAuditEntry>>,
+    pub keda_scaled_objects: RwLock<Vec<KedaScaledObject>>,
+    pub keda_scaler_events: RwLock<Vec<KedaScalerEvent>>,
     pub recent_activity: RwLock<Vec<ActivityEntry>>,
 }
 
@@ -189,6 +220,8 @@ impl AdminState {
             pg_tables: RwLock::new(Vec::new()),
             vault_secrets: RwLock::new(Vec::new()),
             vault_audit: RwLock::new(Vec::new()),
+            keda_scaled_objects: RwLock::new(Vec::new()),
+            keda_scaler_events: RwLock::new(Vec::new()),
             recent_activity: RwLock::new(Vec::new()),
         }
     }
@@ -256,6 +289,67 @@ impl AdminState {
         s.vault_audit.write().unwrap().extend([
             VaultAuditEntry { tenant: acme.clone(), time_unix: 1_000_001, principal: "alice".into(), op: "read-meta", path: "kv/db".into() },
             VaultAuditEntry { tenant: acme.clone(), time_unix: 1_000_010, principal: "bob".into(), op: "read-meta", path: "kv/api".into() },
+        ]);
+        s.keda_scaled_objects.write().unwrap().extend([
+            KedaScaledObject {
+                tenant: acme.clone(),
+                name: "ingest-worker".into(),
+                target_ref: "Deployment/ingest-worker".into(),
+                min_replicas: 1,
+                max_replicas: 50,
+                current_replicas: 8,
+                paused: false,
+                triggers: vec!["kafka".into(), "prometheus".into()],
+            },
+            KedaScaledObject {
+                tenant: acme.clone(),
+                name: "report-runner".into(),
+                target_ref: "Deployment/report-runner".into(),
+                min_replicas: 0,
+                max_replicas: 10,
+                current_replicas: 0,
+                paused: true,
+                triggers: vec!["cron".into()],
+            },
+            KedaScaledObject {
+                tenant: evil.clone(),
+                name: "evil-worker".into(),
+                target_ref: "Deployment/evil-worker".into(),
+                min_replicas: 1,
+                max_replicas: 5,
+                current_replicas: 1,
+                paused: false,
+                triggers: vec!["cpu".into()],
+            },
+        ]);
+        s.keda_scaler_events.write().unwrap().extend([
+            KedaScalerEvent {
+                tenant: acme.clone(),
+                when_unix: 1_000_400,
+                scaled_object: "ingest-worker".into(),
+                trigger: "kafka:lag=2400".into(),
+                from_replicas: 4,
+                to_replicas: 8,
+                verdict: "Scaled",
+            },
+            KedaScalerEvent {
+                tenant: acme.clone(),
+                when_unix: 1_000_450,
+                scaled_object: "ingest-worker".into(),
+                trigger: "kafka:lag=2300".into(),
+                from_replicas: 8,
+                to_replicas: 8,
+                verdict: "NoChange",
+            },
+            KedaScalerEvent {
+                tenant: evil.clone(),
+                when_unix: 1_000_460,
+                scaled_object: "evil-worker".into(),
+                trigger: "cpu:99".into(),
+                from_replicas: 1,
+                to_replicas: 5,
+                verdict: "Scaled",
+            },
         ]);
         s.recent_activity.write().unwrap().extend([
             ActivityEntry { tenant: acme.clone(), when_unix: 1_000_100, kind: "deploy", summary: "deployed web v17".into() },

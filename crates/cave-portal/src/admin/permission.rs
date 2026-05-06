@@ -47,6 +47,11 @@ pub enum Permission {
 
     /// Read worker contributions (night-pump batch outcomes per worker_id).
     ContributionsRead,
+
+    /// Read KEDA ScaledObjects + scaler triggers + scale events.
+    KedaRead,
+    /// Pause / resume / delete KEDA ScaledObjects.
+    KedaWrite,
 }
 
 impl Permission {
@@ -66,6 +71,8 @@ impl Permission {
             Permission::PgQuery => "pg.query.exec",
             Permission::VaultRead => "vault.metadata.read",
             Permission::ContributionsRead => "cluster.contributions.read",
+            Permission::KedaRead => "keda.scaledobject.read",
+            Permission::KedaWrite => "keda.scaledobject.write",
         }
     }
 }
