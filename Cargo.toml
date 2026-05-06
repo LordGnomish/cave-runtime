@@ -132,6 +132,8 @@ members = [
     "crates/cave-knative",
     # === Event-driven Autoscaler (KEDA) ===
     "crates/cave-keda",
+    # === Node Autoscaler (Karpenter) ===
+    "crates/cave-karpenter",
 ]
 
 [workspace.package]
