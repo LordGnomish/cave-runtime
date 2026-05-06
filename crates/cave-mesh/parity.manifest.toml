@@ -12,6 +12,8 @@ version = "1.29.2"
 name        = "cave-mesh"
 description = "Service mesh — Istio-parity control plane (sidecar + ambient mode: ztunnel L4 mTLS, waypoint L7 routing, AuthZ, VS/DR, SPIFFE, telemetry)"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── Ambient-mode file mappings (this batch) ──────────────────────────────────
 [[files]]

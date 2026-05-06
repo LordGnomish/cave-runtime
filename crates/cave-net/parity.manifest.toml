@@ -27,6 +27,7 @@ upstream_bpf_c_h_files     = 302   # bpf/**/*.{c,h}
 name          = "cave-net"
 description   = "Cilium parity port — agent-side state machines, CRDs, REST/gRPC surface, Prometheus metrics. Datapath is semantic; see PARITY_REPORT.md for wire-faithful exclusions."
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — networking control plane
 rs_files          = 86    # crates/cave-net/src/cilium/*.rs
 rs_loc            = 35938

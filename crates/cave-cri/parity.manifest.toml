@@ -21,6 +21,7 @@ notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/c
 name          = "cave-cri"
 description   = "containerd CRI reimplementation — 42 endpoints covering container lifecycle, images, sandboxes, snapshots"
 source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — container runtime interface
 
 # ── File mappings ────────────────────────────────────────────────────────────

@@ -11,6 +11,8 @@ version = "v1.0.0"
 name        = "cave-kamaji"
 description = "Hosted control planes — Kamaji replacement"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # [[files]]
