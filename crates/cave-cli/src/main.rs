@@ -264,6 +264,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: cavectl::native::auth::AuthCmd,
     },
+    /// Event-driven autoscaler (KEDA replacement)
+    Keda {
+        #[command(subcommand)]
+        cmd: KedaCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -434,6 +439,42 @@ enum GraviteeCmd {
     Subscriptions,
     /// List Portal-visible (Public + Published) APIs
     Portal,
+}
+
+#[derive(Subcommand)]
+enum KedaCmd {
+    /// List ScaledObjects in the active tenant
+    #[command(name = "scaledobjects")]
+    ScaledObjects,
+    /// Inspect one ScaledObject (target ref, replica bounds, triggers)
+    #[command(name = "get")]
+    Get {
+        /// ScaledObject name
+        name: String,
+    },
+    /// List the active scaler triggers across all ScaledObjects
+    Scalers,
+    /// Show metric values for a single ScaledObject's scalers
+    Metrics {
+        /// ScaledObject name
+        name: String,
+    },
+    /// Show the recent scale-event log
+    History {
+        /// Maximum events to return
+        #[arg(long, default_value = "50")]
+        limit: u32,
+    },
+    /// Pause auto-scaling (sets autoscaling.keda.sh/paused on the ScaledObject)
+    Pause {
+        /// ScaledObject name
+        name: String,
+    },
+    /// Resume auto-scaling
+    Resume {
+        /// ScaledObject name
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2590,6 +2631,39 @@ source_root = "src"
 
         // ── auth (Keycloak/OIDC/PAT/mTLS) ─────────────────────────────────────
         Commands::Auth { cmd } => cmd.run(&c).await,
+
+        // ── keda (event-driven autoscaler) ────────────────────────────────────
+        Commands::Keda { cmd } => match cmd {
+            KedaCmd::ScaledObjects => c.get("/api/keda/scaledobjects").await,
+            KedaCmd::Get { name } => {
+                c.get(&format!("/api/keda/scaledobjects/{}", urlencode(&name))).await
+            }
+            KedaCmd::Scalers => c.get("/api/keda/scalers").await,
+            KedaCmd::Metrics { name } => {
+                c.get(&format!(
+                    "/api/keda/scaledobjects/{}/metrics",
+                    urlencode(&name)
+                ))
+                .await
+            }
+            KedaCmd::History { limit } => {
+                c.get(&format!("/api/keda/events?limit={limit}")).await
+            }
+            KedaCmd::Pause { name } => {
+                c.post(
+                    &format!("/api/keda/scaledobjects/{}/pause", urlencode(&name)),
+                    json!({}),
+                )
+                .await
+            }
+            KedaCmd::Resume { name } => {
+                c.post(
+                    &format!("/api/keda/scaledobjects/{}/resume", urlencode(&name)),
+                    json!({}),
+                )
+                .await
+            }
+        },
     }
 }
 
