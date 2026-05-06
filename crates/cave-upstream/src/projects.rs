@@ -685,6 +685,24 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "serverless",
         phase: 3,
     },
+    TrackedProject {
+        name: "Karpenter",
+        github_repo: "kubernetes-sigs/karpenter",
+        cave_module: "cave-karpenter",
+        track_features: "NodePool/NodeClaim/NodeClass v1 CRDs, scheduler, consolidation, drift detection, disruption budgets",
+        check_frequency: "monthly",
+        category: "node-autoscaling",
+        phase: 3,
+    },
+    TrackedProject {
+        name: "KubeVirt",
+        github_repo: "kubevirt/kubevirt",
+        cave_module: "cave-kubevirt",
+        track_features: "VirtualMachine/VirtualMachineInstance/DataVolume CRDs, virt-launcher Pod, live migration, instancetype/preference, CDI",
+        check_frequency: "monthly",
+        category: "virtualization",
+        phase: 4,
+    },
     // ============================================================
     // LAKEHOUSE (consolidated per ADR-147 — N upstreams → 1 cave-module)
     // ============================================================

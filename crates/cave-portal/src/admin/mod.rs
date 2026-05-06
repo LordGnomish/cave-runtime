@@ -23,6 +23,7 @@ pub mod contributions;
 pub mod cri;
 pub mod etcd;
 pub mod iam;
+pub mod keda;
 pub mod mesh;
 pub mod pg;
 pub mod tenant_dashboard;
@@ -71,6 +72,8 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::PgQuery,
         Permission::VaultRead,
         Permission::ContributionsRead,
+        Permission::KedaRead,
+        Permission::KedaWrite,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -145,6 +148,14 @@ async fn vault_handler(
     vault::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+async fn keda_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -208,6 +219,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/mesh", get(mesh_handler))
         .route("/admin/pg", get(pg_handler))
         .route("/admin/vault", get(vault_handler))
+        .route("/admin/keda", get(keda_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
