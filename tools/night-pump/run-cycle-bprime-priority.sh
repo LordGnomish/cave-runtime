@@ -73,7 +73,10 @@ clear_phantom_count() {
 }
 get_shelf_count() { grep -E "^$1\t" "$BPRIME_SHELF" 2>/dev/null | head -1 | awk -F'\t' '{print $2}'; }
 inc_shelf_count() {
-  local c="$1" err="${2:-}" n; n=$(get_shelf_count "$c"); n=${n:-0}; n=$((n+1))
+  local c="$1" err="${2:-}" n
+  # awk -v cannot accept embedded newlines/tabs in the value; collapse to single line.
+  err=$(printf '%s' "$err" | tr '\n\t' '  ')
+  n=$(get_shelf_count "$c"); n=${n:-0}; n=$((n+1))
   awk -F'\t' -v c="$c" -v n="$n" -v e="$err" 'BEGIN{OFS="\t"} $1!=c{print} END{print c, n, e}' "$BPRIME_SHELF" > "$BPRIME_SHELF.tmp" && mv "$BPRIME_SHELF.tmp" "$BPRIME_SHELF"
   echo "$n"
 }
