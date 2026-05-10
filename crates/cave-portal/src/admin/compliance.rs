@@ -58,6 +58,39 @@ pub struct CrateCompliance {
     pub obs_alerts_present: bool,
     pub obs_dashboard_present: bool,
     pub four_track_score: u8,
+    /// Infrastructure-only crates (CLI tool, shared primitives, etc.) are
+    /// not expected to ship a Portal admin page or cavectl subcommand;
+    /// they are excluded from the aggregate score and grade.
+    pub infra_only: bool,
+}
+
+/// Crates that are infrastructure tooling, shared primitives, or
+/// runtime support — not Tier-1 upstream-mirror modules. They are
+/// excluded from compliance aggregation because the 4-track contract
+/// does not apply to them. Future work moves this list into each
+/// crate's `parity.manifest.toml` under `[module] infra_only = true`.
+const INFRA_ONLY: &[&str] = &[
+    "cave-cli",
+    "cave-core",
+    "cave-changelog",
+    "cave-types",
+    "cave-utils",
+    "cave-cost-alloc",
+    "cave-kernel",
+    "cave-ebpf-common",
+    "cave-runtime",
+    "cave-portal",
+    "cave-portal-api",
+    "cave-portal-web",
+    "cave-desktop",
+    "cave-scaffold",
+    "cave-docs",
+    "cave-docs-site",
+    "cave-runbook",
+];
+
+pub fn is_infra_only(name: &str) -> bool {
+    INFRA_ONLY.contains(&name)
 }
 
 /// Aggregated compliance state for the whole workspace.
@@ -67,19 +100,34 @@ pub struct ComplianceSnapshot {
 }
 
 impl ComplianceSnapshot {
+    /// Aggregate score over tier-1 (non-infra) crates only. Infra crates
+    /// are excluded — they don't ship Portal/cavectl/obs by contract.
     pub fn aggregate_score(&self) -> u8 {
-        if self.crates.is_empty() {
+        let scored: Vec<&CrateCompliance> = self.crates.iter().filter(|c| !c.infra_only).collect();
+        if scored.is_empty() {
             return 0;
         }
-        let total: u32 = self.crates.iter().map(|c| u32::from(c.four_track_score)).sum();
-        ((total / self.crates.len() as u32).min(100)) as u8
+        let total: u32 = scored.iter().map(|c| u32::from(c.four_track_score)).sum();
+        ((total / scored.len() as u32).min(100)) as u8
     }
 
+    /// Stub indicators across all crates (infra included — fake tests
+    /// don't get a pass just because a crate is infra).
     pub fn total_stub_count(&self) -> u32 {
         self.crates
             .iter()
             .map(|c| c.unimplemented_count + c.todo_count + c.ignored_test_count)
             .sum()
+    }
+
+    /// Number of crates that contribute to the aggregate (non-infra).
+    pub fn tier1_count(&self) -> usize {
+        self.crates.iter().filter(|c| !c.infra_only).count()
+    }
+
+    /// Number of infra-only crates (shown separately on the dashboard).
+    pub fn infra_count(&self) -> usize {
+        self.crates.iter().filter(|c| c.infra_only).count()
     }
 
     pub fn grade(&self) -> char {
@@ -270,6 +318,7 @@ pub fn analyse_crate(
         obs_alerts_present,
         obs_dashboard_present,
         four_track_score,
+        infra_only: is_infra_only(crate_name),
     })
 }
 
@@ -358,6 +407,8 @@ pub fn render(
 ) -> Result<String, ComplianceViewError> {
     ctx.authorise(Permission::AdminComplianceView)?;
     let total = snapshot.crates.len();
+    let tier1 = snapshot.tier1_count();
+    let infra = snapshot.infra_count();
     let avg = snapshot.aggregate_score();
     let stubs = snapshot.total_stub_count();
     let grade = snapshot.grade();
@@ -367,11 +418,17 @@ pub fn render(
         .crates
         .iter()
         .map(|c| {
-            let score_html = format!(
-                r#"<span class="px-2 py-1 rounded {color}">{score}</span>"#,
-                color = cell_color(c.four_track_score),
-                score = c.four_track_score,
-            );
+            let score_html = if c.infra_only {
+                format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-200 text-gray-600" title="infra-only">infra</span>"#,
+                )
+            } else {
+                format!(
+                    r#"<span class="px-2 py-1 rounded {color}">{score}</span>"#,
+                    color = cell_color(c.four_track_score),
+                    score = c.four_track_score,
+                )
+            };
             vec![
                 c.name.clone(),
                 c.upstream_version.clone().unwrap_or_else(|| "—".into()),
@@ -392,15 +449,18 @@ pub fn render(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
-<section class="grid grid-cols-4 gap-4 mb-6">
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">CRATES</div><div class="text-3xl font-bold">{total}</div></div>
+<section class="grid grid-cols-5 gap-4 mb-6">
+  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TIER-1 CRATES</div><div class="text-3xl font-bold">{tier1}</div><div class="text-xs text-gray-400">+ {infra} infra</div></div>
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">AVG 4-TRACK</div><div class="text-3xl font-bold {avg_color} px-2 rounded">{avg}</div></div>
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL STUBS</div><div class="text-3xl font-bold">{stubs}</div></div>
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">GRADE</div><div class="text-3xl font-bold">{grade}</div></div>
+  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL</div><div class="text-3xl font-bold">{total}</div></div>
 </section>
 <section><h2 class="text-lg font-semibold mb-2">Per-crate matrix</h2>{tbl}</section>"#,
         quote = escape(GOLDEN_RULE),
         total = total,
+        tier1 = tier1,
+        infra = infra,
         avg = avg,
         avg_color = avg_color,
         stubs = stubs,
@@ -524,6 +584,43 @@ name = "cave-x"
     }
 
     #[test]
+    fn aggregate_score_excludes_infra_only_crates() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/InfraExempt.tsx",
+            "InfraExempt",
+            "acme"
+        );
+        // 1 tier-1 crate at 50 + 2 infra crates at 25 each.
+        // Aggregate should be 50 (from the single tier-1), not (50+25+25)/3 = 33.
+        let mut t1 = stub_compliance("cave-keda", 50);
+        t1.infra_only = false;
+        let mut i1 = stub_compliance("cave-cli", 25);
+        i1.infra_only = true;
+        let mut i2 = stub_compliance("cave-core", 25);
+        i2.infra_only = true;
+        let snap = ComplianceSnapshot { crates: vec![t1, i1, i2] };
+        assert_eq!(snap.aggregate_score(), 50);
+        assert_eq!(snap.tier1_count(), 1);
+        assert_eq!(snap.infra_count(), 2);
+    }
+
+    #[test]
+    fn is_infra_only_recognises_canonical_names() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/InfraList.tsx",
+            "InfraList",
+            "acme"
+        );
+        assert!(is_infra_only("cave-cli"));
+        assert!(is_infra_only("cave-core"));
+        assert!(is_infra_only("cave-runtime"));
+        assert!(is_infra_only("cave-portal"));
+        assert!(!is_infra_only("cave-keda"));
+        assert!(!is_infra_only("cave-policy"));
+        assert!(!is_infra_only("cave-rdbms-operator"));
+    }
+
+    #[test]
     fn aggregate_score_for_empty_snapshot_is_zero() {
         let (_c, _t) = portal_test_ctx!(
             "plugins/tech-insights/src/components/Scorecards/EmptyState.tsx",
@@ -558,6 +655,7 @@ name = "cave-x"
                     obs_alerts_present: false,
                     obs_dashboard_present: false,
                     four_track_score: 25,
+                    infra_only: false,
                 },
             ],
         };
@@ -641,6 +739,7 @@ name = "cave-x"
             obs_alerts_present: false,
             obs_dashboard_present: false,
             four_track_score: score,
+            infra_only: false,
         }
     }
 
