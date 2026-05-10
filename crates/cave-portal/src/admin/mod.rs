@@ -21,6 +21,7 @@ pub mod state;
 pub mod apiserver;
 pub mod cache;
 pub mod cloud_controller_manager;
+pub mod compliance;
 pub mod contributions;
 pub mod controller_manager;
 pub mod cri;
@@ -109,6 +110,8 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::LakehouseSnapshot,
         Permission::StreamsRead,
         Permission::StreamsAdmin,
+        Permission::AdminComplianceView,
+        Permission::AdminComplianceRefresh,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -293,6 +296,14 @@ async fn streams_handler(
     streams::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+async fn compliance_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let snap = compliance::live_snapshot();
+    compliance::render(&snap, &ctx).map(Html).map_err(err_to_response)
+}
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -369,6 +380,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/rdbms-operator", get(rdbms_operator_handler))
         .route("/admin/lakehouse", get(lakehouse_handler))
         .route("/admin/streams", get(streams_handler))
+        .route("/admin/compliance", get(compliance_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
