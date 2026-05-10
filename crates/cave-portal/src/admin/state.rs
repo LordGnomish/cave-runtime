@@ -358,6 +358,123 @@ impl StreamsConsumerGroup {
     }
 }
 
+// ── policy ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PolicyRule {
+    pub tenant: TenantId,
+    pub name: String,
+    pub action: &'static str, // "Allow" | "Deny" | "Audit"
+    pub subject: String,      // SPIFFE / role glob
+    pub resource: String,     // resource glob
+    pub enabled: bool,
+}
+
+// ── artifacts ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ArtifactRecord {
+    pub tenant: TenantId,
+    pub registry: String,
+    pub name: String,
+    pub digest: String,    // sha256:...
+    pub size_bytes: u64,
+    pub pushed_unix: i64,
+}
+
+// ── alerts ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AlertRule {
+    pub tenant: TenantId,
+    pub name: String,
+    pub severity: &'static str, // "critical" | "warning" | "info"
+    pub expr: String,
+    pub for_seconds: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActiveAlert {
+    pub tenant: TenantId,
+    pub rule: String,
+    pub state: &'static str, // "firing" | "pending"
+    pub fired_unix: i64,
+}
+
+// ── backup ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackupJob {
+    pub tenant: TenantId,
+    pub name: String,
+    pub source: String,
+    pub destination: String,
+    pub schedule_cron: String,
+    pub last_run_unix: Option<i64>,
+    pub state: &'static str, // "Scheduled" | "Running" | "Completed" | "Failed"
+}
+
+// ── incidents ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IncidentRecord {
+    pub tenant: TenantId,
+    pub id: String,
+    pub title: String,
+    pub severity: &'static str, // "SEV1" | "SEV2" | "SEV3" | "SEV4"
+    pub state: &'static str,    // "Open" | "Investigating" | "Resolved"
+    pub opened_unix: i64,
+}
+
+// ── vulns ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VulnRecord {
+    pub tenant: TenantId,
+    pub cve_id: String,
+    pub package: String,
+    pub installed_version: String,
+    pub fixed_version: Option<String>,
+    pub severity: &'static str, // "Critical" | "High" | "Medium" | "Low"
+}
+
+// ── workflows ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkflowRun {
+    pub tenant: TenantId,
+    pub name: String,
+    pub run_id: String,
+    pub status: &'static str, // "Pending" | "Running" | "Succeeded" | "Failed"
+    pub started_unix: i64,
+    pub finished_unix: Option<i64>,
+}
+
+// ── chaos ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChaosExperiment {
+    pub tenant: TenantId,
+    pub name: String,
+    pub kind: String,       // "pod-kill", "network-delay", "cpu-stress", ...
+    pub target_selector: String,
+    pub schedule: &'static str, // "Once" | "Cron" | "Continuous"
+    pub last_run_unix: Option<i64>,
+}
+
+// ── slo ───────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Slo {
+    pub tenant: TenantId,
+    pub name: String,
+    pub service: String,
+    pub objective_pct: f32, // 99.9 etc.
+    pub window_days: u32,
+    pub current_pct: f32,
+    pub error_budget_remaining_pct: f32,
+}
+
 // ── tenant dashboard recent activity ─────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -406,6 +523,16 @@ pub struct AdminState {
     pub lakehouse_snapshots: RwLock<Vec<LakehouseSnapshot>>,
     pub streams_topics: RwLock<Vec<StreamsTopic>>,
     pub streams_consumer_groups: RwLock<Vec<StreamsConsumerGroup>>,
+    pub policy_rules: RwLock<Vec<PolicyRule>>,
+    pub artifact_records: RwLock<Vec<ArtifactRecord>>,
+    pub alert_rules: RwLock<Vec<AlertRule>>,
+    pub active_alerts: RwLock<Vec<ActiveAlert>>,
+    pub backup_jobs: RwLock<Vec<BackupJob>>,
+    pub incident_records: RwLock<Vec<IncidentRecord>>,
+    pub vuln_records: RwLock<Vec<VulnRecord>>,
+    pub workflow_runs: RwLock<Vec<WorkflowRun>>,
+    pub chaos_experiments: RwLock<Vec<ChaosExperiment>>,
+    pub slos: RwLock<Vec<Slo>>,
 }
 
 impl Default for AdminState {
@@ -452,6 +579,16 @@ impl AdminState {
             lakehouse_snapshots: RwLock::new(Vec::new()),
             streams_topics: RwLock::new(Vec::new()),
             streams_consumer_groups: RwLock::new(Vec::new()),
+            policy_rules: RwLock::new(Vec::new()),
+            artifact_records: RwLock::new(Vec::new()),
+            alert_rules: RwLock::new(Vec::new()),
+            active_alerts: RwLock::new(Vec::new()),
+            backup_jobs: RwLock::new(Vec::new()),
+            incident_records: RwLock::new(Vec::new()),
+            vuln_records: RwLock::new(Vec::new()),
+            workflow_runs: RwLock::new(Vec::new()),
+            chaos_experiments: RwLock::new(Vec::new()),
+            slos: RwLock::new(Vec::new()),
         }
     }
 
@@ -665,8 +802,57 @@ impl AdminState {
         ]);
         s.streams_consumer_groups.write().unwrap().extend([
             StreamsConsumerGroup { tenant: acme.clone(), group_id: "orders-consumer".into(), topic: "orders".into(), members: 4, current_offset: 9_500, log_end_offset: 10_000, state: "Stable" },
-            StreamsConsumerGroup { tenant: acme, group_id: "events-consumer".into(), topic: "events".into(), members: 2, current_offset: 5_000, log_end_offset: 50_000, state: "Rebalancing" },
-            StreamsConsumerGroup { tenant: evil, group_id: "evil-consumer".into(), topic: "evil-topic".into(), members: 1, current_offset: 0, log_end_offset: 0, state: "Empty" },
+            StreamsConsumerGroup { tenant: acme.clone(), group_id: "events-consumer".into(), topic: "events".into(), members: 2, current_offset: 5_000, log_end_offset: 50_000, state: "Rebalancing" },
+            StreamsConsumerGroup { tenant: evil.clone(), group_id: "evil-consumer".into(), topic: "evil-topic".into(), members: 1, current_offset: 0, log_end_offset: 0, state: "Empty" },
+        ]);
+        s.policy_rules.write().unwrap().extend([
+            PolicyRule { tenant: acme.clone(), name: "deny-internet-prod".into(), action: "Deny", subject: "spiffe://*/ns/prod/sa/*".into(), resource: "egress:0.0.0.0/0".into(), enabled: true },
+            PolicyRule { tenant: acme.clone(), name: "allow-monitoring".into(), action: "Allow", subject: "spiffe://*/ns/monitoring/sa/prom".into(), resource: "/metrics".into(), enabled: true },
+            PolicyRule { tenant: evil.clone(), name: "evil-allow-all".into(), action: "Allow", subject: "*".into(), resource: "*".into(), enabled: true },
+        ]);
+        s.artifact_records.write().unwrap().extend([
+            ArtifactRecord { tenant: acme.clone(), registry: "registry.acme/web".into(), name: "web:v17".into(), digest: "sha256:aaaa1111".into(), size_bytes: 67_108_864, pushed_unix: 1_001_000 },
+            ArtifactRecord { tenant: acme.clone(), registry: "registry.acme/api".into(), name: "api:v3".into(), digest: "sha256:bbbb2222".into(), size_bytes: 134_217_728, pushed_unix: 1_001_500 },
+            ArtifactRecord { tenant: evil.clone(), registry: "registry.evil/x".into(), name: "x:latest".into(), digest: "sha256:cccc3333".into(), size_bytes: 1024, pushed_unix: 999_000 },
+        ]);
+        s.alert_rules.write().unwrap().extend([
+            AlertRule { tenant: acme.clone(), name: "HighErrorRate".into(), severity: "critical", expr: "rate(errors[5m]) > 0.05".into(), for_seconds: 300 },
+            AlertRule { tenant: acme.clone(), name: "DiskPressure".into(), severity: "warning", expr: "disk_free < 0.10".into(), for_seconds: 600 },
+            AlertRule { tenant: evil.clone(), name: "EvilNoiseAlert".into(), severity: "info", expr: "evil > 0".into(), for_seconds: 30 },
+        ]);
+        s.active_alerts.write().unwrap().extend([
+            ActiveAlert { tenant: acme.clone(), rule: "HighErrorRate".into(), state: "firing", fired_unix: 1_002_100 },
+            ActiveAlert { tenant: evil.clone(), rule: "EvilNoiseAlert".into(), state: "pending", fired_unix: 1_002_200 },
+        ]);
+        s.backup_jobs.write().unwrap().extend([
+            BackupJob { tenant: acme.clone(), name: "pg-prod-daily".into(), source: "rdbms://pg-prod".into(), destination: "s3://backups/pg-prod/".into(), schedule_cron: "0 2 * * *".into(), last_run_unix: Some(1_002_000), state: "Completed" },
+            BackupJob { tenant: acme.clone(), name: "etcd-hourly".into(), source: "etcd://cluster-a".into(), destination: "s3://backups/etcd/".into(), schedule_cron: "0 * * * *".into(), last_run_unix: Some(1_002_500), state: "Running" },
+            BackupJob { tenant: evil.clone(), name: "evil-backup".into(), source: "evil".into(), destination: "evil".into(), schedule_cron: "* * * * *".into(), last_run_unix: None, state: "Scheduled" },
+        ]);
+        s.incident_records.write().unwrap().extend([
+            IncidentRecord { tenant: acme.clone(), id: "INC-2026-001".into(), title: "API latency spike".into(), severity: "SEV2", state: "Investigating", opened_unix: 1_002_300 },
+            IncidentRecord { tenant: acme.clone(), id: "INC-2026-002".into(), title: "DB failover".into(), severity: "SEV1", state: "Resolved", opened_unix: 1_001_900 },
+            IncidentRecord { tenant: evil.clone(), id: "EVIL-001".into(), title: "evil disruption".into(), severity: "SEV4", state: "Open", opened_unix: 999_000 },
+        ]);
+        s.vuln_records.write().unwrap().extend([
+            VulnRecord { tenant: acme.clone(), cve_id: "CVE-2025-0001".into(), package: "openssl".into(), installed_version: "3.0.10".into(), fixed_version: Some("3.0.14".into()), severity: "Critical" },
+            VulnRecord { tenant: acme.clone(), cve_id: "CVE-2025-0042".into(), package: "tokio".into(), installed_version: "1.40.0".into(), fixed_version: None, severity: "Medium" },
+            VulnRecord { tenant: evil.clone(), cve_id: "CVE-2025-9999".into(), package: "evil-lib".into(), installed_version: "0.1.0".into(), fixed_version: None, severity: "Low" },
+        ]);
+        s.workflow_runs.write().unwrap().extend([
+            WorkflowRun { tenant: acme.clone(), name: "etl-orders".into(), run_id: "wf-1001".into(), status: "Succeeded", started_unix: 1_001_800, finished_unix: Some(1_001_900) },
+            WorkflowRun { tenant: acme.clone(), name: "etl-orders".into(), run_id: "wf-1002".into(), status: "Running", started_unix: 1_002_400, finished_unix: None },
+            WorkflowRun { tenant: evil.clone(), name: "evil-wf".into(), run_id: "evil-1".into(), status: "Failed", started_unix: 999_000, finished_unix: Some(999_100) },
+        ]);
+        s.chaos_experiments.write().unwrap().extend([
+            ChaosExperiment { tenant: acme.clone(), name: "kill-web-pod".into(), kind: "pod-kill".into(), target_selector: "app=web".into(), schedule: "Cron", last_run_unix: Some(1_002_000) },
+            ChaosExperiment { tenant: acme.clone(), name: "delay-api-egress".into(), kind: "network-delay".into(), target_selector: "app=api".into(), schedule: "Once", last_run_unix: None },
+            ChaosExperiment { tenant: evil.clone(), name: "evil-chaos".into(), kind: "full-cluster".into(), target_selector: "*".into(), schedule: "Continuous", last_run_unix: Some(1_000_000) },
+        ]);
+        s.slos.write().unwrap().extend([
+            Slo { tenant: acme.clone(), name: "web-availability".into(), service: "web".into(), objective_pct: 99.9, window_days: 30, current_pct: 99.94, error_budget_remaining_pct: 60.0 },
+            Slo { tenant: acme, name: "api-latency-p99".into(), service: "api".into(), objective_pct: 99.0, window_days: 30, current_pct: 98.7, error_budget_remaining_pct: -30.0 },
+            Slo { tenant: evil, name: "evil-slo".into(), service: "evil".into(), objective_pct: 50.0, window_days: 7, current_pct: 100.0, error_budget_remaining_pct: 100.0 },
         ]);
         s
     }

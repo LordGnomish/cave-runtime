@@ -18,8 +18,12 @@ pub mod permission;
 pub mod render;
 pub mod state;
 
+pub mod alerts;
 pub mod apiserver;
+pub mod artifacts;
+pub mod backup;
 pub mod cache;
+pub mod chaos;
 pub mod cloud_controller_manager;
 pub mod compliance;
 pub mod contributions;
@@ -28,6 +32,7 @@ pub mod cri;
 pub mod docdb;
 pub mod etcd;
 pub mod iam;
+pub mod incidents;
 pub mod kamaji;
 pub mod keda;
 pub mod kubelet;
@@ -35,10 +40,14 @@ pub mod lakehouse;
 pub mod mesh;
 pub mod net;
 pub mod pg;
+pub mod policy;
 pub mod rdbms;
 pub mod rdbms_operator;
 pub mod scheduler;
+pub mod slo;
 pub mod streams;
+pub mod vulns;
+pub mod workflows;
 pub mod tenant_dashboard;
 pub mod vault;
 
@@ -112,6 +121,20 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::StreamsAdmin,
         Permission::AdminComplianceView,
         Permission::AdminComplianceRefresh,
+        Permission::PolicyRead,
+        Permission::PolicyWrite,
+        Permission::ArtifactsRead,
+        Permission::AlertsRead,
+        Permission::AlertsAck,
+        Permission::BackupRead,
+        Permission::BackupTrigger,
+        Permission::IncidentsRead,
+        Permission::IncidentsWrite,
+        Permission::VulnsRead,
+        Permission::WorkflowsRead,
+        Permission::ChaosRead,
+        Permission::ChaosTrigger,
+        Permission::SloRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -304,6 +327,78 @@ async fn compliance_handler(
     compliance::render(&snap, &ctx).map(Html).map_err(err_to_response)
 }
 
+async fn policy_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    policy::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn artifacts_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    artifacts::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn alerts_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    alerts::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn backup_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    backup::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn incidents_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    incidents::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn vulns_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    vulns::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn workflows_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    workflows::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn chaos_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    chaos::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn slo_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    slo::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -381,6 +476,15 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/lakehouse", get(lakehouse_handler))
         .route("/admin/streams", get(streams_handler))
         .route("/admin/compliance", get(compliance_handler))
+        .route("/admin/policy", get(policy_handler))
+        .route("/admin/artifacts", get(artifacts_handler))
+        .route("/admin/alerts", get(alerts_handler))
+        .route("/admin/backup", get(backup_handler))
+        .route("/admin/incidents", get(incidents_handler))
+        .route("/admin/vulns", get(vulns_handler))
+        .route("/admin/workflows", get(workflows_handler))
+        .route("/admin/chaos", get(chaos_handler))
+        .route("/admin/slo", get(slo_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
