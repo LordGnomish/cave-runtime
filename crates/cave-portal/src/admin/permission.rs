@@ -70,6 +70,15 @@ pub enum Permission {
     DocdbQuery,
     CacheRead,
     CacheWrite,
+
+    // ── 2026-05-10 batch B: rdbms-operator + lakehouse + streams ──────
+    RdbmsOperatorRead,
+    RdbmsOperatorFailover,
+    RdbmsOperatorBackup,
+    LakehouseRead,
+    LakehouseSnapshot,
+    StreamsRead,
+    StreamsAdmin,
 }
 
 impl Permission {
@@ -107,6 +116,13 @@ impl Permission {
             Permission::DocdbQuery => "docdb.query.exec",
             Permission::CacheRead => "cache.key.read",
             Permission::CacheWrite => "cache.key.write",
+            Permission::RdbmsOperatorRead => "rdbms-operator.cluster.read",
+            Permission::RdbmsOperatorFailover => "rdbms-operator.cluster.failover",
+            Permission::RdbmsOperatorBackup => "rdbms-operator.cluster.backup",
+            Permission::LakehouseRead => "lakehouse.table.read",
+            Permission::LakehouseSnapshot => "lakehouse.snapshot.write",
+            Permission::StreamsRead => "streams.topic.read",
+            Permission::StreamsAdmin => "streams.topic.admin",
         }
     }
 }

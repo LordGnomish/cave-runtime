@@ -30,11 +30,14 @@ pub mod iam;
 pub mod kamaji;
 pub mod keda;
 pub mod kubelet;
+pub mod lakehouse;
 pub mod mesh;
 pub mod net;
 pub mod pg;
 pub mod rdbms;
+pub mod rdbms_operator;
 pub mod scheduler;
+pub mod streams;
 pub mod tenant_dashboard;
 pub mod vault;
 
@@ -99,6 +102,13 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::DocdbQuery,
         Permission::CacheRead,
         Permission::CacheWrite,
+        Permission::RdbmsOperatorRead,
+        Permission::RdbmsOperatorFailover,
+        Permission::RdbmsOperatorBackup,
+        Permission::LakehouseRead,
+        Permission::LakehouseSnapshot,
+        Permission::StreamsRead,
+        Permission::StreamsAdmin,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -257,6 +267,32 @@ async fn cache_handler(
     cache::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+async fn rdbms_operator_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    rdbms_operator::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn lakehouse_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    lakehouse::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn streams_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    streams::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -330,6 +366,9 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/rdbms", get(rdbms_handler))
         .route("/admin/docdb", get(docdb_handler))
         .route("/admin/cache", get(cache_handler))
+        .route("/admin/rdbms-operator", get(rdbms_operator_handler))
+        .route("/admin/lakehouse", get(lakehouse_handler))
+        .route("/admin/streams", get(streams_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
