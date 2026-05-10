@@ -52,6 +52,24 @@ pub enum Permission {
     KedaRead,
     /// Pause / resume / delete KEDA ScaledObjects.
     KedaWrite,
+
+    // ── 2026-05-10 batch: K8s core + data + autoscaler ────────────────
+    SchedulerRead,
+    SchedulerWrite,
+    ControllerManagerRead,
+    KubeletRead,
+    KubeletExec,
+    CloudControllerRead,
+    KamajiRead,
+    KamajiWrite,
+    NetRead,
+    NetWrite,
+    RdbmsRead,
+    RdbmsQuery,
+    DocdbRead,
+    DocdbQuery,
+    CacheRead,
+    CacheWrite,
 }
 
 impl Permission {
@@ -73,6 +91,22 @@ impl Permission {
             Permission::ContributionsRead => "cluster.contributions.read",
             Permission::KedaRead => "keda.scaledobject.read",
             Permission::KedaWrite => "keda.scaledobject.write",
+            Permission::SchedulerRead => "scheduler.node.read",
+            Permission::SchedulerWrite => "scheduler.policy.write",
+            Permission::ControllerManagerRead => "controller-manager.lease.read",
+            Permission::KubeletRead => "kubelet.pod.read",
+            Permission::KubeletExec => "kubelet.pod.exec",
+            Permission::CloudControllerRead => "cloud-controller.volume.read",
+            Permission::KamajiRead => "kamaji.tcp.read",
+            Permission::KamajiWrite => "kamaji.tcp.write",
+            Permission::NetRead => "net.endpoint.read",
+            Permission::NetWrite => "net.policy.write",
+            Permission::RdbmsRead => "rdbms.cluster.read",
+            Permission::RdbmsQuery => "rdbms.query.exec",
+            Permission::DocdbRead => "docdb.collection.read",
+            Permission::DocdbQuery => "docdb.query.exec",
+            Permission::CacheRead => "cache.key.read",
+            Permission::CacheWrite => "cache.key.write",
         }
     }
 }
