@@ -605,3 +605,69 @@ local_path    = "/api/pg/backups/{id}"
 kind          = "http"
 upstream_path = "/health"
 local_path    = "/api/pg/health"
+
+# Qwen-pump B-prime cycle 1778427170 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_basic"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_zero_current"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_utilisation_pct_full_capacity"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_bloated_tables_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_bloated_tables_filter_by_ratio"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_needs_vacuum_basic"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_replication_healthy_healthy_status"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_size_alert_records_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_size_alert_records_filter_by_threshold"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_slow_queries_empty_list"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_slow_queries_filter_by_threshold"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pg_result_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pg_error_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_backup_status_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pool_mode_enum_exists"
