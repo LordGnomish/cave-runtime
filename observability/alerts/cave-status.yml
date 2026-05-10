@@ -1,0 +1,55 @@
+# cave-status alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-status-slo
+    interval: 30s
+    rules:
+      - alert: StatusSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_status_total{job="cave-status",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_status_total{job="cave-status"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-status fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-status/slo-burn-fast.md"
+      - alert: StatusLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_status_request_duration_seconds_bucket{job="cave-status"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-status p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-status/latency.md"
+      - alert: StatusSaturationHigh
+        expr: 'sum(rate(cave_status_inflight_requests{job="cave-status"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-status inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-status/saturation.md"
+      - alert: StatusMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-status"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-status RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-status/memory.md"
+      - alert: StatusHealthProbeFailing
+        expr: 'min(up{job="cave-status"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-status health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-status/health.md"
