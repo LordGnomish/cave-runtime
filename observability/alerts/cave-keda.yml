@@ -95,3 +95,46 @@ groups:
           summary: "cave-keda health probe failing"
           description: "At least one instance reports up == 0."
           runbook_url: "https://docs.cave.dev/runbooks/cave-keda/health.md"
+  # KEDA workload-specific (2026-05-10 batch).
+  - name: cave-keda-workload
+    interval: 30s
+    rules:
+      - alert: KedaScaledObjectSyncErrorRateHigh
+        expr: |
+          (
+            sum(rate(keda_scaledobject_sync_errors_total{job="cave-keda"}[5m]))
+            /
+            sum(rate(keda_scaledobject_sync_attempts_total{job="cave-keda"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda ScaledObject sync error rate > 5%"
+          description: "{{ $value | humanizePercentage }} of ScaledObject reconciliations failing in last 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/scaledobject-sync-errors.md"
+      - alert: KedaControllerDown
+        expr: 'min(up{job="cave-keda",component="controller"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-keda controller is down"
+          description: "Controller pod missing for ≥1m — ScaledObjects will not reconcile."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/controller-down.md"
+      - alert: KedaScalingEventRateSpike
+        expr: |
+          (
+            sum(rate(keda_scaler_events_total{job="cave-keda"}[5m]))
+            /
+            (sum(rate(keda_scaler_events_total{job="cave-keda"}[1h])) + 0.001)
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-keda scaling-event rate 3× hourly baseline"
+          description: "Last 5-minute scaling-event rate = {{ $value }}× the trailing-1h rate. Possible thrashing or trigger misconfig."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-keda/scaling-event-spike.md"
