@@ -3,6 +3,14 @@ name = "cave-apiserver"
 version = "0.1.0"
 edition = "2021"
 description = "Kubernetes-compatible API server — resource CRUD, watch, admission, RBAC"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-apiserver"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["kubernetes", "api", "rbac", "admission", "crud"]
+categories = ["api-bindings", "authentication", "network-programming"]
 license = "Apache-2.0"
 
 [dependencies]
