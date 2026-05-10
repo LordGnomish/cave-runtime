@@ -15,9 +15,11 @@ pub struct KeyValue {
 }
 
 impl KeyValue {
+    /// Converts the key bytes to a UTF-8 string.
     pub fn key_str(&self) -> String {
         String::from_utf8_lossy(&self.key).to_string()
     }
+    /// Converts the value bytes to a UTF-8 string.
     pub fn value_str(&self) -> String {
         String::from_utf8_lossy(&self.value).to_string()
     }
@@ -92,6 +94,7 @@ pub struct TxnRequest {
     pub failure: Vec<RequestOp>,
 }
 
+/// A comparison condition for transactions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Compare {
     pub key: String,
@@ -102,6 +105,7 @@ pub struct Compare {
     pub mod_revision: Option<u64>,
 }
 
+/// The target of a comparison in a transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CompareTarget {
     Version,
@@ -110,6 +114,7 @@ pub enum CompareTarget {
     Value,
 }
 
+/// The result of a comparison in a transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CompareResult {
     Equal,
@@ -118,6 +123,7 @@ pub enum CompareResult {
     NotEqual,
 }
 
+/// A single operation within a transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RequestOp {
     Range(RangeRequest),
@@ -168,6 +174,7 @@ pub struct WatchEvent {
     pub prev_kv: Option<KeyValue>,
 }
 
+/// The type of a watch event.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EventType {
     Put,
@@ -186,6 +193,7 @@ pub struct Member {
 
 // ── Watch ──────────────────────────────────────────────────────────────────
 
+/// Request to create a watch stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchCreateRequest {
     pub key: String,
@@ -195,6 +203,7 @@ pub struct WatchCreateRequest {
     pub prev_kv: bool,
 }
 
+/// Response from a watch stream.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WatchResponse {
     pub header: ResponseHeader,
@@ -205,12 +214,14 @@ pub struct WatchResponse {
 
 // ── Lease extensions ───────────────────────────────────────────────────────
 
+/// Request to keep a lease alive.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseKeepAliveRequest {
     #[serde(rename = "ID")]
     pub id: i64,
 }
 
+/// Response to a lease keep-alive request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseKeepAliveResponse {
     pub header: ResponseHeader,
@@ -220,6 +231,7 @@ pub struct LeaseKeepAliveResponse {
     pub ttl: i64,
 }
 
+/// Request to get TTL for a lease.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseTTLRequest {
     #[serde(rename = "ID")]
@@ -227,6 +239,7 @@ pub struct LeaseTTLRequest {
     pub keys: bool,
 }
 
+/// Response to a lease TTL request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseTTLResponse {
     pub header: ResponseHeader,
@@ -239,12 +252,14 @@ pub struct LeaseTTLResponse {
     pub keys: Vec<Vec<u8>>,
 }
 
+/// Status of a single lease.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseStatus {
     #[serde(rename = "ID")]
     pub id: i64,
 }
 
+/// Response containing a list of lease statuses.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaseLeasesResponse {
     pub header: ResponseHeader,
@@ -253,6 +268,7 @@ pub struct LeaseLeasesResponse {
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 
+/// Permission type for auth operations.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PermType {
     Read,
@@ -260,6 +276,7 @@ pub enum PermType {
     Readwrite,
 }
 
+/// Permission definition for a key range.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Permission {
     pub perm_type: PermType,
@@ -267,6 +284,7 @@ pub struct Permission {
     pub range_end: Option<String>,
 }
 
+/// Auth user information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUser {
     pub name: String,
@@ -274,108 +292,128 @@ pub struct AuthUser {
     pub roles: Vec<String>,
 }
 
+/// Auth role information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRole {
     pub name: String,
     pub key_permission: Vec<Permission>,
 }
 
+/// Response to an auth enable request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthEnableResponse {
     pub header: ResponseHeader,
 }
 
+/// Response to an auth disable request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthDisableResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to authenticate a user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthenticateRequest {
     pub name: String,
     pub password: String,
 }
 
+/// Response to an authentication request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthenticateResponse {
     pub header: ResponseHeader,
     pub token: String,
 }
 
+/// Request to add a new auth user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserAddRequest {
     pub name: String,
     pub password: String,
 }
 
+/// Response to an auth user add request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserAddResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to delete an auth user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserDeleteRequest {
     pub name: String,
 }
 
+/// Response to an auth user delete request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserDeleteResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to get info about an auth user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserGetRequest {
     pub name: String,
 }
 
+/// Response to an auth user get request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserGetResponse {
     pub header: ResponseHeader,
     pub roles: Vec<String>,
 }
 
+/// Response to an auth user list request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserListResponse {
     pub header: ResponseHeader,
     pub users: Vec<String>,
 }
 
+/// Request to change a user's password.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserChangePasswordRequest {
     pub name: String,
     pub password: String,
 }
 
+/// Response to an auth user change password request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserChangePasswordResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to add a new auth role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleAddRequest {
     pub name: String,
 }
 
+/// Response to an auth role add request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleAddResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to delete an auth role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleDeleteRequest {
     pub role: String,
 }
 
+/// Response to an auth role delete request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleDeleteResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to get info about an auth role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleGetRequest {
     pub role: String,
 }
 
+/// Response to an auth role get request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleGetResponse {
     pub header: ResponseHeader,
@@ -383,6 +421,7 @@ pub struct AuthRoleGetResponse {
     pub perm: Vec<Permission>,
 }
 
+/// Response to an auth role list request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleListResponse {
     pub header: ResponseHeader,
@@ -391,6 +430,7 @@ pub struct AuthRoleListResponse {
 
 // ── Maintenance extensions ─────────────────────────────────────────────────
 
+/// Type of alarm in the cluster.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AlarmType {
     None,
@@ -398,6 +438,7 @@ pub enum AlarmType {
     Corrupt,
 }
 
+/// Action to take on an alarm.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AlarmAction {
     Get,
@@ -405,6 +446,7 @@ pub enum AlarmAction {
     Deactivate,
 }
 
+/// Request to get or set alarms.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlarmRequest {
     pub action: AlarmAction,
@@ -412,23 +454,27 @@ pub struct AlarmRequest {
     pub alarm: AlarmType,
 }
 
+/// Status of an alarm on a specific member.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlarmMember {
     pub member_id: u64,
     pub alarm: AlarmType,
 }
 
+/// Response to an alarm request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlarmResponse {
     pub header: ResponseHeader,
     pub alarms: Vec<AlarmMember>,
 }
 
+/// Response to a defragment request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefragmentResponse {
     pub header: ResponseHeader,
 }
 
+/// Response to a hash request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HashResponse {
     pub header: ResponseHeader,
@@ -437,6 +483,7 @@ pub struct HashResponse {
     pub hash_revision: u64,
 }
 
+/// Response to a snapshot request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotResponse {
     pub header: ResponseHeader,
@@ -446,12 +493,14 @@ pub struct SnapshotResponse {
 
 // ── Cluster extensions ─────────────────────────────────────────────────────
 
+/// Request to add a new member to the cluster.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberAddRequest {
     pub peer_ur_ls: Vec<String>,
     pub is_learner: bool,
 }
 
+/// Response to a member add request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberAddResponse {
     pub header: ResponseHeader,
@@ -459,18 +508,21 @@ pub struct MemberAddResponse {
     pub members: Vec<Member>,
 }
 
+/// Request to remove a member from the cluster.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberRemoveRequest {
     #[serde(rename = "ID")]
     pub id: u64,
 }
 
+/// Response to a member remove request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberRemoveResponse {
     pub header: ResponseHeader,
     pub members: Vec<Member>,
 }
 
+/// Request to update a member's configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberUpdateRequest {
     #[serde(rename = "ID")]
@@ -478,12 +530,14 @@ pub struct MemberUpdateRequest {
     pub peer_ur_ls: Vec<String>,
 }
 
+/// Response to a member update request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberUpdateResponse {
     pub header: ResponseHeader,
     pub members: Vec<Member>,
 }
 
+/// Response to a member list request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberListResponse {
     pub header: ResponseHeader,
@@ -492,12 +546,14 @@ pub struct MemberListResponse {
 
 // ── KV compaction ──────────────────────────────────────────────────────────
 
+/// Request to compact the key-value store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionRequest {
     pub revision: u64,
     pub physical: bool,
 }
 
+/// Response to a compaction request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactionResponse {
     pub header: ResponseHeader,
@@ -505,6 +561,7 @@ pub struct CompactionResponse {
 
 // ── Version ────────────────────────────────────────────────────────────────
 
+/// Response containing cluster version information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VersionResponse {
     pub etcdserver: String,
@@ -513,6 +570,7 @@ pub struct VersionResponse {
 
 // ── Watch config (internal, not serialised over the wire) ─────────────────
 
+/// Internal configuration for a watch stream.
 #[derive(Debug, Clone)]
 pub struct WatchConfig {
     pub watch_id: i64,
@@ -524,39 +582,46 @@ pub struct WatchConfig {
 
 // ── Auth grant / revoke ────────────────────────────────────────────────────
 
+/// Request to grant a role to a user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserGrantRoleRequest {
     pub user: String,
     pub role: String,
 }
 
+/// Response to an auth user grant role request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserGrantRoleResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to revoke a role from a user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserRevokeRoleRequest {
     pub name: String,
     pub role: String,
 }
 
+/// Response to an auth user revoke role request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthUserRevokeRoleResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to grant permission to a role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleGrantPermissionRequest {
     pub name: String,
     pub perm: Permission,
 }
 
+/// Response to an auth role grant permission request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleGrantPermissionResponse {
     pub header: ResponseHeader,
 }
 
+/// Request to revoke permission from a role.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleRevokePermissionRequest {
     pub role: String,
@@ -564,6 +629,7 @@ pub struct AuthRoleRevokePermissionRequest {
     pub range_end: Option<String>,
 }
 
+/// Response to an auth role revoke permission request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthRoleRevokePermissionResponse {
     pub header: ResponseHeader,
@@ -579,6 +645,7 @@ pub struct MemberPromoteRequest {
     pub id: u64,
 }
 
+/// Response to a member promote request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberPromoteResponse {
     pub header: ResponseHeader,
@@ -589,28 +656,31 @@ pub struct MemberPromoteResponse {
 /// Mirrors etcd's `raftpb.ConfState` joint fields.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct JointConfig {
-    /// Voters in the *outgoing* (current) configuration (Cold).
+     /// Voters in the *outgoing* (current) configuration (Cold).
     pub outgoing: Vec<u64>,
-    /// Voters in the *incoming* (next) configuration (Cnew).
+     /// Voters in the *incoming* (next) configuration (Cnew).
     pub incoming: Vec<u64>,
-    /// Learners (non-voting) in either configuration.
+     /// Learners (non-voting) in either configuration.
     pub learners: Vec<u64>,
 }
 
 impl JointConfig {
+    /// Checks if the joint configuration is empty.
     pub fn is_empty(&self) -> bool {
         self.outgoing.is_empty() && self.incoming.is_empty()
-    }
+     }
 }
 
+/// Request to enter joint consensus.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnterJointRequest {
-    /// Members to add (transition to learner first if `is_learner=true`).
+     /// Members to add (transition to learner first if `is_learner=true`).
     pub adds: Vec<MemberAddRequest>,
-    /// Member IDs to remove on commit.
+     /// Member IDs to remove on commit.
     pub removes: Vec<u64>,
 }
 
+/// Response to an enter joint consensus request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnterJointResponse {
     pub header: ResponseHeader,
@@ -618,6 +688,7 @@ pub struct EnterJointResponse {
     pub members: Vec<Member>,
 }
 
+/// Response to a leave joint consensus request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeaveJointResponse {
     pub header: ResponseHeader,
@@ -631,12 +702,12 @@ pub struct LeaveJointResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotChunk {
     pub header: ResponseHeader,
-    /// Bytes still to be sent after this chunk (0 on the last chunk).
+     /// Bytes still to be sent after this chunk (0 on the last chunk).
     pub remaining_bytes: u64,
-    /// Chunk payload bytes.
+     /// Chunk payload bytes.
     pub blob: Vec<u8>,
-    /// Hex-encoded sha256 of the *complete* snapshot. Same on every chunk
-    /// so the receiver can verify after assembly.
+     /// Hex-encoded sha256 of the *complete* snapshot. Same on every chunk
+     /// so the receiver can verify after assembly.
     pub checksum: String,
 }
 
@@ -670,8 +741,8 @@ pub enum RaftRole {
     Leader,
     Follower,
     Candidate,
-    /// Pre-candidate state introduced by Ongaro §9.6 to avoid disruptive
-    /// elections from partitioned nodes.
+     /// Pre-candidate state introduced by Ongaro §9.6 to avoid disruptive
+     /// elections from partitioned nodes.
     PreCandidate,
     Learner,
 }
@@ -702,7 +773,7 @@ pub struct SnapshotSenderState {
     pub total_bytes: u64,
     pub sent_bytes: u64,
     pub checksum: String,
-    /// Number of chunks emitted so far.
+     /// Number of chunks emitted so far.
     pub chunks_sent: u64,
     pub completed: bool,
 }
