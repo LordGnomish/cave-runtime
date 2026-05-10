@@ -418,3 +418,65 @@ local_test    = "backoff_delay_grows_exponentially_then_caps"
 [[tests]]
 upstream_test = "TestBackoffMaxRetries"
 local_test    = "backoff_should_retry_respects_max_retries"
+
+# Qwen-pump B-prime cycle 1778421168 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_validate_mask_size_v4_valid"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_validate_mask_size_v6_valid"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_cidrs_overlap_true"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_cidrs_overlap_false"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_diff_backend_pool_empty"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_diff_listeners_empty"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_lb_spec_drifted_no_drift"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_lb_spec_drifted_with_drift"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_advance_slow_start_initial"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_tick_drain_active"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_begin_drain_initial"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_step_on_probe_success"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_step_on_probe_failure"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_zone_count_single"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_zone_count_multiple"
