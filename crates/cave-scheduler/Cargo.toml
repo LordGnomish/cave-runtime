@@ -3,6 +3,14 @@ name = "cave-scheduler"
 version = "0.1.0"
 edition = "2021"
 description = "Pod scheduler — assigns pods to nodes based on resources, affinity, and constraints"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-scheduler"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["scheduler", "kubernetes", "pods", "nodes", "resources"]
+categories = ["api-bindings", "command-line-utilities"]
 license = "Apache-2.0"
 
 [dependencies]
