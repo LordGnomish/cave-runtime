@@ -19,12 +19,22 @@ pub mod render;
 pub mod state;
 
 pub mod apiserver;
+pub mod cache;
+pub mod cloud_controller_manager;
 pub mod contributions;
+pub mod controller_manager;
 pub mod cri;
+pub mod docdb;
 pub mod etcd;
 pub mod iam;
+pub mod kamaji;
+pub mod keda;
+pub mod kubelet;
 pub mod mesh;
+pub mod net;
 pub mod pg;
+pub mod rdbms;
+pub mod scheduler;
 pub mod tenant_dashboard;
 pub mod vault;
 
@@ -71,6 +81,24 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::PgQuery,
         Permission::VaultRead,
         Permission::ContributionsRead,
+        Permission::SchedulerRead,
+        Permission::SchedulerWrite,
+        Permission::ControllerManagerRead,
+        Permission::KubeletRead,
+        Permission::KubeletExec,
+        Permission::CloudControllerRead,
+        Permission::KamajiRead,
+        Permission::KamajiWrite,
+        Permission::NetRead,
+        Permission::NetWrite,
+        Permission::RdbmsRead,
+        Permission::RdbmsQuery,
+        Permission::DocdbRead,
+        Permission::DocdbQuery,
+        Permission::CacheRead,
+        Permission::CacheWrite,
+        Permission::KedaRead,
+        Permission::KedaWrite,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -198,6 +226,90 @@ async fn contributions_leaderboard_handler(
         .map_err(err_to_response)
 }
 
+async fn scheduler_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    scheduler::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn controller_manager_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    controller_manager::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn kubelet_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    kubelet::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn cloud_controller_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    cloud_controller_manager::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn kamaji_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    kamaji::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn net_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    net::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn rdbms_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    rdbms::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn docdb_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    docdb::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn cache_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    cache::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn keda_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
 /// Build the admin router. Mount as `app.merge(admin::router(state))`.
 pub fn router(state: Arc<AdminState>) -> Router {
     Router::new()
@@ -212,6 +324,16 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
         .route("/admin/contributions/{worker_id}", get(contributions_worker_handler))
+        .route("/admin/scheduler", get(scheduler_handler))
+        .route("/admin/controller-manager", get(controller_manager_handler))
+        .route("/admin/kubelet", get(kubelet_handler))
+        .route("/admin/cloud-controller", get(cloud_controller_handler))
+        .route("/admin/kamaji", get(kamaji_handler))
+        .route("/admin/net", get(net_handler))
+        .route("/admin/rdbms", get(rdbms_handler))
+        .route("/admin/docdb", get(docdb_handler))
+        .route("/admin/cache", get(cache_handler))
+        .route("/admin/keda", get(keda_handler))
         .route("/t/{tenant}/dashboard", get(tenant_dashboard_handler))
         .with_state(state)
 }

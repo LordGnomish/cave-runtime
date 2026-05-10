@@ -135,6 +135,143 @@ pub struct VaultAuditEntry {
     pub path: String,
 }
 
+// ── scheduler ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchedulerNode {
+    pub tenant: TenantId,
+    pub name: String,
+    pub ready: bool,
+    pub allocatable_cpu_milli: u64,
+    pub allocatable_mem_mib: u64,
+    pub taints: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SchedulerPolicy {
+    pub tenant: TenantId,
+    pub name: String,
+    pub predicate: String,
+    pub weight: u32,
+}
+
+// ── controller-manager ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControllerLease {
+    pub tenant: TenantId,
+    pub controller: String,
+    pub leader_id: String,
+    pub renewals: u64,
+    pub expires_unix: i64,
+}
+
+// ── kubelet ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KubeletPod {
+    pub tenant: TenantId,
+    pub node: String,
+    pub pod_name: String,
+    pub status: &'static str, // "Running" | "Pending" | "Failed"
+    pub restart_count: u32,
+}
+
+// ── cloud-controller-manager ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CloudVolume {
+    pub tenant: TenantId,
+    pub id: String,
+    pub region: String,
+    pub size_gb: u64,
+    pub attached_node: Option<String>,
+}
+
+// ── kamaji ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KamajiTcp {
+    pub tenant: TenantId,
+    pub name: String,
+    pub k8s_version: String,
+    pub ready_replicas: u32,
+    pub desired_replicas: u32,
+}
+
+// ── net (Cilium) ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NetEndpoint {
+    pub tenant: TenantId,
+    pub identity: u64,
+    pub namespace: String,
+    pub ip: String,
+    pub ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NetPolicy {
+    pub tenant: TenantId,
+    pub name: String,
+    pub direction: &'static str, // "Ingress" | "Egress" | "Both"
+    pub selector: String,
+}
+
+// ── rdbms (postgres operator) ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RdbmsCluster {
+    pub tenant: TenantId,
+    pub name: String,
+    pub version: String,
+    pub replicas: u32,
+    pub primary_node: String,
+}
+
+// ── docdb (mongo / yugabyte / etc.) ───────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DocdbCollection {
+    pub tenant: TenantId,
+    pub database: String,
+    pub collection: String,
+    pub document_count: u64,
+}
+
+// ── cache (dragonfly / valkey) ────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CacheEntry {
+    pub tenant: TenantId,
+    pub namespace: String,
+    pub key: String,
+    pub ttl_seconds: u64,
+    pub size_bytes: u64,
+}
+
+// ── keda ──────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KedaScaledObject {
+    pub tenant: TenantId,
+    pub name: String,
+    pub target_kind: String,
+    pub target_name: String,
+    pub min_replicas: u32,
+    pub max_replicas: u32,
+    pub current_replicas: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KedaScaledJob {
+    pub tenant: TenantId,
+    pub name: String,
+    pub parallelism: u32,
+    pub completions: u32,
+    pub last_run_unix: i64,
+}
+
 // ── tenant dashboard recent activity ─────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -163,6 +300,20 @@ pub struct AdminState {
     pub vault_secrets: RwLock<Vec<VaultSecretMeta>>,
     pub vault_audit: RwLock<Vec<VaultAuditEntry>>,
     pub recent_activity: RwLock<Vec<ActivityEntry>>,
+    // 2026-05-10 batch.
+    pub scheduler_nodes: RwLock<Vec<SchedulerNode>>,
+    pub scheduler_policies: RwLock<Vec<SchedulerPolicy>>,
+    pub controller_leases: RwLock<Vec<ControllerLease>>,
+    pub kubelet_pods: RwLock<Vec<KubeletPod>>,
+    pub cloud_volumes: RwLock<Vec<CloudVolume>>,
+    pub kamaji_tcps: RwLock<Vec<KamajiTcp>>,
+    pub net_endpoints: RwLock<Vec<NetEndpoint>>,
+    pub net_policies: RwLock<Vec<NetPolicy>>,
+    pub rdbms_clusters: RwLock<Vec<RdbmsCluster>>,
+    pub docdb_collections: RwLock<Vec<DocdbCollection>>,
+    pub cache_entries: RwLock<Vec<CacheEntry>>,
+    pub keda_scaled_objects: RwLock<Vec<KedaScaledObject>>,
+    pub keda_scaled_jobs: RwLock<Vec<KedaScaledJob>>,
 }
 
 impl Default for AdminState {
@@ -190,6 +341,19 @@ impl AdminState {
             vault_secrets: RwLock::new(Vec::new()),
             vault_audit: RwLock::new(Vec::new()),
             recent_activity: RwLock::new(Vec::new()),
+            scheduler_nodes: RwLock::new(Vec::new()),
+            scheduler_policies: RwLock::new(Vec::new()),
+            controller_leases: RwLock::new(Vec::new()),
+            kubelet_pods: RwLock::new(Vec::new()),
+            cloud_volumes: RwLock::new(Vec::new()),
+            kamaji_tcps: RwLock::new(Vec::new()),
+            net_endpoints: RwLock::new(Vec::new()),
+            net_policies: RwLock::new(Vec::new()),
+            rdbms_clusters: RwLock::new(Vec::new()),
+            docdb_collections: RwLock::new(Vec::new()),
+            cache_entries: RwLock::new(Vec::new()),
+            keda_scaled_objects: RwLock::new(Vec::new()),
+            keda_scaled_jobs: RwLock::new(Vec::new()),
         }
     }
 
@@ -259,9 +423,72 @@ impl AdminState {
         ]);
         s.recent_activity.write().unwrap().extend([
             ActivityEntry { tenant: acme.clone(), when_unix: 1_000_100, kind: "deploy", summary: "deployed web v17".into() },
-            ActivityEntry { tenant: acme, when_unix: 1_000_200, kind: "policy", summary: "updated AuthorizationPolicy allow-web".into() },
-            ActivityEntry { tenant: evil, when_unix: 1_000_300, kind: "deploy", summary: "deployed evil-web v1".into() },
+            ActivityEntry { tenant: acme.clone(), when_unix: 1_000_200, kind: "policy", summary: "updated AuthorizationPolicy allow-web".into() },
+            ActivityEntry { tenant: evil.clone(), when_unix: 1_000_300, kind: "deploy", summary: "deployed evil-web v1".into() },
         ]);
+        s.scheduler_nodes.write().unwrap().extend([
+            SchedulerNode { tenant: acme.clone(), name: "node-a".into(), ready: true, allocatable_cpu_milli: 8000, allocatable_mem_mib: 16384, taints: vec![] },
+            SchedulerNode { tenant: acme.clone(), name: "node-b".into(), ready: false, allocatable_cpu_milli: 4000, allocatable_mem_mib: 8192, taints: vec!["NoSchedule=cordoned".into()] },
+            SchedulerNode { tenant: evil.clone(), name: "evil-node".into(), ready: true, allocatable_cpu_milli: 1000, allocatable_mem_mib: 2048, taints: vec![] },
+        ]);
+        s.scheduler_policies.write().unwrap().extend([
+            SchedulerPolicy { tenant: acme.clone(), name: "least-utilised".into(), predicate: "cpu<70".into(), weight: 5 },
+            SchedulerPolicy { tenant: evil.clone(), name: "evil-pin".into(), predicate: "host==evil-node".into(), weight: 10 },
+        ]);
+        s.controller_leases.write().unwrap().extend([
+            ControllerLease { tenant: acme.clone(), controller: "deployment".into(), leader_id: "ctl-1".into(), renewals: 17, expires_unix: 1_001_000 },
+            ControllerLease { tenant: acme.clone(), controller: "replicaset".into(), leader_id: "ctl-1".into(), renewals: 18, expires_unix: 1_001_010 },
+            ControllerLease { tenant: evil.clone(), controller: "evil-loop".into(), leader_id: "evil-1".into(), renewals: 1, expires_unix: 1_001_020 },
+        ]);
+        s.kubelet_pods.write().unwrap().extend([
+            KubeletPod { tenant: acme.clone(), node: "node-a".into(), pod_name: "web-0".into(), status: "Running", restart_count: 0 },
+            KubeletPod { tenant: acme.clone(), node: "node-a".into(), pod_name: "api-0".into(), status: "Running", restart_count: 1 },
+            KubeletPod { tenant: acme.clone(), node: "node-b".into(), pod_name: "worker-0".into(), status: "Pending", restart_count: 0 },
+            KubeletPod { tenant: evil.clone(), node: "evil-node".into(), pod_name: "x-0".into(), status: "Running", restart_count: 99 },
+        ]);
+        s.cloud_volumes.write().unwrap().extend([
+            CloudVolume { tenant: acme.clone(), id: "vol-1".into(), region: "eu-central-1".into(), size_gb: 50, attached_node: Some("node-a".into()) },
+            CloudVolume { tenant: acme.clone(), id: "vol-2".into(), region: "eu-central-1".into(), size_gb: 100, attached_node: None },
+            CloudVolume { tenant: evil.clone(), id: "evil-vol".into(), region: "us-east-1".into(), size_gb: 1024, attached_node: None },
+        ]);
+        s.kamaji_tcps.write().unwrap().extend([
+            KamajiTcp { tenant: acme.clone(), name: "tcp-prod".into(), k8s_version: "1.31.2".into(), ready_replicas: 3, desired_replicas: 3 },
+            KamajiTcp { tenant: acme.clone(), name: "tcp-staging".into(), k8s_version: "1.31.0".into(), ready_replicas: 2, desired_replicas: 3 },
+            KamajiTcp { tenant: evil.clone(), name: "evil-tcp".into(), k8s_version: "1.27.0".into(), ready_replicas: 1, desired_replicas: 1 },
+        ]);
+        s.net_endpoints.write().unwrap().extend([
+            NetEndpoint { tenant: acme.clone(), identity: 1001, namespace: "default".into(), ip: "10.0.0.5".into(), ready: true },
+            NetEndpoint { tenant: acme.clone(), identity: 1002, namespace: "default".into(), ip: "10.0.0.6".into(), ready: true },
+            NetEndpoint { tenant: evil.clone(), identity: 9001, namespace: "default".into(), ip: "10.0.99.99".into(), ready: true },
+        ]);
+        s.net_policies.write().unwrap().extend([
+            NetPolicy { tenant: acme.clone(), name: "allow-web".into(), direction: "Ingress", selector: "app=web".into() },
+            NetPolicy { tenant: evil.clone(), name: "evil-allow-all".into(), direction: "Both", selector: "*".into() },
+        ]);
+        s.rdbms_clusters.write().unwrap().extend([
+            RdbmsCluster { tenant: acme.clone(), name: "pg-prod".into(), version: "16.2".into(), replicas: 3, primary_node: "node-a".into() },
+            RdbmsCluster { tenant: evil.clone(), name: "evil-pg".into(), version: "13.0".into(), replicas: 1, primary_node: "evil-node".into() },
+        ]);
+        s.docdb_collections.write().unwrap().extend([
+            DocdbCollection { tenant: acme.clone(), database: "orders".into(), collection: "items".into(), document_count: 10_000 },
+            DocdbCollection { tenant: acme.clone(), database: "orders".into(), collection: "ledger".into(), document_count: 250 },
+            DocdbCollection { tenant: evil.clone(), database: "secrets".into(), collection: "tokens".into(), document_count: 5 },
+        ]);
+        s.cache_entries.write().unwrap().extend([
+            CacheEntry { tenant: acme.clone(), namespace: "session".into(), key: "u-1".into(), ttl_seconds: 3600, size_bytes: 256 },
+            CacheEntry { tenant: acme.clone(), namespace: "session".into(), key: "u-2".into(), ttl_seconds: 1800, size_bytes: 256 },
+            CacheEntry { tenant: evil.clone(), namespace: "session".into(), key: "evil-1".into(), ttl_seconds: 60, size_bytes: 999 },
+        ]);
+        s.keda_scaled_objects.write().unwrap().extend([
+            KedaScaledObject { tenant: acme.clone(), name: "web-so".into(), target_kind: "Deployment".into(), target_name: "web".into(), min_replicas: 1, max_replicas: 10, current_replicas: 3 },
+            KedaScaledObject { tenant: acme.clone(), name: "api-so".into(), target_kind: "Deployment".into(), target_name: "api".into(), min_replicas: 2, max_replicas: 20, current_replicas: 5 },
+            KedaScaledObject { tenant: evil.clone(), name: "evil-so".into(), target_kind: "Deployment".into(), target_name: "evil".into(), min_replicas: 1, max_replicas: 100, current_replicas: 1 },
+        ]);
+        s.keda_scaled_jobs.write().unwrap().extend([
+            KedaScaledJob { tenant: acme.clone(), name: "ingest".into(), parallelism: 4, completions: 100, last_run_unix: 1_001_500 },
+            KedaScaledJob { tenant: evil, name: "evil-job".into(), parallelism: 1, completions: 0, last_run_unix: 0 },
+        ]);
+        let _ = acme; // tenant variables fully consumed
         s
     }
 }
