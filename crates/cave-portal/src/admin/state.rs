@@ -279,6 +279,85 @@ pub struct CacheEntry {
     pub size_bytes: u64,
 }
 
+// ── rdbms-operator (Postgres / CNPG) ──────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RdbmsOperatorCluster {
+    pub tenant: TenantId,
+    pub name: String,
+    pub upstream_kind: &'static str, // "CNPG" | "PgBouncer"
+    pub version: String,
+    pub instances: u32,
+    pub primary_pod: String,
+    pub replication_lag_bytes: u64,
+    pub replication_state: &'static str, // "InSync" | "Catchup" | "Stale" | "Disconnected"
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RdbmsOperatorBackup {
+    pub tenant: TenantId,
+    pub cluster: String,
+    pub backup_id: String,
+    pub started_unix: i64,
+    pub finished_unix: Option<i64>,
+    pub size_mib: u64,
+    pub state: &'static str, // "Completed" | "Running" | "Failed"
+}
+
+// ── lakehouse (Iceberg + DataFusion) ──────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LakehouseTable {
+    pub tenant: TenantId,
+    pub namespace: String,
+    pub name: String,
+    pub format_version: u32,    // Iceberg v1/v2/v3
+    pub partition_count: u64,
+    pub file_count: u64,
+    pub size_bytes: u64,
+    pub current_snapshot_id: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LakehouseSnapshot {
+    pub tenant: TenantId,
+    pub namespace: String,
+    pub table: String,
+    pub snapshot_id: u64,
+    pub committed_unix: i64,
+    pub op: &'static str, // "Append" | "Overwrite" | "Delete" | "Replace"
+    pub added_files: u64,
+}
+
+// ── streams (Kafka + Pulsar) ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamsTopic {
+    pub tenant: TenantId,
+    pub name: String,
+    pub partitions: u32,
+    pub replication_factor: u32,
+    pub retention_ms: u64,
+    pub compaction: &'static str, // "Delete" | "Compact" | "DeleteAndCompact"
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamsConsumerGroup {
+    pub tenant: TenantId,
+    pub group_id: String,
+    pub topic: String,
+    pub members: u32,
+    pub current_offset: u64,
+    pub log_end_offset: u64,
+    pub state: &'static str, // "Stable" | "Rebalancing" | "Empty" | "Dead"
+}
+
+impl StreamsConsumerGroup {
+    pub fn lag(&self) -> u64 {
+        self.log_end_offset.saturating_sub(self.current_offset)
+    }
+}
+
 // ── tenant dashboard recent activity ─────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,6 +400,12 @@ pub struct AdminState {
     pub rdbms_clusters: RwLock<Vec<RdbmsCluster>>,
     pub docdb_collections: RwLock<Vec<DocdbCollection>>,
     pub cache_entries: RwLock<Vec<CacheEntry>>,
+    pub rdbms_operator_clusters: RwLock<Vec<RdbmsOperatorCluster>>,
+    pub rdbms_operator_backups: RwLock<Vec<RdbmsOperatorBackup>>,
+    pub lakehouse_tables: RwLock<Vec<LakehouseTable>>,
+    pub lakehouse_snapshots: RwLock<Vec<LakehouseSnapshot>>,
+    pub streams_topics: RwLock<Vec<StreamsTopic>>,
+    pub streams_consumer_groups: RwLock<Vec<StreamsConsumerGroup>>,
 }
 
 impl Default for AdminState {
@@ -361,6 +446,12 @@ impl AdminState {
             rdbms_clusters: RwLock::new(Vec::new()),
             docdb_collections: RwLock::new(Vec::new()),
             cache_entries: RwLock::new(Vec::new()),
+            rdbms_operator_clusters: RwLock::new(Vec::new()),
+            rdbms_operator_backups: RwLock::new(Vec::new()),
+            lakehouse_tables: RwLock::new(Vec::new()),
+            lakehouse_snapshots: RwLock::new(Vec::new()),
+            streams_topics: RwLock::new(Vec::new()),
+            streams_consumer_groups: RwLock::new(Vec::new()),
         }
     }
 
@@ -544,8 +635,38 @@ impl AdminState {
         ]);
         s.cache_entries.write().unwrap().extend([
             CacheEntry { tenant: acme.clone(), namespace: "session".into(), key: "u-1".into(), ttl_seconds: 3600, size_bytes: 256 },
-            CacheEntry { tenant: acme, namespace: "session".into(), key: "u-2".into(), ttl_seconds: 1800, size_bytes: 256 },
-            CacheEntry { tenant: evil, namespace: "session".into(), key: "evil-1".into(), ttl_seconds: 60, size_bytes: 999 },
+            CacheEntry { tenant: acme.clone(), namespace: "session".into(), key: "u-2".into(), ttl_seconds: 1800, size_bytes: 256 },
+            CacheEntry { tenant: evil.clone(), namespace: "session".into(), key: "evil-1".into(), ttl_seconds: 60, size_bytes: 999 },
+        ]);
+        s.rdbms_operator_clusters.write().unwrap().extend([
+            RdbmsOperatorCluster { tenant: acme.clone(), name: "primary-prod".into(), upstream_kind: "CNPG", version: "1.24.0".into(), instances: 3, primary_pod: "primary-prod-1".into(), replication_lag_bytes: 8192, replication_state: "InSync" },
+            RdbmsOperatorCluster { tenant: acme.clone(), name: "analytics".into(), upstream_kind: "CNPG", version: "1.24.0".into(), instances: 2, primary_pod: "analytics-1".into(), replication_lag_bytes: 4_194_304, replication_state: "Catchup" },
+            RdbmsOperatorCluster { tenant: evil.clone(), name: "evil-cluster".into(), upstream_kind: "CNPG", version: "1.10.0".into(), instances: 1, primary_pod: "evil-1".into(), replication_lag_bytes: 0, replication_state: "InSync" },
+        ]);
+        s.rdbms_operator_backups.write().unwrap().extend([
+            RdbmsOperatorBackup { tenant: acme.clone(), cluster: "primary-prod".into(), backup_id: "bk-2026-05-10-01".into(), started_unix: 1_001_500, finished_unix: Some(1_001_700), size_mib: 4096, state: "Completed" },
+            RdbmsOperatorBackup { tenant: acme.clone(), cluster: "primary-prod".into(), backup_id: "bk-2026-05-10-02".into(), started_unix: 1_002_000, finished_unix: None, size_mib: 0, state: "Running" },
+            RdbmsOperatorBackup { tenant: evil.clone(), cluster: "evil-cluster".into(), backup_id: "evil-bk-1".into(), started_unix: 1_000_000, finished_unix: Some(1_000_100), size_mib: 16, state: "Completed" },
+        ]);
+        s.lakehouse_tables.write().unwrap().extend([
+            LakehouseTable { tenant: acme.clone(), namespace: "warehouse".into(), name: "orders".into(), format_version: 2, partition_count: 365, file_count: 4_320, size_bytes: 1_073_741_824, current_snapshot_id: 1001 },
+            LakehouseTable { tenant: acme.clone(), namespace: "warehouse".into(), name: "events".into(), format_version: 2, partition_count: 90, file_count: 1_120, size_bytes: 268_435_456, current_snapshot_id: 1002 },
+            LakehouseTable { tenant: evil.clone(), namespace: "secrets".into(), name: "tokens".into(), format_version: 2, partition_count: 1, file_count: 4, size_bytes: 4096, current_snapshot_id: 9001 },
+        ]);
+        s.lakehouse_snapshots.write().unwrap().extend([
+            LakehouseSnapshot { tenant: acme.clone(), namespace: "warehouse".into(), table: "orders".into(), snapshot_id: 1001, committed_unix: 1_002_500, op: "Append", added_files: 12 },
+            LakehouseSnapshot { tenant: acme.clone(), namespace: "warehouse".into(), table: "orders".into(), snapshot_id: 1000, committed_unix: 1_002_300, op: "Overwrite", added_files: 4_320 },
+            LakehouseSnapshot { tenant: evil.clone(), namespace: "secrets".into(), table: "tokens".into(), snapshot_id: 9001, committed_unix: 999_999, op: "Append", added_files: 4 },
+        ]);
+        s.streams_topics.write().unwrap().extend([
+            StreamsTopic { tenant: acme.clone(), name: "orders".into(), partitions: 12, replication_factor: 3, retention_ms: 604_800_000, compaction: "Delete" },
+            StreamsTopic { tenant: acme.clone(), name: "events".into(), partitions: 24, replication_factor: 3, retention_ms: 86_400_000, compaction: "Compact" },
+            StreamsTopic { tenant: evil.clone(), name: "evil-topic".into(), partitions: 1, replication_factor: 1, retention_ms: 3_600_000, compaction: "Delete" },
+        ]);
+        s.streams_consumer_groups.write().unwrap().extend([
+            StreamsConsumerGroup { tenant: acme.clone(), group_id: "orders-consumer".into(), topic: "orders".into(), members: 4, current_offset: 9_500, log_end_offset: 10_000, state: "Stable" },
+            StreamsConsumerGroup { tenant: acme, group_id: "events-consumer".into(), topic: "events".into(), members: 2, current_offset: 5_000, log_end_offset: 50_000, state: "Rebalancing" },
+            StreamsConsumerGroup { tenant: evil, group_id: "evil-consumer".into(), topic: "evil-topic".into(), members: 1, current_offset: 0, log_end_offset: 0, state: "Empty" },
         ]);
         s
     }

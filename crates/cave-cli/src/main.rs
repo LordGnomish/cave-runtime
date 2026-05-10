@@ -91,6 +91,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: PgCmd,
     },
+    /// RDBMS operator (CloudNativePG cluster lifecycle: list/failover/scale/backup)
+    Rdbms {
+        #[command(subcommand)]
+        cmd: RdbmsCmd,
+    },
     /// Document database (MongoDB-compatible) management
     Docdb {
         #[command(subcommand)]
@@ -663,6 +668,40 @@ enum KedaCmd {
     ScalerStats {
         /// ScaledObject name
         name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum RdbmsCmd {
+    /// List managed Postgres clusters in the active tenant
+    #[command(name = "cluster-list")]
+    ClusterList,
+    /// Inspect a single cluster (instances, primary, replication state, lag)
+    #[command(name = "cluster-get")]
+    ClusterGet {
+        /// Cluster name
+        name: String,
+    },
+    /// Detailed status incl. backups, lag, primary pod, version
+    #[command(name = "cluster-describe")]
+    ClusterDescribe {
+        /// Cluster name
+        name: String,
+    },
+    /// Trigger a manual failover (promotes a replica to primary)
+    #[command(name = "cluster-failover")]
+    ClusterFailover {
+        /// Cluster name
+        name: String,
+    },
+    /// Scale a cluster to N instances (≥1)
+    #[command(name = "cluster-scale")]
+    ClusterScale {
+        /// Cluster name
+        name: String,
+        /// Desired instance count
+        #[arg(long)]
+        instances: u32,
     },
 }
 
@@ -2143,6 +2182,45 @@ async fn run(cli: Cli) -> Result<()> {
             PgCmd::Queries => c.get("/api/pg/queries").await,
             PgCmd::Backup { database } => {
                 c.post("/api/pg/backup", json!({ "database": database })).await
+            }
+        },
+
+        // ── Rdbms (rdbms-operator: cluster lifecycle) ─────────────────────────
+        Commands::Rdbms { cmd } => match cmd {
+            RdbmsCmd::ClusterList => c.get("/api/rdbms-operator/clusters").await,
+            RdbmsCmd::ClusterGet { name } => {
+                c.get(&format!(
+                    "/api/rdbms-operator/clusters/{}",
+                    urlencode(&name)
+                ))
+                .await
+            }
+            RdbmsCmd::ClusterDescribe { name } => {
+                c.get(&format!(
+                    "/api/rdbms-operator/clusters/{}/describe",
+                    urlencode(&name)
+                ))
+                .await
+            }
+            RdbmsCmd::ClusterFailover { name } => {
+                c.post(
+                    &format!(
+                        "/api/rdbms-operator/clusters/{}/failover",
+                        urlencode(&name)
+                    ),
+                    json!({}),
+                )
+                .await
+            }
+            RdbmsCmd::ClusterScale { name, instances } => {
+                c.post(
+                    &format!(
+                        "/api/rdbms-operator/clusters/{}/scale",
+                        urlencode(&name)
+                    ),
+                    json!({ "instances": instances }),
+                )
+                .await
             }
         },
 
