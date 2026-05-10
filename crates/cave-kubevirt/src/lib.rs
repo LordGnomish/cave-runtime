@@ -3,21 +3,29 @@
 //! Upstream: kubevirt/kubevirt v1.8.2
 //!
 //! Modules:
-//!   models     — VirtualMachine / VirtualMachineInstance / DataVolume CRDs
-//!   store      — In-memory store (RwLock) for the scaffold; real persistence pending
-//!   lifecycle  — RunStrategy → desired phase decision; full reconcile pending
+//!   models      — VirtualMachine / VirtualMachineInstance / DataVolume CRDs
+//!   store       — In-memory store (RwLock) for the scaffold; real persistence pending
+//!   lifecycle   — RunStrategy → desired phase decision; full reconcile pending
 //!
 //! 4-track status (honest):
-//!   Backend   1/4 — this scaffold
-//!   Portal    0/4 — admin page not yet wired
-//!   cavectl   0/4 — `cavectl kubevirt` not yet wired
-//!   Observ.   0/4 — alerts + dashboard not yet authored
+//!   Backend    1/4 — this scaffold
+//!   Portal     0/4 — admin page not yet wired
+//!   cavectl    0/4 — `cavectl kubevirt` not yet wired
+//!   Observ.    0/4 — alerts + dashboard not yet authored
 
+/// Re-export the `lifecycle` module for public access.
 pub mod lifecycle;
+
+/// Re-export the `models` module containing CRD structs.
 pub mod models;
+
+/// Re-export the `store` module for in-memory state management.
 pub mod store;
 
+/// Re-export the `desired_phase` function from the lifecycle module.
 pub use lifecycle::desired_phase;
+
+/// Re-export core model structs from the models module.
 pub use models::{
     Condition, DataVolume, DataVolumeSource, DataVolumeSpec, DataVolumeStatus,
     DataVolumeTemplate, Domain, DomainCpu, DomainMemory, Firmware, HugepagesSpec, InstancetypeRef,
@@ -25,10 +33,17 @@ pub use models::{
     VirtualMachineInstance, VirtualMachineInstanceSpec, VirtualMachineInstanceStatus,
     VirtualMachineInstanceTemplateSpec, VirtualMachineSpec, VirtualMachineStatus, VmPhase, Volume,
 };
+
+/// Re-export the `Store` type from the store module.
 pub use store::Store;
 
+/// The name of this module/crate.
 pub const MODULE_NAME: &str = "cave-kubevirt";
+
+/// The upstream KubeVirt repository identifier.
 pub const UPSTREAM_REPO: &str = "kubevirt/kubevirt";
+
+/// The upstream KubeVirt version string.
 pub const UPSTREAM_VERSION: &str = "v1.8.2";
 
 #[cfg(test)]
