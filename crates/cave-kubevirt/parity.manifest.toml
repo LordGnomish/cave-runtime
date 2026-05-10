@@ -41,3 +41,65 @@ target_tests = 30        # qwen-pump B-prime target
 # kind          = "subresource"
 # upstream_path = "/apis/subresources.kubevirt.io/v1/.../virtualmachineinstances/{name}/console"
 # local_path    = "/api/kubevirt/vmi/{name}/console"
+
+# Qwen-pump B-prime cycle 1778430896 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_constant_20231027120001"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_repo_constant_20231027120002"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_version_constant_20231027120003"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_store_creation_20231027120004"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_vm_phase_enum_variants_20231027120005"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_run_strategy_enum_variants_20231027120006"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_spec_structure_20231027120007"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_structure_20231027120008"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_data_volume_structure_20231027120009"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_domain_structure_20231027120010"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_desired_phase_function_signature_20231027120011"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_condition_structure_20231027120012"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_volume_structure_20231027120013"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_network_structure_20231027120014"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_instancetype_ref_structure_20231027120015"
