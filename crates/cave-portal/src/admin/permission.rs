@@ -79,6 +79,12 @@ pub enum Permission {
     LakehouseSnapshot,
     StreamsRead,
     StreamsAdmin,
+
+    // ── 2026-05-10 batch C: charter compliance dashboard ──────────────
+    /// View the per-crate Charter compliance matrix.
+    AdminComplianceView,
+    /// Trigger a manual refresh of the compliance snapshot.
+    AdminComplianceRefresh,
 }
 
 impl Permission {
@@ -123,6 +129,8 @@ impl Permission {
             Permission::LakehouseSnapshot => "lakehouse.snapshot.write",
             Permission::StreamsRead => "streams.topic.read",
             Permission::StreamsAdmin => "streams.topic.admin",
+            Permission::AdminComplianceView => "admin.compliance.view",
+            Permission::AdminComplianceRefresh => "admin.compliance.refresh",
         }
     }
 }
