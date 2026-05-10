@@ -290,6 +290,46 @@ enum Commands {
         #[command(subcommand)]
         cmd: KedaCmd,
     },
+    /// HashiCorp Vault parity — secret backends + audit
+    Vault {
+        #[command(subcommand)]
+        cmd: VaultCmd,
+    },
+    /// Istio Ambient service-mesh — sidecar-less L4/L7
+    Mesh {
+        #[command(subcommand)]
+        cmd: MeshCmd,
+    },
+    /// Kamaji tenant control plane operator
+    Kamaji {
+        #[command(subcommand)]
+        cmd: KamajiCmd,
+    },
+    /// Backstage permission framework — RBAC for portal views
+    Permission {
+        #[command(subcommand)]
+        cmd: PermissionCmd,
+    },
+    /// Charter compliance + audit
+    Compliance {
+        #[command(subcommand)]
+        cmd: ComplianceCmd,
+    },
+    /// Cluster lifecycle (Kamaji-backed kube clusters)
+    Cluster {
+        #[command(subcommand)]
+        cmd: ClusterCmd,
+    },
+    /// kube-proxy iptables/IPVS dataplane introspection
+    KubeProxy {
+        #[command(subcommand)]
+        cmd: KubeProxyCmd,
+    },
+    /// Tracing pipeline (Tempo/Jaeger parity)
+    Tracing {
+        #[command(subcommand)]
+        cmd: TracingCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -609,6 +649,108 @@ enum GraviteeCmd {
     Subscriptions,
     /// List Portal-visible (Public + Published) APIs
     Portal,
+}
+
+#[derive(Subcommand)]
+enum VaultCmd {
+    /// List secret backends (kv, pki, transit, ...)
+    Backends,
+    /// List secret paths under a backend
+    List { backend: String },
+    /// Read metadata (no secret value) for a path
+    Meta { backend: String, path: String },
+    /// Show recent audit entries
+    Audit { #[arg(long, default_value = "100")] limit: u32 },
+    /// Seal/unseal status
+    Status,
+}
+
+#[derive(Subcommand)]
+enum MeshCmd {
+    /// List AuthorizationPolicy resources
+    Policies,
+    /// Inspect one AuthorizationPolicy
+    Get { name: String },
+    /// Show recent flow log entries
+    Flows { #[arg(long, default_value = "100")] limit: u32 },
+    /// Show waypoint proxy status
+    Waypoints,
+    /// Show mTLS peer identity stats
+    Peers,
+}
+
+#[derive(Subcommand)]
+enum KamajiCmd {
+    /// List TenantControlPlanes
+    #[command(name = "tcp-list")]
+    TcpList,
+    /// Inspect a single TCP (replicas, version, endpoint)
+    #[command(name = "tcp-get")]
+    TcpGet { name: String },
+    /// Scale a TCP to N replicas
+    #[command(name = "tcp-scale")]
+    TcpScale { name: String, #[arg(long)] replicas: u32 },
+    /// Show TCP version upgrade plan
+    #[command(name = "tcp-upgrade-plan")]
+    TcpUpgradePlan { name: String, #[arg(long)] target_version: String },
+}
+
+#[derive(Subcommand)]
+enum PermissionCmd {
+    /// List subjects (users + groups + service accounts)
+    Subjects,
+    /// List role assignments
+    Assignments,
+    /// Check a single (principal, permission) decision
+    Check { principal: String, permission: String },
+    /// List supported permission names
+    Catalog,
+}
+
+#[derive(Subcommand)]
+enum ComplianceCmd {
+    /// Per-crate compliance snapshot
+    Snapshot,
+    /// Trigger a refresh of the snapshot cache (no-op if no cache)
+    Refresh,
+    /// Aggregate score + grade letter
+    Score,
+}
+
+#[derive(Subcommand)]
+enum ClusterCmd {
+    /// List managed kube clusters
+    List,
+    /// Inspect a single cluster (version, nodes, control-plane health)
+    Get { name: String },
+    /// Show node list for a cluster
+    Nodes { name: String },
+    /// Trigger an upgrade plan
+    Upgrade { name: String, #[arg(long)] target_version: String },
+}
+
+#[derive(Subcommand)]
+enum KubeProxyCmd {
+    /// Show dataplane mode (iptables / ipvs / nftables)
+    Mode,
+    /// List service → backend mappings on this node
+    Services,
+    /// Show sync statistics
+    SyncStats,
+    /// Show recent error events
+    Errors,
+}
+
+#[derive(Subcommand)]
+enum TracingCmd {
+    /// Show trace ingest rate + drop counters
+    Stats,
+    /// List recent service-graph nodes
+    Services,
+    /// Look up a single trace by id
+    Trace { trace_id: String },
+    /// Show retention policy + storage backend status
+    Retention,
 }
 
 #[derive(Subcommand)]
@@ -3153,6 +3295,112 @@ source_root = "src"
         },
 
         // ── keda (event-driven autoscaler) ────────────────────────────────────
+        // ── Vault ─────────────────────────────────────────────────────────────
+        Commands::Vault { cmd } => match cmd {
+            VaultCmd::Backends => c.get("/api/vault/backends").await,
+            VaultCmd::List { backend } => {
+                c.get(&format!("/api/vault/backends/{}/paths", urlencode(&backend))).await
+            }
+            VaultCmd::Meta { backend, path } => {
+                c.get(&format!(
+                    "/api/vault/backends/{}/paths/{}",
+                    urlencode(&backend),
+                    urlencode(&path)
+                ))
+                .await
+            }
+            VaultCmd::Audit { limit } => c.get(&format!("/api/vault/audit?limit={limit}")).await,
+            VaultCmd::Status => c.get("/api/vault/status").await,
+        },
+
+        // ── Mesh ──────────────────────────────────────────────────────────────
+        Commands::Mesh { cmd } => match cmd {
+            MeshCmd::Policies => c.get("/api/mesh/authz").await,
+            MeshCmd::Get { name } => c.get(&format!("/api/mesh/authz/{}", urlencode(&name))).await,
+            MeshCmd::Flows { limit } => c.get(&format!("/api/mesh/flows?limit={limit}")).await,
+            MeshCmd::Waypoints => c.get("/api/mesh/waypoints").await,
+            MeshCmd::Peers => c.get("/api/mesh/peers").await,
+        },
+
+        // ── Kamaji ────────────────────────────────────────────────────────────
+        Commands::Kamaji { cmd } => match cmd {
+            KamajiCmd::TcpList => c.get("/api/kamaji/tcps").await,
+            KamajiCmd::TcpGet { name } => {
+                c.get(&format!("/api/kamaji/tcps/{}", urlencode(&name))).await
+            }
+            KamajiCmd::TcpScale { name, replicas } => {
+                c.post(
+                    &format!("/api/kamaji/tcps/{}/scale", urlencode(&name)),
+                    json!({ "replicas": replicas }),
+                )
+                .await
+            }
+            KamajiCmd::TcpUpgradePlan { name, target_version } => {
+                c.post(
+                    &format!("/api/kamaji/tcps/{}/upgrade-plan", urlencode(&name)),
+                    json!({ "target_version": target_version }),
+                )
+                .await
+            }
+        },
+
+        // ── Permission ────────────────────────────────────────────────────────
+        Commands::Permission { cmd } => match cmd {
+            PermissionCmd::Subjects => c.get("/api/permission/subjects").await,
+            PermissionCmd::Assignments => c.get("/api/permission/assignments").await,
+            PermissionCmd::Check { principal, permission } => {
+                c.post(
+                    "/api/permission/check",
+                    json!({ "principal": principal, "permission": permission }),
+                )
+                .await
+            }
+            PermissionCmd::Catalog => c.get("/api/permission/catalog").await,
+        },
+
+        // ── Compliance ────────────────────────────────────────────────────────
+        Commands::Compliance { cmd } => match cmd {
+            ComplianceCmd::Snapshot => c.get("/api/compliance/snapshot").await,
+            ComplianceCmd::Refresh => c.post("/api/compliance/refresh", json!({})).await,
+            ComplianceCmd::Score => c.get("/api/compliance/score").await,
+        },
+
+        // ── Cluster ───────────────────────────────────────────────────────────
+        Commands::Cluster { cmd } => match cmd {
+            ClusterCmd::List => c.get("/api/cluster/clusters").await,
+            ClusterCmd::Get { name } => {
+                c.get(&format!("/api/cluster/clusters/{}", urlencode(&name))).await
+            }
+            ClusterCmd::Nodes { name } => {
+                c.get(&format!("/api/cluster/clusters/{}/nodes", urlencode(&name))).await
+            }
+            ClusterCmd::Upgrade { name, target_version } => {
+                c.post(
+                    &format!("/api/cluster/clusters/{}/upgrade", urlencode(&name)),
+                    json!({ "target_version": target_version }),
+                )
+                .await
+            }
+        },
+
+        // ── KubeProxy ─────────────────────────────────────────────────────────
+        Commands::KubeProxy { cmd } => match cmd {
+            KubeProxyCmd::Mode => c.get("/api/kube-proxy/mode").await,
+            KubeProxyCmd::Services => c.get("/api/kube-proxy/services").await,
+            KubeProxyCmd::SyncStats => c.get("/api/kube-proxy/sync-stats").await,
+            KubeProxyCmd::Errors => c.get("/api/kube-proxy/errors").await,
+        },
+
+        // ── Tracing ───────────────────────────────────────────────────────────
+        Commands::Tracing { cmd } => match cmd {
+            TracingCmd::Stats => c.get("/api/tracing/stats").await,
+            TracingCmd::Services => c.get("/api/tracing/services").await,
+            TracingCmd::Trace { trace_id } => {
+                c.get(&format!("/api/tracing/traces/{}", urlencode(&trace_id))).await
+            }
+            TracingCmd::Retention => c.get("/api/tracing/retention").await,
+        },
+
         Commands::Keda { cmd } => match cmd {
             KedaCmd::ScaledObjects => c.get("/api/keda/scaledobjects").await,
             KedaCmd::Get { name } => {
