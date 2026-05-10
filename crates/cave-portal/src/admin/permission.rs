@@ -85,6 +85,22 @@ pub enum Permission {
     AdminComplianceView,
     /// Trigger a manual refresh of the compliance snapshot.
     AdminComplianceRefresh,
+
+    // ── 2026-05-10 batch D: tier1 admin pages ─────────────────────────
+    PolicyRead,
+    PolicyWrite,
+    ArtifactsRead,
+    AlertsRead,
+    AlertsAck,
+    BackupRead,
+    BackupTrigger,
+    IncidentsRead,
+    IncidentsWrite,
+    VulnsRead,
+    WorkflowsRead,
+    ChaosRead,
+    ChaosTrigger,
+    SloRead,
 }
 
 impl Permission {
@@ -131,6 +147,20 @@ impl Permission {
             Permission::StreamsAdmin => "streams.topic.admin",
             Permission::AdminComplianceView => "admin.compliance.view",
             Permission::AdminComplianceRefresh => "admin.compliance.refresh",
+            Permission::PolicyRead => "policy.rule.read",
+            Permission::PolicyWrite => "policy.rule.write",
+            Permission::ArtifactsRead => "artifacts.record.read",
+            Permission::AlertsRead => "alerts.rule.read",
+            Permission::AlertsAck => "alerts.rule.ack",
+            Permission::BackupRead => "backup.job.read",
+            Permission::BackupTrigger => "backup.job.trigger",
+            Permission::IncidentsRead => "incidents.record.read",
+            Permission::IncidentsWrite => "incidents.record.write",
+            Permission::VulnsRead => "vulns.record.read",
+            Permission::WorkflowsRead => "workflows.run.read",
+            Permission::ChaosRead => "chaos.experiment.read",
+            Permission::ChaosTrigger => "chaos.experiment.trigger",
+            Permission::SloRead => "slo.objective.read",
         }
     }
 }
