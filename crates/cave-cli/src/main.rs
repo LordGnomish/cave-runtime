@@ -640,6 +640,30 @@ enum KedaCmd {
         /// ScaledObject name
         name: String,
     },
+    /// List TriggerAuthentication resources in the active tenant
+    #[command(name = "triggerauth-list")]
+    TriggerAuthList,
+    /// Inspect a single TriggerAuthentication (kind, secrets, env mappings)
+    #[command(name = "triggerauth-get")]
+    TriggerAuthGet {
+        /// TriggerAuthentication name
+        name: String,
+    },
+    /// List ScaledJobs in the active tenant
+    #[command(name = "scaledjob-list")]
+    ScaledJobList,
+    /// Inspect a single ScaledJob (parallelism, completions, last run)
+    #[command(name = "scaledjob-get")]
+    ScaledJobGet {
+        /// ScaledJob name
+        name: String,
+    },
+    /// Show per-scaler activity / latency stats for one ScaledObject
+    #[command(name = "scaler-stats")]
+    ScalerStats {
+        /// ScaledObject name
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3079,6 +3103,21 @@ source_root = "src"
                     &format!("/api/keda/scaledobjects/{}/resume", urlencode(&name)),
                     json!({}),
                 )
+                .await
+            }
+            KedaCmd::TriggerAuthList => c.get("/api/keda/triggerauth").await,
+            KedaCmd::TriggerAuthGet { name } => {
+                c.get(&format!("/api/keda/triggerauth/{}", urlencode(&name))).await
+            }
+            KedaCmd::ScaledJobList => c.get("/api/keda/scaledjobs").await,
+            KedaCmd::ScaledJobGet { name } => {
+                c.get(&format!("/api/keda/scaledjobs/{}", urlencode(&name))).await
+            }
+            KedaCmd::ScalerStats { name } => {
+                c.get(&format!(
+                    "/api/keda/scaledobjects/{}/scaler-stats",
+                    urlencode(&name)
+                ))
                 .await
             }
         },
