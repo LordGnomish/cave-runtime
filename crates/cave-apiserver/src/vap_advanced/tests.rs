@@ -938,84 +938,84 @@ fn plugin_integrates_with_admission_chain() {
 // `apiserver/pkg/admission/plugin/policy/validating/*_integration_test.go`.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore] // TODO(KEP-3488 M1.5): port cel-go evaluator
+#[test] #[cfg(feature = "live-integration")] // TODO(KEP-3488 M1.5): port cel-go evaluator
 fn cel_self_dot_metadata_name_present() {
     // Upstream: `validating_test.go::TestValidate_Self_MetadataName`
     let _e: Box<dyn CelEvaluator> = Box::new(PanicEvaluator);
     // pending: requires real CEL — expression `object.metadata.name == 'allowed'`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_has_macro_on_optional_field() {
     // pending: requires real CEL — `has(object.spec.foo)`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_string_lib_starts_with() {
     // pending: requires real CEL — `object.metadata.name.startsWith('foo-')`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_string_lib_ends_with() {
     // pending: requires real CEL — `object.metadata.name.endsWith('-bar')`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_quantity_compare_milli() {
     // pending: requires real CEL+quantity lib — `quantity('100m') < quantity('1')`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_url_parse_lib() {
     // pending: requires real CEL+url lib — `url('https://x').getHost() == 'x'`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_regex_match() {
     // pending: requires real CEL — `'foo123'.matches('^foo[0-9]+$')`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_authz_check_kind_resource() {
     // pending: requires authorizer activation — `authorizer.group('').resource('pods').check('list').allowed()`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_message_expression_overrides_message() {
     // pending: requires CEL — messageExpression returns string overriding `message`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_variable_reference_other_variable() {
     // pending: requires CEL — `variables.x` reference inside another variable
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_param_array_index() {
     // pending: requires CEL — `params[0].x == 1` after multi-param resolution
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_namespace_object_labels() {
     // pending: requires CEL — `namespaceObject.metadata.labels['team']`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_old_object_diff() {
     // pending: requires CEL — `oldObject.spec.replicas != object.spec.replicas`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_audit_annotation_emission() {
     // pending: M4 hand-off — auditAnnotation produces an audit field on the response
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_message_too_long_truncates() {
     // pending: requires CEL — message longer than 12kB is truncated to 12kB
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_runtime_cost_budget_exceeded_is_error() {
     // pending: requires CEL+cost budget — runtime cost > 1e6 yields an error
 }

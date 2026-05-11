@@ -34,3 +34,6 @@ base64 = "0.22"
 
 [dev-dependencies]
 reqwest = { workspace = true }
+
+[features]
+live-integration = []

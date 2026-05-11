@@ -445,22 +445,22 @@ fn conversion_struct_roundtrip_webhook() {
 // `#[ignore]` — gated on real HTTP layer + ConversionReview body parser
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn webhook_real_https_round_trip() {
     // pending: requires real TLS dial against fixture conversion server
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn conversion_review_v1_body_parser() {
     // pending: requires apiextensions.k8s.io/v1.ConversionReview body parsing
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn conversion_review_v1beta1_compat() {
     // pending: requires v1beta1 conversion review shim
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn hub_spoke_chains_three_versions() {
     // pending: requires explicit hub/spoke routing — convert v1alpha1 → v1beta1 → v1 in two steps
 }

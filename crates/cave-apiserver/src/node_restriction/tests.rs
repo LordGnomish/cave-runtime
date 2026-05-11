@@ -147,12 +147,12 @@ fn nr_pod_create_for_unowned_pod_denied() {
     assert!(!nr.validate(&r).allowed);
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn nr_pod_status_only_allowed_on_own_pods() {
     // pending: requires subresource (status) modelling on AdmissionRequest
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn nr_pod_eviction_subresource() {
     // pending: requires subresource (eviction) modelling — kubelet evict-self
 }
