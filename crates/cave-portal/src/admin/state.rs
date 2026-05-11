@@ -475,6 +475,117 @@ pub struct Slo {
     pub error_budget_remaining_pct: f32,
 }
 
+// ── cave-deploy ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DeployActivity {
+    pub tenant: TenantId,
+    pub id: String,
+    pub service: String,
+    pub version: String,
+    pub status: &'static str,
+}
+
+// ── cave-pipelines ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PipelineRun {
+    pub tenant: TenantId,
+    pub pipeline: String,
+    pub run_id: String,
+    pub status: &'static str,
+    pub duration_seconds: u32,
+}
+
+// ── cave-rollouts ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RolloutStatus {
+    pub tenant: TenantId,
+    pub name: String,
+    pub strategy: &'static str,
+    pub traffic_pct: u32,
+    pub state: &'static str,
+}
+
+// ── cave-knative ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KnativeService {
+    pub tenant: TenantId,
+    pub name: String,
+    pub image: String,
+    pub replicas: u32,
+    pub min_scale: u32,
+    pub max_scale: u32,
+}
+
+// ── cave-llm-gateway ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LlmRoute {
+    pub tenant: TenantId,
+    pub name: String,
+    pub upstream: String,
+    pub rpm_limit: u32,
+    pub daily_tokens: u64,
+}
+
+// ── cave-local-llm ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalLlmModel {
+    pub tenant: TenantId,
+    pub tag: String,
+    pub size_bytes: u64,
+    pub quant: String,
+    pub loaded: bool,
+}
+
+// ── cave-tracker ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrackerIssue {
+    pub tenant: TenantId,
+    pub id: String,
+    pub title: String,
+    pub state: &'static str,
+    pub assignee: Option<String>,
+}
+
+// ── cave-upstream ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpstreamProject {
+    pub tenant: TenantId,
+    pub name: String,
+    pub repo: String,
+    pub pinned_version: String,
+    pub last_check_unix: i64,
+}
+
+// ── cave-container-scan ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ContainerScanResult {
+    pub tenant: TenantId,
+    pub image: String,
+    pub digest: String,
+    pub critical_cves: u32,
+    pub scanned_at_unix: i64,
+}
+
+// ── cave-admission ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmissionDecision {
+    pub tenant: TenantId,
+    pub id: String,
+    pub resource_kind: String,
+    pub decision: &'static str,
+    pub reason: String,
+}
+
 // ── cave-store ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -832,6 +943,16 @@ pub struct AdminState {
     pub security_events: RwLock<Vec<SecurityEvent>>,
     pub ha_failover_events: RwLock<Vec<HaFailoverEvent>>,
     pub erp_invoices: RwLock<Vec<ErpInvoice>>,
+    pub deploy_activities: RwLock<Vec<DeployActivity>>,
+    pub pipeline_runs: RwLock<Vec<PipelineRun>>,
+    pub rollout_statuses: RwLock<Vec<RolloutStatus>>,
+    pub knative_services: RwLock<Vec<KnativeService>>,
+    pub llm_routes: RwLock<Vec<LlmRoute>>,
+    pub local_llm_models: RwLock<Vec<LocalLlmModel>>,
+    pub tracker_issues: RwLock<Vec<TrackerIssue>>,
+    pub upstream_projects: RwLock<Vec<UpstreamProject>>,
+    pub container_scan_results: RwLock<Vec<ContainerScanResult>>,
+    pub admission_decisions: RwLock<Vec<AdmissionDecision>>,
 }
 
 impl Default for AdminState {
@@ -913,6 +1034,16 @@ impl AdminState {
             security_events: RwLock::new(Vec::new()),
             ha_failover_events: RwLock::new(Vec::new()),
             erp_invoices: RwLock::new(Vec::new()),
+            deploy_activities: RwLock::new(Vec::new()),
+            pipeline_runs: RwLock::new(Vec::new()),
+            rollout_statuses: RwLock::new(Vec::new()),
+            knative_services: RwLock::new(Vec::new()),
+            llm_routes: RwLock::new(Vec::new()),
+            local_llm_models: RwLock::new(Vec::new()),
+            tracker_issues: RwLock::new(Vec::new()),
+            upstream_projects: RwLock::new(Vec::new()),
+            container_scan_results: RwLock::new(Vec::new()),
+            admission_decisions: RwLock::new(Vec::new()),
         }
     }
 
@@ -1299,8 +1430,58 @@ impl AdminState {
         ]);
         s.erp_invoices.write().unwrap().extend([
             ErpInvoice { tenant: acme.clone(), invoice_id: "INV-001".into(), customer: "ACME-CUST-1".into(), amount_cents: 250000, status: "Paid" },
-            ErpInvoice { tenant: acme, invoice_id: "INV-002".into(), customer: "ACME-CUST-2".into(), amount_cents: 1000000, status: "Open" },
-            ErpInvoice { tenant: evil, invoice_id: "EVIL-INV".into(), customer: "EVIL-C".into(), amount_cents: 1, status: "Void" },
+            ErpInvoice { tenant: acme.clone(), invoice_id: "INV-002".into(), customer: "ACME-CUST-2".into(), amount_cents: 1000000, status: "Open" },
+            ErpInvoice { tenant: evil.clone(), invoice_id: "EVIL-INV".into(), customer: "EVIL-C".into(), amount_cents: 1, status: "Void" },
+        ]);
+        s.deploy_activities.write().unwrap().extend([
+            DeployActivity { tenant: acme.clone(), id: "dep-001".into(), service: "web".into(), version: "v17".into(), status: "Succeeded" },
+            DeployActivity { tenant: acme.clone(), id: "dep-002".into(), service: "api".into(), version: "v3".into(), status: "InProgress" },
+            DeployActivity { tenant: evil.clone(), id: "evil-dep".into(), service: "evil".into(), version: "x".into(), status: "Failed" },
+        ]);
+        s.pipeline_runs.write().unwrap().extend([
+            PipelineRun { tenant: acme.clone(), pipeline: "build-web".into(), run_id: "run-100".into(), status: "Succeeded", duration_seconds: 120 },
+            PipelineRun { tenant: acme.clone(), pipeline: "build-api".into(), run_id: "run-101".into(), status: "Running", duration_seconds: 0 },
+            PipelineRun { tenant: evil.clone(), pipeline: "evil-pl".into(), run_id: "evil-run".into(), status: "Failed", duration_seconds: 1 },
+        ]);
+        s.rollout_statuses.write().unwrap().extend([
+            RolloutStatus { tenant: acme.clone(), name: "web-canary".into(), strategy: "Canary", traffic_pct: 25, state: "Progressing" },
+            RolloutStatus { tenant: acme.clone(), name: "api-blue-green".into(), strategy: "BlueGreen", traffic_pct: 100, state: "Promoted" },
+            RolloutStatus { tenant: evil.clone(), name: "evil-rollout".into(), strategy: "Canary", traffic_pct: 50, state: "Stuck" },
+        ]);
+        s.knative_services.write().unwrap().extend([
+            KnativeService { tenant: acme.clone(), name: "echo-svc".into(), image: "acme/echo:v1".into(), replicas: 2, min_scale: 0, max_scale: 10 },
+            KnativeService { tenant: acme.clone(), name: "sentiment-svc".into(), image: "acme/nlp:v2".into(), replicas: 5, min_scale: 1, max_scale: 20 },
+            KnativeService { tenant: evil.clone(), name: "evil-svc".into(), image: "evil:x".into(), replicas: 1, min_scale: 0, max_scale: 1 },
+        ]);
+        s.llm_routes.write().unwrap().extend([
+            LlmRoute { tenant: acme.clone(), name: "claude-proxy".into(), upstream: "anthropic.com".into(), rpm_limit: 1000, daily_tokens: 5000000 },
+            LlmRoute { tenant: acme.clone(), name: "local-qwen".into(), upstream: "ollama:11434".into(), rpm_limit: 100, daily_tokens: 1000000 },
+            LlmRoute { tenant: evil.clone(), name: "evil-route".into(), upstream: "evil".into(), rpm_limit: 1, daily_tokens: 1 },
+        ]);
+        s.local_llm_models.write().unwrap().extend([
+            LocalLlmModel { tenant: acme.clone(), tag: "qwen3.6:35b-a3b-coding-mxfp8".into(), size_bytes: 22000000000, quant: "mxfp8".into(), loaded: true },
+            LocalLlmModel { tenant: acme.clone(), tag: "llama3:8b-q4".into(), size_bytes: 5000000000, quant: "q4".into(), loaded: false },
+            LocalLlmModel { tenant: evil.clone(), tag: "evil-model".into(), size_bytes: 1, quant: "unknown".into(), loaded: false },
+        ]);
+        s.tracker_issues.write().unwrap().extend([
+            TrackerIssue { tenant: acme.clone(), id: "ISS-100".into(), title: "slow query on orders".into(), state: "Open", assignee: Some("alice@acme".to_string()) },
+            TrackerIssue { tenant: acme.clone(), id: "ISS-101".into(), title: "flaky CI".into(), state: "InProgress", assignee: None },
+            TrackerIssue { tenant: evil.clone(), id: "EVIL-1".into(), title: "evil bug".into(), state: "Open", assignee: None },
+        ]);
+        s.upstream_projects.write().unwrap().extend([
+            UpstreamProject { tenant: acme.clone(), name: "kubernetes".into(), repo: "kubernetes/kubernetes".into(), pinned_version: "v1.31.2".into(), last_check_unix: 1003000 },
+            UpstreamProject { tenant: acme.clone(), name: "istio".into(), repo: "istio/istio".into(), pinned_version: "1.23.0".into(), last_check_unix: 1003100 },
+            UpstreamProject { tenant: evil.clone(), name: "evil-upstream".into(), repo: "evil/evil".into(), pinned_version: "0.0.1".into(), last_check_unix: 999000 },
+        ]);
+        s.container_scan_results.write().unwrap().extend([
+            ContainerScanResult { tenant: acme.clone(), image: "web:v17".into(), digest: "sha256:aaa1".into(), critical_cves: 0, scanned_at_unix: 1003500 },
+            ContainerScanResult { tenant: acme.clone(), image: "api:v3".into(), digest: "sha256:bbb2".into(), critical_cves: 1, scanned_at_unix: 1003600 },
+            ContainerScanResult { tenant: evil.clone(), image: "evil:latest".into(), digest: "sha256:evil".into(), critical_cves: 99, scanned_at_unix: 999000 },
+        ]);
+        s.admission_decisions.write().unwrap().extend([
+            AdmissionDecision { tenant: acme.clone(), id: "dec-1".into(), resource_kind: "Pod".into(), decision: "Allow", reason: "OK".into() },
+            AdmissionDecision { tenant: acme, id: "dec-2".into(), resource_kind: "Deployment".into(), decision: "Deny", reason: "runAsRoot=true".into() },
+            AdmissionDecision { tenant: evil, id: "evil-dec".into(), resource_kind: "Pod".into(), decision: "Allow", reason: "evil".into() },
         ]);
         s
     }
