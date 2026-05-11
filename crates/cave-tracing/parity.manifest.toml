@@ -17,3 +17,6 @@ version = "v2.17.0"
 name        = "cave-tracing"
 description = "Distributed tracing collector — Jaeger v2 reimplementation"
 source_root = "src"
+
+[parity]
+infra_only = true

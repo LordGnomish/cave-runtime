@@ -64,12 +64,13 @@ pub struct CrateCompliance {
     pub infra_only: bool,
 }
 
-/// Crates that are infrastructure tooling, shared primitives, or
-/// runtime support — not Tier-1 upstream-mirror modules. They are
-/// excluded from compliance aggregation because the 4-track contract
-/// does not apply to them. Future work moves this list into each
-/// crate's `parity.manifest.toml` under `[module] infra_only = true`.
-const INFRA_ONLY: &[&str] = &[
+/// Fallback list of crates that are infrastructure tooling, shared
+/// primitives, or runtime support — not Tier-1 upstream-mirror modules.
+/// The source of truth is each crate's `parity.manifest.toml` under
+/// `[parity] infra_only = true`. This list is consulted only when a
+/// manifest is missing or doesn't carry the field, so newly-added infra
+/// crates can opt in declaratively without touching this file.
+const INFRA_ONLY_FALLBACK: &[&str] = &[
     "cave-cli",
     "cave-core",
     "cave-changelog",
@@ -87,24 +88,23 @@ const INFRA_ONLY: &[&str] = &[
     "cave-docs",
     "cave-docs-site",
     "cave-runbook",
-    // 2026-05-11 expansion: shared primitives + tooling crates that
-    // don't ship Portal/cavectl/obs by contract.
-    "cave-lint",      // developer-tool lint runner
-    "cave-pki",       // PKI primitive used by other crates
-    "cave-db",        // shared DB client primitive
-    "cave-acme",      // ACME client primitive (used by cave-certs)
-    "cave-techdocs",  // docs site generator (alongside cave-docs-site)
-    "cave-registry",  // tiny marker crate (13 LOC)
-    "cave-tracing",   // tracing primitive (alongside cave-trace)
-    "cave-sign",      // signing primitive
-    "cave-pii",       // PII redaction primitive
-    "cave-flags",     // feature-flag primitive
-    "cave-status",    // status-aggregator primitive
-    "cave-profiler",  // profiler primitive
+    "cave-lint",
+    "cave-pki",
+    "cave-db",
+    "cave-acme",
+    "cave-techdocs",
+    "cave-registry",
+    "cave-tracing",
+    "cave-sign",
+    "cave-pii",
+    "cave-flags",
+    "cave-status",
+    "cave-profiler",
 ];
 
-pub fn is_infra_only(name: &str) -> bool {
-    INFRA_ONLY.contains(&name)
+/// Fallback predicate used when no manifest declares `[parity] infra_only`.
+pub fn is_infra_only_fallback(name: &str) -> bool {
+    INFRA_ONLY_FALLBACK.contains(&name)
 }
 
 /// Aggregated compliance state for the whole workspace.
@@ -185,36 +185,69 @@ pub fn compute_four_track_score(
     score
 }
 
-/// Parse the `[upstream]` table from a parity manifest. Returns
-/// `(version, org/repo)` if both fields are present. Tolerant of
-/// missing or malformed manifests.
-pub fn parse_parity_manifest(content: &str) -> (Option<String>, Option<String>) {
-    let mut in_upstream = false;
+/// Parsed view of the bits of `parity.manifest.toml` the dashboard cares about.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ParityManifest {
+    pub upstream_version: Option<String>,
+    pub upstream_org_repo: Option<String>,
+    /// `[parity] infra_only = true` — opt-in flag that the crate is
+    /// infrastructure tooling and exempt from the 4-track contract.
+    /// `None` means the field was absent (caller should fall back).
+    pub infra_only: Option<bool>,
+}
+
+/// Parse `[upstream]` and `[parity]` tables from a parity manifest.
+/// Tolerant of missing or malformed manifests — unknown sections are skipped.
+pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
+    let mut section: &str = "";
     let mut org: Option<String> = None;
     let mut repo: Option<String> = None;
     let mut version: Option<String> = None;
+    let mut infra_only: Option<bool> = None;
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            in_upstream = trimmed == "[upstream]";
+        if let Some(rest) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            section = match rest {
+                "upstream" => "upstream",
+                "parity" => "parity",
+                _ => "",
+            };
             continue;
         }
-        if !in_upstream {
-            continue;
-        }
-        if let Some(rest) = trimmed.strip_prefix("version") {
-            version = extract_string_value(rest);
-        } else if let Some(rest) = trimmed.strip_prefix("org") {
-            org = extract_string_value(rest);
-        } else if let Some(rest) = trimmed.strip_prefix("repo") {
-            repo = extract_string_value(rest);
+        match section {
+            "upstream" => {
+                if let Some(rest) = trimmed.strip_prefix("version") {
+                    version = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("org") {
+                    org = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("repo") {
+                    repo = extract_string_value(rest);
+                }
+            }
+            "parity" => {
+                if let Some(rest) = trimmed.strip_prefix("infra_only") {
+                    infra_only = extract_bool_value(rest);
+                }
+            }
+            _ => {}
         }
     }
-    let org_repo = match (org, repo) {
+    let upstream_org_repo = match (org, repo) {
         (Some(o), Some(r)) => Some(format!("{o}/{r}")),
         _ => None,
     };
-    (version, org_repo)
+    ParityManifest {
+        upstream_version: version,
+        upstream_org_repo,
+        infra_only,
+    }
+}
+
+/// Legacy shim: returns the `(version, org/repo)` pair the older callers
+/// were built around. Prefer [`parse_parity_manifest_full`] for new code.
+pub fn parse_parity_manifest(content: &str) -> (Option<String>, Option<String>) {
+    let m = parse_parity_manifest_full(content);
+    (m.upstream_version, m.upstream_org_repo)
 }
 
 fn extract_string_value(rest: &str) -> Option<String> {
@@ -224,6 +257,15 @@ fn extract_string_value(rest: &str) -> Option<String> {
         None
     } else {
         Some(unquoted.to_string())
+    }
+}
+
+fn extract_bool_value(rest: &str) -> Option<bool> {
+    let after_eq = rest.split_once('=')?.1.trim();
+    match after_eq {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
     }
 }
 
@@ -282,12 +324,17 @@ pub fn analyse_crate(
     }
     let src_root = crate_root.join("src");
     let (loc, tests, ignored, unimpl, todos) = scan_backend(&src_root);
-    let manifest = crate_root.join("parity.manifest.toml");
-    let (upstream_version, upstream_org_repo) = if manifest.exists() {
-        parse_parity_manifest(&fs::read_to_string(&manifest).unwrap_or_default())
+    let manifest_path = crate_root.join("parity.manifest.toml");
+    let manifest = if manifest_path.exists() {
+        parse_parity_manifest_full(&fs::read_to_string(&manifest_path).unwrap_or_default())
     } else {
-        (None, None)
+        ParityManifest::default()
     };
+    let upstream_version = manifest.upstream_version.clone();
+    let upstream_org_repo = manifest.upstream_org_repo.clone();
+    let infra_only = manifest
+        .infra_only
+        .unwrap_or_else(|| is_infra_only_fallback(crate_name));
     let short = crate_name.strip_prefix("cave-").unwrap_or(crate_name);
     // Portal admin module name uses snake_case (kebab → underscore).
     let admin_module = short.replace('-', "_");
@@ -332,7 +379,7 @@ pub fn analyse_crate(
         obs_alerts_present,
         obs_dashboard_present,
         four_track_score,
-        infra_only: is_infra_only(crate_name),
+        infra_only,
     })
 }
 
@@ -619,19 +666,97 @@ name = "cave-x"
     }
 
     #[test]
-    fn is_infra_only_recognises_canonical_names() {
+    fn is_infra_only_fallback_recognises_canonical_names() {
         let (_c, _t) = portal_test_ctx!(
             "plugins/tech-insights/src/components/Scorecards/InfraList.tsx",
             "InfraList",
             "acme"
         );
-        assert!(is_infra_only("cave-cli"));
-        assert!(is_infra_only("cave-core"));
-        assert!(is_infra_only("cave-runtime"));
-        assert!(is_infra_only("cave-portal"));
-        assert!(!is_infra_only("cave-keda"));
-        assert!(!is_infra_only("cave-policy"));
-        assert!(!is_infra_only("cave-rdbms-operator"));
+        assert!(is_infra_only_fallback("cave-cli"));
+        assert!(is_infra_only_fallback("cave-core"));
+        assert!(is_infra_only_fallback("cave-runtime"));
+        assert!(is_infra_only_fallback("cave-portal"));
+        assert!(!is_infra_only_fallback("cave-keda"));
+        assert!(!is_infra_only_fallback("cave-policy"));
+        assert!(!is_infra_only_fallback("cave-rdbms-operator"));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_reads_infra_only_flag_true() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraTrue",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org     = "cave-runtime"
+repo    = "cave-runtime"
+version = "v0.1.0"
+
+[module]
+name = "cave-cli"
+
+[parity]
+infra_only = true
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.infra_only, Some(true));
+        assert_eq!(m.upstream_version.as_deref(), Some("v0.1.0"));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_reads_infra_only_flag_false() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraFalse",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org = "redis"
+repo = "redis"
+version = "7.2.0"
+
+[parity]
+infra_only = false
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.infra_only, Some(false));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_omits_infra_only_when_absent() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraAbsent",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org = "redis"
+repo = "redis"
+version = "7.2.0"
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert!(m.infra_only.is_none());
+        assert_eq!(m.upstream_org_repo.as_deref(), Some("redis/redis"));
+    }
+
+    #[test]
+    fn analyse_crate_picks_up_manifest_infra_only_override() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "analyseCrateInfra",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        // cave-cli has [parity] infra_only = true in its manifest.
+        let c = analyse_crate(&workspace, "cave-cli").unwrap();
+        assert!(c.infra_only);
+        // cave-keda is not infra-only (no flag, not in fallback list).
+        let k = analyse_crate(&workspace, "cave-keda").unwrap();
+        assert!(!k.infra_only);
     }
 
     #[test]

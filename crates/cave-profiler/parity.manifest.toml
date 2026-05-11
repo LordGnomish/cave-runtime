@@ -33,3 +33,6 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/profiler/endpoint"
+
+[parity]
+infra_only = true

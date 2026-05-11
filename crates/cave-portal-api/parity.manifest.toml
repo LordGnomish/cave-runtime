@@ -16,3 +16,6 @@ name        = "cave-portal-api"
 description = "Backstage backend API surface — sub-crate of cave-portal"
 source_root = "src"
 parent_module = "cave-portal"
+
+[parity]
+infra_only = true
