@@ -16,6 +16,7 @@ categories = ["api-bindings", "web-programming", "network-programming"]
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+cave-portal = { path = "../cave-portal" }
 cave-upstream = { path = "../cave-upstream" }
 chrono.workspace = true
 prometheus-client.workspace = true
