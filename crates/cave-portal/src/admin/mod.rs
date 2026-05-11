@@ -658,7 +658,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/streams", get(streams_handler))
         .route("/admin/compliance", get(compliance_handler))
         .route("/admin/compliance/refresh", get(compliance_refresh_handler))
-        .route("/admin/compliance/:crate_name", get(compliance_detail_handler))
+        .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))
         .route("/admin/policy", get(policy_handler))
         .route("/admin/artifacts", get(artifacts_handler))
         .route("/admin/alerts", get(alerts_handler))
