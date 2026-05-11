@@ -1,13 +1,13 @@
 //! Parity tests vs. upstream kubernetes-sigs/karpenter v1.12.0.
 //!
-//! All tests are `#[ignore]` until the corresponding upstream behaviour is
+//! All tests are `#[cfg(feature = "live-integration")]` until the corresponding upstream behaviour is
 //! reimplemented. They exist so the compatibility surface is enumerated rather
 //! than silently missing.
 
 use cave_karpenter::*;
 
 #[test]
-#[ignore = "scaffold: NodePool admission validation not yet implemented"]
+#[cfg(feature = "live-integration")]
 fn parity_nodepool_validation_rejects_empty_requirements() {
     // upstream: pkg/apis/v1/nodepool_validation.go
     // expectation: NodePool with no requirements is rejected at admission.
@@ -15,7 +15,7 @@ fn parity_nodepool_validation_rejects_empty_requirements() {
 }
 
 #[test]
-#[ignore = "scaffold: NodeClaim launch / kubelet bootstrap not yet implemented"]
+#[cfg(feature = "live-integration")]
 fn parity_nodeclaim_launch_creates_machine_via_provider() {
     // upstream: pkg/controllers/nodeclaim/lifecycle/launch.go
     // expectation: a non-empty NodeClaim triggers provider.Create() and records
@@ -24,7 +24,7 @@ fn parity_nodeclaim_launch_creates_machine_via_provider() {
 }
 
 #[test]
-#[ignore = "scaffold: disruption / consolidation reconcile not yet implemented"]
+#[cfg(feature = "live-integration")]
 fn parity_consolidation_replaces_underutilised_nodes() {
     // upstream: pkg/controllers/disruption/consolidation.go
     // expectation: when a node is underutilised and a smaller fits, consolidation
@@ -33,7 +33,7 @@ fn parity_consolidation_replaces_underutilised_nodes() {
 }
 
 #[test]
-#[ignore = "scaffold: drift detection not yet implemented"]
+#[cfg(feature = "live-integration")]
 fn parity_drift_detects_nodeclass_change() {
     // upstream: pkg/controllers/disruption/drift.go
     // expectation: NodeClass spec mutation marks existing NodeClaims as Drifted=true.
@@ -41,7 +41,7 @@ fn parity_drift_detects_nodeclass_change() {
 }
 
 #[test]
-#[ignore = "scaffold: scheduler resource fit not yet implemented"]
+#[cfg(feature = "live-integration")]
 fn parity_scheduler_respects_resource_requests() {
     // upstream: pkg/controllers/provisioning/scheduling/scheduler.go
     // expectation: pod with cpu/memory requests larger than any pool's offering

@@ -495,32 +495,32 @@ fn extract_quota_pvc_counts_one() {
 // `#[ignore]` — areas that need richer Resource modelling first.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn lr_pod_aggregates_container_sums() {
     // pending: requires Pod.spec.containers[].resources — Pod-kind LimitRange sums all containers
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn quota_pod_compute_resource_request() {
     // pending: requires Pod.spec.containers[].resources.requests — quota counts cpu/memory totals
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn quota_scope_terminating_filters_pods() {
     // pending: requires Pod.spec.activeDeadlineSeconds — Terminating scope filters
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn quota_scope_best_effort_filters_pods() {
     // pending: requires Pod.spec.containers[].resources — BestEffort scope filters
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn quota_scope_priority_class() {
     // pending: requires Pod.spec.priorityClassName — PriorityClass scope
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn lr_pvc_storage_validation() {
     // pending: requires PVC.spec.resources.requests.storage — storage range enforcement
 }

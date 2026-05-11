@@ -483,17 +483,17 @@ fn reinvocation_default_is_never() {
 // `#[ignore]` — gated on real CEL.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_returns_typed_jsonpatch_array() {
     // pending: requires CEL with `JSONPatch.parse` library
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_apply_configuration_with_object_construction() {
     // pending: requires CEL Object/Map construction
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn reinvocation_if_needed_runs_twice() {
     // pending: requires plugin-level reinvocation pass with object identity tracking
 }

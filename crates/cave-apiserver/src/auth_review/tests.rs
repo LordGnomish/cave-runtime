@@ -328,17 +328,17 @@ fn rules_review_roundtrip() {
 // `#[ignore]` — gated on real authn/authz integration
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn token_review_with_oidc_jwks_verification() {
     // pending: requires JWKS fetch + RS256 verification
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn webhook_authorizer_round_trip() {
     // pending: requires webhook subprovider — `authorization.Webhook`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn rules_review_aggregates_rolebinding_clusterrolebinding() {
     // pending: requires real RBAC ruleresolver — combine RB + CRB rules
 }

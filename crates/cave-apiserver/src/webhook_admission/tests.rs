@@ -781,54 +781,54 @@ fn dispatcher_adapter_deny_translates_to_response() {
 // `#[ignore]` — gated on real TLS / CABundle verification / cel matchConditions.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn real_tls_dial_against_mock_server() {
     // upstream: webhook/integration_test.go::TestAdmissionWebhook_TLS
     // pending: requires real HTTPS server + rustls handshake
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn ca_bundle_pins_self_signed_cert() {
     // pending: requires real X.509 verification — pin the test CA, reject others
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn timeout_seconds_aborts_slow_webhook() {
     // pending: requires async runtime + deadline; FakeWebhookClient is synchronous
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cluster_dns_resolves_service_reference() {
     // pending: requires Service resolver — `kubernetes.default.svc` style
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn match_condition_cel_filters_invocation() {
     // upstream: matchconditions/matcher_test.go
     // pending: requires CEL evaluator (shared with VAP) — `request.userInfo.username == 'x'`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn match_condition_cel_failure_policy_fail() {
     // pending: requires CEL — runtime error in matchCondition + Fail policy
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn match_condition_cel_failure_policy_ignore() {
     // pending: requires CEL — runtime error in matchCondition + Ignore policy
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn audit_annotations_emitted_on_response() {
     // pending: M4 hand-off — audit framework produces annotation map
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn webhook_returns_v1_admission_review() {
     // pending: requires real HTTP body parser for AdmissionReview v1
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn webhook_v1beta1_compatibility() {
     // pending: requires AdmissionReview v1beta1 conversion shim
 }

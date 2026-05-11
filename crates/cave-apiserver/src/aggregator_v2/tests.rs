@@ -286,22 +286,22 @@ fn condition_unknown_carries_reason_and_message() {
 // `#[ignore]` — gated on real network probe / real openapi spec merger
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn real_https_probe_against_fixture_apiservice() {
     // pending: requires fixture HTTPS apiservice + rustls dial
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn openapi_v3_full_spec_merger_with_components_dedup() {
     // pending: requires kube-openapi-style component-table walker + dedup
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn proxy_websocket_upgrade_passthrough() {
     // pending: requires hyper upgrade + websocket frame routing
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn proxy_streams_response_chunked() {
     // pending: requires async streaming wire — hyper / axum integration
 }
