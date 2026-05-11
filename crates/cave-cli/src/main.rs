@@ -425,6 +425,28 @@ enum Commands {
         #[command(subcommand)]
         cmd: UpstreamCmd,
     },
+    /// cave-admission CLI parity
+    Admission { #[command(subcommand)] cmd: AdmissionCmd },
+    /// cave-cdc CLI parity
+    Cdc { #[command(subcommand)] cmd: CdcCmd },
+    /// cave-certs CLI parity
+    Certs { #[command(subcommand)] cmd: CertsCmd },
+    /// cave-crm CLI parity
+    Crm { #[command(subcommand)] cmd: CrmCmd },
+    /// cave-crossplane CLI parity
+    Crossplane { #[command(subcommand)] cmd: CrossplaneCmd },
+    /// cave-gitops-config CLI parity
+    GitopsConfig { #[command(subcommand)] cmd: GitopsCmd },
+    /// cave-karpenter CLI parity
+    Karpenter { #[command(subcommand)] cmd: KarpenterCmd },
+    /// cave-kubevirt CLI parity
+    Kubevirt { #[command(subcommand)] cmd: KubevirtCmd },
+    /// cave-ledger CLI parity
+    Ledger { #[command(subcommand)] cmd: LedgerCmd },
+    /// cave-oncall CLI parity
+    Oncall { #[command(subcommand)] cmd: OncallCmd },
+    /// cave-search CLI parity
+    Search { #[command(subcommand)] cmd: SearchCmd },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
@@ -485,6 +507,18 @@ enum TrackerCmd { Issues, Create, Transition }
 
 #[derive(Subcommand)]
 enum UpstreamCmd { List, Check, Bump }
+
+#[derive(Subcommand)] enum AdmissionCmd { Decisions, Policies, Audit }
+#[derive(Subcommand)] enum CdcCmd { Pipelines, Lag, Snapshot }
+#[derive(Subcommand)] enum CertsCmd { List, Issue, Renew }
+#[derive(Subcommand)] enum CrmCmd { Accounts, Contacts, Opportunities }
+#[derive(Subcommand)] enum CrossplaneCmd { Claims, Compositions, Providers }
+#[derive(Subcommand)] enum GitopsCmd { Apps, Sync, Diff }
+#[derive(Subcommand)] enum KarpenterCmd { Nodepools, Nodeclaims, Drift }
+#[derive(Subcommand)] enum KubevirtCmd { Vms, Vmis, Migrate }
+#[derive(Subcommand)] enum LedgerCmd { Entries, Verify, Export }
+#[derive(Subcommand)] enum OncallCmd { Shifts, Rotations, Incidents }
+#[derive(Subcommand)] enum SearchCmd { Indexes, Query, Reindex }
 
 #[derive(Subcommand)]
 enum FlagsCmd {
@@ -3649,6 +3683,61 @@ source_root = "src"
             UpstreamCmd::List => c.get("/api/upstream/list").await,
             UpstreamCmd::Check => c.post("/api/upstream/check", json!({})).await,
             UpstreamCmd::Bump => c.post("/api/upstream/bump", json!({})).await,
+        },
+        Commands::Admission { cmd } => match cmd {
+            AdmissionCmd::Decisions => c.get("/api/admission/decisions").await,
+            AdmissionCmd::Policies => c.get("/api/admission/policies").await,
+            AdmissionCmd::Audit => c.get("/api/admission/audit").await,
+        },
+        Commands::Cdc { cmd } => match cmd {
+            CdcCmd::Pipelines => c.get("/api/cdc/pipelines").await,
+            CdcCmd::Lag => c.get("/api/cdc/lag").await,
+            CdcCmd::Snapshot => c.get("/api/cdc/snapshot").await,
+        },
+        Commands::Certs { cmd } => match cmd {
+            CertsCmd::List => c.get("/api/certs/list").await,
+            CertsCmd::Issue => c.get("/api/certs/issue").await,
+            CertsCmd::Renew => c.get("/api/certs/renew").await,
+        },
+        Commands::Crm { cmd } => match cmd {
+            CrmCmd::Accounts => c.get("/api/crm/accounts").await,
+            CrmCmd::Contacts => c.get("/api/crm/contacts").await,
+            CrmCmd::Opportunities => c.get("/api/crm/opportunities").await,
+        },
+        Commands::Crossplane { cmd } => match cmd {
+            CrossplaneCmd::Claims => c.get("/api/crossplane/claims").await,
+            CrossplaneCmd::Compositions => c.get("/api/crossplane/compositions").await,
+            CrossplaneCmd::Providers => c.get("/api/crossplane/providers").await,
+        },
+        Commands::GitopsConfig { cmd } => match cmd {
+            GitopsCmd::Apps => c.get("/api/gitops-config/apps").await,
+            GitopsCmd::Sync => c.get("/api/gitops-config/sync").await,
+            GitopsCmd::Diff => c.get("/api/gitops-config/diff").await,
+        },
+        Commands::Karpenter { cmd } => match cmd {
+            KarpenterCmd::Nodepools => c.get("/api/karpenter/nodepools").await,
+            KarpenterCmd::Nodeclaims => c.get("/api/karpenter/nodeclaims").await,
+            KarpenterCmd::Drift => c.get("/api/karpenter/drift").await,
+        },
+        Commands::Kubevirt { cmd } => match cmd {
+            KubevirtCmd::Vms => c.get("/api/kubevirt/vms").await,
+            KubevirtCmd::Vmis => c.get("/api/kubevirt/vmis").await,
+            KubevirtCmd::Migrate => c.get("/api/kubevirt/migrate").await,
+        },
+        Commands::Ledger { cmd } => match cmd {
+            LedgerCmd::Entries => c.get("/api/ledger/entries").await,
+            LedgerCmd::Verify => c.get("/api/ledger/verify").await,
+            LedgerCmd::Export => c.get("/api/ledger/export").await,
+        },
+        Commands::Oncall { cmd } => match cmd {
+            OncallCmd::Shifts => c.get("/api/oncall/shifts").await,
+            OncallCmd::Rotations => c.get("/api/oncall/rotations").await,
+            OncallCmd::Incidents => c.get("/api/oncall/incidents").await,
+        },
+        Commands::Search { cmd } => match cmd {
+            SearchCmd::Indexes => c.get("/api/search/indexes").await,
+            SearchCmd::Query => c.get("/api/search/query").await,
+            SearchCmd::Reindex => c.get("/api/search/reindex").await,
         },
 
         Commands::Keda { cmd } => match cmd {
