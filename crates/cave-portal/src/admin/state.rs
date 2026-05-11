@@ -475,6 +475,115 @@ pub struct Slo {
     pub error_budget_remaining_pct: f32,
 }
 
+// ── cave-store ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoreBucket {
+    pub tenant: TenantId,
+    pub name: String,
+    pub backend: String,
+    pub object_count: u64,
+    pub size_bytes: u64,
+}
+
+// ── cave-metrics ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MetricSeries {
+    pub tenant: TenantId,
+    pub name: String,
+    pub scraper: String,
+    pub sample_count: u64,
+    pub retention_days: u32,
+}
+
+// ── cave-trace ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TraceService {
+    pub tenant: TenantId,
+    pub service: String,
+    pub span_count_per_sec: u32,
+    pub error_rate_per_thousand: u32,
+}
+
+// ── cave-auth ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthSession {
+    pub tenant: TenantId,
+    pub session_id: String,
+    pub principal: String,
+    pub realm: String,
+    pub expires_unix: i64,
+}
+
+// ── cave-dashboard ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DashboardCatalog {
+    pub tenant: TenantId,
+    pub uid: String,
+    pub title: String,
+    pub folder: String,
+    pub panels: u32,
+}
+
+// ── cave-dns ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DnsZone {
+    pub tenant: TenantId,
+    pub zone: String,
+    pub record_count: u32,
+    pub serial: u64,
+}
+
+// ── cave-logs ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LogStream {
+    pub tenant: TenantId,
+    pub name: String,
+    pub sink: String,
+    pub ingest_rate_per_sec: u32,
+    pub retention_days: u32,
+}
+
+// ── cave-security ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecurityEvent {
+    pub tenant: TenantId,
+    pub id: String,
+    pub kind: String,
+    pub severity: &'static str,
+    pub at_unix: i64,
+}
+
+// ── cave-ha ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HaFailoverEvent {
+    pub tenant: TenantId,
+    pub id: String,
+    pub subject: String,
+    pub old_primary: String,
+    pub new_primary: String,
+    pub at_unix: i64,
+}
+
+// ── cave-erp ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErpInvoice {
+    pub tenant: TenantId,
+    pub invoice_id: String,
+    pub customer: String,
+    pub amount_cents: u64,
+    pub status: &'static str,
+}
+
 // ── cave-ai-obs ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -713,6 +822,16 @@ pub struct AdminState {
     pub uptime_probes: RwLock<Vec<UptimeProbe>>,
     pub kube_clusters: RwLock<Vec<KubeCluster>>,
     pub kube_proxy_services: RwLock<Vec<KubeProxyService>>,
+    pub store_buckets: RwLock<Vec<StoreBucket>>,
+    pub metric_series: RwLock<Vec<MetricSeries>>,
+    pub trace_services: RwLock<Vec<TraceService>>,
+    pub auth_sessions: RwLock<Vec<AuthSession>>,
+    pub dashboard_catalog: RwLock<Vec<DashboardCatalog>>,
+    pub dns_zones: RwLock<Vec<DnsZone>>,
+    pub log_streams: RwLock<Vec<LogStream>>,
+    pub security_events: RwLock<Vec<SecurityEvent>>,
+    pub ha_failover_events: RwLock<Vec<HaFailoverEvent>>,
+    pub erp_invoices: RwLock<Vec<ErpInvoice>>,
 }
 
 impl Default for AdminState {
@@ -784,6 +903,16 @@ impl AdminState {
             uptime_probes: RwLock::new(Vec::new()),
             kube_clusters: RwLock::new(Vec::new()),
             kube_proxy_services: RwLock::new(Vec::new()),
+            store_buckets: RwLock::new(Vec::new()),
+            metric_series: RwLock::new(Vec::new()),
+            trace_services: RwLock::new(Vec::new()),
+            auth_sessions: RwLock::new(Vec::new()),
+            dashboard_catalog: RwLock::new(Vec::new()),
+            dns_zones: RwLock::new(Vec::new()),
+            log_streams: RwLock::new(Vec::new()),
+            security_events: RwLock::new(Vec::new()),
+            ha_failover_events: RwLock::new(Vec::new()),
+            erp_invoices: RwLock::new(Vec::new()),
         }
     }
 
@@ -1120,9 +1249,58 @@ impl AdminState {
             KubeCluster { tenant: evil.clone(), name: "evil-k8s".into(), k8s_version: "1.27.0".into(), nodes: 1, state: "Unknown" },
         ]);
         s.kube_proxy_services.write().unwrap().extend([
-            KubeProxyService { tenant: acme, name: "web".into(), namespace: "default".into(), cluster_ip: "10.96.10.5".into(), backend_count: 3 },
-            KubeProxyService { tenant: TenantId::new("acme").expect("test fixture"), name: "api".into(), namespace: "default".into(), cluster_ip: "10.96.10.6".into(), backend_count: 5 },
-            KubeProxyService { tenant: evil, name: "evil-svc".into(), namespace: "default".into(), cluster_ip: "10.96.99.99".into(), backend_count: 1 },
+            KubeProxyService { tenant: acme.clone(), name: "web".into(), namespace: "default".into(), cluster_ip: "10.96.10.5".into(), backend_count: 3 },
+            KubeProxyService { tenant: acme.clone(), name: "api".into(), namespace: "default".into(), cluster_ip: "10.96.10.6".into(), backend_count: 5 },
+            KubeProxyService { tenant: evil.clone(), name: "evil-svc".into(), namespace: "default".into(), cluster_ip: "10.96.99.99".into(), backend_count: 1 },
+        ]);
+        s.store_buckets.write().unwrap().extend([
+            StoreBucket { tenant: acme.clone(), name: "prod-images".into(), backend: "s3".into(), object_count: 12345, size_bytes: 5368709120 },
+            StoreBucket { tenant: acme.clone(), name: "prod-logs".into(), backend: "s3".into(), object_count: 1000000, size_bytes: 21474836480 },
+            StoreBucket { tenant: evil.clone(), name: "evil-bucket".into(), backend: "s3".into(), object_count: 1, size_bytes: 1 },
+        ]);
+        s.metric_series.write().unwrap().extend([
+            MetricSeries { tenant: acme.clone(), name: "http_requests_total".into(), scraper: "prometheus-prod".into(), sample_count: 1000000000, retention_days: 30 },
+            MetricSeries { tenant: acme.clone(), name: "cpu_seconds_total".into(), scraper: "prometheus-prod".into(), sample_count: 500000000, retention_days: 30 },
+            MetricSeries { tenant: evil.clone(), name: "evil_metric".into(), scraper: "evil-scraper".into(), sample_count: 1, retention_days: 1 },
+        ]);
+        s.trace_services.write().unwrap().extend([
+            TraceService { tenant: acme.clone(), service: "web".into(), span_count_per_sec: 1500, error_rate_per_thousand: 5 },
+            TraceService { tenant: acme.clone(), service: "api".into(), span_count_per_sec: 800, error_rate_per_thousand: 12 },
+            TraceService { tenant: evil.clone(), service: "evil-svc".into(), span_count_per_sec: 1, error_rate_per_thousand: 999 },
+        ]);
+        s.auth_sessions.write().unwrap().extend([
+            AuthSession { tenant: acme.clone(), session_id: "sess-aaa".into(), principal: "alice@acme".into(), realm: "acme-realm".into(), expires_unix: 1010000 },
+            AuthSession { tenant: acme.clone(), session_id: "sess-bbb".into(), principal: "bob@acme".into(), realm: "acme-realm".into(), expires_unix: 1020000 },
+            AuthSession { tenant: evil.clone(), session_id: "sess-evil".into(), principal: "mallory@evil".into(), realm: "evil-realm".into(), expires_unix: 999999 },
+        ]);
+        s.dashboard_catalog.write().unwrap().extend([
+            DashboardCatalog { tenant: acme.clone(), uid: "web-dash".into(), title: "Web Service".into(), folder: "prod".into(), panels: 12 },
+            DashboardCatalog { tenant: acme.clone(), uid: "api-dash".into(), title: "API Service".into(), folder: "prod".into(), panels: 16 },
+            DashboardCatalog { tenant: evil.clone(), uid: "evil-dash".into(), title: "Evil".into(), folder: "evil".into(), panels: 1 },
+        ]);
+        s.dns_zones.write().unwrap().extend([
+            DnsZone { tenant: acme.clone(), zone: "acme.com".into(), record_count: 24, serial: 2026051101 },
+            DnsZone { tenant: acme.clone(), zone: "acme.io".into(), record_count: 12, serial: 2026051102 },
+            DnsZone { tenant: evil.clone(), zone: "evil.com".into(), record_count: 1, serial: 1 },
+        ]);
+        s.log_streams.write().unwrap().extend([
+            LogStream { tenant: acme.clone(), name: "web-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 5000, retention_days: 14 },
+            LogStream { tenant: acme.clone(), name: "api-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 8000, retention_days: 14 },
+            LogStream { tenant: evil.clone(), name: "evil-stream".into(), sink: "evil-sink".into(), ingest_rate_per_sec: 1, retention_days: 1 },
+        ]);
+        s.security_events.write().unwrap().extend([
+            SecurityEvent { tenant: acme.clone(), id: "sec-1".into(), kind: "brute-force-detected".into(), severity: "high", at_unix: 1002000 },
+            SecurityEvent { tenant: acme.clone(), id: "sec-2".into(), kind: "anomalous-egress".into(), severity: "medium", at_unix: 1002500 },
+            SecurityEvent { tenant: evil.clone(), id: "sec-evil".into(), kind: "evil".into(), severity: "info", at_unix: 999000 },
+        ]);
+        s.ha_failover_events.write().unwrap().extend([
+            HaFailoverEvent { tenant: acme.clone(), id: "fo-1".into(), subject: "pg-prod".into(), old_primary: "pg-prod-1".into(), new_primary: "pg-prod-2".into(), at_unix: 1003000 },
+            HaFailoverEvent { tenant: evil.clone(), id: "fo-evil".into(), subject: "evil".into(), old_primary: "e-1".into(), new_primary: "e-2".into(), at_unix: 999000 },
+        ]);
+        s.erp_invoices.write().unwrap().extend([
+            ErpInvoice { tenant: acme.clone(), invoice_id: "INV-001".into(), customer: "ACME-CUST-1".into(), amount_cents: 250000, status: "Paid" },
+            ErpInvoice { tenant: acme, invoice_id: "INV-002".into(), customer: "ACME-CUST-2".into(), amount_cents: 1000000, status: "Open" },
+            ErpInvoice { tenant: evil, invoice_id: "EVIL-INV".into(), customer: "EVIL-C".into(), amount_cents: 1, status: "Void" },
         ]);
         s
     }
