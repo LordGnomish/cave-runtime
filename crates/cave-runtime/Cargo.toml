@@ -142,7 +142,13 @@ chrono = { workspace = true }
 jsonwebtoken = { workspace = true }
 pulldown-cmark = { workspace = true }
 uuid = { workspace = true }
+# Cluster init plumbing
+rcgen = "0.13"
+time = "0.3"
+reqwest = { workspace = true }
+base64 = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true }
 http-body-util = "0.1"
+tempfile = "3"
