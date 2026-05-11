@@ -87,6 +87,20 @@ const INFRA_ONLY: &[&str] = &[
     "cave-docs",
     "cave-docs-site",
     "cave-runbook",
+    // 2026-05-11 expansion: shared primitives + tooling crates that
+    // don't ship Portal/cavectl/obs by contract.
+    "cave-lint",      // developer-tool lint runner
+    "cave-pki",       // PKI primitive used by other crates
+    "cave-db",        // shared DB client primitive
+    "cave-acme",      // ACME client primitive (used by cave-certs)
+    "cave-techdocs",  // docs site generator (alongside cave-docs-site)
+    "cave-registry",  // tiny marker crate (13 LOC)
+    "cave-tracing",   // tracing primitive (alongside cave-trace)
+    "cave-sign",      // signing primitive
+    "cave-pii",       // PII redaction primitive
+    "cave-flags",     // feature-flag primitive
+    "cave-status",    // status-aggregator primitive
+    "cave-profiler",  // profiler primitive
 ];
 
 pub fn is_infra_only(name: &str) -> bool {

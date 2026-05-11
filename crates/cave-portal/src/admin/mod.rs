@@ -18,34 +18,49 @@ pub mod permission;
 pub mod render;
 pub mod state;
 
+pub mod ai_obs;
 pub mod alerts;
 pub mod apiserver;
 pub mod artifacts;
 pub mod backup;
 pub mod cache;
 pub mod chaos;
+pub mod chat;
 pub mod cloud_controller_manager;
+pub mod cluster;
 pub mod compliance;
 pub mod contributions;
 pub mod controller_manager;
+pub mod cost;
 pub mod cri;
+pub mod dast;
+pub mod devlake;
 pub mod docdb;
 pub mod etcd;
+pub mod forensics;
+pub mod gateway;
 pub mod iam;
 pub mod incidents;
+pub mod infra;
 pub mod kamaji;
 pub mod keda;
+pub mod kube_proxy;
 pub mod kubelet;
 pub mod lakehouse;
 pub mod mesh;
 pub mod net;
+pub mod pam;
 pub mod pg;
 pub mod policy;
 pub mod rdbms;
 pub mod rdbms_operator;
+pub mod sbom;
+pub mod scan;
 pub mod scheduler;
+pub mod secrets;
 pub mod slo;
 pub mod streams;
+pub mod uptime;
 pub mod vulns;
 pub mod workflows;
 pub mod tenant_dashboard;
@@ -135,6 +150,21 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::ChaosRead,
         Permission::ChaosTrigger,
         Permission::SloRead,
+        Permission::AiObsRead,
+        Permission::ChatRead,
+        Permission::CostRead,
+        Permission::DastRead,
+        Permission::DevlakeRead,
+        Permission::ForensicsRead,
+        Permission::GatewayRead,
+        Permission::InfraRead,
+        Permission::PamRead,
+        Permission::SbomRead,
+        Permission::ScanRead,
+        Permission::SecretsBrowserRead,
+        Permission::UptimeRead,
+        Permission::ClusterRead,
+        Permission::KubeProxyRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -399,6 +429,22 @@ async fn slo_handler(
     slo::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+async fn ai_obs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ai_obs::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn chat_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); chat::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn cost_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cost::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn dast_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dast::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn devlake_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); devlake::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn forensics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); forensics::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn gateway_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); gateway::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn infra_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); infra::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn pam_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); pam::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn sbom_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); sbom::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); secrets::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn uptime_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); uptime::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn cluster_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cluster::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn kube_proxy_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kube_proxy::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -485,6 +531,21 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/workflows", get(workflows_handler))
         .route("/admin/chaos", get(chaos_handler))
         .route("/admin/slo", get(slo_handler))
+        .route("/admin/ai-obs", get(ai_obs_handler))
+        .route("/admin/chat", get(chat_handler))
+        .route("/admin/cost", get(cost_handler))
+        .route("/admin/dast", get(dast_handler))
+        .route("/admin/devlake", get(devlake_handler))
+        .route("/admin/forensics", get(forensics_handler))
+        .route("/admin/gateway", get(gateway_handler))
+        .route("/admin/infra", get(infra_handler))
+        .route("/admin/pam", get(pam_handler))
+        .route("/admin/sbom", get(sbom_handler))
+        .route("/admin/scan", get(scan_handler))
+        .route("/admin/secrets", get(secrets_handler))
+        .route("/admin/uptime", get(uptime_handler))
+        .route("/admin/cluster", get(cluster_handler))
+        .route("/admin/kube-proxy", get(kube_proxy_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
