@@ -3089,6 +3089,7 @@ source_root = "src"
 
         // ── Local LLM ─────────────────────────────────────────────────────────
         Commands::LocalLlm { cmd } => match cmd {
+            // /api/local-llm/ — surface for compliance audit.
             LocalLlmCmd::Status => {
                 println!("cave-local-llm: Phase 3 scheduler daemon active");
                 println!("  draft:  cave-local-llm run --crate <name>");
