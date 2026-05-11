@@ -130,6 +130,18 @@ pub enum Permission {
     SecurityRead,
     HaRead,
     ErpRead,
+
+    // ── 2026-05-11 batch G: 10 more tier1 admin pages ──────────────────
+    DeployRead,
+    PipelinesRead,
+    RolloutsRead,
+    KnativeRead,
+    LlmGatewayRead,
+    LocalLlmRead,
+    TrackerRead,
+    UpstreamRead,
+    ContainerScanRead,
+    AdmissionRead,
 }
 
 impl Permission {
@@ -215,6 +227,16 @@ impl Permission {
             Permission::SecurityRead => "security.event.read",
             Permission::HaRead => "ha.failover.read",
             Permission::ErpRead => "erp.invoice.read",
+            Permission::DeployRead => "deploy.activity.read",
+            Permission::PipelinesRead => "pipelines.run.read",
+            Permission::RolloutsRead => "rollouts.canary.read",
+            Permission::KnativeRead => "knative.service.read",
+            Permission::LlmGatewayRead => "llm-gateway.route.read",
+            Permission::LocalLlmRead => "local-llm.model.read",
+            Permission::TrackerRead => "tracker.issue.read",
+            Permission::UpstreamRead => "upstream.project.read",
+            Permission::ContainerScanRead => "container-scan.image.read",
+            Permission::AdmissionRead => "admission.decision.read",
         }
     }
 }

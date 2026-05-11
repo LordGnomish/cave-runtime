@@ -18,6 +18,7 @@ pub mod permission;
 pub mod render;
 pub mod state;
 
+pub mod admission_view;
 pub mod ai_obs;
 pub mod alerts;
 pub mod apiserver;
@@ -30,12 +31,14 @@ pub mod chat;
 pub mod cloud_controller_manager;
 pub mod cluster;
 pub mod compliance;
+pub mod container_scan;
 pub mod contributions;
 pub mod controller_manager;
 pub mod cost;
 pub mod cri;
 pub mod dashboard;
 pub mod dast;
+pub mod deploy;
 pub mod devlake;
 pub mod dns;
 pub mod docdb;
@@ -47,6 +50,9 @@ pub mod ha;
 pub mod iam;
 pub mod incidents;
 pub mod infra;
+pub mod knative;
+pub mod llm_gateway;
+pub mod local_llm;
 pub mod logs;
 pub mod metrics;
 pub mod kamaji;
@@ -58,9 +64,11 @@ pub mod mesh;
 pub mod net;
 pub mod pam;
 pub mod pg;
+pub mod pipelines;
 pub mod policy;
 pub mod rdbms;
 pub mod rdbms_operator;
+pub mod rollouts;
 pub mod sbom;
 pub mod scan;
 pub mod scheduler;
@@ -70,7 +78,9 @@ pub mod slo;
 pub mod store;
 pub mod streams;
 pub mod trace;
+pub mod tracker;
 pub mod uptime;
+pub mod upstream;
 pub mod vulns;
 pub mod workflows;
 pub mod tenant_dashboard;
@@ -185,6 +195,16 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::SecurityRead,
         Permission::HaRead,
         Permission::ErpRead,
+        Permission::DeployRead,
+        Permission::PipelinesRead,
+        Permission::RolloutsRead,
+        Permission::KnativeRead,
+        Permission::LlmGatewayRead,
+        Permission::LocalLlmRead,
+        Permission::TrackerRead,
+        Permission::UpstreamRead,
+        Permission::ContainerScanRead,
+        Permission::AdmissionRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -474,6 +494,16 @@ async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<
 async fn security_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); security::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn ha_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ha::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn erp_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); erp::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn deploy_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); deploy::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn pipelines_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); pipelines::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn rollouts_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); rollouts::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn knative_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); knative::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn llm_gateway_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); llm_gateway::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn local_llm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); local_llm::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn tracker_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); tracker::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn upstream_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); upstream::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn container_scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); container_scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn admission_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); admission_view::render(&s, &ctx).map(Html).map_err(err_to_response) }
 
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -586,6 +616,16 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/security", get(security_handler))
         .route("/admin/ha", get(ha_handler))
         .route("/admin/erp", get(erp_handler))
+        .route("/admin/deploy", get(deploy_handler))
+        .route("/admin/pipelines", get(pipelines_handler))
+        .route("/admin/rollouts", get(rollouts_handler))
+        .route("/admin/knative", get(knative_handler))
+        .route("/admin/llm-gateway", get(llm_gateway_handler))
+        .route("/admin/local-llm", get(local_llm_handler))
+        .route("/admin/tracker", get(tracker_handler))
+        .route("/admin/upstream", get(upstream_handler))
+        .route("/admin/container-scan", get(container_scan_handler))
+        .route("/admin/admission", get(admission_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
