@@ -475,6 +475,116 @@ pub struct Slo {
     pub error_budget_remaining_pct: f32,
 }
 
+// ── cave-cdc ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CdcPipeline {
+    pub tenant: TenantId,
+    pub name: String,
+    pub source: String,
+    pub sink: String,
+    pub state: &'static str,
+}
+
+// ── cave-certs ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CertRecord {
+    pub tenant: TenantId,
+    pub subject: String,
+    pub issuer: String,
+    pub not_after_unix: i64,
+    pub serial: String,
+}
+
+// ── cave-crm ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrmAccount {
+    pub tenant: TenantId,
+    pub id: String,
+    pub name: String,
+    pub plan: &'static str,
+    pub mrr_cents: u64,
+}
+
+// ── cave-crossplane ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrossplaneClaim {
+    pub tenant: TenantId,
+    pub name: String,
+    pub kind: String,
+    pub composition: String,
+    pub state: &'static str,
+}
+
+// ── cave-gitops-config ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GitopsApp {
+    pub tenant: TenantId,
+    pub name: String,
+    pub repo: String,
+    pub path: String,
+    pub synced_at_unix: i64,
+}
+
+// ── cave-karpenter ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NodePool {
+    pub tenant: TenantId,
+    pub name: String,
+    pub instance_class: String,
+    pub max_nodes: u32,
+    pub active_nodes: u32,
+}
+
+// ── cave-kubevirt ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VirtualMachine {
+    pub tenant: TenantId,
+    pub name: String,
+    pub phase: &'static str,
+    pub cpu: u32,
+    pub memory_mib: u64,
+}
+
+// ── cave-ledger ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LedgerEntry {
+    pub tenant: TenantId,
+    pub id: String,
+    pub actor: String,
+    pub action: String,
+    pub at_unix: i64,
+}
+
+// ── cave-oncall ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OncallShift {
+    pub tenant: TenantId,
+    pub rotation: String,
+    pub oncaller: String,
+    pub start_unix: i64,
+    pub end_unix: i64,
+}
+
+// ── cave-search ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchIndex {
+    pub tenant: TenantId,
+    pub name: String,
+    pub doc_count: u64,
+    pub size_bytes: u64,
+    pub status: &'static str,
+}
+
 // ── cave-deploy ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -953,6 +1063,16 @@ pub struct AdminState {
     pub upstream_projects: RwLock<Vec<UpstreamProject>>,
     pub container_scan_results: RwLock<Vec<ContainerScanResult>>,
     pub admission_decisions: RwLock<Vec<AdmissionDecision>>,
+    pub cdc_pipelines: RwLock<Vec<CdcPipeline>>,
+    pub cert_records: RwLock<Vec<CertRecord>>,
+    pub crm_accounts: RwLock<Vec<CrmAccount>>,
+    pub crossplane_claims: RwLock<Vec<CrossplaneClaim>>,
+    pub gitops_apps: RwLock<Vec<GitopsApp>>,
+    pub node_pools: RwLock<Vec<NodePool>>,
+    pub virtual_machines: RwLock<Vec<VirtualMachine>>,
+    pub ledger_entries: RwLock<Vec<LedgerEntry>>,
+    pub oncall_shifts: RwLock<Vec<OncallShift>>,
+    pub search_indexes: RwLock<Vec<SearchIndex>>,
 }
 
 impl Default for AdminState {
@@ -1044,6 +1164,16 @@ impl AdminState {
             upstream_projects: RwLock::new(Vec::new()),
             container_scan_results: RwLock::new(Vec::new()),
             admission_decisions: RwLock::new(Vec::new()),
+            cdc_pipelines: RwLock::new(Vec::new()),
+            cert_records: RwLock::new(Vec::new()),
+            crm_accounts: RwLock::new(Vec::new()),
+            crossplane_claims: RwLock::new(Vec::new()),
+            gitops_apps: RwLock::new(Vec::new()),
+            node_pools: RwLock::new(Vec::new()),
+            virtual_machines: RwLock::new(Vec::new()),
+            ledger_entries: RwLock::new(Vec::new()),
+            oncall_shifts: RwLock::new(Vec::new()),
+            search_indexes: RwLock::new(Vec::new()),
         }
     }
 
@@ -1480,8 +1610,59 @@ impl AdminState {
         ]);
         s.admission_decisions.write().unwrap().extend([
             AdmissionDecision { tenant: acme.clone(), id: "dec-1".into(), resource_kind: "Pod".into(), decision: "Allow", reason: "OK".into() },
-            AdmissionDecision { tenant: acme, id: "dec-2".into(), resource_kind: "Deployment".into(), decision: "Deny", reason: "runAsRoot=true".into() },
-            AdmissionDecision { tenant: evil, id: "evil-dec".into(), resource_kind: "Pod".into(), decision: "Allow", reason: "evil".into() },
+            AdmissionDecision { tenant: acme.clone(), id: "dec-2".into(), resource_kind: "Deployment".into(), decision: "Deny", reason: "runAsRoot=true".into() },
+            AdmissionDecision { tenant: evil.clone(), id: "evil-dec".into(), resource_kind: "Pod".into(), decision: "Allow", reason: "evil".into() },
+        ]);
+        s.cdc_pipelines.write().unwrap().extend([
+            CdcPipeline { tenant: acme.clone(), name: "orders-cdc".into(), source: "pg:orders".into(), sink: "kafka:cdc-orders".into(), state: "Running" },
+            CdcPipeline { tenant: acme.clone(), name: "users-cdc".into(), source: "pg:users".into(), sink: "kafka:cdc-users".into(), state: "Paused" },
+            CdcPipeline { tenant: evil.clone(), name: "evil-cdc".into(), source: "evil".into(), sink: "evil".into(), state: "Stopped" },
+        ]);
+        s.cert_records.write().unwrap().extend([
+            CertRecord { tenant: acme.clone(), subject: "acme.com".into(), issuer: "Let's Encrypt".into(), not_after_unix: 1700000000, serial: "01:23:45".into() },
+            CertRecord { tenant: acme.clone(), subject: "api.acme.com".into(), issuer: "Let's Encrypt".into(), not_after_unix: 1710000000, serial: "01:23:46".into() },
+            CertRecord { tenant: evil.clone(), subject: "evil.com".into(), issuer: "evil-ca".into(), not_after_unix: 999999, serial: "00".into() },
+        ]);
+        s.crm_accounts.write().unwrap().extend([
+            CrmAccount { tenant: acme.clone(), id: "acc-1".into(), name: "Acme Robotics".into(), plan: "Enterprise", mrr_cents: 1000000 },
+            CrmAccount { tenant: acme.clone(), id: "acc-2".into(), name: "Globex Co".into(), plan: "Pro", mrr_cents: 200000 },
+            CrmAccount { tenant: evil.clone(), id: "evil-acc".into(), name: "Evil Corp".into(), plan: "Free", mrr_cents: 0 },
+        ]);
+        s.crossplane_claims.write().unwrap().extend([
+            CrossplaneClaim { tenant: acme.clone(), name: "db-1".into(), kind: "PostgresInstance".into(), composition: "composition-pg".into(), state: "Ready" },
+            CrossplaneClaim { tenant: acme.clone(), name: "bucket-1".into(), kind: "S3Bucket".into(), composition: "composition-s3".into(), state: "Provisioning" },
+            CrossplaneClaim { tenant: evil.clone(), name: "evil-claim".into(), kind: "evil".into(), composition: "evil-comp".into(), state: "Failed" },
+        ]);
+        s.gitops_apps.write().unwrap().extend([
+            GitopsApp { tenant: acme.clone(), name: "web-app".into(), repo: "acme/k8s-config".into(), path: "apps/web".into(), synced_at_unix: 1003000 },
+            GitopsApp { tenant: acme.clone(), name: "api-app".into(), repo: "acme/k8s-config".into(), path: "apps/api".into(), synced_at_unix: 1003100 },
+            GitopsApp { tenant: evil.clone(), name: "evil-app".into(), repo: "evil/cfg".into(), path: "apps/evil".into(), synced_at_unix: 999000 },
+        ]);
+        s.node_pools.write().unwrap().extend([
+            NodePool { tenant: acme.clone(), name: "default".into(), instance_class: "m5.large".into(), max_nodes: 20, active_nodes: 12 },
+            NodePool { tenant: acme.clone(), name: "gpu".into(), instance_class: "g5.xlarge".into(), max_nodes: 4, active_nodes: 2 },
+            NodePool { tenant: evil.clone(), name: "evil-pool".into(), instance_class: "t2.nano".into(), max_nodes: 100, active_nodes: 99 },
+        ]);
+        s.virtual_machines.write().unwrap().extend([
+            VirtualMachine { tenant: acme.clone(), name: "vm-1".into(), phase: "Running", cpu: 4, memory_mib: 8192 },
+            VirtualMachine { tenant: acme.clone(), name: "vm-2".into(), phase: "Stopped", cpu: 2, memory_mib: 4096 },
+            VirtualMachine { tenant: evil.clone(), name: "evil-vm".into(), phase: "Running", cpu: 64, memory_mib: 65536 },
+        ]);
+        s.ledger_entries.write().unwrap().extend([
+            LedgerEntry { tenant: acme.clone(), id: "led-1".into(), actor: "alice".into(), action: "deploy.create".into(), at_unix: 1003000 },
+            LedgerEntry { tenant: acme.clone(), id: "led-2".into(), actor: "bob".into(), action: "policy.update".into(), at_unix: 1003100 },
+            LedgerEntry { tenant: evil.clone(), id: "evil-led".into(), actor: "mallory".into(), action: "evil".into(), at_unix: 999000 },
+        ]);
+        s.oncall_shifts.write().unwrap().extend([
+            OncallShift { tenant: acme.clone(), rotation: "sre-primary".into(), oncaller: "alice@acme".into(), start_unix: 1003000, end_unix: 1088400 },
+            OncallShift { tenant: acme, rotation: "sre-secondary".into(), oncaller: "bob@acme".into(), start_unix: 1003000, end_unix: 1088400 },
+            OncallShift { tenant: evil, rotation: "evil-rotation".into(), oncaller: "mallory@evil".into(), start_unix: 999000, end_unix: 1000000 },
+        ]);
+        // search seeded skipped: scope already established a/e via earlier blocks
+        s.search_indexes.write().unwrap().extend([
+            SearchIndex { tenant: TenantId::new("acme").expect("test fixture"), name: "docs-index".into(), doc_count: 100000, size_bytes: 500000000, status: "Healthy" },
+            SearchIndex { tenant: TenantId::new("acme").expect("test fixture"), name: "logs-index".into(), doc_count: 1000000000, size_bytes: 50000000000, status: "Healthy" },
+            SearchIndex { tenant: TenantId::new("evil").expect("test fixture"), name: "evil-index".into(), doc_count: 1, size_bytes: 1, status: "Degraded" },
         ]);
         s
     }

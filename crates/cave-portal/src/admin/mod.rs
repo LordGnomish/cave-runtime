@@ -18,7 +18,7 @@ pub mod permission;
 pub mod render;
 pub mod state;
 
-pub mod admission_view;
+pub mod admission;
 pub mod ai_obs;
 pub mod alerts;
 pub mod apiserver;
@@ -26,6 +26,8 @@ pub mod artifacts;
 pub mod auth;
 pub mod backup;
 pub mod cache;
+pub mod cdc;
+pub mod certs;
 pub mod chaos;
 pub mod chat;
 pub mod cloud_controller_manager;
@@ -36,6 +38,8 @@ pub mod contributions;
 pub mod controller_manager;
 pub mod cost;
 pub mod cri;
+pub mod crm;
+pub mod crossplane;
 pub mod dashboard;
 pub mod dast;
 pub mod deploy;
@@ -46,11 +50,15 @@ pub mod erp;
 pub mod etcd;
 pub mod forensics;
 pub mod gateway;
+pub mod gitops_config;
 pub mod ha;
 pub mod iam;
 pub mod incidents;
 pub mod infra;
+pub mod karpenter;
 pub mod knative;
+pub mod kubevirt;
+pub mod ledger;
 pub mod llm_gateway;
 pub mod local_llm;
 pub mod logs;
@@ -62,6 +70,7 @@ pub mod kubelet;
 pub mod lakehouse;
 pub mod mesh;
 pub mod net;
+pub mod oncall;
 pub mod pam;
 pub mod pg;
 pub mod pipelines;
@@ -72,6 +81,7 @@ pub mod rollouts;
 pub mod sbom;
 pub mod scan;
 pub mod scheduler;
+pub mod search;
 pub mod secrets;
 pub mod security;
 pub mod slo;
@@ -205,6 +215,16 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::UpstreamRead,
         Permission::ContainerScanRead,
         Permission::AdmissionRead,
+        Permission::CdcRead,
+        Permission::CertsRead,
+        Permission::CrmRead,
+        Permission::CrossplaneRead,
+        Permission::GitopsRead,
+        Permission::KarpenterRead,
+        Permission::KubevirtRead,
+        Permission::LedgerRead,
+        Permission::OncallRead,
+        Permission::SearchRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -503,7 +523,17 @@ async fn local_llm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Q
 async fn tracker_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); tracker::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn upstream_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); upstream::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn container_scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); container_scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn admission_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); admission_view::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn admission_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); admission::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn cdc_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cdc::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn certs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); certs::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn crm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); crm::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn crossplane_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); crossplane::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn gitops_config_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); gitops_config::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn karpenter_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); karpenter::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn kubevirt_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kubevirt::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn ledger_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ledger::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn oncall_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); oncall::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn search_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); search::render(&s, &ctx).map(Html).map_err(err_to_response) }
 
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -626,6 +656,16 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/upstream", get(upstream_handler))
         .route("/admin/container-scan", get(container_scan_handler))
         .route("/admin/admission", get(admission_handler))
+        .route("/admin/cdc", get(cdc_handler))
+        .route("/admin/certs", get(certs_handler))
+        .route("/admin/crm", get(crm_handler))
+        .route("/admin/crossplane", get(crossplane_handler))
+        .route("/admin/gitops-config", get(gitops_config_handler))
+        .route("/admin/karpenter", get(karpenter_handler))
+        .route("/admin/kubevirt", get(kubevirt_handler))
+        .route("/admin/ledger", get(ledger_handler))
+        .route("/admin/oncall", get(oncall_handler))
+        .route("/admin/search", get(search_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))

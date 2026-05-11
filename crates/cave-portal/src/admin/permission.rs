@@ -142,6 +142,18 @@ pub enum Permission {
     UpstreamRead,
     ContainerScanRead,
     AdmissionRead,
+
+    // ── 2026-05-11 batch H: 10 more tier1 admin pages ──────────────────
+    CdcRead,
+    CertsRead,
+    CrmRead,
+    CrossplaneRead,
+    GitopsRead,
+    KarpenterRead,
+    KubevirtRead,
+    LedgerRead,
+    OncallRead,
+    SearchRead,
 }
 
 impl Permission {
@@ -237,6 +249,16 @@ impl Permission {
             Permission::UpstreamRead => "upstream.project.read",
             Permission::ContainerScanRead => "container-scan.image.read",
             Permission::AdmissionRead => "admission.decision.read",
+            Permission::CdcRead => "cdc.pipeline.read",
+            Permission::CertsRead => "certs.certificate.read",
+            Permission::CrmRead => "crm.account.read",
+            Permission::CrossplaneRead => "crossplane.composition.read",
+            Permission::GitopsRead => "gitops.config.read",
+            Permission::KarpenterRead => "karpenter.nodepool.read",
+            Permission::KubevirtRead => "kubevirt.vm.read",
+            Permission::LedgerRead => "ledger.entry.read",
+            Permission::OncallRead => "oncall.shift.read",
+            Permission::SearchRead => "search.index.read",
         }
     }
 }
