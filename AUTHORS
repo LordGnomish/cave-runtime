@@ -1,0 +1,10 @@
+Cave Runtime — Authors
+
+Lead Architect:
+- Burak Tartan <btartan@gmail.com>
+
+AI Co-Authors:
+- Claude (Anthropic) — orchestration, architecture, implementation
+- Qwen3.6 35B-A3B (local) — TDD scaffold generation
+
+See CREDITS.md for detailed contribution breakdown.

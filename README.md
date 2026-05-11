@@ -30,7 +30,7 @@ Because every upstream is reimplemented under one roof:
 9. **Zero-downtime upgrade** — rolling, blue-green, version-skew tolerant.
 10. **HA/DR latency hiding** — replication delays never leak to the client SLA.
 11. **Multi-tenant by construction** — every module carries `tenant_id` as first-class attribute; default-deny between tenants; per-tenant quota, SLO, billing. See [ADR-MULTI-TENANT-001](docs/adr/ADR-MULTI-TENANT-001.md).
-12. **Post-quantum crypto ready** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. See [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md).
+12. **Post-quantum crypto migration in progress** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. See [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md).
 
 ## Project layout
 
@@ -95,7 +95,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: read [ADR-GOLDEN-001](doc
 
 ## Security
 
-See [SECURITY.md](SECURITY.md) for disclosure policy. Cave Runtime is post-quantum-crypto ready; report classical-crypto fallbacks as bugs.
+See [SECURITY.md](SECURITY.md) for disclosure policy. Cave Runtime is on a post-quantum-crypto migration path; see ROADMAP for the PQC migration timeline.
 
 ## License
 

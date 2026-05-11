@@ -1,6 +1,22 @@
 # CAVE Runtime Roadmap
 
-## Current: Pre-Release (Target: May 14, 2026)
+## Current: Pre-Release (Target: May 21, 2026)
+
+### OSS launch readiness
+- [x] LICENSE (Apache-2.0)
+- [x] NOTICE (upstream attribution summary)
+- [x] CODE_OF_CONDUCT.md (Contributor Covenant v2.1)
+- [x] AUTHORS, CREDITS.md
+- [x] docs/upstream-attribution.md (per-crate table generated from `parity.manifest.toml`)
+- [x] Provider-specific ADRs moved to `docs/adr/internal/`
+- [ ] `cave-runtime cluster init` subcommand — single-node bootstrap (WIP)
+
+### Post-quantum crypto
+PQC migration is on the roadmap, not complete. ML-KEM / ML-DSA / SLH-DSA
+adoption is staged across `cave-crypto`, `cave-vault`, and `cave-auth`. See
+[ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md). Classical-
+crypto paths remain for compatibility during the migration; please flag any
+production-only-classical paths.
 
 ### Tier 0 — Core (Complete)
 - [x] Single binary boot on port 8080
