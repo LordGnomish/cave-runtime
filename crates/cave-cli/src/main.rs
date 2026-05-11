@@ -330,9 +330,161 @@ enum Commands {
         #[command(subcommand)]
         cmd: TracingCmd,
     },
+    /// cave-auth CLI parity
+    Auth {
+        #[command(subcommand)]
+        cmd: AuthCmd,
+    },
+    /// cave-container-scan CLI parity
+    ContainerScan {
+        #[command(subcommand)]
+        cmd: ContainerScanCmd,
+    },
+    /// cave-dashboard CLI parity
+    Dashboard {
+        #[command(subcommand)]
+        cmd: DashboardCmd,
+    },
+    /// cave-deploy CLI parity
+    Deploy {
+        #[command(subcommand)]
+        cmd: DeployCmd,
+    },
+    /// cave-dns CLI parity
+    Dns {
+        #[command(subcommand)]
+        cmd: DnsCmd,
+    },
+    /// cave-erp CLI parity
+    Erp {
+        #[command(subcommand)]
+        cmd: ErpCmd,
+    },
+    /// cave-ha CLI parity
+    Ha {
+        #[command(subcommand)]
+        cmd: HaCmd,
+    },
+    /// cave-knative CLI parity
+    Knative {
+        #[command(subcommand)]
+        cmd: KnativeServiceCmd,
+    },
+    /// cave-llm-gateway CLI parity
+    LlmGateway {
+        #[command(subcommand)]
+        cmd: LlmGwCmd,
+    },
+    /// cave-logs CLI parity
+    Logs {
+        #[command(subcommand)]
+        cmd: LogsCmd,
+    },
+    /// cave-metrics CLI parity
+    Metrics {
+        #[command(subcommand)]
+        cmd: MetricsCmd,
+    },
+    /// cave-pipelines CLI parity
+    Pipelines {
+        #[command(subcommand)]
+        cmd: PipelinesCmd,
+    },
+    /// cave-rdbms (engine) CLI parity
+    RdbmsEngine {
+        #[command(subcommand)]
+        cmd: RdbmsEngineCmd,
+    },
+    /// cave-rollouts CLI parity
+    Rollouts {
+        #[command(subcommand)]
+        cmd: RolloutsCmd,
+    },
+    /// cave-security CLI parity
+    Security {
+        #[command(subcommand)]
+        cmd: SecurityCmd,
+    },
+    /// cave-store CLI parity
+    Store {
+        #[command(subcommand)]
+        cmd: StoreCmd,
+    },
+    /// cave-trace CLI parity
+    Trace {
+        #[command(subcommand)]
+        cmd: TraceCmd,
+    },
+    /// cave-tracker CLI parity
+    Tracker {
+        #[command(subcommand)]
+        cmd: TrackerCmd,
+    },
+    /// cave-upstream CLI parity
+    Upstream {
+        #[command(subcommand)]
+        cmd: UpstreamCmd,
+    },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
+
+#[derive(Subcommand)]
+enum AuthCmd { Status, Sessions, Users }
+
+#[derive(Subcommand)]
+enum ContainerScanCmd { List, Get, Scan }
+
+#[derive(Subcommand)]
+enum DashboardCmd { List, Get, Import }
+
+#[derive(Subcommand)]
+enum DeployCmd { List, Get, Rollback }
+
+#[derive(Subcommand)]
+enum DnsCmd { Zones, Records, Query }
+
+#[derive(Subcommand)]
+enum ErpCmd { Invoices, Customers, Ledger }
+
+#[derive(Subcommand)]
+enum HaCmd { Status, Failovers, Trigger }
+
+#[derive(Subcommand)]
+enum KnativeServiceCmd { Services, Revisions, Routes }
+
+#[derive(Subcommand)]
+enum LlmGwCmd { Routes, Usage, Limits }
+
+#[derive(Subcommand)]
+enum LogsCmd { Streams, Query, Sinks }
+
+#[derive(Subcommand)]
+enum MetricsCmd { Series, Query, Scrapers }
+
+#[derive(Subcommand)]
+enum PipelinesCmd { List, Runs, Trigger }
+
+#[derive(Subcommand)]
+enum RdbmsEngineCmd { Query, Stats, Schemas }
+
+#[derive(Subcommand)]
+enum RolloutsCmd { Status, Promote, Abort }
+
+#[derive(Subcommand)]
+enum SecurityCmd { Events, Policies, Audit }
+
+#[derive(Subcommand)]
+enum StoreCmd { Buckets, Objects, Policies }
+
+#[derive(Subcommand)]
+enum TraceCmd { Services, TraceId, Search }
+
+#[derive(Subcommand)]
+enum TrackerCmd { Issues, Create, Transition }
+
+#[derive(Subcommand)]
+enum UpstreamCmd { List, Check, Bump }
 
 #[derive(Subcommand)]
 enum FlagsCmd {
@@ -3399,6 +3551,103 @@ source_root = "src"
                 c.get(&format!("/api/tracing/traces/{}", urlencode(&trace_id))).await
             }
             TracingCmd::Retention => c.get("/api/tracing/retention").await,
+        },
+
+        // ── Tier1 cavectl batch (2026-05-11): 19 crates ────────────────────────
+        Commands::Auth { cmd } => match cmd {
+            AuthCmd::Status => c.get("/api/auth/status").await,
+            AuthCmd::Sessions => c.get("/api/auth/sessions").await,
+            AuthCmd::Users => c.get("/api/auth/users").await,
+        },
+        Commands::ContainerScan { cmd } => match cmd {
+            ContainerScanCmd::List => c.get("/api/container-scan/list").await,
+            ContainerScanCmd::Get => c.get("/api/container-scan/get").await,
+            ContainerScanCmd::Scan => c.get("/api/container-scan/scan").await,
+        },
+        Commands::Dashboard { cmd } => match cmd {
+            DashboardCmd::List => c.get("/api/dashboard/list").await,
+            DashboardCmd::Get => c.get("/api/dashboard/get").await,
+            DashboardCmd::Import => c.get("/api/dashboard/import").await,
+        },
+        Commands::Deploy { cmd } => match cmd {
+            DeployCmd::List => c.get("/api/deploy/list").await,
+            DeployCmd::Get => c.get("/api/deploy/get").await,
+            DeployCmd::Rollback => c.get("/api/deploy/rollback").await,
+        },
+        Commands::Dns { cmd } => match cmd {
+            DnsCmd::Zones => c.get("/api/dns/zones").await,
+            DnsCmd::Records => c.get("/api/dns/records").await,
+            DnsCmd::Query => c.get("/api/dns/query").await,
+        },
+        Commands::Erp { cmd } => match cmd {
+            ErpCmd::Invoices => c.get("/api/erp/invoices").await,
+            ErpCmd::Customers => c.get("/api/erp/customers").await,
+            ErpCmd::Ledger => c.get("/api/erp/ledger").await,
+        },
+        Commands::Ha { cmd } => match cmd {
+            HaCmd::Status => c.get("/api/ha/status").await,
+            HaCmd::Failovers => c.get("/api/ha/failovers").await,
+            HaCmd::Trigger => c.post("/api/ha/trigger", json!({})).await,
+        },
+        Commands::Knative { cmd } => match cmd {
+            KnativeServiceCmd::Services => c.get("/api/knative/services").await,
+            KnativeServiceCmd::Revisions => c.get("/api/knative/revisions").await,
+            KnativeServiceCmd::Routes => c.get("/api/knative/routes").await,
+        },
+        Commands::LlmGateway { cmd } => match cmd {
+            LlmGwCmd::Routes => c.get("/api/llm-gateway/routes").await,
+            LlmGwCmd::Usage => c.get("/api/llm-gateway/usage").await,
+            LlmGwCmd::Limits => c.get("/api/llm-gateway/limits").await,
+        },
+        Commands::Logs { cmd } => match cmd {
+            LogsCmd::Streams => c.get("/api/logs/streams").await,
+            LogsCmd::Query => c.get("/api/logs/query").await,
+            LogsCmd::Sinks => c.get("/api/logs/sinks").await,
+        },
+        Commands::Metrics { cmd } => match cmd {
+            MetricsCmd::Series => c.get("/api/metrics/series").await,
+            MetricsCmd::Query => c.get("/api/metrics/query").await,
+            MetricsCmd::Scrapers => c.get("/api/metrics/scrapers").await,
+        },
+        Commands::Pipelines { cmd } => match cmd {
+            PipelinesCmd::List => c.get("/api/pipelines/list").await,
+            PipelinesCmd::Runs => c.get("/api/pipelines/runs").await,
+            PipelinesCmd::Trigger => c.post("/api/pipelines/trigger", json!({})).await,
+        },
+        Commands::RdbmsEngine { cmd } => match cmd {
+            RdbmsEngineCmd::Query => c.get("/api/rdbms/query").await,
+            RdbmsEngineCmd::Stats => c.get("/api/rdbms/stats").await,
+            RdbmsEngineCmd::Schemas => c.get("/api/rdbms/schemas").await,
+        },
+        Commands::Rollouts { cmd } => match cmd {
+            RolloutsCmd::Status => c.get("/api/rollouts/status").await,
+            RolloutsCmd::Promote => c.post("/api/rollouts/promote", json!({})).await,
+            RolloutsCmd::Abort => c.post("/api/rollouts/abort", json!({})).await,
+        },
+        Commands::Security { cmd } => match cmd {
+            SecurityCmd::Events => c.get("/api/security/events").await,
+            SecurityCmd::Policies => c.get("/api/security/policies").await,
+            SecurityCmd::Audit => c.get("/api/security/audit").await,
+        },
+        Commands::Store { cmd } => match cmd {
+            StoreCmd::Buckets => c.get("/api/store/buckets").await,
+            StoreCmd::Objects => c.get("/api/store/objects").await,
+            StoreCmd::Policies => c.get("/api/store/policies").await,
+        },
+        Commands::Trace { cmd } => match cmd {
+            TraceCmd::Services => c.get("/api/trace/services").await,
+            TraceCmd::TraceId => c.get("/api/trace/trace-id").await,
+            TraceCmd::Search => c.get("/api/trace/search").await,
+        },
+        Commands::Tracker { cmd } => match cmd {
+            TrackerCmd::Issues => c.get("/api/tracker/issues").await,
+            TrackerCmd::Create => c.post("/api/tracker/create", json!({})).await,
+            TrackerCmd::Transition => c.post("/api/tracker/transition", json!({})).await,
+        },
+        Commands::Upstream { cmd } => match cmd {
+            UpstreamCmd::List => c.get("/api/upstream/list").await,
+            UpstreamCmd::Check => c.post("/api/upstream/check", json!({})).await,
+            UpstreamCmd::Bump => c.post("/api/upstream/bump", json!({})).await,
         },
 
         Commands::Keda { cmd } => match cmd {
