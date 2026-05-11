@@ -409,12 +409,57 @@ async fn streams_handler(
     streams::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ComplianceQuery {
+    pub tenant_id: String,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub filter: Option<String>,
+}
+
 async fn compliance_handler(
+    Query(q): Query<ComplianceQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let view = compliance::ViewQuery {
+        sort: q
+            .sort
+            .as_deref()
+            .map(compliance::SortKey::parse)
+            .unwrap_or_default(),
+        filter: q
+            .filter
+            .as_deref()
+            .map(compliance::FilterMode::parse)
+            .unwrap_or_default(),
+    };
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id,
+    });
+    let snap = compliance::cached_snapshot_or_refresh();
+    compliance::render_with_view(&snap, &ctx, view)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn compliance_detail_handler(
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(crate_name): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let root = compliance::workspace_root();
+    let detail = compliance::build_crate_detail(&root, &crate_name)
+        .map_err(|e| err_to_response(e))?;
+    compliance::render_detail(&detail, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn compliance_refresh_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    let snap = compliance::live_snapshot();
-    compliance::render(&snap, &ctx).map(Html).map_err(err_to_response)
+    compliance::handle_refresh(&ctx).map(Html).map_err(err_to_response)
 }
 
 async fn policy_handler(
@@ -612,6 +657,8 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/lakehouse", get(lakehouse_handler))
         .route("/admin/streams", get(streams_handler))
         .route("/admin/compliance", get(compliance_handler))
+        .route("/admin/compliance/refresh", get(compliance_refresh_handler))
+        .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))
         .route("/admin/policy", get(policy_handler))
         .route("/admin/artifacts", get(artifacts_handler))
         .route("/admin/alerts", get(alerts_handler))

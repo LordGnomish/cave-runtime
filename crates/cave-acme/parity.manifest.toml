@@ -17,3 +17,6 @@ version = "v0.30.2"
 name        = "cave-acme"
 description = "ACME RFC 8555 certificate authority — step-ca reimplementation"
 source_root = "src"
+
+[parity]
+infra_only = true

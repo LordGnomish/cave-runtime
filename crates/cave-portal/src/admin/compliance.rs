@@ -23,10 +23,13 @@
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
 use crate::admin::types::Cite;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ComplianceViewError {
@@ -64,12 +67,13 @@ pub struct CrateCompliance {
     pub infra_only: bool,
 }
 
-/// Crates that are infrastructure tooling, shared primitives, or
-/// runtime support — not Tier-1 upstream-mirror modules. They are
-/// excluded from compliance aggregation because the 4-track contract
-/// does not apply to them. Future work moves this list into each
-/// crate's `parity.manifest.toml` under `[module] infra_only = true`.
-const INFRA_ONLY: &[&str] = &[
+/// Fallback list of crates that are infrastructure tooling, shared
+/// primitives, or runtime support — not Tier-1 upstream-mirror modules.
+/// The source of truth is each crate's `parity.manifest.toml` under
+/// `[parity] infra_only = true`. This list is consulted only when a
+/// manifest is missing or doesn't carry the field, so newly-added infra
+/// crates can opt in declaratively without touching this file.
+const INFRA_ONLY_FALLBACK: &[&str] = &[
     "cave-cli",
     "cave-core",
     "cave-changelog",
@@ -87,24 +91,23 @@ const INFRA_ONLY: &[&str] = &[
     "cave-docs",
     "cave-docs-site",
     "cave-runbook",
-    // 2026-05-11 expansion: shared primitives + tooling crates that
-    // don't ship Portal/cavectl/obs by contract.
-    "cave-lint",      // developer-tool lint runner
-    "cave-pki",       // PKI primitive used by other crates
-    "cave-db",        // shared DB client primitive
-    "cave-acme",      // ACME client primitive (used by cave-certs)
-    "cave-techdocs",  // docs site generator (alongside cave-docs-site)
-    "cave-registry",  // tiny marker crate (13 LOC)
-    "cave-tracing",   // tracing primitive (alongside cave-trace)
-    "cave-sign",      // signing primitive
-    "cave-pii",       // PII redaction primitive
-    "cave-flags",     // feature-flag primitive
-    "cave-status",    // status-aggregator primitive
-    "cave-profiler",  // profiler primitive
+    "cave-lint",
+    "cave-pki",
+    "cave-db",
+    "cave-acme",
+    "cave-techdocs",
+    "cave-registry",
+    "cave-tracing",
+    "cave-sign",
+    "cave-pii",
+    "cave-flags",
+    "cave-status",
+    "cave-profiler",
 ];
 
-pub fn is_infra_only(name: &str) -> bool {
-    INFRA_ONLY.contains(&name)
+/// Fallback predicate used when no manifest declares `[parity] infra_only`.
+pub fn is_infra_only_fallback(name: &str) -> bool {
+    INFRA_ONLY_FALLBACK.contains(&name)
 }
 
 /// Aggregated compliance state for the whole workspace.
@@ -185,36 +188,69 @@ pub fn compute_four_track_score(
     score
 }
 
-/// Parse the `[upstream]` table from a parity manifest. Returns
-/// `(version, org/repo)` if both fields are present. Tolerant of
-/// missing or malformed manifests.
-pub fn parse_parity_manifest(content: &str) -> (Option<String>, Option<String>) {
-    let mut in_upstream = false;
+/// Parsed view of the bits of `parity.manifest.toml` the dashboard cares about.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ParityManifest {
+    pub upstream_version: Option<String>,
+    pub upstream_org_repo: Option<String>,
+    /// `[parity] infra_only = true` — opt-in flag that the crate is
+    /// infrastructure tooling and exempt from the 4-track contract.
+    /// `None` means the field was absent (caller should fall back).
+    pub infra_only: Option<bool>,
+}
+
+/// Parse `[upstream]` and `[parity]` tables from a parity manifest.
+/// Tolerant of missing or malformed manifests — unknown sections are skipped.
+pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
+    let mut section: &str = "";
     let mut org: Option<String> = None;
     let mut repo: Option<String> = None;
     let mut version: Option<String> = None;
+    let mut infra_only: Option<bool> = None;
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            in_upstream = trimmed == "[upstream]";
+        if let Some(rest) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            section = match rest {
+                "upstream" => "upstream",
+                "parity" => "parity",
+                _ => "",
+            };
             continue;
         }
-        if !in_upstream {
-            continue;
-        }
-        if let Some(rest) = trimmed.strip_prefix("version") {
-            version = extract_string_value(rest);
-        } else if let Some(rest) = trimmed.strip_prefix("org") {
-            org = extract_string_value(rest);
-        } else if let Some(rest) = trimmed.strip_prefix("repo") {
-            repo = extract_string_value(rest);
+        match section {
+            "upstream" => {
+                if let Some(rest) = trimmed.strip_prefix("version") {
+                    version = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("org") {
+                    org = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("repo") {
+                    repo = extract_string_value(rest);
+                }
+            }
+            "parity" => {
+                if let Some(rest) = trimmed.strip_prefix("infra_only") {
+                    infra_only = extract_bool_value(rest);
+                }
+            }
+            _ => {}
         }
     }
-    let org_repo = match (org, repo) {
+    let upstream_org_repo = match (org, repo) {
         (Some(o), Some(r)) => Some(format!("{o}/{r}")),
         _ => None,
     };
-    (version, org_repo)
+    ParityManifest {
+        upstream_version: version,
+        upstream_org_repo,
+        infra_only,
+    }
+}
+
+/// Legacy shim: returns the `(version, org/repo)` pair the older callers
+/// were built around. Prefer [`parse_parity_manifest_full`] for new code.
+pub fn parse_parity_manifest(content: &str) -> (Option<String>, Option<String>) {
+    let m = parse_parity_manifest_full(content);
+    (m.upstream_version, m.upstream_org_repo)
 }
 
 fn extract_string_value(rest: &str) -> Option<String> {
@@ -224,6 +260,15 @@ fn extract_string_value(rest: &str) -> Option<String> {
         None
     } else {
         Some(unquoted.to_string())
+    }
+}
+
+fn extract_bool_value(rest: &str) -> Option<bool> {
+    let after_eq = rest.split_once('=')?.1.trim();
+    match after_eq {
+        "true" => Some(true),
+        "false" => Some(false),
+        _ => None,
     }
 }
 
@@ -271,6 +316,157 @@ fn walk_rs_files(root: &Path, visit: &mut impl FnMut(&str)) {
     }
 }
 
+fn walk_rs_files_with_path(root: &Path, base: &Path, visit: &mut impl FnMut(&str, &Path)) {
+    let entries = match fs::read_dir(root) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_rs_files_with_path(&path, base, visit);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            if let Ok(content) = fs::read_to_string(&path) {
+                let rel = path.strip_prefix(base).unwrap_or(&path);
+                visit(&content, rel);
+            }
+        }
+    }
+}
+
+/// One ignored test surfaced by the drill-down view: the source file
+/// (workspace-relative), the line number of the `#[ignore]` attribute,
+/// and the test function name (best-effort).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IgnoredTest {
+    pub file: String,
+    pub line: u32,
+    pub name: String,
+}
+
+/// Scan a crate's `src/` tree for `#[ignore]` annotations. Returns the
+/// file (workspace-relative), line, and the next visible `fn name` so
+/// the drill-down can render a clickable list.
+pub fn scan_ignored_tests(workspace_root: &Path, crate_name: &str) -> Vec<IgnoredTest> {
+    let src_root = workspace_root.join("crates").join(crate_name).join("src");
+    let mut out = Vec::new();
+    walk_rs_files_with_path(&src_root, workspace_root, &mut |content, rel| {
+        let lines: Vec<&str> = content.lines().collect();
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("#[ignore") {
+                // Look ahead up to 5 lines for `fn <name>`.
+                let mut fn_name = String::from("<unknown>");
+                for j in (idx + 1)..lines.len().min(idx + 6) {
+                    if let Some(after) = lines[j].trim_start().strip_prefix("fn ") {
+                        let name: String = after
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !name.is_empty() {
+                            fn_name = name;
+                            break;
+                        }
+                    } else if let Some(after) = lines[j].trim_start().strip_prefix("async fn ") {
+                        let name: String = after
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !name.is_empty() {
+                            fn_name = name;
+                            break;
+                        }
+                    }
+                }
+                out.push(IgnoredTest {
+                    file: rel.display().to_string(),
+                    line: (idx as u32) + 1,
+                    name: fn_name,
+                });
+            }
+        }
+    });
+    out
+}
+
+/// One commit touching a crate, as surfaced by `git log -- crates/<name>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommitRow {
+    pub sha: String,
+    pub subject: String,
+}
+
+/// Read the last `limit` commits that touched this crate's directory.
+/// Uses a plain `git log` subprocess — sufficient for an admin dashboard
+/// and avoids pulling in `git2`/`gix` just for this view. Returns an
+/// empty vec on git failure (workspace not a repo, git not on PATH, etc.).
+pub fn recent_commits_for_crate(
+    workspace_root: &Path,
+    crate_name: &str,
+    limit: u32,
+) -> Vec<CommitRow> {
+    use std::process::Command;
+    let path_spec = format!("crates/{crate_name}");
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace_root)
+        .arg("log")
+        .arg(format!("-n{limit}"))
+        .arg("--pretty=format:%h %s")
+        .arg("--")
+        .arg(&path_spec)
+        .output();
+    let stdout = match output {
+        Ok(o) if o.status.success() => o.stdout,
+        _ => return Vec::new(),
+    };
+    let text = String::from_utf8_lossy(&stdout);
+    text.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, ' ');
+            let sha = parts.next()?.to_string();
+            let subject = parts.next().unwrap_or("").to_string();
+            if sha.is_empty() {
+                None
+            } else {
+                Some(CommitRow { sha, subject })
+            }
+        })
+        .collect()
+}
+
+/// Detail-page bundle: the per-crate row from the dashboard plus the
+/// extra data (ignored test list, manifest content, recent commits)
+/// that the drill-down surfaces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrateDetail {
+    pub compliance: CrateCompliance,
+    pub ignored_tests: Vec<IgnoredTest>,
+    pub parity_manifest_raw: Option<String>,
+    pub recent_commits: Vec<CommitRow>,
+}
+
+/// Gather everything needed to render `/admin/compliance/<crate>`.
+pub fn build_crate_detail(
+    workspace_root: &Path,
+    crate_name: &str,
+) -> Result<CrateDetail, ComplianceViewError> {
+    let compliance = analyse_crate(workspace_root, crate_name)?;
+    let ignored_tests = scan_ignored_tests(workspace_root, crate_name);
+    let manifest_path = workspace_root
+        .join("crates")
+        .join(crate_name)
+        .join("parity.manifest.toml");
+    let parity_manifest_raw = fs::read_to_string(&manifest_path).ok();
+    let recent_commits = recent_commits_for_crate(workspace_root, crate_name, 10);
+    Ok(CrateDetail {
+        compliance,
+        ignored_tests,
+        parity_manifest_raw,
+        recent_commits,
+    })
+}
+
 /// Compute compliance for one crate by walking its directory.
 pub fn analyse_crate(
     workspace_root: &Path,
@@ -282,12 +478,17 @@ pub fn analyse_crate(
     }
     let src_root = crate_root.join("src");
     let (loc, tests, ignored, unimpl, todos) = scan_backend(&src_root);
-    let manifest = crate_root.join("parity.manifest.toml");
-    let (upstream_version, upstream_org_repo) = if manifest.exists() {
-        parse_parity_manifest(&fs::read_to_string(&manifest).unwrap_or_default())
+    let manifest_path = crate_root.join("parity.manifest.toml");
+    let manifest = if manifest_path.exists() {
+        parse_parity_manifest_full(&fs::read_to_string(&manifest_path).unwrap_or_default())
     } else {
-        (None, None)
+        ParityManifest::default()
     };
+    let upstream_version = manifest.upstream_version.clone();
+    let upstream_org_repo = manifest.upstream_org_repo.clone();
+    let infra_only = manifest
+        .infra_only
+        .unwrap_or_else(|| is_infra_only_fallback(crate_name));
     let short = crate_name.strip_prefix("cave-").unwrap_or(crate_name);
     // Portal admin module name uses snake_case (kebab → underscore).
     let admin_module = short.replace('-', "_");
@@ -332,7 +533,7 @@ pub fn analyse_crate(
         obs_alerts_present,
         obs_dashboard_present,
         four_track_score,
-        infra_only: is_infra_only(crate_name),
+        infra_only,
     })
 }
 
@@ -391,12 +592,148 @@ pub fn workspace_root() -> PathBuf {
     }
 }
 
-/// One-shot snapshot for the live admin handler.
+/// One-shot snapshot for the live admin handler. Always walks the
+/// filesystem — prefer [`cached_snapshot_or_refresh`] in production so
+/// concurrent requests share a 5-minute cache.
 pub fn live_snapshot() -> ComplianceSnapshot {
     let root = workspace_root();
     let names = discover_crate_names(&root);
     let refs: Vec<&str> = names.iter().map(String::as_str).collect();
     build_snapshot(&root, &refs).unwrap_or(ComplianceSnapshot { crates: vec![] })
+}
+
+/// Wraps a [`ComplianceSnapshot`] with the wall-clock instant it was
+/// materialised. The handler uses the timestamp to decide whether the
+/// cached copy is still fresh or needs a re-walk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CachedSnapshot {
+    pub snapshot: ComplianceSnapshot,
+    pub cached_at: DateTime<Utc>,
+}
+
+impl CachedSnapshot {
+    pub fn new(snapshot: ComplianceSnapshot, cached_at: DateTime<Utc>) -> Self {
+        Self { snapshot, cached_at }
+    }
+
+    /// Returns `true` when `now - cached_at > max_age`.
+    pub fn is_stale(&self, now: DateTime<Utc>, max_age: Duration) -> bool {
+        match now.signed_duration_since(self.cached_at).to_std() {
+            Ok(elapsed) => elapsed > max_age,
+            // Future timestamps (clock skew) are treated as fresh — the
+            // cache is only invalidated by elapsed wall-clock time forward.
+            Err(_) => false,
+        }
+    }
+}
+
+/// Process-wide cache shared by HTML handler, JSON endpoint, and the
+/// background refresher. `OnceLock` so we initialise lazily without a
+/// global init step.
+fn cache_cell() -> &'static Mutex<Option<CachedSnapshot>> {
+    static CELL: OnceLock<Mutex<Option<CachedSnapshot>>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(None))
+}
+
+/// Default cache freshness window — the JSON endpoint advertises the
+/// same value via Cache-Control, and the background refresher uses it
+/// as its interval.
+pub const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(300);
+
+/// Return the cached snapshot when fresh, otherwise rebuild + cache.
+/// Concurrent callers see a consistent value: the mutex is held only
+/// across the walk if it actually runs, so the next caller benefits.
+pub fn cached_snapshot_or_refresh() -> ComplianceSnapshot {
+    cached_snapshot_or_refresh_at(Utc::now(), DEFAULT_CACHE_TTL)
+}
+
+/// Testable variant: callers inject `now` + `max_age`.
+pub fn cached_snapshot_or_refresh_at(
+    now: DateTime<Utc>,
+    max_age: Duration,
+) -> ComplianceSnapshot {
+    let cell = cache_cell();
+    {
+        let guard = cell.lock().expect("compliance cache poisoned");
+        if let Some(entry) = guard.as_ref() {
+            if !entry.is_stale(now, max_age) {
+                return entry.snapshot.clone();
+            }
+        }
+    }
+    // Cache miss or stale — walk the filesystem outside the lock so
+    // concurrent readers aren't blocked by the (slow) walk.
+    let fresh = live_snapshot();
+    let mut guard = cell.lock().expect("compliance cache poisoned");
+    *guard = Some(CachedSnapshot::new(fresh.clone(), now));
+    fresh
+}
+
+/// Force-invalidate the cache. Returns the previous timestamp, if any,
+/// so callers can log the refresh delta.
+pub fn invalidate_cache() -> Option<DateTime<Utc>> {
+    let mut guard = cache_cell().lock().expect("compliance cache poisoned");
+    let prev = guard.as_ref().map(|c| c.cached_at);
+    *guard = None;
+    prev
+}
+
+/// Force a refresh now, regardless of cache state. Returns the new snapshot.
+pub fn force_refresh() -> CachedSnapshot {
+    force_refresh_at(Utc::now())
+}
+
+/// Testable variant of [`force_refresh`].
+pub fn force_refresh_at(now: DateTime<Utc>) -> CachedSnapshot {
+    let fresh = live_snapshot();
+    let entry = CachedSnapshot::new(fresh, now);
+    let mut guard = cache_cell().lock().expect("compliance cache poisoned");
+    *guard = Some(entry.clone());
+    entry
+}
+
+/// Render the live `/admin/compliance` page using the cached snapshot.
+pub fn render_cached(ctx: &RequestCtx) -> Result<String, ComplianceViewError> {
+    let snap = cached_snapshot_or_refresh();
+    render(&snap, ctx)
+}
+
+/// Render the manual-refresh acknowledgement page. Authorised by
+/// `Permission::AdminComplianceRefresh` — a strictly stronger right
+/// than the view permission used by `render`.
+pub fn handle_refresh(ctx: &RequestCtx) -> Result<String, ComplianceViewError> {
+    ctx.authorise(Permission::AdminComplianceRefresh)?;
+    let entry = force_refresh();
+    let body = format!(
+        r#"<section class="p-4 bg-green-100 rounded mb-4">
+  <p>Compliance cache refreshed at <strong>{ts}</strong> — {n} crates rescanned.</p>
+  <p><a class="text-blue-700 underline" href="/admin/compliance">Back to dashboard</a></p>
+</section>"#,
+        ts = entry.cached_at.to_rfc3339(),
+        n = entry.snapshot.crates.len(),
+    );
+    Ok(page_shell(
+        &format!("compliance refresh · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
+}
+
+/// Spawn the background refresh loop. Runs in a detached tokio task that
+/// ticks every `interval`, calling [`force_refresh`] on each tick. The
+/// `JoinHandle` is returned so tests can drive the cancellation token to
+/// shut it down cleanly; production callers can drop the handle.
+pub fn spawn_background_refresh(interval: Duration) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        // Skip the immediate first tick so we don't double-walk on startup
+        // when `cached_snapshot_or_refresh` already populated the cache.
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let _ = force_refresh();
+        }
+    })
 }
 
 fn cell_color(value: u8) -> &'static str {
@@ -415,11 +752,146 @@ fn check(b: bool) -> &'static str {
     }
 }
 
+/// Column the dashboard rows are sorted by. The selector is exposed
+/// in the URL (`?sort=score`); unknown values fall back to `Score`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortKey {
+    /// Worst-compliance first — the default. Drives the maintainer's eye.
+    Score,
+    /// Highest stub indicator count first (unimpl + todo + ignored).
+    StubCount,
+    /// Crate name, lexicographic ascending — useful for "find a crate".
+    Name,
+}
+
+impl SortKey {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "stubs" | "stub_count" => SortKey::StubCount,
+            "name" => SortKey::Name,
+            _ => SortKey::Score,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SortKey::Score => "score",
+            SortKey::StubCount => "stubs",
+            SortKey::Name => "name",
+        }
+    }
+}
+
+impl Default for SortKey {
+    fn default() -> Self {
+        SortKey::Score
+    }
+}
+
+/// Optional filter applied before sorting. Multiple values aren't
+/// combined — the selector is single-pick to keep the URL readable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterMode {
+    /// Show every crate, including infra-only ones.
+    All,
+    /// Tier-1 crates whose 4-track score is below 50 (Grade F territory).
+    ScoreUnder50,
+    /// Tier-1 crates that have at least one missing 4-track signal
+    /// (i.e. score < 100). Highlights the long tail.
+    TrackGap,
+    /// Hide infra-only crates entirely.
+    ExcludeInfra,
+}
+
+impl FilterMode {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "score_lt_50" | "score<50" => FilterMode::ScoreUnder50,
+            "track_gap" => FilterMode::TrackGap,
+            "exclude_infra" => FilterMode::ExcludeInfra,
+            _ => FilterMode::All,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FilterMode::All => "all",
+            FilterMode::ScoreUnder50 => "score_lt_50",
+            FilterMode::TrackGap => "track_gap",
+            FilterMode::ExcludeInfra => "exclude_infra",
+        }
+    }
+}
+
+impl Default for FilterMode {
+    fn default() -> Self {
+        FilterMode::All
+    }
+}
+
+/// Query-string knobs for the dashboard view — survives across links
+/// so a maintainer can deep-link into a filtered view.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ViewQuery {
+    pub sort: SortKey,
+    pub filter: FilterMode,
+}
+
+impl ViewQuery {
+    /// Apply filter + sort to the snapshot's crate list. Returns a new
+    /// vec — the underlying snapshot is left untouched.
+    pub fn apply(&self, snapshot: &ComplianceSnapshot) -> Vec<CrateCompliance> {
+        let mut rows: Vec<CrateCompliance> = snapshot
+            .crates
+            .iter()
+            .filter(|c| match self.filter {
+                FilterMode::All => true,
+                FilterMode::ScoreUnder50 => !c.infra_only && c.four_track_score < 50,
+                FilterMode::TrackGap => !c.infra_only && c.four_track_score < 100,
+                FilterMode::ExcludeInfra => !c.infra_only,
+            })
+            .cloned()
+            .collect();
+        match self.sort {
+            SortKey::Score => rows.sort_by(|a, b| match a.four_track_score.cmp(&b.four_track_score) {
+                Ordering::Equal => a.name.cmp(&b.name),
+                ord => ord,
+            }),
+            SortKey::StubCount => {
+                rows.sort_by(|a, b| {
+                    let sa = a.unimplemented_count + a.todo_count + a.ignored_test_count;
+                    let sb = b.unimplemented_count + b.todo_count + b.ignored_test_count;
+                    match sb.cmp(&sa) {
+                        Ordering::Equal => a.name.cmp(&b.name),
+                        ord => ord,
+                    }
+                });
+            }
+            SortKey::Name => rows.sort_by(|a, b| a.name.cmp(&b.name)),
+        }
+        rows
+    }
+
+    /// Build the `?sort=…&filter=…` querystring fragment (without `?`).
+    pub fn to_query_string(&self) -> String {
+        format!("sort={}&filter={}", self.sort.as_str(), self.filter.as_str())
+    }
+}
+
 pub fn render(
     snapshot: &ComplianceSnapshot,
     ctx: &RequestCtx,
 ) -> Result<String, ComplianceViewError> {
+    render_with_view(snapshot, ctx, ViewQuery::default())
+}
+
+pub fn render_with_view(
+    snapshot: &ComplianceSnapshot,
+    ctx: &RequestCtx,
+    view: ViewQuery,
+) -> Result<String, ComplianceViewError> {
     ctx.authorise(Permission::AdminComplianceView)?;
+    let filtered = view.apply(snapshot);
     let total = snapshot.crates.len();
     let tier1 = snapshot.tier1_count();
     let infra = snapshot.infra_count();
@@ -428,8 +900,7 @@ pub fn render(
     let grade = snapshot.grade();
     let avg_color = cell_color(avg);
 
-    let rows: Vec<Vec<String>> = snapshot
-        .crates
+    let rows: Vec<Vec<String>> = filtered
         .iter()
         .map(|c| {
             let score_html = if c.infra_only {
@@ -444,7 +915,12 @@ pub fn render(
                 )
             };
             vec![
-                c.name.clone(),
+                format!(
+                    r#"<a class="text-blue-700 underline" href="/admin/compliance/{name}?tenant_id={tenant}">{label}</a>"#,
+                    name = escape(&c.name),
+                    tenant = escape(ctx.tenant.as_str()),
+                    label = escape(&c.name),
+                ),
                 c.upstream_version.clone().unwrap_or_else(|| "—".into()),
                 c.backend_loc.to_string(),
                 c.backend_test_count.to_string(),
@@ -459,6 +935,39 @@ pub fn render(
         })
         .collect();
 
+    let sort_form = format!(
+        r#"<form method="get" action="/admin/compliance" class="mb-4 flex gap-3 items-end">
+  <input type="hidden" name="tenant_id" value="{tenant}" />
+  <label class="text-sm">sort by
+    <select name="sort" class="border rounded px-2 py-1">
+      <option value="score"{sel_score}>score (worst first)</option>
+      <option value="stubs"{sel_stubs}>stub count (most first)</option>
+      <option value="name"{sel_name}>name (A→Z)</option>
+    </select>
+  </label>
+  <label class="text-sm">filter
+    <select name="filter" class="border rounded px-2 py-1">
+      <option value="all"{f_all}>all crates</option>
+      <option value="score_lt_50"{f_lt50}>tier-1 with score &lt; 50</option>
+      <option value="track_gap"{f_gap}>tier-1 with any track gap</option>
+      <option value="exclude_infra"{f_xinf}>exclude infra-only</option>
+    </select>
+  </label>
+  <button type="submit" class="bg-blue-600 text-white text-sm px-3 py-1 rounded">apply</button>
+  <span class="text-xs text-gray-500 ml-2">showing {shown} / {total}</span>
+</form>"#,
+        tenant = escape(ctx.tenant.as_str()),
+        sel_score = if view.sort == SortKey::Score { " selected" } else { "" },
+        sel_stubs = if view.sort == SortKey::StubCount { " selected" } else { "" },
+        sel_name = if view.sort == SortKey::Name { " selected" } else { "" },
+        f_all = if view.filter == FilterMode::All { " selected" } else { "" },
+        f_lt50 = if view.filter == FilterMode::ScoreUnder50 { " selected" } else { "" },
+        f_gap = if view.filter == FilterMode::TrackGap { " selected" } else { "" },
+        f_xinf = if view.filter == FilterMode::ExcludeInfra { " selected" } else { "" },
+        shown = filtered.len(),
+        total = total,
+    );
+
     let body = format!(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
@@ -470,6 +979,7 @@ pub fn render(
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">GRADE</div><div class="text-3xl font-bold">{grade}</div></div>
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL</div><div class="text-3xl font-bold">{total}</div></div>
 </section>
+{sort_form}
 <section><h2 class="text-lg font-semibold mb-2">Per-crate matrix</h2>{tbl}</section>"#,
         quote = escape(GOLDEN_RULE),
         total = total,
@@ -479,6 +989,7 @@ pub fn render(
         avg_color = avg_color,
         stubs = stubs,
         grade = grade,
+        sort_form = sort_form,
         tbl = table(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
@@ -498,6 +1009,153 @@ const FILE_CITE: Cite = Cite::backstage(
     "plugins/tech-insights/src/components/Scorecards/ScorecardsPage.tsx",
     "ScorecardsPage",
 );
+
+/// Render the drill-down `/admin/compliance/<crate>` page.
+pub fn render_detail(
+    detail: &CrateDetail,
+    ctx: &RequestCtx,
+) -> Result<String, ComplianceViewError> {
+    ctx.authorise(Permission::AdminComplianceView)?;
+    let c = &detail.compliance;
+    let upstream = c
+        .upstream_org_repo
+        .as_deref()
+        .map(|or| {
+            let version = c.upstream_version.as_deref().unwrap_or("—");
+            format!("{or} @ {version}")
+        })
+        .unwrap_or_else(|| "—".into());
+
+    let track_html = format!(
+        r#"<ul class="space-y-1">
+  <li>Backend (LOC {loc}, tests {tests}): {backend}</li>
+  <li>Portal admin page: {portal}</li>
+  <li>cavectl subcommand: {cavectl}</li>
+  <li>Observability alerts: {alerts}</li>
+  <li>Observability dashboard: {dash}</li>
+</ul>"#,
+        loc = c.backend_loc,
+        tests = c.backend_test_count,
+        backend = check(true),
+        portal = check(c.portal_admin_present),
+        cavectl = check(c.cavectl_subcommand_present),
+        alerts = check(c.obs_alerts_present),
+        dash = check(c.obs_dashboard_present),
+    );
+
+    let ignored_html = if detail.ignored_tests.is_empty() {
+        r#"<p class="text-gray-500">No <code>#[ignore]</code> tests — Charter compliant.</p>"#
+            .to_string()
+    } else {
+        let rows: Vec<String> = detail
+            .ignored_tests
+            .iter()
+            .map(|t| {
+                format!(
+                    "<tr><td class=\"px-2 py-1\"><code>{name}</code></td>\
+                     <td class=\"px-2 py-1\">{file}</td>\
+                     <td class=\"px-2 py-1 text-right\">{line}</td></tr>",
+                    name = escape(&t.name),
+                    file = escape(&t.file),
+                    line = t.line,
+                )
+            })
+            .collect();
+        format!(
+            r#"<table class="min-w-full text-sm">
+  <thead><tr class="border-b"><th class="text-left px-2">test</th><th class="text-left px-2">file</th><th class="text-right px-2">line</th></tr></thead>
+  <tbody>{rows}</tbody>
+</table>"#,
+            rows = rows.join("")
+        )
+    };
+
+    let manifest_html = match detail.parity_manifest_raw.as_deref() {
+        Some(raw) => format!(
+            "<pre class=\"text-xs p-3 bg-gray-50 border rounded overflow-x-auto\">{}</pre>",
+            escape(raw)
+        ),
+        None => r#"<p class="text-gray-500">No parity.manifest.toml — first-party crate or scaffold missing.</p>"#.to_string(),
+    };
+
+    let commits_html = if detail.recent_commits.is_empty() {
+        r#"<p class="text-gray-500">No commits touch this crate yet.</p>"#.to_string()
+    } else {
+        let rows: Vec<String> = detail
+            .recent_commits
+            .iter()
+            .map(|cm| {
+                format!(
+                    "<tr><td class=\"px-2 py-1 font-mono\">{sha}</td>\
+                     <td class=\"px-2 py-1\">{subj}</td></tr>",
+                    sha = escape(&cm.sha),
+                    subj = escape(&cm.subject),
+                )
+            })
+            .collect();
+        format!(
+            r#"<table class="min-w-full text-sm">
+  <thead><tr class="border-b"><th class="text-left px-2">sha</th><th class="text-left px-2">subject</th></tr></thead>
+  <tbody>{rows}</tbody>
+</table>"#,
+            rows = rows.join("")
+        )
+    };
+
+    let infra_badge = if c.infra_only {
+        r#" <span class="ml-2 px-2 py-1 text-xs rounded bg-gray-200 text-gray-600">infra-only</span>"#
+    } else {
+        ""
+    };
+
+    let body = format!(
+        r#"<p class="mb-4"><a class="text-blue-700 underline" href="/admin/compliance">← back to dashboard</a></p>
+<header class="mb-6">
+  <h1 class="text-2xl font-bold">{name}{badge}</h1>
+  <p class="text-gray-600">upstream: {upstream}</p>
+</header>
+<section class="grid grid-cols-3 gap-4 mb-6">
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">4-TRACK SCORE</div>
+    <div class="text-3xl font-bold {score_color} px-2 inline-block rounded">{score}</div>
+  </div>
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">STUB MARKERS</div>
+    <div class="text-3xl font-bold">{stubs}</div>
+    <div class="text-xs text-gray-400">unimpl {unimpl} · todo {todo} · ignored {ignored}</div>
+  </div>
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">BACKEND</div>
+    <div class="text-3xl font-bold">{loc}</div>
+    <div class="text-xs text-gray-400">LOC across src/ · {tests} tests</div>
+  </div>
+</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">4-track breakdown</h2>{track}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">Ignored tests</h2>{ignored_block}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">parity.manifest.toml</h2>{manifest}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">Recent commits (last 10)</h2>{commits}</section>
+"#,
+        name = escape(&c.name),
+        badge = infra_badge,
+        upstream = escape(&upstream),
+        score = c.four_track_score,
+        score_color = cell_color(c.four_track_score),
+        stubs = c.unimplemented_count + c.todo_count + c.ignored_test_count,
+        unimpl = c.unimplemented_count,
+        todo = c.todo_count,
+        ignored = c.ignored_test_count,
+        loc = c.backend_loc,
+        tests = c.backend_test_count,
+        track = track_html,
+        ignored_block = ignored_html,
+        manifest = manifest_html,
+        commits = commits_html,
+    );
+    Ok(page_shell(
+        &format!("compliance · {} · {}", escape(ctx.tenant.as_str()), escape(&c.name)),
+        &body,
+    ))
+}
 
 #[cfg(test)]
 mod tests {
@@ -619,19 +1277,97 @@ name = "cave-x"
     }
 
     #[test]
-    fn is_infra_only_recognises_canonical_names() {
+    fn is_infra_only_fallback_recognises_canonical_names() {
         let (_c, _t) = portal_test_ctx!(
             "plugins/tech-insights/src/components/Scorecards/InfraList.tsx",
             "InfraList",
             "acme"
         );
-        assert!(is_infra_only("cave-cli"));
-        assert!(is_infra_only("cave-core"));
-        assert!(is_infra_only("cave-runtime"));
-        assert!(is_infra_only("cave-portal"));
-        assert!(!is_infra_only("cave-keda"));
-        assert!(!is_infra_only("cave-policy"));
-        assert!(!is_infra_only("cave-rdbms-operator"));
+        assert!(is_infra_only_fallback("cave-cli"));
+        assert!(is_infra_only_fallback("cave-core"));
+        assert!(is_infra_only_fallback("cave-runtime"));
+        assert!(is_infra_only_fallback("cave-portal"));
+        assert!(!is_infra_only_fallback("cave-keda"));
+        assert!(!is_infra_only_fallback("cave-policy"));
+        assert!(!is_infra_only_fallback("cave-rdbms-operator"));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_reads_infra_only_flag_true() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraTrue",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org     = "cave-runtime"
+repo    = "cave-runtime"
+version = "v0.1.0"
+
+[module]
+name = "cave-cli"
+
+[parity]
+infra_only = true
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.infra_only, Some(true));
+        assert_eq!(m.upstream_version.as_deref(), Some("v0.1.0"));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_reads_infra_only_flag_false() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraFalse",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org = "redis"
+repo = "redis"
+version = "7.2.0"
+
+[parity]
+infra_only = false
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.infra_only, Some(false));
+    }
+
+    #[test]
+    fn parse_parity_manifest_full_omits_infra_only_when_absent() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "manifestInfraAbsent",
+            "acme"
+        );
+        let manifest = r#"
+[upstream]
+org = "redis"
+repo = "redis"
+version = "7.2.0"
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert!(m.infra_only.is_none());
+        assert_eq!(m.upstream_org_repo.as_deref(), Some("redis/redis"));
+    }
+
+    #[test]
+    fn analyse_crate_picks_up_manifest_infra_only_override() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Manifest.tsx",
+            "analyseCrateInfra",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        // cave-cli has [parity] infra_only = true in its manifest.
+        let c = analyse_crate(&workspace, "cave-cli").unwrap();
+        assert!(c.infra_only);
+        // cave-keda is not infra-only (no flag, not in fallback list).
+        let k = analyse_crate(&workspace, "cave-keda").unwrap();
+        assert!(!k.infra_only);
     }
 
     #[test]
@@ -769,5 +1505,435 @@ name = "cave-x"
                 panic!("workspace root not found");
             }
         }
+    }
+
+    // ── P3 cache tests ────────────────────────────────────────────────────────
+    //
+    // These tests share a process-wide cache via `OnceLock`, so they
+    // serialise on the same mutex to avoid step-on-each-other ordering.
+
+    use std::sync::Mutex as TestMutex;
+    static CACHE_TEST_LOCK: TestMutex<()> = TestMutex::new(());
+
+    fn reset_cache() {
+        invalidate_cache();
+    }
+
+    #[test]
+    fn cached_snapshot_returns_same_value_within_ttl() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheHit",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let first = cached_snapshot_or_refresh_at(t0, Duration::from_secs(300));
+        // 30s later — still within the 5-min window, cache returns the same snapshot.
+        let later = t0 + chrono::Duration::seconds(30);
+        let second = cached_snapshot_or_refresh_at(later, Duration::from_secs(300));
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn cached_snapshot_refreshes_after_ttl_expires() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheStale",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(1));
+        let cached_at_before = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        // Jump well past the 1-second TTL.
+        let later = t0 + chrono::Duration::seconds(60);
+        let _ = cached_snapshot_or_refresh_at(later, Duration::from_secs(1));
+        let cached_at_after = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        assert_ne!(cached_at_before, cached_at_after);
+        assert_eq!(cached_at_after, later);
+    }
+
+    #[test]
+    fn force_refresh_replaces_cache_even_when_fresh() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheManualRefresh",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(3600));
+        let later = t0 + chrono::Duration::seconds(10);
+        let entry = force_refresh_at(later);
+        // Cache should now hold the forced timestamp, not t0.
+        assert_eq!(entry.cached_at, later);
+        let stored_at = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        assert_eq!(stored_at, later);
+    }
+
+    #[test]
+    fn invalidate_cache_returns_previous_timestamp_then_clears() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheInvalidate",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(300));
+        let prev = invalidate_cache().unwrap();
+        assert_eq!(prev, t0);
+        // After invalidate, cache_cell is empty.
+        assert!(cache_cell().lock().unwrap().is_none());
+        // Second invalidate is a no-op — returns None.
+        assert!(invalidate_cache().is_none());
+    }
+
+    #[test]
+    fn handle_refresh_requires_refresh_permission() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "refreshGate",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // View-only permission must be rejected.
+        let view_only = ctx(&[Permission::AdminComplianceView]);
+        let err = handle_refresh(&view_only).unwrap_err();
+        assert!(matches!(err, ComplianceViewError::Auth(_)));
+        // Refresh permission succeeds and renders the ack page.
+        reset_cache();
+        let refresher = ctx(&[Permission::AdminComplianceRefresh]);
+        let html = handle_refresh(&refresher).unwrap();
+        assert!(html.contains("Compliance cache refreshed"));
+    }
+
+    #[tokio::test]
+    async fn spawn_background_refresh_is_idempotent_and_populates_cache() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheBackground",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let handle = spawn_background_refresh(Duration::from_millis(50));
+        // Wait long enough for at least one tick after the initial skip.
+        tokio::time::sleep(Duration::from_millis(180)).await;
+        handle.abort();
+        // After the background pass, the cache should be populated and
+        // a follow-up call within the TTL must return it without re-walking.
+        let stored = cache_cell().lock().unwrap().clone().expect("cache populated");
+        let now = stored.cached_at + chrono::Duration::seconds(1);
+        let snap = cached_snapshot_or_refresh_at(now, Duration::from_secs(300));
+        assert_eq!(snap, stored.snapshot);
+    }
+
+    // ── P4 detail-page tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn build_crate_detail_returns_populated_struct_for_real_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownData",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let detail = build_crate_detail(&workspace, "cave-cache").unwrap();
+        assert_eq!(detail.compliance.name, "cave-cache");
+        // cave-cache has a parity manifest in this repo.
+        assert!(detail.parity_manifest_raw.is_some());
+    }
+
+    #[test]
+    fn build_crate_detail_errors_for_unknown_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownUnknown",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let err = build_crate_detail(&workspace, "cave-does-not-exist").unwrap_err();
+        assert!(matches!(err, ComplianceViewError::BadRoot(_)));
+    }
+
+    #[test]
+    fn render_detail_includes_back_link_score_and_manifest() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownRender",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: CrateCompliance {
+                name: "cave-x".into(),
+                upstream_version: Some("1.2.3".into()),
+                upstream_org_repo: Some("org/repo".into()),
+                backend_loc: 42,
+                backend_test_count: 5,
+                ignored_test_count: 1,
+                unimplemented_count: 0,
+                todo_count: 0,
+                portal_admin_present: true,
+                cavectl_subcommand_present: false,
+                obs_alerts_present: true,
+                obs_dashboard_present: false,
+                four_track_score: 87,
+                infra_only: false,
+            },
+            ignored_tests: vec![IgnoredTest {
+                file: "crates/cave-x/src/lib.rs".into(),
+                line: 17,
+                name: "wip_thing".into(),
+            }],
+            parity_manifest_raw: Some("[upstream]\nversion = \"1.2.3\"\n".into()),
+            recent_commits: vec![CommitRow {
+                sha: "abc123".into(),
+                subject: "feat(cave-x): kick off".into(),
+            }],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("← back to dashboard"));
+        assert!(html.contains("cave-x"));
+        assert!(html.contains(">87<"));
+        assert!(html.contains("org/repo @ 1.2.3"));
+        assert!(html.contains("wip_thing"));
+        assert!(html.contains("abc123"));
+        assert!(html.contains("crates/cave-x/src/lib.rs"));
+    }
+
+    #[test]
+    fn render_detail_refuses_without_view_permission() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "drilldownGate",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: stub_compliance("cave-x", 50),
+            ignored_tests: vec![],
+            parity_manifest_raw: None,
+            recent_commits: vec![],
+        };
+        let err = render_detail(&detail, &ctx(&[])).unwrap_err();
+        assert!(matches!(err, ComplianceViewError::Auth(_)));
+    }
+
+    #[test]
+    fn render_detail_marks_infra_only_in_header() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownInfra",
+            "acme"
+        );
+        let mut compliance = stub_compliance("cave-cli", 25);
+        compliance.infra_only = true;
+        let detail = CrateDetail {
+            compliance,
+            ignored_tests: vec![],
+            parity_manifest_raw: None,
+            recent_commits: vec![],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("infra-only"));
+    }
+
+    // ── P5 sort/filter tests ─────────────────────────────────────────────────
+
+    fn snap_three() -> ComplianceSnapshot {
+        let mut a = stub_compliance("cave-a", 30);
+        a.unimplemented_count = 5;
+        let mut b = stub_compliance("cave-b", 70);
+        b.unimplemented_count = 1;
+        let mut c = stub_compliance("cave-c", 100);
+        c.unimplemented_count = 0;
+        let mut infra = stub_compliance("cave-cli", 25);
+        infra.infra_only = true;
+        ComplianceSnapshot { crates: vec![a, b, c, infra] }
+    }
+
+    #[test]
+    fn view_query_sort_by_score_orders_worst_first() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "sortByScore",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Score,
+            filter: FilterMode::All,
+        };
+        let rows = view.apply(&snap_three());
+        assert_eq!(rows.first().unwrap().name, "cave-cli"); // 25 (lowest)
+        assert_eq!(rows.last().unwrap().name, "cave-c");    // 100 (highest)
+    }
+
+    #[test]
+    fn view_query_sort_by_stub_count_orders_most_first() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "sortByStubs",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::All,
+        };
+        let rows = view.apply(&snap_three());
+        // cave-a has 5 unimpl, the most.
+        assert_eq!(rows.first().unwrap().name, "cave-a");
+    }
+
+    #[test]
+    fn view_query_filter_score_under_50_drops_others_and_infra() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterScoreLt50",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Score,
+            filter: FilterMode::ScoreUnder50,
+        };
+        let rows = view.apply(&snap_three());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "cave-a");
+    }
+
+    #[test]
+    fn view_query_filter_track_gap_excludes_perfect_and_infra() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterTrackGap",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::TrackGap,
+        };
+        let rows = view.apply(&snap_three());
+        let names: Vec<&str> = rows.iter().map(|c| c.name.as_str()).collect();
+        // cave-a (30) and cave-b (70) have gaps; cave-c (100) does not;
+        // cave-cli (infra) is excluded regardless.
+        assert_eq!(names, vec!["cave-a", "cave-b"]);
+    }
+
+    #[test]
+    fn view_query_filter_exclude_infra_drops_infra_only() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterExcludeInfra",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::ExcludeInfra,
+        };
+        let rows = view.apply(&snap_three());
+        assert!(rows.iter().all(|c| !c.infra_only));
+        assert_eq!(rows.len(), 3);
+    }
+
+    #[test]
+    fn view_query_to_query_string_round_trips_through_parsers() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "urlRoundTrip",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::TrackGap,
+        };
+        let qs = view.to_query_string();
+        assert_eq!(qs, "sort=stubs&filter=track_gap");
+        // Pretend the browser sent it back — parsers should recover the same view.
+        let parsed_sort = SortKey::parse("stubs");
+        let parsed_filter = FilterMode::parse("track_gap");
+        assert_eq!(parsed_sort, SortKey::StubCount);
+        assert_eq!(parsed_filter, FilterMode::TrackGap);
+    }
+
+    #[test]
+    fn render_with_view_preserves_selection_in_form_markup() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "renderPreservesSelection",
+            "acme"
+        );
+        let snap = snap_three();
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::TrackGap,
+        };
+        let html = render_with_view(&snap, &ctx(&[Permission::AdminComplianceView]), view).unwrap();
+        // Both selected= markers should be present in the form HTML.
+        assert!(html.contains(r#"value="stubs" selected"#));
+        assert!(html.contains(r#"value="track_gap" selected"#));
+        // Default render (no view) still works through the legacy entry point.
+        let html_default = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html_default.contains(r#"value="score" selected"#));
+        assert!(html_default.contains(r#"value="all" selected"#));
+    }
+
+    #[test]
+    fn scan_ignored_tests_picks_up_attribute_and_fn_name() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "ignoredScan",
+            "acme"
+        );
+        let tmp = tempfile_dir_with_ignored_fn();
+        let crate_dir = tmp.path().join("crates/cave-toy/src");
+        std::fs::create_dir_all(&crate_dir).unwrap();
+        std::fs::write(
+            crate_dir.join("lib.rs"),
+            "#[test]\n#[ignore = \"todo\"]\nfn wip_one() {}\n",
+        )
+        .unwrap();
+        let found = scan_ignored_tests(tmp.path(), "cave-toy");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "wip_one");
+        assert_eq!(found[0].line, 2);
+        assert!(found[0].file.contains("lib.rs"));
+    }
+
+    fn tempfile_dir_with_ignored_fn() -> tempfile::TempDir {
+        tempfile::TempDir::new().expect("tempdir")
+    }
+
+    #[test]
+    fn cached_snapshot_is_stale_handles_clock_skew() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheSkew",
+            "acme"
+        );
+        let now = Utc::now();
+        let cached = CachedSnapshot::new(
+            ComplianceSnapshot { crates: vec![] },
+            now + chrono::Duration::seconds(60), // future timestamp
+        );
+        assert!(!cached.is_stale(now, Duration::from_secs(1)));
     }
 }

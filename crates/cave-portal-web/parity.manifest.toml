@@ -14,3 +14,6 @@ name        = "cave-portal-web"
 description = "Backstage frontend / web surface — sub-crate of cave-portal"
 source_root = "src"
 parent_module = "cave-portal"
+
+[parity]
+infra_only = true

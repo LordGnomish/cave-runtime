@@ -53,3 +53,6 @@ local    = "src/admin/mesh.rs"
 [[files]]
 upstream = "plugins/search/src/components/SearchType/SearchType.tsx"
 local    = "src/admin/pg.rs"
+
+[parity]
+infra_only = true

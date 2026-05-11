@@ -22,3 +22,6 @@ source_root = "src"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 # Intentionally empty.
+
+[parity]
+infra_only = true

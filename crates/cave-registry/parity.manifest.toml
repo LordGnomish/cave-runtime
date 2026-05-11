@@ -38,3 +38,6 @@ priority    = "high"
 # kind          = "http"
 # upstream_path = "/v2/{name}/manifests/{reference}"
 # local_path    = "/v2/{name}/manifests/{reference}"
+
+[parity]
+infra_only = true
