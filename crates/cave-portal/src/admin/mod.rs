@@ -22,6 +22,7 @@ pub mod ai_obs;
 pub mod alerts;
 pub mod apiserver;
 pub mod artifacts;
+pub mod auth;
 pub mod backup;
 pub mod cache;
 pub mod chaos;
@@ -33,15 +34,21 @@ pub mod contributions;
 pub mod controller_manager;
 pub mod cost;
 pub mod cri;
+pub mod dashboard;
 pub mod dast;
 pub mod devlake;
+pub mod dns;
 pub mod docdb;
+pub mod erp;
 pub mod etcd;
 pub mod forensics;
 pub mod gateway;
+pub mod ha;
 pub mod iam;
 pub mod incidents;
 pub mod infra;
+pub mod logs;
+pub mod metrics;
 pub mod kamaji;
 pub mod keda;
 pub mod kube_proxy;
@@ -58,8 +65,11 @@ pub mod sbom;
 pub mod scan;
 pub mod scheduler;
 pub mod secrets;
+pub mod security;
 pub mod slo;
+pub mod store;
 pub mod streams;
+pub mod trace;
 pub mod uptime;
 pub mod vulns;
 pub mod workflows;
@@ -165,6 +175,16 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::UptimeRead,
         Permission::ClusterRead,
         Permission::KubeProxyRead,
+        Permission::StoreRead,
+        Permission::MetricsRead,
+        Permission::TraceRead,
+        Permission::AuthSessionsRead,
+        Permission::DashboardRead2,
+        Permission::DnsRead,
+        Permission::LogsRead,
+        Permission::SecurityRead,
+        Permission::HaRead,
+        Permission::ErpRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -444,6 +464,16 @@ async fn secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Que
 async fn uptime_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); uptime::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn cluster_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cluster::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn kube_proxy_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kube_proxy::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); store::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn security_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); security::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn ha_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ha::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn erp_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); erp::render(&s, &ctx).map(Html).map_err(err_to_response) }
 
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -546,6 +576,16 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/uptime", get(uptime_handler))
         .route("/admin/cluster", get(cluster_handler))
         .route("/admin/kube-proxy", get(kube_proxy_handler))
+        .route("/admin/store", get(store_handler))
+        .route("/admin/metrics", get(metrics_handler))
+        .route("/admin/trace", get(trace_handler))
+        .route("/admin/auth-sessions", get(auth_sessions_handler))
+        .route("/admin/dashboard-catalog", get(dashboard_handler))
+        .route("/admin/dns", get(dns_handler))
+        .route("/admin/logs", get(logs_handler))
+        .route("/admin/security", get(security_handler))
+        .route("/admin/ha", get(ha_handler))
+        .route("/admin/erp", get(erp_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))

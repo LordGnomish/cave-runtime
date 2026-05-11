@@ -118,6 +118,18 @@ pub enum Permission {
     UptimeRead,
     ClusterRead,
     KubeProxyRead,
+
+    // ── 2026-05-11 batch F: 10 more tier1 admin pages ──────────────────
+    StoreRead,
+    MetricsRead,
+    TraceRead,
+    AuthSessionsRead,
+    DashboardRead2,
+    DnsRead,
+    LogsRead,
+    SecurityRead,
+    HaRead,
+    ErpRead,
 }
 
 impl Permission {
@@ -193,6 +205,16 @@ impl Permission {
             Permission::UptimeRead => "uptime.probe.read",
             Permission::ClusterRead => "cluster.kube.read",
             Permission::KubeProxyRead => "kube-proxy.service.read",
+            Permission::StoreRead => "store.bucket.read",
+            Permission::MetricsRead => "metrics.series.read",
+            Permission::TraceRead => "trace.service.read",
+            Permission::AuthSessionsRead => "auth.session.read",
+            Permission::DashboardRead2 => "dashboard.catalog.read",
+            Permission::DnsRead => "dns.zone.read",
+            Permission::LogsRead => "logs.stream.read",
+            Permission::SecurityRead => "security.event.read",
+            Permission::HaRead => "ha.failover.read",
+            Permission::ErpRead => "erp.invoice.read",
         }
     }
 }
