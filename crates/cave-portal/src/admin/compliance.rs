@@ -752,11 +752,146 @@ fn check(b: bool) -> &'static str {
     }
 }
 
+/// Column the dashboard rows are sorted by. The selector is exposed
+/// in the URL (`?sort=score`); unknown values fall back to `Score`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SortKey {
+    /// Worst-compliance first — the default. Drives the maintainer's eye.
+    Score,
+    /// Highest stub indicator count first (unimpl + todo + ignored).
+    StubCount,
+    /// Crate name, lexicographic ascending — useful for "find a crate".
+    Name,
+}
+
+impl SortKey {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "stubs" | "stub_count" => SortKey::StubCount,
+            "name" => SortKey::Name,
+            _ => SortKey::Score,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SortKey::Score => "score",
+            SortKey::StubCount => "stubs",
+            SortKey::Name => "name",
+        }
+    }
+}
+
+impl Default for SortKey {
+    fn default() -> Self {
+        SortKey::Score
+    }
+}
+
+/// Optional filter applied before sorting. Multiple values aren't
+/// combined — the selector is single-pick to keep the URL readable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterMode {
+    /// Show every crate, including infra-only ones.
+    All,
+    /// Tier-1 crates whose 4-track score is below 50 (Grade F territory).
+    ScoreUnder50,
+    /// Tier-1 crates that have at least one missing 4-track signal
+    /// (i.e. score < 100). Highlights the long tail.
+    TrackGap,
+    /// Hide infra-only crates entirely.
+    ExcludeInfra,
+}
+
+impl FilterMode {
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "score_lt_50" | "score<50" => FilterMode::ScoreUnder50,
+            "track_gap" => FilterMode::TrackGap,
+            "exclude_infra" => FilterMode::ExcludeInfra,
+            _ => FilterMode::All,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FilterMode::All => "all",
+            FilterMode::ScoreUnder50 => "score_lt_50",
+            FilterMode::TrackGap => "track_gap",
+            FilterMode::ExcludeInfra => "exclude_infra",
+        }
+    }
+}
+
+impl Default for FilterMode {
+    fn default() -> Self {
+        FilterMode::All
+    }
+}
+
+/// Query-string knobs for the dashboard view — survives across links
+/// so a maintainer can deep-link into a filtered view.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ViewQuery {
+    pub sort: SortKey,
+    pub filter: FilterMode,
+}
+
+impl ViewQuery {
+    /// Apply filter + sort to the snapshot's crate list. Returns a new
+    /// vec — the underlying snapshot is left untouched.
+    pub fn apply(&self, snapshot: &ComplianceSnapshot) -> Vec<CrateCompliance> {
+        let mut rows: Vec<CrateCompliance> = snapshot
+            .crates
+            .iter()
+            .filter(|c| match self.filter {
+                FilterMode::All => true,
+                FilterMode::ScoreUnder50 => !c.infra_only && c.four_track_score < 50,
+                FilterMode::TrackGap => !c.infra_only && c.four_track_score < 100,
+                FilterMode::ExcludeInfra => !c.infra_only,
+            })
+            .cloned()
+            .collect();
+        match self.sort {
+            SortKey::Score => rows.sort_by(|a, b| match a.four_track_score.cmp(&b.four_track_score) {
+                Ordering::Equal => a.name.cmp(&b.name),
+                ord => ord,
+            }),
+            SortKey::StubCount => {
+                rows.sort_by(|a, b| {
+                    let sa = a.unimplemented_count + a.todo_count + a.ignored_test_count;
+                    let sb = b.unimplemented_count + b.todo_count + b.ignored_test_count;
+                    match sb.cmp(&sa) {
+                        Ordering::Equal => a.name.cmp(&b.name),
+                        ord => ord,
+                    }
+                });
+            }
+            SortKey::Name => rows.sort_by(|a, b| a.name.cmp(&b.name)),
+        }
+        rows
+    }
+
+    /// Build the `?sort=…&filter=…` querystring fragment (without `?`).
+    pub fn to_query_string(&self) -> String {
+        format!("sort={}&filter={}", self.sort.as_str(), self.filter.as_str())
+    }
+}
+
 pub fn render(
     snapshot: &ComplianceSnapshot,
     ctx: &RequestCtx,
 ) -> Result<String, ComplianceViewError> {
+    render_with_view(snapshot, ctx, ViewQuery::default())
+}
+
+pub fn render_with_view(
+    snapshot: &ComplianceSnapshot,
+    ctx: &RequestCtx,
+    view: ViewQuery,
+) -> Result<String, ComplianceViewError> {
     ctx.authorise(Permission::AdminComplianceView)?;
+    let filtered = view.apply(snapshot);
     let total = snapshot.crates.len();
     let tier1 = snapshot.tier1_count();
     let infra = snapshot.infra_count();
@@ -765,8 +900,7 @@ pub fn render(
     let grade = snapshot.grade();
     let avg_color = cell_color(avg);
 
-    let rows: Vec<Vec<String>> = snapshot
-        .crates
+    let rows: Vec<Vec<String>> = filtered
         .iter()
         .map(|c| {
             let score_html = if c.infra_only {
@@ -801,6 +935,39 @@ pub fn render(
         })
         .collect();
 
+    let sort_form = format!(
+        r#"<form method="get" action="/admin/compliance" class="mb-4 flex gap-3 items-end">
+  <input type="hidden" name="tenant_id" value="{tenant}" />
+  <label class="text-sm">sort by
+    <select name="sort" class="border rounded px-2 py-1">
+      <option value="score"{sel_score}>score (worst first)</option>
+      <option value="stubs"{sel_stubs}>stub count (most first)</option>
+      <option value="name"{sel_name}>name (A→Z)</option>
+    </select>
+  </label>
+  <label class="text-sm">filter
+    <select name="filter" class="border rounded px-2 py-1">
+      <option value="all"{f_all}>all crates</option>
+      <option value="score_lt_50"{f_lt50}>tier-1 with score &lt; 50</option>
+      <option value="track_gap"{f_gap}>tier-1 with any track gap</option>
+      <option value="exclude_infra"{f_xinf}>exclude infra-only</option>
+    </select>
+  </label>
+  <button type="submit" class="bg-blue-600 text-white text-sm px-3 py-1 rounded">apply</button>
+  <span class="text-xs text-gray-500 ml-2">showing {shown} / {total}</span>
+</form>"#,
+        tenant = escape(ctx.tenant.as_str()),
+        sel_score = if view.sort == SortKey::Score { " selected" } else { "" },
+        sel_stubs = if view.sort == SortKey::StubCount { " selected" } else { "" },
+        sel_name = if view.sort == SortKey::Name { " selected" } else { "" },
+        f_all = if view.filter == FilterMode::All { " selected" } else { "" },
+        f_lt50 = if view.filter == FilterMode::ScoreUnder50 { " selected" } else { "" },
+        f_gap = if view.filter == FilterMode::TrackGap { " selected" } else { "" },
+        f_xinf = if view.filter == FilterMode::ExcludeInfra { " selected" } else { "" },
+        shown = filtered.len(),
+        total = total,
+    );
+
     let body = format!(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
@@ -812,6 +979,7 @@ pub fn render(
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">GRADE</div><div class="text-3xl font-bold">{grade}</div></div>
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL</div><div class="text-3xl font-bold">{total}</div></div>
 </section>
+{sort_form}
 <section><h2 class="text-lg font-semibold mb-2">Per-crate matrix</h2>{tbl}</section>"#,
         quote = escape(GOLDEN_RULE),
         total = total,
@@ -821,6 +989,7 @@ pub fn render(
         avg_color = avg_color,
         stubs = stubs,
         grade = grade,
+        sort_form = sort_form,
         tbl = table(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
@@ -1587,6 +1756,144 @@ version = "7.2.0"
         };
         let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
         assert!(html.contains("infra-only"));
+    }
+
+    // ── P5 sort/filter tests ─────────────────────────────────────────────────
+
+    fn snap_three() -> ComplianceSnapshot {
+        let mut a = stub_compliance("cave-a", 30);
+        a.unimplemented_count = 5;
+        let mut b = stub_compliance("cave-b", 70);
+        b.unimplemented_count = 1;
+        let mut c = stub_compliance("cave-c", 100);
+        c.unimplemented_count = 0;
+        let mut infra = stub_compliance("cave-cli", 25);
+        infra.infra_only = true;
+        ComplianceSnapshot { crates: vec![a, b, c, infra] }
+    }
+
+    #[test]
+    fn view_query_sort_by_score_orders_worst_first() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "sortByScore",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Score,
+            filter: FilterMode::All,
+        };
+        let rows = view.apply(&snap_three());
+        assert_eq!(rows.first().unwrap().name, "cave-cli"); // 25 (lowest)
+        assert_eq!(rows.last().unwrap().name, "cave-c");    // 100 (highest)
+    }
+
+    #[test]
+    fn view_query_sort_by_stub_count_orders_most_first() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "sortByStubs",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::All,
+        };
+        let rows = view.apply(&snap_three());
+        // cave-a has 5 unimpl, the most.
+        assert_eq!(rows.first().unwrap().name, "cave-a");
+    }
+
+    #[test]
+    fn view_query_filter_score_under_50_drops_others_and_infra() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterScoreLt50",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Score,
+            filter: FilterMode::ScoreUnder50,
+        };
+        let rows = view.apply(&snap_three());
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "cave-a");
+    }
+
+    #[test]
+    fn view_query_filter_track_gap_excludes_perfect_and_infra() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterTrackGap",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::TrackGap,
+        };
+        let rows = view.apply(&snap_three());
+        let names: Vec<&str> = rows.iter().map(|c| c.name.as_str()).collect();
+        // cave-a (30) and cave-b (70) have gaps; cave-c (100) does not;
+        // cave-cli (infra) is excluded regardless.
+        assert_eq!(names, vec!["cave-a", "cave-b"]);
+    }
+
+    #[test]
+    fn view_query_filter_exclude_infra_drops_infra_only() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "filterExcludeInfra",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::ExcludeInfra,
+        };
+        let rows = view.apply(&snap_three());
+        assert!(rows.iter().all(|c| !c.infra_only));
+        assert_eq!(rows.len(), 3);
+    }
+
+    #[test]
+    fn view_query_to_query_string_round_trips_through_parsers() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "urlRoundTrip",
+            "acme"
+        );
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::TrackGap,
+        };
+        let qs = view.to_query_string();
+        assert_eq!(qs, "sort=stubs&filter=track_gap");
+        // Pretend the browser sent it back — parsers should recover the same view.
+        let parsed_sort = SortKey::parse("stubs");
+        let parsed_filter = FilterMode::parse("track_gap");
+        assert_eq!(parsed_sort, SortKey::StubCount);
+        assert_eq!(parsed_filter, FilterMode::TrackGap);
+    }
+
+    #[test]
+    fn render_with_view_preserves_selection_in_form_markup() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/SortFilter.tsx",
+            "renderPreservesSelection",
+            "acme"
+        );
+        let snap = snap_three();
+        let view = ViewQuery {
+            sort: SortKey::StubCount,
+            filter: FilterMode::TrackGap,
+        };
+        let html = render_with_view(&snap, &ctx(&[Permission::AdminComplianceView]), view).unwrap();
+        // Both selected= markers should be present in the form HTML.
+        assert!(html.contains(r#"value="stubs" selected"#));
+        assert!(html.contains(r#"value="track_gap" selected"#));
+        // Default render (no view) still works through the legacy entry point.
+        let html_default = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html_default.contains(r#"value="score" selected"#));
+        assert!(html_default.contains(r#"value="all" selected"#));
     }
 
     #[test]

@@ -409,12 +409,37 @@ async fn streams_handler(
     streams::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ComplianceQuery {
+    pub tenant_id: String,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub filter: Option<String>,
+}
+
 async fn compliance_handler(
-    Query(q): Query<AdminQuery>,
+    Query(q): Query<ComplianceQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(q);
+    let view = compliance::ViewQuery {
+        sort: q
+            .sort
+            .as_deref()
+            .map(compliance::SortKey::parse)
+            .unwrap_or_default(),
+        filter: q
+            .filter
+            .as_deref()
+            .map(compliance::FilterMode::parse)
+            .unwrap_or_default(),
+    };
+    let ctx = extract_ctx_from_query(AdminQuery {
+        tenant_id: q.tenant_id,
+    });
     let snap = compliance::cached_snapshot_or_refresh();
-    compliance::render(&snap, &ctx).map(Html).map_err(err_to_response)
+    compliance::render_with_view(&snap, &ctx, view)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn compliance_detail_handler(
