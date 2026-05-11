@@ -475,6 +475,171 @@ pub struct Slo {
     pub error_budget_remaining_pct: f32,
 }
 
+// ── cave-ai-obs ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiModelMetric {
+    pub tenant: TenantId,
+    pub model: String,
+    pub tokens_in: u64,
+    pub tokens_out: u64,
+    pub latency_p99_ms: u32,
+}
+
+// ── cave-chat ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChatThread {
+    pub tenant: TenantId,
+    pub id: String,
+    pub topic: String,
+    pub members: u32,
+    pub last_message_unix: i64,
+}
+
+// ── cave-cost ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CostReport {
+    pub tenant: TenantId,
+    pub period: String,
+    pub service: String,
+    pub amount_cents: u64,
+}
+
+// ── cave-dast ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DastScan {
+    pub tenant: TenantId,
+    pub target: String,
+    pub scan_id: String,
+    pub findings: u32,
+    pub severity: &'static str,
+}
+
+// ── cave-devlake ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DevlakeMetric {
+    pub tenant: TenantId,
+    pub project: String,
+    pub metric: String,
+    pub value_thousandths: u64,
+}
+
+// ── cave-forensics ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ForensicsEvidence {
+    pub tenant: TenantId,
+    pub case_id: String,
+    pub artifact: String,
+    pub collected_unix: i64,
+    pub digest: String,
+}
+
+// ── cave-gateway ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GatewayRoute {
+    pub tenant: TenantId,
+    pub name: String,
+    pub listener: String,
+    pub hostname: String,
+    pub backend: String,
+}
+
+// ── cave-infra ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InfraStack {
+    pub tenant: TenantId,
+    pub name: String,
+    pub provider: String,
+    pub region: String,
+    pub resources: u32,
+    pub state: &'static str,
+}
+
+// ── cave-pam ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PamSession {
+    pub tenant: TenantId,
+    pub id: String,
+    pub principal: String,
+    pub target: String,
+    pub started_unix: i64,
+    pub ended_unix: Option<i64>,
+}
+
+// ── cave-sbom ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SbomComponent {
+    pub tenant: TenantId,
+    pub image: String,
+    pub package: String,
+    pub version: String,
+    pub license: String,
+}
+
+// ── cave-scan ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScanResult {
+    pub tenant: TenantId,
+    pub scan_id: String,
+    pub scanner: String,
+    pub findings: u32,
+    pub worst_severity: &'static str,
+}
+
+// ── cave-secrets ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretMetadata {
+    pub tenant: TenantId,
+    pub path: String,
+    pub backend: String,
+    pub version: u32,
+    pub created_unix: i64,
+}
+
+// ── cave-uptime ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UptimeProbe {
+    pub tenant: TenantId,
+    pub name: String,
+    pub url: String,
+    pub interval_seconds: u32,
+    pub last_status: &'static str,
+}
+
+// ── cave-cluster ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KubeCluster {
+    pub tenant: TenantId,
+    pub name: String,
+    pub k8s_version: String,
+    pub nodes: u32,
+    pub state: &'static str,
+}
+
+// ── cave-kube-proxy ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KubeProxyService {
+    pub tenant: TenantId,
+    pub name: String,
+    pub namespace: String,
+    pub cluster_ip: String,
+    pub backend_count: u32,
+}
+
 // ── tenant dashboard recent activity ─────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -533,6 +698,21 @@ pub struct AdminState {
     pub workflow_runs: RwLock<Vec<WorkflowRun>>,
     pub chaos_experiments: RwLock<Vec<ChaosExperiment>>,
     pub slos: RwLock<Vec<Slo>>,
+    pub ai_model_metrics: RwLock<Vec<AiModelMetric>>,
+    pub chat_threads: RwLock<Vec<ChatThread>>,
+    pub cost_reports: RwLock<Vec<CostReport>>,
+    pub dast_scans: RwLock<Vec<DastScan>>,
+    pub devlake_metrics: RwLock<Vec<DevlakeMetric>>,
+    pub forensics_evidence: RwLock<Vec<ForensicsEvidence>>,
+    pub gateway_routes: RwLock<Vec<GatewayRoute>>,
+    pub infra_stacks: RwLock<Vec<InfraStack>>,
+    pub pam_sessions: RwLock<Vec<PamSession>>,
+    pub sbom_components: RwLock<Vec<SbomComponent>>,
+    pub scan_results: RwLock<Vec<ScanResult>>,
+    pub secret_metadatas: RwLock<Vec<SecretMetadata>>,
+    pub uptime_probes: RwLock<Vec<UptimeProbe>>,
+    pub kube_clusters: RwLock<Vec<KubeCluster>>,
+    pub kube_proxy_services: RwLock<Vec<KubeProxyService>>,
 }
 
 impl Default for AdminState {
@@ -589,6 +769,21 @@ impl AdminState {
             workflow_runs: RwLock::new(Vec::new()),
             chaos_experiments: RwLock::new(Vec::new()),
             slos: RwLock::new(Vec::new()),
+            ai_model_metrics: RwLock::new(Vec::new()),
+            chat_threads: RwLock::new(Vec::new()),
+            cost_reports: RwLock::new(Vec::new()),
+            dast_scans: RwLock::new(Vec::new()),
+            devlake_metrics: RwLock::new(Vec::new()),
+            forensics_evidence: RwLock::new(Vec::new()),
+            gateway_routes: RwLock::new(Vec::new()),
+            infra_stacks: RwLock::new(Vec::new()),
+            pam_sessions: RwLock::new(Vec::new()),
+            sbom_components: RwLock::new(Vec::new()),
+            scan_results: RwLock::new(Vec::new()),
+            secret_metadatas: RwLock::new(Vec::new()),
+            uptime_probes: RwLock::new(Vec::new()),
+            kube_clusters: RwLock::new(Vec::new()),
+            kube_proxy_services: RwLock::new(Vec::new()),
         }
     }
 
@@ -851,8 +1046,83 @@ impl AdminState {
         ]);
         s.slos.write().unwrap().extend([
             Slo { tenant: acme.clone(), name: "web-availability".into(), service: "web".into(), objective_pct: 99.9, window_days: 30, current_pct: 99.94, error_budget_remaining_pct: 60.0 },
-            Slo { tenant: acme, name: "api-latency-p99".into(), service: "api".into(), objective_pct: 99.0, window_days: 30, current_pct: 98.7, error_budget_remaining_pct: -30.0 },
-            Slo { tenant: evil, name: "evil-slo".into(), service: "evil".into(), objective_pct: 50.0, window_days: 7, current_pct: 100.0, error_budget_remaining_pct: 100.0 },
+            Slo { tenant: acme.clone(), name: "api-latency-p99".into(), service: "api".into(), objective_pct: 99.0, window_days: 30, current_pct: 98.7, error_budget_remaining_pct: -30.0 },
+            Slo { tenant: evil.clone(), name: "evil-slo".into(), service: "evil".into(), objective_pct: 50.0, window_days: 7, current_pct: 100.0, error_budget_remaining_pct: 100.0 },
+        ]);
+        s.ai_model_metrics.write().unwrap().extend([
+            AiModelMetric { tenant: acme.clone(), model: "gpt-4".into(), tokens_in: 1000000, tokens_out: 500000, latency_p99_ms: 250 },
+            AiModelMetric { tenant: acme.clone(), model: "claude-3".into(), tokens_in: 2000000, tokens_out: 800000, latency_p99_ms: 180 },
+            AiModelMetric { tenant: evil.clone(), model: "evil-model".into(), tokens_in: 1, tokens_out: 1, latency_p99_ms: 9999 },
+        ]);
+        s.chat_threads.write().unwrap().extend([
+            ChatThread { tenant: acme.clone(), id: "thr-1".into(), topic: "deploy-coord".into(), members: 8, last_message_unix: 1001000 },
+            ChatThread { tenant: acme.clone(), id: "thr-2".into(), topic: "incident-response".into(), members: 12, last_message_unix: 1001500 },
+            ChatThread { tenant: evil.clone(), id: "evil-thr".into(), topic: "evil".into(), members: 1, last_message_unix: 999000 },
+        ]);
+        s.cost_reports.write().unwrap().extend([
+            CostReport { tenant: acme.clone(), period: "2026-05".into(), service: "compute".into(), amount_cents: 1250000 },
+            CostReport { tenant: acme.clone(), period: "2026-05".into(), service: "storage".into(), amount_cents: 320000 },
+            CostReport { tenant: evil.clone(), period: "2026-05".into(), service: "evil".into(), amount_cents: 999 },
+        ]);
+        s.dast_scans.write().unwrap().extend([
+            DastScan { tenant: acme.clone(), target: "https://api.acme/".into(), scan_id: "dast-001".into(), findings: 3, severity: "medium" },
+            DastScan { tenant: acme.clone(), target: "https://web.acme/".into(), scan_id: "dast-002".into(), findings: 12, severity: "high" },
+            DastScan { tenant: evil.clone(), target: "https://evil/".into(), scan_id: "evil-1".into(), findings: 0, severity: "info" },
+        ]);
+        s.devlake_metrics.write().unwrap().extend([
+            DevlakeMetric { tenant: acme.clone(), project: "acme-web".into(), metric: "deploy_freq".into(), value_thousandths: 1500 },
+            DevlakeMetric { tenant: acme.clone(), project: "acme-api".into(), metric: "lead_time_hours".into(), value_thousandths: 24000 },
+            DevlakeMetric { tenant: evil.clone(), project: "evil".into(), metric: "evil_metric".into(), value_thousandths: 1 },
+        ]);
+        s.forensics_evidence.write().unwrap().extend([
+            ForensicsEvidence { tenant: acme.clone(), case_id: "CASE-001".into(), artifact: "memdump-pod-web-0".into(), collected_unix: 1001000, digest: "sha256:aaa1".into() },
+            ForensicsEvidence { tenant: acme.clone(), case_id: "CASE-002".into(), artifact: "pcap-2026-05-11".into(), collected_unix: 1001500, digest: "sha256:bbb2".into() },
+            ForensicsEvidence { tenant: evil.clone(), case_id: "EVIL-001".into(), artifact: "evil-evidence".into(), collected_unix: 999000, digest: "sha256:evil".into() },
+        ]);
+        s.gateway_routes.write().unwrap().extend([
+            GatewayRoute { tenant: acme.clone(), name: "web-route".into(), listener: "https-443".into(), hostname: "acme.com".into(), backend: "svc/web:80".into() },
+            GatewayRoute { tenant: acme.clone(), name: "api-route".into(), listener: "https-443".into(), hostname: "api.acme.com".into(), backend: "svc/api:8080".into() },
+            GatewayRoute { tenant: evil.clone(), name: "evil-route".into(), listener: "http-80".into(), hostname: "evil.com".into(), backend: "svc/evil:1".into() },
+        ]);
+        s.infra_stacks.write().unwrap().extend([
+            InfraStack { tenant: acme.clone(), name: "prod-vpc".into(), provider: "aws".into(), region: "eu-central-1".into(), resources: 24, state: "Ok" },
+            InfraStack { tenant: acme.clone(), name: "staging-vpc".into(), provider: "hetzner".into(), region: "hel1".into(), resources: 12, state: "Drift" },
+            InfraStack { tenant: evil.clone(), name: "evil-vpc".into(), provider: "evil".into(), region: "nowhere".into(), resources: 1, state: "Failed" },
+        ]);
+        s.pam_sessions.write().unwrap().extend([
+            PamSession { tenant: acme.clone(), id: "sess-1".into(), principal: "alice@acme".into(), target: "pg-prod-1".into(), started_unix: 1001000, ended_unix: Some(1_001_300) },
+            PamSession { tenant: acme.clone(), id: "sess-2".into(), principal: "bob@acme".into(), target: "etcd-cluster".into(), started_unix: 1001500, ended_unix: None },
+            PamSession { tenant: evil.clone(), id: "evil-sess".into(), principal: "mallory@evil".into(), target: "any".into(), started_unix: 999000, ended_unix: None },
+        ]);
+        s.sbom_components.write().unwrap().extend([
+            SbomComponent { tenant: acme.clone(), image: "web:v17".into(), package: "openssl".into(), version: "3.0.14".into(), license: "Apache-2.0".into() },
+            SbomComponent { tenant: acme.clone(), image: "web:v17".into(), package: "tokio".into(), version: "1.40.0".into(), license: "MIT".into() },
+            SbomComponent { tenant: evil.clone(), image: "evil:x".into(), package: "evil-pkg".into(), version: "0.1.0".into(), license: "Unknown".into() },
+        ]);
+        s.scan_results.write().unwrap().extend([
+            ScanResult { tenant: acme.clone(), scan_id: "scan-1".into(), scanner: "trivy".into(), findings: 5, worst_severity: "High" },
+            ScanResult { tenant: acme.clone(), scan_id: "scan-2".into(), scanner: "grype".into(), findings: 1, worst_severity: "Low" },
+            ScanResult { tenant: evil.clone(), scan_id: "evil-scan".into(), scanner: "evil-scanner".into(), findings: 99, worst_severity: "Critical" },
+        ]);
+        s.secret_metadatas.write().unwrap().extend([
+            SecretMetadata { tenant: acme.clone(), path: "app/db-password".into(), backend: "vault-kv".into(), version: 3, created_unix: 1001000 },
+            SecretMetadata { tenant: acme.clone(), path: "app/api-token".into(), backend: "vault-kv".into(), version: 1, created_unix: 1001500 },
+            SecretMetadata { tenant: evil.clone(), path: "evil/secret".into(), backend: "evil-kv".into(), version: 1, created_unix: 999000 },
+        ]);
+        s.uptime_probes.write().unwrap().extend([
+            UptimeProbe { tenant: acme.clone(), name: "web-prod".into(), url: "https://web.acme/health".into(), interval_seconds: 60, last_status: "Up" },
+            UptimeProbe { tenant: acme.clone(), name: "api-prod".into(), url: "https://api.acme/health".into(), interval_seconds: 30, last_status: "Up" },
+            UptimeProbe { tenant: evil.clone(), name: "evil-probe".into(), url: "https://evil/".into(), interval_seconds: 30, last_status: "Down" },
+        ]);
+        s.kube_clusters.write().unwrap().extend([
+            KubeCluster { tenant: acme.clone(), name: "prod".into(), k8s_version: "1.31.2".into(), nodes: 12, state: "Ready" },
+            KubeCluster { tenant: acme.clone(), name: "staging".into(), k8s_version: "1.31.0".into(), nodes: 4, state: "Upgrading" },
+            KubeCluster { tenant: evil.clone(), name: "evil-k8s".into(), k8s_version: "1.27.0".into(), nodes: 1, state: "Unknown" },
+        ]);
+        s.kube_proxy_services.write().unwrap().extend([
+            KubeProxyService { tenant: acme, name: "web".into(), namespace: "default".into(), cluster_ip: "10.96.10.5".into(), backend_count: 3 },
+            KubeProxyService { tenant: TenantId::new("acme").expect("test fixture"), name: "api".into(), namespace: "default".into(), cluster_ip: "10.96.10.6".into(), backend_count: 5 },
+            KubeProxyService { tenant: evil, name: "evil-svc".into(), namespace: "default".into(), cluster_ip: "10.96.99.99".into(), backend_count: 1 },
         ]);
         s
     }

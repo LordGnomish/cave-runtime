@@ -101,6 +101,23 @@ pub enum Permission {
     ChaosRead,
     ChaosTrigger,
     SloRead,
+
+    // ── 2026-05-11 batch E: tier1 admin pages (15 crates) ─────────────
+    AiObsRead,
+    ChatRead,
+    CostRead,
+    DastRead,
+    DevlakeRead,
+    ForensicsRead,
+    GatewayRead,
+    InfraRead,
+    PamRead,
+    SbomRead,
+    ScanRead,
+    SecretsBrowserRead,
+    UptimeRead,
+    ClusterRead,
+    KubeProxyRead,
 }
 
 impl Permission {
@@ -161,6 +178,21 @@ impl Permission {
             Permission::ChaosRead => "chaos.experiment.read",
             Permission::ChaosTrigger => "chaos.experiment.trigger",
             Permission::SloRead => "slo.objective.read",
+            Permission::AiObsRead => "ai-obs.metric.read",
+            Permission::ChatRead => "chat.thread.read",
+            Permission::CostRead => "cost.report.read",
+            Permission::DastRead => "dast.scan.read",
+            Permission::DevlakeRead => "devlake.metric.read",
+            Permission::ForensicsRead => "forensics.evidence.read",
+            Permission::GatewayRead => "gateway.route.read",
+            Permission::InfraRead => "infra.stack.read",
+            Permission::PamRead => "pam.session.read",
+            Permission::SbomRead => "sbom.component.read",
+            Permission::ScanRead => "scan.result.read",
+            Permission::SecretsBrowserRead => "secrets.metadata.read",
+            Permission::UptimeRead => "uptime.probe.read",
+            Permission::ClusterRead => "cluster.kube.read",
+            Permission::KubeProxyRead => "kube-proxy.service.read",
         }
     }
 }
