@@ -413,8 +413,28 @@ async fn compliance_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
-    let snap = compliance::live_snapshot();
+    let snap = compliance::cached_snapshot_or_refresh();
     compliance::render(&snap, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn compliance_detail_handler(
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(crate_name): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let root = compliance::workspace_root();
+    let detail = compliance::build_crate_detail(&root, &crate_name)
+        .map_err(|e| err_to_response(e))?;
+    compliance::render_detail(&detail, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn compliance_refresh_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    compliance::handle_refresh(&ctx).map(Html).map_err(err_to_response)
 }
 
 async fn policy_handler(
@@ -612,6 +632,8 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/lakehouse", get(lakehouse_handler))
         .route("/admin/streams", get(streams_handler))
         .route("/admin/compliance", get(compliance_handler))
+        .route("/admin/compliance/refresh", get(compliance_refresh_handler))
+        .route("/admin/compliance/:crate_name", get(compliance_detail_handler))
         .route("/admin/policy", get(policy_handler))
         .route("/admin/artifacts", get(artifacts_handler))
         .route("/admin/alerts", get(alerts_handler))

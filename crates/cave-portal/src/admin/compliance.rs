@@ -316,6 +316,157 @@ fn walk_rs_files(root: &Path, visit: &mut impl FnMut(&str)) {
     }
 }
 
+fn walk_rs_files_with_path(root: &Path, base: &Path, visit: &mut impl FnMut(&str, &Path)) {
+    let entries = match fs::read_dir(root) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_rs_files_with_path(&path, base, visit);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            if let Ok(content) = fs::read_to_string(&path) {
+                let rel = path.strip_prefix(base).unwrap_or(&path);
+                visit(&content, rel);
+            }
+        }
+    }
+}
+
+/// One ignored test surfaced by the drill-down view: the source file
+/// (workspace-relative), the line number of the `#[ignore]` attribute,
+/// and the test function name (best-effort).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IgnoredTest {
+    pub file: String,
+    pub line: u32,
+    pub name: String,
+}
+
+/// Scan a crate's `src/` tree for `#[ignore]` annotations. Returns the
+/// file (workspace-relative), line, and the next visible `fn name` so
+/// the drill-down can render a clickable list.
+pub fn scan_ignored_tests(workspace_root: &Path, crate_name: &str) -> Vec<IgnoredTest> {
+    let src_root = workspace_root.join("crates").join(crate_name).join("src");
+    let mut out = Vec::new();
+    walk_rs_files_with_path(&src_root, workspace_root, &mut |content, rel| {
+        let lines: Vec<&str> = content.lines().collect();
+        for (idx, line) in lines.iter().enumerate() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("#[ignore") {
+                // Look ahead up to 5 lines for `fn <name>`.
+                let mut fn_name = String::from("<unknown>");
+                for j in (idx + 1)..lines.len().min(idx + 6) {
+                    if let Some(after) = lines[j].trim_start().strip_prefix("fn ") {
+                        let name: String = after
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !name.is_empty() {
+                            fn_name = name;
+                            break;
+                        }
+                    } else if let Some(after) = lines[j].trim_start().strip_prefix("async fn ") {
+                        let name: String = after
+                            .chars()
+                            .take_while(|c| c.is_alphanumeric() || *c == '_')
+                            .collect();
+                        if !name.is_empty() {
+                            fn_name = name;
+                            break;
+                        }
+                    }
+                }
+                out.push(IgnoredTest {
+                    file: rel.display().to_string(),
+                    line: (idx as u32) + 1,
+                    name: fn_name,
+                });
+            }
+        }
+    });
+    out
+}
+
+/// One commit touching a crate, as surfaced by `git log -- crates/<name>`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommitRow {
+    pub sha: String,
+    pub subject: String,
+}
+
+/// Read the last `limit` commits that touched this crate's directory.
+/// Uses a plain `git log` subprocess — sufficient for an admin dashboard
+/// and avoids pulling in `git2`/`gix` just for this view. Returns an
+/// empty vec on git failure (workspace not a repo, git not on PATH, etc.).
+pub fn recent_commits_for_crate(
+    workspace_root: &Path,
+    crate_name: &str,
+    limit: u32,
+) -> Vec<CommitRow> {
+    use std::process::Command;
+    let path_spec = format!("crates/{crate_name}");
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace_root)
+        .arg("log")
+        .arg(format!("-n{limit}"))
+        .arg("--pretty=format:%h %s")
+        .arg("--")
+        .arg(&path_spec)
+        .output();
+    let stdout = match output {
+        Ok(o) if o.status.success() => o.stdout,
+        _ => return Vec::new(),
+    };
+    let text = String::from_utf8_lossy(&stdout);
+    text.lines()
+        .filter_map(|line| {
+            let mut parts = line.splitn(2, ' ');
+            let sha = parts.next()?.to_string();
+            let subject = parts.next().unwrap_or("").to_string();
+            if sha.is_empty() {
+                None
+            } else {
+                Some(CommitRow { sha, subject })
+            }
+        })
+        .collect()
+}
+
+/// Detail-page bundle: the per-crate row from the dashboard plus the
+/// extra data (ignored test list, manifest content, recent commits)
+/// that the drill-down surfaces.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CrateDetail {
+    pub compliance: CrateCompliance,
+    pub ignored_tests: Vec<IgnoredTest>,
+    pub parity_manifest_raw: Option<String>,
+    pub recent_commits: Vec<CommitRow>,
+}
+
+/// Gather everything needed to render `/admin/compliance/<crate>`.
+pub fn build_crate_detail(
+    workspace_root: &Path,
+    crate_name: &str,
+) -> Result<CrateDetail, ComplianceViewError> {
+    let compliance = analyse_crate(workspace_root, crate_name)?;
+    let ignored_tests = scan_ignored_tests(workspace_root, crate_name);
+    let manifest_path = workspace_root
+        .join("crates")
+        .join(crate_name)
+        .join("parity.manifest.toml");
+    let parity_manifest_raw = fs::read_to_string(&manifest_path).ok();
+    let recent_commits = recent_commits_for_crate(workspace_root, crate_name, 10);
+    Ok(CrateDetail {
+        compliance,
+        ignored_tests,
+        parity_manifest_raw,
+        recent_commits,
+    })
+}
+
 /// Compute compliance for one crate by walking its directory.
 pub fn analyse_crate(
     workspace_root: &Path,
@@ -630,7 +781,12 @@ pub fn render(
                 )
             };
             vec![
-                c.name.clone(),
+                format!(
+                    r#"<a class="text-blue-700 underline" href="/admin/compliance/{name}?tenant_id={tenant}">{label}</a>"#,
+                    name = escape(&c.name),
+                    tenant = escape(ctx.tenant.as_str()),
+                    label = escape(&c.name),
+                ),
                 c.upstream_version.clone().unwrap_or_else(|| "—".into()),
                 c.backend_loc.to_string(),
                 c.backend_test_count.to_string(),
@@ -684,6 +840,153 @@ const FILE_CITE: Cite = Cite::backstage(
     "plugins/tech-insights/src/components/Scorecards/ScorecardsPage.tsx",
     "ScorecardsPage",
 );
+
+/// Render the drill-down `/admin/compliance/<crate>` page.
+pub fn render_detail(
+    detail: &CrateDetail,
+    ctx: &RequestCtx,
+) -> Result<String, ComplianceViewError> {
+    ctx.authorise(Permission::AdminComplianceView)?;
+    let c = &detail.compliance;
+    let upstream = c
+        .upstream_org_repo
+        .as_deref()
+        .map(|or| {
+            let version = c.upstream_version.as_deref().unwrap_or("—");
+            format!("{or} @ {version}")
+        })
+        .unwrap_or_else(|| "—".into());
+
+    let track_html = format!(
+        r#"<ul class="space-y-1">
+  <li>Backend (LOC {loc}, tests {tests}): {backend}</li>
+  <li>Portal admin page: {portal}</li>
+  <li>cavectl subcommand: {cavectl}</li>
+  <li>Observability alerts: {alerts}</li>
+  <li>Observability dashboard: {dash}</li>
+</ul>"#,
+        loc = c.backend_loc,
+        tests = c.backend_test_count,
+        backend = check(true),
+        portal = check(c.portal_admin_present),
+        cavectl = check(c.cavectl_subcommand_present),
+        alerts = check(c.obs_alerts_present),
+        dash = check(c.obs_dashboard_present),
+    );
+
+    let ignored_html = if detail.ignored_tests.is_empty() {
+        r#"<p class="text-gray-500">No <code>#[ignore]</code> tests — Charter compliant.</p>"#
+            .to_string()
+    } else {
+        let rows: Vec<String> = detail
+            .ignored_tests
+            .iter()
+            .map(|t| {
+                format!(
+                    "<tr><td class=\"px-2 py-1\"><code>{name}</code></td>\
+                     <td class=\"px-2 py-1\">{file}</td>\
+                     <td class=\"px-2 py-1 text-right\">{line}</td></tr>",
+                    name = escape(&t.name),
+                    file = escape(&t.file),
+                    line = t.line,
+                )
+            })
+            .collect();
+        format!(
+            r#"<table class="min-w-full text-sm">
+  <thead><tr class="border-b"><th class="text-left px-2">test</th><th class="text-left px-2">file</th><th class="text-right px-2">line</th></tr></thead>
+  <tbody>{rows}</tbody>
+</table>"#,
+            rows = rows.join("")
+        )
+    };
+
+    let manifest_html = match detail.parity_manifest_raw.as_deref() {
+        Some(raw) => format!(
+            "<pre class=\"text-xs p-3 bg-gray-50 border rounded overflow-x-auto\">{}</pre>",
+            escape(raw)
+        ),
+        None => r#"<p class="text-gray-500">No parity.manifest.toml — first-party crate or scaffold missing.</p>"#.to_string(),
+    };
+
+    let commits_html = if detail.recent_commits.is_empty() {
+        r#"<p class="text-gray-500">No commits touch this crate yet.</p>"#.to_string()
+    } else {
+        let rows: Vec<String> = detail
+            .recent_commits
+            .iter()
+            .map(|cm| {
+                format!(
+                    "<tr><td class=\"px-2 py-1 font-mono\">{sha}</td>\
+                     <td class=\"px-2 py-1\">{subj}</td></tr>",
+                    sha = escape(&cm.sha),
+                    subj = escape(&cm.subject),
+                )
+            })
+            .collect();
+        format!(
+            r#"<table class="min-w-full text-sm">
+  <thead><tr class="border-b"><th class="text-left px-2">sha</th><th class="text-left px-2">subject</th></tr></thead>
+  <tbody>{rows}</tbody>
+</table>"#,
+            rows = rows.join("")
+        )
+    };
+
+    let infra_badge = if c.infra_only {
+        r#" <span class="ml-2 px-2 py-1 text-xs rounded bg-gray-200 text-gray-600">infra-only</span>"#
+    } else {
+        ""
+    };
+
+    let body = format!(
+        r#"<p class="mb-4"><a class="text-blue-700 underline" href="/admin/compliance">← back to dashboard</a></p>
+<header class="mb-6">
+  <h1 class="text-2xl font-bold">{name}{badge}</h1>
+  <p class="text-gray-600">upstream: {upstream}</p>
+</header>
+<section class="grid grid-cols-3 gap-4 mb-6">
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">4-TRACK SCORE</div>
+    <div class="text-3xl font-bold {score_color} px-2 inline-block rounded">{score}</div>
+  </div>
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">STUB MARKERS</div>
+    <div class="text-3xl font-bold">{stubs}</div>
+    <div class="text-xs text-gray-400">unimpl {unimpl} · todo {todo} · ignored {ignored}</div>
+  </div>
+  <div class="p-4 bg-white rounded shadow">
+    <div class="text-xs text-gray-500">BACKEND</div>
+    <div class="text-3xl font-bold">{loc}</div>
+    <div class="text-xs text-gray-400">LOC across src/ · {tests} tests</div>
+  </div>
+</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">4-track breakdown</h2>{track}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">Ignored tests</h2>{ignored_block}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">parity.manifest.toml</h2>{manifest}</section>
+<section class="mb-6"><h2 class="text-lg font-semibold mb-2">Recent commits (last 10)</h2>{commits}</section>
+"#,
+        name = escape(&c.name),
+        badge = infra_badge,
+        upstream = escape(&upstream),
+        score = c.four_track_score,
+        score_color = cell_color(c.four_track_score),
+        stubs = c.unimplemented_count + c.todo_count + c.ignored_test_count,
+        unimpl = c.unimplemented_count,
+        todo = c.todo_count,
+        ignored = c.ignored_test_count,
+        loc = c.backend_loc,
+        tests = c.backend_test_count,
+        track = track_html,
+        ignored_block = ignored_html,
+        manifest = manifest_html,
+        commits = commits_html,
+    );
+    Ok(page_shell(
+        &format!("compliance · {} · {}", escape(ctx.tenant.as_str()), escape(&c.name)),
+        &body,
+    ))
+}
 
 #[cfg(test)]
 mod tests {
@@ -1175,6 +1478,141 @@ version = "7.2.0"
         let now = stored.cached_at + chrono::Duration::seconds(1);
         let snap = cached_snapshot_or_refresh_at(now, Duration::from_secs(300));
         assert_eq!(snap, stored.snapshot);
+    }
+
+    // ── P4 detail-page tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn build_crate_detail_returns_populated_struct_for_real_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownData",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let detail = build_crate_detail(&workspace, "cave-cache").unwrap();
+        assert_eq!(detail.compliance.name, "cave-cache");
+        // cave-cache has a parity manifest in this repo.
+        assert!(detail.parity_manifest_raw.is_some());
+    }
+
+    #[test]
+    fn build_crate_detail_errors_for_unknown_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownUnknown",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let err = build_crate_detail(&workspace, "cave-does-not-exist").unwrap_err();
+        assert!(matches!(err, ComplianceViewError::BadRoot(_)));
+    }
+
+    #[test]
+    fn render_detail_includes_back_link_score_and_manifest() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownRender",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: CrateCompliance {
+                name: "cave-x".into(),
+                upstream_version: Some("1.2.3".into()),
+                upstream_org_repo: Some("org/repo".into()),
+                backend_loc: 42,
+                backend_test_count: 5,
+                ignored_test_count: 1,
+                unimplemented_count: 0,
+                todo_count: 0,
+                portal_admin_present: true,
+                cavectl_subcommand_present: false,
+                obs_alerts_present: true,
+                obs_dashboard_present: false,
+                four_track_score: 87,
+                infra_only: false,
+            },
+            ignored_tests: vec![IgnoredTest {
+                file: "crates/cave-x/src/lib.rs".into(),
+                line: 17,
+                name: "wip_thing".into(),
+            }],
+            parity_manifest_raw: Some("[upstream]\nversion = \"1.2.3\"\n".into()),
+            recent_commits: vec![CommitRow {
+                sha: "abc123".into(),
+                subject: "feat(cave-x): kick off".into(),
+            }],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("← back to dashboard"));
+        assert!(html.contains("cave-x"));
+        assert!(html.contains(">87<"));
+        assert!(html.contains("org/repo @ 1.2.3"));
+        assert!(html.contains("wip_thing"));
+        assert!(html.contains("abc123"));
+        assert!(html.contains("crates/cave-x/src/lib.rs"));
+    }
+
+    #[test]
+    fn render_detail_refuses_without_view_permission() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "drilldownGate",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: stub_compliance("cave-x", 50),
+            ignored_tests: vec![],
+            parity_manifest_raw: None,
+            recent_commits: vec![],
+        };
+        let err = render_detail(&detail, &ctx(&[])).unwrap_err();
+        assert!(matches!(err, ComplianceViewError::Auth(_)));
+    }
+
+    #[test]
+    fn render_detail_marks_infra_only_in_header() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownInfra",
+            "acme"
+        );
+        let mut compliance = stub_compliance("cave-cli", 25);
+        compliance.infra_only = true;
+        let detail = CrateDetail {
+            compliance,
+            ignored_tests: vec![],
+            parity_manifest_raw: None,
+            recent_commits: vec![],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("infra-only"));
+    }
+
+    #[test]
+    fn scan_ignored_tests_picks_up_attribute_and_fn_name() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "ignoredScan",
+            "acme"
+        );
+        let tmp = tempfile_dir_with_ignored_fn();
+        let crate_dir = tmp.path().join("crates/cave-toy/src");
+        std::fs::create_dir_all(&crate_dir).unwrap();
+        std::fs::write(
+            crate_dir.join("lib.rs"),
+            "#[test]\n#[ignore = \"todo\"]\nfn wip_one() {}\n",
+        )
+        .unwrap();
+        let found = scan_ignored_tests(tmp.path(), "cave-toy");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "wip_one");
+        assert_eq!(found[0].line, 2);
+        assert!(found[0].file.contains("lib.rs"));
+    }
+
+    fn tempfile_dir_with_ignored_fn() -> tempfile::TempDir {
+        tempfile::TempDir::new().expect("tempdir")
     }
 
     #[test]
