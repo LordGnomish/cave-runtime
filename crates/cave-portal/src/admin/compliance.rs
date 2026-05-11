@@ -23,10 +23,13 @@
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
 use crate::admin::types::Cite;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ComplianceViewError {
@@ -438,12 +441,148 @@ pub fn workspace_root() -> PathBuf {
     }
 }
 
-/// One-shot snapshot for the live admin handler.
+/// One-shot snapshot for the live admin handler. Always walks the
+/// filesystem — prefer [`cached_snapshot_or_refresh`] in production so
+/// concurrent requests share a 5-minute cache.
 pub fn live_snapshot() -> ComplianceSnapshot {
     let root = workspace_root();
     let names = discover_crate_names(&root);
     let refs: Vec<&str> = names.iter().map(String::as_str).collect();
     build_snapshot(&root, &refs).unwrap_or(ComplianceSnapshot { crates: vec![] })
+}
+
+/// Wraps a [`ComplianceSnapshot`] with the wall-clock instant it was
+/// materialised. The handler uses the timestamp to decide whether the
+/// cached copy is still fresh or needs a re-walk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CachedSnapshot {
+    pub snapshot: ComplianceSnapshot,
+    pub cached_at: DateTime<Utc>,
+}
+
+impl CachedSnapshot {
+    pub fn new(snapshot: ComplianceSnapshot, cached_at: DateTime<Utc>) -> Self {
+        Self { snapshot, cached_at }
+    }
+
+    /// Returns `true` when `now - cached_at > max_age`.
+    pub fn is_stale(&self, now: DateTime<Utc>, max_age: Duration) -> bool {
+        match now.signed_duration_since(self.cached_at).to_std() {
+            Ok(elapsed) => elapsed > max_age,
+            // Future timestamps (clock skew) are treated as fresh — the
+            // cache is only invalidated by elapsed wall-clock time forward.
+            Err(_) => false,
+        }
+    }
+}
+
+/// Process-wide cache shared by HTML handler, JSON endpoint, and the
+/// background refresher. `OnceLock` so we initialise lazily without a
+/// global init step.
+fn cache_cell() -> &'static Mutex<Option<CachedSnapshot>> {
+    static CELL: OnceLock<Mutex<Option<CachedSnapshot>>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(None))
+}
+
+/// Default cache freshness window — the JSON endpoint advertises the
+/// same value via Cache-Control, and the background refresher uses it
+/// as its interval.
+pub const DEFAULT_CACHE_TTL: Duration = Duration::from_secs(300);
+
+/// Return the cached snapshot when fresh, otherwise rebuild + cache.
+/// Concurrent callers see a consistent value: the mutex is held only
+/// across the walk if it actually runs, so the next caller benefits.
+pub fn cached_snapshot_or_refresh() -> ComplianceSnapshot {
+    cached_snapshot_or_refresh_at(Utc::now(), DEFAULT_CACHE_TTL)
+}
+
+/// Testable variant: callers inject `now` + `max_age`.
+pub fn cached_snapshot_or_refresh_at(
+    now: DateTime<Utc>,
+    max_age: Duration,
+) -> ComplianceSnapshot {
+    let cell = cache_cell();
+    {
+        let guard = cell.lock().expect("compliance cache poisoned");
+        if let Some(entry) = guard.as_ref() {
+            if !entry.is_stale(now, max_age) {
+                return entry.snapshot.clone();
+            }
+        }
+    }
+    // Cache miss or stale — walk the filesystem outside the lock so
+    // concurrent readers aren't blocked by the (slow) walk.
+    let fresh = live_snapshot();
+    let mut guard = cell.lock().expect("compliance cache poisoned");
+    *guard = Some(CachedSnapshot::new(fresh.clone(), now));
+    fresh
+}
+
+/// Force-invalidate the cache. Returns the previous timestamp, if any,
+/// so callers can log the refresh delta.
+pub fn invalidate_cache() -> Option<DateTime<Utc>> {
+    let mut guard = cache_cell().lock().expect("compliance cache poisoned");
+    let prev = guard.as_ref().map(|c| c.cached_at);
+    *guard = None;
+    prev
+}
+
+/// Force a refresh now, regardless of cache state. Returns the new snapshot.
+pub fn force_refresh() -> CachedSnapshot {
+    force_refresh_at(Utc::now())
+}
+
+/// Testable variant of [`force_refresh`].
+pub fn force_refresh_at(now: DateTime<Utc>) -> CachedSnapshot {
+    let fresh = live_snapshot();
+    let entry = CachedSnapshot::new(fresh, now);
+    let mut guard = cache_cell().lock().expect("compliance cache poisoned");
+    *guard = Some(entry.clone());
+    entry
+}
+
+/// Render the live `/admin/compliance` page using the cached snapshot.
+pub fn render_cached(ctx: &RequestCtx) -> Result<String, ComplianceViewError> {
+    let snap = cached_snapshot_or_refresh();
+    render(&snap, ctx)
+}
+
+/// Render the manual-refresh acknowledgement page. Authorised by
+/// `Permission::AdminComplianceRefresh` — a strictly stronger right
+/// than the view permission used by `render`.
+pub fn handle_refresh(ctx: &RequestCtx) -> Result<String, ComplianceViewError> {
+    ctx.authorise(Permission::AdminComplianceRefresh)?;
+    let entry = force_refresh();
+    let body = format!(
+        r#"<section class="p-4 bg-green-100 rounded mb-4">
+  <p>Compliance cache refreshed at <strong>{ts}</strong> — {n} crates rescanned.</p>
+  <p><a class="text-blue-700 underline" href="/admin/compliance">Back to dashboard</a></p>
+</section>"#,
+        ts = entry.cached_at.to_rfc3339(),
+        n = entry.snapshot.crates.len(),
+    );
+    Ok(page_shell(
+        &format!("compliance refresh · {}", escape(ctx.tenant.as_str())),
+        &body,
+    ))
+}
+
+/// Spawn the background refresh loop. Runs in a detached tokio task that
+/// ticks every `interval`, calling [`force_refresh`] on each tick. The
+/// `JoinHandle` is returned so tests can drive the cancellation token to
+/// shut it down cleanly; production callers can drop the handle.
+pub fn spawn_background_refresh(interval: Duration) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        // Skip the immediate first tick so we don't double-walk on startup
+        // when `cached_snapshot_or_refresh` already populated the cache.
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let _ = force_refresh();
+        }
+    })
 }
 
 fn cell_color(value: u8) -> &'static str {
@@ -894,5 +1033,162 @@ version = "7.2.0"
                 panic!("workspace root not found");
             }
         }
+    }
+
+    // ── P3 cache tests ────────────────────────────────────────────────────────
+    //
+    // These tests share a process-wide cache via `OnceLock`, so they
+    // serialise on the same mutex to avoid step-on-each-other ordering.
+
+    use std::sync::Mutex as TestMutex;
+    static CACHE_TEST_LOCK: TestMutex<()> = TestMutex::new(());
+
+    fn reset_cache() {
+        invalidate_cache();
+    }
+
+    #[test]
+    fn cached_snapshot_returns_same_value_within_ttl() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheHit",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let first = cached_snapshot_or_refresh_at(t0, Duration::from_secs(300));
+        // 30s later — still within the 5-min window, cache returns the same snapshot.
+        let later = t0 + chrono::Duration::seconds(30);
+        let second = cached_snapshot_or_refresh_at(later, Duration::from_secs(300));
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn cached_snapshot_refreshes_after_ttl_expires() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheStale",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(1));
+        let cached_at_before = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        // Jump well past the 1-second TTL.
+        let later = t0 + chrono::Duration::seconds(60);
+        let _ = cached_snapshot_or_refresh_at(later, Duration::from_secs(1));
+        let cached_at_after = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        assert_ne!(cached_at_before, cached_at_after);
+        assert_eq!(cached_at_after, later);
+    }
+
+    #[test]
+    fn force_refresh_replaces_cache_even_when_fresh() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheManualRefresh",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(3600));
+        let later = t0 + chrono::Duration::seconds(10);
+        let entry = force_refresh_at(later);
+        // Cache should now hold the forced timestamp, not t0.
+        assert_eq!(entry.cached_at, later);
+        let stored_at = cache_cell()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.cached_at)
+            .unwrap();
+        assert_eq!(stored_at, later);
+    }
+
+    #[test]
+    fn invalidate_cache_returns_previous_timestamp_then_clears() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheInvalidate",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let t0 = Utc::now();
+        let _ = cached_snapshot_or_refresh_at(t0, Duration::from_secs(300));
+        let prev = invalidate_cache().unwrap();
+        assert_eq!(prev, t0);
+        // After invalidate, cache_cell is empty.
+        assert!(cache_cell().lock().unwrap().is_none());
+        // Second invalidate is a no-op — returns None.
+        assert!(invalidate_cache().is_none());
+    }
+
+    #[test]
+    fn handle_refresh_requires_refresh_permission() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/permission-react/src/PermissionApi.ts",
+            "refreshGate",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        // View-only permission must be rejected.
+        let view_only = ctx(&[Permission::AdminComplianceView]);
+        let err = handle_refresh(&view_only).unwrap_err();
+        assert!(matches!(err, ComplianceViewError::Auth(_)));
+        // Refresh permission succeeds and renders the ack page.
+        reset_cache();
+        let refresher = ctx(&[Permission::AdminComplianceRefresh]);
+        let html = handle_refresh(&refresher).unwrap();
+        assert!(html.contains("Compliance cache refreshed"));
+    }
+
+    #[tokio::test]
+    async fn spawn_background_refresh_is_idempotent_and_populates_cache() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheBackground",
+            "acme"
+        );
+        let _serial = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        reset_cache();
+        let handle = spawn_background_refresh(Duration::from_millis(50));
+        // Wait long enough for at least one tick after the initial skip.
+        tokio::time::sleep(Duration::from_millis(180)).await;
+        handle.abort();
+        // After the background pass, the cache should be populated and
+        // a follow-up call within the TTL must return it without re-walking.
+        let stored = cache_cell().lock().unwrap().clone().expect("cache populated");
+        let now = stored.cached_at + chrono::Duration::seconds(1);
+        let snap = cached_snapshot_or_refresh_at(now, Duration::from_secs(300));
+        assert_eq!(snap, stored.snapshot);
+    }
+
+    #[test]
+    fn cached_snapshot_is_stale_handles_clock_skew() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Cache.tsx",
+            "cacheSkew",
+            "acme"
+        );
+        let now = Utc::now();
+        let cached = CachedSnapshot::new(
+            ComplianceSnapshot { crates: vec![] },
+            now + chrono::Duration::seconds(60), // future timestamp
+        );
+        assert!(!cached.is_stale(now, Duration::from_secs(1)));
     }
 }

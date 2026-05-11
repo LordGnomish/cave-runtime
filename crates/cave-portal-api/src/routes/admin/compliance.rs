@@ -15,10 +15,12 @@ use axum::{
     extract::Extension,
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
-use cave_portal::admin::compliance::{live_snapshot, ComplianceSnapshot};
+use cave_portal::admin::compliance::{
+    cached_snapshot_or_refresh, force_refresh, ComplianceSnapshot,
+};
 use serde::Serialize;
 
 use crate::routes::rbac::{Guard, GuardError, Principal};
@@ -64,8 +66,30 @@ async fn snapshot_handler(principal: Option<Extension<Principal>>) -> Response {
     if let Err(err) = snapshot_guard().authorize(p, None) {
         return guard_error_response(err);
     }
-    let snap = SnapshotResponse::from_snapshot(live_snapshot());
+    // Pulls from the 5-minute cache; cold cache rebuilds and stores.
+    let snap = SnapshotResponse::from_snapshot(cached_snapshot_or_refresh());
     (StatusCode::OK, cache_headers(), Json(snap)).into_response()
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RefreshResponse {
+    pub schema_version: u32,
+    pub refreshed_at: chrono::DateTime<chrono::Utc>,
+    pub crate_count: usize,
+}
+
+async fn refresh_handler(principal: Option<Extension<Principal>>) -> Response {
+    let p = principal.as_deref();
+    if let Err(err) = snapshot_guard().authorize(p, None) {
+        return guard_error_response(err);
+    }
+    let entry = force_refresh();
+    let body = RefreshResponse {
+        schema_version: 1,
+        refreshed_at: entry.cached_at,
+        crate_count: entry.snapshot.crates.len(),
+    };
+    (StatusCode::OK, Json(body)).into_response()
 }
 
 fn guard_error_response(err: GuardError) -> Response {
@@ -77,9 +101,11 @@ fn guard_error_response(err: GuardError) -> Response {
     (status, err.to_string()).into_response()
 }
 
-/// Build the `/api/compliance/snapshot` router.
+/// Build the compliance API router (snapshot read + manual refresh).
 pub fn router() -> Router {
-    Router::new().route("/api/compliance/snapshot", get(snapshot_handler))
+    Router::new()
+        .route("/api/compliance/snapshot", get(snapshot_handler))
+        .route("/admin/compliance/refresh", post(refresh_handler))
 }
 
 #[cfg(test)]
@@ -204,5 +230,45 @@ mod tests {
         let s = serde_json::to_string(&resp).unwrap();
         assert!(s.contains("\"schema_version\":1"));
         assert!(s.contains("\"crates\":[]"));
+    }
+
+    /// cite: refresh — admin POST returns 200 with the new timestamp + crate count.
+    #[tokio::test]
+    async fn api_compliance_refresh_admin_returns_timestamp() {
+        let app = router();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/compliance/refresh")
+                    .extension(admin())
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 1_048_576).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["schema_version"], 1);
+        assert!(json["refreshed_at"].is_string());
+        assert!(json["crate_count"].as_u64().unwrap() > 0);
+    }
+
+    /// cite: refresh — anonymous POST is rejected with 401.
+    #[tokio::test]
+    async fn api_compliance_refresh_anonymous_rejected() {
+        let app = router();
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/admin/compliance/refresh")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
     }
 }
