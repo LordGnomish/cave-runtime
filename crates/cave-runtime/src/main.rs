@@ -8,13 +8,14 @@ use axum::{
     routing::get,
     Router,
 };
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing::info;
 
+mod cluster;
 mod portal;
 
 static PORTAL_HTML: &str = include_str!("portal_index.html");
@@ -22,10 +23,26 @@ static PORTAL_HTML: &str = include_str!("portal_index.html");
 #[derive(Parser)]
 #[command(name = "cave-runtime", version, about = "CAVE Platform Unified Runtime")]
 struct Cli {
-    #[arg(short, long, default_value = "cave-runtime.yaml")]
+    /// Legacy: path to runtime config. Used when no subcommand is given
+    /// (treated as implicit `serve --config <path>`).
+    #[arg(short, long, default_value = "cave-runtime.yaml", global = true)]
     config: String,
-    #[arg(short, long)]
+    /// Legacy: override listen port for implicit `serve`.
+    #[arg(short, long, global = true)]
     port: Option<u16>,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Run the unified runtime (default if no subcommand is given).
+    Serve,
+    /// Manage cluster lifecycle: init, join, status, destroy.
+    Cluster {
+        #[command(subcommand)]
+        cmd: cluster::ClusterCmd,
+    },
 }
 
 #[tokio::main]
@@ -39,6 +56,15 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let cli = Cli::parse();
+
+    // Dispatch non-serve subcommands and return early.
+    match &cli.command {
+        Some(Command::Cluster { cmd }) => {
+            return cluster::dispatch(cmd.clone()).await;
+        }
+        Some(Command::Serve) | None => { /* fall through to serve */ }
+    }
+
     info!(version = env!("CARGO_PKG_VERSION"), config = %cli.config, "Starting CAVE Unified Runtime");
 
     // Phase 1 states
