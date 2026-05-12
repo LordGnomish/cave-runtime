@@ -8,7 +8,15 @@
 org     = "SonarSource"
 repo    = "sonarqube"
 version = "v10.4.1"
+name    = "SonarQube"
+license = "LGPL-3.0"
+language= "Java"
+url     = "https://github.com/SonarSource/sonarqube"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-scan"
 description = "Code quality & SAST scanner — SonarQube-compatible findings, rules and coverage import"

@@ -6,7 +6,15 @@
 org     = "DependencyTrack"
 repo    = "dependency-track"
 version = "v4.9.0"
+name    = "Dependency-Track"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/DependencyTrack/dependency-track"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-sbom"
 description = "SBOM and dependency tracking — DependencyTrack replacement"

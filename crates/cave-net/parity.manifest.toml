@@ -22,7 +22,10 @@ version = "v1.19.3"
 upstream_files_total       = 2827  # non-vendor non-generated non-test .go
 upstream_pkg_dirs_total    = 118   # distinct pkg/<name>/ directories
 upstream_bpf_c_h_files     = 302   # bpf/**/*.{c,h}
-
+name    = "Cilium"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/cilium/cilium"
 [module]
 name          = "cave-net"
 description   = "Cilium parity port — agent-side state machines, CRDs, REST/gRPC surface, Prometheus metrics. Datapath is semantic; see PARITY_REPORT.md for wire-faithful exclusions."
@@ -42,6 +45,9 @@ total           = 134
 fill_ratio      = 1.0000
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
+last_audit  = "2026-05-12"
+infra_only  = false
+
 [[mapped]]
 upstream_pkg = "pkg/act/"
 local_files  = ["src/cilium/act.rs"]
@@ -921,3 +927,6 @@ local_path    = "/api/net/pods"
 kind          = "http"
 upstream_path = "/v1/policy/check"
 local_path    = "/api/net/check"
+last_audit  = "2026-05-12"
+infra_only  = false
+

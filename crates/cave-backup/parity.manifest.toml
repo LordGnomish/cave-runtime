@@ -6,7 +6,15 @@
 org     = "vmware-tanzu"
 repo    = "velero"
 version = "main"
+name    = "Velero"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/vmware-tanzu/velero"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-backup"
 description = "Kubernetes backup/restore \u2014 compatible with Velero"

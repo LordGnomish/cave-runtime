@@ -9,7 +9,15 @@
 org     = "keycloak"
 repo    = "keycloak"
 version = "v22.0.0"
+name    = "Keycloak"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/keycloak/keycloak"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-auth"
 description = "Identity provider — Keycloak reimplementation (realms/users/tokens/OIDC/JWKS) + OIDC/Okta adapters + RBAC/ABAC + PQC JWS"

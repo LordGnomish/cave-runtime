@@ -10,7 +10,15 @@
 org     = "etcd-io"
 repo    = "etcd"
 version = "v3.5.13"
+name    = "etcd"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/etcd-io/etcd"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-ha"
 description = "High-availability + Raft consensus — etcd's raft package + server failover/DR primitives"

@@ -6,7 +6,15 @@
 org     = "open-policy-agent"
 repo    = "gatekeeper"
 version = "main"
+name    = "OPA Gatekeeper"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/open-policy-agent/gatekeeper"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-compliance"
 description = "Compliance & audit \u2014 CIS Kubernetes Benchmark, SOC2, PCI-DSS, HIPAA"

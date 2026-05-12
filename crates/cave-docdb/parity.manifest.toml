@@ -11,7 +11,15 @@
 org     = "mongodb"
 repo    = "mongo"
 version = "7.0.0"
+name    = "MongoDB"
+license = "SSPL-1.0"
+language= "C++"
+url     = "https://github.com/mongodb/mongo"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-docdb"
 description = "MongoDB-protocol document DB — wire OP_MSG, BSON, find/insert/update/delete/aggregate, cursors, indexes, admin commands"

@@ -7,6 +7,11 @@ org     = "cave-runtime"
 repo    = "cave-runtime"
 version = "v0.1.0"
 
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = true
 [module]
 name        = "cave-upstream"
 description = "Upstream version tracking"

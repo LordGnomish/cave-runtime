@@ -6,7 +6,15 @@
 org     = "n8n-io"
 repo    = "n8n"
 version = "v1.0.0"
+name    = "n8n"
+license = "SUSTL-1.0"
+language= "TypeScript"
+url     = "https://github.com/n8n-io/n8n"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-workflows"
 description = "Workflow automation — n8n replacement"

@@ -11,7 +11,15 @@
 org     = "nobl9"
 repo    = "nobl9-go"
 version = "v0.126.1"
+name    = "Nobl9 SLO SDK (Go)"
+license = "MIT"
+language= "Go"
+url     = "https://github.com/nobl9/nobl9-go"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-slo"
 description = "SLO tracking — OpenSLO replacement"

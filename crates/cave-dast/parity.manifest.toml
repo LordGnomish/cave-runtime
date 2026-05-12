@@ -6,7 +6,15 @@
 org     = "zaproxy"
 repo    = "zaproxy"
 version = "v2.14.0"
+name    = "OWASP ZAP"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/zaproxy/zaproxy"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-dast"
 description = "Dynamic application security testing — OWASP ZAP replacement"

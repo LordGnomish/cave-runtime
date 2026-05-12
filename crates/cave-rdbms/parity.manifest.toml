@@ -10,7 +10,15 @@
 org     = "postgres"
 repo    = "postgres"
 version = "16.0"
+name    = "PostgreSQL"
+license = "PostgreSQL"
+language= "C"
+url     = "https://github.com/postgres/postgres"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-rdbms"
 description = "Postgres-protocol RDBMS — wire v3, SQL parser/planner/executor, txn/savepoints, info_schema"
