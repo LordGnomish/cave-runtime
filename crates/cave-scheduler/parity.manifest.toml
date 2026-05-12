@@ -6,12 +6,161 @@ org     = "kubernetes"
 repo    = "kubernetes"
 version = "v1.36.0"
 
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: kubernetes/kubernetes v1.31.x pkg/scheduler/* packages
+# enumerated and classified honestly.
+# See docs/parity/cave-scheduler-port-2026-05-12.md for methodology.
+mapped_count   = 18
+skipped_count  = 7
+unmapped_count = 4
+total          = 29
+fill_ratio     = 0.8621
+last_audit     = "2026-05-12"
+infra_only     = false
+
 [module]
 name        = "cave-scheduler"
 description = "kube-scheduler reimpl — Filter/Score framework, preemption, priority queue, topology spread, DRA (KEP-4381), multi-profile"
 source_root = "src"
 pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/"
+local_files  = ["src/scheduler.rs", "src/lib.rs"]
+note         = "Top-level scheduling loop + scheduleOne"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/"
+local_files  = ["src/framework.rs", "src/extension_points.rs"]
+note         = "Plugin framework — PreFilter/Filter/PostFilter/PreScore/Score/Reserve/Permit/PreBind/Bind/PostBind"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/"
+local_files  = ["src/plugins.rs"]
+note         = "55 KB of built-in plugins"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/noderesources/"
+local_files  = ["src/noderesources.rs"]
+note         = "Resource fit (least/most/balanced) + extended resources"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/podtopologyspread/"
+local_files  = ["src/topology.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/volumebinding/"
+local_files  = ["src/volume.rs"]
+note         = "VolumeBinding + PVC binding + CSI integration"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/dynamicresources/"
+local_files  = ["src/dra.rs", "src/dra_scheduler.rs"]
+note         = "DRA scheduler hooks (KEP-4381, v1.32 beta)"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/preemption/"
+local_files  = ["src/preempt.rs", "src/default_preemption.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/internal/queue/"
+local_files  = ["src/priority_queue.rs", "src/priority_sort.rs"]
+note         = "Active/Backoff/Unschedulable queues"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/internal/cache/"
+local_files  = ["src/cache.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/runtime/"
+local_files  = ["src/framework.rs", "src/cycle_state.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/profile/"
+local_files  = ["src/profiles.rs"]
+note         = "Multi-profile (multiple schedulers in one binary)"
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/extender/"
+local_files  = ["src/extender.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/schedulinggates/"
+local_files  = ["src/gates.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/eventhandlers.go"
+local_files  = ["src/events.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/defaultbinder/"
+local_files  = ["src/bind.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/apis/scheduling/"
+local_files  = ["src/models.rs"]
+note         = "PriorityClass types"
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/kube-scheduler/"
+local_files  = ["src/routes.rs"]
+
+[[skipped]]
+upstream_pkg = "cmd/kube-scheduler/"
+reason       = "go-bootstrap"
+note         = "Go main() + cobra; cave-runtime serve wires the scheduler"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/apis/config/"
+reason       = "stdlib-analog"
+note         = "KubeSchedulerConfiguration types — cave uses serde structs in models.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/internal/heap/"
+reason       = "stdlib-analog"
+note         = "Min-heap helpers; cave uses std BinaryHeap"
+
+[[skipped]]
+upstream_pkg = "staging/src/k8s.io/component-helpers/scheduling/"
+reason       = "stdlib-analog"
+note         = "Tolerates/Affinity helpers — folded into plugins.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/util/"
+reason       = "stdlib-analog"
+note         = "Conversion + assumption helpers"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/testing/"
+reason       = "test-harness"
+note         = "Test fixture builders — cave has #[cfg(test)] helpers in each module"
+
+[[skipped]]
+upstream_pkg = "pkg/scheduler/metrics/"
+reason       = "parallel-track"
+note         = "Prometheus metric definitions — cave uses prometheus-client crate directly"
+
+[[unmapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/imagelocality/"
+note         = "Score plugin that prefers nodes already holding the pod's container images. plugins.rs declares an image-locality scorer but it computes 0 because cave-kubelet's image cache is not yet exposed to the scheduler."
+
+[[unmapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/interpodaffinity/"
+note         = "Soft-affinity weighted scoring with anti-affinity topology keys. Filter path implemented; PreScore/Score fall back to neutral 0 — hard-affinity works, soft preferences are no-ops."
+
+[[unmapped]]
+upstream_pkg = "pkg/scheduler/framework/preemption/recovery"
+note         = "Preemption-victim restoration after API failure during the victim eviction window. cave preempt.rs aborts and re-queues but does not re-add the would-have-victims, so transient apiserver errors can leak victim state."
+
+[[unmapped]]
+upstream_pkg = "pkg/scheduler/framework/plugins/volumezone/"
+note         = "Forbid pods from binding PVs in a zone that does not include the candidate node. volume.rs handles topology-aware provisioning but does not enforce per-zone restriction at scheduling time."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 

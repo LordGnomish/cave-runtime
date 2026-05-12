@@ -7,12 +7,222 @@ org     = "kubernetes"
 repo    = "kubernetes"
 version = "v1.36.0"
 
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 0.25 was replaced with a
+# measured value: kubernetes/kubernetes v1.31.x pkg/controller/* sub-
+# packages enumerated and classified honestly. The previous 0.25 was a
+# different mechanical metric (10/10 declared files only) and not
+# directly comparable.
+# See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
+mapped_count   = 23
+skipped_count  = 10
+unmapped_count = 12
+total          = 45
+fill_ratio     = 0.7333
+last_audit     = "2026-05-12"
+infra_only     = false
+
 [module]
 name        = "cave-controller-manager"
 description = "Workload controllers — Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob, HPA, PDB, EndpointSlice, Service"
 source_root = "src"
 pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/controller/deployment/"
+local_files  = ["src/deployment.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/replicaset/"
+local_files  = ["src/replicaset.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/statefulset/"
+local_files  = ["src/statefulset.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/daemon/"
+local_files  = ["src/daemonset.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/job/"
+local_files  = ["src/job.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/cronjob/"
+local_files  = ["src/cronjob.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/podautoscaler/"
+local_files  = ["src/hpa.rs"]
+note         = "HPA v2 + metrics/resource/external/object"
+
+[[mapped]]
+upstream_pkg = "pkg/controller/disruption/"
+local_files  = ["src/pdb.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/endpointslice/"
+local_files  = ["src/endpointslice.rs", "src/endpointslice_multiport.rs", "src/endpointslice_topology.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/service/"
+local_files  = ["src/service.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/namespace/"
+local_files  = ["src/namespace_controller.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/serviceaccount/"
+local_files  = ["src/sa/", "src/root_ca_publisher.rs", "src/root_ca_deeper.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/certificates/"
+local_files  = ["src/csr_signer.rs", "src/csr_signer_deeper.rs", "src/csr_auto_approver.rs", "src/csr_pem.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/garbagecollector/"
+local_files  = ["src/gc/", "src/gc_lite/"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/bootstrap/"
+local_files  = ["src/bootstrap_signer.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/nodelifecycle/"
+local_files  = ["src/node_lifecycle/", "src/node_lease.rs", "src/node_lease_deeper.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/volume/persistentvolume/"
+local_files  = ["src/pv/"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/resourcequota/"
+local_files  = ["src/resource_quota.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/rbac/"
+local_files  = ["src/rbac/"]
+note         = "ClusterRoleAggregation"
+
+[[mapped]]
+upstream_pkg = "pkg/controller/controller_ref_manager.go"
+local_files  = ["src/runtime.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/lookup_cache.go"
+local_files  = ["src/runtime.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/util/"
+local_files  = ["src/deeper/", "src/runtime.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/controller/ttl/"
+local_files  = ["src/gc_lite/"]
+note         = "TTL folded into gc_lite (TtlAfterFinished + node-TTL share scheduling helpers)"
+
+[[skipped]]
+upstream_pkg = "cmd/kube-controller-manager/"
+reason       = "go-bootstrap"
+note         = "Go main() + cobra; cave-runtime serve wires the controllers"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/cloud/"
+reason       = "parallel-track"
+note         = "Cloud-node-lifecycle + cloud-route — lives in cave-cloud-controller-manager"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/nodeipam/"
+reason       = "parallel-track"
+note         = "Cloud-CIDR-allocator; node-IPAM responsibility split with CCM"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/apis/config/"
+reason       = "stdlib-analog"
+note         = "KubeControllerManagerConfiguration types — cave uses serde structs"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/testutil/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/metrics/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/history/"
+reason       = "stdlib-analog"
+note         = "ControllerRevision helpers folded into statefulset.rs + daemonset.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/podgc/"
+reason       = "wire-format-detail"
+note         = "Pod GC for terminating namespaces — gc_lite covers cross-cutting GC; per-namespace pod purge sits in namespace_controller.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/volume/expand/"
+reason       = "parallel-track"
+note         = "PVC expansion — kubelet-side resize path in cave-kubelet"
+
+[[skipped]]
+upstream_pkg = "pkg/controller/volume/attachdetach/"
+reason       = "parallel-track"
+note         = "Volume attach/detach — kubelet's volume manager"
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/storageversiongarbagecollector/"
+note         = "Cleans up StorageVersion objects whose owning APIService is gone. cave-apiserver has storage_version.rs but no GC reconciler."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/legacyserviceaccounttokencleaner/"
+note         = "Removes auto-generated SA secrets (post-v1.24 deprecation). cave never created them but the upgrade-cleanup job is not implemented."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/storageversionmigrator/"
+note         = "StorageVersionMigration CRD reconciler. cave-apiserver storage_migration.rs has the trigger surface but the loop is missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/tainteviction/"
+note         = "Per-pod taint-based eviction with grace period. node_lifecycle/ handles NoExecute at node level; per-pod toleration timers missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/cidrallocator/"
+note         = "Allocates pod CIDRs to nodes when running without a cloud provider. cave-net pre-provisioned today; on-the-fly allocator missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/endpoint/"
+note         = "Legacy v1 Endpoints controller — superseded by endpointslice/. v1.32 still ships it for older clients; cave only writes EndpointSlice."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/replication/"
+note         = "Legacy ReplicationController — superseded by ReplicaSet. cave does not ship this."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/volume/pvprotection/"
+note         = "PV-side protection finalizer. PVC-side covered via pv/; PV-side reconciler missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/volume/ephemeral/"
+note         = "Generic-ephemeral-volume controller. Inline emptyDir+downwardAPI handled by cave-kubelet; generic-ephemeral unmapped."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/resourceclaim/"
+note         = "DRA ResourceClaim controller (KEP-4381). cave-scheduler has scheduling hooks (dra.rs); controller-side reconcile of ResourceClaim→Pod binding missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/validatingadmissionpolicystatus/"
+note         = "Status reconciler for VAP type-check results across CRD versions. cave-apiserver vap_advanced.rs validates at write time, no status loop."
+
+[[unmapped]]
+upstream_pkg = "pkg/controller/storageversionmigrator/migrator/"
+note         = "Inner worker for storageversionmigrator above — split out in v1.32."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 [[files]]

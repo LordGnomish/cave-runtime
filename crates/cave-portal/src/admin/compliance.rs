@@ -2638,23 +2638,22 @@ version = "7.2.0"
 
     #[test]
     fn parse_parity_index_json_round_trips_audit_doc_snapshot() {
-        // The embedded parity-index.json must round-trip and surface the
-        // canonical Tier ✅ crates with ratio 1.0. After the 2026-05-12
-        // disk-overlay pass, `manifest_filled` reflects the on-disk
-        // manifest state (license + [parity] block present), so the
-        // Tier C cave-net example below now reports `true` rather than
-        // its original audit-doc `false`.
-        //
-        // cave-etcd is special: the 2026-05-12 inventory expansion
-        // replaced its wave3 self-reported `parity_ratio = 1.0` with a
-        // measured `fill_ratio = 0.9155` (30 mapped + 35 skipped of 71
-        // total packages). The disk-overlay treats the newer
-        // `last_audit` as authoritative, including for honest downgrades.
+        // The embedded parity-index.json reflects the 2026-05-12 measured
+        // audit pass for the K8s core 5 crates (apiserver / scheduler /
+        // controller-manager / kubelet / cri) — their wave3 self-reported
+        // 1.0 was replaced with measured `fill_ratio` values landed in
+        // their respective manifest [parity] blocks. cave-etcd (2026-05-12)
+        // had already moved to 0.9155 via the same pattern.
         let m = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
         for name in ["cave-apiserver", "cave-cri", "cave-kubelet", "cave-scheduler"] {
             let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
             assert_eq!(e.tier, "100", "{name} should be tier 100");
-            assert_eq!(e.parity_ratio, Some(1.0));
+            // Post-2026-05-12: measured ratios are strictly < 1.0 and > 0.7.
+            let r = e.parity_ratio.expect("measured ratio present");
+            assert!(
+                (0.7..1.0).contains(&r),
+                "{name} ratio = {r}, expected 0.7..1.0 after measured audit"
+            );
             assert_eq!(e.manifest_filled, Some(true));
         }
         let etcd = m.get("cave-etcd").unwrap();
@@ -2889,7 +2888,13 @@ priority = "P0"
         let index = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
         attach_parity_index(&mut snap, &index);
         let api = snap.crates.iter().find(|c| c.name == "cave-apiserver").unwrap();
-        assert_eq!(api.parity_ratio, Some(1.0));
+        // Post-2026-05-12: measured ratio for cave-apiserver is ~0.86
+        // (was a wave3 self-report of 1.0 before the audit refresh).
+        let r = api.parity_ratio.expect("apiserver has a measured ratio");
+        assert!(
+            (r - 0.86).abs() < 1e-3,
+            "cave-apiserver ratio = {r}, expected ~0.86 after measured audit"
+        );
         assert_eq!(api.audit_tier.as_deref(), Some("100"));
         let unknown = snap
             .crates

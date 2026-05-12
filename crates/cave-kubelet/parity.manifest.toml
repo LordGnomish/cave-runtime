@@ -7,12 +7,192 @@ org     = "kubernetes"
 repo    = "kubernetes"
 version = "v1.28.0"
 
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: kubernetes/kubernetes v1.31.x pkg/kubelet/* +
+# pkg/volume/* + pkg/probe/* packages enumerated and classified honestly.
+# See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
+mapped_count   = 20
+skipped_count  = 9
+unmapped_count = 9
+total          = 38
+fill_ratio     = 0.7632
+last_audit     = "2026-05-12"
+infra_only     = false
+
 [module]
 name        = "cave-kubelet"
 description = "Node agent — kubelet replacement"
 source_root = "src"
 pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/"
+local_files  = ["src/agent.rs", "src/lib.rs", "src/kubelet_config.rs"]
+note         = "Top-level kubelet agent + sync loop"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/"
+local_files  = ["src/cpumanager.rs", "src/memorymanager.rs", "src/topology_manager.rs", "src/topology.rs"]
+note         = "Container Manager — cpu/memory/topology managers"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/cpumanager/"
+local_files  = ["src/cpumanager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/memorymanager/"
+local_files  = ["src/memorymanager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/topologymanager/"
+local_files  = ["src/topology_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/devicemanager/"
+local_files  = ["src/deviceplugin.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/cm/dra/"
+local_files  = ["src/dra.rs", "src/dra_v1alpha2.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/eviction/"
+local_files  = ["src/eviction.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/images/"
+local_files  = ["src/image_gc.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/server/"
+local_files  = ["src/streaming.rs", "src/routes.rs"]
+note         = "exec / attach / portforward streaming server"
+
+[[mapped]]
+upstream_pkg = "pkg/probe/"
+local_files  = ["src/probe.rs"]
+note         = "Liveness / readiness / startup probes (HTTP / TCP / Exec / GRPC)"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/pluginmanager/"
+local_files  = ["src/plugin_watcher.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/apis/podresources/"
+local_files  = ["src/podresources.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/sidecar/"
+local_files  = ["src/sidecar.rs"]
+note         = "RestartPolicy=Always init containers (KEP-753, v1.31 GA)"
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/nodelease/"
+local_files  = ["src/node_lease.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/volumemanager/reconciler/"
+local_files  = ["src/volume_reconciler.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/volume/csi/"
+local_files  = ["src/csi.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/security/apparmor/"
+local_files  = ["src/apparmor.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/kuberuntime/"
+local_files  = ["src/security.rs", "src/pod_gc.rs", "src/container_metrics.rs"]
+note         = "Pod / container security context + GC + cgroup stats"
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/kubelet/"
+local_files  = ["src/models.rs", "src/routes.rs"]
+
+[[skipped]]
+upstream_pkg = "cmd/kubelet/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/apis/config/"
+reason       = "stdlib-analog"
+note         = "KubeletConfiguration types — cave uses serde structs in kubelet_config.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/cri/"
+reason       = "parallel-track"
+note         = "CRI client — cave talks to cave-cri directly via the runtime module"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/dockershim/"
+reason       = "wire-format-detail"
+note         = "Removed upstream in v1.24"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/network/"
+reason       = "parallel-track"
+note         = "Pod-network plumbing — handled by cave-net's CNI shim"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/metrics/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/util/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/kubelet/types/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/probe/exec/"
+reason       = "wire-format-detail"
+note         = "Folded into probe.rs"
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/status/"
+note         = "Pod status manager — reconciles observed pod phase + conditions back to apiserver. cave-kubelet's sync loop writes status during agent.rs reconciliation but does not maintain the full StatusManager queue + retry semantics."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/prober/"
+note         = "Probe results manager + container-restart trigger. probe.rs runs probes but the worker pool + restart-coordination ledger is missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
+note         = "v2 unified-hierarchy cgroup writer. cave-kubelet writes cpu/mem limits via CRI; direct cgroup writes for systemd-cgroup-driver mode are not implemented."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/lifecycle/"
+note         = "Pod-lifecycle event hooks (preStop, postStart). CRI execution wired in cave-cri but kubelet's per-event timeout + log-correlation orchestration is missing."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/preemption/"
+note         = "Critical-pod preemption admit. cave-kubelet admits pods based on resource availability but does not evict lower-priority pods for system-critical ones."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/nodeshutdown/"
+note         = "Graceful node shutdown handler (KEP-2000). systemd-inhibitor integration + pod-priority-based termination ordering are not implemented."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/userns/"
+note         = "User namespace remapping (KEP-127, v1.30 beta). cave-kubelet runs containers under the kubelet's UID."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/runonce/"
+note         = "Standalone runonce mode (boot static pod manifest without apiserver). Useful for boot-time control-plane components."
+
+[[unmapped]]
+upstream_pkg = "pkg/kubelet/checkpoint/"
+note         = "Container checkpoint API (CRIU). cave-cri has the runtime hook; kubelet-side endpoint + apiserver coordination missing."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # upstream path (rooted at the kubernetes/kubernetes repo) → local path.
