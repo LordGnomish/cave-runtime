@@ -100,6 +100,28 @@ pub struct CrateCompliance {
     /// manifest yet, `"E"` infra-only.
     #[serde(default)]
     pub audit_tier: Option<String>,
+    /// `[portal_ui].status` from the crate's parity manifest, populated
+    /// by `scripts/distribute-portal-ui-audit.py` from
+    /// `docs/parity/portal-ui-audit-2026-05-11.md`.
+    /// One of `"none"` | `"scaffold"` | `"partial"` | `"complete"`.
+    /// `None` when the crate has no `[portal_ui]` block (typically
+    /// infra-only or audit-omitted).
+    #[serde(default)]
+    pub portal_ui_status: Option<String>,
+    /// `[portal_ui].priority` — `"P0"` (release blocker), `"P1"`
+    /// (important), `"P2"` (CLI-first / low-traffic). `None` when
+    /// absent.
+    #[serde(default)]
+    pub portal_ui_priority: Option<String>,
+    /// `[portal_ui].upstream_url` — canonical upstream UI URL (or the
+    /// project page when no first-party UI exists).
+    #[serde(default)]
+    pub portal_ui_upstream_url: Option<String>,
+    /// Numeric score derived from `portal_ui_status`:
+    /// `none = 0`, `scaffold = 25`, `partial = 60`, `complete = 100`.
+    /// `None` mirrors `portal_ui_status = None`.
+    #[serde(default)]
+    pub portal_ui_score: Option<u8>,
 }
 
 /// Fallback list of crates that are infrastructure tooling, shared
@@ -251,6 +273,79 @@ impl ComplianceSnapshot {
         };
         compute_parity_grade(avg_ratio)
     }
+
+    /// Aggregate **portal-UI parity** score (0-100) over tier-1 crates
+    /// whose `[portal_ui]` block is present. Score per crate maps from
+    /// `status`: `none = 0`, `scaffold = 25`, `partial = 60`,
+    /// `complete = 100`. Crates without a `[portal_ui]` block (audit
+    /// omission or infra) are excluded from both numerator and
+    /// denominator — measuring against an unknown is worse than
+    /// counting it as zero.
+    pub fn portal_ui_avg_score(&self) -> u8 {
+        let scored: Vec<u8> = self
+            .crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.portal_ui_score)
+            .collect();
+        if scored.is_empty() {
+            return 0;
+        }
+        let total: u32 = scored.iter().map(|&s| u32::from(s)).sum();
+        ((total / scored.len() as u32).min(100)) as u8
+    }
+
+    /// Number of tier-1 crates whose `[portal_ui]` block is populated.
+    /// Surfaced on the dashboard as "N of M tier-1 crates have a portal-
+    /// UI score" so the grade can't be gamed by omitting rows.
+    pub fn portal_ui_measured_count(&self) -> usize {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only && c.portal_ui_score.is_some())
+            .count()
+    }
+
+    /// A-F letter for the **portal-UI parity** aggregate. Same scale as
+    /// `parity_grade` — both axes measure progress toward upstream
+    /// faithfulness on different surfaces, so the boundaries match.
+    /// Returns `'F'` when no crate has a measurable portal-UI score.
+    pub fn portal_ui_grade(&self) -> char {
+        if self.portal_ui_measured_count() == 0 {
+            return 'F';
+        }
+        let ratio = f64::from(self.portal_ui_avg_score()) / 100.0;
+        compute_parity_grade(ratio)
+    }
+
+    /// Count of crates at P0 priority whose portal-UI status is still
+    /// `none` or `scaffold`. Used by the dashboard headline so a clean
+    /// average can't hide a P0-blocker.
+    pub fn portal_ui_p0_gaps(&self) -> usize {
+        self.crates
+            .iter()
+            .filter(|c| {
+                !c.infra_only
+                    && c.portal_ui_priority.as_deref() == Some("P0")
+                    && matches!(
+                        c.portal_ui_status.as_deref(),
+                        Some("none") | Some("scaffold")
+                    )
+            })
+            .count()
+    }
+}
+
+/// Map a `[portal_ui].status` value to the numeric score the
+/// dashboard averages. Unknown statuses return `None` so a typo in
+/// the audit doc surfaces as missing data rather than silent zero.
+pub fn portal_ui_status_score(status: &str) -> Option<u8> {
+    match status {
+        "none" => Some(0),
+        "scaffold" => Some(25),
+        "partial" => Some(60),
+        "complete" => Some(100),
+        _ => None,
+    }
 }
 
 /// Map a 0-100 structural score to an A-F letter grade.
@@ -325,22 +420,40 @@ pub struct ParityManifest {
     /// infrastructure tooling and exempt from the 4-track contract.
     /// `None` means the field was absent (caller should fall back).
     pub infra_only: Option<bool>,
+    /// `[portal_ui].status` — `"none"` | `"scaffold"` | `"partial"` |
+    /// `"complete"`. `None` when the block is missing.
+    pub portal_ui_status: Option<String>,
+    /// `[portal_ui].priority` — `"P0"` | `"P1"` | `"P2"`.
+    pub portal_ui_priority: Option<String>,
+    /// `[portal_ui].upstream_url` — canonical upstream UI URL.
+    pub portal_ui_upstream_url: Option<String>,
 }
 
-/// Parse `[upstream]` and `[parity]` tables from a parity manifest.
-/// Tolerant of missing or malformed manifests — unknown sections are skipped.
+/// Parse `[upstream]`, `[parity]`, and `[portal_ui]` tables from a
+/// parity manifest. Tolerant of missing or malformed manifests —
+/// unknown sections are skipped.
 pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
     let mut section: &str = "";
     let mut org: Option<String> = None;
     let mut repo: Option<String> = None;
     let mut version: Option<String> = None;
     let mut infra_only: Option<bool> = None;
+    let mut portal_ui_status: Option<String> = None;
+    let mut portal_ui_priority: Option<String> = None;
+    let mut portal_ui_upstream_url: Option<String> = None;
     for line in content.lines() {
         let trimmed = line.trim();
         if let Some(rest) = trimmed.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+            // Skip array-of-tables headers — `[[mapped]]` should not
+            // reset the section to "mapped" because we only consume
+            // the singular tables.
+            if rest.starts_with('[') {
+                continue;
+            }
             section = match rest {
                 "upstream" => "upstream",
                 "parity" => "parity",
+                "portal_ui" => "portal_ui",
                 _ => "",
             };
             continue;
@@ -360,6 +473,15 @@ pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
                     infra_only = extract_bool_value(rest);
                 }
             }
+            "portal_ui" => {
+                if let Some(rest) = trimmed.strip_prefix("status") {
+                    portal_ui_status = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("priority") {
+                    portal_ui_priority = extract_string_value(rest);
+                } else if let Some(rest) = trimmed.strip_prefix("upstream_url") {
+                    portal_ui_upstream_url = extract_string_value(rest);
+                }
+            }
             _ => {}
         }
     }
@@ -371,6 +493,9 @@ pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
         upstream_version: version,
         upstream_org_repo,
         infra_only,
+        portal_ui_status,
+        portal_ui_priority,
+        portal_ui_upstream_url,
     }
 }
 
@@ -725,6 +850,10 @@ pub fn analyse_crate(
         obs_alerts_present,
         obs_dashboard_present,
     );
+    let portal_ui_score = manifest
+        .portal_ui_status
+        .as_deref()
+        .and_then(portal_ui_status_score);
     Ok(CrateCompliance {
         name: crate_name.to_string(),
         upstream_version,
@@ -746,6 +875,10 @@ pub fn analyse_crate(
         parity_ratio: None,
         manifest_filled: None,
         audit_tier: None,
+        portal_ui_status: manifest.portal_ui_status,
+        portal_ui_priority: manifest.portal_ui_priority,
+        portal_ui_upstream_url: manifest.portal_ui_upstream_url,
+        portal_ui_score,
     })
 }
 
@@ -1185,6 +1318,11 @@ pub fn render_with_view(
     let parity_color = cell_color(parity_avg);
     let parity_measured = snapshot.parity_measured_count();
     let manifest_fill_pct = (snapshot.manifest_fill_ratio() * 100.0).round() as u8;
+    let portal_ui_avg = snapshot.portal_ui_avg_score();
+    let portal_ui_grade = snapshot.portal_ui_grade();
+    let portal_ui_color = cell_color(portal_ui_avg);
+    let portal_ui_measured = snapshot.portal_ui_measured_count();
+    let portal_ui_p0_gaps = snapshot.portal_ui_p0_gaps();
 
     let rows: Vec<Vec<String>> = filtered
         .iter()
@@ -1228,6 +1366,30 @@ pub fn render_with_view(
                     r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="not covered by parity audit">—</span>"#,
                 ),
             };
+            let portal_ui_html = match (c.infra_only, c.portal_ui_score.as_ref()) {
+                (true, _) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-200 text-gray-600" title="infra-only">infra</span>"#,
+                ),
+                (false, Some(&score)) => {
+                    let status = c.portal_ui_status.as_deref().unwrap_or("—");
+                    let priority = c.portal_ui_priority.as_deref().unwrap_or("");
+                    let prio_badge = if priority.is_empty() {
+                        String::new()
+                    } else {
+                        format!(r#" <span class="text-[10px] text-gray-500">·{}</span>"#, escape(priority))
+                    };
+                    format!(
+                        r#"<span class="px-2 py-1 rounded {color}">{score}</span> <span class="text-[10px] text-gray-500">{status}</span>{prio}"#,
+                        color = cell_color(score),
+                        score = score,
+                        status = escape(status),
+                        prio = prio_badge,
+                    )
+                }
+                (false, None) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="no [portal_ui] block in parity.manifest.toml">—</span>"#,
+                ),
+            };
             vec![
                 format!(
                     r#"<a class="text-blue-700 underline" href="/admin/compliance/{name}?tenant_id={tenant}">{label}</a>"#,
@@ -1246,6 +1408,7 @@ pub fn render_with_view(
                 check(c.obs_dashboard_present).into(),
                 score_html,
                 parity_html,
+                portal_ui_html,
             ]
         })
         .collect();
@@ -1293,7 +1456,7 @@ pub fn render_with_view(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
-<section class="grid grid-cols-2 gap-4 mb-6">
+<section class="grid grid-cols-3 gap-4 mb-6">
   <div class="p-5 bg-white rounded shadow">
     <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Structural Coverage</div>
     <div class="flex items-baseline gap-3">
@@ -1312,6 +1475,18 @@ pub fn render_with_view(
       Audit ratio across {parity_measured}/{tier1} tier-1 crates. Source:
       <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/full-audit-2026-05-01.md">full-audit-2026-05-01.md</a>.
       Manifest fill: {manifest_fill_pct}% of tier-1 crates declare items.
+    </div>
+  </div>
+  <div class="p-5 bg-white rounded shadow">
+    <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Portal UI Parity</div>
+    <div class="flex items-baseline gap-3">
+      <div class="text-4xl font-bold {portal_ui_color} px-2 rounded">{portal_ui_avg}</div>
+      <div class="text-3xl font-bold text-gray-700">Grade {portal_ui_grade}</div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">
+      `[portal_ui]` blocks across {portal_ui_measured}/{tier1} tier-1 crates. Source:
+      <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/portal-ui-audit-2026-05-11.md">portal-ui-audit-2026-05-11.md</a>.
+      P0 release-blocker gaps: <strong>{portal_ui_p0_gaps}</strong>.
     </div>
   </div>
 </section>
@@ -1335,11 +1510,17 @@ pub fn render_with_view(
         parity_grade = parity_grade,
         parity_measured = parity_measured,
         manifest_fill_pct = manifest_fill_pct,
+        portal_ui_avg = portal_ui_avg,
+        portal_ui_color = portal_ui_color,
+        portal_ui_grade = portal_ui_grade,
+        portal_ui_measured = portal_ui_measured,
+        portal_ui_p0_gaps = portal_ui_p0_gaps,
         sort_form = sort_form,
         tbl = table(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
                 "portal", "cavectl", "alerts", "dash", "structural", "parity",
+                "portal-ui",
             ],
             &rows,
         ),
@@ -1821,6 +2002,10 @@ version = "7.2.0"
                     parity_ratio: None,
                     manifest_filled: None,
                     audit_tier: None,
+                    portal_ui_status: None,
+                    portal_ui_priority: None,
+                    portal_ui_upstream_url: None,
+                    portal_ui_score: None,
                 },
             ],
         };
@@ -1910,6 +2095,10 @@ version = "7.2.0"
             parity_ratio: None,
             manifest_filled: None,
             audit_tier: None,
+            portal_ui_status: None,
+            portal_ui_priority: None,
+            portal_ui_upstream_url: None,
+            portal_ui_score: None,
         }
     }
 
@@ -2123,6 +2312,10 @@ version = "7.2.0"
                 parity_ratio: Some(0.42),
                 manifest_filled: Some(true),
                 audit_tier: Some("B".into()),
+                portal_ui_status: Some("partial".into()),
+                portal_ui_priority: Some("P1".into()),
+                portal_ui_upstream_url: Some("https://example.com/ui".into()),
+                portal_ui_score: Some(60),
             },
             ignored_tests: vec![IgnoredTest {
                 file: "crates/cave-x/src/lib.rs".into(),
@@ -2489,6 +2682,200 @@ version = "7.2.0"
     fn parse_parity_index_json_returns_empty_on_garbage() {
         assert!(parse_parity_index_json("not json").is_empty());
         assert!(parse_parity_index_json("").is_empty());
+    }
+
+    // ── Portal UI parity (3rd grade) ─────────────────────────────────────
+
+    fn portal_ui_compliance(
+        name: &str,
+        infra: bool,
+        status: Option<&str>,
+        priority: Option<&str>,
+    ) -> CrateCompliance {
+        let mut c = stub_compliance(name, 80);
+        c.infra_only = infra;
+        c.portal_ui_status = status.map(str::to_string);
+        c.portal_ui_priority = priority.map(str::to_string);
+        c.portal_ui_score = status.and_then(portal_ui_status_score);
+        c
+    }
+
+    #[test]
+    fn portal_ui_status_score_maps_each_bucket() {
+        assert_eq!(portal_ui_status_score("none"), Some(0));
+        assert_eq!(portal_ui_status_score("scaffold"), Some(25));
+        assert_eq!(portal_ui_status_score("partial"), Some(60));
+        assert_eq!(portal_ui_status_score("complete"), Some(100));
+        // Unknown statuses MUST surface as None — never silently zero.
+        assert_eq!(portal_ui_status_score(""), None);
+        assert_eq!(portal_ui_status_score("WIP"), None);
+    }
+
+    #[test]
+    fn portal_ui_avg_score_excludes_infra_and_unknown() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                portal_ui_compliance("a", false, Some("complete"), Some("P0")),
+                portal_ui_compliance("b", false, Some("partial"), Some("P1")),
+                portal_ui_compliance("c", false, Some("scaffold"), Some("P2")),
+                portal_ui_compliance("d", false, None, None),     // unknown excluded
+                portal_ui_compliance("e", true, Some("none"), Some("P2")), // infra excluded
+            ],
+        };
+        // Average of {100, 60, 25} = 61.66… → 61 (integer division).
+        assert_eq!(snap.portal_ui_avg_score(), 61);
+        assert_eq!(snap.portal_ui_measured_count(), 3);
+    }
+
+    #[test]
+    fn portal_ui_grade_at_boundaries() {
+        // 0 measured → F (never auto-graded A)
+        let empty = ComplianceSnapshot { crates: vec![] };
+        assert_eq!(empty.portal_ui_grade(), 'F');
+        let unknown_only = ComplianceSnapshot {
+            crates: vec![portal_ui_compliance("x", false, None, None)],
+        };
+        assert_eq!(unknown_only.portal_ui_grade(), 'F');
+
+        // All complete → A
+        let all_complete = ComplianceSnapshot {
+            crates: vec![
+                portal_ui_compliance("a", false, Some("complete"), Some("P0")),
+                portal_ui_compliance("b", false, Some("complete"), Some("P1")),
+            ],
+        };
+        assert_eq!(all_complete.portal_ui_avg_score(), 100);
+        assert_eq!(all_complete.portal_ui_grade(), 'A');
+
+        // Mixed scaffold/partial — score 42 → D
+        let mixed = ComplianceSnapshot {
+            crates: vec![
+                portal_ui_compliance("a", false, Some("scaffold"), Some("P2")),
+                portal_ui_compliance("b", false, Some("partial"), Some("P1")),
+            ],
+        };
+        // (25 + 60) / 2 = 42 → ratio 0.42 → grade C (≥0.30)
+        assert_eq!(mixed.portal_ui_avg_score(), 42);
+        assert_eq!(mixed.portal_ui_grade(), 'C');
+
+        // All none → ratio 0.0 → F
+        let all_none = ComplianceSnapshot {
+            crates: vec![
+                portal_ui_compliance("a", false, Some("none"), Some("P0")),
+                portal_ui_compliance("b", false, Some("none"), Some("P1")),
+            ],
+        };
+        assert_eq!(all_none.portal_ui_avg_score(), 0);
+        assert_eq!(all_none.portal_ui_grade(), 'F');
+    }
+
+    #[test]
+    fn portal_ui_p0_gaps_counts_release_blockers_only() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                portal_ui_compliance("blocker-none", false, Some("none"), Some("P0")),
+                portal_ui_compliance("blocker-scaffold", false, Some("scaffold"), Some("P0")),
+                portal_ui_compliance("blocker-partial", false, Some("partial"), Some("P0")),
+                portal_ui_compliance("p1-scaffold", false, Some("scaffold"), Some("P1")),
+                portal_ui_compliance("p2-none", false, Some("none"), Some("P2")),
+                portal_ui_compliance("infra-none", true, Some("none"), Some("P0")),
+            ],
+        };
+        // Only P0 + (none OR scaffold) + non-infra counts.
+        assert_eq!(snap.portal_ui_p0_gaps(), 2);
+    }
+
+    #[test]
+    fn parse_parity_manifest_portal_ui_block_extracts_fields() {
+        let manifest = r#"
+[upstream]
+org = "kedacore"
+repo = "keda"
+
+[parity]
+infra_only = false
+
+[portal_ui]
+upstream_ui  = "KEDA dashboard"
+upstream_url = "https://keda.sh/docs/"
+status       = "partial"
+loc          = 261
+priority     = "P0"
+notes        = "Scaler views"
+last_audit   = "2026-05-11"
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.portal_ui_status.as_deref(), Some("partial"));
+        assert_eq!(m.portal_ui_priority.as_deref(), Some("P0"));
+        assert_eq!(
+            m.portal_ui_upstream_url.as_deref(),
+            Some("https://keda.sh/docs/")
+        );
+    }
+
+    #[test]
+    fn parse_parity_manifest_portal_ui_block_absent_leaves_none() {
+        let manifest = r#"
+[upstream]
+org = "x"
+repo = "y"
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert!(m.portal_ui_status.is_none());
+        assert!(m.portal_ui_priority.is_none());
+        assert!(m.portal_ui_upstream_url.is_none());
+    }
+
+    #[test]
+    fn parse_parity_manifest_ignores_array_of_tables_headers() {
+        // [[mapped]] inside the inventory pattern must NOT reset the
+        // current section — the parser should stay outside the singular
+        // tables it cares about.
+        let manifest = r#"
+[upstream]
+org = "etcd-io"
+repo = "etcd"
+
+[parity]
+infra_only = false
+
+[[mapped]]
+upstream_pkg = "server/storage/wal/"
+
+[portal_ui]
+status   = "scaffold"
+priority = "P0"
+"#;
+        let m = parse_parity_manifest_full(manifest);
+        assert_eq!(m.upstream_org_repo.as_deref(), Some("etcd-io/etcd"));
+        assert_eq!(m.portal_ui_status.as_deref(), Some("scaffold"));
+        assert_eq!(m.portal_ui_priority.as_deref(), Some("P0"));
+    }
+
+    #[test]
+    fn render_includes_third_portal_ui_grade_card() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/PortalUI.tsx",
+            "PortalUIScore",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![portal_ui_compliance(
+                "cave-x",
+                false,
+                Some("partial"),
+                Some("P0"),
+            )],
+        };
+        let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        // Headline card is present.
+        assert!(html.contains("Portal UI Parity"));
+        // The third grade rendered. partial = 60 → ratio 0.6 → grade B.
+        assert!(html.contains("Grade B"));
+        // Table got a portal-ui column header.
+        assert!(html.contains("portal-ui"));
+        // P0 release-blocker gap counter is rendered.
+        assert!(html.contains("release-blocker gaps"));
     }
 
     #[test]
