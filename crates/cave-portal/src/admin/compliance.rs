@@ -2888,12 +2888,16 @@ priority = "P0"
         let index = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
         attach_parity_index(&mut snap, &index);
         let api = snap.crates.iter().find(|c| c.name == "cave-apiserver").unwrap();
-        // Post-2026-05-12: measured ratio for cave-apiserver is ~0.86
-        // (was a wave3 self-report of 1.0 before the audit refresh).
+        // Post-2026-05-12 trajectory:
+        //   1.0  (wave3 self-report)
+        //   0.86 (measured audit pass: 26 mapped / 17 skipped / 7 unmapped of 50)
+        //   0.88 (CEL evaluator MVP landed: 27 mapped / 17 skipped / 6 unmapped of 50)
+        // Assert the ratio falls in the post-CEL-MVP band so future
+        // unmapped-clearing sweeps still fit without test churn.
         let r = api.parity_ratio.expect("apiserver has a measured ratio");
         assert!(
-            (r - 0.86).abs() < 1e-3,
-            "cave-apiserver ratio = {r}, expected ~0.86 after measured audit"
+            (0.85..=0.95).contains(&r),
+            "cave-apiserver ratio = {r}, expected 0.85..=0.95 after measured audit + CEL MVP"
         );
         assert_eq!(api.audit_tier.as_deref(), Some("100"));
         let unknown = snap

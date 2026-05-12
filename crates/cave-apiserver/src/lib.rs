@@ -34,6 +34,7 @@ pub mod selectors;
 pub mod priority_fairness;
 pub mod validating_admission_policy;
 pub mod vap_advanced;
+pub mod cel_eval;
 pub mod mutating_admission_policy;
 pub mod webhook_admission;
 pub mod builtin_admission;

@@ -31,6 +31,10 @@ ring = { workspace = true }
 jsonwebtoken = { workspace = true }
 sha2 = "0.10"
 base64 = "0.22"
+# CEL evaluator for ValidatingAdmissionPolicy (KEP-3488). Pure-Rust impl
+# of the Google CEL spec; v0.9 covers boolean / arithmetic / has() /
+# list/map indexing — enough for the K8s VAP grammar.
+cel-interpreter = "0.9"
 
 [dev-dependencies]
 reqwest = { workspace = true }
