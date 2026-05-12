@@ -934,8 +934,8 @@ infra_only  = false
 [portal_ui]
 upstream_ui  = "Hubble UI (Cilium)"
 upstream_url = "https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/"
-status       = "partial"
-loc          = 209
+status       = "complete"
+loc          = 800
 priority     = "P0"
-notes        = "Flow visibility"
+notes        = "Folder split: flows+policies+services+nodes+identities (23 tests). Cilium Hubble UI parity."
 last_audit   = "2026-05-11"

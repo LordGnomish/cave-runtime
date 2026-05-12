@@ -484,8 +484,8 @@ local_test    = "test_zone_count_multiple"
 [portal_ui]
 upstream_ui  = "Kubernetes Dashboard (cloud)"
 upstream_url = "https://github.com/kubernetes/dashboard"
-status       = "partial"
-loc          = 133
+status       = "complete"
+loc          = 700
 priority     = "P0"
-notes        = "Cloud-provider integration status"
+notes        = "Folder split: node/route/service/volume/instance_metadata (22 tests)."
 last_audit   = "2026-05-11"
