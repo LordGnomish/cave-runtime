@@ -16,6 +16,7 @@ use tower_http::trace::TraceLayer;
 use tracing::info;
 
 mod cluster;
+mod cluster_runtime;
 mod portal;
 
 static PORTAL_HTML: &str = include_str!("portal_index.html");
@@ -30,6 +31,11 @@ struct Cli {
     /// Legacy: override listen port for implicit `serve`.
     #[arg(short, long, global = true)]
     port: Option<u16>,
+    /// Cluster data dir. If `<data_dir>/cluster.json` exists, `serve` starts
+    /// dedicated TLS listeners for cave-etcd (2379) and cave-apiserver (6443).
+    /// Falls back to `$CAVE_DATA_DIR` or `$HOME/.cave/` when omitted.
+    #[arg(long, global = true)]
+    data_dir: Option<std::path::PathBuf>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -319,6 +325,36 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive());
+
+    // Production-mode cluster runtime: if cluster.json exists, spawn dedicated
+    // TLS listeners for cave-etcd (2379) and cave-apiserver (6443).
+    let cluster_handles =
+        match cluster_runtime::ClusterRuntime::load(cli.data_dir.as_deref()).await {
+            Ok(Some(rt)) => {
+                info!(
+                    cluster = %rt.manifest.cluster_name,
+                    data_dir = %rt.data_dir.display(),
+                    "production-mode cluster detected — starting dedicated TLS listeners"
+                );
+                let rt_for_shutdown = rt.clone();
+                tokio::spawn(async move {
+                    if tokio::signal::ctrl_c().await.is_ok() {
+                        info!("Ctrl-C received, persisting etcd snapshot");
+                        let _ = rt_for_shutdown.shutdown_persist().await;
+                    }
+                });
+                rt.spawn_listeners().await.ok()
+            }
+            Ok(None) => {
+                info!("no cluster.json found — development mode (unified listener only)");
+                None
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to load cluster.json — falling back to development mode");
+                None
+            }
+        };
+    let _ = cluster_handles; // handles run for the lifetime of the process
 
     let port = cli.port.unwrap_or(8080);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await?;
