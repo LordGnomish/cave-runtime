@@ -97,6 +97,13 @@ pub mod workflows;
 pub mod tenant_dashboard;
 pub mod vault;
 
+// ── 2026-05-11 batch I: upstream-UI parity admin pages ──────────────
+pub mod grafana;
+pub mod k8s_dashboard;
+pub mod kiali;
+pub mod loki;
+pub mod prometheus;
+
 use axum::{
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
@@ -234,6 +241,12 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::KedaTriggerAuthWrite,
         Permission::KedaScalerCatalog,
         Permission::KedaMetricsRead,
+        // 2026-05-11 batch I: upstream-UI parity pages.
+        Permission::GrafanaRead,
+        Permission::PrometheusRead,
+        Permission::LokiRead,
+        Permission::K8sDashboardRead,
+        Permission::KialiRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -722,6 +735,11 @@ async fn kubevirt_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Qu
 async fn ledger_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); ledger::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn oncall_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); oncall::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn search_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); search::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn grafana_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); grafana::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn prometheus_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); prometheus::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn loki_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); loki::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn k8s_dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); k8s_dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn kiali_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kiali::render(&s, &ctx).map(Html).map_err(err_to_response) }
 
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -886,6 +904,12 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/ledger", get(ledger_handler))
         .route("/admin/oncall", get(oncall_handler))
         .route("/admin/search", get(search_handler))
+        // 2026-05-11 batch I: upstream-UI parity pages.
+        .route("/admin/grafana", get(grafana_handler))
+        .route("/admin/prometheus", get(prometheus_handler))
+        .route("/admin/loki", get(loki_handler))
+        .route("/admin/k8s-dashboard", get(k8s_dashboard_handler))
+        .route("/admin/kiali", get(kiali_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
