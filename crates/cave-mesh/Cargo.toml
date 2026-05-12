@@ -34,3 +34,4 @@ reqwest            = { workspace = true }
 regex              = { workspace = true }
 ring               = { workspace = true }
 rcgen              = "0.13"
+rand               = { workspace = true }

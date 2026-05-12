@@ -212,13 +212,29 @@ pub fn record_outcome(service_id: Uuid, success: bool, threshold: u32, state: &M
 // ─── Retry ───────────────────────────────────────────────────────────────────
 
 /// Compute exponential backoff delay schedule for `attempts` retries.
+///
+/// Sweep-007: delegates to `cave_kernel::retrypolicy::RetryPolicy` so the
+/// kernel's jitter-aware exponential strategy is the single source of
+/// truth across the workspace. The local helper preserves the existing
+/// signature (`attempts/base_ms/max_ms`) and the no-jitter semantics
+/// that mesh xDS retries rely on.
 pub fn retry_with_backoff(attempts: u32, base_ms: u64, max_ms: u64) -> Vec<Duration> {
-    (0..attempts)
-        .map(|i| {
-            let delay_ms = base_ms.saturating_mul(1u64 << i.min(62)).min(max_ms);
-            Duration::from_millis(delay_ms)
-        })
-        .collect()
+    use cave_kernel::retrypolicy::{BackoffStrategy, RetryPolicy};
+    use rand::SeedableRng;
+    if attempts == 0 {
+        return Vec::new();
+    }
+    let strategy = BackoffStrategy::Exponential {
+        base: Duration::from_millis(base_ms),
+        cap: Duration::from_millis(max_ms),
+    };
+    // `RetryPolicy::schedule` emits `max_attempts - 1` delays, so request
+    // one extra attempt to keep the caller-facing count consistent.
+    let policy = RetryPolicy::new(attempts + 1, strategy);
+    // The non-jitter `Exponential` strategy doesn't consume the rng; use
+    // a deterministic seed so the schedule stays reproducible.
+    let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+    policy.schedule(&mut rng)
 }
 
 // ─── Timeout ─────────────────────────────────────────────────────────────────

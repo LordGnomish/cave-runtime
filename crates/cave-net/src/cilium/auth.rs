@@ -27,8 +27,10 @@
 //!   (mirrors `pkg/auth/spire.go::renewSVID`).
 
 use crate::cilium::types::{Cite, TenantId};
+use cave_kernel::identity::SpiffeId as KernelSpiffeId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AuthMode {
@@ -112,7 +114,19 @@ impl Svid {
         if self.trust_domain != expected_td {
             return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
         }
-        if !self.spiffe_id.starts_with(&format!("spiffe://{}/", expected_td)) {
+        // Parse with the kernel's SPIFFE 1.0 grammar (sweep-008) instead of
+        // a hand-rolled `starts_with` check. The kernel parser rejects
+        // empty/percent-encoded/invalid-trust-domain ids that the legacy
+        // prefix check accepted.
+        let parsed = KernelSpiffeId::from_str(&self.spiffe_id)
+            .map_err(|_| AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()))?;
+        if !parsed.is_member_of(expected_td) {
+            return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
+        }
+        // A bare `spiffe://td` (no path) is a trust-domain root id, not a
+        // workload id; reject it here to keep the original behaviour where
+        // we required a non-empty path after the trust domain.
+        if parsed.path().is_empty() {
             return Err(AuthError::UntrustedSpiffe(self.spiffe_id.clone(), expected_td.to_string()));
         }
         Ok(())
@@ -689,6 +703,29 @@ mod tests {
         let (_c, _t) = cilium_test_ctx!("pkg/spire/svid.go", "Svid.ValidateTD.Mismatch", "tenant-auth-tdbad");
         let s = svid("w", 3600, 100);
         assert!(s.validate_trust_domain("other.example").is_err());
+    }
+
+    #[test]
+    fn svid_validate_trust_domain_rejects_malformed_id_via_kernel_parser() {
+        // Sweep-008 — adopting cave_kernel::identity::SpiffeId makes the
+        // validator reject malformed IDs that the legacy `starts_with`
+        // check accepted: missing scheme, percent-encoded path, etc.
+        let (_c, _t) = cilium_test_ctx!("pkg/spire/svid.go", "Svid.ValidateTD.Malformed", "tenant-auth-tdmal");
+        let bad_scheme = Svid {
+            spiffe_id: "not-spiffe://cluster.local/workload".into(),
+            trust_domain: "cluster.local".into(),
+            issued_at: 100,
+            expires_at: 3700,
+        };
+        assert!(bad_scheme.validate_trust_domain("cluster.local").is_err());
+
+        let percent_encoded = Svid {
+            spiffe_id: "spiffe://cluster.local/work%2fload".into(),
+            trust_domain: "cluster.local".into(),
+            issued_at: 100,
+            expires_at: 3700,
+        };
+        assert!(percent_encoded.validate_trust_domain("cluster.local").is_err());
     }
 
     // ── AuthEntry validity helper ────────────────────────────────────────────
