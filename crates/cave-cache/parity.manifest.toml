@@ -10,7 +10,15 @@
 org     = "redis"
 repo    = "redis"
 version = "7.2.0"
+name    = "Redis"
+license = "BSD-3-Clause"
+language= "C"
+url     = "https://github.com/redis/redis"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-cache"
 description = "Redis 7.2 reimplementation — RESP wire + all data types + pub/sub + scripting + persistence + cluster slots + REST shim"

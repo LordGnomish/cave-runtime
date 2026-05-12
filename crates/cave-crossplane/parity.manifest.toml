@@ -6,7 +6,15 @@
 org     = "crossplane"
 repo    = "crossplane"
 version = "main"
+name    = "Crossplane"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/crossplane/crossplane"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-crossplane"
 description = "Crossplane v2 XRD composition engine \u2014 XRDs, compositions, claims, provider abstraction"

@@ -5,7 +5,10 @@
 org     = "zed-industries"
 repo    = "zed"
 version = "main"
-
+name    = "Zed"
+license = "GPL-3.0"
+language= "Rust"
+url     = "https://github.com/zed-industries/zed"
 [module]
 name        = "cave-desktop"
 description = "GPUI-based native admin shell — see ADR-PORTAL-DESKTOP-001"
@@ -25,3 +28,6 @@ source_root = "src"
 
 [parity]
 infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

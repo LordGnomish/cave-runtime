@@ -13,7 +13,15 @@
 org     = "cilium"
 repo    = "tetragon"
 version = "v1.2.0"
+name    = "Tetragon"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/cilium/tetragon"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-forensics"
 description = "Runtime forensics — Tetragon-compatible evidence model with case + chain-of-custody management"

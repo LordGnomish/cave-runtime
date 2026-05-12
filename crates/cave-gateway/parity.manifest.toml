@@ -20,7 +20,15 @@
 org     = "Kong"
 repo    = "kong"
 version = "v3.5.0"
+name    = "Kong"
+license = "Apache-2.0"
+language= "Lua"
+url     = "https://github.com/Kong/kong"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-gateway"
 description = "API gateway — Kong reimplementation + Gravitee API/plan/application/subscription surface + portal/catalog/governance"

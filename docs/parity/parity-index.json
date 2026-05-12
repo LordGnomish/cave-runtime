@@ -2,7 +2,8 @@
   "crates": {
     "cave-acme": {
       "cave_src_loc": 662,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely smallstep/certificates ACME",
       "parity_ratio": null,
       "stubs": null,
@@ -12,7 +13,7 @@
     },
     "cave-admission": {
       "cave_src_loc": 1620,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -22,7 +23,7 @@
     },
     "cave-ai-obs": {
       "cave_src_loc": 408,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -32,7 +33,7 @@
     },
     "cave-alerts": {
       "cave_src_loc": 3829,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -52,7 +53,7 @@
     },
     "cave-artifacts": {
       "cave_src_loc": 4994,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -62,7 +63,7 @@
     },
     "cave-auth": {
       "cave_src_loc": 8236,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -72,7 +73,7 @@
     },
     "cave-backup": {
       "cave_src_loc": 2662,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -82,7 +83,7 @@
     },
     "cave-cache": {
       "cave_src_loc": 11602,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -92,7 +93,7 @@
     },
     "cave-cdc": {
       "cave_src_loc": 1456,
-      "manifest_filled": null,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely debezium / pg-logical-replication",
       "parity_ratio": null,
       "stubs": null,
@@ -102,7 +103,7 @@
     },
     "cave-certs": {
       "cave_src_loc": 914,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -112,7 +113,8 @@
     },
     "cave-changelog": {
       "cave_src_loc": 463,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -122,7 +124,7 @@
     },
     "cave-chaos": {
       "cave_src_loc": 1125,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -132,7 +134,7 @@
     },
     "cave-chat": {
       "cave_src_loc": 419,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -142,7 +144,8 @@
     },
     "cave-cli": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "Operator CLI",
       "parity_ratio": null,
       "stubs": null,
@@ -162,7 +165,7 @@
     },
     "cave-cluster": {
       "cave_src_loc": 4873,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -172,7 +175,7 @@
     },
     "cave-compliance": {
       "cave_src_loc": 2289,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -182,7 +185,7 @@
     },
     "cave-container-scan": {
       "cave_src_loc": 2340,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -202,7 +205,8 @@
     },
     "cave-core": {
       "cave_src_loc": 1990,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -212,7 +216,7 @@
     },
     "cave-cost": {
       "cave_src_loc": 1965,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -222,7 +226,8 @@
     },
     "cave-cost-alloc": {
       "cave_src_loc": 1737,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -242,7 +247,7 @@
     },
     "cave-crossplane": {
       "cave_src_loc": 2328,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -252,7 +257,7 @@
     },
     "cave-dashboard": {
       "cave_src_loc": 8092,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -262,7 +267,7 @@
     },
     "cave-dast": {
       "cave_src_loc": 304,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -275,6 +280,7 @@
       "manifest_filled": null,
       "note": "needs manifest; likely upstream: apache/arrow-datafusion",
       "parity_ratio": null,
+      "phantom": true,
       "stubs": null,
       "tier": "D2",
       "upstream": null,
@@ -282,7 +288,8 @@
     },
     "cave-db": {
       "cave_src_loc": 707,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -292,7 +299,7 @@
     },
     "cave-deploy": {
       "cave_src_loc": 4743,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -302,7 +309,8 @@
     },
     "cave-desktop": {
       "cave_src_loc": 168,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -312,7 +320,7 @@
     },
     "cave-devlake": {
       "cave_src_loc": 526,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -322,7 +330,7 @@
     },
     "cave-dns": {
       "cave_src_loc": 7796,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -332,7 +340,7 @@
     },
     "cave-docdb": {
       "cave_src_loc": 3622,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -342,7 +350,8 @@
     },
     "cave-docs": {
       "cave_src_loc": 460,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -352,7 +361,8 @@
     },
     "cave-docs-site": {
       "cave_src_loc": 2185,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -362,7 +372,8 @@
     },
     "cave-ebpf-common": {
       "cave_src_loc": 127,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -372,7 +383,7 @@
     },
     "cave-erp": {
       "cave_src_loc": 5298,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -395,6 +406,7 @@
       "manifest_filled": false,
       "note": null,
       "parity_ratio": 0.0,
+      "phantom": true,
       "stubs": null,
       "tier": "C",
       "upstream": "external-secrets/external-secrets",
@@ -402,7 +414,8 @@
     },
     "cave-flags": {
       "cave_src_loc": 2948,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -412,7 +425,7 @@
     },
     "cave-forensics": {
       "cave_src_loc": 210,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -422,7 +435,7 @@
     },
     "cave-gateway": {
       "cave_src_loc": 12187,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -432,7 +445,7 @@
     },
     "cave-gitops-config": {
       "cave_src_loc": 2182,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -442,7 +455,7 @@
     },
     "cave-ha": {
       "cave_src_loc": 5882,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -455,6 +468,7 @@
       "manifest_filled": false,
       "note": null,
       "parity_ratio": 0.0,
+      "phantom": true,
       "stubs": null,
       "tier": "C",
       "upstream": "cilium/hubble",
@@ -465,6 +479,7 @@
       "manifest_filled": null,
       "note": "needs manifest; likely upstream: apache/iceberg",
       "parity_ratio": null,
+      "phantom": true,
       "stubs": null,
       "tier": "D2",
       "upstream": null,
@@ -472,7 +487,7 @@
     },
     "cave-incidents": {
       "cave_src_loc": 836,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -482,7 +497,7 @@
     },
     "cave-infra": {
       "cave_src_loc": 4648,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -492,7 +507,7 @@
     },
     "cave-kamaji": {
       "cave_src_loc": 199,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -502,7 +517,7 @@
     },
     "cave-keda": {
       "cave_src_loc": 1145,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -512,7 +527,8 @@
     },
     "cave-kernel": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "Shared parity calculator, ratelimiter, retry, reconcile primitives",
       "parity_ratio": null,
       "stubs": null,
@@ -522,7 +538,7 @@
     },
     "cave-knative": {
       "cave_src_loc": 1167,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -552,7 +568,8 @@
     },
     "cave-ledger": {
       "cave_src_loc": 821,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -562,7 +579,8 @@
     },
     "cave-lint": {
       "cave_src_loc": 625,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -572,7 +590,7 @@
     },
     "cave-llm-gateway": {
       "cave_src_loc": 3689,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -592,7 +610,7 @@
     },
     "cave-logs": {
       "cave_src_loc": 7285,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -612,7 +630,7 @@
     },
     "cave-metrics": {
       "cave_src_loc": 9530,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -622,9 +640,9 @@
     },
     "cave-net": {
       "cave_src_loc": 36645,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 1.0,
       "stubs": null,
       "tier": "C",
       "upstream": "cilium/cilium",
@@ -632,7 +650,7 @@
     },
     "cave-oncall": {
       "cave_src_loc": 1846,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -642,7 +660,7 @@
     },
     "cave-pam": {
       "cave_src_loc": 353,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -652,7 +670,7 @@
     },
     "cave-permission": {
       "cave_src_loc": 586,
-      "manifest_filled": null,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely casbin / authzed",
       "parity_ratio": null,
       "stubs": null,
@@ -665,6 +683,7 @@
       "manifest_filled": false,
       "note": null,
       "parity_ratio": 0.0,
+      "phantom": true,
       "stubs": null,
       "tier": "C",
       "upstream": "pgbouncer/pgbouncer",
@@ -672,7 +691,8 @@
     },
     "cave-pii": {
       "cave_src_loc": 204,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -682,7 +702,7 @@
     },
     "cave-pipelines": {
       "cave_src_loc": 4211,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -692,7 +712,8 @@
     },
     "cave-pki": {
       "cave_src_loc": 607,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely smallstep/certificates or hashicorp/vault PKI",
       "parity_ratio": null,
       "stubs": null,
@@ -702,7 +723,7 @@
     },
     "cave-policy": {
       "cave_src_loc": 11624,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -712,6 +733,7 @@
     },
     "cave-portal": {
       "cave_src_loc": null,
+      "infra_only": true,
       "manifest_filled": true,
       "note": "10/10 files only \u2014 needs fn/test/surface mappings",
       "parity_ratio": 0.25,
@@ -722,7 +744,8 @@
     },
     "cave-portal-api": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "Portal HTTP API attribution endpoints",
       "parity_ratio": null,
       "stubs": null,
@@ -732,7 +755,8 @@
     },
     "cave-portal-web": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "Static web bundle for the portal UI",
       "parity_ratio": null,
       "stubs": null,
@@ -742,7 +766,8 @@
     },
     "cave-profiler": {
       "cave_src_loc": 180,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -752,7 +777,7 @@
     },
     "cave-rdbms": {
       "cave_src_loc": 5073,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -762,7 +787,8 @@
     },
     "cave-registry": {
       "cave_src_loc": 5540,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -772,7 +798,7 @@
     },
     "cave-rollouts": {
       "cave_src_loc": 1898,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -782,7 +808,8 @@
     },
     "cave-runbook": {
       "cave_src_loc": 3237,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -792,7 +819,8 @@
     },
     "cave-runtime": {
       "cave_src_loc": null,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "Single-binary orchestrator hosting all module routers",
       "parity_ratio": null,
       "stubs": null,
@@ -802,7 +830,7 @@
     },
     "cave-sbom": {
       "cave_src_loc": 434,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -812,7 +840,8 @@
     },
     "cave-scaffold": {
       "cave_src_loc": 1398,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -822,7 +851,7 @@
     },
     "cave-scan": {
       "cave_src_loc": 1189,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -842,7 +871,7 @@
     },
     "cave-search": {
       "cave_src_loc": 172,
-      "manifest_filled": null,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely opensearch-project/OpenSearch",
       "parity_ratio": null,
       "stubs": null,
@@ -852,7 +881,7 @@
     },
     "cave-secrets": {
       "cave_src_loc": 648,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -862,7 +891,7 @@
     },
     "cave-security": {
       "cave_src_loc": 6350,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -872,7 +901,8 @@
     },
     "cave-sign": {
       "cave_src_loc": 183,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -882,7 +912,7 @@
     },
     "cave-slo": {
       "cave_src_loc": 476,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -895,6 +925,7 @@
       "manifest_filled": false,
       "note": null,
       "parity_ratio": 0.0,
+      "phantom": true,
       "stubs": null,
       "tier": "C",
       "upstream": "spiffe/spire",
@@ -902,7 +933,8 @@
     },
     "cave-status": {
       "cave_src_loc": 450,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -912,7 +944,7 @@
     },
     "cave-store": {
       "cave_src_loc": 10711,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -932,7 +964,8 @@
     },
     "cave-techdocs": {
       "cave_src_loc": 835,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: backstage/backstage techdocs plugin",
       "parity_ratio": null,
       "stubs": null,
@@ -942,7 +975,7 @@
     },
     "cave-trace": {
       "cave_src_loc": 8923,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -952,7 +985,8 @@
     },
     "cave-tracing": {
       "cave_src_loc": 2502,
-      "manifest_filled": null,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": "needs manifest; likely upstream: needs target \u2014 possibly opentelemetry-rust or jaeger client",
       "parity_ratio": null,
       "stubs": null,
@@ -962,7 +996,7 @@
     },
     "cave-tracker": {
       "cave_src_loc": 4898,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -972,7 +1006,8 @@
     },
     "cave-upstream": {
       "cave_src_loc": 3519,
-      "manifest_filled": false,
+      "infra_only": true,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -982,7 +1017,7 @@
     },
     "cave-uptime": {
       "cave_src_loc": 299,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -1005,6 +1040,7 @@
       "manifest_filled": false,
       "note": null,
       "parity_ratio": 0.0,
+      "phantom": true,
       "stubs": null,
       "tier": "C",
       "upstream": "loft-sh/vcluster",
@@ -1012,7 +1048,7 @@
     },
     "cave-vulns": {
       "cave_src_loc": 384,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
       "parity_ratio": 0.0,
       "stubs": null,
@@ -1022,7 +1058,7 @@
     },
     "cave-workflows": {
       "cave_src_loc": 666,
-      "manifest_filled": false,
+      "manifest_filled": true,
       "note": null,
       "parity_ratio": 0.0,
       "stubs": null,
@@ -1030,6 +1066,13 @@
       "upstream": "n8n-io/n8n",
       "upstream_version": "v1.0.0"
     }
+  },
+  "disk_overlay_at": "2026-05-12",
+  "disk_overlay_stats": {
+    "flipped": 83,
+    "new_filled": 83,
+    "phantoms": 7,
+    "ratio_overrides": 1
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

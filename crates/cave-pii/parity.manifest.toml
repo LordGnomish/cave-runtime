@@ -6,7 +6,10 @@
 org     = "microsoft"
 repo    = "presidio"
 version = "v2.2.0"
-
+name    = "Microsoft Presidio"
+license = "MIT"
+language= "Python"
+url     = "https://github.com/microsoft/presidio"
 [module]
 name        = "cave-pii"
 description = "PII detection and redaction — Microsoft Presidio replacement"
@@ -36,3 +39,6 @@ source_root = "src"
 
 [parity]
 infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

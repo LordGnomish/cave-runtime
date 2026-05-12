@@ -11,7 +11,10 @@
 org     = "Unleash"
 repo    = "unleash"
 version = "v5.0.0"
-
+name    = "Unleash"
+license = "Apache-2.0"
+language= "TypeScript"
+url     = "https://github.com/Unleash/unleash"
 [module]
 name        = "cave-flags"
 description = "Feature-flag platform — Unleash parity (client/frontend/admin REST, strategy + constraint + variant evaluation, metrics, environments)"
@@ -220,3 +223,6 @@ local_path    = "/api/admin/context"
 
 [parity]
 infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

@@ -14,7 +14,15 @@
 org     = "DefectDojo"
 repo    = "django-DefectDojo"
 version = "v2.36.0"
+name    = "DefectDojo"
+license = "BSD-3-Clause"
+language= "Python"
+url     = "https://github.com/DefectDojo/django-DefectDojo"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-vulns"
 description = "Vulnerability aggregation hub — DefectDojo-compatible finding lifecycle, deduplication, SLA tracking, multi-tool ingest; DTrack-style SBOM/SCA correlation"

@@ -6,7 +6,15 @@
 org     = "kedacore"
 repo    = "keda"
 version = "v2.12.0"
+name    = "KEDA"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/kedacore/keda"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-keda"
 description = "Event-driven autoscaling — KEDA replacement"

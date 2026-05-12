@@ -6,7 +6,10 @@
 org     = "cilium"
 repo    = "cilium"
 version = "v1.14.0"
-
+name    = "Cilium"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/cilium/cilium"
 [module]
 name        = "cave-ebpf-common"
 description = "Shared eBPF utilities — Cilium eBPF replacement"
@@ -36,3 +39,6 @@ source_root = "src"
 
 [parity]
 infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

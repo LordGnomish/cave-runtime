@@ -255,15 +255,122 @@ def parse_audit(md_text: str) -> dict[str, dict]:
     return crates
 
 
+def disk_manifest_state(crate: str) -> dict:
+    """Read crates/<crate>/parity.manifest.toml and surface the disk truth
+    about `manifest_filled`, `parity_ratio`, and `infra_only`. The audit
+    doc captures a frozen snapshot from 2026-05-01; this function
+    reflects what the on-disk manifest now claims, so the dashboard can
+    pick up improvements without waiting for the next markdown re-edit.
+
+    `manifest_filled` becomes True iff the `[upstream]` block has a
+    `license` field AND a `[parity]` block exists. For infra-only
+    crates, `[upstream].license` may be absent (no upstream applies);
+    `[parity].infra_only = true` is sufficient to count the manifest
+    as filled.
+    """
+    p = REPO_ROOT / "crates" / crate / "parity.manifest.toml"
+    if not p.is_file():
+        return {}
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+
+    # Find [parity] block
+    parity_m = re.search(
+        r"^\[parity\][^\[]*",
+        text,
+        flags=re.MULTILINE,
+    )
+    if not parity_m:
+        return {}
+    block = parity_m.group(0)
+    rm = re.search(r'^\s*(?:fill_)?ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    ratio = float(rm.group(1)) if rm else None
+    am = re.search(r'^\s*last_audit\s*=\s*"([^"]+)"', block, flags=re.MULTILINE)
+    last_audit = am.group(1) if am else None
+    im = re.search(r'^\s*infra_only\s*=\s*(true|false)', block, flags=re.MULTILINE)
+    infra = im.group(1) == "true" if im else False
+
+    # Check [upstream].license
+    upstream_m = re.search(
+        r"^\[upstream\][^\[]*",
+        text,
+        flags=re.MULTILINE,
+    )
+    has_license = False
+    if upstream_m:
+        has_license = bool(
+            re.search(r'^\s*license\s*=\s*"', upstream_m.group(0), flags=re.MULTILINE)
+        )
+
+    # `manifest_filled` = `[upstream]` carries license info (or infra-only)
+    # AND `[parity]` exists with `last_audit`.
+    filled = (has_license or infra) and last_audit is not None
+    return {
+        "manifest_filled": filled,
+        "parity_ratio_disk": ratio,
+        "infra_only_disk": infra,
+        "last_audit_disk": last_audit,
+    }
+
+
+def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
+    """For every crate in the index, overlay the disk manifest's
+    `manifest_filled` + `parity_ratio` if the disk is newer or
+    authoritative. Crates whose name has no corresponding workspace
+    directory are marked `phantom = true` so the dashboard can exclude
+    them from headline ratios. Returns a delta report.
+    """
+    flipped = 0
+    ratio_overrides = 0
+    new_filled = 0
+    phantoms = 0
+    for name, entry in crates.items():
+        crate_dir = REPO_ROOT / "crates" / name
+        if not crate_dir.is_dir():
+            entry["phantom"] = True
+            phantoms += 1
+            continue
+        disk = disk_manifest_state(name)
+        if not disk:
+            continue
+        before = entry.get("manifest_filled")
+        if disk["manifest_filled"] and before is not True:
+            entry["manifest_filled"] = True
+            new_filled += 1
+            flipped += 1
+        # Only overlay ratio when disk has a meaningful (>0) measured
+        # value AND it doesn't downgrade an already-100% audit value.
+        disk_ratio = disk.get("parity_ratio_disk")
+        if disk_ratio is not None and disk_ratio > 0.0:
+            audit_ratio = entry.get("parity_ratio") or 0.0
+            if disk_ratio > audit_ratio:
+                entry["parity_ratio"] = disk_ratio
+                ratio_overrides += 1
+        # Surface infra_only signal from disk for E-tier entries.
+        if disk.get("infra_only_disk"):
+            entry["infra_only"] = True
+    return {
+        "flipped": flipped,
+        "ratio_overrides": ratio_overrides,
+        "new_filled": new_filled,
+        "phantoms": phantoms,
+    }
+
+
 def main() -> int:
     if not AUDIT_PATH.exists():
         print(f"error: {AUDIT_PATH} missing", file=sys.stderr)
         return 1
     md = AUDIT_PATH.read_text()
     crates = parse_audit(md)
+    overlay = overlay_disk_state(crates)
     out = {
         "generated_from": str(AUDIT_PATH.relative_to(REPO_ROOT)),
         "generated_at": "2026-05-01",
+        "disk_overlay_at": "2026-05-12",
+        "disk_overlay_stats": overlay,
         "crates": crates,
     }
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -273,9 +380,30 @@ def main() -> int:
     by_tier: dict[str, int] = {}
     for entry in crates.values():
         by_tier[entry["tier"]] = by_tier.get(entry["tier"], 0) + 1
+    filled = sum(1 for e in crates.values() if e.get("manifest_filled") is True)
+    not_filled = sum(1 for e in crates.values() if e.get("manifest_filled") is False)
+    unknown = sum(1 for e in crates.values() if e.get("manifest_filled") is None)
     print(
         f"Wrote {OUT_PATH.relative_to(REPO_ROOT)}: {len(crates)} crates "
         f"({', '.join(f'{t}={n}' for t, n in sorted(by_tier.items()))})",
+        file=sys.stderr,
+    )
+    print(
+        f"manifest_filled: true={filled}  false={not_filled}  null={unknown}",
+        file=sys.stderr,
+    )
+    print(
+        f"disk overlay: flipped={overlay['flipped']}  new_filled={overlay['new_filled']}  "
+        f"ratio_overrides={overlay['ratio_overrides']}  phantoms={overlay['phantoms']}",
+        file=sys.stderr,
+    )
+    real_total = len(crates) - overlay['phantoms']
+    real_filled = sum(
+        1 for e in crates.values()
+        if e.get('manifest_filled') is True and not e.get('phantom')
+    )
+    print(
+        f"workspace-only: filled={real_filled}/{real_total}",
         file=sys.stderr,
     )
     return 0

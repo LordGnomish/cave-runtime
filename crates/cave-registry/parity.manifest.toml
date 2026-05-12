@@ -15,7 +15,10 @@
 org     = "distribution"
 repo    = "distribution"
 version = "v3.1.1"
-
+name    = "CNCF Distribution (Docker Registry)"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/distribution/distribution"
 [module]
 name        = "cave-registry"
 description = "OCI image registry — distribution/distribution reimplementation"
@@ -41,3 +44,6 @@ priority    = "high"
 
 [parity]
 infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

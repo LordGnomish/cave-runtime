@@ -2446,7 +2446,11 @@ version = "7.2.0"
     #[test]
     fn parse_parity_index_json_round_trips_audit_doc_snapshot() {
         // The embedded parity-index.json must round-trip and surface the
-        // canonical Tier ✅ crates with ratio 1.0.
+        // canonical Tier ✅ crates with ratio 1.0. After the 2026-05-12
+        // disk-overlay pass, `manifest_filled` reflects the on-disk
+        // manifest state (license + [parity] block present), so the
+        // Tier C cave-net example below now reports `true` rather than
+        // its original audit-doc `false`.
         let m = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
         for name in ["cave-apiserver", "cave-cri", "cave-etcd", "cave-kubelet", "cave-scheduler"] {
             let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
@@ -2457,11 +2461,14 @@ version = "7.2.0"
         let vault = m.get("cave-vault").unwrap();
         assert_eq!(vault.tier, "A");
         assert!(vault.parity_ratio.unwrap() > 0.6 && vault.parity_ratio.unwrap() < 0.7);
-        // Empty-manifest Tier C example: cave-net.
+        // cave-net still reports tier C (audit doc was frozen 2026-05-01),
+        // but its on-disk manifest now carries `fill_ratio = 1.0` and a
+        // `[parity]` block; the disk-overlay propagates those to the
+        // index so the dashboard reflects the live state.
         let net = m.get("cave-net").unwrap();
         assert_eq!(net.tier, "C");
-        assert_eq!(net.parity_ratio, Some(0.0));
-        assert_eq!(net.manifest_filled, Some(false));
+        assert_eq!(net.parity_ratio, Some(1.0));
+        assert_eq!(net.manifest_filled, Some(true));
     }
 
     #[test]

@@ -10,7 +10,15 @@
 org     = "BerriAI"
 repo    = "litellm"
 version = "v1.0.0"
+name    = "LiteLLM"
+license = "MIT"
+language= "Python"
+url     = "https://github.com/BerriAI/litellm"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-llm-gateway"
 description = "LLM gateway — LiteLLM parity (OpenAI-compatible /v1/chat/completions, aliases, providers, keys/rate-limits/budgets, cache, logs, guardrails)"

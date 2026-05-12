@@ -6,7 +6,15 @@
 org     = "langfuse"
 repo    = "langfuse"
 version = "v2.0.0"
+name    = "Langfuse"
+license = "MIT"
+language= "TypeScript"
+url     = "https://github.com/langfuse/langfuse"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-ai-obs"
 description = "AI observability — Langfuse replacement"

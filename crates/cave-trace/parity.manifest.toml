@@ -9,7 +9,15 @@
 org     = "jaegertracing"
 repo    = "jaeger"
 version = "v1.52.0"
+name    = "Jaeger"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/jaegertracing/jaeger"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-trace"
 description = "Distributed tracing — Jaeger reimplementation + OTLP/Zipkin/OpenCensus ingestion + Tempo TraceQL search"

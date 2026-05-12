@@ -13,7 +13,15 @@
 org     = "casbin"
 repo    = "casbin"
 version = "v3.10.0"
+name    = "Casbin"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/casbin/casbin"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-permission"
 description = "Fine-grained authorization — Casbin reimplementation"

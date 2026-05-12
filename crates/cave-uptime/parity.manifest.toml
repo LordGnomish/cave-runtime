@@ -6,7 +6,15 @@
 org     = "louislam"
 repo    = "uptime-kuma"
 version = "v1.23.0"
+name    = "Uptime Kuma"
+license = "MIT"
+language= "JavaScript"
+url     = "https://github.com/louislam/uptime-kuma"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-uptime"
 description = "Uptime monitoring — Uptime Kuma replacement"
