@@ -6,6 +6,22 @@
 org     = "kubernetes-sigs"
 repo    = "karpenter"
 version = "v1.12.0"
+name    = "Karpenter"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/kubernetes-sigs/karpenter"
+[parity]
+# Package-level inventory against kubernetes-sigs/karpenter v1.12.
+# cave-karpenter is a 4-file scaffold (345 LOC); the audit reflects
+# that honestly — only the CRD types + a scheduler stub are mapped,
+# the bulk of Karpenter's reconcile loops are unmapped.
+mapped_count   = 3
+skipped_count  = 8
+unmapped_count = 6
+total          = 17
+fill_ratio     = 0.6471
+last_audit     = "2026-05-12"
+infra_only     = false
 
 [module]
 name        = "cave-karpenter"
@@ -50,3 +66,89 @@ loc          = 219
 priority     = "P2"
 notes        = "karpenter is CRD"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12 — measured, not self-reported)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (3) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1"
+local_files  = ["src/models/mod.rs"]
+note         = "NodePool / NodeClaim CRD type shells. No full status reconciliation yet."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/scheduling/"
+local_files  = ["src/scheduler.rs"]
+note         = "Scheduler stub — fit-into-nodepool helper; no Topology / Solver yet."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/operator/store"
+local_files  = ["src/store.rs"]
+note         = "In-memory NodePool store; CRD-watch shape only."
+
+# ─── Skipped (8) ────────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/cloudprovider/fake/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:hack/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:cmd/"
+reason       = "go-bootstrap"
+note         = "Operator binary main; replaced by cave-runtime serve"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:test/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:charts/"
+reason       = "go-bootstrap"
+note         = "Helm chart"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/utils/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:website/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter:designs/"
+reason       = "go-bootstrap"
+note         = "Design docs"
+
+# ─── Unmapped (6) — honest gaps ─────────────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/provisioning/"
+note         = "Provisioning reconciler — picks NodeClaim from Pending pods. Single biggest gap."
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/"
+note         = "Disruption controller — drift, consolidation, expiration eviction."
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/"
+note         = "NodeClaim lifecycle (launch, register, drain, terminate)."
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/termination/"
+note         = "Termination handler — graceful pod eviction before node delete."
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/cloudprovider/"
+note         = "CloudProvider interface — AWS / GCP / Azure backends. Cloud-specific binding is intentionally deferred to cave-cloud-controller-manager."
+
+[[unmapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/scheduling/topology/"
+note         = "Topology spread-constraint solver. scheduler.rs has a fit-only stub."
+

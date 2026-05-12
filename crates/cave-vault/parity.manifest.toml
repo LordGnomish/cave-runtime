@@ -6,6 +6,23 @@
 org     = "openbao"
 repo    = "openbao"
 version = "v2.5.3"
+name    = "OpenBao"
+license = "MPL-2.0"
+language= "Go"
+url     = "https://github.com/openbao/openbao"
+[parity]
+# Package-level inventory against openbao/openbao v2.5.3 — every
+# top-level package the secret store needs (engines, auth, core,
+# audit, sys-API). Inventory hand-curated 2026-05-12 against the
+# OpenBao tree (`builtin/credential`, `builtin/logical`, `vault/`,
+# `audit/`, `physical/`, `sdk/`, `command/`).
+mapped_count   = 18
+skipped_count  = 11
+unmapped_count = 8
+total          = 37
+fill_ratio     = 0.7838
+last_audit     = "2026-05-12"
+infra_only     = false
 
 [module]
 name          = "cave-vault"
@@ -319,3 +336,184 @@ loc          = 930
 priority     = "P0"
 notes        = "Secret engines, auth methods, policy editor"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — Secret engines + auth methods + core + audit + sys ──────
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/kv/"
+local_files  = ["src/engines/kv1.rs", "src/engines/kv2.rs"]
+note         = "KV v1 + v2 (versioned secrets with soft-delete + check-and-set)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/pki/"
+local_files  = ["src/engines/pki.rs"]
+note         = "Certificate authority (issue / sign / revoke / CRL)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/transit/"
+local_files  = ["src/engines/transit.rs"]
+note         = "Encryption-as-a-service (encrypt / decrypt / rewrap / sign / verify / HMAC)"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/database/"
+local_files  = ["src/engines/database.rs"]
+note         = "Dynamic DB credentials with TTL leases"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/ssh/"
+local_files  = ["src/engines/ssh.rs"]
+note         = "SSH OTP / CA signing"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/totp/"
+local_files  = ["src/engines/totp.rs"]
+note         = "RFC 6238 TOTP secret store"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/aws/"
+local_files  = ["src/engines/aws.rs"]
+note         = "Dynamic AWS IAM credentials"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/logical/cubbyhole/"
+local_files  = ["src/engines/cubbyhole.rs"]
+note         = "Per-token namespaced secret store"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/identity/"
+local_files  = ["src/engines/identity.rs"]
+note         = "Identity entities + groups + aliases"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/userpass/"
+local_files  = ["src/auth/userpass.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/approle/"
+local_files  = ["src/auth/approle.rs"]
+note         = "AppRole — role_id + secret_id pair"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/kubernetes/"
+local_files  = ["src/auth/kubernetes.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/oidc/"
+local_files  = ["src/auth/oidc.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/cert/"
+local_files  = ["src/auth/cert.rs"]
+note         = "TLS client-cert authentication"
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/ldap/"
+local_files  = ["src/auth/ldap.rs"]
+
+[[mapped]]
+upstream_pkg = "openbao:builtin/credential/token/"
+local_files  = ["src/auth/token.rs", "src/token.rs"]
+note         = "Token issuance, renewal, revocation; root / batch / service kinds"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/{core,policy,audit,lease,shamir,seal}/"
+local_files  = ["src/core/policy.rs", "src/core/audit.rs", "src/core/lease.rs", "src/core/seal.rs", "src/shamir.rs", "src/core/wrapping.rs"]
+note         = "Policy engine, audit broker, lease manager, Shamir unseal, response wrapping"
+
+[[mapped]]
+upstream_pkg = "openbao:vault/api/sys/"
+local_files  = ["src/api/sys.rs", "src/routes.rs"]
+note         = "/v1/sys/* endpoints — health, mounts, auth, policies, audit"
+
+# ─── Skipped (11) ───────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "openbao:ui/"
+reason       = "go-bootstrap"
+note         = "Ember.js frontend; cave-portal serves the UI via admin/vault/"
+
+[[skipped]]
+upstream_pkg = "openbao:command/"
+reason       = "CLI"
+note         = "vault CLI; cavectl exposes equivalent surface"
+
+[[skipped]]
+upstream_pkg = "openbao:plugins/"
+reason       = "go-bootstrap"
+note         = "External plugin loading — not yet in scope"
+
+[[skipped]]
+upstream_pkg = "openbao:scripts/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:sdk/"
+reason       = "stdlib-analog"
+note         = "Plugin SDK helpers — Rust uses async-trait directly"
+
+[[skipped]]
+upstream_pkg = "openbao:helper/"
+reason       = "stdlib-analog"
+note         = "Go-stdlib helpers (xor, hashing, parseutil)"
+
+[[skipped]]
+upstream_pkg = "openbao:http/"
+reason       = "stdlib-analog"
+note         = "HTTP routing — replaced by axum"
+
+[[skipped]]
+upstream_pkg = "openbao:vendor/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "openbao:website/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:CHANGELOG.md"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "openbao:terraform/"
+reason       = "go-bootstrap"
+note         = "Terraform module for deployment"
+
+# ─── Unmapped (8) — honest gaps ─────────────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "openbao:physical/"
+note         = "Storage backends (file, raft, consul, etcd, s3, gcs, postgresql). cave-vault uses an in-memory store today; persistence + raft replication are the biggest gap."
+
+[[unmapped]]
+upstream_pkg = "openbao:vault/replication/"
+note         = "DR + Performance replication. Enterprise feature in Vault; OpenBao planning. Out of scope for v1."
+
+[[unmapped]]
+upstream_pkg = "openbao:builtin/credential/azure,gcp,oci/"
+note         = "Cloud-provider auth methods (Azure AD, Google IAM, Oracle Cloud). Single-cloud focus today."
+
+[[unmapped]]
+upstream_pkg = "openbao:builtin/credential/jwt/"
+note         = "Generic JWT auth (separate from oidc.rs). Tracked but not implemented."
+
+[[unmapped]]
+upstream_pkg = "openbao:builtin/logical/{azure,gcp,consul,nomad,terraform,mongodbatlas}/"
+note         = "Cloud-provider / orchestrator secret engines. AWS only today (engines/aws.rs)."
+
+[[unmapped]]
+upstream_pkg = "openbao:vault/{namespaces,quotas}/"
+note         = "Namespaces (multi-tenancy via path hierarchy) + rate-limit quotas. Single-namespace assumption today."
+
+[[unmapped]]
+upstream_pkg = "openbao:vault/agent/"
+note         = "Vault Agent — sidecar that auto-auths + auto-renews. Client-side feature, intentionally deferred."
+
+[[unmapped]]
+upstream_pkg = "openbao:vault/activity/"
+note         = "Client-activity tracking (for licensing + usage reports). Not in scope."
+
