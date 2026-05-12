@@ -17,12 +17,188 @@ repo    = "runc"
 version = "v1.4.2"
 notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/cgroups/fs2/."
 
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: containerd v2.2.x pkg/cri/* + core/* + plugins/*
+# packages enumerated and classified honestly.
+# See docs/parity/cave-cri-port-2026-05-12.md for methodology.
+mapped_count   = 17
+skipped_count  = 11
+unmapped_count = 6
+total          = 34
+fill_ratio     = 0.8235
+last_audit     = "2026-05-12"
+infra_only     = false
+
 [module]
 name          = "cave-cri"
 description   = "containerd CRI reimplementation — 42 endpoints covering container lifecycle, images, sandboxes, snapshots"
 source_root   = "src"
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 pump_priority = "HIGH"  # charter-critical 7 — container runtime interface
+
+# ── Package-level upstream inventory (2026-05-12 measured audit) ────────────
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/"
+local_files  = ["src/routes.rs", "src/runtime.rs"]
+note         = "CRI gRPC service (re-shaped as JSON over HTTP) — Sandbox/Container/Image/Streaming verbs"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/podsandbox/"
+local_files  = ["src/sandbox.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/container/"
+local_files  = ["src/runtime.rs", "src/state_machine.rs"]
+note         = "Container lifecycle state machine — Created/Running/Exited"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/images/"
+local_files  = ["src/registry.rs", "src/manifest_list.rs", "src/pull_progress.rs"]
+note         = "Image registry client + manifest list + pull progress"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/streaming/"
+local_files  = ["src/streaming.rs", "src/transport.rs"]
+note         = "exec / attach / port-forward server side"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/stats/"
+local_files  = ["src/stats.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/runtime/"
+local_files  = ["src/runtime_handler.rs"]
+note         = "RuntimeHandler (kata, runsc, etc.)"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/util/"
+local_files  = ["src/paths.rs", "src/error.rs"]
+
+[[mapped]]
+upstream_pkg = "core/runtime/v2/"
+local_files  = ["src/runtime.rs"]
+note         = "Shim v2 runtime interface — collapsed into direct OCI bundle exec"
+
+[[mapped]]
+upstream_pkg = "core/runtime/v2/runc/"
+local_files  = ["src/oci_spec.rs", "src/rootfs.rs"]
+note         = "runc shim — OCI bundle spec generation"
+
+[[mapped]]
+upstream_pkg = "pkg/runc/v2/runc/manager/"
+local_files  = ["src/cgroup.rs", "src/cgroup_v2.rs"]
+note         = "cgroup v1 (legacy) + v2 (unified) writers"
+
+[[mapped]]
+upstream_pkg = "core/snapshots/"
+local_files  = ["src/rootfs.rs", "src/store.rs"]
+note         = "Snapshotter (overlayfs default) — rootfs layer assembly"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/store/"
+local_files  = ["src/store.rs"]
+
+[[mapped]]
+upstream_pkg = "remotes/docker/"
+local_files  = ["src/registry.rs", "src/auth.rs"]
+note         = "Docker registry transport — Bearer challenge + token cache"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/server/log/"
+local_files  = ["src/logs.rs", "src/log_v2.rs"]
+note         = "Container log rotation + multi-stream"
+
+[[mapped]]
+upstream_pkg = "pkg/cri/health/"
+local_files  = ["src/health.rs"]
+
+[[mapped]]
+upstream_pkg = "pkg/userns/"
+local_files  = ["src/userns.rs", "src/namespace.rs"]
+note         = "User-namespace remapping (KEP-127 host side)"
+
+[[skipped]]
+upstream_pkg = "cmd/containerd/"
+reason       = "go-bootstrap"
+note         = "Go main() + cobra; cave-runtime serve wires the CRI module"
+
+[[skipped]]
+upstream_pkg = "cmd/ctr/"
+reason       = "CLI"
+note         = "Operator CLI — cave-cli has its own cavectl cri subcommands"
+
+[[skipped]]
+upstream_pkg = "cmd/containerd-shim-runc-v2/"
+reason       = "wire-format-detail"
+note         = "Per-container shim binary — cave runs runc directly without a separate shim process"
+
+[[skipped]]
+upstream_pkg = "api/"
+reason       = "wire-format-detail"
+note         = "Protobuf-generated gRPC types — cave uses serde-derived JSON shapes in models.rs"
+
+[[skipped]]
+upstream_pkg = "core/transfer/"
+reason       = "parallel-track"
+note         = "Image-transfer plugin — folded into registry.rs"
+
+[[skipped]]
+upstream_pkg = "core/sandbox/"
+reason       = "wire-format-detail"
+note         = "Sandbox controller interface — folded into sandbox.rs"
+
+[[skipped]]
+upstream_pkg = "pkg/events/"
+reason       = "stdlib-analog"
+note         = "Event publisher — cave emits via tracing crate"
+
+[[skipped]]
+upstream_pkg = "pkg/process/"
+reason       = "stdlib-analog"
+note         = "Process lifecycle helpers — folded into runtime.rs"
+
+[[skipped]]
+upstream_pkg = "core/metrics/"
+reason       = "parallel-track"
+note         = "Prometheus metric definitions — cave uses prometheus-client crate"
+
+[[skipped]]
+upstream_pkg = "pkg/plugin/"
+reason       = "stdlib-analog"
+note         = "Plugin registry — cave wires plugins statically in main.rs"
+
+[[skipped]]
+upstream_pkg = "vendor/"
+reason       = "stdlib-analog"
+note         = "Vendored Go deps; Rust deps in Cargo.toml"
+
+[[unmapped]]
+upstream_pkg = "core/content/"
+note         = "Content store (CAS) with garbage collection. cave-cri reads images directly from registry into rootfs.rs without a persistent CAS layer; image GC is reduced to image_gc.rs in cave-kubelet, which only knows about images-by-tag."
+
+[[unmapped]]
+upstream_pkg = "core/diff/"
+note         = "Layer diff service — applies/extracts overlayfs diffs as gzipped tarballs. cave-cri shells out to tar at rootfs assembly; the diff *production* path (commit container changes back to a new layer) is not implemented."
+
+[[unmapped]]
+upstream_pkg = "core/leases/"
+note         = "Resource lease tracker to prevent GC of in-use content. Tightly coupled to core/content/ above — missing for the same reason."
+
+[[unmapped]]
+upstream_pkg = "pkg/cri/server/podsandbox/sandbox_run_other.go (non-Linux)"
+note         = "Windows/FreeBSD sandbox runners. cave-cri Linux-only by design; left as an honest gap rather than a skip because the Charter does not explicitly limit platform support."
+
+[[unmapped]]
+upstream_pkg = "pkg/oom/"
+note         = "OOM event watcher — feeds eviction.rs in kubelet. cave-cri exits container with OOMKilled status but does not surface the kernel oom_score_adj events for cluster-level scoring."
+
+[[unmapped]]
+upstream_pkg = "core/introspection/"
+note         = "containerd self-introspection API (list installed plugins + versions). cave-cri serves /healthz but not /introspection — the operator tooling that consumes it would need a cave-runtime-wide equivalent."
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
