@@ -21,7 +21,9 @@ use tracing::{info, warn};
 /// Cluster lifecycle subcommands.
 #[derive(Subcommand, Debug, Clone)]
 pub enum ClusterCmd {
-    /// Initialize a new single-node Cave cluster.
+    /// Initialize a new Cave cluster. Defaults to single-node;
+    /// `--bootstrap-strategy=multi` plus `--peers=...` declares the
+    /// initial multi-node membership.
     Init {
         #[arg(long, default_value = "/var/lib/cave")]
         data_dir: PathBuf,
@@ -29,6 +31,16 @@ pub enum ClusterCmd {
         cluster_name: String,
         #[arg(long, default_value = "127.0.0.1:6443")]
         advertise_address: String,
+        /// Bootstrap strategy: `single` (default, one node) or `multi`.
+        #[arg(long, default_value = "single")]
+        bootstrap_strategy: String,
+        /// Comma-separated peer list, each shaped as `<node_id>:<advertise>`.
+        /// Example: `2:10.0.0.2:6443,3:10.0.0.3:6443`. Empty for single-node.
+        #[arg(long, default_value = "")]
+        peers: String,
+        /// Local node id within the cluster. Defaults to 1.
+        #[arg(long, default_value = "1")]
+        node_id: u64,
     },
     /// Worker-node join: POST the bootstrap token to the master apiserver and
     /// persist the returned join config + issued kubelet certificate.
@@ -87,8 +99,18 @@ pub struct ClusterManifest {
     pub data_dir: String,
     #[serde(default = "default_bootstrap_strategy")]
     pub bootstrap_strategy: String,
+    /// Peer entries shaped as `"<node_id>:<advertise_url>"`, e.g.
+    /// `"2:https://10.0.0.2:6443"`. The peer transport parses these on
+    /// startup. Empty by default; populated by `cluster init` when
+    /// `--peers ...` is supplied or appended by `cluster join` on the
+    /// master.
     #[serde(default)]
     pub peers: Vec<String>,
+    /// Stable identifier for the local node within the Raft cluster.
+    /// `None` (the default) implies single-node mode and the registry
+    /// uses `1`.
+    #[serde(default)]
+    pub local_node_id: Option<u64>,
 }
 
 fn default_bootstrap_strategy() -> String {
@@ -101,7 +123,17 @@ pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
             data_dir,
             cluster_name,
             advertise_address,
-        } => init(&data_dir, &cluster_name, &advertise_address),
+            bootstrap_strategy,
+            peers,
+            node_id,
+        } => init(
+            &data_dir,
+            &cluster_name,
+            &advertise_address,
+            &bootstrap_strategy,
+            &peers,
+            node_id,
+        ),
         ClusterCmd::Join {
             bootstrap_token,
             master_address,
@@ -123,8 +155,15 @@ pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
     }
 }
 
-/// `cluster init` — provision a fresh single-node cluster on disk.
-pub fn init(data_dir: &Path, cluster_name: &str, advertise_address: &str) -> Result<()> {
+/// `cluster init` — provision a fresh single- or multi-node cluster on disk.
+pub fn init(
+    data_dir: &Path,
+    cluster_name: &str,
+    advertise_address: &str,
+    bootstrap_strategy: &str,
+    peers_csv: &str,
+    node_id: u64,
+) -> Result<()> {
     info!(?data_dir, %cluster_name, %advertise_address, "cluster init");
 
     if data_dir.join("cluster.json").exists() {
@@ -196,6 +235,24 @@ pub fn init(data_dir: &Path, cluster_name: &str, advertise_address: &str) -> Res
     // etcd snapshot dir — serve restores from `snapshot.bin` if it exists.
     fs::create_dir_all(&etcd_dir)?;
 
+    let parsed_peers: Vec<String> = peers_csv
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    if !matches!(bootstrap_strategy, "single" | "multi") {
+        return Err(anyhow!(
+            "--bootstrap-strategy must be `single` or `multi`, got `{}`",
+            bootstrap_strategy
+        ));
+    }
+    if bootstrap_strategy == "multi" && parsed_peers.is_empty() {
+        return Err(anyhow!(
+            "--bootstrap-strategy=multi requires at least one `--peers <id:url>` entry"
+        ));
+    }
+
     let manifest = ClusterManifest {
         cluster_name: cluster_name.to_string(),
         advertise_address: advertise_address.to_string(),
@@ -206,8 +263,9 @@ pub fn init(data_dir: &Path, cluster_name: &str, advertise_address: &str) -> Res
         components: COMPONENTS.iter().map(|s| s.to_string()).collect(),
         kubeconfig_path: kubeconfig_path.display().to_string(),
         data_dir: data_dir.display().to_string(),
-        bootstrap_strategy: "single".into(),
-        peers: Vec::new(),
+        bootstrap_strategy: bootstrap_strategy.to_string(),
+        peers: parsed_peers,
+        local_node_id: Some(node_id),
     };
     fs::write(
         data_dir.join("cluster.json"),
@@ -220,6 +278,14 @@ pub fn init(data_dir: &Path, cluster_name: &str, advertise_address: &str) -> Res
     println!("  advertise:    {}", advertise_address);
     println!("  components:   {}", COMPONENTS.join(", "));
     println!("  kubeconfig:   {}", kubeconfig_path.display());
+    println!("  bootstrap strategy: {}", bootstrap_strategy);
+    println!("  local node id:      {}", node_id);
+    if !manifest.peers.is_empty() {
+        println!("  peers:");
+        for p in &manifest.peers {
+            println!("    - {}", p);
+        }
+    }
     println!("  bootstrap token (for worker joins):");
     println!("    {}", bootstrap_token);
     println!();
@@ -769,7 +835,7 @@ mod tests {
     fn init_creates_expected_layout() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "unit-test", "127.0.0.1:6443").expect("init");
+        init(&dd, "unit-test", "127.0.0.1:6443", "single", "", 1).expect("init");
         assert!(dd.join("cluster.json").is_file());
         assert!(dd.join("pki/ca.crt").is_file());
         assert!(dd.join("pki/ca.key").is_file());
@@ -797,8 +863,8 @@ mod tests {
     fn init_is_idempotent_guard() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "guard", "127.0.0.1:6443").unwrap();
-        let err = init(&dd, "guard", "127.0.0.1:6443").unwrap_err();
+        init(&dd, "guard", "127.0.0.1:6443", "single", "", 1).unwrap();
+        let err = init(&dd, "guard", "127.0.0.1:6443", "single", "", 1).unwrap_err();
         assert!(err.to_string().contains("already initialized"));
     }
 
@@ -806,7 +872,7 @@ mod tests {
     fn destroy_requires_force() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "destroy-test", "127.0.0.1:6443").unwrap();
+        init(&dd, "destroy-test", "127.0.0.1:6443", "single", "", 1).unwrap();
         assert!(destroy(&dd, false).is_err());
         assert!(dd.join("cluster.json").is_file(), "data dir must persist");
         destroy(&dd, true).expect("force destroy");
@@ -864,7 +930,7 @@ mod tests {
     fn init_writes_bootstrap_token() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "tok-test", "127.0.0.1:6443").unwrap();
+        init(&dd, "tok-test", "127.0.0.1:6443", "single", "", 1).unwrap();
         let raw = fs::read_to_string(dd.join("bootstrap-tokens.json")).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
         let tokens = parsed["tokens"].as_array().unwrap();

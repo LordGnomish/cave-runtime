@@ -34,6 +34,10 @@ use tokio::fs;
 use tracing::{info, warn};
 
 use crate::cluster::ClusterManifest;
+use crate::raft_transport::{
+    handle_members, handle_raft_message, heartbeat_loop, election_timer_loop, Peer, PeerRegistry,
+    RaftListenerState,
+};
 
 const ETCD_PORT: u16 = 2379;
 const APISERVER_PORT: u16 = 6443;
@@ -48,6 +52,7 @@ pub struct ClusterRuntime {
     pub bootstrap_tokens: Vec<String>,
     pub ca_cert_pem: String,
     pub ca_key_pem: String,
+    pub peer_registry: Arc<PeerRegistry>,
 }
 
 impl ClusterRuntime {
@@ -71,7 +76,7 @@ impl ClusterRuntime {
                 serde_json::from_str(&raw).context("parse cluster.json")?;
 
             let etcd_store = restore_etcd_store(&dd).await?;
-            let apiserver_store = Arc::new(cave_apiserver::store::ResourceStore::new());
+            let apiserver_store = apiserver_persist::restore(&dd).await?;
             let bootstrap_tokens = load_bootstrap_tokens(&dd).await.unwrap_or_default();
 
             // Load the cluster CA so the CSR controller can sign kubelet leaves.
@@ -93,13 +98,29 @@ impl ClusterRuntime {
                 peers = manifest.peers.len(),
                 "production-mode cluster runtime loaded"
             );
+            // Honest multi-node note: peer transport + heartbeat + member
+            // registry are wired (this commit), but log replication and
+            // safe leader election are still scope-cut.
             if manifest.bootstrap_strategy != "single" || !manifest.peers.is_empty() {
-                warn!(
+                info!(
                     bootstrap_strategy = %manifest.bootstrap_strategy,
                     peers = manifest.peers.len(),
-                    "cluster.json declares multi-node settings, but multi-node Raft is not yet wired \
-                     — falling back to single-node MVP. Peer-replication is a known follow-up."
+                    "multi-node cluster declared — heartbeat transport will fan out, but \
+                     log replication is not yet applied (see raft_transport docs)."
                 );
+            }
+            let local_id = manifest.local_node_id.unwrap_or(1);
+            let local_url = format!("https://{}", manifest.advertise_address);
+            let peer_registry = Arc::new(PeerRegistry::new(local_id, local_url));
+            for p in &manifest.peers {
+                if let Some((id_str, addr)) = parse_peer_entry(p) {
+                    if let Ok(id) = id_str.parse::<u64>() {
+                        peer_registry.add_peer(Peer {
+                            id,
+                            url: ensure_https(&addr),
+                        });
+                    }
+                }
             }
             return Ok(Some(Self {
                 manifest,
@@ -109,6 +130,7 @@ impl ClusterRuntime {
                 bootstrap_tokens,
                 ca_cert_pem,
                 ca_key_pem,
+                peer_registry,
             }));
         }
         Ok(None)
@@ -132,8 +154,17 @@ impl ClusterRuntime {
         .await?;
 
         let advertise_ip = parse_listen_ip(&self.manifest.advertise_address);
-        let etcd_addr = SocketAddr::new(advertise_ip, ETCD_PORT);
-        let api_addr = SocketAddr::new(advertise_ip, APISERVER_PORT);
+        // Apiserver binds on the advertise_address's port. The etcd port
+        // is derived as `apiserver_port - 4064` so a single-host 3-node
+        // smoke test fits without colliding on 2379. The default
+        // (6443 → 2379) keeps single-node operators unchanged.
+        let advertise_port = parse_advertise_port(&self.manifest.advertise_address)
+            .unwrap_or(APISERVER_PORT);
+        let etcd_port = advertise_port
+            .checked_sub(APISERVER_PORT - ETCD_PORT)
+            .unwrap_or(ETCD_PORT);
+        let etcd_addr = SocketAddr::new(advertise_ip, etcd_port);
+        let api_addr = SocketAddr::new(advertise_ip, advertise_port);
 
         let etcd_router = etcd_router(self.etcd_store.clone());
         let api_router = apiserver_router(
@@ -141,6 +172,7 @@ impl ClusterRuntime {
             self.bootstrap_tokens.clone(),
             self.ca_cert_pem.clone(),
             self.ca_key_pem.clone(),
+            self.peer_registry.clone(),
         );
 
         let etcd_handle = tokio::spawn(async move {
@@ -158,36 +190,87 @@ impl ClusterRuntime {
                 .map_err(|e| anyhow!("apiserver listener: {e}"))
         });
 
-        // Background: WAL writer — subscribes to the store's broadcast and
-        // appends every Put/Delete event to disk with fsync.
-        let wal_path = self.data_dir.join("etcd/wal.log");
-        let wal_rx = self.etcd_store.subscribe();
+        // Background: cave-etcd WAL writer — subscribes to the store's
+        // broadcast and appends every Put/Delete event to disk with fsync.
+        let etcd_wal_path = self.data_dir.join("etcd/wal.log");
+        let etcd_wal_rx = self.etcd_store.subscribe();
         tokio::spawn(async move {
-            if let Err(e) = wal::run_writer(wal_path, wal_rx).await {
+            if let Err(e) = wal::run_writer(etcd_wal_path, etcd_wal_rx).await {
                 warn!(error = %e, "etcd WAL writer task ended");
             }
         });
 
-        // Background: snapshot the etcd store every 60s.
-        let dd = self.data_dir.clone();
+        // Background: apiserver WAL writer — same shape, framing the
+        // ResourceStore's Added/Modified/Deleted events as JSON-encoded
+        // payloads.
+        let api_wal_path = self.data_dir.join("apiserver/wal.log");
+        let api_wal_rx = self.apiserver_store.subscribe();
+        tokio::spawn(async move {
+            if let Err(e) = apiserver_persist::run_wal_writer(api_wal_path, api_wal_rx).await {
+                warn!(error = %e, "apiserver WAL writer task ended");
+            }
+        });
+
+        // Background: snapshot both stores every 60s. Each gets its own
+        // task so a slow flush on one side doesn't starve the other.
+        let etcd_snap_dd = self.data_dir.clone();
         let store_for_snapshot = self.etcd_store.clone();
         tokio::spawn(async move {
             let mut tick = tokio::time::interval(tokio::time::Duration::from_secs(60));
             tick.tick().await; // skip the immediate first tick
             loop {
                 tick.tick().await;
-                if let Err(e) = persist_etcd_snapshot(&dd, &store_for_snapshot).await {
+                if let Err(e) = persist_etcd_snapshot(&etcd_snap_dd, &store_for_snapshot).await {
                     warn!(error = %e, "periodic etcd snapshot failed");
                 }
+            }
+        });
+        let api_snap_dd = self.data_dir.clone();
+        let api_store_for_snapshot = self.apiserver_store.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(tokio::time::Duration::from_secs(60));
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                if let Err(e) =
+                    apiserver_persist::persist_snapshot(&api_snap_dd, &api_store_for_snapshot)
+                        .await
+                {
+                    warn!(error = %e, "periodic apiserver snapshot failed");
+                }
+            }
+        });
+
+        // Background: Raft heartbeat + election timer. Heartbeats run
+        // unconditionally (1s tick) — a single-node cluster just has no
+        // peers to send them to. The election timer is a no-op until
+        // peers exist.
+        let registry_for_hb = self.peer_registry.clone();
+        let ca_for_hb = self.ca_cert_pem.clone();
+        tokio::spawn(async move {
+            if let Err(e) = heartbeat_loop(registry_for_hb, ca_for_hb).await {
+                warn!(error = %e, "raft heartbeat loop ended");
+            }
+        });
+        let registry_for_elect = self.peer_registry.clone();
+        tokio::spawn(async move {
+            // 2500ms election timeout: long enough that one missed
+            // heartbeat doesn't trigger a spurious term bump.
+            if let Err(e) = election_timer_loop(registry_for_elect, 2500).await {
+                warn!(error = %e, "raft election timer ended");
             }
         });
 
         Ok(vec![etcd_handle, api_handle])
     }
 
-    /// Flush a final etcd snapshot to disk (called from the SIGINT handler).
+    /// Flush a final snapshot of both stores to disk. Called from the
+    /// SIGINT handler so a clean Ctrl-C produces a deterministic on-disk
+    /// state without waiting for the next periodic tick.
     pub async fn shutdown_persist(&self) -> Result<()> {
-        persist_etcd_snapshot(&self.data_dir, &self.etcd_store).await
+        persist_etcd_snapshot(&self.data_dir, &self.etcd_store).await?;
+        apiserver_persist::persist_snapshot(&self.data_dir, &self.apiserver_store).await?;
+        Ok(())
     }
 }
 
@@ -203,6 +286,34 @@ fn candidate_dirs(explicit: Option<&Path>) -> Vec<PathBuf> {
         out.push(PathBuf::from(home).join(".cave"));
     }
     out
+}
+
+/// Parse a `cluster.json::peers` entry of the form `"<id>:<host:port>"` or
+/// `"<id>:https://<host:port>"`. Returns `(id_str, address)` or `None` if
+/// malformed.
+fn parse_peer_entry(s: &str) -> Option<(String, String)> {
+    let s = s.trim();
+    if let Some((id, rest)) = s.split_once(':') {
+        let rest = rest.trim();
+        if rest.is_empty() {
+            return None;
+        }
+        Some((id.trim().to_string(), rest.to_string()))
+    } else {
+        None
+    }
+}
+
+fn ensure_https(s: &str) -> String {
+    if s.starts_with("http://") || s.starts_with("https://") {
+        s.to_string()
+    } else {
+        format!("https://{}", s)
+    }
+}
+
+fn parse_advertise_port(advertise: &str) -> Option<u16> {
+    advertise.rsplit(':').next().and_then(|p| p.parse().ok())
 }
 
 fn parse_listen_ip(advertise: &str) -> std::net::IpAddr {
@@ -371,6 +482,7 @@ fn apiserver_router(
     bootstrap_tokens: Vec<String>,
     ca_cert_pem: String,
     ca_key_pem: String,
+    peer_registry: Arc<PeerRegistry>,
 ) -> Router {
     let listener_state = ApiserverListenerState {
         resources: resources.clone(),
@@ -399,6 +511,19 @@ fn apiserver_router(
         .route(
             "/api/v1/certificatesigningrequests/{name}",
             get(get_csr).with_state(listener_state),
+        )
+        // ── multi-node Raft transport (heartbeat + member registry only) ──
+        .route(
+            "/raft/message",
+            post(handle_raft_message).with_state(RaftListenerState {
+                registry: peer_registry.clone(),
+            }),
+        )
+        .route(
+            "/api/v1/cluster/members",
+            get(handle_members).with_state(RaftListenerState {
+                registry: peer_registry,
+            }),
         )
 }
 
@@ -815,6 +940,349 @@ mod wal {
 }
 
 // ---------------------------------------------------------------------------
+// apiserver persistence (snapshot + WAL, mirrors the cave-etcd pattern)
+// ---------------------------------------------------------------------------
+
+mod apiserver_persist {
+    //! Persist the cave-apiserver `ResourceStore` to disk so K8s resources
+    //! survive process restarts (kill -9 included).
+    //!
+    //! Layout under `<data_dir>/apiserver/`:
+    //! * `snapshot.json` — atomic write of `ResourceStore::list_all()`
+    //!   serialised as a JSON array. Refreshed every 60s.
+    //! * `wal.log` — append-only frame of every Added/Modified/Deleted
+    //!   watch event since process start. Fsync'd per record.
+    //!
+    //! Replay is idempotent: snapshot rows are upserted first, then the
+    //! WAL is replayed (upsert for Added/Modified, delete-if-present for
+    //! Deleted). Replaying a record that's already represented in the
+    //! snapshot is a no-op, so we never need to track event revisions —
+    //! WAL records that landed during snapshot collection get redundantly
+    //! re-applied on restart and converge to the same state.
+    //!
+    //! Trade-off: the WAL grows unbounded between snapshots; a manual
+    //! `wal.log` rotation is the operator's escape hatch if disk
+    //! pressure becomes a problem. Matches the cave-etcd WAL policy in
+    //! the same crate today.
+    //!
+    //! Record framing (little-endian):
+    //! ```text
+    //! u32 record_len    (covers everything after this field)
+    //! u8  op_type       (0 = Added | 1 = Modified | 2 = Deleted)
+    //! u32 payload_len
+    //! payload bytes     (JSON-encoded Resource)
+    //! ```
+
+    use anyhow::{Context, Result};
+    use cave_apiserver::resources::Resource;
+    use cave_apiserver::store::{ResourceStore, WatchEvent, WatchEventType};
+    use cave_kernel::eventbus::EventBusError;
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+    use tokio::fs::OpenOptions;
+    use tokio::io::AsyncWriteExt;
+    use tracing::{debug, info, warn};
+
+    const OP_ADDED: u8 = 0;
+    const OP_MODIFIED: u8 = 1;
+    const OP_DELETED: u8 = 2;
+
+    /// Restore an apiserver store from `<data_dir>/apiserver/snapshot.json`
+    /// + WAL replay. Returns a fresh empty store when nothing is on disk.
+    pub async fn restore(data_dir: &Path) -> Result<Arc<ResourceStore>> {
+        let store = Arc::new(ResourceStore::new());
+        let dir = data_dir.join("apiserver");
+        let snap_path = dir.join("snapshot.json");
+        let wal_path = dir.join("wal.log");
+
+        let mut from_snapshot: usize = 0;
+        if snap_path.exists() {
+            let bytes = tokio::fs::read(&snap_path)
+                .await
+                .with_context(|| format!("read {}", snap_path.display()))?;
+            if !bytes.is_empty() {
+                match serde_json::from_slice::<Vec<Resource>>(&bytes) {
+                    Ok(resources) => {
+                        for r in resources {
+                            store.upsert(r);
+                            from_snapshot += 1;
+                        }
+                        info!(
+                            count = from_snapshot,
+                            bytes = bytes.len(),
+                            "apiserver snapshot restored"
+                        );
+                    }
+                    Err(e) => warn!(error = %e, "apiserver snapshot parse failed — starting empty"),
+                }
+            }
+        }
+
+        if wal_path.exists() {
+            let bytes = tokio::fs::read(&wal_path)
+                .await
+                .with_context(|| format!("read {}", wal_path.display()))?;
+            let replayed = replay_into(&bytes, &store);
+            if replayed > 0 {
+                info!(
+                    replayed,
+                    wal_bytes = bytes.len(),
+                    "apiserver WAL replayed"
+                );
+            }
+        }
+        Ok(store)
+    }
+
+    /// Drive the WAL writer task. Returns when the broadcast subscription
+    /// closes. Spawned by `ClusterRuntime::spawn_listeners`.
+    pub async fn run_wal_writer(
+        wal_path: PathBuf,
+        mut rx: cave_kernel::eventbus::Subscription<WatchEvent>,
+    ) -> Result<()> {
+        if let Some(parent) = wal_path.parent() {
+            tokio::fs::create_dir_all(parent).await.ok();
+        }
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&wal_path)
+            .await
+            .with_context(|| format!("open apiserver WAL {}", wal_path.display()))?;
+        loop {
+            // cave_kernel::eventbus::Subscription wraps tokio broadcast.
+            match rx.recv().await {
+                Ok(ev) => {
+                    let bytes = match encode_record(&ev) {
+                        Ok(b) => b,
+                        Err(e) => {
+                            warn!(error = %e, "apiserver WAL encode failed");
+                            continue;
+                        }
+                    };
+                    if let Err(e) = file.write_all(&bytes).await {
+                        warn!(error = %e, "apiserver WAL write failed");
+                        continue;
+                    }
+                    if let Err(e) = file.sync_data().await {
+                        warn!(error = %e, "apiserver WAL fsync failed");
+                    }
+                }
+                Err(EventBusError::Lagged(n)) => {
+                    warn!(skipped = n, "apiserver WAL subscriber lagged");
+                }
+                Err(EventBusError::Closed) => {
+                    debug!("apiserver WAL writer: broadcast closed");
+                    return Ok(());
+                }
+                Err(EventBusError::NoSubscribers) => {
+                    debug!("apiserver WAL writer: no subscribers");
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    /// Write `<data_dir>/apiserver/snapshot.json` atomically.
+    pub async fn persist_snapshot(data_dir: &Path, store: &ResourceStore) -> Result<()> {
+        let dir = data_dir.join("apiserver");
+        tokio::fs::create_dir_all(&dir).await.ok();
+        let resources = store.list_all();
+        let bytes = serde_json::to_vec(&resources).context("encode apiserver snapshot")?;
+        let snap_path = dir.join("snapshot.json");
+        let tmp_path = dir.join("snapshot.json.tmp");
+        tokio::fs::write(&tmp_path, &bytes).await?;
+        tokio::fs::rename(&tmp_path, &snap_path).await?;
+        info!(
+            count = resources.len(),
+            bytes = bytes.len(),
+            path = %snap_path.display(),
+            "apiserver snapshot persisted"
+        );
+        Ok(())
+    }
+
+    fn encode_record(ev: &WatchEvent) -> Result<Vec<u8>> {
+        let op: u8 = match ev.event_type {
+            WatchEventType::Added => OP_ADDED,
+            WatchEventType::Modified => OP_MODIFIED,
+            WatchEventType::Deleted => OP_DELETED,
+        };
+        let payload = serde_json::to_vec(&ev.resource).context("encode WatchEvent payload")?;
+        let body_len = 1 + 4 + payload.len();
+        let mut out = Vec::with_capacity(4 + body_len);
+        out.extend_from_slice(&(body_len as u32).to_le_bytes());
+        out.push(op);
+        out.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+        out.extend_from_slice(&payload);
+        Ok(out)
+    }
+
+    fn decode_record(rec: &[u8]) -> Option<(u8, Resource)> {
+        if rec.len() < 1 + 4 {
+            return None;
+        }
+        let op = rec[0];
+        let payload_len = u32::from_le_bytes(rec[1..5].try_into().ok()?) as usize;
+        if rec.len() < 5 + payload_len {
+            return None;
+        }
+        let resource: Resource = serde_json::from_slice(&rec[5..5 + payload_len]).ok()?;
+        Some((op, resource))
+    }
+
+    /// Replay every record in `buf`. Idempotent — safe to call after a
+    /// snapshot restore. Returns the number of records applied.
+    pub fn replay_into(buf: &[u8], store: &ResourceStore) -> usize {
+        let mut applied = 0;
+        let mut cursor = 0;
+        while cursor + 4 <= buf.len() {
+            let rec_len = u32::from_le_bytes([
+                buf[cursor],
+                buf[cursor + 1],
+                buf[cursor + 2],
+                buf[cursor + 3],
+            ]) as usize;
+            cursor += 4;
+            if cursor + rec_len > buf.len() {
+                warn!(
+                    cursor,
+                    rec_len,
+                    buf_len = buf.len(),
+                    "apiserver WAL: truncated trailing record, stopping replay"
+                );
+                break;
+            }
+            let rec = &buf[cursor..cursor + rec_len];
+            cursor += rec_len;
+
+            if let Some((op, resource)) = decode_record(rec) {
+                let kind = resource.kind().to_string();
+                let namespace = resource.namespace().to_string();
+                let name = resource.name().to_string();
+                match op {
+                    OP_ADDED | OP_MODIFIED => {
+                        store.upsert(resource);
+                        applied += 1;
+                    }
+                    OP_DELETED => {
+                        let _ = store.delete(&kind, &namespace, &name);
+                        applied += 1;
+                    }
+                    _ => warn!(op, "apiserver WAL: unknown op type"),
+                }
+            }
+        }
+        applied
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use cave_apiserver::resources::{Namespace, ObjectMeta};
+
+        fn ns_resource(name: &str) -> Resource {
+            Resource::Namespace(Namespace {
+                api_version: "v1".into(),
+                kind: "Namespace".into(),
+                metadata: ObjectMeta::new(name, ""),
+                status: cave_apiserver::resources::NamespaceStatus::default(),
+            })
+        }
+
+        #[test]
+        fn record_encode_decode_roundtrips() {
+            let ev = WatchEvent {
+                event_type: WatchEventType::Added,
+                resource: ns_resource("hello"),
+            };
+            let bytes = encode_record(&ev).unwrap();
+            let body = &bytes[4..];
+            let (op, r) = decode_record(body).unwrap();
+            assert_eq!(op, OP_ADDED);
+            assert_eq!(r.name(), "hello");
+            assert_eq!(r.kind(), "Namespace");
+        }
+
+        #[test]
+        fn replay_is_idempotent() {
+            let store = ResourceStore::new();
+            let ev = WatchEvent {
+                event_type: WatchEventType::Added,
+                resource: ns_resource("ns-1"),
+            };
+            let bytes = encode_record(&ev).unwrap();
+            // apply twice
+            let n1 = replay_into(&bytes, &store);
+            let n2 = replay_into(&bytes, &store);
+            assert_eq!(n1, 1);
+            assert_eq!(n2, 1);
+            // only one row should exist regardless
+            assert_eq!(store.count("Namespace"), 1);
+        }
+
+        #[test]
+        fn replay_applies_delete_after_create() {
+            let store = ResourceStore::new();
+            let mut buf = encode_record(&WatchEvent {
+                event_type: WatchEventType::Added,
+                resource: ns_resource("doomed"),
+            })
+            .unwrap();
+            buf.extend(
+                encode_record(&WatchEvent {
+                    event_type: WatchEventType::Deleted,
+                    resource: ns_resource("doomed"),
+                })
+                .unwrap(),
+            );
+            replay_into(&buf, &store);
+            assert_eq!(store.count("Namespace"), 0);
+        }
+
+        #[test]
+        fn replay_tolerates_truncated_trailing_record() {
+            let store = ResourceStore::new();
+            let mut buf = encode_record(&WatchEvent {
+                event_type: WatchEventType::Added,
+                resource: ns_resource("ok"),
+            })
+            .unwrap();
+            buf.extend(
+                encode_record(&WatchEvent {
+                    event_type: WatchEventType::Added,
+                    resource: ns_resource("partial"),
+                })
+                .unwrap(),
+            );
+            buf.pop(); // truncate last byte
+            let n = replay_into(&buf, &store);
+            assert_eq!(n, 1);
+            assert_eq!(store.count("Namespace"), 1);
+            // The successful row should be "ok", not "partial"
+            assert!(store.get("Namespace", "", "ok").is_ok());
+        }
+
+        #[tokio::test]
+        async fn snapshot_roundtrips_through_disk() {
+            let tmp = tempfile::TempDir::new().unwrap();
+            let dd = tmp.path().to_path_buf();
+            let store = ResourceStore::new();
+            for i in 0..7 {
+                store.upsert(ns_resource(&format!("ns-{i}")));
+            }
+            persist_snapshot(&dd, &store).await.unwrap();
+            assert!(dd.join("apiserver/snapshot.json").is_file());
+
+            // Restore into a fresh store via the public entrypoint.
+            let restored = restore(&dd).await.unwrap();
+            assert_eq!(restored.count("Namespace"), 7);
+            assert!(restored.get("Namespace", "", "ns-3").is_ok());
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -836,7 +1304,7 @@ mod tests {
     async fn load_succeeds_after_init() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "load-test", "127.0.0.1:6443").unwrap();
+        init(&dd, "load-test", "127.0.0.1:6443", "single", "", 1).unwrap();
         let rt = ClusterRuntime::load(Some(&dd))
             .await
             .unwrap()
@@ -849,7 +1317,7 @@ mod tests {
     async fn etcd_snapshot_roundtrips() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "snap-test", "127.0.0.1:6443").unwrap();
+        init(&dd, "snap-test", "127.0.0.1:6443", "single", "", 1).unwrap();
         let rt = ClusterRuntime::load(Some(&dd)).await.unwrap().unwrap();
 
         // Put one key, persist, reload, verify.
@@ -1129,7 +1597,7 @@ mod tests {
     async fn wal_survives_simulated_crash() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        crate::cluster::init(&dd, "wal-test", "127.0.0.1:6443").unwrap();
+        crate::cluster::init(&dd, "wal-test", "127.0.0.1:6443", "single", "", 1).unwrap();
         let rt = ClusterRuntime::load(Some(&dd)).await.unwrap().unwrap();
 
         // Spawn just the WAL writer, drive a few PUTs, drop the writer

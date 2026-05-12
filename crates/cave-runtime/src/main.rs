@@ -18,6 +18,7 @@ use tracing::info;
 mod cluster;
 mod cluster_runtime;
 mod portal;
+mod raft_transport;
 
 static PORTAL_HTML: &str = include_str!("portal_index.html");
 
