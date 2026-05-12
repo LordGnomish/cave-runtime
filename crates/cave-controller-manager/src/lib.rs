@@ -48,6 +48,12 @@ pub mod gc_lite;
 /// transition + taint-based eviction trigger.
 pub mod node_lease;
 
+/// Sweep-012 adoption: controller-manager *own* leader election —
+/// active-passive scheduling for multiple replicas via
+/// `cave_kernel::lease`. Distinct from `node_lease` (per-kubelet
+/// liveness signal that this controller watches).
+pub mod leader_election;
+
 /// 100-pct PUSH-HARD M8: Node lifecycle deeper — taints + zone-state
 /// classifier + per-zone rate-limited eviction queue.
 pub mod node_lifecycle;
