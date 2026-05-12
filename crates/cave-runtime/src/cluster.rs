@@ -8,14 +8,15 @@
 use anyhow::{anyhow, Context, Result};
 use clap::Subcommand;
 use rcgen::{
-    BasicConstraints, CertificateParams, DnType, IsCa, KeyPair, KeyUsagePurpose, SanType,
+    BasicConstraints, CertificateParams, DnType, ExtendedKeyUsagePurpose, IsCa, KeyPair,
+    KeyUsagePurpose, SanType,
 };
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration as StdDuration;
 use time::{Duration, OffsetDateTime};
-use tracing::info;
+use tracing::{info, warn};
 
 /// Cluster lifecycle subcommands.
 #[derive(Subcommand, Debug, Clone)]
@@ -30,7 +31,7 @@ pub enum ClusterCmd {
         advertise_address: String,
     },
     /// Worker-node join: POST the bootstrap token to the master apiserver and
-    /// persist the returned join config.
+    /// persist the returned join config + issued kubelet certificate.
     Join {
         #[arg(long)]
         bootstrap_token: String,
@@ -40,6 +41,12 @@ pub enum ClusterCmd {
         data_dir: PathBuf,
         #[arg(long, default_value = "")]
         node_name: String,
+        /// Path to the master's CA certificate (PEM). If omitted, the master's
+        /// CA is fetched once over an unverified TLS connection (TOFU) and
+        /// cached at `<data_dir>/master-ca.crt` — subsequent joins to the same
+        /// data dir then pin against the cached copy.
+        #[arg(long)]
+        ca_bundle: Option<PathBuf>,
     },
     /// Cluster health: parse kubeconfig and probe the control-plane.
     Status {
@@ -65,6 +72,10 @@ const COMPONENTS: &[&str] = &[
 ];
 
 /// Manifest written to `<data_dir>/cluster.json` summarizing the init.
+///
+/// `bootstrap_strategy` and `peers` are forward-looking fields so the file
+/// shape doesn't need to change when multi-node Raft lands. Today every
+/// init writes `bootstrap_strategy: "single"` and an empty peer list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterManifest {
     pub cluster_name: String,
@@ -74,6 +85,14 @@ pub struct ClusterManifest {
     pub components: Vec<String>,
     pub kubeconfig_path: String,
     pub data_dir: String,
+    #[serde(default = "default_bootstrap_strategy")]
+    pub bootstrap_strategy: String,
+    #[serde(default)]
+    pub peers: Vec<String>,
+}
+
+fn default_bootstrap_strategy() -> String {
+    "single".into()
 }
 
 pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
@@ -88,7 +107,17 @@ pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
             master_address,
             data_dir,
             node_name,
-        } => join(&data_dir, &bootstrap_token, &master_address, &node_name).await,
+            ca_bundle,
+        } => {
+            join(
+                &data_dir,
+                &bootstrap_token,
+                &master_address,
+                &node_name,
+                ca_bundle.as_deref(),
+            )
+            .await
+        }
         ClusterCmd::Status { kubeconfig } => status(&kubeconfig).await,
         ClusterCmd::Destroy { data_dir, force } => destroy(&data_dir, force),
     }
@@ -177,6 +206,8 @@ pub fn init(data_dir: &Path, cluster_name: &str, advertise_address: &str) -> Res
         components: COMPONENTS.iter().map(|s| s.to_string()).collect(),
         kubeconfig_path: kubeconfig_path.display().to_string(),
         data_dir: data_dir.display().to_string(),
+        bootstrap_strategy: "single".into(),
+        peers: Vec::new(),
     };
     fs::write(
         data_dir.join("cluster.json"),
@@ -236,8 +267,19 @@ fn generate_leaf(
     params.not_after = OffsetDateTime::now_utc() + Duration::days(365);
     params.key_usages.push(KeyUsagePurpose::DigitalSignature);
     params.key_usages.push(KeyUsagePurpose::KeyEncipherment);
-    // Server-style components get DNS + IP SANs for the advertise host.
+    // Server-style components get DNS + IP SANs for the advertise host
+    // plus the ServerAuth EKU. Without an EKU, rustls (correctly) refuses
+    // the cert when a chain-validating client pins the CA.
     if matches!(component, "apiserver" | "etcd" | "kubelet") {
+        params
+            .extended_key_usages
+            .push(ExtendedKeyUsagePurpose::ServerAuth);
+        // kubelet also acts as a client to the apiserver.
+        if component == "kubelet" {
+            params
+                .extended_key_usages
+                .push(ExtendedKeyUsagePurpose::ClientAuth);
+        }
         if let Ok(ia5) = rcgen::Ia5String::try_from(advertise_host.to_string()) {
             params.subject_alt_names.push(SanType::DnsName(ia5));
         }
@@ -247,6 +289,12 @@ fn generate_leaf(
         if let Ok(localhost) = rcgen::Ia5String::try_from("localhost".to_string()) {
             params.subject_alt_names.push(SanType::DnsName(localhost));
         }
+    } else {
+        // Client-style components (admin, scheduler, controller-manager)
+        // present client certs against the apiserver.
+        params
+            .extended_key_usages
+            .push(ExtendedKeyUsagePurpose::ClientAuth);
     }
     let cert = params
         .signed_by(&key, ca_cert, ca_key)
@@ -313,6 +361,7 @@ pub async fn join(
     bootstrap_token: &str,
     master_address: &str,
     node_name: &str,
+    ca_bundle: Option<&Path>,
 ) -> Result<()> {
     info!(?data_dir, %master_address, "cluster join");
     if bootstrap_token.len() < 16 {
@@ -330,15 +379,23 @@ pub async fn join(
     } else {
         format!("https://{}", master_address)
     };
-    let join_url = format!("{}/api/v1/bootstrap/join", base.trim_end_matches('/'));
+    let base = base.trim_end_matches('/').to_string();
 
-    // The master CA isn't validated here — for an MVP cluster the worker
-    // trusts on first use.  A production implementation would consume a
-    // CA bundle pinned out-of-band.
+    // ── Step 1: resolve the master CA cert (pin) ─────────────────────────
+    let cached_ca_path = data_dir.join("master-ca.crt");
+    let (ca_pem, pin_source) = resolve_master_ca(&base, ca_bundle, &cached_ca_path).await?;
+    info!(source = pin_source, "master CA pinned");
+
+    let pinned_cert = reqwest::Certificate::from_pem(ca_pem.as_bytes())
+        .context("parse pinned master CA as reqwest::Certificate")?;
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
+        .add_root_certificate(pinned_cert)
+        .danger_accept_invalid_hostnames(true) // self-signed leaf may not have a matching SAN for the operator's address
         .timeout(StdDuration::from_secs(10))
         .build()?;
+
+    // ── Step 2: bootstrap-token POST ─────────────────────────────────────
+    let join_url = format!("{}/api/v1/bootstrap/join", base);
     let body = serde_json::json!({
         "token": bootstrap_token,
         "node_name": resolved_node_name,
@@ -360,13 +417,32 @@ pub async fn join(
     }
     let parsed: serde_json::Value = serde_json::from_str(&text).context("parse join response")?;
 
+    // ── Step 3: CSR — generate kubelet keypair locally, submit to master ─
+    let csr_outcome = request_kubelet_certificate(
+        &client,
+        &base,
+        bootstrap_token,
+        &resolved_node_name,
+        data_dir,
+    )
+    .await;
+    let csr_summary = match &csr_outcome {
+        Ok(_) => "issued".to_string(),
+        Err(e) => {
+            warn!(error = %e, "kubelet CSR request failed — join continues without a node cert");
+            format!("failed ({})", e)
+        }
+    };
+
     let join_config = format!(
         "# Auto-generated by `cave-runtime cluster join` ({}).\n\
          master_address: {master}\n\
          node_name: {node}\n\
          bootstrap_token_redacted: {redacted}\n\
          status: {server_status}\n\
-         server_message: {msg}\n",
+         server_message: {msg}\n\
+         ca_pin_source: {pin_source}\n\
+         kubelet_csr: {csr_summary}\n",
         OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .unwrap_or_else(|_| "unknown".into()),
@@ -385,6 +461,8 @@ pub async fn join(
             .get("message")
             .and_then(|v| v.as_str())
             .unwrap_or(""),
+        pin_source = pin_source,
+        csr_summary = csr_summary,
     );
     fs::write(data_dir.join("join.yaml"), join_config)?;
     println!(
@@ -397,6 +475,137 @@ pub async fn join(
         "  server status: {}",
         parsed.get("status").and_then(|v| v.as_str()).unwrap_or("?")
     );
+    println!("  CA pin:       {}", pin_source);
+    println!("  kubelet CSR:  {}", csr_summary);
+    csr_outcome?;
+    Ok(())
+}
+
+/// Resolve the master CA certificate (PEM). Returns `(pem, source_label)`.
+///
+/// Order of precedence:
+/// 1. `--ca-bundle PATH` is provided → load from that path.
+/// 2. `<data_dir>/master-ca.crt` already cached → load + pin against it.
+/// 3. TOFU — make one unverified TLS request to `GET <base>/api/v1/bootstrap/ca`,
+///    cache the returned PEM at `<data_dir>/master-ca.crt`.
+async fn resolve_master_ca(
+    master_base: &str,
+    explicit_ca_bundle: Option<&Path>,
+    cached_path: &Path,
+) -> Result<(String, &'static str)> {
+    if let Some(p) = explicit_ca_bundle {
+        let pem = fs::read_to_string(p)
+            .with_context(|| format!("read --ca-bundle {}", p.display()))?;
+        validate_pem_cert(&pem, p)?;
+        return Ok((pem, "--ca-bundle"));
+    }
+    if cached_path.exists() {
+        let pem = fs::read_to_string(cached_path)
+            .with_context(|| format!("read cached CA {}", cached_path.display()))?;
+        validate_pem_cert(&pem, cached_path)?;
+        return Ok((pem, "cached"));
+    }
+    // TOFU fetch.
+    let tofu_client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .timeout(StdDuration::from_secs(10))
+        .build()?;
+    let ca_url = format!("{}/api/v1/bootstrap/ca", master_base);
+    let resp = tofu_client
+        .get(&ca_url)
+        .send()
+        .await
+        .with_context(|| format!("GET {} (TOFU)", ca_url))?;
+    if !resp.status().is_success() {
+        return Err(anyhow!(
+            "master returned status {} when fetching CA via TOFU",
+            resp.status()
+        ));
+    }
+    let pem = resp.text().await.context("read CA response body")?;
+    validate_pem_cert(&pem, cached_path)?;
+    if let Some(parent) = cached_path.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    fs::write(cached_path, &pem)
+        .with_context(|| format!("cache CA at {}", cached_path.display()))?;
+    Ok((pem, "TOFU"))
+}
+
+fn validate_pem_cert(pem: &str, source: impl std::fmt::Debug) -> Result<()> {
+    if !pem.contains("BEGIN CERTIFICATE") {
+        return Err(anyhow!(
+            "CA bundle at {:?} does not look like a PEM certificate (missing BEGIN CERTIFICATE)",
+            source
+        ));
+    }
+    Ok(())
+}
+
+/// Submit a kubelet CSR to the master and persist the issued cert.
+async fn request_kubelet_certificate(
+    client: &reqwest::Client,
+    master_base: &str,
+    bootstrap_token: &str,
+    node_name: &str,
+    data_dir: &Path,
+) -> Result<()> {
+    // Generate kubelet keypair + a self-PEM CSR. The master signs against the
+    // cluster CA and returns the leaf cert.
+    let kubelet_kp = KeyPair::generate().map_err(|e| anyhow!("kubelet keypair: {e}"))?;
+    let mut csr_params = CertificateParams::default();
+    let cn = format!("system:node:{}", node_name);
+    csr_params.distinguished_name.push(DnType::CommonName, &cn);
+    csr_params
+        .distinguished_name
+        .push(DnType::OrganizationName, "system:nodes");
+    if let Ok(ia5) = rcgen::Ia5String::try_from(node_name.to_string()) {
+        csr_params.subject_alt_names.push(SanType::DnsName(ia5));
+    }
+    let csr = csr_params
+        .serialize_request(&kubelet_kp)
+        .map_err(|e| anyhow!("serialize CSR: {e}"))?;
+    let csr_pem = csr.pem().map_err(|e| anyhow!("CSR pem: {e}"))?;
+
+    let csr_url = format!("{}/api/v1/certificatesigningrequests", master_base);
+    let body = serde_json::json!({
+        "token": bootstrap_token,
+        "node_name": node_name,
+        "csr_pem": csr_pem,
+        "usage": "kubelet-client",
+    });
+    let resp = client
+        .post(&csr_url)
+        .json(&body)
+        .send()
+        .await
+        .with_context(|| format!("POST {}", csr_url))?;
+    let status = resp.status();
+    let text = resp.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(anyhow!(
+            "master rejected CSR (status {}): {}",
+            status,
+            text.lines().next().unwrap_or("")
+        ));
+    }
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).context("parse CSR response")?;
+    let signed_pem = parsed
+        .get("certificate")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("CSR response missing `certificate` field"))?;
+    let ca_pem = parsed
+        .get("ca")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("CSR response missing `ca` field"))?;
+
+    let kubelet_dir = data_dir.join("kubelet");
+    fs::create_dir_all(&kubelet_dir)
+        .with_context(|| format!("create {}", kubelet_dir.display()))?;
+    fs::write(kubelet_dir.join("tls.crt"), signed_pem)?;
+    fs::write(kubelet_dir.join("tls.key"), kubelet_kp.serialize_pem())?;
+    fs::write(kubelet_dir.join("ca.crt"), ca_pem)?;
     Ok(())
 }
 
@@ -434,10 +643,36 @@ pub async fn status(kubeconfig_path: &Path) -> Result<()> {
     println!("Cluster:    {}", cluster_name);
     println!("Server:     {}", server);
 
-    let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .timeout(StdDuration::from_secs(3))
-        .build()?;
+    // Prefer the cluster's own CA from the kubeconfig's
+    // `certificate-authority-data` blob — that is the strongest pin we have
+    // when we're acting as the admin. Fall back to "no verification" only if
+    // the blob is missing so this command still tells you something useful
+    // for an out-of-band kubeconfig.
+    let ca_blob_b64 = yaml
+        .get("clusters")
+        .and_then(|c| c.get(0))
+        .and_then(|c0| c0.get("cluster"))
+        .and_then(|c| c.get("certificate-authority-data"))
+        .and_then(|s| s.as_str());
+    let client = match ca_blob_b64 {
+        Some(b64) => {
+            use base64::Engine as _;
+            let pem = base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .context("decode certificate-authority-data")?;
+            let cert = reqwest::Certificate::from_pem(&pem)
+                .context("parse certificate-authority-data as PEM")?;
+            reqwest::Client::builder()
+                .add_root_certificate(cert)
+                .danger_accept_invalid_hostnames(true)
+                .timeout(StdDuration::from_secs(3))
+                .build()?
+        }
+        None => reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .timeout(StdDuration::from_secs(3))
+            .build()?,
+    };
 
     // apiserver /healthz
     let api_url = format!("{}/healthz", server.trim_end_matches('/'));
@@ -604,7 +839,9 @@ mod tests {
         let dd = tmp.path().join("worker");
         // The short-token guard fires before any network call, so this is
         // safe to run without a live master.
-        assert!(join(&dd, "short", "10.0.0.1:6443", "worker-1").await.is_err());
+        assert!(join(&dd, "short", "10.0.0.1:6443", "worker-1", None)
+            .await
+            .is_err());
     }
 
     #[tokio::test]
@@ -612,7 +849,14 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("worker");
         // A bind on 127.0.0.1:1 will always refuse — exercises the network-error path.
-        let res = join(&dd, "abcdef0123456789", "https://127.0.0.1:1", "worker-1").await;
+        let res = join(
+            &dd,
+            "abcdef0123456789",
+            "https://127.0.0.1:1",
+            "worker-1",
+            None,
+        )
+        .await;
         assert!(res.is_err(), "must fail when master unreachable");
     }
 
