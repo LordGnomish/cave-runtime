@@ -65,7 +65,7 @@
       "cave_src_loc": 8236,
       "manifest_filled": true,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.7568,
       "stubs": null,
       "tier": "C",
       "upstream": "keycloak/keycloak",
@@ -85,7 +85,7 @@
       "cave_src_loc": 11602,
       "manifest_filled": true,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8158,
       "stubs": null,
       "tier": "C",
       "upstream": "redis/redis",
@@ -244,6 +244,16 @@
       "tier": "100",
       "upstream": "containerd/containerd",
       "upstream_version": "v1.7.0"
+    },
+    "cave-crm": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
     },
     "cave-crossplane": {
       "cave_src_loc": 2328,
@@ -515,6 +525,16 @@
       "upstream": "clastix/kamaji",
       "upstream_version": "v1.0.0"
     },
+    "cave-karpenter": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.6471,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-keda": {
       "cave_src_loc": 1145,
       "manifest_filled": true,
@@ -565,6 +585,26 @@
       "tier": "100",
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
+    },
+    "cave-kubevirt": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-lakehouse": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
     },
     "cave-ledger": {
       "cave_src_loc": 821,
@@ -622,7 +662,7 @@
       "cave_src_loc": null,
       "manifest_filled": true,
       "note": "8/8 files only \u2014 needs fn/test/surface mappings",
-      "parity_ratio": 0.25,
+      "parity_ratio": 0.7714,
       "stubs": null,
       "tier": "B",
       "upstream": "istio/istio",
@@ -784,6 +824,16 @@
       "tier": "C",
       "upstream": "postgres/postgres",
       "upstream_version": "16.0"
+    },
+    "cave-rdbms-operator": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.7917,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
     },
     "cave-registry": {
       "cave_src_loc": 5540,
@@ -956,7 +1006,7 @@
       "cave_src_loc": null,
       "manifest_filled": true,
       "note": "3 fn missing, 2 surfaces missing",
-      "parity_ratio": 0.7159,
+      "parity_ratio": 0.7907,
       "stubs": null,
       "tier": "A",
       "upstream": "apache/kafka",
@@ -1029,7 +1079,7 @@
       "cave_src_loc": null,
       "manifest_filled": true,
       "note": "1 fn missing, 1 surface missing, **0 tests declared** \u2014 needs test mapping pass",
-      "parity_ratio": 0.6625,
+      "parity_ratio": 0.7838,
       "stubs": null,
       "tier": "A",
       "upstream": "hashicorp/vault",
@@ -1069,10 +1119,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 83,
-    "new_filled": 83,
+    "flipped": 84,
+    "injected": 5,
+    "new_filled": 84,
     "phantoms": 7,
-    "ratio_overrides": 19
+    "ratio_overrides": 26
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

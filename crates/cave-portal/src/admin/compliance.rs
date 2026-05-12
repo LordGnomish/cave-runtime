@@ -2666,7 +2666,14 @@ version = "7.2.0"
         );
         let vault = m.get("cave-vault").unwrap();
         assert_eq!(vault.tier, "A");
-        assert!(vault.parity_ratio.unwrap() > 0.6 && vault.parity_ratio.unwrap() < 0.7);
+        // 2026-05-12 honest measured-parity expansion replaced the
+        // audit-doc's 0.6625 with the disk-derived 0.7838 (see
+        // docs/parity/cave-vault-port-2026-05-12.md).
+        assert!(
+            vault.parity_ratio.unwrap() > 0.75 && vault.parity_ratio.unwrap() < 0.80,
+            "got vault parity {:?}",
+            vault.parity_ratio
+        );
         // cave-net still reports tier C (audit doc was frozen 2026-05-01),
         // but its on-disk manifest now carries `fill_ratio = 1.0` and a
         // `[parity]` block; the disk-overlay propagates those to the

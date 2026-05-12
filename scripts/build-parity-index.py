@@ -333,12 +333,41 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
     `manifest_filled` + `parity_ratio` if the disk is newer or
     authoritative. Crates whose name has no corresponding workspace
     directory are marked `phantom = true` so the dashboard can exclude
-    them from headline ratios. Returns a delta report.
+    them from headline ratios. Workspace crates absent from the
+    audit doc (e.g. cave-rdbms-operator, cave-karpenter) get a
+    synthesized entry from their on-disk manifest. Returns a delta
+    report.
     """
     flipped = 0
     ratio_overrides = 0
     new_filled = 0
     phantoms = 0
+    injected = 0
+    # Walk every workspace member and inject a stub entry for any
+    # crate the audit doc didn't cover. The disk overlay then fills
+    # in the measured ratio just like it does for known entries.
+    crates_dir = REPO_ROOT / "crates"
+    if crates_dir.is_dir():
+        for p in sorted(crates_dir.iterdir()):
+            if not (p.is_dir() and (p / "Cargo.toml").is_file()):
+                continue
+            name = p.name
+            if name in crates:
+                continue
+            # Synthesize an audit-unknown entry — the disk overlay below
+            # will fill manifest_filled + parity_ratio if the on-disk
+            # `[parity]` block carries them.
+            crates[name] = {
+                "tier": "C",
+                "parity_ratio": None,
+                "manifest_filled": None,
+                "cave_src_loc": None,
+                "upstream": None,
+                "upstream_version": None,
+                "stubs": None,
+                "note": "added by disk-overlay; not in audit doc",
+            }
+            injected += 1
     for name, entry in crates.items():
         crate_dir = REPO_ROOT / "crates" / name
         if not crate_dir.is_dir():
@@ -385,6 +414,7 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
         "ratio_overrides": ratio_overrides,
         "new_filled": new_filled,
         "phantoms": phantoms,
+        "injected": injected,
     }
 
 
