@@ -26,6 +26,7 @@ use crate::admin::types::Cite;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -46,7 +47,22 @@ hidden compile-only gates. The 4-track minimum (Backend + Portal + cavectl + \
 Observability) is a contract, not an aspiration.";
 
 /// Per-crate compliance snapshot.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// Two orthogonal axes:
+/// * `four_track_score` — **structural** coverage (Backend present + Portal
+///   admin page + cavectl subcommand + Observability files). Detects whether
+///   the four delivery tracks have artefacts, not whether they are real
+///   reimplementations.
+/// * `parity_ratio` — **upstream parity** as scored by `cargo run -p
+///   cave-kernel --example parity_audit` and surfaced via the audit doc
+///   index (`docs/parity/parity-index.json`). Measures whether the cave
+///   crate actually mirrors its declared upstream's items, functions,
+///   tests, and surface APIs.
+///
+/// A crate can score 100 on `four_track_score` while having `parity_ratio
+/// = 0.0` (scaffold only). The dashboard surfaces both grades so
+/// "structural complete" is never mistaken for "upstream parity reached".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CrateCompliance {
     pub name: String,
     pub upstream_version: Option<String>,
@@ -65,6 +81,25 @@ pub struct CrateCompliance {
     /// not expected to ship a Portal admin page or cavectl subcommand;
     /// they are excluded from the aggregate score and grade.
     pub infra_only: bool,
+    /// Upstream parity ratio in `[0.0, 1.0]` from the parity audit. `None`
+    /// when the crate is not in the audit (e.g. infra-only or skeleton
+    /// without a manifest). Surfaced as a second-axis grade so structural
+    /// completion can never masquerade as real upstream parity.
+    #[serde(default)]
+    pub parity_ratio: Option<f64>,
+    /// `Some(true)` when the crate's `parity.manifest.toml` declares at
+    /// least one of `[[files]]`/`[[functions]]`/`[[tests]]`/`[[surfaces]]`;
+    /// `Some(false)` when the manifest exists but every section is empty
+    /// (calculator returns 0.0 regardless of impl size); `None` when no
+    /// manifest is expected (CAVE-internal infra crates).
+    #[serde(default)]
+    pub manifest_filled: Option<bool>,
+    /// Audit tier as defined in `full-audit-2026-05-01.md`:
+    /// `"100"` reached, `"A"` close to 100, `"B"` partial-fill, `"C"`
+    /// empty manifest with impl present, `"D1"` skeleton, `"D2"` no
+    /// manifest yet, `"E"` infra-only.
+    #[serde(default)]
+    pub audit_tier: Option<String>,
 }
 
 /// Fallback list of crates that are infrastructure tooling, shared
@@ -111,14 +146,17 @@ pub fn is_infra_only_fallback(name: &str) -> bool {
 }
 
 /// Aggregated compliance state for the whole workspace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ComplianceSnapshot {
     pub crates: Vec<CrateCompliance>,
 }
 
 impl ComplianceSnapshot {
-    /// Aggregate score over tier-1 (non-infra) crates only. Infra crates
-    /// are excluded — they don't ship Portal/cavectl/obs by contract.
+    /// Aggregate **structural** score over tier-1 (non-infra) crates only.
+    /// Infra crates are excluded — they don't ship Portal/cavectl/obs by
+    /// contract. This is "do the four delivery tracks exist?", NOT "does
+    /// the cave crate actually reach upstream parity?" — see
+    /// [`Self::aggregate_parity_score`] for the latter.
     pub fn aggregate_score(&self) -> u8 {
         let scored: Vec<&CrateCompliance> = self.crates.iter().filter(|c| !c.infra_only).collect();
         if scored.is_empty() {
@@ -126,6 +164,55 @@ impl ComplianceSnapshot {
         }
         let total: u32 = scored.iter().map(|c| u32::from(c.four_track_score)).sum();
         ((total / scored.len() as u32).min(100)) as u8
+    }
+
+    /// Aggregate **parity** score (0-100) over tier-1 crates that have a
+    /// known `parity_ratio`. Crates whose ratio is unknown (audit doesn't
+    /// cover them, or `manifest_filled` is unknown) are excluded from the
+    /// numerator AND denominator — measuring against an unknown is worse
+    /// than measuring against zero.
+    ///
+    /// Returns 0 when no tier-1 crate has a measurable ratio.
+    pub fn aggregate_parity_score(&self) -> u8 {
+        let scored: Vec<f64> = self
+            .crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.parity_ratio)
+            .collect();
+        if scored.is_empty() {
+            return 0;
+        }
+        let avg = scored.iter().sum::<f64>() / scored.len() as f64;
+        (avg.clamp(0.0, 1.0) * 100.0).round() as u8
+    }
+
+    /// Fraction of tier-1 crates whose `parity.manifest.toml` is non-empty
+    /// (i.e. declares any `[[files]]`/`[[functions]]`/`[[tests]]`/`[[surfaces]]`
+    /// mappings). Returns `0.0` when no tier-1 crate has a known fill state.
+    /// `0.0` when no tier-1 crate has a known fill state.
+    pub fn manifest_fill_ratio(&self) -> f64 {
+        let scored: Vec<bool> = self
+            .crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.manifest_filled)
+            .collect();
+        if scored.is_empty() {
+            return 0.0;
+        }
+        scored.iter().filter(|b| **b).count() as f64 / scored.len() as f64
+    }
+
+    /// Count of tier-1 crates with a known parity ratio (i.e. measurable
+    /// against the audit). Used by the dashboard to surface "N of M
+    /// tier-1 crates have a parity score" so the parity grade can't be
+    /// gamed by hiding crates from the audit.
+    pub fn parity_measured_count(&self) -> usize {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only && c.parity_ratio.is_some())
+            .count()
     }
 
     /// Stub indicators across all crates (infra included — fake tests
@@ -147,12 +234,26 @@ impl ComplianceSnapshot {
         self.crates.iter().filter(|c| c.infra_only).count()
     }
 
+    /// A-F letter for the **structural** aggregate (Portal/cavectl/obs
+    /// presence). See [`Self::parity_grade`] for the upstream-parity grade.
     pub fn grade(&self) -> char {
         compliance_grade_letter(self.aggregate_score())
     }
+
+    /// A-F letter for the **upstream parity** aggregate. Returns `'F'`
+    /// when no crate has a measurable ratio so the grade is never
+    /// "missing → A".
+    pub fn parity_grade(&self) -> char {
+        let avg_ratio = if self.parity_measured_count() == 0 {
+            0.0
+        } else {
+            f64::from(self.aggregate_parity_score()) / 100.0
+        };
+        compute_parity_grade(avg_ratio)
+    }
 }
 
-/// Map a 0-100 score to an A-F letter grade.
+/// Map a 0-100 structural score to an A-F letter grade.
 pub fn compliance_grade_letter(score: u8) -> char {
     match score {
         90..=u8::MAX => 'A',
@@ -160,6 +261,33 @@ pub fn compliance_grade_letter(score: u8) -> char {
         70..=79 => 'C',
         60..=69 => 'D',
         _ => 'F',
+    }
+}
+
+/// Map a `[0.0, 1.0]` parity ratio to an A-F letter grade.
+///
+/// Boundaries (intentionally stricter than the structural grade — real
+/// upstream parity is rarer than 4-track scaffolding):
+/// * `>= 0.70` → A
+/// * `>= 0.50` → B
+/// * `>= 0.30` → C
+/// * `>= 0.15` → D
+/// * `< 0.15` → F
+pub fn compute_parity_grade(ratio: f64) -> char {
+    if ratio.is_nan() {
+        return 'F';
+    }
+    let r = ratio.clamp(0.0, 1.0);
+    if r >= 0.70 {
+        'A'
+    } else if r >= 0.50 {
+        'B'
+    } else if r >= 0.30 {
+        'C'
+    } else if r >= 0.15 {
+        'D'
+    } else {
+        'F'
     }
 }
 
@@ -251,6 +379,84 @@ pub fn parse_parity_manifest_full(content: &str) -> ParityManifest {
 pub fn parse_parity_manifest(content: &str) -> (Option<String>, Option<String>) {
     let m = parse_parity_manifest_full(content);
     (m.upstream_version, m.upstream_org_repo)
+}
+
+/// One row from `docs/parity/parity-index.json` — the audit-doc-derived
+/// view of a crate's upstream-parity state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ParityIndexEntry {
+    pub tier: String,
+    #[serde(default)]
+    pub parity_ratio: Option<f64>,
+    #[serde(default)]
+    pub manifest_filled: Option<bool>,
+    #[serde(default)]
+    pub cave_src_loc: Option<u64>,
+    #[serde(default)]
+    pub upstream: Option<String>,
+    #[serde(default)]
+    pub upstream_version: Option<String>,
+    #[serde(default)]
+    pub stubs: Option<u32>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+/// JSON wrapper matching the on-disk schema of `parity-index.json`.
+/// `generated_from`/`generated_at` are deserialised so a `cargo about`-
+/// style provenance log can surface them later; they are not currently
+/// rendered.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+struct ParityIndexFile {
+    #[serde(default)]
+    generated_from: Option<String>,
+    #[serde(default)]
+    generated_at: Option<String>,
+    #[serde(default)]
+    crates: HashMap<String, ParityIndexEntry>,
+}
+
+/// Embedded snapshot of the parity audit index. The audit doc + index
+/// JSON live in `docs/parity/`; the dashboard reads from the filesystem
+/// at runtime (so a re-run of `scripts/build-parity-index.py` is picked
+/// up without a rebuild) but ALSO embeds this fallback so the dashboard
+/// still renders in environments where `docs/` isn't deployed.
+const PARITY_INDEX_EMBEDDED: &str = include_str!("../../../../docs/parity/parity-index.json");
+
+/// Load the parity index from a path on disk. Returns the inner crate
+/// map. Silently returns an empty map on any read/parse failure — the
+/// dashboard still renders, it just shows `parity_ratio: None` for
+/// every crate.
+pub fn load_parity_index_from(path: &Path) -> HashMap<String, ParityIndexEntry> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return HashMap::new();
+    };
+    parse_parity_index_json(&raw)
+}
+
+/// Parse the parity-index JSON blob. Public for tests + the embedded-
+/// fallback path; production callers should prefer
+/// [`load_parity_index_from`] (filesystem) or [`load_parity_index`]
+/// (filesystem-with-embedded-fallback).
+pub fn parse_parity_index_json(raw: &str) -> HashMap<String, ParityIndexEntry> {
+    match serde_json::from_str::<ParityIndexFile>(raw) {
+        Ok(f) => f.crates,
+        Err(_) => HashMap::new(),
+    }
+}
+
+/// Load the parity index, preferring the on-disk copy under the given
+/// workspace root and falling back to the binary-embedded snapshot. The
+/// disk path is `<workspace>/docs/parity/parity-index.json`.
+pub fn load_parity_index(workspace_root: &Path) -> HashMap<String, ParityIndexEntry> {
+    let on_disk = load_parity_index_from(
+        &workspace_root.join("docs/parity/parity-index.json"),
+    );
+    if !on_disk.is_empty() {
+        return on_disk;
+    }
+    parse_parity_index_json(PARITY_INDEX_EMBEDDED)
 }
 
 fn extract_string_value(rest: &str) -> Option<String> {
@@ -438,7 +644,7 @@ pub fn recent_commits_for_crate(
 /// Detail-page bundle: the per-crate row from the dashboard plus the
 /// extra data (ignored test list, manifest content, recent commits)
 /// that the drill-down surfaces.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CrateDetail {
     pub compliance: CrateCompliance,
     pub ignored_tests: Vec<IgnoredTest>,
@@ -534,10 +740,46 @@ pub fn analyse_crate(
         obs_dashboard_present,
         four_track_score,
         infra_only,
+        // Parity-axis fields are attached in a separate pass by
+        // [`attach_parity_index`] so the filesystem walk stays pure and
+        // testable without the audit JSON.
+        parity_ratio: None,
+        manifest_filled: None,
+        audit_tier: None,
     })
 }
 
-/// Build a compliance snapshot for the given crate name list.
+/// Mutate `snapshot` in place, copying audit-derived parity data from
+/// `index` onto each matching crate. Crates absent from the index keep
+/// their default `None` fields (the dashboard surfaces "—" + "audit
+/// unknown" for those). Infra-only crates are touched too — the audit
+/// tier `"E"` is informative even if no parity ratio applies.
+pub fn attach_parity_index(
+    snapshot: &mut ComplianceSnapshot,
+    index: &HashMap<String, ParityIndexEntry>,
+) {
+    for c in &mut snapshot.crates {
+        if let Some(entry) = index.get(&c.name) {
+            c.parity_ratio = entry.parity_ratio;
+            c.manifest_filled = entry.manifest_filled;
+            c.audit_tier = Some(entry.tier.clone());
+            // Backfill upstream metadata from the audit when the crate's
+            // own manifest didn't surface it (typical for tier C/D where
+            // the manifest exists but is sparse).
+            if c.upstream_org_repo.is_none() {
+                c.upstream_org_repo = entry.upstream.clone();
+            }
+            if c.upstream_version.is_none() {
+                c.upstream_version = entry.upstream_version.clone();
+            }
+        }
+    }
+}
+
+/// Build a compliance snapshot for the given crate name list. Loads
+/// the parity audit index from `<workspace>/docs/parity/parity-index.json`
+/// (or the binary-embedded fallback) and stamps `parity_ratio` +
+/// `manifest_filled` + `audit_tier` onto each crate.
 pub fn build_snapshot(
     workspace_root: &Path,
     crate_names: &[&str],
@@ -551,7 +793,10 @@ pub fn build_snapshot(
         Ordering::Equal => a.name.cmp(&b.name),
         ord => ord,
     });
-    Ok(ComplianceSnapshot { crates })
+    let mut snapshot = ComplianceSnapshot { crates };
+    let index = load_parity_index(workspace_root);
+    attach_parity_index(&mut snapshot, &index);
+    Ok(snapshot)
 }
 
 /// Discover every directory under `crates/` that has a Cargo.toml — used by
@@ -605,7 +850,7 @@ pub fn live_snapshot() -> ComplianceSnapshot {
 /// Wraps a [`ComplianceSnapshot`] with the wall-clock instant it was
 /// materialised. The handler uses the timestamp to decide whether the
 /// cached copy is still fresh or needs a re-walk.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CachedSnapshot {
     pub snapshot: ComplianceSnapshot,
     pub cached_at: DateTime<Utc>,
@@ -762,6 +1007,10 @@ pub enum SortKey {
     StubCount,
     /// Crate name, lexicographic ascending — useful for "find a crate".
     Name,
+    /// Worst upstream-parity ratio first; crates without a known ratio
+    /// sort last so the dashboard surfaces measured-and-bad over
+    /// measured-and-good before falling back to unmeasured.
+    Parity,
 }
 
 impl SortKey {
@@ -769,6 +1018,7 @@ impl SortKey {
         match s {
             "stubs" | "stub_count" => SortKey::StubCount,
             "name" => SortKey::Name,
+            "parity" => SortKey::Parity,
             _ => SortKey::Score,
         }
     }
@@ -778,6 +1028,7 @@ impl SortKey {
             SortKey::Score => "score",
             SortKey::StubCount => "stubs",
             SortKey::Name => "name",
+            SortKey::Parity => "parity",
         }
     }
 }
@@ -801,6 +1052,15 @@ pub enum FilterMode {
     TrackGap,
     /// Hide infra-only crates entirely.
     ExcludeInfra,
+    /// Tier-1 crates whose `parity.manifest.toml` is empty (no `[[files]]`/
+    /// `[[functions]]`/`[[tests]]`/`[[surfaces]]` declared). These score 0
+    /// in the parity audit regardless of impl size — biggest dashboard
+    /// lever per hour spent (per the audit).
+    ManifestEmpty,
+    /// Tier-1 crates with a known parity ratio above 0 — i.e. the ones
+    /// actually being measured. Useful to focus on real progress instead
+    /// of the empty-manifest long tail.
+    ParityMeasured,
 }
 
 impl FilterMode {
@@ -809,6 +1069,8 @@ impl FilterMode {
             "score_lt_50" | "score<50" => FilterMode::ScoreUnder50,
             "track_gap" => FilterMode::TrackGap,
             "exclude_infra" => FilterMode::ExcludeInfra,
+            "manifest_empty" => FilterMode::ManifestEmpty,
+            "parity_measured" => FilterMode::ParityMeasured,
             _ => FilterMode::All,
         }
     }
@@ -819,6 +1081,8 @@ impl FilterMode {
             FilterMode::ScoreUnder50 => "score_lt_50",
             FilterMode::TrackGap => "track_gap",
             FilterMode::ExcludeInfra => "exclude_infra",
+            FilterMode::ManifestEmpty => "manifest_empty",
+            FilterMode::ParityMeasured => "parity_measured",
         }
     }
 }
@@ -849,6 +1113,10 @@ impl ViewQuery {
                 FilterMode::ScoreUnder50 => !c.infra_only && c.four_track_score < 50,
                 FilterMode::TrackGap => !c.infra_only && c.four_track_score < 100,
                 FilterMode::ExcludeInfra => !c.infra_only,
+                FilterMode::ManifestEmpty => !c.infra_only && c.manifest_filled == Some(false),
+                FilterMode::ParityMeasured => {
+                    !c.infra_only && c.parity_ratio.map(|r| r > 0.0).unwrap_or(false)
+                }
             })
             .cloned()
             .collect();
@@ -868,6 +1136,19 @@ impl ViewQuery {
                 });
             }
             SortKey::Name => rows.sort_by(|a, b| a.name.cmp(&b.name)),
+            SortKey::Parity => {
+                rows.sort_by(|a, b| {
+                    // Unmeasured last; otherwise ascending (worst first).
+                    let key = |c: &CrateCompliance| match c.parity_ratio {
+                        Some(r) => (0u8, (r * 10_000.0) as i64),
+                        None => (1u8, i64::MAX),
+                    };
+                    match key(a).cmp(&key(b)) {
+                        Ordering::Equal => a.name.cmp(&b.name),
+                        ord => ord,
+                    }
+                });
+            }
         }
         rows
     }
@@ -899,6 +1180,11 @@ pub fn render_with_view(
     let stubs = snapshot.total_stub_count();
     let grade = snapshot.grade();
     let avg_color = cell_color(avg);
+    let parity_avg = snapshot.aggregate_parity_score();
+    let parity_grade = snapshot.parity_grade();
+    let parity_color = cell_color(parity_avg);
+    let parity_measured = snapshot.parity_measured_count();
+    let manifest_fill_pct = (snapshot.manifest_fill_ratio() * 100.0).round() as u8;
 
     let rows: Vec<Vec<String>> = filtered
         .iter()
@@ -913,6 +1199,34 @@ pub fn render_with_view(
                     color = cell_color(c.four_track_score),
                     score = c.four_track_score,
                 )
+            };
+            let parity_html = match (c.infra_only, c.parity_ratio) {
+                (true, _) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-200 text-gray-600" title="infra-only">infra</span>"#,
+                ),
+                (false, Some(r)) => {
+                    let pct = (r.clamp(0.0, 1.0) * 100.0).round() as u8;
+                    let tier_badge = c
+                        .audit_tier
+                        .as_deref()
+                        .map(|t| format!(r#" <span class="text-[10px] text-gray-500">·{}</span>"#, escape(t)))
+                        .unwrap_or_default();
+                    let warn = if c.manifest_filled == Some(false) {
+                        r#" <span title="parity.manifest.toml is empty — calculator returns 0.0 regardless of impl size" class="text-orange-600">⚠</span>"#
+                    } else {
+                        ""
+                    };
+                    format!(
+                        r#"<span class="px-2 py-1 rounded {color}">{pct}%</span>{warn}{badge}"#,
+                        color = cell_color(pct),
+                        pct = pct,
+                        warn = warn,
+                        badge = tier_badge,
+                    )
+                }
+                (false, None) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="not covered by parity audit">—</span>"#,
+                ),
             };
             vec![
                 format!(
@@ -931,6 +1245,7 @@ pub fn render_with_view(
                 check(c.obs_alerts_present).into(),
                 check(c.obs_dashboard_present).into(),
                 score_html,
+                parity_html,
             ]
         })
         .collect();
@@ -940,7 +1255,8 @@ pub fn render_with_view(
   <input type="hidden" name="tenant_id" value="{tenant}" />
   <label class="text-sm">sort by
     <select name="sort" class="border rounded px-2 py-1">
-      <option value="score"{sel_score}>score (worst first)</option>
+      <option value="score"{sel_score}>structural (worst first)</option>
+      <option value="parity"{sel_parity}>parity (worst first)</option>
       <option value="stubs"{sel_stubs}>stub count (most first)</option>
       <option value="name"{sel_name}>name (A→Z)</option>
     </select>
@@ -948,8 +1264,10 @@ pub fn render_with_view(
   <label class="text-sm">filter
     <select name="filter" class="border rounded px-2 py-1">
       <option value="all"{f_all}>all crates</option>
-      <option value="score_lt_50"{f_lt50}>tier-1 with score &lt; 50</option>
+      <option value="score_lt_50"{f_lt50}>tier-1 with structural &lt; 50</option>
       <option value="track_gap"{f_gap}>tier-1 with any track gap</option>
+      <option value="manifest_empty"{f_mfe}>tier-1 with empty manifest</option>
+      <option value="parity_measured"{f_pms}>tier-1 with parity &gt; 0</option>
       <option value="exclude_infra"{f_xinf}>exclude infra-only</option>
     </select>
   </label>
@@ -958,11 +1276,14 @@ pub fn render_with_view(
 </form>"#,
         tenant = escape(ctx.tenant.as_str()),
         sel_score = if view.sort == SortKey::Score { " selected" } else { "" },
+        sel_parity = if view.sort == SortKey::Parity { " selected" } else { "" },
         sel_stubs = if view.sort == SortKey::StubCount { " selected" } else { "" },
         sel_name = if view.sort == SortKey::Name { " selected" } else { "" },
         f_all = if view.filter == FilterMode::All { " selected" } else { "" },
         f_lt50 = if view.filter == FilterMode::ScoreUnder50 { " selected" } else { "" },
         f_gap = if view.filter == FilterMode::TrackGap { " selected" } else { "" },
+        f_mfe = if view.filter == FilterMode::ManifestEmpty { " selected" } else { "" },
+        f_pms = if view.filter == FilterMode::ParityMeasured { " selected" } else { "" },
         f_xinf = if view.filter == FilterMode::ExcludeInfra { " selected" } else { "" },
         shown = filtered.len(),
         total = total,
@@ -972,12 +1293,32 @@ pub fn render_with_view(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
-<section class="grid grid-cols-5 gap-4 mb-6">
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TIER-1 CRATES</div><div class="text-3xl font-bold">{tier1}</div><div class="text-xs text-gray-400">+ {infra} infra</div></div>
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">AVG 4-TRACK</div><div class="text-3xl font-bold {avg_color} px-2 rounded">{avg}</div></div>
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL STUBS</div><div class="text-3xl font-bold">{stubs}</div></div>
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">GRADE</div><div class="text-3xl font-bold">{grade}</div></div>
-  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL</div><div class="text-3xl font-bold">{total}</div></div>
+<section class="grid grid-cols-2 gap-4 mb-6">
+  <div class="p-5 bg-white rounded shadow">
+    <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Structural Coverage</div>
+    <div class="flex items-baseline gap-3">
+      <div class="text-4xl font-bold {avg_color} px-2 rounded">{avg}</div>
+      <div class="text-3xl font-bold text-gray-700">Grade {grade}</div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">Backend + Portal page + cavectl + Observability artefacts present.<br/>Does NOT measure whether the four tracks reach upstream parity.</div>
+  </div>
+  <div class="p-5 bg-white rounded shadow">
+    <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Upstream Parity</div>
+    <div class="flex items-baseline gap-3">
+      <div class="text-4xl font-bold {parity_color} px-2 rounded">{parity_avg}</div>
+      <div class="text-3xl font-bold text-gray-700">Grade {parity_grade}</div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">
+      Audit ratio across {parity_measured}/{tier1} tier-1 crates. Source:
+      <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/full-audit-2026-05-01.md">full-audit-2026-05-01.md</a>.
+      Manifest fill: {manifest_fill_pct}% of tier-1 crates declare items.
+    </div>
+  </div>
+</section>
+<section class="grid grid-cols-3 gap-4 mb-6">
+  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TIER-1 CRATES</div><div class="text-3xl font-bold">{tier1}</div><div class="text-xs text-gray-400">+ {infra} infra · {total} total</div></div>
+  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL STUBS</div><div class="text-3xl font-bold">{stubs}</div><div class="text-xs text-gray-400">unimpl! + todo + ignored</div></div>
+  <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">PARITY MEASURED</div><div class="text-3xl font-bold">{parity_measured}</div><div class="text-xs text-gray-400">of {tier1} tier-1 in audit</div></div>
 </section>
 {sort_form}
 <section><h2 class="text-lg font-semibold mb-2">Per-crate matrix</h2>{tbl}</section>"#,
@@ -989,11 +1330,16 @@ pub fn render_with_view(
         avg_color = avg_color,
         stubs = stubs,
         grade = grade,
+        parity_avg = parity_avg,
+        parity_color = parity_color,
+        parity_grade = parity_grade,
+        parity_measured = parity_measured,
+        manifest_fill_pct = manifest_fill_pct,
         sort_form = sort_form,
         tbl = table(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
-                "portal", "cavectl", "alerts", "dash", "score",
+                "portal", "cavectl", "alerts", "dash", "structural", "parity",
             ],
             &rows,
         ),
@@ -1009,6 +1355,63 @@ const FILE_CITE: Cite = Cite::backstage(
     "plugins/tech-insights/src/components/Scorecards/ScorecardsPage.tsx",
     "ScorecardsPage",
 );
+
+/// Build the upstream-parity card + an optional "manifest empty" warning
+/// banner for the drill-down view. Returns `(card_html, warning_html)`;
+/// the warning is empty for infra-only / no-audit / filled-manifest crates.
+fn render_parity_block(c: &CrateCompliance) -> (String, String) {
+    if c.infra_only {
+        let card = r#"<div class="p-4 bg-gray-100 rounded shadow">
+  <div class="text-xs text-gray-500 uppercase tracking-wide">Upstream Parity</div>
+  <div class="text-3xl font-bold text-gray-600 mt-1">infra</div>
+  <div class="text-xs text-gray-500 mt-2">Infrastructure-only crate — no upstream counterpart.</div>
+</div>"#.to_string();
+        return (card, String::new());
+    }
+    let card = match c.parity_ratio {
+        Some(r) => {
+            let pct = (r.clamp(0.0, 1.0) * 100.0).round() as u8;
+            let grade = compute_parity_grade(r);
+            let tier_label = c
+                .audit_tier
+                .as_deref()
+                .map(|t| format!("audit tier <strong>{}</strong>", escape(t)))
+                .unwrap_or_else(|| "audit tier —".into());
+            format!(
+                r#"<div class="p-4 bg-white rounded shadow">
+  <div class="text-xs text-gray-500 uppercase tracking-wide">Upstream Parity</div>
+  <div class="flex items-baseline gap-3 mt-1">
+    <div class="text-3xl font-bold {color} px-2 inline-block rounded">{pct}%</div>
+    <div class="text-2xl font-bold text-gray-700">Grade {grade}</div>
+  </div>
+  <div class="text-xs text-gray-500 mt-2">{tier_label} — source: <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/full-audit-2026-05-01.md">full-audit-2026-05-01.md</a></div>
+</div>"#,
+                color = cell_color(pct),
+                pct = pct,
+                grade = grade,
+                tier_label = tier_label,
+            )
+        }
+        None => r#"<div class="p-4 bg-gray-50 rounded shadow border border-dashed">
+  <div class="text-xs text-gray-500 uppercase tracking-wide">Upstream Parity</div>
+  <div class="text-3xl font-bold text-gray-500 mt-1">—</div>
+  <div class="text-xs text-gray-500 mt-2">Not covered by the parity audit (no parity.manifest.toml or audit-pending).</div>
+</div>"#.to_string(),
+    };
+    let warning = if c.manifest_filled == Some(false) {
+        r#"<section class="mb-6 p-3 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800">
+  <strong>⚠ parity.manifest empty.</strong> The manifest declares an upstream
+  but no <code>[[files]]</code>/<code>[[functions]]</code>/<code>[[tests]]</code>/<code>[[surfaces]]</code>
+  mappings, so the parity calculator returns <code>0.0</code> regardless of how
+  much real code this crate ships. Fill in upstream→cave mappings (see
+  <a class="underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/full-audit-2026-05-01.md">audit doc</a>)
+  to unlock a real parity score.
+</section>"#.to_string()
+    } else {
+        String::new()
+    };
+    (card, warning)
+}
 
 /// Render the drill-down `/admin/compliance/<crate>` page.
 pub fn render_detail(
@@ -1108,17 +1511,24 @@ pub fn render_detail(
         ""
     };
 
+    let (parity_card, parity_warn) = render_parity_block(c);
+
     let body = format!(
         r#"<p class="mb-4"><a class="text-blue-700 underline" href="/admin/compliance">← back to dashboard</a></p>
 <header class="mb-6">
   <h1 class="text-2xl font-bold">{name}{badge}</h1>
   <p class="text-gray-600">upstream: {upstream}</p>
 </header>
-<section class="grid grid-cols-3 gap-4 mb-6">
+{warn}
+<section class="grid grid-cols-2 gap-4 mb-6">
   <div class="p-4 bg-white rounded shadow">
-    <div class="text-xs text-gray-500">4-TRACK SCORE</div>
-    <div class="text-3xl font-bold {score_color} px-2 inline-block rounded">{score}</div>
+    <div class="text-xs text-gray-500 uppercase tracking-wide">Structural Coverage</div>
+    <div class="text-3xl font-bold {score_color} px-2 inline-block rounded mt-1">{score}</div>
+    <div class="text-xs text-gray-500 mt-2">Backend + Portal + cavectl + Observability presence.</div>
   </div>
+  {parity_card}
+</section>
+<section class="grid grid-cols-2 gap-4 mb-6">
   <div class="p-4 bg-white rounded shadow">
     <div class="text-xs text-gray-500">STUB MARKERS</div>
     <div class="text-3xl font-bold">{stubs}</div>
@@ -1138,8 +1548,10 @@ pub fn render_detail(
         name = escape(&c.name),
         badge = infra_badge,
         upstream = escape(&upstream),
+        warn = parity_warn,
         score = c.four_track_score,
         score_color = cell_color(c.four_track_score),
+        parity_card = parity_card,
         stubs = c.unimplemented_count + c.todo_count + c.ignored_test_count,
         unimpl = c.unimplemented_count,
         todo = c.todo_count,
@@ -1406,6 +1818,9 @@ version = "7.2.0"
                     obs_dashboard_present: false,
                     four_track_score: 25,
                     infra_only: false,
+                    parity_ratio: None,
+                    manifest_filled: None,
+                    audit_tier: None,
                 },
             ],
         };
@@ -1469,8 +1884,10 @@ version = "7.2.0"
         };
         let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
         assert!(html.contains("line-by-line TDD"));
-        assert!(html.contains("GRADE"));
-        assert!(html.contains(">A<"));
+        // Dual-card header: structural grade + upstream parity grade.
+        assert!(html.contains("Structural Coverage"));
+        assert!(html.contains("Upstream Parity"));
+        assert!(html.contains("Grade A"));
         assert!(html.contains("cave-x"));
     }
 
@@ -1490,6 +1907,9 @@ version = "7.2.0"
             obs_dashboard_present: false,
             four_track_score: score,
             infra_only: false,
+            parity_ratio: None,
+            manifest_filled: None,
+            audit_tier: None,
         }
     }
 
@@ -1700,6 +2120,9 @@ version = "7.2.0"
                 obs_dashboard_present: false,
                 four_track_score: 87,
                 infra_only: false,
+                parity_ratio: Some(0.42),
+                manifest_filled: Some(true),
+                audit_tier: Some("B".into()),
             },
             ignored_tests: vec![IgnoredTest {
                 file: "crates/cave-x/src/lib.rs".into(),
@@ -1935,5 +2358,320 @@ version = "7.2.0"
             now + chrono::Duration::seconds(60), // future timestamp
         );
         assert!(!cached.is_stale(now, Duration::from_secs(1)));
+    }
+
+    // ---------------- parity-axis tests ----------------
+
+    fn parity_compliance(
+        name: &str,
+        score: u8,
+        ratio: Option<f64>,
+        filled: Option<bool>,
+        tier: Option<&str>,
+        infra: bool,
+    ) -> CrateCompliance {
+        let mut c = stub_compliance(name, score);
+        c.parity_ratio = ratio;
+        c.manifest_filled = filled;
+        c.audit_tier = tier.map(str::to_string);
+        c.infra_only = infra;
+        c
+    }
+
+    #[test]
+    fn compute_parity_grade_maps_buckets() {
+        assert_eq!(compute_parity_grade(1.0), 'A');
+        assert_eq!(compute_parity_grade(0.70), 'A');
+        assert_eq!(compute_parity_grade(0.69), 'B');
+        assert_eq!(compute_parity_grade(0.50), 'B');
+        assert_eq!(compute_parity_grade(0.49), 'C');
+        assert_eq!(compute_parity_grade(0.30), 'C');
+        assert_eq!(compute_parity_grade(0.29), 'D');
+        assert_eq!(compute_parity_grade(0.15), 'D');
+        assert_eq!(compute_parity_grade(0.14), 'F');
+        assert_eq!(compute_parity_grade(0.0), 'F');
+        // NaN and out-of-range inputs stay safe.
+        assert_eq!(compute_parity_grade(f64::NAN), 'F');
+        assert_eq!(compute_parity_grade(2.0), 'A'); // clamp
+        assert_eq!(compute_parity_grade(-0.5), 'F'); // clamp
+    }
+
+    #[test]
+    fn aggregate_parity_score_averages_only_measured_tier1() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                // Measured tier-1 contributors:
+                parity_compliance("a", 100, Some(1.0), Some(true), Some("100"), false),
+                parity_compliance("b", 100, Some(0.50), Some(true), Some("B"), false),
+                // Unmeasured tier-1 — must be ignored, NOT counted as 0:
+                parity_compliance("c", 75, None, None, None, false),
+                // Infra crate — excluded regardless:
+                parity_compliance("d", 100, Some(0.0), Some(false), Some("E"), true),
+            ],
+        };
+        // Mean of (1.0, 0.50) = 0.75 → 75.
+        assert_eq!(snap.aggregate_parity_score(), 75);
+        assert_eq!(snap.parity_grade(), 'A');
+        assert_eq!(snap.parity_measured_count(), 2);
+    }
+
+    #[test]
+    fn aggregate_parity_score_is_zero_when_nothing_measured() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("a", 100, None, None, None, false),
+                parity_compliance("b", 25, None, None, None, false),
+            ],
+        };
+        assert_eq!(snap.aggregate_parity_score(), 0);
+        assert_eq!(snap.parity_grade(), 'F');
+        assert_eq!(snap.parity_measured_count(), 0);
+    }
+
+    #[test]
+    fn manifest_fill_ratio_is_fraction_of_known_filled() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("a", 100, Some(0.4), Some(true), Some("A"), false),
+                parity_compliance("b", 100, Some(0.0), Some(false), Some("C"), false),
+                parity_compliance("c", 100, Some(0.0), Some(false), Some("C"), false),
+                parity_compliance("d", 100, None, None, None, true), // infra excluded
+            ],
+        };
+        // 1 filled / 3 tier-1-with-known-state = 0.333…
+        let ratio = snap.manifest_fill_ratio();
+        assert!((ratio - 1.0 / 3.0).abs() < 1e-9, "got {ratio}");
+    }
+
+    #[test]
+    fn parse_parity_index_json_round_trips_audit_doc_snapshot() {
+        // The embedded parity-index.json must round-trip and surface the
+        // canonical Tier ✅ crates with ratio 1.0.
+        let m = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
+        for name in ["cave-apiserver", "cave-cri", "cave-etcd", "cave-kubelet", "cave-scheduler"] {
+            let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
+            assert_eq!(e.tier, "100", "{name} should be tier 100");
+            assert_eq!(e.parity_ratio, Some(1.0));
+            assert_eq!(e.manifest_filled, Some(true));
+        }
+        let vault = m.get("cave-vault").unwrap();
+        assert_eq!(vault.tier, "A");
+        assert!(vault.parity_ratio.unwrap() > 0.6 && vault.parity_ratio.unwrap() < 0.7);
+        // Empty-manifest Tier C example: cave-net.
+        let net = m.get("cave-net").unwrap();
+        assert_eq!(net.tier, "C");
+        assert_eq!(net.parity_ratio, Some(0.0));
+        assert_eq!(net.manifest_filled, Some(false));
+    }
+
+    #[test]
+    fn parse_parity_index_json_returns_empty_on_garbage() {
+        assert!(parse_parity_index_json("not json").is_empty());
+        assert!(parse_parity_index_json("").is_empty());
+    }
+
+    #[test]
+    fn attach_parity_index_stamps_fields_on_match_only() {
+        let mut snap = ComplianceSnapshot {
+            crates: vec![
+                stub_compliance("cave-apiserver", 100),
+                stub_compliance("cave-unknown-by-audit", 87),
+            ],
+        };
+        let index = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
+        attach_parity_index(&mut snap, &index);
+        let api = snap.crates.iter().find(|c| c.name == "cave-apiserver").unwrap();
+        assert_eq!(api.parity_ratio, Some(1.0));
+        assert_eq!(api.audit_tier.as_deref(), Some("100"));
+        let unknown = snap
+            .crates
+            .iter()
+            .find(|c| c.name == "cave-unknown-by-audit")
+            .unwrap();
+        assert!(unknown.parity_ratio.is_none());
+        assert!(unknown.audit_tier.is_none());
+    }
+
+    #[test]
+    fn view_query_sort_by_parity_orders_worst_first_then_unmeasured() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("c-good", 100, Some(0.9), Some(true), Some("A"), false),
+                parity_compliance("b-bad", 100, Some(0.1), Some(true), Some("B"), false),
+                parity_compliance("d-unknown", 100, None, None, None, false),
+                parity_compliance("a-empty", 100, Some(0.0), Some(false), Some("C"), false),
+            ],
+        };
+        let view = ViewQuery {
+            sort: SortKey::Parity,
+            filter: FilterMode::All,
+        };
+        let names: Vec<String> = view.apply(&snap).into_iter().map(|c| c.name).collect();
+        // a-empty (0.0) before b-bad (0.1) before c-good (0.9) before d-unknown (None).
+        assert_eq!(names, vec!["a-empty", "b-bad", "c-good", "d-unknown"]);
+    }
+
+    #[test]
+    fn view_query_filter_manifest_empty_keeps_only_empty_tier1() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("empty1", 100, Some(0.0), Some(false), Some("C"), false),
+                parity_compliance("filled", 100, Some(0.5), Some(true), Some("A"), false),
+                parity_compliance("unknown", 100, None, None, None, false),
+                parity_compliance("infra", 100, Some(0.0), Some(false), Some("E"), true),
+            ],
+        };
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::ManifestEmpty,
+        };
+        let names: Vec<String> = view.apply(&snap).into_iter().map(|c| c.name).collect();
+        assert_eq!(names, vec!["empty1"]);
+    }
+
+    #[test]
+    fn view_query_filter_parity_measured_keeps_only_positive_ratio_tier1() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("zero", 100, Some(0.0), Some(false), Some("C"), false),
+                parity_compliance("partial", 100, Some(0.25), Some(true), Some("B"), false),
+                parity_compliance("perfect", 100, Some(1.0), Some(true), Some("100"), false),
+                parity_compliance("unknown", 100, None, None, None, false),
+            ],
+        };
+        let view = ViewQuery {
+            sort: SortKey::Name,
+            filter: FilterMode::ParityMeasured,
+        };
+        let names: Vec<String> = view.apply(&snap).into_iter().map(|c| c.name).collect();
+        assert_eq!(names, vec!["partial", "perfect"]);
+    }
+
+    #[test]
+    fn render_dashboard_shows_dual_grade_cards_and_parity_column() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/DualGrade.tsx",
+            "dualGrade",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                parity_compliance("cave-apiserver", 100, Some(1.0), Some(true), Some("100"), false),
+                parity_compliance("cave-portal", 100, Some(0.25), Some(true), Some("B"), false),
+            ],
+        };
+        let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        // Both cards present.
+        assert!(html.contains("Structural Coverage"));
+        assert!(html.contains("Upstream Parity"));
+        // Structural grade A (avg 100) + parity grade B (avg 0.625) both render.
+        assert!(html.contains("Grade A"), "expected structural Grade A");
+        assert!(html.contains("Grade B"), "expected parity Grade B");
+        // Per-row parity % shows up.
+        assert!(html.contains("100%"));
+        assert!(html.contains("25%"));
+        // Manifest fill section appears.
+        assert!(html.contains("Manifest fill:"));
+    }
+
+    #[test]
+    fn render_dashboard_shows_dash_for_unmeasured_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Unmeasured.tsx",
+            "unmeasured",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![parity_compliance("cave-unmeasured", 87, None, None, None, false)],
+        };
+        let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("not covered by parity audit"));
+    }
+
+    #[test]
+    fn render_detail_shows_parity_card_and_warning_for_empty_manifest() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/EmptyManifestBanner.tsx",
+            "emptyBanner",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: parity_compliance(
+                "cave-net",
+                100,
+                Some(0.0),
+                Some(false),
+                Some("C"),
+                false,
+            ),
+            ignored_tests: vec![],
+            parity_manifest_raw: Some("[upstream]\norg = \"cilium\"\n".into()),
+            recent_commits: vec![],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("Upstream Parity"));
+        assert!(html.contains("parity.manifest empty"));
+        assert!(html.contains("audit tier"));
+    }
+
+    /// Diagnostic-only: runs against the real workspace and prints the
+    /// dual-grade snapshot. Ignored by default so CI doesn't depend on
+    /// the audit JSON being checked in; run with
+    /// `cargo test -p cave-portal -- --ignored --nocapture
+    /// live_snapshot_dual_grade_prints`.
+    #[test]
+    #[ignore = "diagnostic — prints against the real workspace"]
+    fn live_snapshot_dual_grade_prints() {
+        let snap = live_snapshot();
+        println!("crates total        : {}", snap.crates.len());
+        println!("tier-1 count        : {}", snap.tier1_count());
+        println!("infra count         : {}", snap.infra_count());
+        println!(
+            "structural          : {} (Grade {})",
+            snap.aggregate_score(),
+            snap.grade()
+        );
+        println!(
+            "parity              : {} (Grade {})",
+            snap.aggregate_parity_score(),
+            snap.parity_grade()
+        );
+        println!(
+            "parity measured     : {} / {}",
+            snap.parity_measured_count(),
+            snap.tier1_count()
+        );
+        println!(
+            "manifest fill ratio : {:.1}%",
+            snap.manifest_fill_ratio() * 100.0
+        );
+        println!("total stubs         : {}", snap.total_stub_count());
+        let perfect: Vec<&str> = snap
+            .crates
+            .iter()
+            .filter(|c| c.parity_ratio == Some(1.0))
+            .map(|c| c.name.as_str())
+            .collect();
+        println!("at 100% parity      : {} → {:?}", perfect.len(), perfect);
+    }
+
+    #[test]
+    fn render_detail_shows_infra_parity_label_for_infra_crate() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/InfraParity.tsx",
+            "infraParity",
+            "acme"
+        );
+        let detail = CrateDetail {
+            compliance: parity_compliance("cave-runtime", 100, None, None, Some("E"), true),
+            ignored_tests: vec![],
+            parity_manifest_raw: None,
+            recent_commits: vec![],
+        };
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(html.contains("Upstream Parity"));
+        assert!(html.contains("Infrastructure-only crate"));
+        // No misleading empty-manifest warning for infra crates.
+        assert!(!html.contains("parity.manifest empty"));
     }
 }
