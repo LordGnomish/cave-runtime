@@ -18,6 +18,8 @@ use tracing::info;
 mod cluster;
 mod cluster_runtime;
 mod portal;
+mod raft_apply;
+mod raft_command;
 mod raft_core;
 mod raft_driver;
 mod raft_transport;
