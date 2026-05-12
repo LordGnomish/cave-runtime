@@ -136,6 +136,65 @@ pub struct VaultAuditEntry {
     pub path: String,
 }
 
+/// A mounted secrets engine — mirrors `GET /v1/sys/mounts` in the
+/// Vault HTTP API. Engines are the Vault concept that determines
+/// HOW a path's secrets are stored (kv-v2, transit, pki, database, …).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultSecretsEngine {
+    pub tenant: TenantId,
+    /// Mount path (e.g. `kv/` or `pki-int/`). Includes trailing slash
+    /// per Vault convention.
+    pub path: String,
+    /// Engine type identifier (`kv`, `pki`, `transit`, `database`, …).
+    pub engine_type: String,
+    /// Optional engine version (KV mounts carry `version=2` etc.).
+    pub version: u32,
+    /// Default TTL applied to leases issued by this mount, in seconds.
+    /// `0` means inherit from the Vault default.
+    pub default_lease_ttl_s: u64,
+    /// Sealed-status indicator: `true` means the mount is currently
+    /// usable, `false` means it was disabled or seal-wrapped.
+    pub enabled: bool,
+}
+
+/// A mounted auth method — mirrors `GET /v1/sys/auth`. Auth methods
+/// determine HOW a caller authenticates (token, userpass, kubernetes,
+/// approle, oidc, …). The `vault_auth_methods` collection lists
+/// every mount in the tenant; the `accessor` field is the unique
+/// stable identifier Vault uses in audit logs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultAuthMethod {
+    pub tenant: TenantId,
+    /// Mount path (e.g. `userpass/`, `kubernetes/`).
+    pub path: String,
+    /// Method type identifier (`token`, `userpass`, `kubernetes`,
+    /// `approle`, `oidc`, …).
+    pub method_type: String,
+    /// Vault-issued stable identifier (used in audit logs to identify
+    /// the mount even across rename).
+    pub accessor: String,
+    /// Default TTL for tokens issued by this method, in seconds.
+    pub default_lease_ttl_s: u64,
+    /// `true` if the mount is currently active.
+    pub enabled: bool,
+}
+
+/// A named policy — mirrors `GET /v1/sys/policies/acl/<name>`. Vault
+/// policies are HCL documents; the `rules` field carries the rendered
+/// text so the UI can show the same content `vault policy read` would.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VaultPolicy {
+    pub tenant: TenantId,
+    pub name: String,
+    /// HCL policy body. May be multi-line; the UI escapes it before
+    /// rendering.
+    pub rules: String,
+    /// Number of tokens currently bound to this policy. Surfaced so
+    /// an operator can see at a glance whether deleting the policy
+    /// would orphan access.
+    pub bound_token_count: u32,
+}
+
 // ── keda ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1005,6 +1064,10 @@ pub struct AdminState {
     pub pg_tables: RwLock<Vec<PgTable>>,
     pub vault_secrets: RwLock<Vec<VaultSecretMeta>>,
     pub vault_audit: RwLock<Vec<VaultAuditEntry>>,
+    // 2026-05-12 batch: rich Vault UI surface (engines + auth + policies).
+    pub vault_engines: RwLock<Vec<VaultSecretsEngine>>,
+    pub vault_auth_methods: RwLock<Vec<VaultAuthMethod>>,
+    pub vault_policies: RwLock<Vec<VaultPolicy>>,
     pub keda_scaled_objects: RwLock<Vec<KedaScaledObject>>,
     pub keda_scaler_events: RwLock<Vec<KedaScalerEvent>>,
     // 2026-05-12 batch: rich CRD-shaped KEDA detail surface.
@@ -1175,6 +1238,9 @@ impl AdminState {
             pg_tables: RwLock::new(Vec::new()),
             vault_secrets: RwLock::new(Vec::new()),
             vault_audit: RwLock::new(Vec::new()),
+            vault_engines: RwLock::new(Vec::new()),
+            vault_auth_methods: RwLock::new(Vec::new()),
+            vault_policies: RwLock::new(Vec::new()),
             keda_scaled_objects: RwLock::new(Vec::new()),
             keda_scaler_events: RwLock::new(Vec::new()),
             keda_scaled_object_details: RwLock::new(Vec::new()),
@@ -1319,6 +1385,49 @@ impl AdminState {
         s.vault_audit.write().unwrap().extend([
             VaultAuditEntry { tenant: acme.clone(), time_unix: 1_000_001, principal: "alice".into(), op: "read-meta", path: "kv/db".into() },
             VaultAuditEntry { tenant: acme.clone(), time_unix: 1_000_010, principal: "bob".into(), op: "read-meta", path: "kv/api".into() },
+        ]);
+        s.vault_engines.write().unwrap().extend([
+            VaultSecretsEngine { tenant: acme.clone(), path: "kv/".into(), engine_type: "kv".into(), version: 2, default_lease_ttl_s: 0, enabled: true },
+            VaultSecretsEngine { tenant: acme.clone(), path: "transit/".into(), engine_type: "transit".into(), version: 1, default_lease_ttl_s: 0, enabled: true },
+            VaultSecretsEngine { tenant: acme.clone(), path: "pki-int/".into(), engine_type: "pki".into(), version: 1, default_lease_ttl_s: 86400, enabled: true },
+            VaultSecretsEngine { tenant: acme.clone(), path: "database/".into(), engine_type: "database".into(), version: 1, default_lease_ttl_s: 3600, enabled: true },
+            VaultSecretsEngine { tenant: acme.clone(), path: "legacy-kv/".into(), engine_type: "kv".into(), version: 1, default_lease_ttl_s: 0, enabled: false },
+            // Foreign tenant — must be filtered out by tenant scoping.
+            VaultSecretsEngine { tenant: evil.clone(), path: "kv/".into(), engine_type: "kv".into(), version: 2, default_lease_ttl_s: 0, enabled: true },
+        ]);
+        s.vault_auth_methods.write().unwrap().extend([
+            VaultAuthMethod { tenant: acme.clone(), path: "token/".into(), method_type: "token".into(), accessor: "auth_token_a1".into(), default_lease_ttl_s: 0, enabled: true },
+            VaultAuthMethod { tenant: acme.clone(), path: "userpass/".into(), method_type: "userpass".into(), accessor: "auth_userpass_b2".into(), default_lease_ttl_s: 3600, enabled: true },
+            VaultAuthMethod { tenant: acme.clone(), path: "kubernetes/".into(), method_type: "kubernetes".into(), accessor: "auth_kubernetes_c3".into(), default_lease_ttl_s: 1800, enabled: true },
+            VaultAuthMethod { tenant: acme.clone(), path: "approle/".into(), method_type: "approle".into(), accessor: "auth_approle_d4".into(), default_lease_ttl_s: 1800, enabled: true },
+            VaultAuthMethod { tenant: acme.clone(), path: "oidc/".into(), method_type: "oidc".into(), accessor: "auth_oidc_e5".into(), default_lease_ttl_s: 3600, enabled: false },
+            VaultAuthMethod { tenant: evil.clone(), path: "token/".into(), method_type: "token".into(), accessor: "auth_token_evil".into(), default_lease_ttl_s: 0, enabled: true },
+        ]);
+        s.vault_policies.write().unwrap().extend([
+            VaultPolicy {
+                tenant: acme.clone(),
+                name: "default".into(),
+                rules: r#"path "kv/data/*" { capabilities = ["read", "list"] }"#.into(),
+                bound_token_count: 12,
+            },
+            VaultPolicy {
+                tenant: acme.clone(),
+                name: "db-admin".into(),
+                rules: r#"path "database/creds/*" { capabilities = ["read"] }"#.into(),
+                bound_token_count: 3,
+            },
+            VaultPolicy {
+                tenant: acme.clone(),
+                name: "pki-ca".into(),
+                rules: r#"path "pki-int/issue/*" { capabilities = ["create", "update"] }"#.into(),
+                bound_token_count: 1,
+            },
+            VaultPolicy {
+                tenant: evil.clone(),
+                name: "evil-default".into(),
+                rules: r#"path "kv/*" { capabilities = ["read", "write"] }"#.into(),
+                bound_token_count: 1,
+            },
         ]);
         s.keda_scaled_objects.write().unwrap().extend([
             KedaScaledObject {

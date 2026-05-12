@@ -390,8 +390,8 @@ local_path    = "/api/gitops/pipelines/{request_id}"
 [portal_ui]
 upstream_ui  = "Flux (CLI)"
 upstream_url = "https://fluxcd.io/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 238
 priority     = "P2"
 notes        = "CLI-first"
 last_audit   = "2026-05-11"

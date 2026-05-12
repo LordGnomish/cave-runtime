@@ -146,9 +146,19 @@ META: dict[str, dict] = {
     "cave-tenant-dashboard":{"upstream_ui": "(cave-original)", "url": "(internal)", "priority": "P2", "notes": "Internal tenant UI"},
 }
 
-# Promotion list — admin pages hand-reviewed and confirmed as a faithful
-# upstream-UI port. Empty today; expand as ports land.
-COMPLETE: set[str] = set()
+# Promotion list — admin pages hand-reviewed and confirmed as a
+# faithful upstream-UI port. Promoted on 2026-05-12 after the
+# 11-crate P0 expansion batch (see commits
+# `feat(portal): expand <N> admin pages …`):
+#
+# * `cave-vault` — folder-split (mod / secrets_engines / auth_methods /
+#   policies / kv_browser / audit) mirroring Vault's four UI tabs
+#   plus the secrets-engine mount list. Plaintext-protection
+#   invariant preserved.
+# * `cave-mesh` — Kiali-faithful aggregations: workloads (by source)
+#   + services (by destination, with health classification) + authz
+#   + flows. 484 LOC, 13 tests.
+COMPLETE: set[str] = {"cave-vault", "cave-mesh"}
 
 SCORE_VALUE = {"none": 0, "scaffold": 25, "partial": 60, "complete": 100}
 
@@ -157,17 +167,41 @@ def admin_short(crate: str) -> str:
     return crate.removeprefix("cave-").replace("-", "_")
 
 
-def admin_path(crate: str) -> Path:
-    return ADMIN / f"{admin_short(crate)}.rs"
+def admin_path(crate: str) -> Path | None:
+    """Return the admin entry point for `crate`. Some admin views are
+    a single `.rs` file, others (vault, keda) live under a folder
+    with a `mod.rs`. This helper picks whichever shape exists, or
+    returns `None` when neither does."""
+    short = admin_short(crate)
+    single = ADMIN / f"{short}.rs"
+    if single.is_file():
+        return single
+    folder_mod = ADMIN / short / "mod.rs"
+    if folder_mod.is_file():
+        return folder_mod
+    return None
 
 
-def admin_loc(p: Path) -> int:
-    if not p.is_file():
-        return 0
-    try:
-        return sum(1 for _ in p.open(encoding="utf-8"))
-    except OSError:
-        return 0
+def admin_loc(crate: str) -> int:
+    """Total `.rs` LOC for `crate`'s admin view. For folder-shaped
+    views, sums every `.rs` under `admin/<short>/`."""
+    short = admin_short(crate)
+    single = ADMIN / f"{short}.rs"
+    if single.is_file():
+        try:
+            return sum(1 for _ in single.open(encoding="utf-8"))
+        except OSError:
+            return 0
+    folder = ADMIN / short
+    if folder.is_dir():
+        total = 0
+        for f in folder.rglob("*.rs"):
+            try:
+                total += sum(1 for _ in f.open(encoding="utf-8"))
+            except OSError:
+                continue
+        return total
+    return 0
 
 
 def score_for(crate: str, loc: int) -> str:
@@ -196,12 +230,12 @@ def emit_rows() -> list[dict]:
         if crate in INFRA_ONLY:
             continue
         ap = admin_path(crate)
-        loc = admin_loc(ap)
+        loc = admin_loc(crate)
         meta = META.get(crate, {})
         score = score_for(crate, loc)
         rows.append({
             "crate": crate,
-            "has_admin": "✓" if ap.is_file() else "—",
+            "has_admin": "✓" if ap is not None else "—",
             "upstream_ui": meta.get("upstream_ui", "(unmapped)"),
             "url": meta.get("url", "—"),
             "score": score,

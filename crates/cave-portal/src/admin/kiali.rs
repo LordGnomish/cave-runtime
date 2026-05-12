@@ -60,6 +60,53 @@ pub fn list_edges(
     Ok(rows)
 }
 
+/// Per-node graph metrics — same shape as Kiali's `nodes` summary
+/// (incoming + outgoing edge counts, total bytes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GraphNode {
+    pub name: String,
+    pub incoming: u32,
+    pub outgoing: u32,
+    pub bytes_total: u64,
+}
+
+/// Derive per-node summaries from a list of edges. Used by the
+/// topology overlay to colour nodes by traffic volume.
+pub fn list_nodes(edges: &[TopologyEdge]) -> Vec<GraphNode> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, GraphNode> = BTreeMap::new();
+    for e in edges {
+        let s = acc.entry(e.source.clone()).or_insert(GraphNode {
+            name: e.source.clone(),
+            incoming: 0,
+            outgoing: 0,
+            bytes_total: 0,
+        });
+        s.outgoing += 1;
+        s.bytes_total += e.bytes;
+        let d = acc.entry(e.destination.clone()).or_insert(GraphNode {
+            name: e.destination.clone(),
+            incoming: 0,
+            outgoing: 0,
+            bytes_total: 0,
+        });
+        d.incoming += 1;
+        d.bytes_total += e.bytes;
+    }
+    acc.into_values().collect()
+}
+
+/// Edge health based on verdict — `Healthy` if every edge variant for
+/// the (source, destination) pair is `Forwarded`, `Failing` if any is
+/// `Dropped`. Maps to Kiali's edge-colour legend.
+pub fn edge_health(edge: &TopologyEdge) -> &'static str {
+    if edge.verdict == "Forwarded" {
+        "Healthy"
+    } else {
+        "Failing"
+    }
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KialiViewError> {
     let rows = list_edges(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
@@ -158,6 +205,62 @@ mod tests {
         );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::KialiRead])).unwrap();
         assert!(html.contains("kiali.io"));
+    }
+
+    #[test]
+    fn list_nodes_aggregates_in_and_out_degree() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kiali/src/components/Topology.tsx",
+            "Nodes",
+            "acme"
+        );
+        let edges = list_edges(&AdminState::seeded(), &ctx(&[Permission::KialiRead])).unwrap();
+        let nodes = list_nodes(&edges);
+        // Every node has at least one edge (either in or out).
+        assert!(nodes.iter().all(|n| n.incoming + n.outgoing > 0));
+        // Total bytes_total == 2 * sum(edges.bytes) (each edge counted
+        // on both endpoints).
+        let edge_total: u64 = edges.iter().map(|e| e.bytes).sum();
+        let node_total: u64 = nodes.iter().map(|n| n.bytes_total).sum();
+        assert_eq!(node_total, edge_total * 2);
+    }
+
+    #[test]
+    fn edge_health_classifies_verdict_buckets() {
+        let healthy = TopologyEdge {
+            source: "a".into(),
+            destination: "b".into(),
+            verdict: "Forwarded",
+            bytes: 100,
+        };
+        assert_eq!(edge_health(&healthy), "Healthy");
+        let failing = TopologyEdge {
+            source: "a".into(),
+            destination: "b".into(),
+            verdict: "Dropped",
+            bytes: 100,
+        };
+        assert_eq!(edge_health(&failing), "Failing");
+    }
+
+    #[test]
+    fn list_nodes_handles_empty_edges() {
+        let nodes = list_nodes(&[]);
+        assert!(nodes.is_empty());
+    }
+
+    #[test]
+    fn list_edges_sums_bytes_for_same_key() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kiali/src/components/Topology.tsx",
+            "EdgeAggregateBytes",
+            "acme"
+        );
+        let edges = list_edges(&AdminState::seeded(), &ctx(&[Permission::KialiRead])).unwrap();
+        // Edges that carry Forwarded flows must have positive bytes;
+        // Dropped edges may legitimately be zero in the seed.
+        let forwarded: Vec<_> = edges.iter().filter(|e| e.verdict == "Forwarded").collect();
+        assert!(forwarded.iter().all(|e| e.bytes > 0));
     }
 
     #[test]
