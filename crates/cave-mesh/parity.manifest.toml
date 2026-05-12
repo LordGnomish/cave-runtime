@@ -52,8 +52,8 @@ local    = "src/ambient/telemetry.rs"
 [portal_ui]
 upstream_ui  = "Kiali (Istio)"
 upstream_url = "https://kiali.io/"
-status       = "partial"
-loc          = 211
+status       = "complete"
+loc          = 484
 priority     = "P0"
 notes        = "Service-mesh topology; covered by admin/kiali.rs"
 last_audit   = "2026-05-11"

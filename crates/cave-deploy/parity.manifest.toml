@@ -354,8 +354,8 @@ local_path    = "/api/deploy/webhook"
 [portal_ui]
 upstream_ui  = "Argo CD UI"
 upstream_url = "https://argo-cd.readthedocs.io/en/stable/user-guide/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 261
 priority     = "P1"
 notes        = "Application sync graph"
 last_audit   = "2026-05-11"

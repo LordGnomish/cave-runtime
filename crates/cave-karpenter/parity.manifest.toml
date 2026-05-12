@@ -45,8 +45,8 @@ target_tests = 30        # qwen-pump B-prime target
 [portal_ui]
 upstream_ui  = "(CRD-only)"
 upstream_url = "https://karpenter.sh/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 219
 priority     = "P2"
 notes        = "karpenter is CRD"
 last_audit   = "2026-05-11"

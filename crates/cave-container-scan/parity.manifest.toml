@@ -316,8 +316,8 @@ local_path    = "/api/container-scan/stats"
 [portal_ui]
 upstream_ui  = "Trivy (CLI)"
 upstream_url = "https://trivy.dev/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 219
 priority     = "P2"
 notes        = "CLI-first"
 last_audit   = "2026-05-11"
