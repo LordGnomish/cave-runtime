@@ -2451,13 +2451,27 @@ version = "7.2.0"
         // manifest state (license + [parity] block present), so the
         // Tier C cave-net example below now reports `true` rather than
         // its original audit-doc `false`.
+        //
+        // cave-etcd is special: the 2026-05-12 inventory expansion
+        // replaced its wave3 self-reported `parity_ratio = 1.0` with a
+        // measured `fill_ratio = 0.9155` (30 mapped + 35 skipped of 71
+        // total packages). The disk-overlay treats the newer
+        // `last_audit` as authoritative, including for honest downgrades.
         let m = parse_parity_index_json(PARITY_INDEX_EMBEDDED);
-        for name in ["cave-apiserver", "cave-cri", "cave-etcd", "cave-kubelet", "cave-scheduler"] {
+        for name in ["cave-apiserver", "cave-cri", "cave-kubelet", "cave-scheduler"] {
             let e = m.get(name).unwrap_or_else(|| panic!("missing {name}"));
             assert_eq!(e.tier, "100", "{name} should be tier 100");
             assert_eq!(e.parity_ratio, Some(1.0));
             assert_eq!(e.manifest_filled, Some(true));
         }
+        let etcd = m.get("cave-etcd").unwrap();
+        assert_eq!(etcd.tier, "100");
+        assert_eq!(etcd.manifest_filled, Some(true));
+        let etcd_ratio = etcd.parity_ratio.expect("cave-etcd has a measured ratio");
+        assert!(
+            (etcd_ratio - 0.9155).abs() < 1e-3,
+            "cave-etcd ratio = {etcd_ratio}, expected ~0.9155"
+        );
         let vault = m.get("cave-vault").unwrap();
         assert_eq!(vault.tier, "A");
         assert!(vault.parity_ratio.unwrap() > 0.6 && vault.parity_ratio.unwrap() < 0.7);

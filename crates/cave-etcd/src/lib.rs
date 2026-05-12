@@ -84,6 +84,7 @@ pub mod snap_db;
 pub mod snapshot_stream;
 pub mod snapshot_wire;
 pub mod store;
+pub mod wal;
 pub mod watch_filters;
 
 #[cfg(test)]
