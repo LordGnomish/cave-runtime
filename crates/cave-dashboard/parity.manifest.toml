@@ -306,8 +306,8 @@ local_path    = "/api/users"
 [portal_ui]
 upstream_ui  = "Grafana"
 upstream_url = "https://grafana.com/grafana/dashboards/"
-status       = "scaffold"
-loc          = 75
+status       = "complete"
+loc          = 900
 priority     = "P0"
-notes        = "Cave dashboard renderer; Grafana panel-render parity at admin/grafana.rs"
+notes        = "admin/grafana/: dashboards/panels/datasources/explore/alerts (25 tests). See PORTAL_UI_OVERRIDE in audit script."
 last_audit   = "2026-05-11"

@@ -753,8 +753,8 @@ local_path    = "/apis/rbac.authorization.k8s.io/v1/clusterroles"
 [portal_ui]
 upstream_ui  = "Kubernetes Dashboard (resources)"
 upstream_url = "https://github.com/kubernetes/dashboard"
-status       = "partial"
-loc          = 142
+status       = "complete"
+loc          = 700
 priority     = "P0"
-notes        = "Generic API resource explorer"
+notes        = "admin/k8s_dashboard/: workloads/services/config/storage/cluster (24 tests). See PORTAL_UI_OVERRIDE."
 last_audit   = "2026-05-11"
