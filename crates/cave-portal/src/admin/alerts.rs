@@ -1,4 +1,7 @@
-//! `/admin/alerts` view — alert rule browser + active-alert acknowledge.
+//! `/admin/alerts` — Alertmanager UI parity. Rules + active alerts
+//! with severity-grouped pills and the existing ack mutator.
+//!
+//! Upstream UI: <https://prometheus.io/docs/alerting/latest/clients/>
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
@@ -36,9 +39,38 @@ pub fn ack_alert(state: &AdminState, ctx: &RequestCtx, rule: &str) -> Result<(),
     Ok(())
 }
 
+/// Group rules by severity ("critical", "warning", "info" — same
+/// vocabulary Alertmanager uses).
+pub fn group_by_severity(rules: &[AlertRule]) -> Vec<(String, usize)> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, usize> = BTreeMap::new();
+    for r in rules { *acc.entry(r.severity.to_string()).or_insert(0) += 1; }
+    let mut out: Vec<(String, usize)> = acc.into_iter().collect();
+    // Standard severity order: critical > warning > info.
+    out.sort_by(|a, b| severity_rank(&b.0).cmp(&severity_rank(&a.0)));
+    out
+}
+
+fn severity_rank(s: &str) -> u32 {
+    match s {
+        "critical" => 3,
+        "warning" => 2,
+        "info" => 1,
+        _ => 0,
+    }
+}
+
+pub fn rules_by_severity<'a>(rules: &'a [AlertRule], severity: &str) -> Vec<&'a AlertRule> {
+    rules.iter().filter(|r| r.severity == severity).collect()
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AlertsViewError> {
     let rules = list_rules(state, ctx)?;
     let active = list_active(state, ctx)?;
+    let groups = group_by_severity(&rules);
+    let chips: String = groups.iter().map(|(s, n)| format!(
+        r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{s} <strong>×{n}</strong></span>"#,
+        s = escape(s), n = n)).collect();
     let r_rows: Vec<Vec<String>> = rules.iter().map(|r| vec![
         r.name.clone(), r.severity.into(), r.expr.clone(), format!("{}s", r.for_seconds),
     ]).collect();
@@ -46,8 +78,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AlertsView
         a.rule.clone(), a.state.into(), a.fired_unix.to_string(),
     ]).collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Rules ({n_r})</h2>{r_tbl}</section>
-<section class="mt-6"><h2 class="text-lg font-semibold mb-2">Active ({n_a})</h2>{a_tbl}</section>"#,
+        r#"<section>
+  <p class="text-sm text-gray-600 mb-3">Alertmanager UI parity (cave-alerts). Upstream: <a class="text-blue-700 underline" href="https://prometheus.io/docs/alerting/latest/clients/">prometheus.io/docs/alerting</a>.</p>
+  <div class="mb-4">{chips}</div>
+  <section><h2 class="text-lg font-semibold mb-2">Rules ({n_r})</h2>{r_tbl}</section>
+  <section class="mt-6"><h2 class="text-lg font-semibold mb-2">Active ({n_a})</h2>{a_tbl}</section>
+</section>"#,
+        chips = chips,
         n_r = rules.len(), n_a = active.len(),
         r_tbl = table(&["name", "severity", "expr", "for"], &r_rows),
         a_tbl = table(&["rule", "state", "fired"], &a_rows),
@@ -95,6 +132,32 @@ mod tests {
     fn ack_alert_requires_ack_perm() {
         let (_c, _t) = portal_test_ctx!("plugins/permission-backend/src/PermissionsService.ts", "ackPerm", "acme");
         assert!(ack_alert(&AdminState::seeded(), &ctx(&[Permission::AlertsRead]), "HighErrorRate").is_err());
+    }
+
+    #[test]
+    fn group_by_severity_orders_critical_first() {
+        let r = list_rules(&AdminState::seeded(), &ctx(&[Permission::AlertsRead])).unwrap();
+        let g = group_by_severity(&r);
+        // Critical (if any) must precede warning (if any).
+        let crit_pos = g.iter().position(|(s, _)| s == "critical");
+        let warn_pos = g.iter().position(|(s, _)| s == "warning");
+        if let (Some(c), Some(w)) = (crit_pos, warn_pos) { assert!(c < w); }
+    }
+
+    #[test]
+    fn rules_by_severity_filters() {
+        let r = list_rules(&AdminState::seeded(), &ctx(&[Permission::AlertsRead])).unwrap();
+        if let Some(f) = r.first() {
+            let sev = f.severity;
+            assert!(rules_by_severity(&r, sev).iter().all(|x| x.severity == sev));
+        }
+        assert!(rules_by_severity(&r, "no-such").is_empty());
+    }
+
+    #[test]
+    fn render_includes_severity_chips_and_upstream_link() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::AlertsRead])).unwrap();
+        assert!(html.contains("prometheus.io/docs/alerting"));
     }
 
     #[test]

@@ -1,4 +1,7 @@
-//! `/admin/workflows` view — workflow run browser (Argo Workflows / Temporal parity).
+//! `/admin/workflows` — n8n editor parity (Argo Workflows / Temporal
+//! sibling). Workflow run browser with status cards + duration aggregate.
+//!
+//! Upstream UI: <https://docs.n8n.io/>
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
@@ -23,16 +26,51 @@ pub fn runs_for(state: &AdminState, ctx: &RequestCtx, name: &str) -> Result<Vec<
     Ok(list_runs(state, ctx)?.into_iter().filter(|r| r.name == name).collect())
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct WorkflowSummary {
+    pub total: u32,
+    pub running: u32,
+    pub succeeded: u32,
+    pub failed: u32,
+}
+
+pub fn workflow_summary(rows: &[WorkflowRun]) -> WorkflowSummary {
+    let mut s = WorkflowSummary { total: rows.len() as u32, ..Default::default() };
+    for r in rows {
+        match r.status {
+            "Running" | "Pending" => s.running += 1,
+            "Succeeded" => s.succeeded += 1,
+            "Failed" => s.failed += 1,
+            _ => {}
+        }
+    }
+    s
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, WorkflowsViewError> {
     let runs = list_runs(state, ctx)?;
+    let summary = workflow_summary(&runs);
     let rows: Vec<Vec<String>> = runs.iter().map(|r| vec![
         r.name.clone(), r.run_id.clone(), r.status.into(),
         r.started_unix.to_string(),
         r.finished_unix.map(|f| f.to_string()).unwrap_or_else(|| "—".into()),
     ]).collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Workflow runs ({n})</h2>{tbl}</section>"#,
+        r#"<section>
+  <p class="text-sm text-gray-600 mb-3">n8n editor / Argo Workflows (cave-workflows). Upstream: <a class="text-blue-700 underline" href="https://docs.n8n.io/">docs.n8n.io</a>.</p>
+  <div class="mb-4 grid grid-cols-4 gap-2 text-center text-sm">
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">TOTAL</div><div class="text-2xl font-bold">{total}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">RUNNING</div><div class="text-2xl font-bold text-blue-700">{running}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">SUCCEEDED</div><div class="text-2xl font-bold text-green-700">{succeeded}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">FAILED</div><div class="text-2xl font-bold text-red-700">{failed}</div></div>
+  </div>
+  <h2 class="text-lg font-semibold mb-2">Workflow runs ({n})</h2>{tbl}
+</section>"#,
         n = runs.len(),
+        total = summary.total,
+        running = summary.running,
+        succeeded = summary.succeeded,
+        failed = summary.failed,
         tbl = table(&["name", "run_id", "status", "started", "finished"], &rows),
     );
     Ok(page_shell(&format!("workflows · {}", escape(ctx.tenant.as_str())), &body))
@@ -76,6 +114,22 @@ mod tests {
         let s = AdminState::seeded();
         let r = runs_for(&s, &ctx(&[Permission::WorkflowsRead]), "evil-wf").unwrap();
         assert!(r.is_empty());
+    }
+
+    #[test]
+    fn workflow_summary_counts_states() {
+        let r = list_runs(&AdminState::seeded(), &ctx(&[Permission::WorkflowsRead])).unwrap();
+        let s = workflow_summary(&r);
+        assert_eq!(s.total, r.len() as u32);
+        let total_counted = s.running + s.succeeded + s.failed;
+        assert!(total_counted <= s.total);
+    }
+
+    #[test]
+    fn render_includes_summary_cards_and_upstream_link() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::WorkflowsRead])).unwrap();
+        assert!(html.contains("SUCCEEDED"));
+        assert!(html.contains("docs.n8n.io"));
     }
 
     #[test]

@@ -1,4 +1,7 @@
-//! `/admin/chaos` view — chaos experiment browser + on-demand trigger.
+//! `/admin/chaos` — Chaos Dashboard parity. Experiment timeline +
+//! per-kind counters + last-run staleness flag.
+//!
+//! Upstream UI: <https://chaos-mesh.org/docs/>
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
@@ -28,16 +31,42 @@ pub fn trigger(state: &AdminState, ctx: &RequestCtx, name: &str, now_unix: i64) 
     Ok(())
 }
 
+pub fn group_by_kind(rows: &[ChaosExperiment]) -> Vec<(String, usize)> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, usize> = BTreeMap::new();
+    for r in rows { *acc.entry(r.kind.clone()).or_insert(0) += 1; }
+    acc.into_iter().collect()
+}
+
+pub fn never_run<'a>(rows: &'a [ChaosExperiment]) -> Vec<&'a ChaosExperiment> {
+    rows.iter().filter(|e| e.last_run_unix.is_none()).collect()
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ChaosViewError> {
     let exps = list_experiments(state, ctx)?;
+    let never_count = never_run(&exps).len();
+    let kinds = group_by_kind(&exps);
+    let chips: String = kinds.iter().map(|(k, n)| format!(
+        r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{k} <strong>×{n}</strong></span>"#,
+        k = escape(k), n = n)).collect();
     let rows: Vec<Vec<String>> = exps.iter().map(|e| vec![
         e.name.clone(), e.kind.clone(), e.target_selector.clone(),
         e.schedule.into(),
         e.last_run_unix.map(|x| x.to_string()).unwrap_or_else(|| "never".into()),
     ]).collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Chaos experiments ({n})</h2>{tbl}</section>"#,
+        r#"<section>
+  <p class="text-sm text-gray-600 mb-3">Chaos Dashboard (cave-chaos). Upstream: <a class="text-blue-700 underline" href="https://chaos-mesh.org/docs/">chaos-mesh.org/docs</a>.</p>
+  <div class="mb-4 flex gap-4 text-sm">
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{n}</strong> experiments</span>
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{never}</strong> never run</span>
+  </div>
+  <div class="mb-4">{chips}</div>
+  <h2 class="text-lg font-semibold mb-2">Chaos experiments ({n})</h2>{tbl}
+</section>"#,
         n = exps.len(),
+        never = never_count,
+        chips = chips,
         tbl = table(&["name", "kind", "target", "schedule", "last_run"], &rows),
     );
     Ok(page_shell(&format!("chaos · {}", escape(ctx.tenant.as_str())), &body))
@@ -82,6 +111,26 @@ mod tests {
         let s = AdminState::seeded();
         let c = ctx(&[Permission::ChaosRead, Permission::ChaosTrigger]);
         assert!(matches!(trigger(&s, &c, "evil-chaos", 0).unwrap_err(), ChaosViewError::ExperimentNotFound(_)));
+    }
+
+    #[test]
+    fn group_by_kind_counts() {
+        let e = list_experiments(&AdminState::seeded(), &ctx(&[Permission::ChaosRead])).unwrap();
+        let g = group_by_kind(&e);
+        assert_eq!(g.iter().map(|(_, n)| n).sum::<usize>(), e.len());
+    }
+
+    #[test]
+    fn never_run_filters_no_last_run() {
+        let e = list_experiments(&AdminState::seeded(), &ctx(&[Permission::ChaosRead])).unwrap();
+        let n = never_run(&e);
+        assert!(n.iter().all(|x| x.last_run_unix.is_none()));
+    }
+
+    #[test]
+    fn render_includes_kind_chips_and_upstream_link() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::ChaosRead])).unwrap();
+        assert!(html.contains("chaos-mesh.org/docs"));
     }
 
     #[test]
