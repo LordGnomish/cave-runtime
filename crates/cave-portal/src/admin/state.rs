@@ -1007,6 +1007,12 @@ pub struct AdminState {
     pub vault_audit: RwLock<Vec<VaultAuditEntry>>,
     pub keda_scaled_objects: RwLock<Vec<KedaScaledObject>>,
     pub keda_scaler_events: RwLock<Vec<KedaScalerEvent>>,
+    // 2026-05-12 batch: rich CRD-shaped KEDA detail surface.
+    pub keda_scaled_object_details:
+        RwLock<Vec<crate::admin::keda::types::KedaScaledObjectDetail>>,
+    pub keda_scaled_jobs: RwLock<Vec<crate::admin::keda::types::KedaScaledJob>>,
+    pub keda_trigger_authentications:
+        RwLock<Vec<crate::admin::keda::types::KedaTriggerAuthentication>>,
     pub recent_activity: RwLock<Vec<ActivityEntry>>,
     // 2026-05-10 batch.
     pub scheduler_nodes: RwLock<Vec<SchedulerNode>>,
@@ -1171,6 +1177,9 @@ impl AdminState {
             vault_audit: RwLock::new(Vec::new()),
             keda_scaled_objects: RwLock::new(Vec::new()),
             keda_scaler_events: RwLock::new(Vec::new()),
+            keda_scaled_object_details: RwLock::new(Vec::new()),
+            keda_scaled_jobs: RwLock::new(Vec::new()),
+            keda_trigger_authentications: RwLock::new(Vec::new()),
             recent_activity: RwLock::new(Vec::new()),
             scheduler_nodes: RwLock::new(Vec::new()),
             scheduler_policies: RwLock::new(Vec::new()),
@@ -1377,6 +1386,7 @@ impl AdminState {
             ActivityEntry { tenant: acme.clone(), when_unix: 1_000_200, kind: "policy", summary: "updated AuthorizationPolicy allow-web".into() },
             ActivityEntry { tenant: evil.clone(), when_unix: 1_000_300, kind: "deploy", summary: "deployed evil-web v1".into() },
         ]);
+        seed_keda_rich(&s, &acme, &evil);
         s.scheduler_nodes.write().unwrap().extend([
             SchedulerNode { tenant: acme.clone(), name: "node-a".into(), ready: true, allocatable_cpu_milli: 8000, allocatable_mem_mib: 16384, taints: vec![] },
             SchedulerNode { tenant: acme.clone(), name: "node-b".into(), ready: false, allocatable_cpu_milli: 4000, allocatable_mem_mib: 8192, taints: vec!["NoSchedule=cordoned".into()] },
@@ -1770,4 +1780,321 @@ pub fn tally_by_kind(rows: &[ActivityEntry], tenant: &TenantId) -> BTreeMap<&'st
         *out.entry(r.kind).or_insert(0) += 1;
     }
     out
+}
+
+/// Seed rich KEDA fixtures (ScaledObject detail, ScaledJobs, TriggerAuth).
+/// Kept in a free function rather than inline in `seeded()` so the file
+/// stays scannable.
+fn seed_keda_rich(s: &AdminState, acme: &TenantId, evil: &TenantId) {
+    use crate::admin::keda::types::*;
+    s.keda_scaled_object_details
+        .write()
+        .unwrap()
+        .extend([
+            KedaScaledObjectDetail {
+                tenant: acme.clone(),
+                namespace: "ingest".into(),
+                name: "ingest-worker".into(),
+                annotations: vec![
+                    ("autoscaling.keda.sh/paused".into(), "false".into()),
+                    ("scaledobject.keda.sh/transfer-hpa-ownership".into(), "true".into()),
+                ],
+                scale_target_ref: KedaScaleTargetRef {
+                    api_version: "apps/v1".into(),
+                    kind: "Deployment".into(),
+                    name: "ingest-worker".into(),
+                    env_source_container_name: Some("worker".into()),
+                },
+                min_replica_count: 1,
+                max_replica_count: 50,
+                idle_replica_count: Some(0),
+                polling_interval_secs: 30,
+                cooldown_period_secs: 300,
+                initial_cooldown_period_secs: 0,
+                fallback: Some(KedaFallback {
+                    failure_threshold: 3,
+                    replicas: 4,
+                }),
+                triggers: vec![
+                    KedaTrigger {
+                        kind: "kafka".into(),
+                        name: Some("ingest-lag".into()),
+                        metadata: vec![
+                            ("bootstrapServers".into(), "kafka.bus.svc:9092".into()),
+                            ("consumerGroup".into(), "ingest".into()),
+                            ("topic".into(), "events".into()),
+                            ("lagThreshold".into(), "1000".into()),
+                        ],
+                        auth_ref: Some(KedaAuthRef {
+                            name: "kafka-sasl".into(),
+                            kind: "TriggerAuthentication".into(),
+                        }),
+                        metric_type: "AverageValue".into(),
+                        use_cached_metrics: false,
+                    },
+                    KedaTrigger {
+                        kind: "prometheus".into(),
+                        name: Some("queue-depth".into()),
+                        metadata: vec![
+                            ("serverAddress".into(), "http://prom.observability.svc:9090".into()),
+                            ("query".into(), "sum(ingest_queue_depth)".into()),
+                            ("threshold".into(), "100".into()),
+                        ],
+                        auth_ref: None,
+                        metric_type: "AverageValue".into(),
+                        use_cached_metrics: true,
+                    },
+                ],
+                advanced: Some(KedaAdvanced {
+                    restore_to_original_replica_count: true,
+                    hpa_name: None,
+                    hpa_behavior_yaml: Some(
+                        "scaleDown:\n  policies:\n  - type: Pods\n    value: 1\n    periodSeconds: 60\n"
+                            .into(),
+                    ),
+                }),
+                status: KedaScaledObjectStatus {
+                    last_active_time: Some(1_000_450),
+                    original_replica_count: 2,
+                    health: KedaHealth {
+                        overall: "Healthy".into(),
+                        message: "all triggers reporting".into(),
+                    },
+                    active_triggers: vec!["kafka".into()],
+                    reason: "ScalingActive".into(),
+                },
+            },
+            KedaScaledObjectDetail {
+                tenant: acme.clone(),
+                namespace: "reports".into(),
+                name: "report-runner".into(),
+                annotations: vec![
+                    ("autoscaling.keda.sh/paused".into(), "true".into()),
+                ],
+                scale_target_ref: KedaScaleTargetRef {
+                    api_version: "apps/v1".into(),
+                    kind: "Deployment".into(),
+                    name: "report-runner".into(),
+                    env_source_container_name: None,
+                },
+                min_replica_count: 0,
+                max_replica_count: 10,
+                idle_replica_count: None,
+                polling_interval_secs: 60,
+                cooldown_period_secs: 600,
+                initial_cooldown_period_secs: 0,
+                fallback: None,
+                triggers: vec![KedaTrigger {
+                    kind: "cron".into(),
+                    name: Some("business-hours".into()),
+                    metadata: vec![
+                        ("timezone".into(), "Europe/Istanbul".into()),
+                        ("start".into(), "0 9 * * 1-5".into()),
+                        ("end".into(), "0 18 * * 1-5".into()),
+                        ("desiredReplicas".into(), "3".into()),
+                    ],
+                    auth_ref: None,
+                    metric_type: "AverageValue".into(),
+                    use_cached_metrics: false,
+                }],
+                advanced: None,
+                status: KedaScaledObjectStatus {
+                    last_active_time: None,
+                    original_replica_count: 0,
+                    health: KedaHealth {
+                        overall: "Healthy".into(),
+                        message: "paused".into(),
+                    },
+                    active_triggers: vec![],
+                    reason: "Paused".into(),
+                },
+            },
+            KedaScaledObjectDetail {
+                tenant: evil.clone(),
+                namespace: "default".into(),
+                name: "evil-worker".into(),
+                annotations: vec![],
+                scale_target_ref: KedaScaleTargetRef {
+                    api_version: "apps/v1".into(),
+                    kind: "Deployment".into(),
+                    name: "evil-worker".into(),
+                    env_source_container_name: None,
+                },
+                min_replica_count: 1,
+                max_replica_count: 5,
+                idle_replica_count: None,
+                polling_interval_secs: 15,
+                cooldown_period_secs: 60,
+                initial_cooldown_period_secs: 0,
+                fallback: None,
+                triggers: vec![KedaTrigger {
+                    kind: "cpu".into(),
+                    name: None,
+                    metadata: vec![
+                        ("type".into(), "Utilization".into()),
+                        ("value".into(), "75".into()),
+                    ],
+                    auth_ref: None,
+                    metric_type: "Utilization".into(),
+                    use_cached_metrics: false,
+                }],
+                advanced: None,
+                status: KedaScaledObjectStatus {
+                    last_active_time: Some(1_000_460),
+                    original_replica_count: 1,
+                    health: KedaHealth {
+                        overall: "Healthy".into(),
+                        message: "cpu trigger active".into(),
+                    },
+                    active_triggers: vec!["cpu".into()],
+                    reason: "ScalingActive".into(),
+                },
+            },
+        ]);
+    s.keda_scaled_jobs.write().unwrap().extend([
+        KedaScaledJob {
+            tenant: acme.clone(),
+            namespace: "ingest".into(),
+            name: "backfill-runner".into(),
+            job_template_yaml:
+                "spec:\n  template:\n    spec:\n      containers:\n      - name: runner\n        image: ingest:v3\n      restartPolicy: OnFailure\n"
+                    .into(),
+            polling_interval_secs: 30,
+            successful_jobs_history_limit: 100,
+            failed_jobs_history_limit: 100,
+            max_replica_count: 20,
+            scaling_strategy: "default".into(),
+            triggers: vec![KedaTrigger {
+                kind: "aws-sqs-queue".into(),
+                name: Some("backfill-queue".into()),
+                metadata: vec![
+                    ("queueURL".into(), "https://sqs.eu-west-1.amazonaws.com/000000/backfill".into()),
+                    ("queueLength".into(), "10".into()),
+                    ("awsRegion".into(), "eu-west-1".into()),
+                ],
+                auth_ref: Some(KedaAuthRef {
+                    name: "aws-irsa".into(),
+                    kind: "TriggerAuthentication".into(),
+                }),
+                metric_type: "AverageValue".into(),
+                use_cached_metrics: false,
+            }],
+            status: KedaScaledJobStatus {
+                last_active_time: Some(1_000_500),
+                running_jobs: 3,
+                pending_jobs: 1,
+                succeeded_jobs_24h: 142,
+                failed_jobs_24h: 2,
+            },
+        },
+        KedaScaledJob {
+            tenant: evil.clone(),
+            namespace: "default".into(),
+            name: "evil-cron-jobs".into(),
+            job_template_yaml: "spec:\n  template:\n    spec:\n      containers:\n      - name: x\n        image: evil:1\n".into(),
+            polling_interval_secs: 60,
+            successful_jobs_history_limit: 3,
+            failed_jobs_history_limit: 3,
+            max_replica_count: 2,
+            scaling_strategy: "accurate".into(),
+            triggers: vec![KedaTrigger {
+                kind: "cron".into(),
+                name: None,
+                metadata: vec![
+                    ("timezone".into(), "UTC".into()),
+                    ("start".into(), "0 * * * *".into()),
+                    ("end".into(), "30 * * * *".into()),
+                    ("desiredReplicas".into(), "1".into()),
+                ],
+                auth_ref: None,
+                metric_type: "AverageValue".into(),
+                use_cached_metrics: false,
+            }],
+            status: KedaScaledJobStatus {
+                last_active_time: None,
+                running_jobs: 0,
+                pending_jobs: 0,
+                succeeded_jobs_24h: 24,
+                failed_jobs_24h: 0,
+            },
+        },
+    ]);
+    s.keda_trigger_authentications.write().unwrap().extend([
+        KedaTriggerAuthentication {
+            tenant: acme.clone(),
+            namespace: "ingest".into(),
+            name: "kafka-sasl".into(),
+            cluster_scoped: false,
+            secret_refs: vec![
+                KedaSecretRef {
+                    parameter: "sasl".into(),
+                    secret_name: "kafka-creds".into(),
+                    key: "sasl".into(),
+                },
+                KedaSecretRef {
+                    parameter: "username".into(),
+                    secret_name: "kafka-creds".into(),
+                    key: "username".into(),
+                },
+                KedaSecretRef {
+                    parameter: "password".into(),
+                    secret_name: "kafka-creds".into(),
+                    key: "password".into(),
+                },
+            ],
+            env_refs: vec![],
+            pod_identity_provider: "none".into(),
+            hashicorp_vault: None,
+            azure_key_vault: None,
+        },
+        KedaTriggerAuthentication {
+            tenant: acme.clone(),
+            namespace: "ingest".into(),
+            name: "aws-irsa".into(),
+            cluster_scoped: false,
+            secret_refs: vec![],
+            env_refs: vec![KedaEnvRef {
+                parameter: "AWS_REGION".into(),
+                name: "AWS_REGION".into(),
+                container_name: "runner".into(),
+            }],
+            pod_identity_provider: "aws".into(),
+            hashicorp_vault: None,
+            azure_key_vault: None,
+        },
+        KedaTriggerAuthentication {
+            tenant: acme.clone(),
+            namespace: "reports".into(),
+            name: "vault-bound".into(),
+            cluster_scoped: false,
+            secret_refs: vec![],
+            env_refs: vec![],
+            pod_identity_provider: "none".into(),
+            hashicorp_vault: Some(KedaVaultBinding {
+                address: "https://vault.acme.svc:8200".into(),
+                authentication: "kubernetes".into(),
+                mount: "kubernetes".into(),
+                role: "keda-reader".into(),
+                credential_secret_name: "vault-bootstrap".into(),
+                paths: vec!["secret/data/keda/reports".into()],
+            }),
+            azure_key_vault: None,
+        },
+        KedaTriggerAuthentication {
+            tenant: evil.clone(),
+            namespace: "default".into(),
+            name: "evil-azure".into(),
+            cluster_scoped: false,
+            secret_refs: vec![],
+            env_refs: vec![],
+            pod_identity_provider: "azure-workload".into(),
+            hashicorp_vault: None,
+            azure_key_vault: Some(KedaAzureKvBinding {
+                vault_uri: "https://evilkv.vault.azure.net".into(),
+                tenant_id: "00000000-0000-0000-0000-000000000000".into(),
+                client_id: "11111111-1111-1111-1111-111111111111".into(),
+                secrets: vec!["queue-conn".into()],
+            }),
+        },
+    ]);
 }

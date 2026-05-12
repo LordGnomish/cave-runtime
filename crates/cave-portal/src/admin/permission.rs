@@ -154,6 +154,26 @@ pub enum Permission {
     LedgerRead,
     OncallRead,
     SearchRead,
+
+    // ── 2026-05-12 batch: KEDA real reimplementation ───────────────────
+    /// Read ScaledObject detail (CRD-shaped). Stricter than `KedaRead`
+    /// which only exposes the summary list.
+    KedaScaledObjectRead,
+    /// Create / edit / delete ScaledObjects.
+    KedaScaledObjectWrite,
+    /// Read ScaledJobs.
+    KedaScaledJobRead,
+    /// Create / edit / delete ScaledJobs.
+    KedaScaledJobWrite,
+    /// Read TriggerAuthentication / ClusterTriggerAuthentication.
+    KedaTriggerAuthRead,
+    /// Mutate TriggerAuthentication.
+    KedaTriggerAuthWrite,
+    /// Browse the scaler catalog (read-only static content).
+    KedaScalerCatalog,
+    /// Read per-scaler Prometheus-backed metrics (events/min, sync errors,
+    /// scaling latency p50/p99).
+    KedaMetricsRead,
 }
 
 impl Permission {
@@ -259,6 +279,14 @@ impl Permission {
             Permission::LedgerRead => "ledger.entry.read",
             Permission::OncallRead => "oncall.shift.read",
             Permission::SearchRead => "search.index.read",
+            Permission::KedaScaledObjectRead => "keda.scaledobject.detail.read",
+            Permission::KedaScaledObjectWrite => "keda.scaledobject.detail.write",
+            Permission::KedaScaledJobRead => "keda.scaledjob.read",
+            Permission::KedaScaledJobWrite => "keda.scaledjob.write",
+            Permission::KedaTriggerAuthRead => "keda.triggerauthentication.read",
+            Permission::KedaTriggerAuthWrite => "keda.triggerauthentication.write",
+            Permission::KedaScalerCatalog => "keda.scaler.catalog",
+            Permission::KedaMetricsRead => "keda.metrics.read",
         }
     }
 }
