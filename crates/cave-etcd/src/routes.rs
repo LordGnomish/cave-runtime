@@ -2,19 +2,26 @@
 
 use crate::b64;
 use crate::models::*;
+use crate::raft_bridge::{RaftBridgeError, SharedRaftBridge};
 use crate::store::KvStore;
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::sse::{Event, Sse},
+    response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
+/// Mount the etcd routes against a shared `KvStore`. Single-node
+/// deployments call this directly; multi-node deployments wrap the
+/// router with a `RaftBridge` extension via
+/// [`create_router_with_bridge`] so write handlers consult the Raft
+/// leader before mutating local state.
 pub fn create_router(state: Arc<KvStore>) -> Router {
     Router::new()
         .route("/api/etcd/health", get(health))
@@ -73,6 +80,21 @@ pub fn create_router(state: Arc<KvStore>) -> Router {
         // Parity
         .route("/api/etcd/parity", get(parity))
         .with_state(state)
+}
+
+/// Variant that injects a `SharedRaftBridge` extension. Write handlers
+/// pick it up via `Option<Extension<SharedRaftBridge>>`; when absent
+/// the handlers fall through to the existing direct-write path so
+/// single-node deployments are unchanged.
+pub fn create_router_with_bridge(
+    state: Arc<KvStore>,
+    bridge: Option<SharedRaftBridge>,
+) -> Router {
+    let router = create_router(state);
+    match bridge {
+        Some(b) => router.layer(Extension(b)),
+        None => router,
+    }
 }
 
 // ── Parity ────────────────────────────────────────────────────────────────────
@@ -190,19 +212,79 @@ async fn kv_range(
 
 async fn kv_put(
     State(store): State<Arc<KvStore>>,
+    bridge: Option<Extension<SharedRaftBridge>>,
     headers: HeaderMap,
     Json(req): Json<PutRequest>,
-) -> Result<Json<PutResponse>, (StatusCode, String)> {
+) -> Response {
     let token = extract_token(&headers);
     let req = decode_put_request(req);
-    store
-        .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    if let Err(e) =
+        store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
+    {
+        return (StatusCode::UNAUTHORIZED, e.to_string()).into_response();
+    }
+    // Multi-node Raft mode: propose-and-wait through the bridge.
+    // The apply daemon writes the key into the local KvStore on commit;
+    // by the time the bridge returns Ok, this node has the entry.
+    if let Some(Extension(b)) = bridge {
+        match b.propose_put(req.key.clone(), req.value.clone(), req.lease).await {
+            Ok(()) => {
+                // The bridge has already applied through the daemon.
+                // Re-read the row so the response carries the same
+                // shape as the direct path (header.revision +
+                // prev_kv encoded when available).
+                let range = RangeRequest {
+                    key: req.key.clone(),
+                    range_end: None,
+                    limit: None,
+                    revision: None,
+                    keys_only: false,
+                    count_only: false,
+                };
+                let header = match store.range(&range) {
+                    Ok(r) => r.header,
+                    Err(_) => ResponseHeader::default(),
+                };
+                let resp = PutResponse { header, prev_kv: None };
+                return Json(resp).into_response();
+            }
+            Err(RaftBridgeError::NotLeader { leader_url }) => {
+                // 503 with a Location: header so etcd clients can
+                // retry against the leader without re-issuing a DNS
+                // lookup.
+                let mut r = (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    format!(
+                        "not leader; leader_url={}",
+                        leader_url.as_deref().unwrap_or("unknown")
+                    ),
+                )
+                    .into_response();
+                if let Some(url) = leader_url {
+                    if let Ok(hv) = axum::http::HeaderValue::from_str(&url) {
+                        r.headers_mut().insert(axum::http::header::LOCATION, hv);
+                    }
+                }
+                return r;
+            }
+            Err(RaftBridgeError::Timeout) => {
+                return (
+                    StatusCode::GATEWAY_TIMEOUT,
+                    "timed out waiting for raft commit+apply".to_string(),
+                )
+                    .into_response();
+            }
+            Err(RaftBridgeError::Internal(msg)) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response();
+            }
+        }
+    }
+    // Single-node mode (no bridge installed): direct apply.
     let mut resp = store.put(&req);
     if let Some(ref mut kv) = resp.prev_kv {
         encode_kv(kv);
     }
-    Ok(Json(resp))
+    Json(resp).into_response()
 }
 
 async fn kv_delete_range(
@@ -1138,5 +1220,142 @@ mod tests {
         let chunks: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
         assert!(!chunks.is_empty());
         assert_eq!(chunks[0]["checksum"].as_str().unwrap().len(), 64);
+    }
+
+    // ── Raft bridge dispatch (write-path redirection) ─────────────────────
+
+    use crate::raft_bridge::test_doubles::RecordingBridge;
+    use std::sync::atomic::Ordering as AtomicOrd;
+
+    fn app_with_bridge(bridge: Arc<RecordingBridge>) -> (Router, Arc<RecordingBridge>) {
+        let kv = Arc::new(KvStore::new());
+        let dyn_bridge: SharedRaftBridge = bridge.clone();
+        let app = create_router_with_bridge(kv, Some(dyn_bridge));
+        (app, bridge)
+    }
+
+    #[tokio::test]
+    async fn kv_put_leader_proposes_and_returns_200() {
+        let bridge = Arc::new(RecordingBridge::leader());
+        let (app, b) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "value": b64::encode(b"bar"),
+                "lease": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        // The bridge recorded the propose call with decoded args.
+        let calls = b.put_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1, "bridge should see one propose_put call");
+        assert_eq!(calls[0].0, "/foo");
+        assert_eq!(calls[0].1, "bar");
+    }
+
+    #[tokio::test]
+    async fn kv_put_follower_returns_503_with_leader_location_header() {
+        let bridge = Arc::new(RecordingBridge::follower(Some(
+            "https://10.0.0.1:6443".to_string(),
+        )));
+        let (app, b) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "value": b64::encode(b"bar"),
+                "lease": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let loc = resp.headers().get(axum::http::header::LOCATION);
+        assert!(loc.is_some(), "Location header must be set on 503");
+        assert_eq!(loc.unwrap().to_str().unwrap(), "https://10.0.0.1:6443");
+        // The follower still recorded the propose attempt (it's the
+        // bridge's job to reject it, not the route handler).
+        assert_eq!(b.propose_count.load(AtomicOrd::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn kv_put_follower_without_known_leader_returns_503_no_location() {
+        let bridge = Arc::new(RecordingBridge::follower(None));
+        let (app, _) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "value": b64::encode(b"bar"),
+                "lease": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(resp.headers().get(axum::http::header::LOCATION).is_none());
+    }
+
+    #[tokio::test]
+    async fn kv_put_bridge_timeout_returns_504() {
+        let bridge = Arc::new(RecordingBridge::leader());
+        bridge.force_timeout.store(true, AtomicOrd::Relaxed);
+        let (app, _) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "value": b64::encode(b"bar"),
+                "lease": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    #[tokio::test]
+    async fn kv_put_without_bridge_uses_direct_path() {
+        // No bridge installed → behaviour is identical to the original
+        // single-node mode. Confirm the row landed and the response
+        // header carries a revision.
+        let app = test_app();
+        let resp = post_json(
+            app.clone(),
+            "/api/etcd/v3/kv/put",
+            serde_json::json!({
+                "key": b64::encode(b"/direct"),
+                "value": b64::encode(b"path"),
+                "lease": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert!(v["header"]["revision"].as_u64().unwrap() >= 1);
+        // Read it back.
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/range",
+            serde_json::json!({
+                "key": b64::encode(b"/direct"),
+                "range_end": null,
+                "limit": null,
+                "revision": null,
+                "keys_only": false,
+                "count_only": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }

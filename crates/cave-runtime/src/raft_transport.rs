@@ -174,6 +174,13 @@ impl PeerRegistry {
         ids
     }
 
+    /// HTTPS URL the bridge can suggest to a client retrying a write
+    /// against a known leader. `None` if the registry has not seen
+    /// the node yet (partition / cold start).
+    pub fn url_for(&self, node_id: NodeId) -> Option<String> {
+        self.inner.get(&node_id).map(|kv| kv.value().0.url.clone())
+    }
+
     pub fn current_term(&self) -> u64 {
         self.current_term.load(Ordering::Relaxed)
     }

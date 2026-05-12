@@ -78,6 +78,7 @@ pub mod maintenance_v2;
 pub mod membership_audit;
 pub mod membership_v2;
 pub mod models;
+pub mod raft_bridge;
 pub mod rbac_deeper;
 pub mod routes;
 pub mod snap_db;
