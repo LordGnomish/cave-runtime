@@ -10,18 +10,20 @@ version = "v1.36.0"
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
 #   fill_ratio = (mapped + skipped) / total
-# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
-# measured value: top-level kubernetes/kubernetes v1.31.x apiserver-
-# bearing packages were enumerated and classified honestly. The legacy
-# `[[files]]/[[functions]]/[[tests]]/[[surfaces]]` blocks below are
-# retained for historical context; the measured ratio is computed only
-# over the new schema.
+# Measured pass: top-level kubernetes/kubernetes v1.31.x apiserver-
+# bearing packages enumerated and classified honestly.
+# 2026-05-12 (audit landing): 26 mapped / 17 skipped / 7 unmapped = 0.86.
+# 2026-05-12 (later same day, CEL evaluator MVP landed): the CEL
+# evaluator entry moved from [[unmapped]] to [[mapped]] — see
+# `src/cel_eval.rs` (CelInterpreterEvaluator backed by the
+# `cel-interpreter` crate). New ratio: 27 mapped / 17 skipped / 6
+# unmapped = 0.88.
 # See docs/parity/cave-apiserver-port-2026-05-12.md for methodology.
-mapped_count   = 26
+mapped_count   = 27
 skipped_count  = 17
-unmapped_count = 7
+unmapped_count = 6
 total          = 50
-fill_ratio     = 0.86
+fill_ratio     = 0.88
 last_audit     = "2026-05-12"
 infra_only     = false
 
@@ -245,9 +247,10 @@ upstream_pkg = "staging/src/k8s.io/legacy-cloud-providers/"
 reason       = "wire-format-detail"
 note         = "Legacy CCM stubs slated for removal upstream"
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "staging/src/k8s.io/apiserver/pkg/cel/"
-note         = "CEL evaluator for ValidatingAdmissionPolicy expressions. Current vap_advanced.rs validates expression syntax but does not evaluate them against AdmissionRequest payloads at runtime — a real port needs a CEL parser+interpreter (~3-5K LOC of work). Tracked as the largest single behavioural gap."
+local_files  = ["src/cel_eval.rs"]
+note         = "Real CEL evaluator (CelInterpreterEvaluator) backed by the cel-interpreter crate. Supports the VAP CEL subset: boolean / int / string / has() / startsWith() / logical ops / object.{spec,metadata,...} field traversal / oldObject diffs / params / request / named variables. Program-cache shares compiled expressions across calls. Wired into vap_advanced::Dispatcher via the existing CelEvaluator trait (PanicEvaluator → CelInterpreterEvaluator)."
 
 [[unmapped]]
 upstream_pkg = "pkg/apis/resource/ (DRA)"

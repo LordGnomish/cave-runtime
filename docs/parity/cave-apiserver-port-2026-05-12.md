@@ -22,33 +22,58 @@ Per cave-net's pattern (134-entry gold-standard with `fill_ratio = 1.0`), each e
 
 | Bucket | Count | Notes |
 |---|---:|---|
-| `[[mapped]]` | 26 | Core apiserver framework + handlers + admission + auth + audit + CRD + aggregator + per-resource registries |
+| `[[mapped]]` | 27 | Core apiserver framework + handlers + admission + auth + audit + CRD + aggregator + per-resource registries + **CEL evaluator** |
 | `[[skipped]]` | 17 | Bootstrap, client-go, code generators, kube-proxy, kubelet probes, cloud-providers, metrics, legacy CCM |
-| `[[unmapped]]` | 7 | Real gaps: CEL evaluator, DRA resources, audit-backend plugin registry, live OpenAPI synthesis, admission initializer, Lease semantics, exec/attach proxy |
+| `[[unmapped]]` | 6 | Real gaps: DRA resources, audit-backend plugin registry, live OpenAPI synthesis, admission initializer, Lease semantics, exec/attach proxy |
 | **Total** | **50** | |
-| **fill_ratio** | **0.86** | (mapped + skipped) / total |
+| **fill_ratio** | **0.88** | (mapped + skipped) / total |
 
-The previous self-reported `parity_ratio = 1.0` is replaced by `fill_ratio = 0.86` in the manifest's `[parity]` block.
+**Trajectory (2026-05-12):**
+1. Initial measured-audit landing: `1.0` (wave3 self-report) → `0.86` (26 mapped / 17 skipped / 7 unmapped).
+2. CEL evaluator MVP landed same day: `0.86` → `0.88` (27 / 17 / 6).
 
-## What this audit does NOT do
+The `staging/src/k8s.io/apiserver/pkg/cel/` package moved from `[[unmapped]]` to `[[mapped]]` — see [`crates/cave-apiserver/src/cel_eval.rs`](../../crates/cave-apiserver/src/cel_eval.rs). Implementation is `CelInterpreterEvaluator` backed by the `cel-interpreter` crate (pure-Rust CEL spec subset). The evaluator wires into the existing `vap_advanced::Dispatcher` via the `CelEvaluator` trait; the `PanicEvaluator` stub remains for test gating but is no longer the default.
 
-- **It does not change runtime behaviour.** Every cave-apiserver test continues to pass; the only edits to the crate are the manifest block + this doc.
-- **It does not land the CEL evaluator** (the single largest gap). A real CEL port is 3–5K LOC of work (parser + interpreter + value model + admission integration); deferred to a follow-up.
-- **It does not synthesise live OpenAPI v3 from registered CRDs.** Same scope reasoning.
+## What this audit does NOT do (still)
 
-## What the 7 unmapped entries actually mean
+- **DRA resources** — `pkg/apis/resource/` still unmapped (ResourceClaim / ResourceClass / scheduler hooks). cave-scheduler has the scheduling-side dra.rs but the storage + controller-side surface is not in cave-apiserver.
+- **Audit backend plugin registry**, **live OpenAPI v3 synthesis**, **admission initializer**, **Lease holder-identity semantics**, **connect-verb proxy** — all still unmapped, sized between 200 LOC and ~1 K LOC of follow-up work each.
 
-1. **CEL evaluator** — `staging/src/k8s.io/apiserver/pkg/cel/`. The validating-admission-policy code path parses CEL expressions for syntax but never evaluates them against `AdmissionRequest` payloads. Effectively makes VAP a no-op on cave today.
-2. **DynamicResourceAllocation** — `pkg/apis/resource/`. ResourceClaim / ResourceClass / PodSchedulingContext + scheduler hooks. Beta in v1.32; alpha+gated through v1.31. Cave currently rejects these as unknown CRDs.
-3. **Audit backend plugin registry** — `staging/src/k8s.io/apiserver/plugin/pkg/audit/`. Cave's audit.rs has the inline log + WORM sinks; there is no upstream-style pluggable backend registry, so a new sink today requires editing the central handler.
-4. **Live OpenAPI v3** — `staging/src/k8s.io/apiserver/pkg/endpoints/openapi/`. discovery_v2.rs emits a near-static OpenAPI document; per-resource schemas synthesised from CRD types are missing.
-5. **Admission plugin initializer** — `staging/src/k8s.io/apiserver/pkg/admission/initializer/`. Cave plugins are constructed manually in `cave-runtime/main.rs` rather than via the upstream initializer-chain wiring.
-6. **Lease semantics** — `pkg/registry/coordination/lease/storage/`. routes.rs surfaces Lease CRUD but does not enforce the holder-identity / renewTime semantics needed for proper leader-election clients. cave-ha uses its own Raft-derived leases instead.
-7. **Connect verbs** — `staging/src/k8s.io/apiserver/pkg/registry/rest/connect.go`. Pod exec / attach / port-forward proxying. cave-cri serves exec directly; the apiserver-side proxy path is not wired.
+## What the 6 remaining unmapped entries mean
 
-## Next steps (out of scope for this audit)
+1. **DynamicResourceAllocation** — `pkg/apis/resource/`. ResourceClaim / ResourceClass / PodSchedulingContext + scheduler hooks. Beta in v1.32; alpha+gated through v1.31. Cave currently rejects these as unknown CRDs.
+2. **Audit backend plugin registry** — `staging/src/k8s.io/apiserver/plugin/pkg/audit/`. Cave's audit.rs has the inline log + WORM sinks; there is no upstream-style pluggable backend registry, so a new sink today requires editing the central handler.
+3. **Live OpenAPI v3** — `staging/src/k8s.io/apiserver/pkg/endpoints/openapi/`. discovery_v2.rs emits a near-static OpenAPI document; per-resource schemas synthesised from CRD types are missing.
+4. **Admission plugin initializer** — `staging/src/k8s.io/apiserver/pkg/admission/initializer/`. Cave plugins are constructed manually in `cave-runtime/main.rs` rather than via the upstream initializer-chain wiring.
+5. **Lease semantics** — `pkg/registry/coordination/lease/storage/`. routes.rs surfaces Lease CRUD but does not enforce the holder-identity / renewTime semantics needed for proper leader-election clients. cave-ha uses its own Raft-derived leases instead.
+6. **Connect verbs** — `staging/src/k8s.io/apiserver/pkg/registry/rest/connect.go`. Pod exec / attach / port-forward proxying. cave-cri serves exec directly; the apiserver-side proxy path is not wired.
 
-- CEL evaluator port — biggest behaviour gap. Likely its own crate or `cave-cel` module.
-- DRA resources — requires both apiserver storage + scheduler hooks.
-- Audit backend registry — small refactor (~300 LOC), unblock pluggable sinks.
-- The other four can wait for follow-ups guided by user demand.
+## CEL evaluator MVP — what landed
+
+`src/cel_eval.rs`:
+- `CelInterpreterEvaluator` implements the `crate::vap_advanced::CelEvaluator` trait.
+- Pure-Rust CEL via the `cel-interpreter` crate (Google CEL spec subset). Supports:
+  - Scalar comparison ops (`==`, `!=`, `<`, `>`, `<=`, `>=`)
+  - Logical ops (`&&`, `||`, `!`)
+  - Integer arithmetic
+  - String literals (`'foo'`, `"foo"`)
+  - Field traversal (`object.spec.replicas`, `object.metadata.labels.team`)
+  - `has(path)` macro for presence tests
+  - `.startsWith(prefix)` method on strings
+  - List indexing (`params[0].maxReplicas`)
+- Activation slots: `object`, `oldObject`, `request`, `params`, `namespaceObject`, named user `variables`.
+- Program cache: `Mutex<HashMap<String, Arc<Program>>>` so the same expression compiles once.
+- Error mapping: ParseError → `CelError::Compile`, runtime/type errors → `CelError::Runtime`, non-scalar result → `CelError::Type` (dispatcher treats this as fail-policy outcome).
+
+**Tests (23 in `cel_eval::tests`):**
+- 18 grammar unit tests (boolean literals, arithmetic, comparisons, equality, logical ops, has() present/missing, startsWith, oldObject, paramRef list indexing, request metadata, user variables, invalid syntax, undeclared reference, missing field traversal, program cache, dyn-trait compat, list-result type error).
+- 5 Dispatcher integration tests: admit on pass, deny on fail, matchCondition short-circuit (empty outcome), FailurePolicy::Fail surfaces Error, FailurePolicy::Ignore surfaces SilencedError.
+
+All 23 pass; full apiserver suite 951/951 pass; `cargo check --workspace` clean.
+
+## Out of scope (honestly)
+
+- **MessageExpression evaluation** — the `Validation::message_expression` field is recognised but the dispatcher uses the literal `message` only. Wiring is a 30-line addition once the audit data shows demand.
+- **Authorization functions** (`authorizer.path(...).check('read').allowed()`) — the `authorizer` activation slot is not bound, so policies that consult RBAC at evaluation time fail with `CelError::Runtime` (undeclared reference). Real adoption needs a bridge from the apiserver authorizer chain into cel-interpreter's `Function` registry.
+- **Timestamp + Duration types** — cel-interpreter supports them under the `chrono` feature; not enabled here to keep the dep tree small. Easy follow-up.
+- **CEL CSE / optimization** — cel-interpreter compiles to an AST and walks it on each evaluate. Upstream cel-go does sub-expression caching. Out of scope for MVP.
