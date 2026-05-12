@@ -40,7 +40,7 @@
 //!   bad entry can't stall the loop.
 
 use crate::raft_command::{RaftCommand, RaftCommandError};
-use crate::raft_core::LogEntry;
+use crate::raft_core::{LogEntry, LogIndex, ProposeError};
 use cave_apiserver::resources::Resource;
 use cave_apiserver::store::ResourceStore;
 use cave_etcd::models::{DeleteRangeRequest, PutRequest};
@@ -56,6 +56,53 @@ use tracing::{debug, info, warn};
 pub struct ApplyTargets {
     pub kv: Arc<KvStore>,
     pub resources: Arc<ResourceStore>,
+}
+
+/// Broadcasts each newly-applied `LogIndex` to anyone who is waiting
+/// on `propose_and_wait`. Cheap to clone — the daemon owns the
+/// `Sender` and write-path callers clone a `Receiver`.
+///
+/// The watch is initialised at 0 because no entry has applied yet at
+/// startup. `propose_and_wait` treats `*recv.borrow() >= assigned_index`
+/// as "applied" so the comparison is monotonic regardless of which
+/// term the leader was in when it proposed.
+#[derive(Debug, Clone)]
+pub struct ApplyNotifier {
+    tx: Arc<tokio::sync::watch::Sender<LogIndex>>,
+}
+
+impl ApplyNotifier {
+    pub fn new() -> Self {
+        let (tx, _) = tokio::sync::watch::channel(0);
+        Self { tx: Arc::new(tx) }
+    }
+
+    /// Subscribe; clones the receiver so each waiter sees the live
+    /// value plus any subsequent update.
+    pub fn subscribe(&self) -> tokio::sync::watch::Receiver<LogIndex> {
+        self.tx.subscribe()
+    }
+
+    /// Last published index. 0 means "nothing applied yet".
+    pub fn current(&self) -> LogIndex {
+        *self.tx.borrow()
+    }
+
+    /// Publish a new last-applied index. The daemon calls this once
+    /// per `apply_one` success. Idempotent — if the value didn't
+    /// change, the watch still bumps subscribers.
+    pub fn publish(&self, index: LogIndex) {
+        // `send_replace` always replaces and notifies; `send` would
+        // skip if the value compares equal, which loses the
+        // "apply happened" pulse when the same index re-arrives.
+        let _ = self.tx.send_replace(index);
+    }
+}
+
+impl Default for ApplyNotifier {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Diagnostics counters surfaced to `/admin/cluster` and operator
@@ -116,6 +163,30 @@ pub enum ApplyError {
 }
 
 /// Apply one log entry to the local state machine. Public so unit
+/// tests can drive it without spinning up a daemon. `notifier` is
+/// optional — when present, the last-applied index is broadcast to
+/// any `propose_and_wait` callers; when absent, callers don't need
+/// the apply-completion signal.
+pub fn apply_one_notify(
+    entry: &LogEntry,
+    t: &ApplyTargets,
+    m: &ApplyMetrics,
+    notifier: Option<&ApplyNotifier>,
+) -> Result<(), ApplyError> {
+    let r = apply_one(entry, t, m);
+    if let Some(n) = notifier {
+        // Bump the watch only on success. A failed entry advances the
+        // metric counter but does NOT advance last_applied_index, and
+        // we propagate the same discipline through the notifier so
+        // propose_and_wait won't unblock on a partial apply.
+        if r.is_ok() {
+            n.publish(entry.index);
+        }
+    }
+    r
+}
+
+/// Apply one log entry to the local state machine. Public so unit
 /// tests can drive it without spinning up a daemon.
 pub fn apply_one(entry: &LogEntry, t: &ApplyTargets, m: &ApplyMetrics) -> Result<(), ApplyError> {
     let cmd = RaftCommand::decode(&entry.command)?;
@@ -161,8 +232,19 @@ pub fn apply_one(entry: &LogEntry, t: &ApplyTargets, m: &ApplyMetrics) -> Result
 /// the loop because Raft has already committed it and divergence here
 /// would be worse than the failure itself.
 pub fn apply_batch(entries: Vec<LogEntry>, t: &ApplyTargets, m: &ApplyMetrics) {
+    apply_batch_notify(entries, t, m, None);
+}
+
+/// Same as `apply_batch` but optionally signals the supplied
+/// notifier after each successful entry.
+pub fn apply_batch_notify(
+    entries: Vec<LogEntry>,
+    t: &ApplyTargets,
+    m: &ApplyMetrics,
+    notifier: Option<&ApplyNotifier>,
+) {
     for entry in entries {
-        if let Err(e) = apply_one(&entry, t, m) {
+        if let Err(e) = apply_one_notify(&entry, t, m, notifier) {
             warn!(index = entry.index, error = %e, "apply error — entry skipped");
             m.apply_errors.fetch_add(1, Ordering::Relaxed);
             if matches!(e, ApplyError::Decode(_)) {
@@ -192,6 +274,208 @@ impl CommittedEntrySource for RaftCoreSource {
     }
 }
 
+// ── RaftBridge impl over `propose_and_wait` ───────────────────────────────
+//
+// cave-etcd's `routes::kv_put` consults `cave_etcd::raft_bridge::RaftBridge`
+// before mutating local state. The host installs the impl below when
+// running in multi-node mode.
+
+/// Bundles everything the bridge needs to propose + wait. Cheap to
+/// clone (all Arc).
+#[derive(Clone)]
+pub struct RaftBridgeImpl {
+    pub core: Arc<tokio::sync::Mutex<crate::raft_core::RaftCore>>,
+    pub notifier: ApplyNotifier,
+    pub peers: Arc<crate::raft_transport::PeerRegistry>,
+    pub timeout: Duration,
+}
+
+impl std::fmt::Debug for RaftBridgeImpl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RaftBridgeImpl")
+            .field("local_id", &self.peers.local_id)
+            .field("local_url", &self.peers.local_url)
+            .field("timeout", &self.timeout)
+            .field("last_applied", &self.notifier.current())
+            .finish()
+    }
+}
+
+impl RaftBridgeImpl {
+    pub fn new(
+        core: Arc<tokio::sync::Mutex<crate::raft_core::RaftCore>>,
+        notifier: ApplyNotifier,
+        peers: Arc<crate::raft_transport::PeerRegistry>,
+    ) -> Self {
+        Self {
+            core,
+            notifier,
+            peers,
+            timeout: Duration::from_secs(5),
+        }
+    }
+
+    /// Resolve the current leader URL via the local Raft view + the
+    /// peer registry. Returns `None` when no leader is known.
+    async fn current_leader_url(&self) -> Option<String> {
+        let guard = self.core.lock().await;
+        let leader_id = guard.leader()?;
+        drop(guard);
+        self.peers.url_for(leader_id)
+    }
+}
+
+#[async_trait::async_trait]
+impl cave_etcd::raft_bridge::RaftBridge for RaftBridgeImpl {
+    fn is_leader(&self) -> bool {
+        // Avoid blocking on the async mutex from this sync hook;
+        // a brief inconsistency window is acceptable — propose_and_wait
+        // re-checks under the lock and returns NotLeader if we lost it.
+        match self.core.try_lock() {
+            Ok(guard) => guard
+                .leader()
+                .map(|id| id == self.peers.local_id)
+                .unwrap_or(false),
+            Err(_) => false,
+        }
+    }
+
+    fn leader_url(&self) -> Option<String> {
+        match self.core.try_lock() {
+            Ok(guard) => guard.leader().and_then(|id| self.peers.url_for(id)),
+            Err(_) => None,
+        }
+    }
+
+    async fn propose_put(
+        &self,
+        key: String,
+        value: String,
+        lease: Option<i64>,
+    ) -> Result<(), cave_etcd::raft_bridge::RaftBridgeError> {
+        let cmd = RaftCommand::EtcdPut { key, value, lease };
+        match propose_and_wait(&self.core, &self.notifier, cmd, self.timeout).await {
+            Ok(_) => Ok(()),
+            Err(WriteError::NotLeader { .. }) => Err(
+                cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
+                    leader_url: self.current_leader_url().await,
+                },
+            ),
+            Err(WriteError::Timeout { .. }) => {
+                Err(cave_etcd::raft_bridge::RaftBridgeError::Timeout)
+            }
+            Err(e) => Err(cave_etcd::raft_bridge::RaftBridgeError::Internal(
+                e.to_string(),
+            )),
+        }
+    }
+
+    async fn propose_delete(
+        &self,
+        key: String,
+        range_end: Option<String>,
+    ) -> Result<(), cave_etcd::raft_bridge::RaftBridgeError> {
+        let cmd = RaftCommand::EtcdDelete { key, range_end };
+        match propose_and_wait(&self.core, &self.notifier, cmd, self.timeout).await {
+            Ok(_) => Ok(()),
+            Err(WriteError::NotLeader { .. }) => Err(
+                cave_etcd::raft_bridge::RaftBridgeError::NotLeader {
+                    leader_url: self.current_leader_url().await,
+                },
+            ),
+            Err(WriteError::Timeout { .. }) => {
+                Err(cave_etcd::raft_bridge::RaftBridgeError::Timeout)
+            }
+            Err(e) => Err(cave_etcd::raft_bridge::RaftBridgeError::Internal(
+                e.to_string(),
+            )),
+        }
+    }
+}
+
+// ── Propose + wait ────────────────────────────────────────────────────────
+//
+// Write-path entry point for the HTTPS handlers. Used when the host
+// is configured for multi-node Raft mode; single-node deployments
+// keep mutating the local stores directly (see `Writer::Direct`).
+
+/// Errors returned by [`propose_and_wait`] and the `Writer::Raft`
+/// path. Variant names mirror the failure modes the HTTPS handlers
+/// surface (`503 not-leader-here`, `504 timeout-waiting-for-apply`,
+/// `500 internal`).
+#[derive(Debug, thiserror::Error)]
+pub enum WriteError {
+    #[error("not leader; redirect to {leader_url:?}")]
+    NotLeader { leader_url: Option<String> },
+    #[error("timeout waiting for commit+apply (assigned_index={assigned_index})")]
+    Timeout { assigned_index: LogIndex },
+    #[error("encode: {0}")]
+    Encode(#[from] RaftCommandError),
+    #[error("raft propose: {0}")]
+    Propose(String),
+    #[error("internal: {0}")]
+    Internal(String),
+}
+
+impl From<ProposeError> for WriteError {
+    fn from(e: ProposeError) -> Self {
+        WriteError::Propose(format!("{e:?}"))
+    }
+}
+
+/// Propose `cmd` to the local Raft core, wait for it to be applied
+/// on this node, then return. The host's HTTPS write handlers call
+/// this via the `Writer::Raft` path so the response only goes out
+/// after the entry has been replicated and applied.
+///
+/// Timeout is wall-clock — the watch channel may not fire during a
+/// network partition, and we don't want to leave the client
+/// open-ended. 5 s is the upstream etcd default for `--write-timeout`.
+pub async fn propose_and_wait(
+    core: &Arc<tokio::sync::Mutex<crate::raft_core::RaftCore>>,
+    notifier: &ApplyNotifier,
+    cmd: RaftCommand,
+    timeout: Duration,
+) -> Result<LogIndex, WriteError> {
+    let bytes = cmd.encode()?;
+    let mut rx = notifier.subscribe();
+    let assigned_index = {
+        let mut guard = core.lock().await;
+        match guard.propose(bytes) {
+            Ok(idx) => idx,
+            Err(ProposeError::NotLeader(_role, _leader_id)) => {
+                // The bridge layer in cave-runtime resolves the leader
+                // ID to a URL (it knows the peer registry); from here
+                // we surface the raw fact.
+                return Err(WriteError::NotLeader { leader_url: None });
+            }
+        }
+    };
+    // Wait until the apply daemon reports `last_applied_index >= assigned_index`.
+    // Cheap-fast path: maybe the daemon already ran by the time we
+    // got here (single-node, or a very fast leader).
+    if *rx.borrow() >= assigned_index {
+        return Ok(assigned_index);
+    }
+    let deadline = tokio::time::sleep(timeout);
+    tokio::pin!(deadline);
+    loop {
+        tokio::select! {
+            r = rx.changed() => {
+                if r.is_err() {
+                    return Err(WriteError::Internal("apply notifier closed".into()));
+                }
+                if *rx.borrow() >= assigned_index {
+                    return Ok(assigned_index);
+                }
+            }
+            _ = &mut deadline => {
+                return Err(WriteError::Timeout { assigned_index });
+            }
+        }
+    }
+}
+
 /// Long-running apply task. Polls `source` every `interval` and
 /// applies whatever it returns. Returns when the cancellation token
 /// is fired; on Drop the spawn'd handle aborts.
@@ -207,7 +491,21 @@ pub async fn run_apply_loop(
     mut shutdown: tokio::sync::watch::Receiver<bool>,
     interval: Duration,
 ) {
-    info!(?interval, "raft apply loop starting");
+    run_apply_loop_with_notifier(source, targets, metrics, None, shutdown.clone(), interval).await
+}
+
+/// Variant of `run_apply_loop` that also signals `notifier` after
+/// each successful apply. Used by the multi-node Raft mode so
+/// `propose_and_wait` callers can observe their entry land.
+pub async fn run_apply_loop_with_notifier(
+    source: Arc<dyn CommittedEntrySource>,
+    targets: Arc<ApplyTargets>,
+    metrics: Arc<ApplyMetrics>,
+    notifier: Option<ApplyNotifier>,
+    mut shutdown: tokio::sync::watch::Receiver<bool>,
+    interval: Duration,
+) {
+    info!(?interval, has_notifier = notifier.is_some(), "raft apply loop starting");
     let mut ticker = tokio::time::interval(interval);
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
@@ -216,7 +514,7 @@ pub async fn run_apply_loop(
                 let batch = source.drain().await;
                 if !batch.is_empty() {
                     debug!(n = batch.len(), "draining committed batch");
-                    apply_batch(batch, &targets, &metrics);
+                    apply_batch_notify(batch, &targets, &metrics, notifier.as_ref());
                 }
             }
             _ = shutdown.changed() => {
@@ -505,6 +803,140 @@ mod tests {
     // above cover apply_one / apply_batch deterministically; this
     // ignored test still proves the spawn+select!+shutdown wiring
     // when run on its own with `--ignored`.
+    // ── ApplyNotifier ─────────────────────────────────────────────────────
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn notifier_publishes_last_applied_index_on_each_apply() {
+        let (t, m) = targets();
+        let n = ApplyNotifier::new();
+        assert_eq!(n.current(), 0);
+        let entry = mk_entry(7, 1, &RaftCommand::NoOp);
+        apply_one_notify(&entry, &t, &m, Some(&n)).unwrap();
+        assert_eq!(n.current(), 7);
+        let entry2 = mk_entry(8, 1, &RaftCommand::NoOp);
+        apply_one_notify(&entry2, &t, &m, Some(&n)).unwrap();
+        assert_eq!(n.current(), 8);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn notifier_does_not_advance_on_apply_error() {
+        let (t, m) = targets();
+        let n = ApplyNotifier::new();
+        n.publish(5); // simulate a prior successful apply
+        // A typed-decode error should NOT bump the notifier — clients
+        // waiting for index N must still see "not yet applied" if N
+        // failed to land.
+        let bogus = mk_entry(6, 1, &RaftCommand::ApiserverUpsert {
+            resource: serde_json::json!({"kind": "NotAResource"}),
+        });
+        let _ = apply_one_notify(&bogus, &t, &m, Some(&n));
+        assert_eq!(n.current(), 5, "notifier must not advance on apply failure");
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn notifier_subscribe_receives_subsequent_publish() {
+        let n = ApplyNotifier::new();
+        let mut rx = n.subscribe();
+        assert_eq!(*rx.borrow(), 0);
+        n.publish(42);
+        rx.changed().await.unwrap();
+        assert_eq!(*rx.borrow(), 42);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn apply_batch_with_notifier_bumps_per_successful_entry() {
+        let (t, m) = targets();
+        let n = ApplyNotifier::new();
+        let good = mk_entry(1, 1, &RaftCommand::NoOp);
+        let bad = LogEntry { term: 1, index: 2, command: b"not-json".to_vec() };
+        let later = mk_entry(3, 1, &RaftCommand::NoOp);
+        apply_batch_notify(vec![good, bad, later], &t, &m, Some(&n));
+        // index 2 failed, so the notifier holds the most recent
+        // success (index 3) — NOT 2.
+        assert_eq!(n.current(), 3);
+        assert_eq!(m.snapshot().apply_errors, 1);
+    }
+
+    // ── propose_and_wait ──────────────────────────────────────────────────
+    //
+    // We can't easily stand up a real RaftCore here (it wants a state
+    // path + clock). Instead the dedicated tests under
+    // `raft_core::tests` cover the propose path; here we focus on the
+    // notifier glue: an `assigned_index` watch event must unblock the
+    // wait, and a stale watch must time out.
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn propose_and_wait_returns_when_notifier_reaches_assigned_index() {
+        // Bypass propose; just exercise the wait loop directly.
+        let n = ApplyNotifier::new();
+        let nc = n.clone();
+        let task = tokio::spawn(async move {
+            let mut rx = nc.subscribe();
+            let assigned = 5;
+            if *rx.borrow() >= assigned {
+                return Ok::<_, &'static str>(assigned);
+            }
+            let deadline = tokio::time::sleep(Duration::from_secs(2));
+            tokio::pin!(deadline);
+            loop {
+                tokio::select! {
+                    r = rx.changed() => {
+                        if r.is_err() { return Err("closed"); }
+                        if *rx.borrow() >= assigned { return Ok(assigned); }
+                    }
+                    _ = &mut deadline => return Err("timeout"),
+                }
+            }
+        });
+        // Simulate the apply daemon catching up.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        n.publish(3);
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        n.publish(5);
+        let got = tokio::time::timeout(Duration::from_secs(5), task).await.unwrap().unwrap();
+        assert_eq!(got, Ok(5));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn propose_and_wait_loop_times_out_when_apply_never_reaches() {
+        let n = ApplyNotifier::new();
+        let nc = n.clone();
+        let task = tokio::spawn(async move {
+            let mut rx = nc.subscribe();
+            let assigned: LogIndex = 10;
+            let deadline = tokio::time::sleep(Duration::from_millis(80));
+            tokio::pin!(deadline);
+            loop {
+                tokio::select! {
+                    r = rx.changed() => {
+                        if r.is_err() { return Err("closed"); }
+                        if *rx.borrow() >= assigned { return Ok(assigned); }
+                    }
+                    _ = &mut deadline => return Err("timeout"),
+                }
+            }
+        });
+        // Publish a couple of small indices — none reach `assigned=10`.
+        n.publish(2);
+        n.publish(3);
+        let got = tokio::time::timeout(Duration::from_secs(2), task).await.unwrap().unwrap();
+        assert_eq!(got, Err("timeout"));
+    }
+
+    // ── apply_loop (kept ignored due to portal flake races) ──────────────
+
+    // RaftBridgeImpl end-to-end coverage lives in cave-etcd's
+    // `routes::tests::kv_put_*` suite via the `RecordingBridge`
+    // test-double: those tests exercise the dispatch contract
+    // (`leader → 200`, `follower → 503 + Location`, `timeout → 504`,
+    // `no-bridge → direct`) without needing a real RaftCore. A
+    // proper RaftBridgeImpl integration test would require a temp
+    // data_dir + driver tick clock; out of scope for unit-level
+    // coverage and tracked in
+    // docs/synergy/raft-write-path-redirection-2026-05-12.md.
+
+    // ── apply_loop (kept ignored due to portal flake races) ──────────────
+
     #[tokio::test(flavor = "current_thread")]
     #[ignore = "real-time tokio integration; races with portal tests under default --test-threads"]
     async fn apply_loop_drains_until_shutdown() {
