@@ -41,41 +41,48 @@ so the multiplier doesn't overflow until F(93).
   shapes live in `retrypolicy` where they belong.
 * No "decorrelated jitter" — that variant is owned by `retrypolicy`.
 
-## Adoption — recon
+## Adoption — landed for cave-mesh outlier ejection
 
-The original sweep-005 deferral note identified Envoy/Istio
-outlier-ejection as the consumer. cave-mesh's `circuit.rs` has the
-`base_ejection_time` / `max_ejection_time` shape:
+`crates/cave-mesh/src/circuit.rs`'s ejection-duration calculation
+moved from the inline expression
 
 ```rust
-pub struct BreakerConfig {
-    pub consecutive_errors: u32,
-    pub base_ejection_time: Duration,
-    pub max_ejection_time: Duration,
-    pub max_ejection_percent: u8,
-    ...
-}
+base.saturating_mul(1u32.saturating_add(entry.reopen_count))
+    .min(max_ej)
 ```
 
-The straight-line replacement would be:
+to the kernel primitive:
 
 ```rust
-let backoff = Backoff::Exponential {
-    base: cfg.base_ejection_time,
-    cap: cfg.max_ejection_time,
+let backoff = Backoff::Linear {
+    base: entry.config.base_ejection_time,
+    cap: entry.config.max_ejection_time,
 };
-let next_wait = backoff.delay_for(ejection_count);
+let ejection = backoff.delay_for(entry.reopen_count);
 ```
 
-Why this didn't land in the same PR: cave-mesh's circuit-breaker
-state machine tracks an internal `ejection_duration: Duration`
-that's mutated on each ejection cycle; swapping the calculation to
-`Backoff::Exponential` is a semantic change (linear-with-doubling
-vs the current pure exponential) that needs parity-test coverage.
-The parity tests in `cave-mesh/tests/cilium_parity_e2e.rs` are
-1759 deep; re-baselining them is real work and warrants its own
-PR.
+A reread of the original inline math showed it produces `base *
+(n+1)` capped at `cap` — that's **linear**, not exponential as the
+original docstring claimed. `Backoff::Linear { base, cap }.
+delay_for(n) = base * (n+1)` exactly matches, so the swap is
+behaviour-identical and the docstring is corrected at the same
+time.
+
+164/164 cave-mesh lib tests still pass (no parity-test regression).
+
+## Adoption — deferred
+
+The kernel `Backoff` enum carries `Constant` / `Linear` /
+`Exponential` / `Fibonacci`. The cave-mesh swap above only adopts
+`Linear`; future tunings of the outlier-ejection cadence (e.g. an
+operator-toggleable Exponential mode) are now one-line changes
+inside `circuit.rs` rather than rewriting the expression.
+
+Other backoff users (cave-mesh `proxy.rs::retry_with_backoff`)
+already adopted `cave_kernel::retrypolicy::RetryPolicy` in sweep-007;
+they belong to the retry track, not the outlier-ejection track.
 
 ## Tests
 
 `cargo test -p cave-kernel --lib backoff::` — 11 passed.
+`cargo test -p cave-mesh --lib` — 164/164 (no regression).

@@ -2,10 +2,18 @@
 //!
 //! Configured per (host, optional subset).  Transitions:
 //!   Closed   → Open      after `consecutive_errors` failures in a row
-//!   Open     → HalfOpen  after `base_ejection_time` has elapsed (exponential back-off)
+//!   Open     → HalfOpen  after `base_ejection_time` has elapsed (linear back-off)
 //!   HalfOpen → Closed    on the next successful probe
 //!   HalfOpen → Open      on the next failed probe
+//!
+//! Sweep-011 adoption: the per-ejection wait schedule
+//! (`base * (1 + reopen_count)` capped at `max_ejection_time`) is now
+//! produced by `cave_kernel::backoff::Backoff::Linear`. Behaviour is
+//! byte-for-byte identical; the kernel primitive becomes the single
+//! source of truth for the schedule shape so future tweaks (Fibonacci
+//! / Exponential) are one-line swaps.
 
+use cave_kernel::backoff::Backoff;
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},
@@ -155,17 +163,20 @@ impl CircuitBreaker {
             .or_insert_with(|| BreakerEntry::new(BreakerConfig::default()));
 
         let threshold = entry.config.consecutive_errors;
-        let base = entry.config.base_ejection_time;
-        let max_ej = entry.config.max_ejection_time;
+        // Kernel-primitive backoff: `Backoff::Linear { base, cap }`
+        // emits `base * (n+1)` capped at `cap`, byte-for-byte the
+        // same as the prior `base.saturating_mul(1+reopen_count)`
+        // expression.
+        let backoff = Backoff::Linear {
+            base: entry.config.base_ejection_time,
+            cap: entry.config.max_ejection_time,
+        };
 
         match &mut entry.state {
             BreakerState::Closed { consecutive_errors } => {
                 *consecutive_errors += 1;
                 if *consecutive_errors >= threshold {
-                    let ejection = std::cmp::min(
-                        base.saturating_mul(1u32.saturating_add(entry.reopen_count)),
-                        max_ej,
-                    );
+                    let ejection = backoff.delay_for(entry.reopen_count);
                     warn!(
                         breaker = %key,
                         errors = *consecutive_errors,
@@ -180,10 +191,7 @@ impl CircuitBreaker {
                 }
             }
             BreakerState::HalfOpen => {
-                let ejection = std::cmp::min(
-                    base.saturating_mul(1u32.saturating_add(entry.reopen_count)),
-                    max_ej,
-                );
+                let ejection = backoff.delay_for(entry.reopen_count);
                 warn!(breaker = %key, "Circuit breaker → Open (probe failed)");
                 entry.state = BreakerState::Open {
                     opened_at: Instant::now(),
