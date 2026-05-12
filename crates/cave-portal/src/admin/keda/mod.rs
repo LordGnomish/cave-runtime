@@ -1,9 +1,22 @@
-//! `/admin/keda` view — ScaledObject list, trigger summary, scale-event history.
+//! `/admin/keda` views — KEDA ScaledObject, ScaledJob, TriggerAuthentication,
+//! scaler-catalog browser, and per-scaler metrics.
 //!
-//! Mirrors KEDA's `/scaledobjects` + scaling-event log in upstream
-//! `kedacore/keda`. The view is read-mostly; the only mutator exposed is
-//! `pause` / `resume`, which corresponds to setting the `autoscaling.keda.sh/paused`
-//! annotation on the ScaledObject.
+//! Ported from upstream `kedacore/keda` v2.14:
+//! * `apis/keda/v1alpha1/scaledobject_types.go`
+//! * `apis/keda/v1alpha1/scaledjob_types.go`
+//! * `apis/keda/v1alpha1/triggerauthentication_types.go`
+//! * `pkg/scalers/*` for the catalog rows.
+//!
+//! The top-level overview (this module) shows the per-tenant ScaledObject
+//! table + scaling-event tail. The sub-modules below render the dedicated
+//! CRUD pages and the catalog.
+
+pub mod metrics;
+pub mod scaled_objects;
+pub mod scaled_jobs;
+pub mod scalers;
+pub mod trigger_authentications;
+pub mod types;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};

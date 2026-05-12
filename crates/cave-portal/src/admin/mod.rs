@@ -226,6 +226,14 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::LedgerRead,
         Permission::OncallRead,
         Permission::SearchRead,
+        Permission::KedaScaledObjectRead,
+        Permission::KedaScaledObjectWrite,
+        Permission::KedaScaledJobRead,
+        Permission::KedaScaledJobWrite,
+        Permission::KedaTriggerAuthRead,
+        Permission::KedaTriggerAuthWrite,
+        Permission::KedaScalerCatalog,
+        Permission::KedaMetricsRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -309,6 +317,128 @@ async fn keda_handler(
         tracing::warn!(error = %e, "keda materialise failed; falling back to cached rows");
     }
     keda::render(&state, &ctx).map(Html).map_err(err_to_response)
+}
+
+async fn keda_scaledobjects_list_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_objects::render_list(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledobjects_new_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_objects::render_new_form(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledobjects_detail_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Path((ns, name)): Path<(String, String)>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_objects::render_detail(&state, &ctx, &ns, &name)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledobjects_edit_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Path((ns, name)): Path<(String, String)>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_objects::render_edit_yaml(&state, &ctx, &ns, &name)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledobjects_delete_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Path((ns, name)): Path<(String, String)>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_objects::render_delete_confirm(&state, &ctx, &ns, &name)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledjobs_list_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_jobs::render_list(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scaledjobs_detail_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Path((ns, name)): Path<(String, String)>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scaled_jobs::render_detail(&state, &ctx, &ns, &name)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_triggerauth_list_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::trigger_authentications::render_list(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_triggerauth_detail_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Path((ns, name)): Path<(String, String)>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::trigger_authentications::render_detail(&state, &ctx, &ns, &name)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_scalers_list_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scalers::render(&ctx).map(Html).map_err(err_to_response)
+}
+
+async fn keda_scalers_detail_handler(
+    Path(kind): Path<String>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::scalers::render_detail(&ctx, &kind)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn keda_metrics_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    keda::metrics::render(&state, &ctx)
+        .map(Html)
+        .map_err(err_to_response)
 }
 
 async fn scheduler_handler(
@@ -657,6 +787,36 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/pg", get(pg_handler))
         .route("/admin/vault", get(vault_handler))
         .route("/admin/keda", get(keda_handler))
+        .route("/admin/keda/scaledobjects", get(keda_scaledobjects_list_handler))
+        .route("/admin/keda/scaledobjects/new", get(keda_scaledobjects_new_handler))
+        .route(
+            "/admin/keda/scaledobjects/{ns}/{name}",
+            get(keda_scaledobjects_detail_handler),
+        )
+        .route(
+            "/admin/keda/scaledobjects/{ns}/{name}/edit",
+            get(keda_scaledobjects_edit_handler),
+        )
+        .route(
+            "/admin/keda/scaledobjects/{ns}/{name}/delete",
+            get(keda_scaledobjects_delete_handler),
+        )
+        .route("/admin/keda/scaledjobs", get(keda_scaledjobs_list_handler))
+        .route(
+            "/admin/keda/scaledjobs/{ns}/{name}",
+            get(keda_scaledjobs_detail_handler),
+        )
+        .route(
+            "/admin/keda/triggerauthentications",
+            get(keda_triggerauth_list_handler),
+        )
+        .route(
+            "/admin/keda/triggerauthentications/{ns}/{name}",
+            get(keda_triggerauth_detail_handler),
+        )
+        .route("/admin/keda/scalers", get(keda_scalers_list_handler))
+        .route("/admin/keda/scalers/{kind}", get(keda_scalers_detail_handler))
+        .route("/admin/keda/metrics", get(keda_metrics_handler))
         .route("/admin/scheduler", get(scheduler_handler))
         .route("/admin/controller-manager", get(controller_manager_handler))
         .route("/admin/kubelet", get(kubelet_handler))

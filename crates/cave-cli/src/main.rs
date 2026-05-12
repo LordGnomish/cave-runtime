@@ -997,6 +997,47 @@ enum KedaCmd {
         /// ScaledObject name
         name: String,
     },
+
+    // ── 2026-05-12: new admin-portal-backed surface ────────────────────
+    /// Pretty-print a ScaledObject's full CRD detail (admin portal-backed)
+    #[command(name = "scaledobject-describe")]
+    ScaledObjectDescribe {
+        /// Namespace
+        #[arg(long)]
+        namespace: String,
+        /// ScaledObject name
+        name: String,
+    },
+    /// Apply a ScaledObject from a YAML file
+    #[command(name = "scaledobject-apply")]
+    ScaledObjectApply {
+        /// Path to a ScaledObject YAML manifest
+        #[arg(short, long)]
+        file: String,
+    },
+    /// Delete a ScaledObject by namespace/name
+    #[command(name = "scaledobject-delete")]
+    ScaledObjectDelete {
+        #[arg(long)]
+        namespace: String,
+        name: String,
+    },
+    /// Full ScaledJob detail by namespace/name
+    #[command(name = "scaledjob-describe")]
+    ScaledJobDescribe {
+        #[arg(long)]
+        namespace: String,
+        name: String,
+    },
+    /// Per-scaler-kind catalog entry (docs URL, metadata keys, example YAML)
+    #[command(name = "scaler-detail")]
+    ScalerDetail {
+        /// Scaler trigger type, e.g. `kafka`, `aws-sqs-queue`
+        kind: String,
+    },
+    /// Tenant-wide per-scaler Prometheus stats (events/min, errors/min, p50/p99)
+    #[command(name = "scaler-metrics")]
+    ScalerMetrics,
 }
 
 #[derive(Subcommand)]
@@ -3785,6 +3826,44 @@ source_root = "src"
                 ))
                 .await
             }
+            // ── 2026-05-12: admin-portal-backed paths ──────────────────
+            KedaCmd::ScaledObjectDescribe { namespace, name } => {
+                c.get(&format!(
+                    "/admin/keda/scaledobjects/{}/{}",
+                    urlencode(&namespace),
+                    urlencode(&name)
+                ))
+                .await
+            }
+            KedaCmd::ScaledObjectApply { file } => {
+                let body = tokio::fs::read_to_string(&file).await.map_err(|e| {
+                    anyhow::anyhow!("Failed to read {file}: {e}")
+                })?;
+                c.post("/api/keda/scaledobjects", json!({ "yaml": body })).await
+            }
+            KedaCmd::ScaledObjectDelete { namespace, name } => {
+                c.post(
+                    &format!(
+                        "/admin/keda/scaledobjects/{}/{}/delete",
+                        urlencode(&namespace),
+                        urlencode(&name)
+                    ),
+                    json!({}),
+                )
+                .await
+            }
+            KedaCmd::ScaledJobDescribe { namespace, name } => {
+                c.get(&format!(
+                    "/admin/keda/scaledjobs/{}/{}",
+                    urlencode(&namespace),
+                    urlencode(&name)
+                ))
+                .await
+            }
+            KedaCmd::ScalerDetail { kind } => {
+                c.get(&format!("/admin/keda/scalers/{}", urlencode(&kind))).await
+            }
+            KedaCmd::ScalerMetrics => c.get("/admin/keda/metrics").await,
         },
     }
 }
