@@ -283,3 +283,12 @@ local_path    = "/webhook/mutate"
 kind          = "http"
 upstream_path = "/kyverno/policies"
 local_path    = "/api/kyverno/policies"
+
+[portal_ui]
+upstream_ui  = "OPA Rego Playground"
+upstream_url = "https://play.openpolicyagent.org/"
+status       = "partial"
+loc          = 97
+priority     = "P1"
+notes        = "Policy editor"
+last_audit   = "2026-05-11"

@@ -341,3 +341,12 @@ local_path    = "/connectors"
 kind          = "http"
 upstream_path = "/connectors/{name}/status"
 local_path    = "/connectors/{name}/status"
+
+[portal_ui]
+upstream_ui  = "AKHQ / kafdrop (external)"
+upstream_url = "https://akhq.io/"
+status       = "partial"
+loc          = 293
+priority     = "P1"
+notes        = "Kafka topic browser"
+last_audit   = "2026-05-11"

@@ -393,3 +393,12 @@ local_path    = "/api/cluster/tenants/{id}"
 kind          = "http"
 upstream_path = "/version/supported"
 local_path    = "/api/cluster/versions"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://cluster-api.sigs.k8s.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Cluster-API CLI/CRD"
+last_audit   = "2026-05-11"

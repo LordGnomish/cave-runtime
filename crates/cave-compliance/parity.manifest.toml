@@ -485,3 +485,12 @@ local_path    = "/api/compliance/policy-mappings/suggest/{control_ref}"
 kind          = "http"
 upstream_path = "/api/compliance/health"
 local_path    = "/api/compliance/health"
+
+[portal_ui]
+upstream_ui  = "(cave-original)"
+upstream_url = "(internal)"
+status       = "partial"
+loc          = 3085
+priority     = "P2"
+notes        = "The /admin/compliance dashboard itself"
+last_audit   = "2026-05-11"

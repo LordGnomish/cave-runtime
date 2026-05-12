@@ -46,3 +46,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/slo/endpoint"
+
+[portal_ui]
+upstream_ui  = "OpenSLO (spec)"
+upstream_url = "https://openslo.com/"
+status       = "partial"
+loc          = 89
+priority     = "P2"
+notes        = "Spec-first, no canonical UI"
+last_audit   = "2026-05-11"

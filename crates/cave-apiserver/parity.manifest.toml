@@ -487,3 +487,12 @@ local_path    = "/apis/storage.k8s.io/v1/storageclasses"
 kind          = "http"
 upstream_path = "GET /apis/rbac.authorization.k8s.io/v1/clusterroles"
 local_path    = "/apis/rbac.authorization.k8s.io/v1/clusterroles"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (resources)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "partial"
+loc          = 142
+priority     = "P0"
+notes        = "Generic API resource explorer"
+last_audit   = "2026-05-11"

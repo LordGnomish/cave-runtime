@@ -134,3 +134,12 @@ local_path    = "/api/forensics/cases"
 kind          = "http"
 upstream_path = "/v1/events/evidence"
 local_path    = "/api/forensics/cases/{id}/evidence"
+
+[portal_ui]
+upstream_ui  = "Tetragon (CLI)"
+upstream_url = "https://tetragon.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "CLI-first"
+last_audit   = "2026-05-11"

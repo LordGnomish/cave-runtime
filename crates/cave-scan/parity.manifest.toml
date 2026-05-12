@@ -176,3 +176,12 @@ local_path    = "/api/scan/rules"
 kind          = "http"
 upstream_path = "/api/measures/component"
 local_path    = "/api/scan/coverage"
+
+[portal_ui]
+upstream_ui  = "SonarQube"
+upstream_url = "https://www.sonarsource.com/products/sonarqube/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Code-quality UI"
+last_audit   = "2026-05-11"

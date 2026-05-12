@@ -671,3 +671,12 @@ local_test    = "test_backup_status_enum_exists"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_pool_mode_enum_exists"
+
+[portal_ui]
+upstream_ui  = "CloudNativePG (CRD)"
+upstream_url = "https://cloudnative-pg.io/"
+status       = "partial"
+loc          = 300
+priority     = "P1"
+notes        = "Cluster lifecycle UI"
+last_audit   = "2026-05-11"

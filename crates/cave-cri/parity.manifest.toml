@@ -1130,3 +1130,12 @@ local_path    = "/api/cri/cgroup/v2/controllers"
 kind          = "http"
 upstream_path = "RuntimeService.CgroupV2DevicesProgram"
 local_path    = "/api/cri/cgroup/v2/devices/program"
+
+[portal_ui]
+upstream_ui  = "(CLI-only)"
+upstream_url = "https://containerd.io/"
+status       = "partial"
+loc          = 168
+priority     = "P2"
+notes        = "containerd is CLI"
+last_audit   = "2026-05-11"

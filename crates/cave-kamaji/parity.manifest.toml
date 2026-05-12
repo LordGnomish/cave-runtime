@@ -105,3 +105,12 @@ local_test    = "test_create_tenant_request_validation_20231027_101300"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_tenant_control_plane_lifecycle_20231027_101400"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://kamaji.clastix.io/"
+status       = "partial"
+loc          = 164
+priority     = "P2"
+notes        = "kamaji is CRD/CLI"
+last_audit   = "2026-05-11"

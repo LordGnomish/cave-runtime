@@ -348,3 +348,12 @@ local_path    = "/api/v1/cache/pubsub/{channel}"
 kind          = "http"
 upstream_path = "MULTI/EXEC pipeline"
 local_path    = "/api/v1/cache/pipeline"
+
+[portal_ui]
+upstream_ui  = "RedisInsight (external)"
+upstream_url = "https://redis.io/insight/"
+status       = "partial"
+loc          = 196
+priority     = "P0"
+notes        = "Key explorer, slow-log"
+last_audit   = "2026-05-11"

@@ -716,3 +716,12 @@ local_path    = "/api/scheduler/nodes"
 # KEP-4381: Dynamic Resource Allocation with Structured Parameters (GA in v1.36)
 # KEP-3633: PodAffinity matchLabelKeys (Beta in v1.31, GA target v1.36)
 # KEP-3094: minDomains in Pod Topology Spread (GA in v1.30; tracked here)
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (scheduling)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "partial"
+loc          = 214
+priority     = "P0"
+notes        = "Scheduler queue, predicates, priorities"
+last_audit   = "2026-05-11"

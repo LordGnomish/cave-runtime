@@ -44,3 +44,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/v1/workspaces/{slug}/projects/{pid}/issues/"
 # local_path    = "/api/tracker/issues"
+
+[portal_ui]
+upstream_ui  = "Linear / Plane"
+upstream_url = "https://linear.app/"
+status       = "scaffold"
+loc          = 75
+priority     = "P1"
+notes        = "Issue browser"
+last_audit   = "2026-05-11"

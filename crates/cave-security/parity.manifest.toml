@@ -320,3 +320,12 @@ local_path    = "/api/sbom/{image}"
 kind          = "http"
 upstream_path = "/api/security/health"
 local_path    = "/api/security/health"
+
+[portal_ui]
+upstream_ui  = "Falco (limited)"
+upstream_url = "https://falco.org/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Falcosidekick UI is partial"
+last_audit   = "2026-05-11"

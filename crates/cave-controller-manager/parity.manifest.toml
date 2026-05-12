@@ -54,3 +54,12 @@ local    = "src/endpointslice.rs"
 [[files]]
 upstream = "pkg/controller/service/controller.go"
 local    = "src/service.rs"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (controllers)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "partial"
+loc          = 132
+priority     = "P0"
+notes        = "Controller status surfaced via k8s_dashboard"
+last_audit   = "2026-05-11"

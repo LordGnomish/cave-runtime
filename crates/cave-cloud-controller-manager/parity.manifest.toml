@@ -480,3 +480,12 @@ local_test    = "test_zone_count_single"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_zone_count_multiple"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (cloud)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "partial"
+loc          = 133
+priority     = "P0"
+notes        = "Cloud-provider integration status"
+last_audit   = "2026-05-11"

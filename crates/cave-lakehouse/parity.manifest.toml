@@ -416,3 +416,12 @@ local_path    = "/api/lakehouse/query"
 kind          = "http"
 upstream_path = "/health"
 local_path    = "/api/lakehouse/health"
+
+[portal_ui]
+upstream_ui  = "Spark UI (per-app)"
+upstream_url = "https://spark.apache.org/docs/latest/web-ui.html"
+status       = "partial"
+loc          = 294
+priority     = "P1"
+notes        = "Iceberg snapshot + Spark job views"
+last_audit   = "2026-05-11"
