@@ -1,0 +1,1036 @@
+{
+  "crates": {
+    "cave-acme": {
+      "cave_src_loc": 662,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: likely smallstep/certificates ACME",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-admission": {
+      "cave_src_loc": 1620,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-ai-obs": {
+      "cave_src_loc": 408,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "langfuse/langfuse",
+      "upstream_version": "v2.0.0"
+    },
+    "cave-alerts": {
+      "cave_src_loc": 3829,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "prometheus/alertmanager",
+      "upstream_version": "v0.26.0"
+    },
+    "cave-apiserver": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": null,
+      "parity_ratio": 1.0,
+      "stubs": 0,
+      "tier": "100",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-artifacts": {
+      "cave_src_loc": 4994,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "sonatype/nexus-public",
+      "upstream_version": "v3.0.0"
+    },
+    "cave-auth": {
+      "cave_src_loc": 8236,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "keycloak/keycloak",
+      "upstream_version": "v22.0.0"
+    },
+    "cave-backup": {
+      "cave_src_loc": 2662,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "vmware-tanzu/velero",
+      "upstream_version": "v1.12.0"
+    },
+    "cave-cache": {
+      "cave_src_loc": 11602,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "redis/redis",
+      "upstream_version": "7.2.0"
+    },
+    "cave-cdc": {
+      "cave_src_loc": 1456,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: likely debezium / pg-logical-replication",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-certs": {
+      "cave_src_loc": 914,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "cert-manager/cert-manager",
+      "upstream_version": "v1.13.0"
+    },
+    "cave-changelog": {
+      "cave_src_loc": 463,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "towncrier/towncrier",
+      "upstream_version": "23.0.0"
+    },
+    "cave-chaos": {
+      "cave_src_loc": 1125,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "chaos-mesh/chaos-mesh",
+      "upstream_version": "v2.6.0"
+    },
+    "cave-chat": {
+      "cave_src_loc": 419,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "danny-avila/LibreChat",
+      "upstream_version": "v0.7.0"
+    },
+    "cave-cli": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "Operator CLI",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "E",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-cloud-controller-manager": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "6 fn missing, **0 tests / 0 surfaces declared**",
+      "parity_ratio": 0.4444,
+      "stubs": null,
+      "tier": "A",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-cluster": {
+      "cave_src_loc": 4873,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "kubernetes-sigs/cluster-api",
+      "upstream_version": "v1.6.0"
+    },
+    "cave-compliance": {
+      "cave_src_loc": 2289,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "open-policy-agent/gatekeeper",
+      "upstream_version": "v3.14.0"
+    },
+    "cave-container-scan": {
+      "cave_src_loc": 2340,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "aquasecurity/trivy",
+      "upstream_version": "v0.48.0"
+    },
+    "cave-controller-manager": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "10/10 files only, **3 stubs** in src",
+      "parity_ratio": 0.25,
+      "stubs": null,
+      "tier": "B",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-core": {
+      "cave_src_loc": 1990,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-cost": {
+      "cave_src_loc": 1965,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "opencost/opencost",
+      "upstream_version": "v1.108.0"
+    },
+    "cave-cost-alloc": {
+      "cave_src_loc": 1737,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "opencost/opencost",
+      "upstream_version": "v1.108.0"
+    },
+    "cave-cri": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": null,
+      "parity_ratio": 1.0,
+      "stubs": 0,
+      "tier": "100",
+      "upstream": "containerd/containerd",
+      "upstream_version": "v1.7.0"
+    },
+    "cave-crossplane": {
+      "cave_src_loc": 2328,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "crossplane/crossplane",
+      "upstream_version": "v1.14.0"
+    },
+    "cave-dashboard": {
+      "cave_src_loc": 8092,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "grafana/grafana",
+      "upstream_version": "v10.2.0"
+    },
+    "cave-dast": {
+      "cave_src_loc": 304,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "zaproxy/zaproxy",
+      "upstream_version": "v2.14.0"
+    },
+    "cave-datafusion": {
+      "cave_src_loc": 1921,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: apache/arrow-datafusion",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-db": {
+      "cave_src_loc": 707,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-deploy": {
+      "cave_src_loc": 4743,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "argoproj/argo-cd",
+      "upstream_version": "v2.9.0"
+    },
+    "cave-desktop": {
+      "cave_src_loc": 168,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "zed-industries/zed",
+      "upstream_version": "main"
+    },
+    "cave-devlake": {
+      "cave_src_loc": 526,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "apache/incubator-devlake",
+      "upstream_version": "v0.19.0"
+    },
+    "cave-dns": {
+      "cave_src_loc": 7796,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "coredns/coredns",
+      "upstream_version": "v1.11.0"
+    },
+    "cave-docdb": {
+      "cave_src_loc": 3622,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "mongodb/mongo",
+      "upstream_version": "7.0.0"
+    },
+    "cave-docs": {
+      "cave_src_loc": 460,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.20.0"
+    },
+    "cave-docs-site": {
+      "cave_src_loc": 2185,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-ebpf-common": {
+      "cave_src_loc": 127,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "cilium/cilium",
+      "upstream_version": "v1.14.0"
+    },
+    "cave-erp": {
+      "cave_src_loc": 5298,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "erpnext/erpnext",
+      "upstream_version": "v15.0.0"
+    },
+    "cave-etcd": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": null,
+      "parity_ratio": 1.0,
+      "stubs": 0,
+      "tier": "100",
+      "upstream": "etcd-io/etcd",
+      "upstream_version": "v3.5.13"
+    },
+    "cave-external-secrets": {
+      "cave_src_loc": 652,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "external-secrets/external-secrets",
+      "upstream_version": "v0.9.0"
+    },
+    "cave-flags": {
+      "cave_src_loc": 2948,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "Unleash/unleash",
+      "upstream_version": "v5.0.0"
+    },
+    "cave-forensics": {
+      "cave_src_loc": 210,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "cilium/tetragon",
+      "upstream_version": "v1.0.0"
+    },
+    "cave-gateway": {
+      "cave_src_loc": 12187,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "Kong/kong",
+      "upstream_version": "v3.5.0"
+    },
+    "cave-gitops-config": {
+      "cave_src_loc": 2182,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "fluxcd/flux2",
+      "upstream_version": "v2.1.0"
+    },
+    "cave-ha": {
+      "cave_src_loc": 5882,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "etcd-io/etcd",
+      "upstream_version": "v3.5.13"
+    },
+    "cave-hubble": {
+      "cave_src_loc": 572,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "cilium/hubble",
+      "upstream_version": "v0.13.0"
+    },
+    "cave-iceberg": {
+      "cave_src_loc": 1986,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: apache/iceberg",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-incidents": {
+      "cave_src_loc": 836,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "grafana/oncall",
+      "upstream_version": "v1.4.0"
+    },
+    "cave-infra": {
+      "cave_src_loc": 4648,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "hashicorp/terraform",
+      "upstream_version": "v1.6.0"
+    },
+    "cave-kamaji": {
+      "cave_src_loc": 199,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "clastix/kamaji",
+      "upstream_version": "v1.0.0"
+    },
+    "cave-keda": {
+      "cave_src_loc": 1145,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "kedacore/keda",
+      "upstream_version": "v2.12.0"
+    },
+    "cave-kernel": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "Shared parity calculator, ratelimiter, retry, reconcile primitives",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "E",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-knative": {
+      "cave_src_loc": 1167,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "knative/serving",
+      "upstream_version": "v1.12.0"
+    },
+    "cave-kube-proxy": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "10/10 files; **8 fn missing, 4 surfaces missing**",
+      "parity_ratio": 0.25,
+      "stubs": null,
+      "tier": "B",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-kubelet": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": null,
+      "parity_ratio": 1.0,
+      "stubs": 0,
+      "tier": "100",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-ledger": {
+      "cave_src_loc": 821,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-lint": {
+      "cave_src_loc": 625,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "SonarSource/sonarqube",
+      "upstream_version": "v10.3.0"
+    },
+    "cave-llm-gateway": {
+      "cave_src_loc": 3689,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "BerriAI/litellm",
+      "upstream_version": "v1.0.0"
+    },
+    "cave-local-llm": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "5/5 fn, 3/3 surf \u2014 **3 stubs** in src; needs file + test mappings",
+      "parity_ratio": 0.5,
+      "stubs": null,
+      "tier": "B",
+      "upstream": "huggingface/transformers",
+      "upstream_version": "v4.36"
+    },
+    "cave-logs": {
+      "cave_src_loc": 7285,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "grafana/loki",
+      "upstream_version": "v2.9.0"
+    },
+    "cave-mesh": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "8/8 files only \u2014 needs fn/test/surface mappings",
+      "parity_ratio": 0.25,
+      "stubs": null,
+      "tier": "B",
+      "upstream": "istio/istio",
+      "upstream_version": "1.20.0"
+    },
+    "cave-metrics": {
+      "cave_src_loc": 9530,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "prometheus/prometheus",
+      "upstream_version": "v2.48.0"
+    },
+    "cave-net": {
+      "cave_src_loc": 36645,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "cilium/cilium",
+      "upstream_version": "v1.19.3"
+    },
+    "cave-oncall": {
+      "cave_src_loc": 1846,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "grafana/oncall",
+      "upstream_version": "v1.4.0"
+    },
+    "cave-pam": {
+      "cave_src_loc": 353,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "gravitational/teleport",
+      "upstream_version": "v14.0.0"
+    },
+    "cave-permission": {
+      "cave_src_loc": 586,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: likely casbin / authzed",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-pg": {
+      "cave_src_loc": 2184,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "pgbouncer/pgbouncer",
+      "upstream_version": "1.21.0"
+    },
+    "cave-pii": {
+      "cave_src_loc": 204,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "microsoft/presidio",
+      "upstream_version": "v2.2.0"
+    },
+    "cave-pipelines": {
+      "cave_src_loc": 4211,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "tektoncd/pipeline",
+      "upstream_version": "v0.55.0"
+    },
+    "cave-pki": {
+      "cave_src_loc": 607,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: likely smallstep/certificates or hashicorp/vault PKI",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-policy": {
+      "cave_src_loc": 11624,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "open-policy-agent/opa",
+      "upstream_version": "v0.58.0"
+    },
+    "cave-portal": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "10/10 files only \u2014 needs fn/test/surface mappings",
+      "parity_ratio": 0.25,
+      "stubs": null,
+      "tier": "B",
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.20.0"
+    },
+    "cave-portal-api": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "Portal HTTP API attribution endpoints",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "E",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-portal-web": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "Static web bundle for the portal UI",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "E",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-profiler": {
+      "cave_src_loc": 180,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "grafana/pyroscope",
+      "upstream_version": "v1.3.0"
+    },
+    "cave-rdbms": {
+      "cave_src_loc": 5073,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "postgres/postgres",
+      "upstream_version": "16.0"
+    },
+    "cave-registry": {
+      "cave_src_loc": 5540,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "goharbor/harbor",
+      "upstream_version": "v2.10.0"
+    },
+    "cave-rollouts": {
+      "cave_src_loc": 1898,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "argoproj/argo-rollouts",
+      "upstream_version": "v1.6.0"
+    },
+    "cave-runbook": {
+      "cave_src_loc": 3237,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-runtime": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "Single-binary orchestrator hosting all module routers",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "E",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-sbom": {
+      "cave_src_loc": 434,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "DependencyTrack/dependency-track",
+      "upstream_version": "v4.9.0"
+    },
+    "cave-scaffold": {
+      "cave_src_loc": 1398,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.20.0"
+    },
+    "cave-scan": {
+      "cave_src_loc": 1189,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "SonarSource/sonarqube",
+      "upstream_version": "v10.3.0"
+    },
+    "cave-scheduler": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": null,
+      "parity_ratio": 1.0,
+      "stubs": 0,
+      "tier": "100",
+      "upstream": "kubernetes/kubernetes",
+      "upstream_version": "v1.28.0"
+    },
+    "cave-search": {
+      "cave_src_loc": 172,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: likely opensearch-project/OpenSearch",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-secrets": {
+      "cave_src_loc": 648,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "trufflesecurity/trufflehog",
+      "upstream_version": "v3.63.0"
+    },
+    "cave-security": {
+      "cave_src_loc": 6350,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "falcosecurity/falco",
+      "upstream_version": "v0.36.0"
+    },
+    "cave-sign": {
+      "cave_src_loc": 183,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "sigstore/sigstore",
+      "upstream_version": "v1.8.0"
+    },
+    "cave-slo": {
+      "cave_src_loc": 476,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "OpenSLO/OpenSLO",
+      "upstream_version": "v0.1.0"
+    },
+    "cave-spire": {
+      "cave_src_loc": 705,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "spiffe/spire",
+      "upstream_version": "v1.9.0"
+    },
+    "cave-status": {
+      "cave_src_loc": 450,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "louislam/uptime-kuma",
+      "upstream_version": "v1.23.0"
+    },
+    "cave-store": {
+      "cave_src_loc": 10711,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "minio/minio",
+      "upstream_version": null
+    },
+    "cave-streams": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "3 fn missing, 2 surfaces missing",
+      "parity_ratio": 0.7159,
+      "stubs": null,
+      "tier": "A",
+      "upstream": "apache/kafka",
+      "upstream_version": "3.6.0"
+    },
+    "cave-techdocs": {
+      "cave_src_loc": 835,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: backstage/backstage techdocs plugin",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-trace": {
+      "cave_src_loc": 8923,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "jaegertracing/jaeger",
+      "upstream_version": "v1.52.0"
+    },
+    "cave-tracing": {
+      "cave_src_loc": 2502,
+      "manifest_filled": null,
+      "note": "needs manifest; likely upstream: needs target \u2014 possibly opentelemetry-rust or jaeger client",
+      "parity_ratio": null,
+      "stubs": null,
+      "tier": "D2",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-tracker": {
+      "cave_src_loc": 4898,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "linear-app/linear",
+      "upstream_version": "v1.0.0"
+    },
+    "cave-upstream": {
+      "cave_src_loc": 3519,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
+    "cave-uptime": {
+      "cave_src_loc": 299,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "louislam/uptime-kuma",
+      "upstream_version": "v1.23.0"
+    },
+    "cave-vault": {
+      "cave_src_loc": null,
+      "manifest_filled": true,
+      "note": "1 fn missing, 1 surface missing, **0 tests declared** \u2014 needs test mapping pass",
+      "parity_ratio": 0.6625,
+      "stubs": null,
+      "tier": "A",
+      "upstream": "hashicorp/vault",
+      "upstream_version": "v1.15.0"
+    },
+    "cave-vcluster": {
+      "cave_src_loc": 532,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "loft-sh/vcluster",
+      "upstream_version": "v0.19.0"
+    },
+    "cave-vulns": {
+      "cave_src_loc": 384,
+      "manifest_filled": false,
+      "note": "skeleton \u2014 needs real impl",
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "D1",
+      "upstream": "DefectDojo/django-DefectDojo",
+      "upstream_version": "v2.28.0"
+    },
+    "cave-workflows": {
+      "cave_src_loc": 666,
+      "manifest_filled": false,
+      "note": null,
+      "parity_ratio": 0.0,
+      "stubs": null,
+      "tier": "C",
+      "upstream": "n8n-io/n8n",
+      "upstream_version": "v1.0.0"
+    }
+  },
+  "generated_at": "2026-05-01",
+  "generated_from": "docs/parity/full-audit-2026-05-01.md"
+}
