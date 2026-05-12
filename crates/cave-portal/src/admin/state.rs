@@ -12,8 +12,9 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::sync::RwLock;
+use std::sync::{OnceLock, RwLock};
 
+use crate::admin::runtime_client::{RuntimeError, SharedRuntime};
 use crate::admin::types::TenantId;
 
 // ── etcd ──────────────────────────────────────────────────────────────────
@@ -984,6 +985,13 @@ pub struct ActivityEntry {
 
 #[derive(Debug)]
 pub struct AdminState {
+    /// Real-runtime data source set at startup (one-shot via
+    /// `set_runtime_client`). When `None`, admin views read directly
+    /// from the seeded `RwLock<Vec<T>>` fixtures below — the legacy
+    /// development workflow is unchanged. When set, the `materialise_*`
+    /// methods refresh the corresponding collection from the live
+    /// cave-apiserver before each render.
+    pub runtime_client: OnceLock<SharedRuntime>,
     pub etcd_kv: RwLock<Vec<EtcdKv>>,
     pub etcd_leases: RwLock<Vec<EtcdLease>>,
     pub etcd_event_log: RwLock<Vec<EtcdEvent>>,
@@ -1082,10 +1090,72 @@ impl Default for AdminState {
 }
 
 impl AdminState {
+    /// Install a real-runtime data source for this state. Idempotent —
+    /// the first call wins; subsequent calls silently no-op so concurrent
+    /// startup hooks can't double-install.
+    pub fn set_runtime_client(&self, client: SharedRuntime) {
+        let _ = self.runtime_client.set(client);
+    }
+
+    /// `Some(client)` when a real apiserver client has been installed.
+    pub fn runtime(&self) -> Option<&SharedRuntime> {
+        self.runtime_client.get()
+    }
+
+    /// If a real runtime is installed, fetch the live kubelet pods for
+    /// the given tenant and overwrite `self.kubelet_pods` for that
+    /// tenant in place. Returns `Ok(())` whether the materialiser fired
+    /// or not (no runtime = no-op).
+    pub async fn materialise_kubelet_pods(&self, tenant: &TenantId) -> Result<(), RuntimeError> {
+        let Some(rt) = self.runtime() else {
+            return Ok(());
+        };
+        let fresh = rt.list_kubelet_pods(tenant).await?;
+        replace_tenant_rows(&self.kubelet_pods, tenant, fresh, |r| &r.tenant);
+        Ok(())
+    }
+
+    pub async fn materialise_scheduler_nodes(
+        &self,
+        tenant: &TenantId,
+    ) -> Result<(), RuntimeError> {
+        let Some(rt) = self.runtime() else {
+            return Ok(());
+        };
+        let fresh = rt.list_scheduler_nodes(tenant).await?;
+        replace_tenant_rows(&self.scheduler_nodes, tenant, fresh, |r| &r.tenant);
+        Ok(())
+    }
+
+    pub async fn materialise_net_endpoints(
+        &self,
+        tenant: &TenantId,
+    ) -> Result<(), RuntimeError> {
+        let Some(rt) = self.runtime() else {
+            return Ok(());
+        };
+        let fresh = rt.list_net_endpoints(tenant).await?;
+        replace_tenant_rows(&self.net_endpoints, tenant, fresh, |r| &r.tenant);
+        Ok(())
+    }
+
+    pub async fn materialise_keda_scaled_objects(
+        &self,
+        tenant: &TenantId,
+    ) -> Result<(), RuntimeError> {
+        let Some(rt) = self.runtime() else {
+            return Ok(());
+        };
+        let fresh = rt.list_keda_scaled_objects(tenant).await?;
+        replace_tenant_rows(&self.keda_scaled_objects, tenant, fresh, |r| &r.tenant);
+        Ok(())
+    }
+
     /// Empty state — used by integration tests that want to push their
     /// own fixtures.
     pub fn empty() -> Self {
         Self {
+            runtime_client: OnceLock::new(),
             etcd_kv: RwLock::new(Vec::new()),
             etcd_leases: RwLock::new(Vec::new()),
             etcd_event_log: RwLock::new(Vec::new()),
@@ -1674,6 +1744,23 @@ where
     F: Fn(&T) -> &TenantId,
 {
     rows.iter().filter(|r| f(r) == tenant).collect()
+}
+
+/// Replace all rows for `tenant` in `lock` with `fresh`. Rows belonging
+/// to other tenants are preserved — the materialise path is per-tenant,
+/// not a global wipe, so two concurrent calls for different tenants
+/// don't stomp on each other.
+pub fn replace_tenant_rows<T, F>(
+    lock: &RwLock<Vec<T>>,
+    tenant: &TenantId,
+    fresh: Vec<T>,
+    tenant_of: F,
+) where
+    F: Fn(&T) -> &TenantId,
+{
+    let mut guard = lock.write().expect("admin-state lock poisoned");
+    guard.retain(|r| tenant_of(r) != tenant);
+    guard.extend(fresh);
 }
 
 /// Tally helper used by tenant_dashboard.
