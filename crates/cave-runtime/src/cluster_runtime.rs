@@ -34,6 +34,8 @@ use tokio::fs;
 use tracing::{info, warn};
 
 use crate::cluster::ClusterManifest;
+use crate::raft_core::RaftCore;
+use crate::raft_driver::{self, RaftHandle};
 use crate::raft_transport::{
     handle_members, handle_raft_message, heartbeat_loop, election_timer_loop, Peer, PeerRegistry,
     RaftListenerState,
@@ -53,6 +55,9 @@ pub struct ClusterRuntime {
     pub ca_cert_pem: String,
     pub ca_key_pem: String,
     pub peer_registry: Arc<PeerRegistry>,
+    /// Raft consensus state machine (shared via Mutex; the driver task
+    /// + HTTP handlers all lock through this).
+    pub raft: RaftHandle,
 }
 
 impl ClusterRuntime {
@@ -112,6 +117,8 @@ impl ClusterRuntime {
             let local_id = manifest.local_node_id.unwrap_or(1);
             let local_url = format!("https://{}", manifest.advertise_address);
             let peer_registry = Arc::new(PeerRegistry::new(local_id, local_url));
+            // Collect member ids for the Raft cluster (includes local).
+            let mut member_ids: Vec<u64> = vec![local_id];
             for p in &manifest.peers {
                 if let Some((id_str, addr)) = parse_peer_entry(p) {
                     if let Ok(id) = id_str.parse::<u64>() {
@@ -119,9 +126,20 @@ impl ClusterRuntime {
                             id,
                             url: ensure_https(&addr),
                         });
+                        if !member_ids.contains(&id) {
+                            member_ids.push(id);
+                        }
                     }
                 }
             }
+            member_ids.sort();
+            let raft_core =
+                RaftCore::load_or_init(local_id, member_ids, &dd, std::time::Instant::now())
+                    .context("raft core init")?;
+            let raft = RaftHandle {
+                core: Arc::new(tokio::sync::Mutex::new(raft_core)),
+                registry: peer_registry.clone(),
+            };
             return Ok(Some(Self {
                 manifest,
                 data_dir: dd,
@@ -131,6 +149,7 @@ impl ClusterRuntime {
                 ca_cert_pem,
                 ca_key_pem,
                 peer_registry,
+                raft,
             }));
         }
         Ok(None)
@@ -173,7 +192,11 @@ impl ClusterRuntime {
             self.ca_cert_pem.clone(),
             self.ca_key_pem.clone(),
             self.peer_registry.clone(),
-        );
+        )
+        // Mount the Raft-consensus routes (RPC + leader-info + propose).
+        // They live on the same TLS listener so a peer's CA-pinned reqwest
+        // client reaches them without a separate trust store.
+        .merge(crate::raft_driver::router(self.raft.clone()));
 
         let etcd_handle = tokio::spawn(async move {
             info!(addr = %etcd_addr, "cave-etcd TLS listener starting");
@@ -260,6 +283,20 @@ impl ClusterRuntime {
                 warn!(error = %e, "raft election timer ended");
             }
         });
+
+        // Raft consensus driver — ticks RaftCore every 50 ms, fans out
+        // RequestVote / AppendEntries RPCs to peers, routes replies back.
+        // Single-node clusters skip the driver entirely (no peers to talk
+        // to); multi-node spawns it.
+        if self.manifest.peers.len() > 0 {
+            let raft_handle = self.raft.clone();
+            let ca_for_raft = self.ca_cert_pem.clone();
+            tokio::spawn(async move {
+                if let Err(e) = raft_driver::run_driver(raft_handle, ca_for_raft).await {
+                    warn!(error = %e, "raft consensus driver ended");
+                }
+            });
+        }
 
         Ok(vec![etcd_handle, api_handle])
     }
