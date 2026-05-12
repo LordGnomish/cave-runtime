@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 cave-core = { path = "../cave-core" }
 cave-db = { path = "../cave-db" }
+cave-kernel = { path = "../cave-kernel" }
 axum = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

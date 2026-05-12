@@ -46,7 +46,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Semaphore;
+// Sweep-010 adoption: switched from `tokio::sync::Semaphore` to the
+// kernel primitive. The kernel re-exports the tokio semaphore
+// underneath, so cancellation + fairness are identical; only the
+// import path changes. The `permit` value type also changes
+// (`OwnedSemaphorePermit` → `cave_kernel::semaphore::Permit`) but
+// callers only hold it for its drop side-effect.
+use cave_kernel::semaphore::Semaphore;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -239,7 +245,10 @@ impl Daemon {
             return Ok(report);
         }
 
-        let sem = Arc::new(Semaphore::new(self.cfg.concurrency.max(1)));
+        // `cave_kernel::semaphore::Semaphore` is internally `Arc`-wrapped
+        // and implements `Clone`, so the prior `Arc::new(Semaphore::new(..))`
+        // double-wrap goes away.
+        let sem = Semaphore::new(self.cfg.concurrency.max(1));
         let client = reqwest::Client::builder()
             .user_agent(&self.cfg.user_agent)
             .timeout(self.cfg.request_timeout)
@@ -276,7 +285,9 @@ impl Daemon {
             let user_agent = self.cfg.user_agent.clone();
 
             futs.push(async move {
-                let _permit = sem.acquire().await.expect("semaphore not closed");
+                // Kernel semaphore's `acquire()` is infallible (the inner
+                // tokio handle is never explicitly closed).
+                let _permit = sem.acquire().await;
                 let cfg_borrowed = PollConfig {
                     github_api_base: &cfg.api_base,
                     github_token: cfg.token.as_deref(),
