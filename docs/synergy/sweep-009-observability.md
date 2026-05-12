@@ -35,26 +35,48 @@ Three shapes, OTEL/Prometheus-faithful:
 * No tracing propagator (`traceparent` header parsing) — call sites
   that need it pull the existing `tracing_opentelemetry` crate.
 
-## Adoption — deferred
+## Adoption — pilot landed, full migration deferred
 
 The brief named cave-mesh, cave-gateway, cave-portal-api as target
 adopters. All three currently emit through the `tracing` macros
-directly. Migrating to the kernel `Tracer` trait would re-route
-their existing instrumentation through an indirection layer; the
-sweep was scoped narrowly enough that doing both the primitive AND
-the migration in one commit would have bloated the diff past honest
-reviewability.
+directly. Migrating their full instrumentation surface to the kernel
+`Tracer` trait would re-route hundreds of `tracing::info!` /
+`tracing::span!` call sites — way too big for one PR.
 
-The primitive is the prerequisite; the adoption ticket can land
-next, gated on each crate's per-PR test surface:
+### Landed: cave-portal-api LogEntry → kernel LogRecord bridge
 
-* `cave-mesh` — 1759 tests; per-request span migration touches
-  `proxy.rs`, `xds.rs`, `traffic.rs` instrumentation.
+`crates/cave-portal-api/src/routes/logs.rs` now exposes:
+
+* `LogLevel::to_kernel()` — variant-by-variant cast to
+  `cave_kernel::observability::LogLevel`. Preserves ordering.
+* `LogEntry::as_kernel_record()` — converts a portal-api log entry
+  into a `cave_kernel::observability::LogRecord` with `tenant` /
+  `instance` / `id` surfacing as kernel record fields and the
+  portal's `app` becoming the kernel record's `target`. Best-effort
+  RFC3339 timestamp parsing (falls back to 0 on malformed input
+  rather than panicking).
+
+The bridge means an external log forwarder can ingest portal-api
+entries with the same `LogRecord` parser it uses for every other
+cave module — the kernel shape is the single wire contract.
+
+3 new tests (`level_to_kernel_preserves_ordering`,
+`as_kernel_record_surfaces_portal_fields_as_kernel_fields`,
+`as_kernel_record_handles_malformed_timestamp`); portal-api logs
+suite 18 → 21.
+
+### Deferred
+
+* `cave-mesh` — per-request span migration touches `proxy.rs`,
+  `xds.rs`, `traffic.rs` instrumentation; 1759 tests would need to
+  rebaseline against the new tracer.
 * `cave-gateway` — auth + circuit-breaker spans, ~600 tests to
   re-baseline.
-* `cave-portal-api` — audit log records (already structured —
-  shortest migration of the three).
+
+Both stay on `tracing::*` until a dedicated migration PR lands.
 
 ## Tests
 
 `cargo test -p cave-kernel --lib observability::` — 16 passed.
+`cargo test -p cave-portal-api --lib routes::logs::` — 21 passed
+(was 18 + 3 bridge tests).

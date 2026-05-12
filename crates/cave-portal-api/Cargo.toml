@@ -16,6 +16,7 @@ categories = ["api-bindings", "web-programming", "network-programming"]
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+cave-kernel = { path = "../cave-kernel" }
 cave-portal = { path = "../cave-portal" }
 cave-upstream = { path = "../cave-upstream" }
 chrono.workspace = true
