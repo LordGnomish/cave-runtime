@@ -36,7 +36,35 @@ spawned tasks without `Arc::clone` ceremony.
   Cave-llm-gateway's per-request token-budget would need this; it
   stays on its local impl until weighted permits land in the kernel.
 
-## Adoption — recon, then deferred
+## Adoption — landed for cave-upstream daemon
+
+`crates/cave-upstream/src/daemon.rs` previously imported
+`tokio::sync::Semaphore` directly and wrapped it in
+`Arc::new(Semaphore::new(...))` plus an `.expect("semaphore not
+closed")` at the acquire call. With the kernel primitive:
+
+```rust
+// before
+use tokio::sync::Semaphore;
+let sem = Arc::new(Semaphore::new(self.cfg.concurrency.max(1)));
+let _permit = sem.acquire().await.expect("semaphore not closed");
+
+// after
+use cave_kernel::semaphore::Semaphore;
+let sem = Semaphore::new(self.cfg.concurrency.max(1));     // Clone+Arc internal
+let _permit = sem.acquire().await;                          // infallible
+```
+
+The kernel primitive's `Clone` impl drops the redundant `Arc::new`
+wrap, and its infallible `acquire()` drops the `.expect(...)`.
+Behaviour identical (cancellation + fairness inherit from the inner
+tokio semaphore).
+
+`cargo test -p cave-upstream --lib` — 47/49 pass (the two failures
+pre-date this change and are unrelated, confirmed by a stash + test
+run on `main`).
+
+## Adoption — deferred
 
 The original sweep-006 deferral note flagged `cave-mesh::rate_limit`
 as "semaphore-shaped". The 2026-05-12 reread of that file shows it
@@ -49,12 +77,11 @@ Other candidates exist but each is a real refactor:
 | Crate | Site | Shape | Why not adopted |
 |-------|------|-------|-----------------|
 | `cave-gateway` | per-route `max_in_flight` cap | true semaphore | Local impl pre-dates kernel; migration touches 4 routes + 12 tests. |
-| `cave-mesh` | `circuit.rs` `max_pending_requests` | true semaphore | Coupled to circuit-breaker state; needs careful sequencing. |
+| `cave-mesh` | `circuit.rs` `max_pending_requests` | config-only today | Field exists in `BreakerConfig` but no in-code enforcement; adoption requires implementing the gate first, not just swapping the type. |
 | `cave-rdbms-operator` | per-cluster max-concurrent failover | true semaphore | Single use site; cleanest candidate, but blocked on the Cluster CRD refactor in Paket C. |
-
-The primitive is the prerequisite; each adoption ticket can land
-in its own PR with its own test re-baseline.
 
 ## Tests
 
 `cargo test -p cave-kernel --lib semaphore::` — 8 passed.
+`cargo test -p cave-upstream --lib` — 47 passing (regression-free
+against the 2 pre-existing failures).

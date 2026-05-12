@@ -39,44 +39,49 @@ internally wraps `Arc<RwLock<Inner>>`.
 * No `KeepAlive` stream like etcd's gRPC server-streaming response.
   Callers tick `renew()` on their own cadence.
 
-## Adoption — recon
+## Adoption — landed: controller-manager leader election
 
-The brief named `cave-controller-manager` and
-`cave-rdbms-operator` as adopters. Per-crate recon:
+New `crates/cave-controller-manager/src/leader_election.rs` (~140
+LOC + 13 unit tests) wraps `cave_kernel::lease::LeaseManager` in a
+controller-manager-shaped `LeaderElector` handle. Public surface:
 
-### cave-controller-manager
+* `LeaderElector::default_for_replica(manager, replica_id)` —
+  constructs an elector with the upstream-default
+  `kube-controller-manager` lease name and 15s TTL (matches
+  `LeaderElectionConfiguration.LeaseDuration` in
+  `pkg/leaderelection`).
+* `acquire(now) -> Role` — promotes to `Leader` if the lease is
+  free OR this replica already holds it; returns `Standby`
+  otherwise.
+* `renew(now)` — slides the expiry forward; fails if the replica
+  no longer holds the lease (signal to step down and stop
+  reconcilers immediately).
+* `release()` — voluntary release on graceful shutdown so a
+  standby can take over without waiting for expiry. Idempotent.
+* `status(now) -> ElectionStatus` — snapshot of role + holder +
+  expiry + revision, useful for the admin UI.
 
-`src/node_lease.rs` exists (230 LOC) and shapes a `Lease` type +
-helpers. BUT — that `Lease` represents the **kube-node-lease**
-Kubernetes resource (the per-node liveness signal kubelets renew),
-not controller-manager leader-election. The shapes look similar
-but their lifecycles are different:
+Distinct from `node_lease.rs` (per-kubelet liveness — what this
+controller *watches*); leader_election is the controller-manager's
+*own* lease (what decides which replica drives reconciliation).
 
-* `kube-node-lease` is **per-node**, written by the kubelet,
-  watched by the controller-manager.
-* The controller-manager's own leader election would be a
-  **per-controller** lease (one `kube-controller-manager` lease in
-  the `kube-system` namespace).
+Single-node MVP — `LeaseManager` lives in-process. Multi-node
+Raft-backed storage lands with Paket C's consensus layer; the
+adopter's API stays the same.
 
-`cave-controller-manager` does NOT currently have controller-self
-leader election; introducing it would be a feature add, not an
-adoption. The primitive is the prerequisite; the feature ticket can
-land separately.
+13/13 leader_election tests pass.
 
-### cave-rdbms-operator
+## Adoption — deferred: cave-rdbms-operator
 
 CloudNativePG's primary-election uses a Postgres-side
 `pg_advisory_lock` rather than an etcd lease. Mirroring that
-faithfully is outside the kernel lease's scope. The cave-side
-fencing logic in `ha.rs` could plausibly use a kernel lease as a
-secondary safeguard, but cave-rdbms-operator's Cargo doesn't
-depend on `cave-kernel` yet — adding the dep + the integration
-is a coordinated change with the operator's existing primary-election
-state machine.
-
-Both adoptions stay deferred; the primitive lands so the
-follow-up work has something to consume.
+faithfully is outside the kernel lease's scope. cave-rdbms-operator
+keeps its existing fencing logic; the kernel lease could plausibly
+serve as a secondary safeguard but that's a feature add, not a
+swap.
 
 ## Tests
 
 `cargo test -p cave-kernel --lib lease::` — 14 passed.
+`cargo test -p cave-controller-manager --lib leader_election::` —
+13 passed.
