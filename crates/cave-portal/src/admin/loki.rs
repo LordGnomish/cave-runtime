@@ -34,7 +34,7 @@ pub fn list_streams(
 ) -> Result<Vec<LokiStreamRow>, LokiViewError> {
     ctx.authorise(Permission::LokiRead)?;
     let streams = state.log_streams.read().unwrap();
-    let rows = streams
+    let mut rows: Vec<LokiStreamRow> = streams
         .iter()
         .filter(|r| r.tenant.as_str() == ctx.tenant.as_str())
         .map(|r| LokiStreamRow {
@@ -44,7 +44,56 @@ pub fn list_streams(
             retention_days: r.retention_days,
         })
         .collect();
+    rows.sort_by(|a, b| a.sink.cmp(&b.sink).then(a.name.cmp(&b.name)));
     Ok(rows)
+}
+
+/// Total ingest rate across all streams (samples/sec aggregate).
+/// Mirrors the Grafana-Explore-Loki header metric.
+pub fn total_ingest_rate(rows: &[LokiStreamRow]) -> u64 {
+    rows.iter().map(|r| u64::from(r.ingest_rate_per_sec)).sum()
+}
+
+/// Trivially validate a LogQL query — used by the query editor's
+/// inline syntax hint before the request is even sent. Real LogQL has
+/// a richer grammar; this checks the basic stream selector + filter
+/// shape (`{label="value"} |= "pattern"`).
+///
+/// Returns `Ok(())` if the query parses as a stream selector,
+/// `Err(reason)` otherwise.
+pub fn validate_logql(query: &str) -> Result<(), String> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Err("empty query".into());
+    }
+    if !trimmed.starts_with('{') {
+        return Err("LogQL queries must start with a stream selector `{...}`".into());
+    }
+    let close = trimmed.find('}').ok_or_else(|| {
+        "stream selector `{...}` is unclosed".to_string()
+    })?;
+    let selector = &trimmed[1..close];
+    if selector.trim().is_empty() {
+        return Err("stream selector must contain at least one label matcher".into());
+    }
+    // Each comma-separated piece must look like `k="v"` or `k=~"re"`.
+    for piece in selector.split(',') {
+        let p = piece.trim();
+        if !(p.contains("=\"") || p.contains("=~\"") || p.contains("!=\"") || p.contains("!~\"")) {
+            return Err(format!("label matcher `{p}` is malformed"));
+        }
+    }
+    Ok(())
+}
+
+/// Filter streams to those matching a substring (Grafana Explore's
+/// quick-filter chip).
+pub fn filter_by_name<'a>(
+    rows: &'a [LokiStreamRow],
+    needle: &str,
+) -> Vec<&'a LokiStreamRow> {
+    let lc = needle.to_lowercase();
+    rows.iter().filter(|r| r.name.to_lowercase().contains(&lc)).collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LokiViewError> {
@@ -144,5 +193,60 @@ mod tests {
         );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::LokiRead])).unwrap();
         assert!(!html.contains("evil-stream"));
+    }
+
+    #[test]
+    fn validate_logql_accepts_basic_stream_selector() {
+        assert!(validate_logql(r#"{app="web"}"#).is_ok());
+        assert!(validate_logql(r#"{app="web",env="prod"}"#).is_ok());
+        assert!(validate_logql(r#"{app=~"web.*"}"#).is_ok());
+        assert!(validate_logql(r#"{app!="web"} |= "error""#).is_ok());
+    }
+
+    #[test]
+    fn validate_logql_rejects_malformed_queries() {
+        assert!(validate_logql("").is_err());
+        assert!(validate_logql("app=web").is_err());
+        assert!(validate_logql("{").is_err());
+        assert!(validate_logql("{}").is_err());
+        assert!(validate_logql("{bad}").is_err());
+    }
+
+    #[test]
+    fn total_ingest_rate_sums_rates() {
+        let rows = vec![
+            LokiStreamRow { name: "a".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
+            LokiStreamRow { name: "b".into(), sink: "loki".into(), ingest_rate_per_sec: 250, retention_days: 7 },
+        ];
+        assert_eq!(total_ingest_rate(&rows), 350);
+        assert_eq!(total_ingest_rate(&[]), 0);
+    }
+
+    #[test]
+    fn filter_by_name_substring_match() {
+        let rows = vec![
+            LokiStreamRow { name: "web-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
+            LokiStreamRow { name: "api-stdout".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
+            LokiStreamRow { name: "auth-trace".into(), sink: "loki".into(), ingest_rate_per_sec: 100, retention_days: 7 },
+        ];
+        let matches = filter_by_name(&rows, "stdout");
+        assert_eq!(matches.len(), 2);
+        let empty = filter_by_name(&rows, "no-match");
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn list_streams_sorted_by_sink_then_name() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/loki/src/components/StreamsList.tsx",
+            "SortedOrder",
+            "acme"
+        );
+        let rows = list_streams(&AdminState::seeded(), &ctx(&[Permission::LokiRead])).unwrap();
+        for w in rows.windows(2) {
+            let a = (&w[0].sink, &w[0].name);
+            let b = (&w[1].sink, &w[1].name);
+            assert!(a <= b);
+        }
     }
 }

@@ -73,6 +73,53 @@ pub fn list_workloads(
     Ok(rows)
 }
 
+/// Summary counts for the upstream dashboard's header card:
+/// total nodes, ready nodes, running pods, restarting pods.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkloadSummary {
+    pub total_nodes: u32,
+    pub ready_nodes: u32,
+    pub total_pods: u32,
+    pub running_pods: u32,
+    pub failing_pods: u32,
+}
+
+pub fn workload_summary(rows: &[WorkloadRow]) -> WorkloadSummary {
+    use std::collections::BTreeSet;
+    let mut nodes_seen: BTreeSet<&str> = BTreeSet::new();
+    let mut ready_nodes_set: BTreeSet<&str> = BTreeSet::new();
+    let mut total_pods = 0u32;
+    let mut running_pods = 0u32;
+    let mut failing_pods = 0u32;
+    for r in rows {
+        nodes_seen.insert(r.node.as_str());
+        if r.node_ready {
+            ready_nodes_set.insert(r.node.as_str());
+        }
+        if !r.pod_name.is_empty() {
+            total_pods += 1;
+            match r.status {
+                "Running" => running_pods += 1,
+                "Failed" => failing_pods += 1,
+                _ => {}
+            }
+        }
+    }
+    WorkloadSummary {
+        total_nodes: nodes_seen.len() as u32,
+        ready_nodes: ready_nodes_set.len() as u32,
+        total_pods,
+        running_pods,
+        failing_pods,
+    }
+}
+
+/// Filter rows to a single node — used by the node-detail drill-down
+/// the upstream Dashboard exposes.
+pub fn rows_for_node<'a>(rows: &'a [WorkloadRow], node: &str) -> Vec<&'a WorkloadRow> {
+    rows.iter().filter(|r| r.node == node).collect()
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, K8sDashboardViewError> {
     let rows = list_workloads(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
@@ -87,6 +134,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, K8sDashboa
             ]
         })
         .collect();
+    let summary = workload_summary(&rows);
     let body = format!(
         r#"<section>
   <p class="text-sm text-gray-600 mb-3">
@@ -94,10 +142,22 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, K8sDashboa
     cave-kubelet + cave-scheduler + cave-controller-manager).
     Upstream: <a class="text-blue-700 underline" href="https://github.com/kubernetes/dashboard">github.com/kubernetes/dashboard</a>.
   </p>
+  <div class="mb-4 grid grid-cols-5 gap-2 text-center text-sm">
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">NODES</div><div class="text-2xl font-bold">{total_nodes}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">READY</div><div class="text-2xl font-bold">{ready_nodes}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">PODS</div><div class="text-2xl font-bold">{total_pods}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">RUNNING</div><div class="text-2xl font-bold text-green-700">{running_pods}</div></div>
+    <div class="p-3 bg-white rounded shadow"><div class="text-xs text-gray-500">FAILING</div><div class="text-2xl font-bold text-red-700">{failing_pods}</div></div>
+  </div>
   <h2 class="text-lg font-semibold mb-2">Workloads ({n})</h2>
   {tbl}
 </section>"#,
         n = rows.len(),
+        total_nodes = summary.total_nodes,
+        ready_nodes = summary.ready_nodes,
+        total_pods = summary.total_pods,
+        running_pods = summary.running_pods,
+        failing_pods = summary.failing_pods,
         tbl = table(
             &["node", "node_state", "pod", "status", "restarts"],
             &table_rows,
@@ -169,6 +229,53 @@ mod tests {
         );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
         assert!(html.contains("github.com/kubernetes/dashboard"));
+    }
+
+    #[test]
+    fn workload_summary_counts_distinct_nodes_and_pod_states() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kubernetes/src/components/Workloads.tsx",
+            "Summary",
+            "acme"
+        );
+        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead]))
+            .unwrap();
+        let s = workload_summary(&rows);
+        // node-a Ready + node-b NotReady → 2 total, 1 ready.
+        assert_eq!(s.total_nodes, 2);
+        assert_eq!(s.ready_nodes, 1);
+        assert!(s.total_pods > 0);
+        // Idle nodes contribute zero pods, not Running.
+        assert!(s.running_pods <= s.total_pods);
+    }
+
+    #[test]
+    fn rows_for_node_returns_only_target_rows() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kubernetes/src/components/Workloads.tsx",
+            "RowsForNode",
+            "acme"
+        );
+        let rows = list_workloads(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead]))
+            .unwrap();
+        let na = rows_for_node(&rows, "node-a");
+        assert!(!na.is_empty());
+        assert!(na.iter().all(|r| r.node == "node-a"));
+    }
+
+    #[test]
+    fn render_includes_summary_cards() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kubernetes/src/components/Workloads.tsx",
+            "SummaryCards",
+            "acme"
+        );
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::K8sDashboardRead])).unwrap();
+        assert!(html.contains("NODES"));
+        assert!(html.contains("READY"));
+        assert!(html.contains("PODS"));
+        assert!(html.contains("RUNNING"));
+        assert!(html.contains("FAILING"));
     }
 
     #[test]

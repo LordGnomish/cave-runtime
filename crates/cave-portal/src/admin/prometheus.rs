@@ -36,7 +36,7 @@ pub fn list_targets(
 ) -> Result<Vec<PrometheusTargetRow>, PrometheusViewError> {
     ctx.authorise(Permission::PrometheusRead)?;
     let series = state.metric_series.read().unwrap();
-    let rows = series
+    let mut rows: Vec<PrometheusTargetRow> = series
         .iter()
         .filter(|r| r.tenant.as_str() == ctx.tenant.as_str())
         .map(|r| PrometheusTargetRow {
@@ -46,7 +46,47 @@ pub fn list_targets(
             retention_days: r.retention_days,
         })
         .collect();
+    rows.sort_by(|a, b| a.scraper.cmp(&b.scraper).then(a.series.cmp(&b.series)));
     Ok(rows)
+}
+
+/// Group targets by `scraper` so the UI can render one panel per
+/// Prometheus scrape job (matches `/targets` page layout — each
+/// scrape job has its own collapsed section).
+pub fn group_by_scraper(
+    rows: &[PrometheusTargetRow],
+) -> Vec<(String, Vec<PrometheusTargetRow>)> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, Vec<PrometheusTargetRow>> = BTreeMap::new();
+    for r in rows {
+        acc.entry(r.scraper.clone()).or_default().push(r.clone());
+    }
+    let mut out: Vec<(String, Vec<PrometheusTargetRow>)> = acc.into_iter().collect();
+    for (_, v) in &mut out {
+        v.sort_by(|a, b| a.series.cmp(&b.series));
+    }
+    out
+}
+
+/// Total samples scraped across all targets. Mirrors the
+/// `prometheus_tsdb_head_samples_appended_total` counter in the
+/// upstream UI's summary header.
+pub fn total_samples(rows: &[PrometheusTargetRow]) -> u64 {
+    rows.iter().map(|r| r.sample_count).sum()
+}
+
+/// Find one target row by series name + scraper (composite key —
+/// Prometheus permits the same metric name across scrapers).
+pub fn detail(
+    state: &AdminState,
+    ctx: &RequestCtx,
+    scraper: &str,
+    series: &str,
+) -> Result<Option<PrometheusTargetRow>, PrometheusViewError> {
+    let rows = list_targets(state, ctx)?;
+    Ok(rows
+        .into_iter()
+        .find(|r| r.scraper == scraper && r.series == series))
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, PrometheusViewError> {
@@ -126,6 +166,74 @@ mod tests {
         );
         let html = render(&AdminState::seeded(), &ctx(&[Permission::PrometheusRead])).unwrap();
         assert!(html.contains("Targets ("));
+    }
+
+    #[test]
+    fn group_by_scraper_returns_one_entry_per_job() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/prometheus/src/components/TargetsList.tsx",
+            "GroupByScraper",
+            "acme"
+        );
+        let rows = list_targets(&AdminState::seeded(), &ctx(&[Permission::PrometheusRead])).unwrap();
+        let groups = group_by_scraper(&rows);
+        let names: Vec<&str> = groups.iter().map(|(n, _)| n.as_str()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted);
+        let total: usize = groups.iter().map(|(_, v)| v.len()).sum();
+        assert_eq!(total, rows.len());
+    }
+
+    #[test]
+    fn total_samples_sums_all_series() {
+        let rows = vec![
+            PrometheusTargetRow { series: "a".into(), scraper: "s".into(), sample_count: 100, retention_days: 30 },
+            PrometheusTargetRow { series: "b".into(), scraper: "s".into(), sample_count: 250, retention_days: 30 },
+        ];
+        assert_eq!(total_samples(&rows), 350);
+        assert_eq!(total_samples(&[]), 0);
+    }
+
+    #[test]
+    fn detail_returns_target_by_composite_key() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/prometheus/src/components/TargetDetail.tsx",
+            "Detail",
+            "acme"
+        );
+        let s = AdminState::seeded();
+        let d = detail(
+            &s,
+            &ctx(&[Permission::PrometheusRead]),
+            "prometheus-prod",
+            "http_requests_total",
+        )
+        .unwrap();
+        assert!(d.is_some());
+        let none = detail(
+            &s,
+            &ctx(&[Permission::PrometheusRead]),
+            "no-scraper",
+            "no-series",
+        )
+        .unwrap();
+        assert!(none.is_none());
+    }
+
+    #[test]
+    fn list_targets_returns_sorted_by_scraper_then_series() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/prometheus/src/components/TargetsList.tsx",
+            "SortedOrder",
+            "acme"
+        );
+        let rows = list_targets(&AdminState::seeded(), &ctx(&[Permission::PrometheusRead])).unwrap();
+        for w in rows.windows(2) {
+            let a = (&w[0].scraper, &w[0].series);
+            let b = (&w[1].scraper, &w[1].series);
+            assert!(a <= b);
+        }
     }
 
     #[test]
