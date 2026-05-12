@@ -147,6 +147,9 @@ rcgen = "0.13"
 time = "0.3"
 reqwest = { workspace = true }
 base64 = { workspace = true }
+axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
 
 [dev-dependencies]
 tower = { workspace = true }
