@@ -12,6 +12,7 @@
 //! The router takes its own `Arc<AdminState>` so it can be merged into the
 //! main portal router without touching `PortalState`.
 
+pub mod runtime_client;
 pub mod types;
 
 pub mod permission;
@@ -304,6 +305,9 @@ async fn keda_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
+    if let Err(e) = state.materialise_keda_scaled_objects(&ctx.tenant).await {
+        tracing::warn!(error = %e, "keda materialise failed; falling back to cached rows");
+    }
     keda::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
@@ -312,6 +316,9 @@ async fn scheduler_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
+    if let Err(e) = state.materialise_scheduler_nodes(&ctx.tenant).await {
+        tracing::warn!(error = %e, "scheduler materialise failed; falling back to cached rows");
+    }
     scheduler::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
@@ -330,6 +337,9 @@ async fn kubelet_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
+    if let Err(e) = state.materialise_kubelet_pods(&ctx.tenant).await {
+        tracing::warn!(error = %e, "kubelet materialise failed; falling back to cached rows");
+    }
     kubelet::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
@@ -356,6 +366,9 @@ async fn net_handler(
     Query(q): Query<AdminQuery>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let ctx = extract_ctx_from_query(q);
+    if let Err(e) = state.materialise_net_endpoints(&ctx.tenant).await {
+        tracing::warn!(error = %e, "net materialise failed; falling back to cached rows");
+    }
     net::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 

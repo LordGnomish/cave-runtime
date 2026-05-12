@@ -108,6 +108,26 @@ async fn main() -> anyhow::Result<()> {
     let workflows_state = Arc::new(cave_workflows::State::default());
     let scan_state = Arc::new(cave_scan::State::default());
     let portal_state = Arc::new(cave_portal::PortalState::default());
+    // AdminState backs the per-module `/admin/*` views. Probe the data
+    // dir for a kubeconfig; if found, install an `ApiserverClient` so
+    // the admin views materialise live data from the apiserver instead
+    // of seeded fixtures.
+    let admin_state = Arc::new(cave_portal::admin::state::AdminState::seeded());
+    {
+        use cave_portal::admin::runtime_client::{probe_data_dir_for_runtime, WireOutcome};
+        let outcome = probe_data_dir_for_runtime(&admin_state, cli.data_dir.as_deref());
+        match outcome {
+            WireOutcome::Wired => {
+                info!(data_dir = ?cli.data_dir, "portal admin → ApiserverClient (real-runtime mode)");
+            }
+            WireOutcome::NoDataDir => {
+                info!("portal admin → seeded fixtures (no data dir / no kubeconfig)");
+            }
+            WireOutcome::KubeconfigBroken => {
+                tracing::warn!("portal admin → seeded fixtures (kubeconfig present but unparseable)");
+            }
+        }
+    }
     let scaffold_state = Arc::new(cave_scaffold::State::default());
     let chaos_state = Arc::new(cave_chaos::State::default());
     let policy_state = Arc::new(cave_policy::State::default());
