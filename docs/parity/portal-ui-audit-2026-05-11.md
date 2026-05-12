@@ -16,9 +16,9 @@ existing Structural and Upstream Parity grades.
 |---|--:|
 | Total crates in audit (non-infra) | 73 |
 | `none` | 0 |
-| `scaffold` | 26 |
-| `partial` | 45 |
-| `complete` | 2 |
+| `scaffold` | 25 |
+| `partial` | 42 |
+| `complete` | 6 |
 
 **Priority distribution**
 
@@ -28,7 +28,7 @@ existing Structural and Upstream Parity grades.
 | P1 | 26 |
 | P2 | 35 |
 
-**Portal UI average score:** **48 / 100**
+**Portal UI average score:** **51 / 100**
 
 Score values: `none = 0`, `scaffold = 25`, `partial = 60`,
 `complete = 100`. Average is the arithmetic mean across
@@ -41,7 +41,7 @@ non-infra crates.
 | `cave-admission` | ✓ | (CRD-only) | [link](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) | `scaffold` | 75 | P2 | Validating/mutating webhook lifecycle |
 | `cave-ai-obs` | ✓ | Langfuse | [link](https://langfuse.com/) | `scaffold` | 75 | P2 | LLM observability |
 | `cave-alerts` | ✓ | Alertmanager UI | [link](https://prometheus.io/docs/alerting/latest/clients/) | `partial` | 171 | P1 | Active alerts, silences |
-| `cave-apiserver` | ✓ | Kubernetes Dashboard (resources) | [link](https://github.com/kubernetes/dashboard) | `partial` | 142 | P0 | Generic API resource explorer |
+| `cave-apiserver` | ✓ | Kubernetes Dashboard (resources) | [link](https://github.com/kubernetes/dashboard) | `complete` | 887 | P0 | Generic API resource explorer |
 | `cave-artifacts` | ✓ | Pulp Web UI | [link](https://pulpproject.org/) | `partial` | 138 | P1 | Repository browser |
 | `cave-auth` | ✓ | Keycloak Admin Console | [link](https://www.keycloak.org/documentation) | `partial` | 174 | P1 | Realm / client / user management |
 | `cave-backup` | ✓ | Velero (limited UI) | [link](https://velero.io/) | `partial` | 105 | P2 | Mostly CLI |
@@ -52,14 +52,14 @@ non-infra crates.
 | `cave-chat` | ✓ | LibreChat | [link](https://www.librechat.ai/) | `scaffold` | 75 | P2 | Chat client UI |
 | `cave-cloud-controller-manager` | ✓ | Kubernetes Dashboard (cloud) | [link](https://github.com/kubernetes/dashboard) | `partial` | 133 | P0 | Cloud-provider integration status |
 | `cave-cluster` | ✓ | (CRD-only) | [link](https://cluster-api.sigs.k8s.io/) | `scaffold` | 75 | P2 | Cluster-API CLI/CRD |
-| `cave-compliance` | ✓ | (cave-original) | (internal) | `partial` | 3090 | P2 | The /admin/compliance dashboard itself |
+| `cave-compliance` | ✓ | (cave-original) | (internal) | `partial` | 3094 | P2 | The /admin/compliance dashboard itself |
 | `cave-container-scan` | ✓ | Trivy (CLI) | [link](https://trivy.dev/) | `partial` | 219 | P2 | CLI-first |
 | `cave-controller-manager` | ✓ | Kubernetes Dashboard (controllers) | [link](https://github.com/kubernetes/dashboard) | `partial` | 132 | P0 | Controller status surfaced via k8s_dashboard |
 | `cave-cost` | ✓ | OpenCost UI | [link](https://www.opencost.io/) | `scaffold` | 75 | P2 | Cost allocation panels |
 | `cave-cri` | ✓ | (CLI-only) | [link](https://containerd.io/) | `partial` | 168 | P2 | containerd is CLI |
 | `cave-crm` | ✓ | Twenty CRM | [link](https://twenty.com/) | `partial` | 144 | P1 | Full CRM React app |
 | `cave-crossplane` | ✓ | (CRD-first) | [link](https://www.crossplane.io/) | `scaffold` | 75 | P2 | Minimal UI |
-| `cave-dashboard` | ✓ | Grafana | [link](https://grafana.com/grafana/dashboards/) | `scaffold` | 75 | P0 | Cave dashboard renderer; Grafana panel-render parity at admin/grafana.rs |
+| `cave-dashboard` | ✓ | Grafana | [link](https://grafana.com/grafana/dashboards/) | `complete` | 853 | P0 | Cave dashboard renderer; Grafana panel-render parity at admin/grafana.rs |
 | `cave-dast` | ✓ | OWASP ZAP (Swing) | [link](https://www.zaproxy.org/) | `scaffold` | 75 | P2 | Desktop Java UI — not portable |
 | `cave-deploy` | ✓ | Argo CD UI | [link](https://argo-cd.readthedocs.io/en/stable/user-guide/) | `partial` | 261 | P1 | Application sync graph |
 | `cave-devlake` | ✓ | Apache DevLake UI | [link](https://devlake.apache.org/) | `scaffold` | 75 | P2 | Engineering metrics |
@@ -78,7 +78,7 @@ non-infra crates.
 | `cave-keda` | ✓ | KEDA dashboard (community plugin) | [link](https://keda.sh/docs/2.16/concepts/) | `partial` | 3198 | P0 | Scaler / trigger views |
 | `cave-knative` | ✓ | (CRD-only) | [link](https://knative.dev/) | `scaffold` | 75 | P2 | knative is CRD |
 | `cave-kube-proxy` | ✓ | (iptables-only) | [link](https://kubernetes.io/docs/concepts/services-networking/) | `scaffold` | 75 | P2 | no UI |
-| `cave-kubelet` | ✓ | Kubernetes Dashboard (workloads) | [link](https://github.com/kubernetes/dashboard) | `partial` | 280 | P0 | Per-node Pod / Volume / Lease views |
+| `cave-kubelet` | ✓ | Kubernetes Dashboard (workloads) | [link](https://github.com/kubernetes/dashboard) | `complete` | 995 | P0 | Per-node Pod / Volume / Lease views |
 | `cave-kubevirt` | ✓ | KubeVirt UI (limited) | [link](https://kubevirt.io/) | `partial` | 223 | P2 | Mostly CLI |
 | `cave-lakehouse` | ✓ | Spark UI (per-app) | [link](https://spark.apache.org/docs/latest/web-ui.html) | `partial` | 294 | P1 | Iceberg snapshot + Spark job views |
 | `cave-ledger` | ✓ | (cave-original) | (internal) | `scaffold` | 75 | P2 | Internal audit ledger |
@@ -86,7 +86,7 @@ non-infra crates.
 | `cave-local-llm` | ✓ | (CLI-only) | [link](https://ollama.com/) | `scaffold` | 75 | P2 | Ollama is CLI |
 | `cave-logs` | ✓ | Grafana Explore (Loki) | [link](https://grafana.com/docs/loki/) | `partial` | 136 | P1 | LogQL query; admin/loki.rs ports upstream-UI shape |
 | `cave-mesh` | ✓ | Kiali (Istio) | [link](https://kiali.io/) | `complete` | 484 | P0 | Service-mesh topology; covered by admin/kiali.rs |
-| `cave-metrics` | ✓ | Prometheus expr browser | [link](https://prometheus.io/docs/) | `partial` | 134 | P1 | Targets, alerts, query; cave-side concept; admin/prometheus.rs ports upstream-UI shape |
+| `cave-metrics` | ✓ | Prometheus expr browser | [link](https://prometheus.io/docs/) | `complete` | 794 | P1 | Targets, alerts, query; cave-side concept; admin/prometheus.rs ports upstream-UI shape |
 | `cave-net` | ✓ | Hubble UI (Cilium) | [link](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/) | `partial` | 209 | P0 | Flow visibility |
 | `cave-oncall` | ✓ | Grafana OnCall | [link](https://grafana.com/docs/oncall/latest/) | `partial` | 139 | P1 | Duplicate of incidents — TODO collapse |
 | `cave-pam` | ✓ | Teleport Web UI | [link](https://goteleport.com/docs/) | `scaffold` | 75 | P2 | Access proxy UI |

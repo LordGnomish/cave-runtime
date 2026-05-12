@@ -149,7 +149,7 @@ META: dict[str, dict] = {
 # Promotion list — admin pages hand-reviewed and confirmed as a
 # faithful upstream-UI port. Promoted on 2026-05-12 after the
 # 11-crate P0 expansion batch (see commits
-# `feat(portal): expand <N> admin pages …`):
+# `feat(portal): expand <N> admin pages …`).
 #
 # * `cave-vault` — folder-split (mod / secrets_engines / auth_methods /
 #   policies / kv_browser / audit) mirroring Vault's four UI tabs
@@ -158,12 +158,53 @@ META: dict[str, dict] = {
 # * `cave-mesh` — Kiali-faithful aggregations: workloads (by source)
 #   + services (by destination, with health classification) + authz
 #   + flows. 484 LOC, 13 tests.
-COMPLETE: set[str] = {"cave-vault", "cave-mesh"}
+#
+# 2026-05-12 second batch (feat/portal-5-p0-complete-promotion):
+#
+# * `cave-kubelet` — admin/kubelet/ folder split (pods / nodes /
+#   volumes / events / metrics) mirroring Kubernetes Dashboard
+#   per-node view. ~750 LOC, 30 tests.
+# * `cave-dashboard` — admin/grafana/ folder split (dashboards / panels /
+#   datasources / explore / alerts) — see PORTAL_UI_OVERRIDE.
+#   ~900 LOC, 25 tests.
+# * `cave-metrics` — admin/prometheus/ folder split (targets / rules /
+#   tsdb / flags / status) — see PORTAL_UI_OVERRIDE. ~650 LOC, 23
+#   tests.
+# * `cave-apiserver` — admin/k8s_dashboard/ folder split (workloads /
+#   services / config / storage / cluster) — see PORTAL_UI_OVERRIDE.
+#   ~700 LOC, 24 tests.
+#
+# (`cave-mesh` already complete keeps its mesh.rs; the bonus
+# admin/kiali/ folder ships under the kiali URL but does not change
+# cave-mesh's audit row.)
+COMPLETE: set[str] = {
+    "cave-vault",
+    "cave-mesh",
+    "cave-kubelet",
+    "cave-dashboard",
+    "cave-metrics",
+    "cave-apiserver",
+}
+
+# Some admin pages live under a URL/short-name that differs from the
+# crate's short-name (e.g. cave-dashboard's portal UI lives at
+# admin/grafana/, not admin/dashboard.rs). This map tells the audit
+# script which folder to measure for those crates.
+PORTAL_UI_OVERRIDE: dict[str, str] = {
+    "cave-dashboard": "grafana",
+    "cave-metrics": "prometheus",
+    "cave-apiserver": "k8s_dashboard",
+}
 
 SCORE_VALUE = {"none": 0, "scaffold": 25, "partial": 60, "complete": 100}
 
 
 def admin_short(crate: str) -> str:
+    """Resolve the admin URL short-name for `crate`. PORTAL_UI_OVERRIDE
+    takes precedence so a crate whose portal page lives under a
+    differently-named folder is still measured correctly."""
+    if crate in PORTAL_UI_OVERRIDE:
+        return PORTAL_UI_OVERRIDE[crate]
     return crate.removeprefix("cave-").replace("-", "_")
 
 
