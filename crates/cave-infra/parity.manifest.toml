@@ -317,3 +317,12 @@ local_path    = "/api/infra/natural"
 kind          = "http"
 upstream_path = "/v1/server/mcp"
 local_path    = "/mcp"
+
+[portal_ui]
+upstream_ui  = "Terraform Cloud (proprietary)"
+upstream_url = "https://www.hashicorp.com/products/terraform"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "OSS Terraform is CLI"
+last_audit   = "2026-05-11"

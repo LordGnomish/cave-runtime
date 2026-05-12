@@ -41,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/dast/endpoint"
+
+[portal_ui]
+upstream_ui  = "OWASP ZAP (Swing)"
+upstream_url = "https://www.zaproxy.org/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Desktop Java UI — not portable"
+last_audit   = "2026-05-11"

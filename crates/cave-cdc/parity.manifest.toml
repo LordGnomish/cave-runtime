@@ -26,3 +26,12 @@ infra_only  = false
 name        = "cave-cdc"
 description = "Change Data Capture — Debezium server reimplementation"
 source_root = "src"
+
+[portal_ui]
+upstream_ui  = "Debezium UI (deprecated)"
+upstream_url = "https://debezium.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Historical UI"
+last_audit   = "2026-05-11"

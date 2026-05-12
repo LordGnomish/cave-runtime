@@ -1193,3 +1193,12 @@ note         = "Offline data-dir surgery utility (backup-restore, defrag without
 [[unmapped]]
 upstream_pkg = "server/lease/leasehttp/"
 note         = "HTTP transport for lease-keepalive between peers. Single-node MVP doesn't need it; multi-node will."
+
+[portal_ui]
+upstream_ui  = "etcdctl (CLI-only)"
+upstream_url = "https://etcd.io/docs/v3.5/op-guide/"
+status       = "partial"
+loc          = 206
+priority     = "P0"
+notes        = "etcd has no canonical UI; cave-side shows revision / KV stats"
+last_audit   = "2026-05-11"

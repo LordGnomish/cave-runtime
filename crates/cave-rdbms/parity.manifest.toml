@@ -538,3 +538,12 @@ local_path    = "/api/rdbms/server/info"
 kind          = "http"
 upstream_path = "/explain"
 local_path    = "/api/rdbms/explain"
+
+[portal_ui]
+upstream_ui  = "pgAdmin (external)"
+upstream_url = "https://www.pgadmin.org/"
+status       = "partial"
+loc          = 140
+priority     = "P1"
+notes        = "Same surface as pg"
+last_audit   = "2026-05-11"

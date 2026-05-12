@@ -236,3 +236,12 @@ local_path    = "/api/artifacts/repair"
 kind          = "http"
 upstream_path = "/pulp/api/v3/signing-services/"
 local_path    = "/api/artifacts/signing-services"
+
+[portal_ui]
+upstream_ui  = "Pulp Web UI"
+upstream_url = "https://pulpproject.org/"
+status       = "partial"
+loc          = 88
+priority     = "P1"
+notes        = "Repository browser"
+last_audit   = "2026-05-11"

@@ -174,6 +174,19 @@ pub enum Permission {
     /// Read per-scaler Prometheus-backed metrics (events/min, sync errors,
     /// scaling latency p50/p99).
     KedaMetricsRead,
+
+    // ── 2026-05-11 batch I: 5 upstream-UI parity admin pages ──────────
+    /// Read Grafana panel-render data (dashboards by uid / folder).
+    GrafanaRead,
+    /// Read Prometheus targets / alerts / rules.
+    PrometheusRead,
+    /// Run LogQL queries against the Loki-equivalent backend.
+    LokiRead,
+    /// Read Kubernetes Dashboard resources (workloads, configmaps,
+    /// services — backed by cave-apiserver / cave-kubelet / etc.).
+    K8sDashboardRead,
+    /// Read Istio Kiali topology + traffic data (backed by cave-mesh).
+    KialiRead,
 }
 
 impl Permission {
@@ -287,6 +300,11 @@ impl Permission {
             Permission::KedaTriggerAuthWrite => "keda.triggerauthentication.write",
             Permission::KedaScalerCatalog => "keda.scaler.catalog",
             Permission::KedaMetricsRead => "keda.metrics.read",
+            Permission::GrafanaRead => "grafana.panel.read",
+            Permission::PrometheusRead => "prometheus.target.read",
+            Permission::LokiRead => "loki.logql.read",
+            Permission::K8sDashboardRead => "k8s-dashboard.resource.read",
+            Permission::KialiRead => "kiali.topology.read",
         }
     }
 }

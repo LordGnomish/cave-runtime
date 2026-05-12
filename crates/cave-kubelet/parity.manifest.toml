@@ -791,3 +791,12 @@ local_path    = "/api/kubelet/pods"
 kind          = "http"
 upstream_path = "/stats/summary"
 local_path    = "/api/kubelet/status"
+
+[portal_ui]
+upstream_ui  = "Kubernetes Dashboard (workloads)"
+upstream_url = "https://github.com/kubernetes/dashboard"
+status       = "partial"
+loc          = 157
+priority     = "P0"
+notes        = "Per-node Pod / Volume / Lease views"
+last_audit   = "2026-05-11"

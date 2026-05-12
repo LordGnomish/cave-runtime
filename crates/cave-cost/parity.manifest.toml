@@ -41,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/cost/endpoint"
+
+[portal_ui]
+upstream_ui  = "OpenCost UI"
+upstream_url = "https://www.opencost.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Cost allocation panels"
+last_audit   = "2026-05-11"

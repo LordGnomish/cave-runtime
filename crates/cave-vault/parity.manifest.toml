@@ -310,3 +310,12 @@ local_path    = "/v1/sys/unseal"
 kind          = "http"
 upstream_path = "/v1/sys/health"
 local_path    = "/v1/sys/health"
+
+[portal_ui]
+upstream_ui  = "Vault Web UI (built-in)"
+upstream_url = "https://developer.hashicorp.com/vault/docs/configuration/ui"
+status       = "partial"
+loc          = 156
+priority     = "P0"
+notes        = "Secret engines, auth methods, policy editor"
+last_audit   = "2026-05-11"

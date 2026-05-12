@@ -464,3 +464,12 @@ local_path    = "/api/docdb/server/info"
 kind          = "http"
 upstream_path = "/admin/serverStats"
 local_path    = "/api/docdb/stats"
+
+[portal_ui]
+upstream_ui  = "MongoDB Compass (external)"
+upstream_url = "https://www.mongodb.com/products/tools/compass"
+status       = "partial"
+loc          = 131
+priority     = "P1"
+notes        = "Collection browser"
+last_audit   = "2026-05-11"

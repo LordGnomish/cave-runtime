@@ -50,3 +50,12 @@ local_path    = "POST /api/generate"
 kind          = "http"
 upstream_path = "POST /api/chat"
 local_path    = "POST /api/chat"
+
+[portal_ui]
+upstream_ui  = "(CLI-only)"
+upstream_url = "https://ollama.com/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Ollama is CLI"
+last_audit   = "2026-05-11"

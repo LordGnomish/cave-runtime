@@ -330,3 +330,12 @@ local_path    = "/admin/v1/routes"
 kind          = "http"
 upstream_path = "/plugins"
 local_path    = "/admin/v1/plugins"
+
+[portal_ui]
+upstream_ui  = "Kong Manager"
+upstream_url = "https://docs.konghq.com/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Plugin / route browser"
+last_audit   = "2026-05-11"

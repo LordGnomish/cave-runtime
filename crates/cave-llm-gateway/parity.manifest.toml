@@ -286,3 +286,12 @@ local_path    = "/api/gateway/logs/{consumer}"
 kind          = "http"
 upstream_path = "/guardrails"
 local_path    = "/api/gateway/guardrails"
+
+[portal_ui]
+upstream_ui  = "LiteLLM admin UI"
+upstream_url = "https://docs.litellm.ai/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Newer admin UI"
+last_audit   = "2026-05-11"

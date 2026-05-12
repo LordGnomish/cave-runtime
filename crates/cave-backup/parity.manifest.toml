@@ -543,3 +543,12 @@ local_path    = "/api/backup/server/status"
 kind          = "http"
 upstream_path = "/api/backup/health"
 local_path    = "/api/backup/health"
+
+[portal_ui]
+upstream_ui  = "Velero (limited UI)"
+upstream_url = "https://velero.io/"
+status       = "partial"
+loc          = 105
+priority     = "P2"
+notes        = "Mostly CLI"
+last_audit   = "2026-05-11"

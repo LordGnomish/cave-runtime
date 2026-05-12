@@ -371,3 +371,12 @@ local_path    = "/api/logs/ready"
 kind          = "http"
 upstream_path = "/metrics"
 local_path    = "/api/logs/metrics"
+
+[portal_ui]
+upstream_ui  = "Grafana Explore (Loki)"
+upstream_url = "https://grafana.com/docs/loki/"
+status       = "scaffold"
+loc          = 75
+priority     = "P1"
+notes        = "LogQL query; admin/loki.rs ports upstream-UI shape"
+last_audit   = "2026-05-11"

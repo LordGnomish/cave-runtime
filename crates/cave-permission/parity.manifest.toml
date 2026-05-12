@@ -26,3 +26,12 @@ infra_only  = false
 name        = "cave-permission"
 description = "Fine-grained authorization — Casbin reimplementation"
 source_root = "src"
+
+[portal_ui]
+upstream_ui  = "Casbin (CLI)"
+upstream_url = "https://casbin.org/"
+status       = "partial"
+loc          = 404
+priority     = "P2"
+notes        = "RBAC primitive"
+last_audit   = "2026-05-11"

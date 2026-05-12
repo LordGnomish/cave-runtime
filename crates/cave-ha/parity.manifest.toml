@@ -445,3 +445,12 @@ local_path    = "/api/v1/ha/health"
 kind          = "http"
 upstream_path = "/v3/maintenance/raft-state"
 local_path    = "/api/v1/ha/raft/state"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://etcd.io/docs/v3.5/op-guide/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "etcd HA is CLI"
+last_audit   = "2026-05-11"

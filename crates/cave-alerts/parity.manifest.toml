@@ -635,3 +635,12 @@ local_path    = "/api/v2/route"
 kind          = "http"
 upstream_path = "/api/v2/status"
 local_path    = "/api/v2/status"
+
+[portal_ui]
+upstream_ui  = "Alertmanager UI"
+upstream_url = "https://prometheus.io/docs/alerting/latest/clients/"
+status       = "partial"
+loc          = 108
+priority     = "P1"
+notes        = "Active alerts, silences"
+last_audit   = "2026-05-11"

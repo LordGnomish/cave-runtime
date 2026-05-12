@@ -165,3 +165,12 @@ local_path    = "/api/secrets/scan"
 kind          = "http"
 upstream_path = "/detectors"
 local_path    = "/api/secrets/detectors"
+
+[portal_ui]
+upstream_ui  = "TruffleHog (CLI)"
+upstream_url = "https://trufflesecurity.com/trufflehog"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "CLI-first"
+last_audit   = "2026-05-11"

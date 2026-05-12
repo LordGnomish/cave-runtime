@@ -103,3 +103,12 @@ local_test    = "test_network_structure_20231027120014"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_instancetype_ref_structure_20231027120015"
+
+[portal_ui]
+upstream_ui  = "KubeVirt UI (limited)"
+upstream_url = "https://kubevirt.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Mostly CLI"
+last_audit   = "2026-05-11"

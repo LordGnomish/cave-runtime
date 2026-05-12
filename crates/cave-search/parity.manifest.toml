@@ -25,3 +25,12 @@ infra_only  = false
 name        = "cave-search"
 description = "Full-text + analytics search — Manticore reimplementation"
 source_root = "src"
+
+[portal_ui]
+upstream_ui  = "OpenSearch Dashboards"
+upstream_url = "https://opensearch.org/docs/"
+status       = "scaffold"
+loc          = 75
+priority     = "P1"
+notes        = "Discover, visualize"
+last_audit   = "2026-05-11"

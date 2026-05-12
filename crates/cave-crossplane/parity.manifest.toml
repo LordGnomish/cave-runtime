@@ -377,3 +377,12 @@ local_path    = "/api/crossplane/reconcile/queue"
 kind          = "http"
 upstream_path = "/api/crossplane/reconcile/history"
 local_path    = "/api/crossplane/reconcile/history"
+
+[portal_ui]
+upstream_ui  = "(CRD-first)"
+upstream_url = "https://www.crossplane.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Minimal UI"
+last_audit   = "2026-05-11"
