@@ -869,8 +869,8 @@ local_path    = "/api/scheduler/nodes"
 [portal_ui]
 upstream_ui  = "Kubernetes Dashboard (scheduling)"
 upstream_url = "https://github.com/kubernetes/dashboard"
-status       = "partial"
-loc          = 214
+status       = "complete"
+loc          = 850
 priority     = "P0"
-notes        = "Scheduler queue, predicates, priorities"
+notes        = "Folder split: queue/plugins/bindings/nodescores/events (23 tests). kube-scheduler observability parity."
 last_audit   = "2026-05-11"

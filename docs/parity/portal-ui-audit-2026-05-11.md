@@ -17,8 +17,8 @@ existing Structural and Upstream Parity grades.
 | Total crates in audit (non-infra) | 73 |
 | `none` | 0 |
 | `scaffold` | 25 |
-| `partial` | 42 |
-| `complete` | 6 |
+| `partial` | 36 |
+| `complete` | 12 |
 
 **Priority distribution**
 
@@ -28,7 +28,7 @@ existing Structural and Upstream Parity grades.
 | P1 | 26 |
 | P2 | 35 |
 
-**Portal UI average score:** **51 / 100**
+**Portal UI average score:** **54 / 100**
 
 Score values: `none = 0`, `scaffold = 25`, `partial = 60`,
 `complete = 100`. Average is the arithmetic mean across
@@ -45,16 +45,16 @@ non-infra crates.
 | `cave-artifacts` | ✓ | Pulp Web UI | [link](https://pulpproject.org/) | `partial` | 138 | P1 | Repository browser |
 | `cave-auth` | ✓ | Keycloak Admin Console | [link](https://www.keycloak.org/documentation) | `partial` | 174 | P1 | Realm / client / user management |
 | `cave-backup` | ✓ | Velero (limited UI) | [link](https://velero.io/) | `partial` | 105 | P2 | Mostly CLI |
-| `cave-cache` | ✓ | RedisInsight (external) | [link](https://redis.io/insight/) | `partial` | 196 | P0 | Key explorer, slow-log |
+| `cave-cache` | ✓ | RedisInsight (external) | [link](https://redis.io/insight/) | `complete` | 876 | P0 | Key explorer, slow-log |
 | `cave-cdc` | ✓ | Debezium UI (deprecated) | [link](https://debezium.io/) | `scaffold` | 75 | P2 | Historical UI |
 | `cave-certs` | ✓ | (CRD-only) | [link](https://cert-manager.io/) | `scaffold` | 75 | P2 | cert-manager has no UI |
 | `cave-chaos` | ✓ | Chaos Dashboard | [link](https://chaos-mesh.org/docs/) | `partial` | 143 | P1 | Experiment timeline |
 | `cave-chat` | ✓ | LibreChat | [link](https://www.librechat.ai/) | `scaffold` | 75 | P2 | Chat client UI |
-| `cave-cloud-controller-manager` | ✓ | Kubernetes Dashboard (cloud) | [link](https://github.com/kubernetes/dashboard) | `partial` | 133 | P0 | Cloud-provider integration status |
+| `cave-cloud-controller-manager` | ✓ | Kubernetes Dashboard (cloud) | [link](https://github.com/kubernetes/dashboard) | `complete` | 681 | P0 | Cloud-provider integration status |
 | `cave-cluster` | ✓ | (CRD-only) | [link](https://cluster-api.sigs.k8s.io/) | `scaffold` | 75 | P2 | Cluster-API CLI/CRD |
 | `cave-compliance` | ✓ | (cave-original) | (internal) | `partial` | 3094 | P2 | The /admin/compliance dashboard itself |
 | `cave-container-scan` | ✓ | Trivy (CLI) | [link](https://trivy.dev/) | `partial` | 219 | P2 | CLI-first |
-| `cave-controller-manager` | ✓ | Kubernetes Dashboard (controllers) | [link](https://github.com/kubernetes/dashboard) | `partial` | 132 | P0 | Controller status surfaced via k8s_dashboard |
+| `cave-controller-manager` | ✓ | Kubernetes Dashboard (controllers) | [link](https://github.com/kubernetes/dashboard) | `complete` | 702 | P0 | Controller status surfaced via k8s_dashboard |
 | `cave-cost` | ✓ | OpenCost UI | [link](https://www.opencost.io/) | `scaffold` | 75 | P2 | Cost allocation panels |
 | `cave-cri` | ✓ | (CLI-only) | [link](https://containerd.io/) | `partial` | 168 | P2 | containerd is CLI |
 | `cave-crm` | ✓ | Twenty CRM | [link](https://twenty.com/) | `partial` | 144 | P1 | Full CRM React app |
@@ -66,7 +66,7 @@ non-infra crates.
 | `cave-dns` | ✓ | (config-only) | [link](https://coredns.io/) | `scaffold` | 75 | P2 | CoreDNS is corefile-only |
 | `cave-docdb` | ✓ | MongoDB Compass (external) | [link](https://www.mongodb.com/products/tools/compass) | `partial` | 131 | P1 | Collection browser |
 | `cave-erp` | ✓ | ERPNext | [link](https://erpnext.com/) | `partial` | 153 | P1 | Full ERP UI |
-| `cave-etcd` | ✓ | etcdctl (CLI-only) | [link](https://etcd.io/docs/v3.5/op-guide/) | `partial` | 206 | P0 | etcd has no canonical UI; cave-side shows revision / KV stats |
+| `cave-etcd` | ✓ | etcdctl (CLI-only) | [link](https://etcd.io/docs/v3.5/op-guide/) | `complete` | 672 | P0 | etcd has no canonical UI; cave-side shows revision / KV stats |
 | `cave-forensics` | ✓ | Tetragon (CLI) | [link](https://tetragon.io/) | `scaffold` | 75 | P2 | CLI-first |
 | `cave-gateway` | ✓ | Kong Manager | [link](https://docs.konghq.com/) | `scaffold` | 75 | P2 | Plugin / route browser |
 | `cave-gitops-config` | ✓ | Flux (CLI) | [link](https://fluxcd.io/) | `partial` | 238 | P2 | CLI-first |
@@ -87,7 +87,7 @@ non-infra crates.
 | `cave-logs` | ✓ | Grafana Explore (Loki) | [link](https://grafana.com/docs/loki/) | `partial` | 136 | P1 | LogQL query; admin/loki.rs ports upstream-UI shape |
 | `cave-mesh` | ✓ | Kiali (Istio) | [link](https://kiali.io/) | `complete` | 484 | P0 | Service-mesh topology; covered by admin/kiali.rs |
 | `cave-metrics` | ✓ | Prometheus expr browser | [link](https://prometheus.io/docs/) | `complete` | 794 | P1 | Targets, alerts, query; cave-side concept; admin/prometheus.rs ports upstream-UI shape |
-| `cave-net` | ✓ | Hubble UI (Cilium) | [link](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/) | `partial` | 209 | P0 | Flow visibility |
+| `cave-net` | ✓ | Hubble UI (Cilium) | [link](https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/) | `complete` | 780 | P0 | Flow visibility |
 | `cave-oncall` | ✓ | Grafana OnCall | [link](https://grafana.com/docs/oncall/latest/) | `partial` | 139 | P1 | Duplicate of incidents — TODO collapse |
 | `cave-pam` | ✓ | Teleport Web UI | [link](https://goteleport.com/docs/) | `scaffold` | 75 | P2 | Access proxy UI |
 | `cave-permission` | ✓ | Casbin (CLI) | [link](https://casbin.org/) | `partial` | 432 | P2 | RBAC primitive |
@@ -98,7 +98,7 @@ non-infra crates.
 | `cave-rollouts` | ✓ | Argo Rollouts UI | [link](https://argo-rollouts.readthedocs.io/en/stable/dashboard/) | `partial` | 150 | P1 | Canary progress |
 | `cave-sbom` | ✓ | Dependency-Track | [link](https://dependencytrack.org/) | `partial` | 135 | P1 | Component / vuln correlation |
 | `cave-scan` | ✓ | SonarQube | [link](https://www.sonarsource.com/products/sonarqube/) | `scaffold` | 75 | P2 | Code-quality UI |
-| `cave-scheduler` | ✓ | Kubernetes Dashboard (scheduling) | [link](https://github.com/kubernetes/dashboard) | `partial` | 214 | P0 | Scheduler queue, predicates, priorities |
+| `cave-scheduler` | ✓ | Kubernetes Dashboard (scheduling) | [link](https://github.com/kubernetes/dashboard) | `complete` | 824 | P0 | Scheduler queue, predicates, priorities |
 | `cave-search` | ✓ | OpenSearch Dashboards | [link](https://opensearch.org/docs/) | `partial` | 147 | P1 | Discover, visualize |
 | `cave-secrets` | ✓ | TruffleHog (CLI) | [link](https://trufflesecurity.com/trufflehog) | `scaffold` | 75 | P2 | CLI-first |
 | `cave-security` | ✓ | Falco (limited) | [link](https://falco.org/) | `scaffold` | 75 | P2 | Falcosidekick UI is partial |

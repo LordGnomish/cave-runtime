@@ -361,10 +361,10 @@ local_path    = "/api/v1/cache/pipeline"
 [portal_ui]
 upstream_ui  = "RedisInsight (external)"
 upstream_url = "https://redis.io/insight/"
-status       = "partial"
-loc          = 196
+status       = "complete"
+loc          = 850
 priority     = "P0"
-notes        = "Key explorer, slow-log"
+notes        = "Folder split: keyspace+commands+clients+replication+pubsub (26 tests). Valkey/Redis UI parity."
 last_audit   = "2026-05-11"
 
 

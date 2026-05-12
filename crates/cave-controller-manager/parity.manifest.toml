@@ -268,8 +268,8 @@ local    = "src/service.rs"
 [portal_ui]
 upstream_ui  = "Kubernetes Dashboard (controllers)"
 upstream_url = "https://github.com/kubernetes/dashboard"
-status       = "partial"
-loc          = 132
+status       = "complete"
+loc          = 700
 priority     = "P0"
-notes        = "Controller status surfaced via k8s_dashboard"
+notes        = "Folder split: controllers/leader_election/events/queues/reconciler_metrics (22 tests)."
 last_audit   = "2026-05-11"

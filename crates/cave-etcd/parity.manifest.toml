@@ -1197,8 +1197,8 @@ note         = "HTTP transport for lease-keepalive between peers. Single-node MV
 [portal_ui]
 upstream_ui  = "etcdctl (CLI-only)"
 upstream_url = "https://etcd.io/docs/v3.5/op-guide/"
-status       = "partial"
-loc          = 206
+status       = "complete"
+loc          = 800
 priority     = "P0"
-notes        = "etcd has no canonical UI; cave-side shows revision / KV stats"
+notes        = "Folder split: members/keyspace/leases/alarms/metrics (20 tests). etcdctl parity."
 last_audit   = "2026-05-11"

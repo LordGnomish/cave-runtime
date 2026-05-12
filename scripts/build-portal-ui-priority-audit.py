@@ -184,6 +184,20 @@ COMPLETE: set[str] = {
     "cave-dashboard",
     "cave-metrics",
     "cave-apiserver",
+    # 2026-05-12 third batch (feat/portal-6-more-p0-complete):
+    # six P0 admin pages promoted via folder split + 5 tabs each.
+    # * `cave-cache` — keyspace + commands + clients + replication + pubsub (26 tests)
+    # * `cave-net` — flows + policies + services + nodes + identities (23 tests)
+    # * `cave-cloud-controller-manager` — node/route/service/volume/instance-metadata (22 tests)
+    # * `cave-controller-manager` — controllers/leader-election/events/queues/reconciler-metrics (22 tests)
+    # * `cave-etcd` — members/keyspace/leases/alarms/metrics (20 tests)
+    # * `cave-scheduler` — queue/plugins/bindings/nodescores/events (23 tests)
+    "cave-cache",
+    "cave-net",
+    "cave-cloud-controller-manager",
+    "cave-controller-manager",
+    "cave-etcd",
+    "cave-scheduler",
 }
 
 # Some admin pages live under a URL/short-name that differs from the
