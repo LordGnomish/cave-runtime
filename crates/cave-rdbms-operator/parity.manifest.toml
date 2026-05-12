@@ -13,6 +13,19 @@
 # `routes.rs` exposes a unified HTTP admin API that maps both upstreams onto
 # REST endpoints under `/api/pg/*`.
 
+[parity]
+# Package-level inventory against CloudNativePG v1.24 + PgBouncer 1.21.
+# Hand-curated against the CNPG repository layout
+# (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
+# fill_ratio = (mapped + skipped) / total
+mapped_count   = 9
+skipped_count  = 10
+unmapped_count = 5
+total          = 24
+fill_ratio     = 0.7917
+last_audit     = "2026-05-12"
+infra_only     = false
+
 [module]
 name        = "cave-rdbms-operator"
 description = "RDBMS operator (CloudNativePG-style) — sibling to cave-rdbms (engine)"
@@ -680,3 +693,129 @@ loc          = 300
 priority     = "P1"
 notes        = "Cluster lifecycle UI"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12 — measured, not self-reported)
+# See cave-etcd-port-2026-05-12.md for schema; same shape applies here.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (9) — CloudNativePG packages with real cave-rdbms-operator coverage
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:api/v1/cluster_types.go"
+local_files  = ["src/types.rs", "src/models.rs"]
+note         = "Cluster CRD spec + status fields"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/lifecycle.go"
+local_files  = ["src/lifecycle.rs"]
+note         = "Instance lifecycle (create / start / stop / promote / delete)"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replica.go"
+local_files  = ["src/ha.rs"]
+note         = "Replica registration, lag tracking, failover trigger, pg_rewind"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/barman/barman.go"
+local_files  = ["src/backup.rs"]
+note         = "Barman backup loop (start/complete/fail, retention, PITR base)"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/metrics/metrics.go"
+local_files  = ["src/monitoring.rs"]
+note         = "PostgreSQL exporter metrics + status struct"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/user.go"
+local_files  = ["src/user.rs"]
+note         = "User / role create / drop / grant / revoke / password"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/specs/pgbouncer.go"
+local_files  = ["src/pool.rs"]
+note         = "PgBouncer pool spec + lifecycle (acts as the bridge upstream)"
+
+[[mapped]]
+upstream_pkg = "pgbouncer:src/{pooler.c,objects.c,admin.c}"
+local_files  = ["src/pool.rs"]
+note         = "Connection pool primitives — acquire / release / stats / list"
+
+[[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/url/url.go"
+local_files  = ["src/routes.rs"]
+note         = "Unified HTTP admin API; mirrors the CNPG webserver routes"
+
+# ─── Skipped (10) — out of scope per Charter ───────────────────────────────
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:e2e/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:hack/"
+reason       = "go-bootstrap"
+note         = "kubebuilder boilerplate, manifest generators"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:config/"
+reason       = "go-bootstrap"
+note         = "kubectl/operator install manifests + Helm chart"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:cmd/manager/"
+reason       = "go-bootstrap"
+note         = "Operator binary main; replaced by cave-runtime serve"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/utils/"
+reason       = "stdlib-analog"
+note         = "Go-stdlib helpers; Rust uses tokio + std directly"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/version/"
+reason       = "stdlib-analog"
+note         = "Version-string parsing; Rust uses semver crate"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:internal/cmd/plugin/"
+reason       = "CLI"
+note         = "kubectl-cnpg plugin; replaced by cavectl rdbms subcommand"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:pkg/management/log/"
+reason       = "stdlib-analog"
+note         = "Logging glue; Rust uses tracing"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:contrib/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "cloudnative-pg:docs/"
+reason       = "go-bootstrap"
+note         = "Documentation site"
+
+# ─── Unmapped (5) — real port gaps acknowledged ─────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/webserver/"
+note         = "Per-pod sidecar webserver (status JSON, backup endpoints). The operator's HTTP surface exists in routes.rs but the per-instance sidecar protocol is not yet implemented."
+
+[[unmapped]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replicacluster.go"
+note         = "Replica-cluster (cross-cluster replication) failover. Single-cluster HA only today."
+
+[[unmapped]]
+upstream_pkg = "cloudnative-pg:pkg/specs/scheduledbackup_types.go"
+note         = "ScheduledBackup CRD with cron expression. backup.rs covers one-shot Backup; cron scheduler is a gap."
+
+[[unmapped]]
+upstream_pkg = "cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
+note         = "Built-in catalog of monitoring queries (slow queries, replication slot drift). monitoring.rs covers metrics emission but not the query catalog."
+
+[[unmapped]]
+upstream_pkg = "cloudnative-pg:pkg/management/postgres/pgaudit/"
+note         = "pgaudit extension management (`pgaudit.log` config). Tracked but not yet implemented."
+

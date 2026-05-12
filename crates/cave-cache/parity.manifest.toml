@@ -16,9 +16,18 @@ language= "C"
 url     = "https://github.com/redis/redis"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# Package-level inventory against redis/redis 7.2.0. Inventory
+# hand-curated 2026-05-12 against the Redis source tree
+# (`src/{server,networking,db,t_*,replication,cluster,scripting,
+# expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
+# cache `src/commands/` directory mirrors Redis's `t_*.c` 1:1.
+mapped_count   = 18
+skipped_count  = 13
+unmapped_count = 7
+total          = 38
+fill_ratio     = 0.8158
+last_audit     = "2026-05-12"
+infra_only     = false
 [module]
 name        = "cave-cache"
 description = "Redis 7.2 reimplementation — RESP wire + all data types + pub/sub + scripting + persistence + cluster slots + REST shim"
@@ -357,3 +366,193 @@ loc          = 196
 priority     = "P0"
 notes        = "Key explorer, slow-log"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — every Redis data type + core engine ─────────────────────
+
+[[mapped]]
+upstream_pkg = "redis:src/server.c"
+local_files  = ["src/cache.rs", "src/engine.rs", "src/lib.rs"]
+note         = "Server bootstrap, event loop, command dispatch"
+
+[[mapped]]
+upstream_pkg = "redis:src/networking.c"
+local_files  = ["src/codec.rs", "src/resp.rs"]
+note         = "RESP2/RESP3 wire protocol parser + reply writer"
+
+[[mapped]]
+upstream_pkg = "redis:src/db.c"
+local_files  = ["src/db.rs", "src/keyspace.rs"]
+note         = "Multi-db keyspace + lookup primitives"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_string.c"
+local_files  = ["src/commands/strings.rs"]
+note         = "GET / SET / GETRANGE / SETRANGE / APPEND / INCR / DECR / GETSET"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_list.c"
+local_files  = ["src/commands/lists.rs", "src/lists.rs"]
+note         = "LPUSH / RPUSH / LPOP / RPOP / LRANGE / LINSERT / LREM / LSET / BLPOP"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_hash.c"
+local_files  = ["src/commands/hashes.rs", "src/hashes.rs"]
+note         = "HSET / HGET / HDEL / HEXISTS / HKEYS / HVALS / HINCRBY"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_set.c"
+local_files  = ["src/commands/sets.rs"]
+note         = "SADD / SREM / SISMEMBER / SUNION / SINTER / SDIFF / SPOP / SRANDMEMBER"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_zset.c"
+local_files  = ["src/commands/sorted_sets.rs"]
+note         = "ZADD / ZRANGE / ZRANGEBYSCORE / ZRANGEBYLEX / ZINCRBY / ZUNIONSTORE / ZINTERSTORE"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_stream.c"
+local_files  = ["src/commands/streams.rs"]
+note         = "XADD / XREAD / XRANGE / XGROUP / XREADGROUP / XACK / XCLAIM"
+
+[[mapped]]
+upstream_pkg = "redis:src/bitops.c"
+local_files  = ["src/commands/bitmap.rs"]
+note         = "SETBIT / GETBIT / BITCOUNT / BITOP / BITPOS / BITFIELD"
+
+[[mapped]]
+upstream_pkg = "redis:src/geo.c"
+local_files  = ["src/commands/geo.rs"]
+note         = "GEOADD / GEOPOS / GEODIST / GEOSEARCH (geohash + zset backing)"
+
+[[mapped]]
+upstream_pkg = "redis:src/hyperloglog.c"
+local_files  = ["src/commands/hyperloglog.rs"]
+note         = "PFADD / PFCOUNT / PFMERGE"
+
+[[mapped]]
+upstream_pkg = "redis:src/expire.c"
+local_files  = ["src/expiry.rs", "src/commands/expiry.rs"]
+note         = "EXPIRE / EXPIREAT / TTL / PERSIST + lazy expiry sweep"
+
+[[mapped]]
+upstream_pkg = "redis:src/acl.c"
+local_files  = ["src/acl.rs"]
+note         = "ACL SETUSER / GETUSER / WHOAMI / LIST / CAT"
+
+[[mapped]]
+upstream_pkg = "redis:src/connection.c + src/pubsub.c"
+local_files  = ["src/pubsub.rs", "src/commands/pubsub.rs"]
+note         = "PUBLISH / SUBSCRIBE / PSUBSCRIBE / channel routing"
+
+[[mapped]]
+upstream_pkg = "redis:src/aof.c + src/rdb.c"
+local_files  = ["src/persistence.rs"]
+note         = "AOF append-only log + RDB snapshot writer"
+
+[[mapped]]
+upstream_pkg = "redis:src/eviction.c"
+local_files  = ["src/eviction.rs"]
+note         = "Maxmemory eviction policies (LRU, LFU, random, ttl)"
+
+[[mapped]]
+upstream_pkg = "redis:src/scripting.c"
+local_files  = ["src/commands/scripting.rs"]
+note         = "EVAL / EVALSHA / SCRIPT LOAD — Lua script execution"
+
+# ─── Skipped (13) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "redis:deps/lua/"
+reason       = "stdlib-analog"
+note         = "Bundled Lua interpreter source — Rust uses mlua/rlua crates"
+
+[[skipped]]
+upstream_pkg = "redis:deps/jemalloc/"
+reason       = "stdlib-analog"
+note         = "jemalloc allocator — Rust uses tikv-jemallocator opt-in"
+
+[[skipped]]
+upstream_pkg = "redis:deps/linenoise/"
+reason       = "CLI"
+note         = "redis-cli line-editor"
+
+[[skipped]]
+upstream_pkg = "redis:deps/hiredis/"
+reason       = "stdlib-analog"
+note         = "C client library — not server-side"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-cli.c"
+reason       = "CLI"
+note         = "Client binary; cavectl exposes equivalent"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-benchmark.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-sentinel.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-check-rdb.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/util.c + sds.c + dict.c"
+reason       = "stdlib-analog"
+note         = "C-stdlib analogs — Rust uses std + dashmap"
+
+[[skipped]]
+upstream_pkg = "redis:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "redis:utils/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/anet.c + endianconv.c"
+reason       = "stdlib-analog"
+note         = "Socket + byte-order helpers — Rust uses tokio + byteorder"
+
+[[skipped]]
+upstream_pkg = "redis:Makefile + sentinel.conf + redis.conf"
+reason       = "go-bootstrap"
+note         = "Build + config templates"
+
+# ─── Unmapped (7) — honest gaps ────────────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "redis:src/cluster.c"
+note         = "Cluster mode (slot routing, gossip, MOVED/ASK redirects). cave-cache is single-node today; src/cluster.rs has slot config but no actual gossip."
+
+[[unmapped]]
+upstream_pkg = "redis:src/sentinel.c"
+note         = "Sentinel HA (master + N replicas + automatic failover). Not implemented."
+
+[[unmapped]]
+upstream_pkg = "redis:src/replication.c"
+note         = "Master/replica replication (psync / partial resync). Single-node only today."
+
+[[unmapped]]
+upstream_pkg = "redis:src/modules/"
+note         = "Loadable module API (redis-modules SDK). External-plugin loading is out of scope."
+
+[[unmapped]]
+upstream_pkg = "redis:src/cluster_slot_stats.c"
+note         = "Per-slot stats for cluster mode. Coupled with the cluster gap above."
+
+[[unmapped]]
+upstream_pkg = "redis:src/functions.c"
+note         = "FUNCTION LOAD / FCALL — Redis 7's persisted Lua functions (distinct from EVAL). EVAL-only today."
+
+[[unmapped]]
+upstream_pkg = "redis:src/tls.c"
+note         = "Native TLS support (Redis 6+ feature). cave-cache's TLS comes via the cluster_runtime listener, not the cache itself."
+

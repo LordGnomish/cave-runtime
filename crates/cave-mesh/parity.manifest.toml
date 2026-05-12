@@ -7,6 +7,24 @@
 org     = "istio"
 repo    = "istio"
 version = "1.29.2"
+name    = "Istio"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/istio/istio"
+[parity]
+# Package-level inventory against istio/istio v1.29 + ambient-mode
+# add-ons (ztunnel, waypoint). Inventory hand-curated 2026-05-12
+# against the Istio repo layout (pilot/, security/, telemetry/,
+# istioctl/, operator/, cni/, pkg/) plus the ztunnel repo.
+# The ambient-mode layer in `src/ambient/` is the cave-side entry
+# point; legacy control-plane bits live alongside.
+mapped_count   = 14
+skipped_count  = 13
+unmapped_count = 8
+total          = 35
+fill_ratio     = 0.7714
+last_audit     = "2026-05-12"
+infra_only     = false
 
 [module]
 name        = "cave-mesh"
@@ -57,3 +75,175 @@ loc          = 484
 priority     = "P0"
 notes        = "Service-mesh topology; covered by admin/kiali.rs"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (14) ───────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/core/v1alpha3/route"
+local_files  = ["src/routes.rs", "src/traffic.rs"]
+note         = "Routing rules — VirtualService → cluster + retry + fault + match"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/xds"
+local_files  = ["src/lib.rs"]
+note         = "xDS discovery service (ADS, CDS, EDS, LDS, RDS shapes)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/pki"
+local_files  = ["src/spiffe.rs", "src/mtls.rs"]
+note         = "SPIFFE ID + workload PKI + mTLS handshake"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/server"
+local_files  = ["src/auth.rs"]
+note         = "AuthorizationPolicy enforcement, JWT validation"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/sidecar"
+local_files  = ["src/sidecar.rs"]
+note         = "Sidecar resource — workload-scoped reachability + policy filter"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/proxy"
+local_files  = ["src/proxy.rs"]
+note         = "Envoy proxy state machine + circuit breaker integration"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/circuitbreaker"
+local_files  = ["src/circuit.rs"]
+note         = "Per-host outlier ejection + half-open probes (sweep-011 backoff adopted)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/ratelimit"
+local_files  = ["src/rate_limit.rs"]
+note         = "Token-bucket per-destination rate limit"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/serviceregistry"
+local_files  = ["src/registry.rs", "src/store.rs"]
+note         = "Service + workload registry; xDS subscribers"
+
+[[mapped]]
+upstream_pkg = "istio/istio:telemetry/pkg"
+local_files  = ["src/telemetry.rs", "src/metrics.rs", "src/observability.rs"]
+note         = "RED metrics, span emission, log records per request"
+
+[[mapped]]
+upstream_pkg = "ztunnel:src/proxy/{inbound,outbound,hbone}"
+local_files  = ["src/ambient/hbone.rs", "src/ambient/ztunnel.rs"]
+note         = "HBONE tunnel encapsulation (HTTP CONNECT) for ambient mode L4 mTLS"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/ambient/{authz,virtualservice,destinationrule,waypoint}"
+local_files  = ["src/ambient/authz.rs", "src/ambient/virtualservice.rs", "src/ambient/destinationrule.rs", "src/ambient/waypoint.rs"]
+note         = "Ambient-mode CRD handling — AuthZ, VS, DR, waypoint deployment"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/server/ca"
+local_files  = ["src/ambient/svid.rs"]
+note         = "SVID issuance for ambient identities (ztunnel + waypoint pods)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/multicluster"
+local_files  = ["src/multicluster.rs"]
+note         = "Multi-cluster service-export + east-west gateway config"
+
+# ─── Skipped (13) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "istio/istio:istioctl/"
+reason       = "CLI"
+note         = "istioctl CLI; cavectl mesh exposes the equivalent"
+
+[[skipped]]
+upstream_pkg = "istio/istio:operator/"
+reason       = "go-bootstrap"
+note         = "Helm operator; cave-runtime owns its own lifecycle"
+
+[[skipped]]
+upstream_pkg = "istio/istio:cni/"
+reason       = "go-bootstrap"
+note         = "CNI plugin (init container); k8s networking is cave-cni's job"
+
+[[skipped]]
+upstream_pkg = "istio/istio:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "istio/istio:e2e/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "istio/istio:bin/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:tools/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:samples/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:helm/"
+reason       = "go-bootstrap"
+note         = "Helm chart"
+
+[[skipped]]
+upstream_pkg = "istio/istio:pkg/log/ + pkg/util/"
+reason       = "stdlib-analog"
+note         = "Logging + utility helpers; Rust uses tracing + std"
+
+[[skipped]]
+upstream_pkg = "istio/istio:manifests/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:release/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:operator/cmd/mesh/"
+reason       = "CLI"
+note         = "mesh CLI subcommand"
+
+# ─── Unmapped (8) — honest gaps ────────────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
+note         = "WASM filter chain (EnvoyFilter / WasmPlugin). Cave-mesh has no WASM extension surface."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/federation/"
+note         = "Multi-network federation gateway. Single-network today."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/serviceentry/external/"
+note         = "VM-mesh expansion — non-k8s workloads (VirtualMachine + WorkloadEntry CRD). Not implemented."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:security/pkg/jwt/"
+note         = "JWT validation pipeline (cache + JWKS refresh). auth.rs has basic JWT; full pipeline is a gap."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:telemetry/api/v1/AnalyticsClient"
+note         = "Backend analytics protocol — sends mesh usage to Istio team. Out of scope."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:istioctl/pkg/{analyze,debug}/"
+note         = "Static analysis + diagnose. Distinct from runtime mesh."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/serviceregistry/serviceentry/"
+note         = "ServiceEntry CRD — manual service catalog. registry.rs handles auto-discovery only."
+
+[[unmapped]]
+upstream_pkg = "ztunnel:src/state/policy/L7"
+note         = "Ambient L7 policy (waypoint proxy filter chain). waypoint.rs has the routing stub; L7 filter ordering is unmapped."
+

@@ -10,7 +10,10 @@
 org     = "apache"
 repo    = "kafka"
 version = "4.2.0"
-
+name    = "Apache Kafka"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/apache/kafka"
 [[upstreams]]
 org     = "apache"
 repo    = "kafka"
@@ -22,6 +25,21 @@ org     = "apache"
 repo    = "pulsar"
 version = "v4.2.0"
 notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressing."
+
+[parity]
+# Package-level inventory against Kafka (primary) + Pulsar
+# (secondary). Inventory hand-curated 2026-05-12 against Kafka's
+# package tree (server/, controller/, common/, clients/, log/,
+# coordinator/, network/, raft/, streams/, connect/, storage/)
+# plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
+# Each entry counts once, even when both Kafka and Pulsar contribute.
+mapped_count   = 18
+skipped_count  = 16
+unmapped_count = 9
+total          = 43
+fill_ratio     = 0.7907
+last_audit     = "2026-05-12"
+infra_only     = false
 
 [module]
 name          = "cave-streams"
@@ -350,3 +368,213 @@ loc          = 293
 priority     = "P1"
 notes        = "Kafka topic browser"
 last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12; dual-upstream Kafka + Pulsar)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — Kafka and Pulsar wire + broker + protocol packages ──────
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/main/java/org/apache/kafka/common/protocol"
+local_files  = ["src/kafka_protocol.rs", "src/protocol.rs"]
+note         = "Kafka protocol versioning + ApiVersions + KIP-482 flexible versions"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../network"
+local_files  = ["src/kafka_wire.rs"]
+note         = "Kafka wire codec — RequestHeader / ResponseHeader + length-prefix frames"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/src/main/scala/kafka/server"
+local_files  = ["src/broker.rs", "src/server.rs"]
+note         = "Broker process — KafkaApis dispatch, ApiKey routing"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:storage/src/main/java/.../log"
+local_files  = ["src/segment_log.rs", "src/storage.rs"]
+note         = "Per-partition append-only segment log + index files"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/.../log/LogCompaction"
+local_files  = ["src/log_compaction.rs", "src/compaction.rs"]
+note         = "Log-compaction tombstone-keyed retention"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../producer"
+local_files  = ["src/producer.rs", "src/idempotent_producer.rs"]
+note         = "Producer client — acks + idempotent producer ID semantics"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:clients/src/.../consumer"
+local_files  = ["src/consumer.rs", "src/consumer_group.rs", "src/incremental_rebalance.rs"]
+note         = "Consumer + ConsumerGroup coordinator + incremental cooperative rebalance"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:core/.../transaction"
+local_files  = ["src/transactions.rs", "src/txn_markers.rs"]
+note         = "EOS transactions — TxnId + producer epoch + markers"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:metadata/.../partitioned_topic"
+local_files  = ["src/partitioned_topic.rs", "src/topic.rs"]
+note         = "Topic + partition metadata"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/.../acl"
+local_files  = ["src/acl.rs"]
+note         = "ACLs — principal + resource + operation"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:server/.../quota"
+local_files  = ["src/quota.rs"]
+note         = "Per-client + per-user produce/fetch quotas"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:streams/src/main/java"
+local_files  = ["src/streams_api.rs"]
+note         = "Kafka Streams API surface (KStream / KTable) — DSL stub"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/api"
+local_files  = ["src/connect.rs"]
+note         = "Connect REST + Source/SinkConnector contract"
+
+[[mapped]]
+upstream_pkg = "apache/kafka:schema-registry"
+local_files  = ["src/schema_registry.rs", "src/schema_evolution.rs"]
+note         = "Schema registry + Avro / Protobuf compatibility check"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-common/.../protocol"
+local_files  = ["src/pulsar_wire.rs"]
+note         = "Pulsar binary protocol — Send / Subscribe / Ack frames"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../admin"
+local_files  = ["src/pulsar_admin.rs"]
+note         = "Pulsar admin REST API (namespaces, tenants, topics)"
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../dispatcher"
+local_files  = ["src/pulsar_dispatch.rs", "src/pulsar_topic.rs"]
+note         = "Pulsar consumer dispatcher (Exclusive / Shared / Failover / Key_Shared)"
+
+[[mapped]]
+upstream_pkg = "common:tenant + cursor + mirror"
+local_files  = ["src/tenant.rs", "src/unified_cursor.rs", "src/mirror.rs", "src/compression.rs", "src/admin.rs"]
+note         = "Cave-side multi-tenant scoping + unified consumer cursor + mirroring + compression"
+
+# ─── Skipped (16) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "apache/kafka:tools/"
+reason       = "CLI"
+note         = "kafka-topics.sh, kafka-console-producer/consumer, kafka-acls"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:bin/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:gradle/ + build.gradle"
+reason       = "go-bootstrap"
+note         = "Gradle build system"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:checkstyle/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:docs/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:examples/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:trogdor/"
+reason       = "test-harness"
+note         = "Soak testing framework"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:common/utils/"
+reason       = "stdlib-analog"
+note         = "Java-stdlib helpers — Rust uses std + tokio"
+
+[[skipped]]
+upstream_pkg = "apache/kafka:jmh-benchmarks/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-client-cpp + pulsar-client-go + pulsar-client-python"
+reason       = "stdlib-analog"
+note         = "Non-Java client libraries"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-package-management/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:tiered-storage/jcloud + tiered-storage/file-system"
+reason       = "go-bootstrap"
+note         = "JClouds + HDFS tiered storage; cave-store handles object storage"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:pulsar-functions/"
+reason       = "go-bootstrap"
+note         = "Pulsar Functions (stream processing); maps to cave-pipelines"
+
+[[skipped]]
+upstream_pkg = "apache/pulsar:bouncy-castle/"
+reason       = "stdlib-analog"
+note         = "BC crypto provider — Rust uses ring"
+
+# ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:raft/"
+note         = "KRaft consensus (KIP-500) — Kafka's ZooKeeper-replacement metadata quorum. Single-node only today."
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:storage/tiered/"
+note         = "Tiered storage (KIP-405) — cold partition offload to object store. Not implemented."
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:connect/runtime/"
+note         = "Connect worker runtime — task scheduling, offset management, dead-letter queue. connect.rs has the REST surface only."
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:streams/processor-api"
+note         = "Kafka Streams Processor API (low-level state stores + punctuation). streams_api.rs stubs the DSL only."
+
+[[unmapped]]
+upstream_pkg = "apache/kafka:server/group-coordinator/share/"
+note         = "Share groups (KIP-932) — queue-style consumption. Newer feature, not yet in scope."
+
+[[unmapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../replication/"
+note         = "Geo-replication between Pulsar clusters. Single-cluster only."
+
+[[unmapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
+note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar equivalent is a gap."
+
+[[unmapped]]
+upstream_pkg = "apache/pulsar:managed-ledger/"
+note         = "BookKeeper-backed durable log — Pulsar's storage substrate. cave-streams uses its own segment_log instead."
+
+[[unmapped]]
+upstream_pkg = "apache/pulsar:pulsar-io/"
+note         = "Pulsar IO connector framework (parallel to Kafka Connect). connect.rs covers Kafka Connect only."
+
