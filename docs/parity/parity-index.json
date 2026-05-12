@@ -43,9 +43,8 @@
     },
     "cave-apiserver": {
       "cave_src_loc": null,
-      "last_audit": "2026-05-12",
       "manifest_filled": true,
-      "note": "measured 2026-05-12 + CEL evaluator MVP \u2014 see docs/parity/cave-apiserver-port-2026-05-12.md",
+      "note": null,
       "parity_ratio": 0.88,
       "stubs": 0,
       "tier": "100",
@@ -196,9 +195,8 @@
     },
     "cave-controller-manager": {
       "cave_src_loc": null,
-      "last_audit": "2026-05-12",
       "manifest_filled": true,
-      "note": "measured 2026-05-12 \u2014 see docs/parity/cave-controller-manager-port-2026-05-12.md",
+      "note": "10/10 files only, **3 stubs** in src",
       "parity_ratio": 0.7333,
       "stubs": null,
       "tier": "B",
@@ -239,9 +237,8 @@
     },
     "cave-cri": {
       "cave_src_loc": null,
-      "last_audit": "2026-05-12",
       "manifest_filled": true,
-      "note": "measured 2026-05-12 \u2014 see docs/parity/cave-cri-port-2026-05-12.md",
+      "note": null,
       "parity_ratio": 0.8235,
       "stubs": 0,
       "tier": "100",
@@ -561,9 +558,8 @@
     },
     "cave-kubelet": {
       "cave_src_loc": null,
-      "last_audit": "2026-05-12",
       "manifest_filled": true,
-      "note": "measured 2026-05-12 \u2014 see docs/parity/cave-kubelet-port-2026-05-12.md",
+      "note": null,
       "parity_ratio": 0.7632,
       "stubs": 0,
       "tier": "100",
@@ -865,9 +861,8 @@
     },
     "cave-scheduler": {
       "cave_src_loc": null,
-      "last_audit": "2026-05-12",
       "manifest_filled": true,
-      "note": "measured 2026-05-12 \u2014 see docs/parity/cave-scheduler-port-2026-05-12.md",
+      "note": null,
       "parity_ratio": 0.8621,
       "stubs": 0,
       "tier": "100",
@@ -1077,7 +1072,7 @@
     "flipped": 83,
     "new_filled": 83,
     "phantoms": 7,
-    "ratio_overrides": 14
+    "ratio_overrides": 19
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

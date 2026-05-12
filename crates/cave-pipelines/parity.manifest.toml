@@ -317,8 +317,8 @@ local_path    = "/api/build-status"
 [portal_ui]
 upstream_ui  = "Tekton Dashboard"
 upstream_url = "https://tekton.dev/docs/dashboard/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 149
 priority     = "P1"
 notes        = "PipelineRun graph"
 last_audit   = "2026-05-11"

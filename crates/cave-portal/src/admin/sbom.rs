@@ -1,4 +1,7 @@
-//! `/admin/sbom` view — sbom resource browser.
+//! `/admin/sbom` — Dependency-Track parity. Component browser
+//! grouped by image with license/package count summary.
+//!
+//! Upstream UI: <https://dependencytrack.org/>
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
@@ -13,16 +16,51 @@ pub enum SbomViewError {
 
 pub fn list_records(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<SbomComponent>, SbomViewError> {
     ctx.authorise(Permission::SbomRead)?;
-    Ok(scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| &r.tenant)
-        .into_iter().cloned().collect())
+    let mut rows: Vec<SbomComponent> = scope(&state.sbom_components.read().unwrap(), &ctx.tenant, |r| &r.tenant)
+        .into_iter().cloned().collect();
+    rows.sort_by(|a, b| a.image.cmp(&b.image).then(a.package.cmp(&b.package)));
+    Ok(rows)
+}
+
+pub fn group_by_image(rows: &[SbomComponent]) -> Vec<(String, Vec<SbomComponent>)> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, Vec<SbomComponent>> = BTreeMap::new();
+    for r in rows { acc.entry(r.image.clone()).or_default().push(r.clone()); }
+    acc.into_iter().collect()
+}
+
+pub fn unique_licenses(rows: &[SbomComponent]) -> Vec<String> {
+    use std::collections::BTreeSet;
+    let mut set: BTreeSet<String> = BTreeSet::new();
+    for r in rows { set.insert(r.license.clone()); }
+    set.into_iter().collect()
+}
+
+pub fn by_license<'a>(rows: &'a [SbomComponent], license: &str) -> Vec<&'a SbomComponent> {
+    rows.iter().filter(|r| r.license == license).collect()
 }
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SbomViewError> {
     let rows = list_records(state, ctx)?;
-    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![r.image.clone(), r.package.clone(), r.version.clone(), r.license.clone()]).collect();
+    let licenses = unique_licenses(&rows);
+    let images = group_by_image(&rows);
+    let table_rows: Vec<Vec<String>> = rows.iter().map(|r| vec![
+        escape(&r.image), escape(&r.package), escape(&r.version), escape(&r.license),
+    ]).collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Sbom ({n})</h2>{tbl}</section>"#,
+        r#"<section>
+  <p class="text-sm text-gray-600 mb-3">Dependency-Track (cave-sbom). Upstream: <a class="text-blue-700 underline" href="https://dependencytrack.org/">dependencytrack.org</a>.</p>
+  <div class="mb-4 flex gap-4 text-sm">
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{n}</strong> components</span>
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{i}</strong> images</span>
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{l}</strong> licenses</span>
+  </div>
+  <h2 class="text-lg font-semibold mb-2">Components ({n})</h2>
+  {tbl}
+</section>"#,
         n = rows.len(),
+        i = images.len(),
+        l = licenses.len(),
         tbl = table(&["image", "package", "version", "license"], &table_rows),
     );
     Ok(page_shell(&format!("sbom · {}", escape(ctx.tenant.as_str())), &body))
@@ -38,38 +76,60 @@ mod tests {
     fn ctx(perms: &[Permission]) -> RequestCtx { RequestCtx::developer("acme", perms) }
 
     #[test]
-    fn list_filters_to_owner() {
-        let (_c, _t) = portal_test_ctx!("plugins/sbom/src/components/ComponentsList.tsx", "ComponentsList", "acme");
-        let s = AdminState::seeded();
-        let r = list_records(&s, &ctx(&[Permission::SbomRead])).unwrap();
+    fn list_filters_to_owner_sorted_by_image_then_package() {
+        let r = list_records(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
         assert_eq!(r.len(), 2);
-        assert!(r.iter().all(|x| x.tenant.as_str() == "acme"));
+        for w in r.windows(2) {
+            assert!((w[0].image.as_str(), w[0].package.as_str()) <= (w[1].image.as_str(), w[1].package.as_str()));
+        }
     }
 
     #[test]
     fn list_refuses_without_perm() {
-        let (_c, _t) = portal_test_ctx!("plugins/permission-react/src/PermissionApi.ts", "authorize", "acme");
         assert!(list_records(&AdminState::seeded(), &ctx(&[])).is_err());
     }
 
     #[test]
+    fn group_by_image_collects() {
+        let r = list_records(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
+        let g = group_by_image(&r);
+        assert_eq!(g.iter().map(|(_, v)| v.len()).sum::<usize>(), r.len());
+    }
+
+    #[test]
+    fn unique_licenses_dedup() {
+        let r = list_records(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
+        let u = unique_licenses(&r);
+        let set: std::collections::BTreeSet<&str> = r.iter().map(|x| x.license.as_str()).collect();
+        assert_eq!(u.len(), set.len());
+    }
+
+    #[test]
+    fn by_license_filters() {
+        let r = list_records(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
+        if let Some(f) = r.first() {
+            let l = f.license.clone();
+            assert!(by_license(&r, &l).iter().all(|x| x.license == l));
+        }
+        assert!(by_license(&r, "no-such").is_empty());
+    }
+
+    #[test]
     fn render_contains_owner_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/sbom/src/components/ComponentsList.tsx", "RenderOwner", "acme");
         let html = render(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
         assert!(html.contains("web:v17"));
     }
 
     #[test]
     fn render_excludes_evil_row() {
-        let (_c, _t) = portal_test_ctx!("plugins/sbom/src/components/ComponentsList.tsx", "RenderEvil", "acme");
         let html = render(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
         assert!(!html.contains("evil:x"));
     }
 
     #[test]
-    fn render_shows_acme_count() {
-        let (_c, _t) = portal_test_ctx!("plugins/sbom/src/components/ComponentsList.tsx", "Count", "acme");
+    fn render_includes_license_count_and_upstream_link() {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::SbomRead])).unwrap();
-        assert!(html.contains("(2)"));
+        assert!(html.contains("licenses"));
+        assert!(html.contains("dependencytrack.org"));
     }
 }

@@ -433,8 +433,8 @@ local_path    = "/api/v1/metrics/targets"
 [portal_ui]
 upstream_ui  = "Prometheus expr browser"
 upstream_url = "https://prometheus.io/docs/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 134
 priority     = "P1"
 notes        = "Targets, alerts, query; cave-side concept; admin/prometheus.rs ports upstream-UI shape"
 last_audit   = "2026-05-11"

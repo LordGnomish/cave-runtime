@@ -1,4 +1,7 @@
-//! `/admin/incidents` view — incident tracker + state transitions.
+//! `/admin/incidents` — Grafana OnCall incidents parity. Severity
+//! grouped pills + state-transition mutator (preserved).
+//!
+//! Upstream UI: <https://grafana.com/docs/oncall/latest/>
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
@@ -38,14 +41,42 @@ pub fn transition(state: &AdminState, ctx: &RequestCtx, id: &str, new_state: &st
     Ok(())
 }
 
+pub fn group_by_severity(rows: &[IncidentRecord]) -> Vec<(String, usize)> {
+    use std::collections::BTreeMap;
+    let mut acc: BTreeMap<String, usize> = BTreeMap::new();
+    for r in rows { *acc.entry(r.severity.to_string()).or_insert(0) += 1; }
+    let mut out: Vec<(String, usize)> = acc.into_iter().collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
+pub fn open_incidents<'a>(rows: &'a [IncidentRecord]) -> Vec<&'a IncidentRecord> {
+    rows.iter().filter(|i| i.state != "Resolved").collect()
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IncidentsViewError> {
     let incs = list_incidents(state, ctx)?;
+    let open_n = open_incidents(&incs).len();
+    let groups = group_by_severity(&incs);
+    let chips: String = groups.iter().map(|(s, n)| format!(
+        r#"<span class="px-2 py-1 mr-2 rounded bg-gray-200 text-sm">{s} <strong>×{n}</strong></span>"#,
+        s = escape(s), n = n)).collect();
     let rows: Vec<Vec<String>> = incs.iter().map(|i| vec![
         i.id.clone(), i.title.clone(), i.severity.into(), i.state.into(), i.opened_unix.to_string(),
     ]).collect();
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Incidents ({n})</h2>{tbl}</section>"#,
+        r#"<section>
+  <p class="text-sm text-gray-600 mb-3">Grafana OnCall incidents (cave-incidents). Upstream: <a class="text-blue-700 underline" href="https://grafana.com/docs/oncall/latest/">grafana.com/docs/oncall</a>.</p>
+  <div class="mb-4 flex gap-4 text-sm">
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{n}</strong> incidents</span>
+    <span class="px-2 py-1 rounded bg-gray-200"><strong>{open}</strong> open</span>
+  </div>
+  <div class="mb-4">{chips}</div>
+  <h2 class="text-lg font-semibold mb-2">Incidents ({n})</h2>{tbl}
+</section>"#,
         n = incs.len(),
+        open = open_n,
+        chips = chips,
         tbl = table(&["id", "title", "severity", "state", "opened"], &rows),
     );
     Ok(page_shell(&format!("incidents · {}", escape(ctx.tenant.as_str())), &body))
@@ -92,6 +123,27 @@ mod tests {
         let c = ctx(&[Permission::IncidentsRead, Permission::IncidentsWrite]);
         assert!(matches!(transition(&s, &c, "INC-2026-001", "Pondering").unwrap_err(), IncidentsViewError::InvalidState(_)));
         assert!(matches!(transition(&s, &c, "EVIL-001", "Resolved").unwrap_err(), IncidentsViewError::IncidentNotFound(_)));
+    }
+
+    #[test]
+    fn group_by_severity_counts() {
+        let i = list_incidents(&AdminState::seeded(), &ctx(&[Permission::IncidentsRead])).unwrap();
+        let g = group_by_severity(&i);
+        assert_eq!(g.iter().map(|(_, n)| n).sum::<usize>(), i.len());
+    }
+
+    #[test]
+    fn open_incidents_excludes_resolved() {
+        let i = list_incidents(&AdminState::seeded(), &ctx(&[Permission::IncidentsRead])).unwrap();
+        let o = open_incidents(&i);
+        assert!(o.iter().all(|x| x.state != "Resolved"));
+    }
+
+    #[test]
+    fn render_includes_open_count_and_upstream_link() {
+        let html = render(&AdminState::seeded(), &ctx(&[Permission::IncidentsRead])).unwrap();
+        assert!(html.contains("open"));
+        assert!(html.contains("grafana.com/docs/oncall"));
     }
 
     #[test]
