@@ -276,15 +276,28 @@ def disk_manifest_state(crate: str) -> dict:
     except OSError:
         return {}
 
-    # Find [parity] block
-    parity_m = re.search(
-        r"^\[parity\][^\[]*",
-        text,
-        flags=re.MULTILINE,
-    )
-    if not parity_m:
+    # Find [parity] block — scan line-by-line so comments containing
+    # `[` (e.g. references to [[mapped]] in inventory manifests) don't
+    # truncate the capture.
+    lines = text.splitlines()
+    block_lines: list[str] = []
+    in_block = False
+    for line in lines:
+        stripped = line.lstrip()
+        if stripped.startswith("[parity]"):
+            in_block = True
+            block_lines.append(line)
+            continue
+        if in_block:
+            # Stop at the next table header (single or array-of-tables).
+            # Comments / blank lines stay in the block. Lines that start
+            # with `#` may legitimately contain `[`.
+            if stripped.startswith("[") and not stripped.startswith("#"):
+                break
+            block_lines.append(line)
+    if not block_lines:
         return {}
-    block = parity_m.group(0)
+    block = "\n".join(block_lines)
     rm = re.search(r'^\s*(?:fill_)?ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
     ratio = float(rm.group(1)) if rm else None
     am = re.search(r'^\s*last_audit\s*=\s*"([^"]+)"', block, flags=re.MULTILINE)
@@ -340,12 +353,28 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
             entry["manifest_filled"] = True
             new_filled += 1
             flipped += 1
-        # Only overlay ratio when disk has a meaningful (>0) measured
-        # value AND it doesn't downgrade an already-100% audit value.
+        # Overlay disk-measured ratio when the on-disk `[parity]` block
+        # carries a `last_audit` newer than the audit-doc snapshot
+        # (`2026-05-01`). A freshly measured ratio is authoritative —
+        # including the case where the new measurement downgrades a
+        # stale 1.0 self-reported value. We still refuse to downgrade
+        # without a newer audit date, so a half-edited manifest cannot
+        # accidentally erase audit-doc data.
         disk_ratio = disk.get("parity_ratio_disk")
-        if disk_ratio is not None and disk_ratio > 0.0:
-            audit_ratio = entry.get("parity_ratio") or 0.0
-            if disk_ratio > audit_ratio:
+        disk_audit = disk.get("last_audit_disk")
+        if disk_ratio is not None:
+            audit_ratio = entry.get("parity_ratio")
+            newer_audit = disk_audit is not None and disk_audit > "2026-05-01"
+            should_overlay = (
+                # New audit always wins (honest downgrade allowed).
+                newer_audit
+                # Otherwise, only allow strict upgrades from None / 0.
+                or (
+                    audit_ratio is None
+                    or (audit_ratio == 0.0 and disk_ratio > 0.0)
+                )
+            )
+            if should_overlay and disk_ratio != audit_ratio:
                 entry["parity_ratio"] = disk_ratio
                 ratio_overrides += 1
         # Surface infra_only signal from disk for E-tier entries.
