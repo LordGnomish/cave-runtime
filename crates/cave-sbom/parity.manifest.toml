@@ -45,8 +45,8 @@ source_root = "src"
 [portal_ui]
 upstream_ui  = "Dependency-Track"
 upstream_url = "https://dependencytrack.org/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 135
 priority     = "P1"
 notes        = "Component / vuln correlation"
 last_audit   = "2026-05-11"

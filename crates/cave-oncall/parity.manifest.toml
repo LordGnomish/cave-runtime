@@ -45,8 +45,8 @@ source_root = "src"
 [portal_ui]
 upstream_ui  = "Grafana OnCall"
 upstream_url = "https://grafana.com/docs/oncall/latest/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 139
 priority     = "P1"
 notes        = "Duplicate of incidents — TODO collapse"
 last_audit   = "2026-05-11"

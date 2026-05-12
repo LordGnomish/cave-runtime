@@ -41,8 +41,8 @@ source_root = "src"
 [portal_ui]
 upstream_ui  = "Twenty CRM"
 upstream_url = "https://twenty.com/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 144
 priority     = "P1"
 notes        = "Full CRM React app"
 last_audit   = "2026-05-11"

@@ -48,8 +48,8 @@ source_root = "src"
 [portal_ui]
 upstream_ui  = "ERPNext"
 upstream_url = "https://erpnext.com/"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 153
 priority     = "P1"
 notes        = "Full ERP UI"
 last_audit   = "2026-05-11"

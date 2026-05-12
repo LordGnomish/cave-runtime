@@ -360,8 +360,8 @@ local_path    = "/api/auth/token"
 [portal_ui]
 upstream_ui  = "Keycloak Admin Console"
 upstream_url = "https://www.keycloak.org/documentation"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 174
 priority     = "P1"
 notes        = "Realm / client / user management"
 last_audit   = "2026-05-11"

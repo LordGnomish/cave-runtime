@@ -373,8 +373,8 @@ local_path    = "/v3/kv/txn"
 [portal_ui]
 upstream_ui  = "MinIO Console"
 upstream_url = "https://min.io/docs/minio/linux/operations/minio-console.html"
-status       = "scaffold"
-loc          = 75
+status       = "partial"
+loc          = 137
 priority     = "P1"
 notes        = "Bucket browser"
 last_audit   = "2026-05-11"
