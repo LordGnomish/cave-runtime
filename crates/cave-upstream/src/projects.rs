@@ -225,8 +225,16 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "Cilium",
         github_repo: "cilium/cilium",
-        cave_module: "cave-ebpf-common",
-        track_features: "eBPF programs, CiliumNetworkPolicy CRD, egress gateway, kube-proxy replacement, bandwidth mgr",
+        // 2026-05-13: was `cave-ebpf-common` — a 188-LOC shared eBPF
+        // types crate with a skeleton parity manifest (every [[files]]
+        // / [[functions]] / [[tests]] / [[surfaces]] block commented
+        // out). The kernel parity calculator therefore returned
+        // overall=0.0 for it, and the /upstream tracker page rendered
+        // "Cilium 0%" — Burak's report. The actual Cilium port lives
+        // in cave-net (36k LOC, full mapping inventory, fill_ratio =
+        // 0.9179 per its parity.manifest.toml). Remap to the real one.
+        cave_module: "cave-net",
+        track_features: "eBPF programs, CiliumNetworkPolicy CRD, egress gateway, kube-proxy replacement, bandwidth mgr, Hubble flow visibility, agent state machines",
         check_frequency: "biweekly",
         category: "networking",
         phase: 1,
@@ -831,6 +839,23 @@ mod tests {
                 project.name
             );
         }
+    }
+
+    #[test]
+    fn cilium_project_maps_to_cave_net_not_cave_ebpf_common() {
+        // Regression for the 2026-05-13 "Cilium 0%" bug: previously
+        // mapped to cave-ebpf-common (a 188-LOC shared types crate
+        // with a skeleton manifest, kernel parity = 0.0). The actual
+        // Cilium port lives in cave-net (36k LOC, fill_ratio = 0.9179).
+        let cilium = TRACKED_PROJECTS
+            .iter()
+            .find(|p| p.name == "Cilium" && p.github_repo == "cilium/cilium")
+            .expect("Cilium tracked project must exist");
+        assert_eq!(
+            cilium.cave_module, "cave-net",
+            "Cilium must map to cave-net (where the parity manifest declares cilium/cilium); \
+             cave-ebpf-common is a shared types crate, not a port"
+        );
     }
 
     #[test]
