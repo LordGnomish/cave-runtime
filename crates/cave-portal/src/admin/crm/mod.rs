@@ -1,7 +1,21 @@
 //! `/admin/crm` — Twenty CRM parity. Mirrors the upstream's
 //! Accounts landing page with per-plan grouping and MRR summary card.
 //!
+//! Tab layout — mirrors the Twenty sidebar:
+//!
+//! * [`contacts`]   — account-owners-of-record list
+//! * [`deals`]      — opportunity pipeline
+//! * [`activities`] — per-account next-touch
+//! * [`workflows`]  — lifecycle automations
+//! * [`reports`]    — per-plan revenue roll-up
+//!
 //! Upstream UI: <https://twenty.com/>
+
+pub mod activities;
+pub mod contacts;
+pub mod deals;
+pub mod reports;
+pub mod workflows;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};

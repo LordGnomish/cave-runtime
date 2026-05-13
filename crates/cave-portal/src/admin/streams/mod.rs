@@ -5,6 +5,20 @@
 //! plus consumer-group lag (current_offset vs log_end_offset). The
 //! single mutator is `reset_consumer_offset`, which exposes the
 //! `kafka-consumer-groups.sh --reset-offsets` semantics.
+//!
+//! Tab layout — mirrors Kafka admin tooling:
+//!
+//! * [`topics`]          — topic registry + per-topic configs
+//! * [`brokers`]         — live broker roster
+//! * [`consumer_groups`] — group state + lag
+//! * [`partitions`]      — per-partition leader + replica view
+//! * [`acls`]            — tenant-scoped allow rules
+
+pub mod acls;
+pub mod brokers;
+pub mod consumer_groups;
+pub mod partitions;
+pub mod topics;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};

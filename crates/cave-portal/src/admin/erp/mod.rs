@@ -1,7 +1,21 @@
 //! `/admin/erp` — ERPNext parity. Mirrors the upstream's Invoices
 //! landing page with status-group pills + totals.
 //!
+//! Tab layout — mirrors the ERPNext sidebar:
+//!
+//! * [`invoices`]   — Sales Invoice list
+//! * [`inventory`]  — Stock view, per customer
+//! * [`accounting`] — AR waterfall by status
+//! * [`hr`]         — synthesised relationship-manager directory
+//! * [`projects`]   — per-customer roll-up
+//!
 //! Upstream UI: <https://erpnext.com/>
+
+pub mod accounting;
+pub mod hr;
+pub mod inventory;
+pub mod invoices;
+pub mod projects;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
