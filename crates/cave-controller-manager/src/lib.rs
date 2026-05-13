@@ -134,6 +134,32 @@ pub mod tainteviction;
 /// per-node sub-CIDRs at node-add events.
 pub mod cidrallocator;
 
+/// k8s-streams-mesh batch 2026-05-13: VAP status reconciler.
+/// Aggregates per-GVK type-check outcomes onto policy status.
+/// Mirrors `pkg/controller/validatingadmissionpolicystatus/`.
+pub mod validatingadmissionpolicystatus;
+
+/// k8s-streams-mesh batch 2026-05-13: PV-side protection
+/// finalizer. Blocks deletion while still bound / referenced.
+/// Mirrors `pkg/controller/volume/pvprotection/`.
+pub mod pvprotection;
+
+/// k8s-streams-mesh batch 2026-05-13: StorageVersion garbage
+/// collector. Removes SV objects whose owning APIService is gone.
+/// Mirrors `pkg/controller/storageversiongarbagecollector/`.
+pub mod storageversiongarbagecollector;
+
+/// k8s-streams-mesh batch 2026-05-13: legacy SA token cleaner
+/// (KEP-2799 deprecation). Mirrors
+/// `pkg/controller/legacyserviceaccounttokencleaner/`.
+pub mod legacyserviceaccounttokencleaner;
+
+/// k8s-streams-mesh batch 2026-05-13: generic-ephemeral-volume
+/// controller — materialises PVCs from pod's volumeClaimTemplate
+/// with owner-reference adoption. Mirrors
+/// `pkg/controller/volume/ephemeral/`.
+pub mod ephemeralvolume;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
 
 #[cfg(test)]

@@ -112,6 +112,23 @@ pub mod lifecycle;
 /// critical incoming pod. Mirrors `pkg/kubelet/preemption/`.
 pub mod preemption;
 
+/// k8s-core push batch3 2026-05-13: graceful node-shutdown ordering
+/// (KEP-2000). Mirrors `pkg/kubelet/nodeshutdown/`.
+pub mod nodeshutdown;
+
+/// k8s-core push batch3 2026-05-13: standalone runonce mode for
+/// boot-time static-pod manifests. Mirrors `pkg/kubelet/runonce/`.
+pub mod runonce;
+
+/// k8s-core push batch3 2026-05-13: user-namespace allocator
+/// (KEP-127). Mirrors `pkg/kubelet/userns/`.
+pub mod userns;
+
+/// k8s-core push batch3 2026-05-13: cgroup v2 backend abstraction +
+/// path conventions for kubepods slices. Mirrors
+/// `pkg/kubelet/cm/util/cgroups/`.
+pub mod cgroups;
+
 use agent::KubeletState;
 use std::sync::Arc;
 

@@ -19,11 +19,11 @@ url     = "https://github.com/istio/istio"
 # The ambient-mode layer in `src/ambient/` is the cave-side entry
 # point; legacy control-plane bits live alongside.
 mapped_count   = 16
-partial_count  = 1
+partial_count  = 2
 skipped_count  = 13
-unmapped_count = 5
+unmapped_count = 4
 total          = 35
-fill_ratio     = 0.8571
+fill_ratio     = 0.8857
 honest_ratio   = 0.8286
 last_audit     = "2026-05-13"
 infra_only     = false
@@ -222,9 +222,12 @@ upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
 local_files  = ["src/wasm_plugin.rs"]
 note         = "WasmPlugin CRD lifecycle + filter-chain projection: PluginPhase (Authn / Authz / Stats / Unspecified), URL/sha256 validation (https requires sha; oci is sha-by-digest), reconcile against workload-label selector, project_chain emits a stable phase+priority+name ordering ready for xDS proxy translation. Honest scope cut: no embedded wasmtime/wasmer runtime — the actual bytecode execution stays in the bound envoy."
 
-[[unmapped]]
+# pilot/pkg/networking/federation/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+
+[[partial]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/federation/"
-note         = "Multi-network federation gateway. Single-network today."
+local_files  = ["src/federation.rs"]
+note         = "Multi-network federation control plane — MeshNetwork enrolment, EastWestGateway lifecycle + health flip, NetworkEndpoint publish/retract keyed on (service, network) with SPIFFE-id-stable slot replacement, TrustBundle rotate + bundle projection to consumers, cross_network_endpoints() pairs remote endpoints with their network's healthy east-west gateway addresses for xDS programming. Scope cut: actual data-plane forwarding stays in bound Envoy / ambient proxy; cross-mesh federation tracked separately."
 
 [[unmapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/serviceentry/external/"
