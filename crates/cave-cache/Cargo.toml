@@ -27,6 +27,9 @@ tracing        = { workspace = true }
 ring           = { workspace = true }
 regex          = { workspace = true }
 rand           = { workspace = true }
+rustls-pemfile = "2"
 
 [dev-dependencies]
 tokio          = { workspace = true }
+tempfile       = "3"
+rcgen          = "0.13"

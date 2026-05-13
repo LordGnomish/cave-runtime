@@ -1,8 +1,8 @@
 # cave-net — Cilium parity report
 
 Pinned upstream: **cilium/cilium @ v1.19.3**
-Sprint branch: `feat/cave-net-real-100`
-Generated: 2026-04-29
+Sprint branch: `feat/cni-mesh-cache-batch3`
+Generated: 2026-04-29 · Honest-audit revision 2026-05-13
 
 This document is the honest companion to `parity.manifest.toml`. The manifest
 proves *coverage*; this report describes *fidelity* — which surfaces are
@@ -18,10 +18,10 @@ wire-faithful, which are semantic-only, and what remains for follow-up sprints.
 | upstream `pkg/<name>/` directories | 118 |
 | upstream top-level dirs | 16 |
 | **manifest total entries** | **134** |
-| mapped | 117 |
+| mapped | 106 |
 | skipped (UI/CLI/orchestrator) | 17 |
-| unmapped | **0** |
-| `fill_ratio` | **1.0000** |
+| unmapped (acknowledged real port gaps) | **11** |
+| `fill_ratio` | **0.9179** (honest-audit 2026-05-13; was 1.0 — see "Honest-audit revision" below) |
 | cave-net Rust modules | 86 |
 | cave-net Rust LOC | ~36 k |
 | tests passing | **1 759** (was 1 556 before this sprint, **+203**) |
@@ -29,6 +29,35 @@ wire-faithful, which are semantic-only, and what remains for follow-up sprints.
 | release build | clean |
 
 ---
+
+## Honest-audit revision (2026-05-13)
+
+The original sprint shipped `fill_ratio = 1.0` by classifying every
+upstream `pkg/<name>/` directory as either `mapped` or `skipped` —
+breadcrumb-only mappings via `src/cilium/idiom_map.rs` and
+`src/cilium/binary_cites.rs` count as "mapped" by the structural
+definition (a Rust file cites the Go package).
+
+A stricter audit demotes 11 of those breadcrumb-only rows back to
+`unmapped` because the cite is documentation, not a port:
+
+| upstream pkg | gap class | reason |
+|---|---|---|
+| `bpf/` | eBPF source (#1) | 302 C/H files — no BPF bytecode generation |
+| `pkg/bpf/` | eBPF userspace (#1) | no libbpf loader |
+| `pkg/ebpf/` | eBPF userspace (#1) | no cilium/ebpf go-binding equivalent |
+| `pkg/aws/` | cloud IPAM (#4) | no AWS-SDK ENI plumbing |
+| `pkg/azure/` | cloud IPAM (#4) | no Azure-IPAM plumbing |
+| `pkg/alibabacloud/` | cloud IPAM (#4) | no Alibaba-IPAM plumbing |
+| `pkg/netns/` | Linux netlink (#5) | netns enter/exit syscalls |
+| `pkg/cgroups/` | Linux netlink (#5) | bpf-cgroup-attach |
+| `pkg/mountinfo/` | Linux netlink (#5) | /proc/<pid>/mountinfo |
+| `pkg/multicast/` | Linux netlink (#5) | IGMP membership |
+| `pkg/mcastmanager/` | Linux netlink (#5) | multicast group lifecycle |
+
+Counts after revision: `mapped 106 / skipped 17 / unmapped 11 = 134`,
+`fill_ratio 0.9179`. No code changed — only the manifest's honesty
+about which categories qualify as "ported."
 
 ## What changed in this sprint
 
