@@ -1150,6 +1150,13 @@ pub struct AdminState {
     pub ledger_entries: RwLock<Vec<LedgerEntry>>,
     pub oncall_shifts: RwLock<Vec<OncallShift>>,
     pub search_indexes: RwLock<Vec<SearchIndex>>,
+
+    // ── 2026-05-13 realtime + power-user batch ────────────────────
+    pub event_bus: std::sync::Arc<crate::admin::events::EventBus>,
+    pub audit_store: std::sync::Arc<crate::admin::audit::AuditStore>,
+    pub cluster_live: std::sync::Arc<crate::admin::cluster_live::ClusterLiveState>,
+    pub onboarding: std::sync::Arc<crate::admin::onboarding::OnboardingState>,
+    pub global_search: std::sync::Arc<crate::admin::global_search::GlobalSearchIndex>,
 }
 
 impl Default for AdminState {
@@ -1319,6 +1326,15 @@ impl AdminState {
             ledger_entries: RwLock::new(Vec::new()),
             oncall_shifts: RwLock::new(Vec::new()),
             search_indexes: RwLock::new(Vec::new()),
+            event_bus: std::sync::Arc::new(crate::admin::events::EventBus::new()),
+            audit_store: std::sync::Arc::new(crate::admin::audit::AuditStore::default()),
+            cluster_live: std::sync::Arc::new(
+                crate::admin::cluster_live::ClusterLiveState::new(),
+            ),
+            onboarding: std::sync::Arc::new(crate::admin::onboarding::OnboardingState::new()),
+            global_search: std::sync::Arc::new(
+                crate::admin::global_search::GlobalSearchIndex::new(),
+            ),
         }
     }
 

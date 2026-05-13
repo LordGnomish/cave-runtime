@@ -109,6 +109,15 @@ pub mod kiali;
 pub mod loki;
 pub mod prometheus;
 
+// ── 2026-05-13 realtime + power-user batch ──────────────────────────
+pub mod events;
+pub mod audit;
+pub mod global_search;
+pub mod quick_actions;
+pub mod onboarding;
+pub mod cluster_live;
+pub mod bulk;
+
 use axum::{
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
@@ -254,6 +263,16 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::LokiRead,
         Permission::K8sDashboardRead,
         Permission::KialiRead,
+        // 2026-05-13 realtime + power-user batch.
+        Permission::EventsSubscribe,
+        Permission::AuditRead,
+        Permission::AuditWrite,
+        Permission::OnboardRead,
+        Permission::OnboardWrite,
+        Permission::GlobalSearchRead,
+        Permission::QuickActionTrigger,
+        Permission::ClusterLiveRead,
+        Permission::BulkOpsSubmit,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -849,6 +868,208 @@ async fn loki_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<
 async fn k8s_dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); k8s_dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn kiali_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kiali::render(&s, &ctx).map(Html).map_err(err_to_response) }
 
+// ── 2026-05-13 realtime + power-user handlers ──────────────────────
+
+#[derive(Debug, Deserialize)]
+struct AuditQuery {
+    tenant_id: String,
+    #[serde(default)]
+    from_unix: Option<i64>,
+    #[serde(default)]
+    to_unix: Option<i64>,
+    #[serde(default)]
+    persona: Option<String>,
+    #[serde(default)]
+    action: Option<String>,
+    #[serde(default)]
+    target: Option<String>,
+}
+
+fn audit_filter_from(q: &AuditQuery) -> audit::AuditFilter {
+    audit::AuditFilter {
+        from_unix: q.from_unix,
+        to_unix: q.to_unix,
+        persona: q.persona.clone(),
+        action: q.action.clone(),
+        target: q.target.clone(),
+    }
+}
+
+async fn audit_page_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AuditQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let filter = audit_filter_from(&q);
+    audit::render(state.audit_store.clone(), &ctx, &filter)
+        .map(Html)
+        .map_err(err_to_response)
+}
+
+async fn audit_csv_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AuditQuery>,
+) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let filter = audit_filter_from(&q);
+    let body = audit::export_csv(&state.audit_store, &ctx, &filter).map_err(err_to_response)?;
+    let mut resp = axum::response::Response::new(axum::body::Body::from(body));
+    resp.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("text/csv; charset=utf-8"),
+    );
+    resp.headers_mut().insert(
+        axum::http::header::CONTENT_DISPOSITION,
+        axum::http::HeaderValue::from_static("attachment; filename=\"audit.csv\""),
+    );
+    Ok(resp)
+}
+
+async fn cluster_live_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let snap = state.cluster_live.read(&ctx).map_err(err_to_response)?;
+    let body = format!(
+        r#"<section><h2 class="text-lg font-semibold mb-2">Cluster · live</h2>{}</section>"#,
+        snap.render_html()
+    );
+    Ok(Html(render::page_shell(
+        &format!("cluster · {}", render::escape(ctx.tenant.as_str())),
+        &body,
+    )))
+}
+
+async fn onboard_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    let progress = state.onboarding.read(&ctx).map_err(err_to_response)?;
+    let next = state
+        .onboarding
+        .next_step(&ctx)
+        .map_err(err_to_response)?;
+    let pct = progress.percent_complete(ctx.persona);
+    let next_html = match next {
+        Some(s) => format!(
+            r#"<div class="mt-3"><a class="text-blue-700 underline" href="{href}">Next step: {title}</a><p class="text-sm text-gray-600">{desc}</p></div>"#,
+            href = render::escape(&s.href),
+            title = render::escape(&s.title),
+            desc = render::escape(&s.description),
+        ),
+        None => r#"<div class="mt-3 text-sm text-gray-600">All caught up — tour complete or dismissed.</div>"#.into(),
+    };
+    let body = format!(
+        r#"<section><h2 class="text-lg font-semibold mb-2">Onboarding · {pct}%</h2>{next}</section>"#,
+        pct = pct,
+        next = next_html,
+    );
+    Ok(Html(render::page_shell(
+        &format!("onboard · {}", render::escape(ctx.tenant.as_str())),
+        &body,
+    )))
+}
+
+#[derive(Debug, Deserialize)]
+struct GlobalSearchQuery {
+    tenant_id: String,
+    #[serde(default)]
+    q: Option<String>,
+}
+
+async fn global_search_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<GlobalSearchQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(AdminQuery { tenant_id: q.tenant_id.clone() });
+    let query = q.q.unwrap_or_default();
+    let hits = state
+        .global_search
+        .query(&ctx, &query, 25)
+        .map_err(err_to_response)?;
+    let rows: String = hits
+        .iter()
+        .map(|h| {
+            format!(
+                r#"<li class="py-1"><a class="text-blue-700 underline" href="{href}">{label}</a> <span class="text-xs text-gray-500">({kind})</span></li>"#,
+                href = render::escape(&h.doc.href),
+                label = render::escape(&h.doc.label),
+                kind = match h.doc.kind {
+                    global_search::DocKind::Route => "route",
+                    global_search::DocKind::Resource => "resource",
+                    global_search::DocKind::Command => "command",
+                    global_search::DocKind::Crate => "crate",
+                },
+            )
+        })
+        .collect();
+    let body = format!(
+        r#"<section><form><input class="border rounded px-2 py-1" name="q" value="{q}" placeholder="search routes / resources / crates"/><input type="hidden" name="tenant_id" value="{tid}"/></form><ul class="mt-3">{rows}</ul></section>"#,
+        q = render::escape(&query),
+        tid = render::escape(ctx.tenant.as_str()),
+        rows = rows,
+    );
+    Ok(Html(render::page_shell(
+        &format!("search · {}", render::escape(ctx.tenant.as_str())),
+        &body,
+    )))
+}
+
+async fn events_stream_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<axum::response::sse::Sse<impl futures::Stream<Item = Result<axum::response::sse::Event, std::convert::Infallible>>>, (StatusCode, Html<String>)> {
+    use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
+    let ctx = extract_ctx_from_query(q);
+    let sub = state.event_bus.subscribe(ctx).map_err(err_to_response)?;
+    let stream = async_stream::stream! {
+        let mut sub = sub;
+        loop {
+            match sub.next_with_timeout(std::time::Duration::from_secs(15)).await {
+                Ok(Some(ev)) => {
+                    let data = serde_json::to_string(&ev).unwrap_or_else(|_| "{}".into());
+                    yield Ok::<_, std::convert::Infallible>(SseEvent::default().event(ev.kind()).data(data));
+                }
+                Ok(None) => {
+                    // keepalive handled by axum's KeepAlive helper
+                    continue;
+                }
+                Err(_) => break,
+            }
+        }
+    };
+    Ok(Sse::new(stream).keep_alive(KeepAlive::new().interval(std::time::Duration::from_secs(15))))
+}
+
+async fn bulk_submit_handler(
+    AxumState(state): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::Json(req): axum::Json<bulk::BulkOpRequest>,
+) -> Result<axum::Json<bulk::BulkOpResult>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    // No-op executor by default — submit endpoint is exposed for
+    // dashboards that build their own executor via the in-process
+    // shared state. For now we emulate the dry-run flow so the
+    // round trip is verifiable.
+    let exec = bulk::FixedExecutor::new();
+    let result = bulk::submit(&ctx, &req, &exec).map_err(err_to_response)?;
+    // Best-effort audit record so the activity feed sees the action.
+    state.audit_store.record(
+        ctx.persona.as_str(),
+        audit::AuditAction::Operate,
+        format!("bulk/{}", req.kind.as_str()),
+        if result.is_full_success() {
+            audit::AuditResult::Ok
+        } else {
+            audit::AuditResult::Error
+        },
+        format!("targets={} ok={} fail={}", req.targets.len(), result.ok_count, result.fail_count),
+    );
+    Ok(axum::Json(result))
+}
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -1026,6 +1247,14 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/contributions/leaderboard", get(contributions_leaderboard_handler))
         .route("/admin/contributions/{worker_id}", get(contributions_worker_handler))
         .route("/t/{tenant}/dashboard", get(tenant_dashboard_handler))
+
+        .route("/admin/audit", get(audit_page_handler))
+        .route("/admin/audit.csv", get(audit_csv_handler))
+        .route("/admin/cluster/live", get(cluster_live_handler))
+        .route("/admin/onboard", get(onboard_handler))
+        .route("/admin/global-search", get(global_search_handler))
+        .route("/api/events/stream", get(events_stream_handler))
+        .route("/api/bulk/submit", axum::routing::post(bulk_submit_handler))
         .with_state(state)
 }
 
