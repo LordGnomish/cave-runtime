@@ -11,7 +11,7 @@
 //!    on every request — the daemon writes, we read.
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell, table, table_html as render_table_html};
 use crate::admin::state::{scope, AdminState, UpstreamProject};
 use crate::admin::types::Cite;
 use cave_upstream_watchd::diff::Severity;
@@ -160,10 +160,14 @@ pub fn render_watchd_panel_in(
         ""
     };
 
-    let table_html = if events.is_empty() {
+    let table_block = if events.is_empty() {
         "<p class=\"text-xs text-zinc-500\">No GAP_OPENED events recorded yet — the daemon emits one per upstream release that moves past our pin.</p>".to_string()
     } else {
-        table(
+        // 2026-05-13: the `severity` cell is a pre-formatted
+        // `<span class="...">label</span>` badge built upstream; use
+        // table_html so the badge renders styled instead of as literal
+        // escaped text. Other cells are still escaped at the call site.
+        render_table_html(
             &[
                 "cave-module",
                 "repo",
@@ -181,7 +185,7 @@ pub fn render_watchd_panel_in(
         r#"<section class="mt-6 p-3 border rounded">{header}{note}{tbl}</section>"#,
         header = header,
         note = tenant_note,
-        tbl = table_html,
+        tbl = table_block,
     )
 }
 
@@ -315,10 +319,12 @@ pub fn render_auto_port_panel_in(
         ""
     };
 
-    let table_html = if records.is_empty() {
+    let table_block = if records.is_empty() {
         "<p class=\"text-xs text-zinc-500\">No auto-port records yet — the dispatcher writes one row per dispatched gap (see <code>cave-upstream-watchd dispatch</code>).</p>".to_string()
     } else {
-        table(
+        // 2026-05-13: `status` cell is a pre-formatted `<span>` badge;
+        // use table_html so it renders styled instead of as literal text.
+        render_table_html(
             &[
                 "cave-module",
                 "task_id",
@@ -336,7 +342,7 @@ pub fn render_auto_port_panel_in(
         r#"<section class="mt-6 p-3 border rounded">{header}{note}{tbl}</section>"#,
         header = header,
         note = tenant_note,
-        tbl = table_html,
+        tbl = table_block,
     )
 }
 

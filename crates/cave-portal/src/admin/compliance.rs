@@ -21,7 +21,7 @@
 //! These show up in the doc-comment so a future commit can fill them in.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell, table, table_html};
 use crate::admin::types::Cite;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -1026,11 +1026,29 @@ pub struct CrateDetail {
 }
 
 /// Gather everything needed to render `/admin/compliance/<crate>`.
+///
+/// **2026-05-13 fix**: previously this returned a `compliance` whose
+/// `parity_ratio` was always `None` because the parity-axis fields are
+/// populated by [`attach_parity_index`] — and the drill-down code path
+/// never called it. The matrix view (which goes through
+/// [`build_snapshot`]) did, so the table cell showed 92% but the
+/// drill-down card rendered "Not covered by the parity audit". Both
+/// callers now go through the same parity attachment.
 pub fn build_crate_detail(
     workspace_root: &Path,
     crate_name: &str,
 ) -> Result<CrateDetail, ComplianceViewError> {
     let compliance = analyse_crate(workspace_root, crate_name)?;
+    // Attach the parity axis the same way build_snapshot does, so the
+    // drill-down card sees the manifest's fill_ratio + honest_ratio +
+    // class counts. Without this the drill-down always rendered
+    // "Not covered by the parity audit (no parity.manifest.toml or
+    // audit-pending)" — even for crates whose manifest carries an
+    // explicit fill_ratio. Burak's "Cilium 0" report came from here.
+    let mut single = ComplianceSnapshot { crates: vec![compliance] };
+    let index = load_parity_index(workspace_root);
+    attach_parity_index(&mut single, &index);
+    let compliance = single.crates.pop().expect("single-crate snapshot");
     let ignored_tests = scan_ignored_tests(workspace_root, crate_name);
     let manifest_path = workspace_root
         .join("crates")
@@ -2053,7 +2071,12 @@ pub fn render_with_view(
         behavioral_ported = behavioral_ported,
         behavioral_total = behavioral_total,
         sort_form = sort_form,
-        tbl = table(
+        // 2026-05-13: switched from `table` (escapes every cell) to
+        // `table_html` (cells already contain pre-formatted badge / link /
+        // icon markup that the row-builder above produced). Burak's
+        // "Cilium 0" report came partly from this column rendering as
+        // literal `<span ...>92%</span>` text in the browser.
+        tbl = table_html(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
                 "portal", "cavectl", "alerts", "dash", "structural", "parity",
@@ -2835,6 +2858,59 @@ version = "7.2.0"
         assert_eq!(detail.compliance.name, "cave-cache");
         // cave-cache has a parity manifest in this repo.
         assert!(detail.parity_manifest_raw.is_some());
+    }
+
+    #[test]
+    fn build_crate_detail_attaches_parity_ratio_from_manifest() {
+        // Regression: before the 2026-05-13 fix, build_crate_detail only
+        // called analyse_crate (which leaves parity_ratio = None) and
+        // never attach_parity_index. The drill-down page then always
+        // rendered "Not covered by the parity audit" — exactly what
+        // Burak's "Cilium 0" report described for /admin/compliance/cave-net.
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownParity",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let detail = build_crate_detail(&workspace, "cave-net").unwrap();
+        assert_eq!(detail.compliance.name, "cave-net");
+        let ratio = detail
+            .compliance
+            .parity_ratio
+            .expect("cave-net drill-down must carry parity_ratio after attach");
+        assert!(
+            (0.85..=1.0).contains(&ratio),
+            "cave-net parity_ratio ~0.92 expected, got {ratio}"
+        );
+        // honest_ratio should also be populated.
+        assert!(detail.compliance.honest_parity_ratio.is_some());
+        // And the upstream metadata.
+        assert_eq!(detail.compliance.upstream_org_repo.as_deref(), Some("cilium/cilium"));
+    }
+
+    #[test]
+    fn render_detail_for_cave_net_renders_upstream_parity_card_not_empty() {
+        // End-to-end regression: the drill-down HTML for cave-net must NOT
+        // contain the "Not covered by the parity audit" branch — that
+        // branch was firing because build_crate_detail forgot to attach
+        // parity-index data. With the fix the card renders a percent
+        // badge + grade letter.
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Drilldown.tsx",
+            "drilldownCavenet",
+            "acme"
+        );
+        let workspace = locate_workspace_root();
+        let detail = build_crate_detail(&workspace, "cave-net").unwrap();
+        let html = render_detail(&detail, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        assert!(
+            !html.contains("Not covered by the parity audit"),
+            "drill-down must NOT show 'Not covered' for cave-net (parity_ratio is real)"
+        );
+        // Percent and grade are present.
+        assert!(html.contains("Grade "), "grade letter rendered");
+        assert!(html.contains("%"), "percent badge rendered");
     }
 
     #[test]
@@ -3886,6 +3962,37 @@ priority = "P0"
             None => {} // pre-2026-05-13 schema
             Some(n) => assert_eq!(n, 0, "infra crate has no partials"),
         }
+    }
+
+    #[test]
+    fn render_dashboard_matrix_emits_real_span_not_escaped_text() {
+        // Regression: when the compliance matrix renderer was using
+        // `table()` (which escapes every cell), cells like
+        // `<span class="...">92%</span>` rendered as literal
+        // `&lt;span class=...&gt;92%&lt;/span&gt;` text in the browser.
+        // Burak's "Cilium 0" report came partly from this. The matrix
+        // now goes through `table_html` so spans survive intact.
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cave-x", Some(0.95), Some(0.84), Some(4), false),
+            ],
+        };
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        // A pre-formatted span survives.
+        assert!(
+            html.contains(r#"<span class="px-2 py-1 rounded"#),
+            "expected real <span> in matrix; got escaped output instead — table_html regression"
+        );
+        // Confirmed: never as escaped text.
+        assert!(
+            !html.contains("&lt;span class=&quot;px-2 py-1 rounded"),
+            "matrix must not double-escape badge spans"
+        );
     }
 
     #[test]

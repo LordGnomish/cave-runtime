@@ -83,6 +83,38 @@ pub fn table(headers: &[&str], rows: &[Vec<String>]) -> String {
     out
 }
 
+/// Render an HTML table whose cells are **already-escaped raw HTML**
+/// (badges, links, icons). Headers are still escaped — those are
+/// always plain-text labels in this codebase. The caller is
+/// responsible for escaping any user-controlled substrings inside
+/// each cell.
+///
+/// Added 2026-05-13 to fix the compliance-matrix double-escape bug:
+/// `compliance.rs` builds per-cell HTML like
+/// `<span class="...">92%</span>`, which `table()` would render as
+/// literal `&lt;span class=...&gt;92%&lt;/span&gt;` text. The
+/// dashboard's matrix now goes through `table_html` so badges /
+/// links / status icons render as intended.
+pub fn table_html(headers: &[&str], rows: &[Vec<String>]) -> String {
+    let mut out = String::new();
+    out.push_str(r#"<table class="min-w-full text-sm border-collapse">"#);
+    out.push_str(r#"<thead class="bg-gray-100"><tr>"#);
+    for h in headers {
+        let _ = write!(out, r#"<th class="px-3 py-2 text-left">{}</th>"#, escape(h));
+    }
+    out.push_str("</tr></thead><tbody>");
+    for row in rows {
+        out.push_str(r#"<tr class="border-t">"#);
+        for cell in row {
+            // Emit cell verbatim — the caller has already produced HTML.
+            let _ = write!(out, r#"<td class="px-3 py-2">{}</td>"#, cell);
+        }
+        out.push_str("</tr>");
+    }
+    out.push_str("</tbody></table>");
+    out
+}
+
 /// Render a small htmx-driven action button. `hx_target` is the CSS selector
 /// the response should swap into; `label` is the visible text.
 pub fn htmx_button(hx_get: &str, hx_target: &str, label: &str) -> String {
@@ -135,6 +167,37 @@ mod tests {
         assert!(html.contains("/static/htmx.min.js"));
         assert!(html.contains("/static/tailwind-light.css"));
         assert!(html.contains("<p>body</p>"));
+    }
+
+    #[test]
+    fn table_html_emits_cells_verbatim() {
+        // The 2026-05-13 sibling to `table()`: when the caller has
+        // already produced safe HTML for each cell (badges, links,
+        // icons), `table_html` must NOT escape it. Headers are still
+        // escaped because they are always plain-text labels in this
+        // codebase.
+        let (_cite, _t) = crate::portal_test_ctx!(
+            "packages/core-components/src/components/Table/Table.tsx",
+            "TableHtml",
+            "tenant-render-table-html"
+        );
+        let html = table_html(
+            &["score"],
+            &[vec![r#"<span class="px-2 rounded bg-green-100">92%</span>"#.into()]],
+        );
+        // The span survives intact (not double-escaped).
+        assert!(html.contains(r#"<span class="px-2 rounded bg-green-100">92%</span>"#));
+        // And it does NOT appear as escaped text.
+        assert!(!html.contains("&lt;span"));
+        assert!(!html.contains("&quot;"));
+    }
+
+    #[test]
+    fn table_html_still_escapes_headers() {
+        // Headers are always plain-text labels — escape them just like
+        // `table()` does, even though cell content is verbatim.
+        let html = table_html(&["a<b"], &[vec!["x".into()]]);
+        assert!(html.contains("a&lt;b"));
     }
 
     #[test]
