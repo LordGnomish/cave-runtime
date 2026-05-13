@@ -99,13 +99,41 @@ async fn handle_raft_rpc(
     let mut core = handle.core.lock().await;
     match rpc {
         RaftRpc::RequestVote(args) => {
+            tracing::info!(
+                target: "cave_runtime::raft::rpc",
+                event = "rpc_in_vote",
+                local = core.local_id,
+                from = args.candidate_id,
+                term = args.term,
+                last_log_index = args.last_log_index,
+                last_log_term = args.last_log_term,
+                "inbound RequestVote"
+            );
             handle.registry.note_heartbeat(args.candidate_id);
             let reply = core
                 .handle_request_vote(args, now)
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("vote: {e}")))?;
+            tracing::info!(
+                target: "cave_runtime::raft::rpc",
+                event = "rpc_out_vote_reply",
+                local = core.local_id,
+                term = reply.term,
+                granted = reply.vote_granted,
+                "outbound RequestVoteReply"
+            );
             Ok(Json(RaftRpcReply::RequestVote(reply)))
         }
         RaftRpc::AppendEntries(args) => {
+            tracing::debug!(
+                target: "cave_runtime::raft::rpc",
+                event = "rpc_in_append",
+                local = core.local_id,
+                from = args.leader_id,
+                term = args.term,
+                prev_log_index = args.prev_log_index,
+                entries_len = args.entries.len(),
+                "inbound AppendEntries"
+            );
             handle.registry.note_heartbeat(args.leader_id);
             let reply = core
                 .handle_append_entries(args, now)
@@ -205,13 +233,44 @@ pub async fn run_driver(handle: RaftHandle, ca_pem: String) -> Result<()> {
                 .map(|m| m.url)
             {
                 Some(u) => u,
-                None => continue,
+                None => {
+                    tracing::warn!(
+                        target: "cave_runtime::raft::rpc",
+                        event = "rpc_skip_no_peer",
+                        to,
+                        "outbound RPC skipped — peer not in registry"
+                    );
+                    continue;
+                }
             };
             let endpoint = format!("{}/raft/rpc", peer_url.trim_end_matches('/'));
             let rpc = match ob.msg {
                 OutboundMessage::RequestVote(a) => RaftRpc::RequestVote(a),
                 OutboundMessage::AppendEntries(a) => RaftRpc::AppendEntries(a),
             };
+            match &rpc {
+                RaftRpc::RequestVote(a) => tracing::info!(
+                    target: "cave_runtime::raft::rpc",
+                    event = "rpc_out_vote",
+                    to,
+                    endpoint = endpoint.as_str(),
+                    term = a.term,
+                    candidate_id = a.candidate_id,
+                    last_log_index = a.last_log_index,
+                    last_log_term = a.last_log_term,
+                    "outbound RequestVote"
+                ),
+                RaftRpc::AppendEntries(a) => tracing::debug!(
+                    target: "cave_runtime::raft::rpc",
+                    event = "rpc_out_append",
+                    to,
+                    endpoint = endpoint.as_str(),
+                    term = a.term,
+                    prev_log_index = a.prev_log_index,
+                    entries_len = a.entries.len(),
+                    "outbound AppendEntries"
+                ),
+            }
             let client_ = client.clone();
             let handle_ = handle.clone();
             tokio::spawn(async move {
@@ -252,8 +311,32 @@ pub async fn run_driver(handle: RaftHandle, ca_pem: String) -> Result<()> {
                             Err(e) => debug!(endpoint, error = %e, "decode raft reply"),
                         }
                     }
-                    Ok(resp) => debug!(endpoint, status = %resp.status(), "raft rpc non-2xx"),
-                    Err(e) => debug!(endpoint, error = %e, "raft rpc send failed"),
+                    Ok(resp) => tracing::warn!(
+                        target: "cave_runtime::raft::rpc",
+                        event = "rpc_out_non2xx",
+                        endpoint,
+                        status = %resp.status(),
+                        "raft rpc non-2xx"
+                    ),
+                    Err(e) => {
+                        // Walk the source chain so a TLS or hostname
+                        // rejection surfaces past reqwest's generic
+                        // "error sending request" wrapper.
+                        let mut details = format!("{e}");
+                        let mut cur: &dyn std::error::Error = &e;
+                        while let Some(src) = std::error::Error::source(cur) {
+                            details.push_str(" :: ");
+                            details.push_str(&src.to_string());
+                            cur = src;
+                        }
+                        tracing::warn!(
+                            target: "cave_runtime::raft::rpc",
+                            event = "rpc_out_err",
+                            endpoint,
+                            error = details.as_str(),
+                            "raft rpc send failed"
+                        );
+                    }
                 }
             });
         }

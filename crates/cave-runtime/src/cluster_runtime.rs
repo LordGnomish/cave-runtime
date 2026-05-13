@@ -1404,7 +1404,7 @@ mod tests {
     async fn load_succeeds_after_init() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "load-test", "127.0.0.1:6443", "single", "", 1).unwrap();
+        init(&dd, "load-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
         let rt = ClusterRuntime::load(Some(&dd))
             .await
             .unwrap()
@@ -1417,7 +1417,7 @@ mod tests {
     async fn etcd_snapshot_roundtrips() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "snap-test", "127.0.0.1:6443", "single", "", 1).unwrap();
+        init(&dd, "snap-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
         let rt = ClusterRuntime::load(Some(&dd)).await.unwrap().unwrap();
 
         // Put one key, persist, reload, verify.
@@ -1697,7 +1697,7 @@ mod tests {
     async fn wal_survives_simulated_crash() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        crate::cluster::init(&dd, "wal-test", "127.0.0.1:6443", "single", "", 1).unwrap();
+        crate::cluster::init(&dd, "wal-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
         let rt = ClusterRuntime::load(Some(&dd)).await.unwrap().unwrap();
 
         // Spawn just the WAL writer, drive a few PUTs, drop the writer

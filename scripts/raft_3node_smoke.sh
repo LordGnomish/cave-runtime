@@ -65,6 +65,18 @@ CAVECTL=./target/debug/cavectl
 mkdir -p "$LOG_DIR"
 
 # ── init three nodes ────────────────────────────────────────────────────────
+#
+# Each `cluster init` generates a fresh per-node CA. For peer-to-peer
+# TLS to validate (run_driver's reqwest client uses CA pinning) the
+# three nodes must share a CA. We do that the simplest way: init
+# node1 first, then copy node1's `pki/ca.{crt,key}` into nodes 2 + 3
+# before their inits. The init re-signs the per-component leaves
+# against the existing CA when present.
+#
+# In production this is handled by `cluster join`, which fetches the
+# leader's CA via TOFU + cache (`docs/synergy/cluster-csr-ca-wal-2026-05-12.md`).
+# The smoke skips that handshake because it boots all three nodes
+# from the same operator's shell.
 echo "==> initializing 3 data dirs under $TMPROOT"
 for i in 1 2 3; do
   dd=$TMPROOT/node$i
@@ -74,13 +86,26 @@ for i in 1 2 3; do
     2) peers="1:127.0.0.1:$PORT1,3:127.0.0.1:$PORT3" ;;
     3) peers="1:127.0.0.1:$PORT1,2:127.0.0.1:$PORT2" ;;
   esac
+  # For nodes 2 + 3, seed the data dir with node1's CA + pass
+  # `--reuse-existing-ca` so the init signs leaf certs against the
+  # same root.  Without this every node would generate its own CA
+  # and cross-node TLS would fail with "certificates required to
+  # validate this certificate cannot be found".
+  reuse_flag=""
+  if [ $i -gt 1 ]; then
+    mkdir -p "$dd/pki"
+    cp "$TMPROOT/node1/pki/ca.crt" "$dd/pki/ca.crt"
+    cp "$TMPROOT/node1/pki/ca.key" "$dd/pki/ca.key"
+    reuse_flag="--reuse-existing-ca"
+  fi
   $RUNTIME cluster init \
     --data-dir "$dd" \
     --cluster-name cave-smoke \
     --advertise-address "127.0.0.1:$port" \
     --bootstrap-strategy=multi \
     --node-id=$i \
-    --peers="$peers" >"$LOG_DIR/init$i.log" 2>&1
+    --peers="$peers" \
+    $reuse_flag >"$LOG_DIR/init$i.log" 2>&1
 done
 
 # ── start three serves ──────────────────────────────────────────────────────
@@ -118,20 +143,28 @@ echo "  leader: $LEADER_URL"
 echo "==> PUT /v3/kv/put on leader, then RANGE on every node"
 KEY_B64=$(printf %s "/smoke/foo" | base64)
 VAL_B64=$(printf %s "bar" | base64)
-curl --max-time 5 -sk -X POST "$LEADER_URL/api/etcd/v3/kv/put" \
+LEADER_ETCD_URL=$(echo "$LEADER_URL" | sed -E 's,:([0-9]+),:'"$(($(echo "$LEADER_URL" | sed -E 's,.*:([0-9]+).*,\1,') - 4064))"',')
+PUT_RESP=$(curl --max-time 8 -sk -w "\nHTTP %{http_code}" -X POST "$LEADER_ETCD_URL/api/etcd/v3/kv/put" \
   -H 'content-type: application/json' \
-  -d "{\"key\":\"$KEY_B64\",\"value\":\"$VAL_B64\",\"lease\":null,\"prev_kv\":false}" \
-  >"$LOG_DIR/put.json"
+  -d "{\"key\":\"$KEY_B64\",\"value\":\"$VAL_B64\",\"lease\":null,\"prev_kv\":false}")
+echo "  PUT response: $PUT_RESP" | head -c 400
+echo
+echo "$PUT_RESP" >"$LOG_DIR/put.json"
 sleep 1
-for port in $PORT1 $PORT2 $PORT3; do
-  got=$(curl --max-time 5 -sk -X POST "https://127.0.0.1:$port/api/etcd/v3/kv/range" \
+for port in $ETCD1 $ETCD2 $ETCD3; do
+  body=$(curl --max-time 5 -sk -X POST "https://127.0.0.1:$port/api/etcd/v3/kv/range" \
     -H 'content-type: application/json' \
-    -d "{\"key\":\"$KEY_B64\",\"range_end\":null,\"limit\":null,\"revision\":null,\"keys_only\":false,\"count_only\":false}" \
-    | jq -r '.kvs[0].value // empty' | base64 -d 2>/dev/null || true)
+    -d "{\"key\":\"$KEY_B64\",\"range_end\":null,\"limit\":null,\"revision\":null,\"keys_only\":false,\"count_only\":false}")
+  # KeyValue.value is `Vec<u8>` serialised as a JSON int-array, then
+  # base64-wrapped by encode_kv (etcd v3 wire convention). Convert the
+  # int-array → bytes → base64-decode.
+  got=$(echo "$body" | jq -r '.kvs[0].value // empty | join(",")' \
+    | awk -F',' 'NF{ for(i=1;i<=NF;i++) printf "%c",$i; }' \
+    | base64 -d 2>/dev/null || true)
   if [ "$got" = "bar" ]; then
-    echo "  $port → bar ✓"
+    echo "  etcd:$port → bar ✓"
   else
-    echo "FAIL: node $port returned '$got' (expected 'bar')"
+    echo "FAIL: etcd:$port returned '$got' (expected 'bar'); raw range: $body"
     exit 1
   fi
 done
@@ -147,12 +180,13 @@ for port in $PORT1 $PORT2 $PORT3; do
   fi
 done
 [ -n "$FOLLOWER_URL" ] || { echo "FAIL: no follower found"; exit 1; }
+FOLLOWER_ETCD_URL=$(echo "$FOLLOWER_URL" | sed -E 's,:([0-9]+),:'"$(($(echo "$FOLLOWER_URL" | sed -E 's,.*:([0-9]+).*,\1,') - 4064))"',')
 STATUS=$(curl --max-time 5 -sk -o /dev/null -w '%{http_code}' \
-  -X POST "$FOLLOWER_URL/api/etcd/v3/kv/put" \
+  -X POST "$FOLLOWER_ETCD_URL/api/etcd/v3/kv/put" \
   -H 'content-type: application/json' \
   -d "{\"key\":\"$KEY_B64\",\"value\":\"$VAL_B64\",\"lease\":null,\"prev_kv\":false}" || true)
 LOC=$(curl --max-time 5 -sk -D - -o /dev/null \
-  -X POST "$FOLLOWER_URL/api/etcd/v3/kv/put" \
+  -X POST "$FOLLOWER_ETCD_URL/api/etcd/v3/kv/put" \
   -H 'content-type: application/json' \
   -d "{\"key\":\"$KEY_B64\",\"value\":\"$VAL_B64\",\"lease\":null,\"prev_kv\":false}" \
   | grep -i '^location:' | tr -d '\r')
@@ -197,21 +231,25 @@ echo "  new leader: $NEW_LEADER_URL ✓"
 echo "==> PUT after failover on new leader"
 KEY2_B64=$(printf %s "/smoke/after-failover" | base64)
 VAL2_B64=$(printf %s "ok" | base64)
-curl --max-time 5 -sk -X POST "$NEW_LEADER_URL/api/etcd/v3/kv/put" \
+NEW_LEADER_ETCD_URL=$(echo "$NEW_LEADER_URL" | sed -E 's,:([0-9]+),:'"$(($(echo "$NEW_LEADER_URL" | sed -E 's,.*:([0-9]+).*,\1,') - 4064))"',')
+curl --max-time 5 -sk -X POST "$NEW_LEADER_ETCD_URL/api/etcd/v3/kv/put" \
   -H 'content-type: application/json' \
   -d "{\"key\":\"$KEY2_B64\",\"value\":\"$VAL2_B64\",\"lease\":null,\"prev_kv\":false}" \
   >/dev/null
 sleep 1
-for port in $PORT1 $PORT2 $PORT3; do
-  [ "$port" = "$LEADER_PORT" ] && continue
+LEADER_ETCD_PORT=$((LEADER_PORT - 4064))
+for port in $ETCD1 $ETCD2 $ETCD3; do
+  [ "$port" = "$LEADER_ETCD_PORT" ] && continue
   got=$(curl --max-time 5 -sk -X POST "https://127.0.0.1:$port/api/etcd/v3/kv/range" \
     -H 'content-type: application/json' \
     -d "{\"key\":\"$KEY2_B64\",\"range_end\":null,\"limit\":null,\"revision\":null,\"keys_only\":false,\"count_only\":false}" \
-    | jq -r '.kvs[0].value // empty' | base64 -d 2>/dev/null || true)
+    | jq -r '.kvs[0].value // empty | join(",")' \
+    | awk -F',' 'NF{ for(i=1;i<=NF;i++) printf "%c",$i; }' \
+    | base64 -d 2>/dev/null || true)
   if [ "$got" = "ok" ]; then
-    echo "  $port → ok ✓"
+    echo "  etcd:$port → ok ✓"
   else
-    echo "FAIL: node $port returned '$got' after failover (expected 'ok')"
+    echo "FAIL: etcd:$port returned '$got' after failover (expected 'ok')"
     exit 1
   fi
 done

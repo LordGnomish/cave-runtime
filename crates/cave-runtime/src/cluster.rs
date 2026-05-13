@@ -41,6 +41,14 @@ pub enum ClusterCmd {
         /// Local node id within the cluster. Defaults to 1.
         #[arg(long, default_value = "1")]
         node_id: u64,
+        /// When set, reuse `pki/ca.{crt,key}` already present in the
+        /// data dir (signed by an earlier init or copied from a peer)
+        /// instead of generating a fresh CA. Used by the 3-node bash
+        /// smoke + by operators bootstrapping co-resident nodes; the
+        /// production join flow uses `cluster join` to fetch the
+        /// leader's CA via TOFU.
+        #[arg(long, default_value_t = false)]
+        reuse_existing_ca: bool,
     },
     /// Worker-node join: POST the bootstrap token to the master apiserver and
     /// persist the returned join config + issued kubelet certificate.
@@ -126,6 +134,7 @@ pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
             bootstrap_strategy,
             peers,
             node_id,
+            reuse_existing_ca,
         } => init(
             &data_dir,
             &cluster_name,
@@ -133,6 +142,7 @@ pub async fn dispatch(cmd: ClusterCmd) -> Result<()> {
             &bootstrap_strategy,
             &peers,
             node_id,
+            reuse_existing_ca,
         ),
         ClusterCmd::Join {
             bootstrap_token,
@@ -163,8 +173,9 @@ pub fn init(
     bootstrap_strategy: &str,
     peers_csv: &str,
     node_id: u64,
+    reuse_existing_ca: bool,
 ) -> Result<()> {
-    info!(?data_dir, %cluster_name, %advertise_address, "cluster init");
+    info!(?data_dir, %cluster_name, %advertise_address, reuse_existing_ca, "cluster init");
 
     if data_dir.join("cluster.json").exists() {
         return Err(anyhow!(
@@ -181,10 +192,36 @@ pub fn init(
         fs::create_dir_all(d).with_context(|| format!("create {}", d.display()))?;
     }
 
+    // CA path: when `reuse_existing_ca` is set and `pki/ca.{crt,key}`
+    // are already on disk, parse them into rcgen primitives and skip
+    // root-CA generation. The new leaf certs are then signed by the
+    // *existing* CA, which is the precondition for cross-node TLS to
+    // validate in a multi-node setup (each peer must trust a common
+    // root). When the flag is unset, behaviour is unchanged.
     let root_cn = format!("cave-runtime root CA ({})", cluster_name);
-    let (ca_cert_pem, ca_key_pem, ca_cert, ca_key) = generate_root_ca(&root_cn)?;
-    fs::write(pki_dir.join("ca.crt"), &ca_cert_pem)?;
-    fs::write(pki_dir.join("ca.key"), &ca_key_pem)?;
+    let (ca_cert_pem, ca_key_pem, ca_cert, ca_key) = if reuse_existing_ca
+        && pki_dir.join("ca.crt").exists()
+        && pki_dir.join("ca.key").exists()
+    {
+        let ca_cert_pem = fs::read_to_string(pki_dir.join("ca.crt"))
+            .with_context(|| format!("read {}", pki_dir.join("ca.crt").display()))?;
+        let ca_key_pem = fs::read_to_string(pki_dir.join("ca.key"))
+            .with_context(|| format!("read {}", pki_dir.join("ca.key").display()))?;
+        let ca_key = KeyPair::from_pem(&ca_key_pem)
+            .map_err(|e| anyhow!("parse existing ca.key: {e}"))?;
+        let params = CertificateParams::from_ca_cert_pem(&ca_cert_pem)
+            .map_err(|e| anyhow!("parse existing ca.crt: {e}"))?;
+        let ca_cert = params
+            .self_signed(&ca_key)
+            .map_err(|e| anyhow!("re-derive existing CA: {e}"))?;
+        info!("cluster init: reusing existing CA from pki/ca.crt");
+        (ca_cert_pem, ca_key_pem, ca_cert, ca_key)
+    } else {
+        let g = generate_root_ca(&root_cn)?;
+        fs::write(pki_dir.join("ca.crt"), &g.0)?;
+        fs::write(pki_dir.join("ca.key"), &g.1)?;
+        g
+    };
 
     let advertise_host = advertise_address
         .split(':')
@@ -835,7 +872,7 @@ mod tests {
     fn init_creates_expected_layout() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "unit-test", "127.0.0.1:6443", "single", "", 1).expect("init");
+        init(&dd, "unit-test", "127.0.0.1:6443", "single", "", 1, false).expect("init");
         assert!(dd.join("cluster.json").is_file());
         assert!(dd.join("pki/ca.crt").is_file());
         assert!(dd.join("pki/ca.key").is_file());
@@ -863,8 +900,8 @@ mod tests {
     fn init_is_idempotent_guard() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "guard", "127.0.0.1:6443", "single", "", 1).unwrap();
-        let err = init(&dd, "guard", "127.0.0.1:6443", "single", "", 1).unwrap_err();
+        init(&dd, "guard", "127.0.0.1:6443", "single", "", 1, false).unwrap();
+        let err = init(&dd, "guard", "127.0.0.1:6443", "single", "", 1, false).unwrap_err();
         assert!(err.to_string().contains("already initialized"));
     }
 
@@ -872,7 +909,7 @@ mod tests {
     fn destroy_requires_force() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "destroy-test", "127.0.0.1:6443", "single", "", 1).unwrap();
+        init(&dd, "destroy-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
         assert!(destroy(&dd, false).is_err());
         assert!(dd.join("cluster.json").is_file(), "data dir must persist");
         destroy(&dd, true).expect("force destroy");
@@ -930,7 +967,7 @@ mod tests {
     fn init_writes_bootstrap_token() {
         let tmp = TempDir::new().unwrap();
         let dd = tmp.path().join("cluster");
-        init(&dd, "tok-test", "127.0.0.1:6443", "single", "", 1).unwrap();
+        init(&dd, "tok-test", "127.0.0.1:6443", "single", "", 1, false).unwrap();
         let raw = fs::read_to_string(dd.join("bootstrap-tokens.json")).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
         let tokens = parsed["tokens"].as_array().unwrap();
