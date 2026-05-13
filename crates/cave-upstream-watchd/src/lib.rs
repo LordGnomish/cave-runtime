@@ -48,6 +48,13 @@ pub mod auto_port_gate;
 pub mod prompt;
 pub mod task_queue;
 
+/// 2026-05-13 TDD-strict mode: Charter §1 ("line-by-line TDD upstream
+/// parity") turned into a verifiable signal. Walks branch history and
+/// flags impl-without-prior-test / `#[ignore]` / mixed commits. Embedded
+/// in [`auto_port_gate::CharterV2Gate`] when a [`tdd::GitInspector`] is
+/// supplied, and exposed standalone via the `cave-tdd-check` binary.
+pub mod tdd;
+
 pub use changelog::{parse_release_body, Changelog, ChangelogEntry, ChangeKind};
 pub use diff::{compare_pin_against_latest, Severity, VersionDiff};
 pub use event::{emit, GapEvent, GapEventSink, JsonlSink};
@@ -64,6 +71,11 @@ pub use prompt::{build_prompt, PortContext};
 pub use task_queue::{
     DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput, TaskQueue, TaskQueueError,
     TaskStatus,
+};
+pub use tdd::{
+    analyze_tdd_compliance, scan_stubs, ClassifiedCommit, CommitKind, FileChange, FileChangeKind,
+    FileKind, GitError, GitInspector, ShellGitInspector, TddAnalyzer, TddCompliance, TddDetails,
+    TddError, TddFinding,
 };
 
 #[cfg(test)]
