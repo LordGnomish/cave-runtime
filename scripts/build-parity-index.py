@@ -273,6 +273,123 @@ def parse_audit(md_text: str) -> dict[str, dict]:
     return crates
 
 
+def behavioral_parity_state(crate: str) -> dict:
+    """Read crates/<crate>/parity.manifest.toml and surface the
+    behavioral-parity audit: the cross-reference between cave tests
+    and the upstream tests they port.
+
+    Schema (since 2026-05-13):
+
+    ```toml
+    [behavioral_parity]
+    audit_scope = "..."
+    audit_at    = "YYYY-MM-DD"
+
+    [[upstream_test]]
+    upstream_path  = "..."
+    upstream_name  = "..."
+    cave_path      = "..." | "—"
+    cave_test_name = "..." | "—"
+    status         = "ported" | "partial" | "missing"
+    notes          = "..."
+    ```
+
+    Returns a dict with `behavioral_ratio` (float in [0.0, 1.0] or
+    None when no `[[upstream_test]]` entries exist), `ported_count`,
+    `total_count`, `partial_count`, `missing_count`, and the
+    `audit_scope` / `audit_at` meta fields.
+
+    Honest scope-bounded denominator: the ratio is
+    `ported / total declared`, where `total` is the audit subset
+    declared in the manifest, not the full upstream test corpus.
+    The maintainer expands the scope by adding more `[[upstream_test]]`
+    entries.
+    """
+    p = REPO_ROOT / "crates" / crate / "parity.manifest.toml"
+    if not p.is_file():
+        return {}
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+
+    # Walk line-by-line; we tolerate missing `tomllib` on the runtime
+    # the dashboard hosts on, and this keeps the parser predictable for
+    # the dashboard's frozen schema.
+    ported = 0
+    partial = 0
+    missing = 0
+    total = 0
+    in_entry = False
+    cur_status = None
+    audit_scope = None
+    audit_at = None
+    in_bp_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("[[upstream_test]]"):
+            # New entry — close the previous one.
+            if in_entry and cur_status is not None:
+                total += 1
+                if cur_status == "ported":
+                    ported += 1
+                elif cur_status == "partial":
+                    partial += 1
+                elif cur_status == "missing":
+                    missing += 1
+            in_entry = True
+            cur_status = None
+            in_bp_block = False
+            continue
+        if stripped.startswith("["):
+            # Section boundary closes the current entry too.
+            if in_entry and cur_status is not None:
+                total += 1
+                if cur_status == "ported":
+                    ported += 1
+                elif cur_status == "partial":
+                    partial += 1
+                elif cur_status == "missing":
+                    missing += 1
+                in_entry = False
+                cur_status = None
+            in_bp_block = stripped.startswith("[behavioral_parity]")
+            continue
+        if in_entry and stripped.startswith("status"):
+            m = re.match(r'status\s*=\s*"(\w+)"', stripped)
+            if m:
+                cur_status = m.group(1)
+        elif in_bp_block:
+            ms = re.match(r'audit_scope\s*=\s*"([^"]+)"', stripped)
+            if ms:
+                audit_scope = ms.group(1)
+            ma = re.match(r'audit_at\s*=\s*"([^"]+)"', stripped)
+            if ma:
+                audit_at = ma.group(1)
+    # Tail: close the last entry if the file ended inside one.
+    if in_entry and cur_status is not None:
+        total += 1
+        if cur_status == "ported":
+            ported += 1
+        elif cur_status == "partial":
+            partial += 1
+        elif cur_status == "missing":
+            missing += 1
+
+    if total == 0:
+        return {}
+    ratio = ported / total
+    return {
+        "behavioral_ratio": ratio,
+        "ported_count": ported,
+        "total_count": total,
+        "partial_count": partial,
+        "missing_count": missing,
+        "behavioral_audit_scope": audit_scope,
+        "behavioral_audit_at": audit_at,
+    }
+
+
 def disk_manifest_state(crate: str) -> dict:
     """Read crates/<crate>/parity.manifest.toml and surface the disk truth
     about `manifest_filled`, `parity_ratio`, and `infra_only`. The audit
@@ -422,6 +539,19 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
         # Surface infra_only signal from disk for E-tier entries.
         if disk.get("infra_only_disk"):
             entry["infra_only"] = True
+        # Behavioral-parity overlay: read the manifest's
+        # `[[upstream_test]]` entries and attach the per-crate ratio.
+        bp = behavioral_parity_state(name)
+        if bp:
+            entry["behavioral_parity"] = bp["behavioral_ratio"]
+            entry["behavioral_ported"] = bp["ported_count"]
+            entry["behavioral_total"] = bp["total_count"]
+            entry["behavioral_partial"] = bp["partial_count"]
+            entry["behavioral_missing"] = bp["missing_count"]
+            if bp.get("behavioral_audit_scope"):
+                entry["behavioral_audit_scope"] = bp["behavioral_audit_scope"]
+            if bp.get("behavioral_audit_at"):
+                entry["behavioral_audit_at"] = bp["behavioral_audit_at"]
     return {
         "flipped": flipped,
         "ratio_overrides": ratio_overrides,
@@ -478,6 +608,15 @@ def main() -> int:
         f"workspace-only: filled={real_filled}/{real_total}",
         file=sys.stderr,
     )
+    bp_audited = [e for e in crates.values() if e.get("behavioral_total")]
+    if bp_audited:
+        ported = sum(e["behavioral_ported"] for e in bp_audited)
+        total = sum(e["behavioral_total"] for e in bp_audited)
+        print(
+            f"behavioral_parity: {ported}/{total} ported across "
+            f"{len(bp_audited)} crate(s) with [[upstream_test]] block",
+            file=sys.stderr,
+        )
     return 0
 
 

@@ -1202,3 +1202,140 @@ loc          = 800
 priority     = "P0"
 notes        = "Folder split: members/keyspace/leases/alarms/metrics (20 tests). etcdctl parity."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "mvcc/kvstore + etcdserver/txn + lessor + wal (v3.6.10)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/put_creates_key_with_version_1"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_creates_key_at_version_one"
+status         = "ported"
+notes          = "First put → version 1, mod_revision = create_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/successive_puts_bump_version"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_bumps_version_and_mod_revision"
+status         = "ported"
+notes          = "Each put increments version and stamps mod_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/range_keys_within_window"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_returns_keys_in_window"
+status         = "ported"
+notes          = "Range [a, c) returns a + b but not c (half-open interval)."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/count_only_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_count_only_returns_count_without_payload"
+status         = "ported"
+notes          = "count_only → kvs cleared, count populated."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestDeleteRange/returns_count_and_clears"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_delete_range_removes_key_and_returns_count"
+status         = "ported"
+notes          = "DeleteRange returns deleted count and clears the keys."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/equal_runs_success_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_equal_value_runs_success_branch"
+status         = "ported"
+notes          = "Value-equal compare → success branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/unequal_runs_failure_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_unequal_runs_failure_branch"
+status         = "ported"
+notes          = "Value-unequal compare → failure branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/returns_positive_int63"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_returns_positive_int63"
+status         = "ported"
+notes          = "Lease IDs occupy positive int63 space."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/avoids_taken_ids"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_skips_collisions"
+status         = "ported"
+notes          = "Collision retry path skips taken candidates."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/retry_cap"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_returns_err_when_retries_exhausted"
+status         = "ported"
+notes          = "Hard-coded retry cap of 5 matches upstream."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestSave/monotonic_index_assignment"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_append_entry_assigns_monotonic_index"
+status         = "ported"
+notes          = "Each append_entry assigns last_index+1."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestReopen/preserves_last_entry_index"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_reopen_preserves_last_entry_index"
+status         = "ported"
+notes          = "Restart replays the on-disk WAL and restores last_entry_index."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestRelease/truncate_through_drops_entries"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_truncate_through_drops_entries_up_to_index"
+status         = "ported"
+notes          = "Snapshot-driven truncate keeps only entries with index > snapshot_index."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestCompactRevisionDrops"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Compaction RevisionCompacted error path not yet ported as upstream cross-ref test."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/api/v3rpc/watch_test.go"
+upstream_name  = "TestWatchProgressNotification"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Watch progress notification semantics not yet covered behaviourally."
+
+[[upstream_test]]
+upstream_path  = "server/auth/store_test.go"
+upstream_name  = "TestAuthenticate"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Auth v3 authenticate flow not yet expressed as upstream-port test."

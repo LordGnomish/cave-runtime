@@ -987,3 +987,156 @@ loc          = 750
 priority     = "P0"
 notes        = "Folder split: pods/nodes/volumes/events/metrics (30 tests)."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "prober/{worker,results} + preemption + lifecycle (v1.36.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/2xx_success"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_status_2xx_success"
+status         = "ported"
+notes          = "HTTP 2xx → ProbeResult::Success."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/3xx_success"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_3xx_counted_as_success"
+status         = "ported"
+notes          = "HTTP redirect treated as healthy by upstream prober."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/prober_test.go"
+upstream_name  = "TestStatusToResult/4xx_5xx_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_http_4xx_5xx_failure"
+status         = "ported"
+notes          = "Non-2xx/3xx → ProbeResult::Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/grpc_prober_test.go"
+upstream_name  = "TestGrpcProbe/serving_vs_not_serving"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_grpc_serving_to_success_not_serving_to_failure"
+status         = "ported"
+notes          = "gRPC health Serving → Success, NotServing → Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/exec/exec_test.go"
+upstream_name  = "TestExecResult/zero_success_nonzero_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_exec_zero_success_nonzero_failure"
+status         = "ported"
+notes          = "exec exit 0 → Success; anything else → Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/failure_threshold_flips_outcome"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_worker_failure_threshold_flips_to_failure"
+status         = "ported"
+notes          = "Consecutive failures past failureThreshold flip outcome to Failure."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/success_resets_failure_counter"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_worker_success_resets_failure_counter"
+status         = "ported"
+notes          = "A successful sample resets consecutive_failure to 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestReadinessDefault/pre_threshold_failure"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_readiness_defaults_to_failure_pre_threshold"
+status         = "ported"
+notes          = "Readiness defaults to failure → MarkNotReady before threshold crossed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestDoProbe/initial_delay_blocks_fire"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_probe_initial_delay_blocks_fire"
+status         = "ported"
+notes          = "should_fire is false until initialDelaySeconds elapsed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/node_has_room_no_victims"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_admit_when_node_already_has_room"
+status         = "ported"
+notes          = "AdmitNoVictims when deficit == 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/lowest_priority_first"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_picks_lowest_priority_victim_first"
+status         = "ported"
+notes          = "Victim selection ordered by ascending priority."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/preemption/preemption_test.go"
+upstream_name  = "TestEvictPodsToFreeRequests/insufficient_when_low_pri_cannot_cover"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_preemption_returns_insufficient_when_no_lower_priority_pods_help"
+status         = "ported"
+notes          = "Returns Insufficient when even all lower-pri candidates can't cover deficit."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/success_marks_completed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_exec_success_marks_completed"
+status         = "ported"
+notes          = "Success sample → HookOutcome::Completed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerHttp/serde_round_trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_http_handler_serde_round_trips"
+status         = "ported"
+notes          = "JSON shape of HttpGet handler stable across round-trip (transport-independent)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/failure_is_sticky"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_exec_failure_records_reason_and_sticky"
+status         = "ported"
+notes          = "Once failure recorded, later success doesn't clear it."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestPreStopTimeout/timeout_at_boundary"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lifecycle_pre_stop_timeout_fires_at_boundary"
+status         = "ported"
+notes          = "PreStop hook exceeding its timeout → TimedOut."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestCleanListenedRanges/grace_period_overrides_termGrace"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Termination grace period override path not yet exercised in the pure decide() layer."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestStatusManager/dedupe_identical_status_writes"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Status-manager dedupe behaviour (already implemented) not yet expressed as upstream-port test."

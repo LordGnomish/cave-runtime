@@ -226,6 +226,11 @@ mod tests {
             portal_ui_priority: Some("P1".into()),
             portal_ui_upstream_url: None,
             portal_ui_score: Some(80),
+            behavioral_parity: None,
+            behavioral_ported: None,
+            behavioral_total: None,
+            behavioral_audit_scope: None,
+            behavioral_audit_at: None,
         }
     }
 

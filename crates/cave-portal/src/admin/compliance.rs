@@ -134,6 +134,28 @@ pub struct CrateCompliance {
     /// `None` mirrors `portal_ui_status = None`.
     #[serde(default)]
     pub portal_ui_score: Option<u8>,
+    /// Behavioral-parity ratio (0.0..=1.0) — fraction of `[[upstream_test]]`
+    /// entries with `status = "ported"` over the total declared in the
+    /// manifest. `None` when the crate has no `[[upstream_test]]` block.
+    /// Added 2026-05-13 by the upstream-test-port batch — measures
+    /// whether the cave reimpl actually ports upstream tests, not just
+    /// the surface shape (which `parity_ratio` already covers).
+    #[serde(default)]
+    pub behavioral_parity: Option<f64>,
+    /// Count of `[[upstream_test]]` entries with `status = "ported"`.
+    #[serde(default)]
+    pub behavioral_ported: Option<u32>,
+    /// Total `[[upstream_test]]` entries declared in the manifest.
+    #[serde(default)]
+    pub behavioral_total: Option<u32>,
+    /// `[behavioral_parity].audit_scope` — short description of which
+    /// upstream packages are covered in the audit subset.
+    #[serde(default)]
+    pub behavioral_audit_scope: Option<String>,
+    /// `[behavioral_parity].audit_at` — date the cross-reference last
+    /// updated.
+    #[serde(default)]
+    pub behavioral_audit_at: Option<String>,
 }
 
 /// Fallback list of crates that are infrastructure tooling, shared
@@ -327,6 +349,65 @@ impl ComplianceSnapshot {
         }
         let ratio = f64::from(self.portal_ui_avg_score()) / 100.0;
         compute_parity_grade(ratio)
+    }
+
+    /// Aggregate **behavioral parity** score (0-100) over tier-1 crates
+    /// whose manifest declares a `[[upstream_test]]` block. Score per
+    /// crate = `ported / total × 100`. Crates without a behavioral
+    /// audit are excluded from both numerator and denominator — the
+    /// audit subset is opt-in. Returns 0 when no crate has been audited.
+    pub fn behavioral_parity_avg(&self) -> u8 {
+        let scored: Vec<f64> = self
+            .crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.behavioral_parity)
+            .collect();
+        if scored.is_empty() {
+            return 0;
+        }
+        let avg = scored.iter().sum::<f64>() / scored.len() as f64;
+        (avg.clamp(0.0, 1.0) * 100.0).round() as u8
+    }
+
+    /// Number of tier-1 crates that have a behavioral audit.
+    pub fn behavioral_audited_count(&self) -> usize {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only && c.behavioral_parity.is_some())
+            .count()
+    }
+
+    /// A-F grade for behavioral parity. Same scale as `parity_grade`.
+    /// Returns `'F'` when no crate has been audited so the dashboard
+    /// shows the honest baseline (most crates are unaudited at first
+    /// landing).
+    pub fn behavioral_grade(&self) -> char {
+        if self.behavioral_audited_count() == 0 {
+            return 'F';
+        }
+        compute_parity_grade(f64::from(self.behavioral_parity_avg()) / 100.0)
+    }
+
+    /// Total `[[upstream_test]]` entries declared across audited tier-1
+    /// crates — used by the dashboard headline so the audit scope is
+    /// visible (e.g. "73 of 85 upstream tests ported across 5 crates").
+    pub fn behavioral_total_declared(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.behavioral_total)
+            .sum()
+    }
+
+    /// Total `[[upstream_test]]` entries with `status = "ported"` across
+    /// audited tier-1 crates.
+    pub fn behavioral_total_ported(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.behavioral_ported)
+            .sum()
     }
 
     /// Count of crates at P0 priority whose portal-UI status is still
@@ -550,6 +631,20 @@ pub struct ParityIndexEntry {
     pub stubs: Option<u32>,
     #[serde(default)]
     pub note: Option<String>,
+    /// Behavioral-parity ratio (0.0..=1.0) — populated by
+    /// `scripts/build-parity-index.py` from the crate's
+    /// `[[upstream_test]]` block. `None` when the crate has no
+    /// behavioral audit. See [`CrateCompliance::behavioral_parity`].
+    #[serde(default)]
+    pub behavioral_parity: Option<f64>,
+    #[serde(default)]
+    pub behavioral_ported: Option<u32>,
+    #[serde(default)]
+    pub behavioral_total: Option<u32>,
+    #[serde(default)]
+    pub behavioral_audit_scope: Option<String>,
+    #[serde(default)]
+    pub behavioral_audit_at: Option<String>,
 }
 
 /// JSON wrapper matching the on-disk schema of `parity-index.json`.
@@ -906,6 +1001,11 @@ pub fn analyse_crate(
         portal_ui_priority: manifest.portal_ui_priority,
         portal_ui_upstream_url: manifest.portal_ui_upstream_url,
         portal_ui_score,
+        behavioral_parity: None,
+        behavioral_ported: None,
+        behavioral_total: None,
+        behavioral_audit_scope: None,
+        behavioral_audit_at: None,
     })
 }
 
@@ -934,6 +1034,12 @@ pub fn attach_parity_index(
             if c.upstream_version.is_none() {
                 c.upstream_version = entry.upstream_version.clone();
             }
+            // Behavioral-parity overlay (added 2026-05-13).
+            c.behavioral_parity = entry.behavioral_parity;
+            c.behavioral_ported = entry.behavioral_ported;
+            c.behavioral_total = entry.behavioral_total;
+            c.behavioral_audit_scope = entry.behavioral_audit_scope.clone();
+            c.behavioral_audit_at = entry.behavioral_audit_at.clone();
         }
     }
 
@@ -1428,6 +1534,12 @@ pub fn render_with_view(
     let portal_ui_color = cell_color(portal_ui_avg);
     let portal_ui_measured = snapshot.portal_ui_measured_count();
     let portal_ui_p0_gaps = snapshot.portal_ui_p0_gaps();
+    let behavioral_avg = snapshot.behavioral_parity_avg();
+    let behavioral_grade = snapshot.behavioral_grade();
+    let behavioral_color = cell_color(behavioral_avg);
+    let behavioral_audited = snapshot.behavioral_audited_count();
+    let behavioral_ported = snapshot.behavioral_total_ported();
+    let behavioral_total = snapshot.behavioral_total_declared();
 
     let rows: Vec<Vec<String>> = filtered
         .iter()
@@ -1469,6 +1581,29 @@ pub fn render_with_view(
                 }
                 (false, None) => format!(
                     r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="not covered by parity audit">—</span>"#,
+                ),
+            };
+            let behavioral_html = match (c.infra_only, c.behavioral_parity) {
+                (true, _) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-200 text-gray-600" title="infra-only">infra</span>"#,
+                ),
+                (false, Some(r)) => {
+                    let pct = (r.clamp(0.0, 1.0) * 100.0).round() as u8;
+                    let detail = match (c.behavioral_ported, c.behavioral_total) {
+                        (Some(p), Some(t)) => format!(
+                            r#" <span class="text-[10px] text-gray-500">{p}/{t}</span>"#
+                        ),
+                        _ => String::new(),
+                    };
+                    format!(
+                        r#"<span class="px-2 py-1 rounded {color}">{pct}%</span>{detail}"#,
+                        color = cell_color(pct),
+                        pct = pct,
+                        detail = detail,
+                    )
+                }
+                (false, None) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="no [[upstream_test]] block in parity.manifest.toml">—</span>"#,
                 ),
             };
             let portal_ui_html = match (c.infra_only, c.portal_ui_score.as_ref()) {
@@ -1514,6 +1649,7 @@ pub fn render_with_view(
                 score_html,
                 parity_html,
                 portal_ui_html,
+                behavioral_html,
             ]
         })
         .collect();
@@ -1561,7 +1697,7 @@ pub fn render_with_view(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
-<section class="grid grid-cols-3 gap-4 mb-6">
+<section class="grid grid-cols-4 gap-4 mb-6">
   <div class="p-5 bg-white rounded shadow">
     <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Structural Coverage</div>
     <div class="flex items-baseline gap-3">
@@ -1594,6 +1730,20 @@ pub fn render_with_view(
       P0 release-blocker gaps: <strong>{portal_ui_p0_gaps}</strong>.
     </div>
   </div>
+  <div class="p-5 bg-white rounded shadow">
+    <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Behavioral Parity</div>
+    <div class="flex items-baseline gap-3">
+      <div class="text-4xl font-bold {behavioral_color} px-2 rounded">{behavioral_avg}</div>
+      <div class="text-3xl font-bold text-gray-700">Grade {behavioral_grade}</div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">
+      Ported {behavioral_ported}/{behavioral_total} upstream tests across
+      {behavioral_audited}/{tier1} tier-1 crates with a behavioral audit.
+      Scope-bounded: denominator is each crate's audited subset, not
+      the full upstream corpus. Empty `[[upstream_test]]` block → not
+      audited → counted as F.
+    </div>
+  </div>
 </section>
 <section class="grid grid-cols-3 gap-4 mb-6">
   <div class="p-4 bg-white rounded shadow"><div class="text-xs text-gray-500">TIER-1 CRATES</div><div class="text-3xl font-bold">{tier1}</div><div class="text-xs text-gray-400">+ {infra} infra · {total} total</div></div>
@@ -1620,12 +1770,18 @@ pub fn render_with_view(
         portal_ui_grade = portal_ui_grade,
         portal_ui_measured = portal_ui_measured,
         portal_ui_p0_gaps = portal_ui_p0_gaps,
+        behavioral_avg = behavioral_avg,
+        behavioral_color = behavioral_color,
+        behavioral_grade = behavioral_grade,
+        behavioral_audited = behavioral_audited,
+        behavioral_ported = behavioral_ported,
+        behavioral_total = behavioral_total,
         sort_form = sort_form,
         tbl = table(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
                 "portal", "cavectl", "alerts", "dash", "structural", "parity",
-                "portal-ui",
+                "portal-ui", "behavioral",
             ],
             &rows,
         ),
@@ -2113,6 +2269,11 @@ version = "7.2.0"
                     portal_ui_priority: None,
                     portal_ui_upstream_url: None,
                     portal_ui_score: None,
+                    behavioral_parity: None,
+                    behavioral_ported: None,
+                    behavioral_total: None,
+                    behavioral_audit_scope: None,
+                    behavioral_audit_at: None,
                 },
             ],
         };
@@ -2208,6 +2369,11 @@ version = "7.2.0"
             portal_ui_priority: None,
             portal_ui_upstream_url: None,
             portal_ui_score: None,
+            behavioral_parity: None,
+            behavioral_ported: None,
+            behavioral_total: None,
+            behavioral_audit_scope: None,
+            behavioral_audit_at: None,
         }
     }
 
@@ -2427,6 +2593,11 @@ version = "7.2.0"
                 portal_ui_priority: Some("P1".into()),
                 portal_ui_upstream_url: Some("https://example.com/ui".into()),
                 portal_ui_score: Some(60),
+                behavioral_parity: None,
+                behavioral_ported: None,
+                behavioral_total: None,
+                behavioral_audit_scope: None,
+                behavioral_audit_at: None,
             },
             ignored_tests: vec![IgnoredTest {
                 file: "crates/cave-x/src/lib.rs".into(),
@@ -3214,5 +3385,105 @@ priority = "P0"
         assert!(html.contains("Infrastructure-only crate"));
         // No misleading empty-manifest warning for infra crates.
         assert!(!html.contains("parity.manifest empty"));
+    }
+
+    // ---------------- behavioral-parity tests ----------------
+
+    fn behavioral_compliance(
+        name: &str,
+        infra: bool,
+        ratio: Option<f64>,
+        ported: Option<u32>,
+        total: Option<u32>,
+    ) -> CrateCompliance {
+        let mut c = stub_compliance(name, 100);
+        c.infra_only = infra;
+        c.behavioral_parity = ratio;
+        c.behavioral_ported = ported;
+        c.behavioral_total = total;
+        c
+    }
+
+    #[test]
+    fn behavioral_parity_avg_excludes_unaudited_and_infra() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Behavioral.tsx",
+            "behavioralAvg",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                behavioral_compliance("a", false, Some(0.8), Some(8), Some(10)),
+                behavioral_compliance("b", false, Some(0.5), Some(5), Some(10)),
+                // unaudited tier-1 — excluded from numerator AND denominator
+                behavioral_compliance("c", false, None, None, None),
+                // infra — always excluded
+                behavioral_compliance("d", true, Some(1.0), Some(10), Some(10)),
+            ],
+        };
+        // (0.8 + 0.5) / 2 = 0.65 → 65.
+        assert_eq!(snap.behavioral_parity_avg(), 65);
+        assert_eq!(snap.behavioral_audited_count(), 2);
+        assert_eq!(snap.behavioral_total_ported(), 13);
+        assert_eq!(snap.behavioral_total_declared(), 20);
+    }
+
+    #[test]
+    fn behavioral_grade_returns_f_when_no_audit() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Behavioral.tsx",
+            "behavioralGradeF",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                behavioral_compliance("x", false, None, None, None),
+                behavioral_compliance("y", false, None, None, None),
+            ],
+        };
+        // No crate has been audited → honest F baseline.
+        assert_eq!(snap.behavioral_grade(), 'F');
+        assert_eq!(snap.behavioral_audited_count(), 0);
+    }
+
+    #[test]
+    fn behavioral_grade_maps_to_parity_grade_scale() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Behavioral.tsx",
+            "behavioralGradeScale",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                // avg 0.75 → A on parity scale (≥0.70).
+                behavioral_compliance("a", false, Some(0.75), Some(15), Some(20)),
+            ],
+        };
+        assert_eq!(snap.behavioral_grade(), 'A');
+    }
+
+    #[test]
+    fn render_includes_behavioral_card_and_column_header() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Behavioral.tsx",
+            "behavioralRender",
+            "acme"
+        );
+        let snap = ComplianceSnapshot {
+            crates: vec![behavioral_compliance("a", false, Some(0.8), Some(8), Some(10))],
+        };
+        let html = render(&snap, &ctx(&[Permission::AdminComplianceView])).unwrap();
+        // Headline card.
+        assert!(
+            html.contains("Behavioral Parity"),
+            "expected Behavioral Parity card in dashboard"
+        );
+        // Per-row column.
+        assert!(
+            html.contains(">behavioral<"),
+            "expected behavioral column header in matrix"
+        );
+        // Per-row count detail (8/10 from the test fixture).
+        assert!(html.contains("8/10"));
     }
 }

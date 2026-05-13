@@ -758,3 +758,157 @@ loc          = 700
 priority     = "P0"
 notes        = "admin/k8s_dashboard/: workloads/services/config/storage/cluster (24 tests). See PORTAL_UI_OVERRIDE."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "labels/selector + fields/selector + namespacelifecycle + admission chain + limitranger + resourcequota (v1.36.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/labels/selector_test.go"
+upstream_name  = "TestParse/key_equals_value"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_label_selector_parse_equals_single"
+status         = "ported"
+notes          = "Smoke parse of `key=value` syntax."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/labels/selector_test.go"
+upstream_name  = "TestParse/key_in_set"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_label_selector_parse_in_operator_with_value_set"
+status         = "ported"
+notes          = "Set-based In operator with comma-separated values."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/labels/selector_test.go"
+upstream_name  = "TestMatches/in_operator_present_and_absent"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_label_selector_matches_in_operator_against_present_and_absent_keys"
+status         = "ported"
+notes          = "In never matches when label is absent."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/labels/selector_test.go"
+upstream_name  = "TestMatches/does_not_exist_succeeds_when_absent"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_label_selector_does_not_exist_succeeds_when_absent"
+status         = "ported"
+notes          = "!key (DoesNotExist) matches only when label key is absent."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/fields/selector_test.go"
+upstream_name  = "TestSelectorParse/metadata_name_equals"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_field_selector_parse_equals"
+status         = "ported"
+notes          = "Field selector accepts dotted field paths."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/fields/selector_test.go"
+upstream_name  = "TestSelectorParse/bare_key_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_field_selector_rejects_bare_key_without_operator"
+status         = "ported"
+notes          = "Fields don't support Exists-style bare keys (unlike labels)."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/namespacelifecycle/admission_test.go"
+upstream_name  = "TestAdmitOnlyAllowsRequestsForSystemUsers/non_system_denied"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_namespace_lifecycle_denies_kube_system_writes_by_non_system_user"
+status         = "ported"
+notes          = "Non-system user writing kube-system → 403."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/namespacelifecycle/admission_test.go"
+upstream_name  = "TestAdmitOnlyAllowsRequestsForSystemUsers/system_user_allowed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_namespace_lifecycle_allows_kube_system_writes_by_system_user"
+status         = "ported"
+notes          = "system: prefix user writing kube-system → allow."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating/dispatcher_test.go"
+upstream_name  = "TestDispatch/deny_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_admission_chain_validating_deny_short_circuits_to_deny"
+status         = "ported"
+notes          = "First validator denies → no further validators called, deny is final."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating/dispatcher_test.go"
+upstream_name  = "TestDispatch/mutating_runs_before_validating"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_admission_chain_mutating_runs_before_validating"
+status         = "ported"
+notes          = "Mutating phase visits hooks before validating phase."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating/dispatcher_test.go"
+upstream_name  = "cave-specific:rogue_mutator_alters_tenant_id"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_admission_chain_rejects_mutator_that_alters_tenant_id"
+status         = "ported"
+notes          = "cave Charter invariant on top of upstream — mutator must not alter tenant_id."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/limitranger/admission_test.go"
+upstream_name  = "TestMergePodResourceRequirements/default_request_filled_when_absent"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_limit_ranger_applies_default_request_when_absent"
+status         = "ported"
+notes          = "Default requests + limits applied when caller omitted them."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/limitranger/admission_test.go"
+upstream_name  = "TestPodLimitFunc/below_min_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_limit_ranger_validate_container_rejects_below_min"
+status         = "ported"
+notes          = "Container CPU request below LimitRange min → Below error."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/limitranger/admission_test.go"
+upstream_name  = "TestPodLimitFunc/ratio_exceeded_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_limit_ranger_validate_container_rejects_ratio_exceeded"
+status         = "ported"
+notes          = "limit/request ratio > max → RatioExceeded error."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/resourcequota/admission_test.go"
+upstream_name  = "TestAdmissionIgnoresDelete/used_plus_want_over_hard_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_resource_quota_denies_when_used_plus_want_exceeds_hard"
+status         = "ported"
+notes          = "used + want > hard → QuotaError::Exceeded."
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/resourcequota/admission_test.go"
+upstream_name  = "TestAdmissionIgnoresDelete/under_hard_allowed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_resource_quota_allows_when_under_hard_limit"
+status         = "ported"
+notes          = "used + want < hard → ok()."
+
+# Honest "still missing" entries — declared in the audit scope but
+# not yet ported.
+
+[[upstream_test]]
+upstream_path  = "plugin/pkg/admission/resourcequota/admission_test.go"
+upstream_name  = "TestAdmissionPodResources/extended_resources"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Extended-resource quota tracking (nvidia.com/gpu, hugepages-2Mi) not yet wired into extract_quota_requests."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher_test.go"
+upstream_name  = "TestPolicyEvaluation/messageExpression"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "VAP messageExpression CEL field not yet evaluated (see cel_eval.rs deferred list)."
