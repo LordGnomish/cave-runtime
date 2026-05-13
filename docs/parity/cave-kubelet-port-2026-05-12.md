@@ -10,13 +10,38 @@
 
 | Bucket | Count |
 |---|---:|
-| `[[mapped]]` | 20 |
+| `[[mapped]]` | **22** (was 20) |
 | `[[skipped]]` | 9 |
-| `[[unmapped]]` | 9 |
+| `[[unmapped]]` | **7** (was 9) |
 | **Total** | **38** |
-| **fill_ratio** | **0.7632** |
+| **fill_ratio** | **0.8158** (was 0.7632) |
 
-`parity_ratio = 1.0` → `fill_ratio = 0.7632`.
+`parity_ratio = 1.0` → `fill_ratio = 0.8158` (2026-05-13 update).
+
+### 2026-05-13 k8s-core push update
+
+The two biggest unmapped packages in the 2026-05-12 audit are now
+ported:
+
+* **`pkg/kubelet/status/`** → `src/pod_status_manager.rs`.
+  Lazy hash-dedupe (status content hash excludes free-text
+  `message`), bounded queue with oldest-eviction on overflow,
+  exponential backoff via `cave_kernel::backoff::Backoff::Exponential`
+  with a default 200ms → 30s schedule, transient vs permanent
+  failure separation (only transient bumps the failure counter),
+  deleted-pod drop semantics so racing `set_status` on a removed pod
+  is silently suppressed. `DispatchOutcome` + `AttemptOutcome` make
+  the kubelet sync-loop integration testable without an apiserver.
+  15 deterministic tests cover every transition.
+* **`pkg/kubelet/prober/`** → `src/prober.rs`.
+  `ProberCoordinator` wraps the existing per-probe `ProberManager`
+  state machine and adds the missing coordinator layer: a worker
+  pool (`cave_kernel::semaphore::Semaphore`, default 16 concurrent),
+  per-container ledger that suppresses duplicate `RestartContainer`
+  events while a previous restart is still in flight (cleared by
+  `mark_restart_completed` or auto-cleared after a configurable
+  safety window), readiness flip dedup so `MarkReady`/`MarkNotReady`
+  only emit on true transitions. 17 tests.
 
 ## Mapped highlights (20)
 
@@ -29,10 +54,12 @@
 - **AppArmor** integration.
 - **Node lease + plugin watcher + pod-resources**.
 
-## Unmapped (9, ordered by likely demand)
+## Unmapped (7 as of 2026-05-13, ordered by likely demand)
 
-1. **`pkg/kubelet/status/`** — PodStatusManager queue + retry. Today's sync-time writes can leak phase updates on transient apiserver failure.
-2. **`pkg/kubelet/prober/`** — Probe-worker pool + restart coordination ledger. probe.rs runs probes; the coordinator is missing.
+1. ~~**`pkg/kubelet/status/`**~~ — **CLOSED 2026-05-13**, see the
+   k8s-core push update above.
+2. ~~**`pkg/kubelet/prober/`**~~ — **CLOSED 2026-05-13**, see the
+   k8s-core push update above.
 3. **`pkg/kubelet/cm/util/cgroups/`** — v2 unified-hierarchy direct cgroup writes. Cave writes via CRI today; systemd-cgroup-driver mode unsupported.
 4. **`pkg/kubelet/lifecycle/`** — preStop / postStart hook orchestration with per-event timeouts.
 5. **`pkg/kubelet/preemption/`** — Critical-pod admit (evict lower-priority for system-critical).

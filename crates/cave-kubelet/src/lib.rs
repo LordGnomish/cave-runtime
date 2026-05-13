@@ -92,6 +92,17 @@ pub mod volume_reconciler;
 /// Pod garbage collection logic.
 pub mod pod_gc;
 
+/// k8s-core push 2026-05-13: PodStatusManager — queue, lazy-enqueue
+/// hash-dedupe, exponential-backoff retry, drop-on-delete semantics.
+/// Mirrors `pkg/kubelet/status/status_manager.go`.
+pub mod pod_status_manager;
+
+/// k8s-core push 2026-05-13: prober worker pool + restart-coordination
+/// ledger. Sits on top of `probe::ProberManager` to bound concurrency
+/// and de-duplicate restart-trigger fan-out.
+/// Mirrors `pkg/kubelet/prober/worker.go` + `prober/results/`.
+pub mod prober;
+
 use agent::KubeletState;
 use std::sync::Arc;
 

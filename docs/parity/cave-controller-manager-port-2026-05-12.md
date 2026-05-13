@@ -16,13 +16,34 @@ Same as cave-etcd / cave-apiserver / cave-scheduler. Each entry is `[[mapped]]` 
 
 | Bucket | Count |
 |---|---:|
-| `[[mapped]]` | 23 |
+| `[[mapped]]` | **24** (was 23) |
 | `[[skipped]]` | 10 |
-| `[[unmapped]]` | 12 |
+| `[[unmapped]]` | **11** (was 12) |
 | **Total** | **45** |
-| **fill_ratio** | **0.7333** |
+| **fill_ratio** | **0.7556** (was 0.7333) |
 
-The previous self-reported `parity_ratio = 0.25` is replaced by `fill_ratio = 0.7333`. (Note: the numbers measure different things — 0.25 was "10/10 files declared in [[files]]" via the old schema; 0.7333 is `(mapped + skipped) / total` over enumerated upstream sub-packages. The new metric is the comparable one going forward.)
+The previous self-reported `parity_ratio = 0.25` is replaced by `fill_ratio = 0.7556`. (Note: the numbers measure different things — 0.25 was "10/10 files declared in [[files]]" via the old schema; 0.7556 is `(mapped + skipped) / total` over enumerated upstream sub-packages. The new metric is the comparable one going forward.)
+
+### 2026-05-13 k8s-core push update
+
+`pkg/controller/resourceclaim/` (DRA, KEP-4381) — the biggest unmapped
+gap in the 2026-05-12 audit — has been ported. `src/resourceclaim.rs`
+implements the deterministic state machine:
+
+* `AddFinalizer` → `Allocate` (Immediate or WaitForFirstConsumer with
+  scheduler candidate) → `AddReservation` / `RemoveReservation` for
+  consumer pod lifecycle → on delete, `AwaitConsumerDrain` →
+  `RequestDeallocation` → `RemoveFinalizer` → `AwaitDeletion`.
+* `apply_reservation_diff` helper that handles the add/remove
+  diffing against the current `reservedFor[]`.
+* Tenant gate (`check_tenant`) for cross-tenant isolation.
+* `reconcile_outcome` mapping into the `crate::types::Reconcile`
+  enum so the existing manager loop (`runtime.rs`) drives it.
+
+23 deterministic tests cover every transition + a full-cycle audit
+test that walks one claim through every state. Device-fitness
+matching remains in `cave-scheduler/src/dra.rs` (the *candidate*
+node + devices triple is passed into this reconciler as input).
 
 ## Mapped highlights — the 23 controllers cave ships
 
@@ -45,10 +66,12 @@ Each maps to one or more `crates/cave-controller-manager/src/` files. 20 KB tota
 - `pkg/controller/metrics/`, `pkg/controller/testutil/`, `pkg/controller/history/` — stdlib analogs / test harness / folded.
 - `pkg/controller/podgc/`, `pkg/controller/volume/{expand,attachdetach}/` — covered by other crates.
 
-## Unmapped (12 — real gaps)
+## Unmapped (11 — real gaps as of 2026-05-13)
 
 The big ones:
-1. **DRA `resourceclaim/` controller** — scheduler hooks exist (cave-scheduler/dra.rs); the cluster-side ResourceClaim ↔ Pod binding reconciler is missing. Blocker for DRA GA.
+1. ~~**DRA `resourceclaim/` controller**~~ — **CLOSED 2026-05-13**, see
+   the k8s-core push update above. `src/resourceclaim.rs` ships the
+   state machine.
 2. **`tainteviction/`** — per-pod toleration-timer eviction. Node-level NoExecute works; per-pod grace timing does not.
 3. **`cidrallocator/`** — on-the-fly node CIDR allocation when running without a cloud provider. Cave-net is currently pre-provisioned.
 4. **`validatingadmissionpolicystatus/`** — type-check status reconciler for VAP. cave-apiserver validates at write time but the steady-state status loop is missing.
