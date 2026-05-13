@@ -112,46 +112,103 @@ fn scan_body(path: &Path, body: &str, out: &mut Vec<StubFinding>) {
     }
 }
 
-/// Replace the contents of every double-quoted string literal with spaces
-/// (length-preserving) so a subsequent `contains` check sees only non-string
-/// code. Handles standard `\"` escapes and `\\` so `"a\"b"` is treated as one
-/// literal containing `a"b`. Does NOT handle raw strings (`r"..."` /
-/// `r#"..."#`) — those are rare in production and the worst case is a
-/// false positive (over-report), which is the gate's safe failure mode.
+/// Replace the contents of every string literal — regular `"..."` and raw
+/// `r"..."` / `r#"..."#` / `r##"..."##` (any number of hashes) — with
+/// spaces (length-preserving, newlines kept) so a subsequent `contains`
+/// check sees only non-string code. Regular strings handle `\"` and `\\`
+/// escapes; raw strings honour their hash-delimiter rules per the Rust
+/// reference.
 pub(crate) fn strip_string_literals(src: &str) -> String {
+    // Two-state machine over `char_indices`:
+    //   State::Code     — outside any string
+    //   State::Str { .. } — inside a regular `"..."` literal (escape-aware)
+    //   State::Raw { hashes } — inside a raw `r#...".."#...` literal
+    //
+    // Substitution rule: a char that is *inside* a string is replaced with
+    // ` ` (newline preserved); the same-byte-count substitution is enough
+    // because the scanner only looks for ASCII needles and never reports
+    // column ranges.
+    enum State {
+        Code,
+        Str,
+        Raw(usize), // hash count
+    }
+
     let mut out = String::with_capacity(src.len());
-    let mut in_str = false;
-    let mut chars = src.chars().peekable();
-    while let Some(c) = chars.next() {
-        if !in_str {
-            if c == '"' {
-                in_str = true;
-                out.push(' '); // preserve column
-            } else {
-                out.push(c);
-            }
-        } else {
-            if c == '\\' {
-                // skip escaped char (preserve column by emitting two spaces)
-                out.push(' ');
-                if let Some(next) = chars.next() {
-                    // Preserve newline so downstream line splitting stays
-                    // accurate when the escape was at end-of-line.
-                    if next == '\n' {
-                        out.push('\n');
-                    } else {
-                        out.push(' ');
+    let mut state = State::Code;
+    let mut iter = src.char_indices().peekable();
+    while let Some((i, c)) = iter.next() {
+        match state {
+            State::Code => {
+                // Look ahead for raw-string opener: `r`/`br` + N×`#` + `"`.
+                let is_raw_prefix = c == 'r'
+                    || (c == 'b' && {
+                        let rest = &src[i + c.len_utf8()..];
+                        rest.starts_with('r')
+                    });
+                if is_raw_prefix {
+                    let prefix_len = if c == 'b' { 2 } else { 1 };
+                    let rest = &src[i + prefix_len..];
+                    let hashes = rest.bytes().take_while(|b| *b == b'#').count();
+                    let after_hashes = &rest[hashes..];
+                    if after_hashes.starts_with('"') {
+                        // Commit: mask `r` (or `br`) + hashes + opening `"`
+                        let total = prefix_len + hashes + 1;
+                        out.push_str(&" ".repeat(total));
+                        // Advance the char iterator past those `total` bytes
+                        // (all ASCII so byte-count == char-count).
+                        for _ in 0..(total - c.len_utf8()) {
+                            iter.next();
+                        }
+                        state = State::Raw(hashes);
+                        continue;
                     }
                 }
-            } else if c == '"' {
-                in_str = false;
-                out.push(' ');
-            } else if c == '\n' {
-                // Preserve newline — multi-line strings keep line indices
-                // aligned for the per-line scan.
-                out.push('\n');
-            } else {
-                out.push(' ');
+                if c == '"' {
+                    out.push(' ');
+                    state = State::Str;
+                } else {
+                    out.push(c);
+                }
+            }
+            State::Str => {
+                if c == '\\' {
+                    out.push(' ');
+                    if let Some((_, next)) = iter.next() {
+                        if next == '\n' {
+                            out.push('\n');
+                        } else {
+                            out.push(' ');
+                        }
+                    }
+                } else if c == '"' {
+                    out.push(' ');
+                    state = State::Code;
+                } else if c == '\n' {
+                    out.push('\n');
+                } else {
+                    out.push(' ');
+                }
+            }
+            State::Raw(hashes) => {
+                if c == '"' {
+                    // Closing iff followed by exactly `hashes` `#` chars.
+                    let rest = &src[i + 1..];
+                    if rest.bytes().take(hashes).filter(|b| *b == b'#').count() == hashes {
+                        out.push(' ');
+                        for _ in 0..hashes {
+                            out.push(' ');
+                            iter.next();
+                        }
+                        state = State::Code;
+                        continue;
+                    }
+                    out.push(' ');
+                } else if c == '\n' {
+                    out.push('\n');
+                } else {
+                    out.push(' ');
+                }
             }
         }
     }
@@ -288,5 +345,70 @@ fn other() { unimplemented!() }
         assert!(s.contains("foo"));
         assert!(s.contains("bar"));
         assert!(!s.contains("x"));
+    }
+
+    // ── raw-string handling ──────────────────────────────────────────
+
+    #[test]
+    fn raw_string_single_hash_masks_inner_macro() {
+        // r#"..."# with macro calls inside — common Rust test-fixture
+        // shape. The masker must hide them so the gate does not
+        // false-positive on its own / nearby test source files.
+        let body = "let src = r#\"\npub fn x() { unimplemented!() }\npub fn y() { todo!() }\n\"#;\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert!(out.is_empty(), "raw-string leak: {out:?}");
+    }
+
+    #[test]
+    fn raw_string_double_hash_masks_inner_macro() {
+        let body = "let s = r##\"todo!()\"##;\nlet y = 1;\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert!(out.is_empty(), "{out:?}");
+    }
+
+    #[test]
+    fn raw_string_no_hash_masks_inner_macro() {
+        let body = "let s = r\"todo!()\";\nlet y = 1;\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert!(out.is_empty(), "{out:?}");
+    }
+
+    #[test]
+    fn byte_raw_string_masks_inner_macro() {
+        let body = "let s = br#\"todo!()\"#;\nlet y = 1;\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert!(out.is_empty(), "{out:?}");
+    }
+
+    #[test]
+    fn raw_string_does_not_consume_lone_r_identifier() {
+        // `let r = todo!()` starts with `r` but `r` is followed by `=`,
+        // not `"`. Must NOT enter raw-string mode; the real macro call
+        // MUST be flagged.
+        let body = "let r = todo!(\"yes\");\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert_eq!(out.len(), 1);
+    }
+
+    #[test]
+    fn real_macro_after_raw_string_still_flagged() {
+        let body = "let s = r#\"todo!()\"#; todo!();\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert_eq!(out.len(), 1, "{out:?}");
+    }
+
+    #[test]
+    fn raw_string_with_unbalanced_hashes_inside_is_preserved() {
+        // Inner `#` doesn't terminate; only `"##` does for double-hash.
+        let body = "let s = r##\"foo \"#\" todo!()\"##;\nlet y = 1;\n";
+        let mut out = Vec::new();
+        scan_body(Path::new("x.rs"), body, &mut out);
+        assert!(out.is_empty(), "{out:?}");
     }
 }

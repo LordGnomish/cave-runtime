@@ -18,9 +18,9 @@ url     = "https://github.com/openbao/openbao"
 # `audit/`, `physical/`, `sdk/`, `command/`).
 mapped_count   = 19
 skipped_count  = 11
-unmapped_count = 7
-total          = 37
-fill_ratio     = 0.8108
+unmapped_count = 8
+total          = 38
+fill_ratio     = 0.7895
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -431,9 +431,9 @@ local_files  = ["src/api/sys.rs", "src/routes.rs"]
 note         = "/v1/sys/* endpoints — health, mounts, auth, policies, audit"
 
 [[mapped]]
-upstream_pkg = "openbao:physical/{file,inmem}/"
-local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs"]
-note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, one file per key, path-traversal guarded) + in-memory backend. Remaining backends (raft/s3/consul/etcd/gcs/postgresql) tracked as unmapped."
+upstream_pkg = "openbao:physical/{file,inmem,raft}/"
+local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs", "src/storage/raft.rs"]
+note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, path-traversal guarded) + in-memory backend + Raft-replicated backend (append-only log w/ term + index, propose/commit/apply pipeline, vote per Raft §5.1, snapshot install + log replay, idempotent delete, configurable inner state-machine Backend). Remaining backends (s3/consul/etcd/gcs/postgresql) tracked as unmapped."
 
 # ─── Skipped (11) ───────────────────────────────────────────────────────────
 
@@ -491,8 +491,8 @@ note         = "Terraform module for deployment"
 # ─── Unmapped (8) — honest gaps ─────────────────────────────────────────────
 
 [[unmapped]]
-upstream_pkg = "openbao:physical/{raft,s3,consul,etcd,gcs,postgresql}/"
-note         = "Remaining storage backends. Raft needs cluster-runtime integration; S3/GCS need cloud SDKs; consul/etcd would re-export cave-etcd via the trait. Tracked, not implemented."
+upstream_pkg = "openbao:physical/{s3,consul,etcd,gcs,postgresql}/"
+note         = "Remaining storage backends. S3/GCS need cloud SDKs; consul/etcd would re-export cave-etcd via the trait. Raft has landed (see [[mapped]] entry for `openbao:physical/{file,inmem,raft}/`)."
 
 [[unmapped]]
 upstream_pkg = "openbao:vault/replication/"
