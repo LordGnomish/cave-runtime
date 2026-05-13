@@ -61,6 +61,36 @@ enum Cmd {
         #[arg(long)]
         events: Option<PathBuf>,
     },
+    /// Auto-port dispatcher: one-shot scan over events.jsonl,
+    /// submit any unprocessed GAP to the configured TaskQueue, then
+    /// verify completed tasks against the charter-v2 gate. Honours
+    /// `CAVE_AUTOPORT_DISABLE=1` kill switch.
+    Dispatch {
+        /// Override workspace root.
+        #[arg(long)]
+        workspace: Option<PathBuf>,
+        /// Override events.jsonl path.
+        #[arg(long)]
+        events: Option<PathBuf>,
+        /// Override dispatched.jsonl path.
+        #[arg(long)]
+        state: Option<PathBuf>,
+        /// Override audit.jsonl path.
+        #[arg(long)]
+        audit: Option<PathBuf>,
+        /// Backend: `dryrun` | `pump` | `opus`. Default: dryrun
+        /// (safe — never side-effects until the operator opts in).
+        #[arg(long, default_value = "dryrun")]
+        backend: String,
+        /// Skip the verify_completed pass (only run scan_and_dispatch).
+        #[arg(long)]
+        scan_only: bool,
+    },
+    /// Print every dispatched record as a JSON array — diagnostic.
+    DumpDispatched {
+        #[arg(long)]
+        state: Option<PathBuf>,
+    },
 }
 
 fn workspace_root() -> PathBuf {
@@ -121,7 +151,133 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", serde_json::to_string_pretty(&evts)?);
             Ok(())
         }
+        Cmd::Dispatch {
+            workspace,
+            events,
+            state,
+            audit,
+            backend,
+            scan_only,
+        } => {
+            let root = workspace.unwrap_or_else(workspace_root);
+            let (default_events, default_state, default_audit) =
+                cave_upstream_watchd::AutoPortDispatcher::default_paths();
+            let events_path = events.unwrap_or(default_events);
+            let state_path = state.unwrap_or(default_state);
+            let audit_path = audit.unwrap_or(default_audit);
+            run_dispatch(&root, &events_path, &state_path, &audit_path, &backend, scan_only).await
+        }
+        Cmd::DumpDispatched { state } => {
+            let p = state.unwrap_or_else(|| {
+                cave_upstream_watchd::AutoPortDispatcher::default_paths().1
+            });
+            let text = std::fs::read_to_string(&p).unwrap_or_default();
+            let records: Vec<cave_upstream_watchd::DispatchedRecord> = text
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .filter_map(|l| serde_json::from_str(l).ok())
+                .collect();
+            println!("{}", serde_json::to_string_pretty(&records)?);
+            Ok(())
+        }
     }
+}
+
+async fn run_dispatch(
+    workspace: &std::path::Path,
+    events_path: &std::path::Path,
+    state_path: &std::path::Path,
+    audit_path: &std::path::Path,
+    backend_str: &str,
+    scan_only: bool,
+) -> anyhow::Result<()> {
+    use cave_upstream_watchd::{
+        auto_port::{AutoPortDispatcher, DispatcherConfig, WorkspaceContextResolver},
+        auto_port_gate::CharterV2Gate,
+        task_queue::{DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskQueue},
+    };
+    use std::sync::Arc;
+
+    let gate = Arc::new(CharterV2Gate::new(workspace.to_path_buf()));
+    let stub_gate = gate.clone();
+    let ratio_gate = gate.clone();
+    let resolver = Arc::new(WorkspaceContextResolver {
+        workspace_root: workspace.to_path_buf(),
+        gate: gate.clone(),
+        stub_counter: Arc::new(move || stub_gate.count_workspace_stubs().unwrap_or(0)),
+        ratio_reader: Arc::new(move |crate_name: &str| {
+            ratio_gate.read_fill_ratio(crate_name).ok().flatten()
+        }),
+    });
+
+    let queue: Arc<dyn TaskQueue> = match backend_str {
+        "dryrun" => {
+            let log = audit_path.with_file_name("dryrun-audit.jsonl");
+            tracing::info!(backend = "dryrun", log = %log.display(), "auto-port dispatcher up");
+            Arc::new(DryRunTaskQueue::new(log))
+        }
+        "pump" => {
+            let q = PumpTaskQueue::default_paths();
+            tracing::info!(
+                backend = "pump",
+                queue = %q.queue_dir.display(),
+                completed = %q.completed_dir.display(),
+                "auto-port dispatcher up"
+            );
+            Arc::new(q)
+        }
+        "opus" => {
+            let state_dir = state_path.with_file_name("opus");
+            let q = OpusTaskQueue::from_env(state_dir).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "ANTHROPIC_API_KEY not set — refusing to construct OpusTaskQueue. \
+                     Set the env var or use --backend dryrun/pump."
+                )
+            })?;
+            tracing::info!(backend = "opus", "auto-port dispatcher up");
+            Arc::new(q)
+        }
+        other => {
+            anyhow::bail!("unknown backend '{other}' — pick dryrun | pump | opus");
+        }
+    };
+
+    let dispatcher = AutoPortDispatcher::new(
+        events_path.to_path_buf(),
+        state_path.to_path_buf(),
+        audit_path.to_path_buf(),
+        queue,
+        gate,
+        resolver,
+        DispatcherConfig::default(),
+    );
+    dispatcher.boot().await?;
+
+    let scan = dispatcher.scan_and_dispatch().await?;
+    tracing::info!(?scan, "scan_and_dispatch complete");
+    println!(
+        "dispatch: considered={} dispatched={} already={} skipped_disabled={} skipped_cooldown={} skipped_rate={} errors={}",
+        scan.considered,
+        scan.dispatched,
+        scan.already_dispatched,
+        scan.skipped_disabled,
+        scan.skipped_cooldown,
+        scan.skipped_rate_limit,
+        scan.errors,
+    );
+    if !scan_only {
+        let verify = dispatcher.verify_completed().await?;
+        tracing::info!(?verify, "verify_completed complete");
+        println!(
+            "verify:   considered={} still_running={} merged={} charter_failed={} backend_failed={}",
+            verify.considered,
+            verify.still_running,
+            verify.merged,
+            verify.charter_failed,
+            verify.backend_failed,
+        );
+    }
+    Ok(())
 }
 
 async fn run_poll(

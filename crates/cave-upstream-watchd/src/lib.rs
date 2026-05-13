@@ -39,12 +39,32 @@ pub mod persistence;
 pub mod poller;
 pub mod tracked;
 
+/// 2026-05-13 auto-port batch: Charter "self-improving" closer —
+/// turns `GAP_OPENED` events into queued port tasks, verifies the
+/// result against the charter-v2 gate, and records the outcome to
+/// the audit JSONL.
+pub mod auto_port;
+pub mod auto_port_gate;
+pub mod prompt;
+pub mod task_queue;
+
 pub use changelog::{parse_release_body, Changelog, ChangelogEntry, ChangeKind};
 pub use diff::{compare_pin_against_latest, Severity, VersionDiff};
 pub use event::{emit, GapEvent, GapEventSink, JsonlSink};
 pub use persistence::{WatchState, WatchStateEntry};
 pub use poller::{fetch_latest, GitHubClient, PollOutcome};
 pub use tracked::{load_from_workspace, TrackedProject};
+
+pub use auto_port::{
+    AutoPortDispatcher, AutoPortError, AutoPortStatus, DispatchedRecord, DispatchSummary,
+    DispatcherConfig, VerifySummary,
+};
+pub use auto_port_gate::{CharterBaseline, CharterGate, CharterV2Gate, VerifyResult};
+pub use prompt::{build_prompt, PortContext};
+pub use task_queue::{
+    DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput, TaskQueue, TaskQueueError,
+    TaskStatus,
+};
 
 #[cfg(test)]
 pub(crate) fn fixture_workspace() -> tempfile::TempDir {

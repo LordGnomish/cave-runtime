@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-upstream-watchd auto-port dispatcher launchd plist (macOS).
+
+  Runs `cave-upstream-watchd dispatch` every 15 minutes. The
+  dispatcher is idempotent — re-running picks up where the last
+  run left off via the on-disk `dispatched.jsonl` state.
+
+  Install:
+    cp scripts/com.cave.auto-port-dispatcher.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.cave.auto-port-dispatcher.plist
+
+  Uninstall:
+    launchctl unload -w ~/Library/LaunchAgents/com.cave.auto-port-dispatcher.plist
+
+  Kill switch (without unloading):
+    launchctl setenv CAVE_AUTOPORT_DISABLE 1
+    # Re-enable:
+    launchctl unsetenv CAVE_AUTOPORT_DISABLE
+
+  Backend selection:
+    The default below is `dryrun` so the dispatcher records what it
+    WOULD have submitted but never side-effects. Edit the
+    ProgramArguments to flip `--backend pump` (local LLM via the
+    qwen-pump queue dir) or `--backend opus` (Anthropic API; the
+    operator must also export ANTHROPIC_API_KEY in launchd's env).
+
+  Logs:
+    ~/Library/Application Support/cave-runtime/watchd/dispatch.{log,err}
+    State files live alongside the events.jsonl that
+    cave-upstream-watchd's poll subcommand writes:
+      ~/Library/Application Support/cave-runtime/watchd/events.jsonl
+      ~/Library/Application Support/cave-runtime/watchd/dispatched.jsonl
+      ~/Library/Application Support/cave-runtime/watchd/audit.jsonl
+
+  Cadence:
+    StartInterval = 900 (15 minutes). Longer than the poll plist
+    (5 min) because each dispatch run may shell out to a slow LLM
+    backend; 15 min keeps tail latency tolerable without saturating
+    the disk-pressure ceiling.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cave.auto-port-dispatcher</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/cave-upstream-watchd</string>
+    <string>dispatch</string>
+    <string>--backend</string>
+    <string>dryrun</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>900</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/dispatch.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/dispatch.err</string>
+
+  <!-- Operator: uncomment + populate when flipping to opus backend. -->
+  <!--
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>ANTHROPIC_API_KEY</key>
+    <string>sk-REPLACE_ME_DO_NOT_COMMIT</string>
+    <key>CAVE_OPUS_MODEL</key>
+    <string>claude-opus-4-7</string>
+  </dict>
+  -->
+
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+</dict>
+</plist>
