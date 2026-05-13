@@ -31,3 +31,6 @@ ring = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
+# SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
+quick-xml = "0.37"
+flate2    = "1.0"

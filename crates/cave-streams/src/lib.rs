@@ -33,6 +33,7 @@ pub mod error;
 pub mod idempotent_producer;
 pub mod incremental_rebalance;
 pub mod kafka_wire;
+pub mod kraft;
 pub mod log_compaction;
 pub mod mirror;
 pub mod partitioned_topic;

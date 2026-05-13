@@ -21,12 +21,12 @@ url     = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 12
+mapped_count   = 13
 skipped_count  = 16
-unmapped_count = 9
+unmapped_count = 8
 total          = 37
-fill_ratio     = 0.7568
-last_audit     = "2026-05-12"
+fill_ratio     = 0.7838
+last_audit     = "2026-05-13"
 infra_only     = false
 [module]
 name        = "cave-auth"
@@ -443,6 +443,19 @@ upstream_pkg = "keycloak:adapters/oidc/okta"
 local_files  = ["src/okta.rs"]
 note         = "Okta adapter (specialised OIDC profile)"
 
+[[mapped]]
+upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/"
+local_files  = [
+  "src/saml/mod.rs",
+  "src/saml/authn_request.rs",
+  "src/saml/response.rs",
+  "src/saml/metadata.rs",
+  "src/saml/binding.rs",
+  "src/saml/signature.rs",
+  "src/saml/broker.rs",
+]
+note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. XML c14n step is caller-pluggable; tracked as a known limitation."
+
 # ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
 
 [[skipped]]
@@ -521,9 +534,7 @@ reason       = "test-harness"
 
 # ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
 
-[[unmapped]]
-upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/"
-note         = "SAML 2.0 protocol — only OIDC implemented today. Tracked but not yet started."
+# SAML 2.0 promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 
 [[unmapped]]
 upstream_pkg = "keycloak:services/.../authorization/"

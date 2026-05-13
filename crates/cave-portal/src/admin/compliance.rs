@@ -2666,11 +2666,11 @@ version = "7.2.0"
         );
         let vault = m.get("cave-vault").unwrap();
         assert_eq!(vault.tier, "A");
-        // 2026-05-12 honest measured-parity expansion replaced the
-        // audit-doc's 0.6625 with the disk-derived 0.7838 (see
-        // docs/parity/cave-vault-port-2026-05-12.md).
+        // 2026-05-13 storage-backends sweep bumped 0.7838 → 0.8108
+        // (file + inmem backends landed; see
+        // docs/parity/cave-vault-port-2026-05-13.md).
         assert!(
-            vault.parity_ratio.unwrap() > 0.75 && vault.parity_ratio.unwrap() < 0.80,
+            vault.parity_ratio.unwrap() > 0.79 && vault.parity_ratio.unwrap() < 0.83,
             "got vault parity {:?}",
             vault.parity_ratio
         );

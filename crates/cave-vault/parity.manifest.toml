@@ -16,12 +16,12 @@ url     = "https://github.com/openbao/openbao"
 # audit, sys-API). Inventory hand-curated 2026-05-12 against the
 # OpenBao tree (`builtin/credential`, `builtin/logical`, `vault/`,
 # `audit/`, `physical/`, `sdk/`, `command/`).
-mapped_count   = 18
+mapped_count   = 19
 skipped_count  = 11
-unmapped_count = 8
+unmapped_count = 7
 total          = 37
-fill_ratio     = 0.7838
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8108
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -430,6 +430,11 @@ upstream_pkg = "openbao:vault/api/sys/"
 local_files  = ["src/api/sys.rs", "src/routes.rs"]
 note         = "/v1/sys/* endpoints — health, mounts, auth, policies, audit"
 
+[[mapped]]
+upstream_pkg = "openbao:physical/{file,inmem}/"
+local_files  = ["src/storage/mod.rs", "src/storage/file.rs", "src/storage/inmemory.rs"]
+note         = "Persistent storage — `Backend` trait + file backend (atomic write+rename, one file per key, path-traversal guarded) + in-memory backend. Remaining backends (raft/s3/consul/etcd/gcs/postgresql) tracked as unmapped."
+
 # ─── Skipped (11) ───────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -486,8 +491,8 @@ note         = "Terraform module for deployment"
 # ─── Unmapped (8) — honest gaps ─────────────────────────────────────────────
 
 [[unmapped]]
-upstream_pkg = "openbao:physical/"
-note         = "Storage backends (file, raft, consul, etcd, s3, gcs, postgresql). cave-vault uses an in-memory store today; persistence + raft replication are the biggest gap."
+upstream_pkg = "openbao:physical/{raft,s3,consul,etcd,gcs,postgresql}/"
+note         = "Remaining storage backends. Raft needs cluster-runtime integration; S3/GCS need cloud SDKs; consul/etcd would re-export cave-etcd via the trait. Tracked, not implemented."
 
 [[unmapped]]
 upstream_pkg = "openbao:vault/replication/"

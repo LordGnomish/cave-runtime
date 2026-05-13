@@ -25,6 +25,7 @@ pub mod keycloak;
 pub mod middleware;
 pub mod okta;
 pub mod rbac;
+pub mod saml;
 pub mod tokens;
 
 use cave_core::config::AuthProvider;

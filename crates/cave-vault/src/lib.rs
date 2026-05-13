@@ -4,6 +4,7 @@ pub mod core;
 pub mod engines;
 pub mod error;
 pub mod response;
+pub mod storage;
 pub mod token;
 
 // Earlier-generation top-level modules — the newer subdir versions
