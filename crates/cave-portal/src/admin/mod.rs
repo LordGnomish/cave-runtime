@@ -39,6 +39,12 @@ pub mod compliance;
 /// Record browser. Platform-only — walks `docs/adr/*.md` and
 /// excludes `docs/adr/internal/`.
 pub mod adr;
+
+/// 2026-05-13 Portal UX foundation: top bar + sidebar + breadcrumb
+/// + footer + command palette (Cmd+K) + keyboard shortcuts (g h/k/c)
+/// + dark mode toggle + tooltips + empty states + skeleton loaders
+/// + toast notifications. See `layout/mod.rs` for the entry points.
+pub mod layout;
 pub mod container_scan;
 pub mod contributions;
 pub mod controller_manager;
