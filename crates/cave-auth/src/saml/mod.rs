@@ -43,6 +43,7 @@
 pub mod authn_request;
 pub mod binding;
 pub mod broker;
+pub mod canonicalization;
 pub mod metadata;
 pub mod response;
 pub mod signature;

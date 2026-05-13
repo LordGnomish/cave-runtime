@@ -452,9 +452,10 @@ local_files  = [
   "src/saml/metadata.rs",
   "src/saml/binding.rs",
   "src/saml/signature.rs",
+  "src/saml/canonicalization.rs",
   "src/saml/broker.rs",
 ]
-note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. XML c14n step is caller-pluggable; tracked as a known limitation."
+note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exc-c14n canonicalization (rfc3741 subset) — caller-pluggable hook remains for strict-mode IdPs. (2026-05-13 c14n landed.)"
 
 # ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
 
