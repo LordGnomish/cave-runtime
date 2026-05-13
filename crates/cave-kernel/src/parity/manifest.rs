@@ -24,6 +24,54 @@ pub struct ParityManifest {
     pub tests: Vec<TestMapping>,
     #[serde(default)]
     pub surfaces: Vec<SurfaceMapping>,
+    /// Post-2026-05-12 package-level inventory + ratios. When present,
+    /// the calculator prefers `fill_ratio` as the overall parity score
+    /// over the legacy heuristic average of the 4 axes — the manifest
+    /// author's own measured value is more trustworthy than the kernel's
+    /// substring-match heuristic.
+    #[serde(default)]
+    pub parity: Option<ParitySection>,
+}
+
+/// `[parity]` block on a manifest (added 2026-05-12 alongside the new
+/// `[[mapped]]` / `[[partial]]` / `[[skipped]]` / `[[unmapped]]`
+/// package-level inventory). All fields are optional so legacy
+/// manifests (4-axis only) keep deserialising.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ParitySection {
+    /// `(mapped + partial + skipped) / total` — author-measured.
+    #[serde(default)]
+    pub fill_ratio: Option<f32>,
+    /// `(mapped + skipped) / total` — partials excluded.
+    #[serde(default)]
+    pub honest_ratio: Option<f32>,
+    /// Legacy spelling for `fill_ratio` (pre-2026-05-12 manifests).
+    #[serde(default)]
+    pub ratio: Option<f32>,
+    /// True for Cave-internal crates (no upstream parity axis applies).
+    /// The tracker uses this to surface "infra" instead of a number.
+    #[serde(default)]
+    pub infra_only: Option<bool>,
+    #[serde(default)]
+    pub mapped_count: Option<u32>,
+    #[serde(default)]
+    pub partial_count: Option<u32>,
+    #[serde(default)]
+    pub skipped_count: Option<u32>,
+    #[serde(default)]
+    pub unmapped_count: Option<u32>,
+    #[serde(default)]
+    pub total: Option<u32>,
+    #[serde(default)]
+    pub last_audit: Option<String>,
+}
+
+impl ParitySection {
+    /// Returns the best available ratio: `fill_ratio` if set,
+    /// otherwise legacy `ratio`, otherwise `None`.
+    pub fn measured_ratio(&self) -> Option<f32> {
+        self.fill_ratio.or(self.ratio)
+    }
 }
 
 impl ParityManifest {

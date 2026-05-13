@@ -122,13 +122,28 @@ impl<R: FileResolver> ParityCalculator<R> {
         let surface_parity = self.calc_surface_parity(manifest, source_root);
         let stubs_detected = self.resolver.count_stubs(source_root);
 
-        let scores = [
-            file_parity.score,
-            function_parity.score,
-            test_parity.score,
-            surface_parity.score,
-        ];
-        let overall = scores.iter().sum::<f32>() / 4.0;
+        // 2026-05-13: prefer the manifest's measured `[parity] fill_ratio`
+        // over the legacy 4-axis heuristic average. The heuristic does
+        // substring matches that pass too easily (it counts `fn name` as
+        // present even when the function has different generics, body, or
+        // wrong impl block); the on-disk `fill_ratio` is the author's
+        // own audited number, which the compliance dashboard already
+        // uses elsewhere. Burak reported "/upstream shows Cilium 100%"
+        // (heuristic) vs the dashboard's 92% (fill_ratio) — both refer
+        // to cave-net. Make them consistent.
+        //
+        // Falls back to the heuristic average when no `[parity]` block
+        // exists (legacy manifests) or when fill_ratio is unset.
+        let heuristic_overall = (file_parity.score
+            + function_parity.score
+            + test_parity.score
+            + surface_parity.score)
+            / 4.0;
+        let overall = manifest
+            .parity
+            .as_ref()
+            .and_then(|p| p.measured_ratio())
+            .unwrap_or(heuristic_overall);
 
         let gaps = self.collect_gaps(manifest, source_root);
 
@@ -265,8 +280,8 @@ impl<R: FileResolver> ParityCalculator<R> {
 mod tests {
     use super::*;
     use crate::parity::manifest::{
-        FileMapping, FunctionMapping, ModuleInfo, ParityManifest, SurfaceMapping, TestMapping,
-        UpstreamInfo,
+        FileMapping, FunctionMapping, ModuleInfo, ParityManifest, ParitySection, SurfaceMapping,
+        TestMapping, UpstreamInfo,
     };
     use std::collections::{HashMap, HashSet};
 
@@ -396,6 +411,7 @@ mod tests {
                     local_path: "/api/bar".into(),
                 },
             ],
+            parity: None,
         }
     }
 
@@ -609,6 +625,99 @@ mod tests {
             .with_source_pattern("src", "/api/bar");
         let report = ParityCalculator::new(r).calculate(&sample_manifest());
         assert!((report.overall - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn overall_prefers_manifest_fill_ratio_over_heuristic() {
+        // Regression for the Cilium-100% display bug (2026-05-13).
+        // Before the fix, /upstream tracker over-reported cave-net as
+        // 100% because all 4 heuristic axes' substring matches passed,
+        // while the on-disk fill_ratio was 0.9179. Both surfaces
+        // (compliance dashboard + /upstream tracker) must show the
+        // same number now — the manifest's measured fill_ratio wins.
+        let r = MockResolver::new()
+            .with_file("src/foo.rs")
+            .with_file("src/bar.rs")
+            .with_file_pattern("src/foo.rs", "fn foo")
+            .with_file_pattern("src/foo.rs", "fn bar")
+            .with_source_pattern("src", "fn test_foo")
+            .with_source_pattern("src", "fn test_bar")
+            .with_source_pattern("src", "/api/foo")
+            .with_source_pattern("src", "/api/bar");
+        let mut manifest = sample_manifest();
+        manifest.parity = Some(ParitySection {
+            fill_ratio: Some(0.9179),
+            honest_ratio: Some(0.9179),
+            ratio: None,
+            infra_only: Some(false),
+            mapped_count: Some(42),
+            partial_count: Some(0),
+            skipped_count: Some(81),
+            unmapped_count: Some(11),
+            total: Some(134),
+            last_audit: Some("2026-05-13".into()),
+        });
+        let report = ParityCalculator::new(r).calculate(&manifest);
+        // Heuristic alone would give 1.0; manifest fill_ratio wins.
+        assert!(
+            (report.overall - 0.9179).abs() < 1e-4,
+            "expected overall = manifest fill_ratio 0.9179, got {}",
+            report.overall
+        );
+    }
+
+    #[test]
+    fn overall_legacy_ratio_field_recognised() {
+        // Pre-2026-05-12 manifests used `ratio` instead of `fill_ratio`.
+        // The reader treats them as synonymous (measured_ratio falls
+        // back to ratio when fill_ratio is None).
+        let r = MockResolver::new(); // empty resolver → heuristic = 0
+        let mut manifest = sample_manifest();
+        manifest.parity = Some(ParitySection {
+            fill_ratio: None,
+            ratio: Some(0.42),
+            ..Default::default()
+        });
+        let report = ParityCalculator::new(r).calculate(&manifest);
+        assert!((report.overall - 0.42).abs() < 1e-4);
+    }
+
+    #[test]
+    fn overall_falls_back_to_heuristic_when_no_parity_block() {
+        // Back-compat: manifests without a [parity] block keep the
+        // legacy 4-axis heuristic. Test re-asserts the same
+        // expectation as overall_one_when_all_present.
+        let r = MockResolver::new()
+            .with_file("src/foo.rs")
+            .with_file("src/bar.rs")
+            .with_file_pattern("src/foo.rs", "fn foo")
+            .with_file_pattern("src/foo.rs", "fn bar")
+            .with_source_pattern("src", "fn test_foo")
+            .with_source_pattern("src", "fn test_bar")
+            .with_source_pattern("src", "/api/foo")
+            .with_source_pattern("src", "/api/bar");
+        let mut manifest = sample_manifest();
+        manifest.parity = None;
+        let report = ParityCalculator::new(r).calculate(&manifest);
+        assert!((report.overall - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn overall_parity_section_without_ratio_falls_back_to_heuristic() {
+        // [parity] block present but measured_ratio is None — fall back
+        // to heuristic.
+        let r = MockResolver::new()
+            .with_file("src/foo.rs")
+            .with_file("src/bar.rs");
+        // 2 of 2 files match, 0 functions/tests/surfaces → heuristic = 0.25.
+        let mut manifest = sample_manifest();
+        manifest.parity = Some(ParitySection {
+            fill_ratio: None,
+            ratio: None,
+            ..Default::default()
+        });
+        let report = ParityCalculator::new(r).calculate(&manifest);
+        assert!((report.overall - 0.25).abs() < f32::EPSILON);
     }
 
     // ── gaps ──────────────────────────────────────────────────────────────────
