@@ -412,9 +412,12 @@ CAVE_END
 
     #[tokio::test]
     async fn timeseries_pads_empty_days() {
+        let _g = crate::portal::WORKSPACE_ROOT_TEST_GUARD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         // Even if we provide no commits at all the response must contain
         // exactly N day rows so the chart axis is continuous.
-        // SAFETY: tests run sequentially in the same binary.
+        // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__"); }
         let resp = api_timeseries(Query(TimeseriesQuery { days: 5 })).await;
         let v: serde_json::Value = serde_json::to_value(&resp.0).unwrap();
@@ -423,7 +426,10 @@ CAVE_END
 
     #[tokio::test]
     async fn authors_endpoint_returns_all_buckets() {
-        // SAFETY: tests run sequentially in the same binary.
+        let _g = crate::portal::WORKSPACE_ROOT_TEST_GUARD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", "/__no_such_dir_for_test__"); }
         let resp = api_authors().await;
         let v: serde_json::Value = serde_json::to_value(&resp.0).unwrap();

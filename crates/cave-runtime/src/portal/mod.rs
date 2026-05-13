@@ -31,3 +31,16 @@ pub fn workspace_root() -> std::path::PathBuf {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
 }
+
+/// Process-wide test-only mutex that the
+/// `adr::tests` / `upstream::tests` / `attribution::tests` modules
+/// all lock before mutating the `CAVE_WORKSPACE_ROOT` env var.
+///
+/// `cargo test` runs `#[tokio::test]`s in parallel; without this
+/// guard one test's `set_var` races another's read, producing flaky
+/// `assertion failed: v["total"].as_u64().unwrap() >= 3` panics.
+/// The guard serialises only the env-var-mutating tests; the pure
+/// unit tests above don't take it.
+#[cfg(test)]
+pub(crate) static WORKSPACE_ROOT_TEST_GUARD: std::sync::Mutex<()> =
+    std::sync::Mutex::new(());
