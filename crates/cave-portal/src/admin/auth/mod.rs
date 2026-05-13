@@ -3,7 +3,21 @@
 //! can see per-realm utilisation at a glance, matching the upstream's
 //! `Sessions` view.
 //!
+//! Tab layout — mirrors the Keycloak Admin Console:
+//!
+//! * [`realms`]   — Realm Settings
+//! * [`clients`]  — OIDC client registrations
+//! * [`users`]    — per-realm user roster
+//! * [`sessions`] — per-session detail view
+//! * [`events`]   — synthesised audit-log trail
+//!
 //! Upstream UI: <https://www.keycloak.org/documentation>
+
+pub mod clients;
+pub mod events;
+pub mod realms;
+pub mod sessions;
+pub mod users;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};

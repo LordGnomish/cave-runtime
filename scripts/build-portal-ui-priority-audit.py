@@ -198,6 +198,18 @@ COMPLETE: set[str] = {
     "cave-controller-manager",
     "cave-etcd",
     "cave-scheduler",
+    # 2026-05-13 fourth batch (feat/portal-cli-streams-auth-batch4):
+    # five P1 admin pages promoted via folder split + 5 tabs each.
+    # * cave-auth     → admin/auth/    — realms / clients / users / sessions / events
+    # * cave-streams  → admin/streams/ — topics / brokers / consumer_groups / partitions / acls
+    # * cave-erp      → admin/erp/     — invoices / inventory / accounting / hr / projects
+    # * cave-crm      → admin/crm/     — contacts / deals / activities / workflows / reports
+    # * cave-trivy    → admin/container_scan/ — vulnerabilities / images / policies / history / reports
+    "cave-auth",
+    "cave-streams",
+    "cave-erp",
+    "cave-crm",
+    "cave-container-scan",
 }
 
 # Some admin pages live under a URL/short-name that differs from the
@@ -208,6 +220,7 @@ PORTAL_UI_OVERRIDE: dict[str, str] = {
     "cave-dashboard": "grafana",
     "cave-metrics": "prometheus",
     "cave-apiserver": "k8s_dashboard",
+    "cave-container-scan": "container_scan",
 }
 
 SCORE_VALUE = {"none": 0, "scaffold": 25, "partial": 60, "complete": 100}

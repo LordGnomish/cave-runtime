@@ -3,7 +3,21 @@
 //! the `trivy image` JSON output as a per-image table with severity
 //! filtering and aggregate counters.
 //!
+//! Tab layout — mirrors the Trivy CLI output sections:
+//!
+//! * [`vulnerabilities`] — per-scan CVE table (default landing)
+//! * [`images`]          — deduplicated image roster
+//! * [`policies`]        — admission gates derived from scans
+//! * [`history`]         — chronological scan log
+//! * [`reports`]         — per-severity roll-up
+//!
 //! Upstream: <https://trivy.dev/>
+
+pub mod history;
+pub mod images;
+pub mod policies;
+pub mod reports;
+pub mod vulnerabilities;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell, table};
