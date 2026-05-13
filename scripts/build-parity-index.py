@@ -2,6 +2,14 @@
 """
 Parse `docs/parity/full-audit-2026-05-01.md` into `docs/parity/parity-index.json`.
 
+Source-of-truth ordering for the per-crate `parity_ratio` (Fix-A,
+2026-05-13): **manifest first, audit doc fallback**. Audit doc is
+still the source of truth for tier classification, upstream
+identity, and the "what's missing" notes; those rarely change. The
+ratio is the one number that drifts every time a new file lands or
+an audit re-measures a crate, so we read it live from the on-disk
+manifest's `[parity] fill_ratio` (or legacy `ratio`).
+
 Output schema:
 {
   "generated_from": "docs/parity/full-audit-2026-05-01.md",
@@ -10,6 +18,9 @@ Output schema:
     "<crate-name>": {
       "tier": "100" | "A" | "B" | "C" | "D1" | "D2" | "E",
       "parity_ratio": float | null,       # null = not measurable
+      "parity_ratio_source": "manifest"   # disk manifest fill_ratio/ratio
+                          | "audit"       # audit-doc snapshot
+                          | "none",       # never measured
       "manifest_filled": bool | null,     # null = no manifest
       "cave_src_loc": int | null,         # from audit table for tier C/D
       "upstream": "org/repo" | null,
@@ -135,6 +146,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "100",
             "parity_ratio": 1.0,
+            "parity_ratio_source": "audit",
             "manifest_filled": True,
             "cave_src_loc": None,
             "upstream": org_repo,
@@ -154,6 +166,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "A",
             "parity_ratio": ratio,
+            "parity_ratio_source": "audit" if ratio is not None else "none",
             "manifest_filled": True,
             "cave_src_loc": None,
             "upstream": org_repo,
@@ -173,6 +186,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "B",
             "parity_ratio": ratio,
+            "parity_ratio_source": "audit" if ratio is not None else "none",
             "manifest_filled": True,
             "cave_src_loc": None,
             "upstream": org_repo,
@@ -192,6 +206,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "C",
             "parity_ratio": 0.0,
+            "parity_ratio_source": "audit",
             "manifest_filled": False,
             "cave_src_loc": loc,
             "upstream": org_repo,
@@ -210,6 +225,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "D1",
             "parity_ratio": 0.0,
+            "parity_ratio_source": "audit",
             "manifest_filled": False,
             "cave_src_loc": loc,
             "upstream": org_repo,
@@ -228,6 +244,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "D2",
             "parity_ratio": None,
+            "parity_ratio_source": "none",
             "manifest_filled": None,
             "cave_src_loc": loc,
             "upstream": None,
@@ -244,6 +261,7 @@ def parse_audit(md_text: str) -> dict[str, dict]:
         crates[name] = {
             "tier": "E",
             "parity_ratio": None,
+            "parity_ratio_source": "none",
             "manifest_filled": None,
             "cave_src_loc": None,
             "upstream": None,
@@ -360,6 +378,7 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
             crates[name] = {
                 "tier": "C",
                 "parity_ratio": None,
+                "parity_ratio_source": "none",
                 "manifest_filled": None,
                 "cave_src_loc": None,
                 "upstream": None,
@@ -382,30 +401,24 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
             entry["manifest_filled"] = True
             new_filled += 1
             flipped += 1
-        # Overlay disk-measured ratio when the on-disk `[parity]` block
-        # carries a `last_audit` newer than the audit-doc snapshot
-        # (`2026-05-01`). A freshly measured ratio is authoritative —
-        # including the case where the new measurement downgrades a
-        # stale 1.0 self-reported value. We still refuse to downgrade
-        # without a newer audit date, so a half-edited manifest cannot
-        # accidentally erase audit-doc data.
+        # Fix-A 2026-05-13: manifest is the **primary** source of
+        # truth for parity_ratio. Whenever the on-disk
+        # `[parity] fill_ratio` (or legacy `ratio`) is present, it
+        # wins over the audit-doc snapshot — including the case where
+        # the manifest is older than the doc, because the manifest is
+        # what the per-crate parity work is updating and the doc is a
+        # frozen Wave-3 capture from 2026-05-01.
+        #
+        # We surface `parity_ratio_source = "manifest"` so the
+        # compliance dashboard can render where the number came from.
         disk_ratio = disk.get("parity_ratio_disk")
-        disk_audit = disk.get("last_audit_disk")
         if disk_ratio is not None:
             audit_ratio = entry.get("parity_ratio")
-            newer_audit = disk_audit is not None and disk_audit > "2026-05-01"
-            should_overlay = (
-                # New audit always wins (honest downgrade allowed).
-                newer_audit
-                # Otherwise, only allow strict upgrades from None / 0.
-                or (
-                    audit_ratio is None
-                    or (audit_ratio == 0.0 and disk_ratio > 0.0)
-                )
-            )
-            if should_overlay and disk_ratio != audit_ratio:
+            if disk_ratio != audit_ratio:
                 entry["parity_ratio"] = disk_ratio
                 ratio_overrides += 1
+            entry["parity_ratio_source"] = "manifest"
+            entry["last_audit_disk"] = disk.get("last_audit_disk")
         # Surface infra_only signal from disk for E-tier entries.
         if disk.get("infra_only_disk"):
             entry["infra_only"] = True

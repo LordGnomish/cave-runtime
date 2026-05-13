@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-upstream-watchd launchd plist (macOS).
+
+  Install:
+    cp scripts/com.cave.upstream-watchd.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.cave.upstream-watchd.plist
+
+  Uninstall:
+    launchctl unload -w ~/Library/LaunchAgents/com.cave.upstream-watchd.plist
+    rm ~/Library/LaunchAgents/com.cave.upstream-watchd.plist
+
+  Logs:
+    ~/Library/Application Support/cave-runtime/watchd/watchd.log
+    ~/Library/Application Support/cave-runtime/watchd/watchd.err
+
+  Environment:
+    GITHUB_TOKEN must be set in the system keychain or as a launchd
+    `EnvironmentVariables` key (NOT shown here — the operator should
+    edit the copy in LaunchAgents/ rather than commit a token).
+
+  Cadence:
+    StartInterval = 300 seconds = 5 minutes. Matches Burak's
+    self-healing/self-improving Charter: any new upstream release is
+    detected and surfaced as a GAP_OPENED event within five minutes
+    of being published.
+
+  Linux equivalent:
+    A systemd timer + service should be added under
+    `deploy/systemd/cave-upstream-watchd.{service,timer}` when the
+    daemon is ready for the Linux production path. The TOML config
+    file shape + binary CLI are identical.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cave.upstream-watchd</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/cave-upstream-watchd</string>
+    <string>poll</string>
+  </array>
+
+  <!-- 5-minute poll cadence per Burak's spec. -->
+  <key>StartInterval</key>
+  <integer>300</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/watchd.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/watchd.err</string>
+
+  <!-- Operator: replace with `pbpaste` of a token, then `chmod 600`. -->
+  <!--
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>GITHUB_TOKEN</key>
+    <string>ghp_REPLACE_ME_DO_NOT_COMMIT</string>
+  </dict>
+  -->
+
+  <!-- Lower priority so the daemon doesn't compete with the runtime. -->
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>5</integer>
+</dict>
+</plist>
