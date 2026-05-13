@@ -1279,6 +1279,49 @@ mod router_tests {
     }
 
     #[tokio::test]
+    async fn admin_compliance_route_renders_behavioral_parity_card() {
+        // End-to-end mount smoke: drive the router through `/admin/compliance`
+        // with a forged platform_admin JWT extension (the handler is
+        // platform-only since the persona-fix batch on 2026-05-13).
+        let (_cite, _t) = portal_test_ctx!(
+            "plugins/tech-insights/src/components/Scorecards/Behavioral.tsx",
+            "complianceRouteSmoke",
+            "acme"
+        );
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/compliance?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp).await;
+        assert!(
+            body.contains("Behavioral Parity"),
+            "expected Behavioral Parity card in live render"
+        );
+        assert!(
+            body.contains(">behavioral<"),
+            "expected behavioral column header in live render"
+        );
+        // Source-of-truth: at least one of the 5 audited crates surfaces
+        // a per-row count (cave-scheduler is 13/16 at landing time).
+        // We assert the structural shape, not the literal count, so the
+        // test stays stable as audits expand.
+        assert!(
+            body.contains("upstream tests"),
+            "expected behavioral card explanatory text"
+        );
+    }
+
+    #[tokio::test]
     async fn etcd_route_renders_only_owner_kv_when_tenant_query_set() {
         let (_cite, _t) = portal_test_ctx!(
             "plugins/explore/src/components/Tabs/DocsTab.tsx",

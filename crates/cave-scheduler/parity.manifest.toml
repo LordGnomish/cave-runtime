@@ -877,3 +877,153 @@ loc          = 850
 priority     = "P0"
 notes        = "Folder split: queue/plugins/bindings/nodescores/events (23 tests). kube-scheduler observability parity."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Each [[upstream_test]] entry pairs ONE upstream test (Go t.Run subtest =
+# one entry) with the cave port. `status`:
+#   ported  — line-by-line behavioral port, asserts the same input→output
+#             equivalence class as the upstream case;
+#   partial — covers part of the upstream case (e.g. only the happy path);
+#   missing — declared in the audited scope but not yet ported.
+#
+# behavioral_parity_ratio (rendered on /admin/compliance) =
+#   ported_count / total entries here.
+# Scope-bounded: the denominator is the audited subset, not the entire
+# upstream test corpus. Honest Charter framing — expand the scope by
+# adding more `missing` entries.
+
+[behavioral_parity]
+audit_scope = "imagelocality + tainttoleration + nodeaffinity + nodename + nodeunschedulable + noderesources/least_allocated (v1.36.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/40MB_image_one_of_ten_nodes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_40mb_one_of_ten_below_threshold"
+status         = "ported"
+notes          = "Scaled 40MB × (1/10) = 4MB; below 23MB min → score 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/250MB_single_node_linear"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_250mb_single_node_linear"
+status         = "ported"
+notes          = "Linear region: (250 − 23) / (1000 − 23) × 100 ≈ 23."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/2000MB_saturates_max"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_2000mb_single_node_saturates"
+status         = "ported"
+notes          = "Image >> 1000MB max → MAX_NODE_SCORE."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/no_images_in_pod"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_no_images_in_pod"
+status         = "ported"
+notes          = "Empty container_images → score 0 short-circuit."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/multi_container_monotonic"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_multi_container_monotonic_sum"
+status         = "ported"
+notes          = "Adding a cached image must not decrease the score (monotonic)."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestImageLocalityPriority/scaled_score_formula"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_scaled_score_formula_holds"
+status         = "ported"
+notes          = "Driver-level formula: size × num_nodes / total_nodes."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "image_locality.go::constants"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_image_locality_constants_match"
+status         = "ported"
+notes          = "Threshold constants 23<<20 and 1000<<20 match upstream verbatim."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/no_schedule_blocks_when_not_tolerated"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_taint_toleration_no_schedule_blocks_when_not_tolerated"
+status         = "ported"
+notes          = "NoSchedule taint, no toleration → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationFilter/Exists_operator_tolerates_any_value"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_taint_toleration_exists_operator_tolerates_any_value"
+status         = "ported"
+notes          = "Exists toleration matches taint regardless of value."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeaffinity/node_affinity_test.go"
+upstream_name  = "TestNodeAffinity/required_NotIn_excludes_match"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_affinity_required_notin_excludes_match"
+status         = "ported"
+notes          = "Required NotIn operator: matching value → Unschedulable."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodename/node_name_test.go"
+upstream_name  = "TestNodeName/skip_when_unspecified"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_name_skip_when_unspecified"
+status         = "ported"
+notes          = "Pod.spec.nodeName absent → plugin returns Skip code."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/nodeunschedulable/node_unschedulable_test.go"
+upstream_name  = "TestNodeUnschedulable/cordoned_with_toleration_passes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_node_unschedulable_cordoned_with_toleration_passes"
+status         = "ported"
+notes          = "Toleration on node.kubernetes.io/unschedulable lets pod schedule."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/noderesources/least_allocated_test.go"
+upstream_name  = "TestLeastAllocated/more_free_resources_score_higher"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_least_allocated_more_free_scores_higher"
+status         = "ported"
+notes          = "Cold node (allocated=0) outscores hot node (allocated≈full)."
+
+# Honest "still missing" entries — these are declared in the audit
+# scope but not yet ported. They count toward the denominator and
+# pull the behavioral_parity_ratio down so the dashboard stays honest.
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/imagelocality/image_locality_test.go"
+upstream_name  = "TestNormalizeScore/cap_below_max"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Score-aggregation normalisation not yet wired through Framework.run_score."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/tainttoleration/taint_toleration_test.go"
+upstream_name  = "TestTaintTolerationScore/preferred_count_minus_intolerable"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "PreferNoSchedule scoring path not yet ported (filter-only TaintToleration today)."
+
+[[upstream_test]]
+upstream_path  = "pkg/scheduler/framework/plugins/podtopologyspread/scoring_test.go"
+upstream_name  = "TestPodTopologySpreadScore/skew_zero_full_score"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Topology spread Score not yet exposed via plugins.rs."

@@ -609,3 +609,148 @@ note         = "BookKeeper-backed durable log — Pulsar's storage substrate. ca
 upstream_pkg = "apache/pulsar:pulsar-io/"
 note         = "Pulsar IO connector framework (parallel to Kafka Connect). connect.rs covers Kafka Connect only."
 
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "UnifiedLog + ProducerStateManager + GroupCoordinator/range+roundrobin (kafka 4.2.0)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/appendRecordsAssignsMonotonicOffsets"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_append_assigns_monotonic_offsets"
+status         = "ported"
+notes          = "Each append returns the previous next_offset + 1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/readReturnsEntriesFromOffset"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_read_returns_entries_starting_at_offset"
+status         = "ported"
+notes          = "Read starts at the requested offset, returns all entries ≥ it."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/rollSegmentOnSizeThreshold"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_rolls_when_active_segment_exceeds_max_bytes"
+status         = "ported"
+notes          = "Segment rolls when next append would exceed max_segment_bytes."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/UnifiedLogTest.scala"
+upstream_name  = "UnifiedLogTest/truncateBeforeAdvancesLogStart"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_segment_log_truncate_before_advances_log_start_and_drops_entries"
+status         = "ported"
+notes          = "truncate_before(N) drops entries < N and advances log_start_offset."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/firstBatchAccepted"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_first_batch_accepted"
+status         = "ported"
+notes          = "Initial batch always accepted; last_sequence = base + count - 1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/inOrderBatchExtendsSequence"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_in_order_extends_sequence"
+status         = "ported"
+notes          = "base_sequence == last_sequence + 1 → Accepted, sequence advances."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/duplicateBatchDetected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_duplicate_returns_duplicate"
+status         = "ported"
+notes          = "base_sequence ≤ last_sequence → Duplicate (safe to ack)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/outOfOrderSequenceRejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_out_of_order_returns_out_of_order"
+status         = "ported"
+notes          = "base_sequence > last_sequence + 1 → OutOfOrder (Kafka error 28)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/lowerEpochFenced"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_lower_epoch_is_fenced"
+status         = "ported"
+notes          = "epoch < current → INVALID_PRODUCER_EPOCH-equivalent error."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/log/ProducerStateManagerTest.scala"
+upstream_name  = "ProducerStateManagerTest/higherEpochPersists"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_higher_epoch_persists_into_state"
+status         = "ported"
+notes          = "epoch > current → bump persisted broker-side."
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/transaction/ProducerIdManagerTest.scala"
+upstream_name  = "ProducerIdManagerTest/allocateMonotonic"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_producer_id_manager_allocates_monotonic_ids"
+status         = "ported"
+notes          = "allocate() returns strictly increasing IDs."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RangeAssignorTest.java"
+upstream_name  = "RangeAssignorTest/evenSplit"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_range_assignor_evenly_splits"
+status         = "ported"
+notes          = "Even split among members when partitions divide evenly."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RangeAssignorTest.java"
+upstream_name  = "RangeAssignorTest/unevenSplit_remainderToEarlierMembers"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_range_assignor_distributes_remainder_to_earlier_members"
+status         = "ported"
+notes          = "Remainder partitions assigned to alphabetically-earlier members."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/RoundRobinAssignorTest.java"
+upstream_name  = "RoundRobinAssignorTest/interleavesPartitions"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_roundrobin_interleaves_partitions"
+status         = "ported"
+notes          = "Partitions assigned in alternating fashion across sorted members."
+
+[[upstream_test]]
+upstream_path  = "clients/.../consumer/internals/ConsumerProtocolTest.java"
+upstream_name  = "ConsumerProtocolTest/protocol_aliases"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_rebalance_protocol_from_str_recognises_aliases"
+status         = "ported"
+notes          = "Round-robin, range, cooperative-sticky string aliases parsed correctly."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/joinGroupStableAfterRebalance"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Full join_group → sync_group → heartbeat lifecycle not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "core/.../coordinator/transaction/TransactionCoordinatorTest.scala"
+upstream_name  = "TransactionCoordinatorTest/commitTransactionMarkersWritten"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Transaction markers (COMMIT/ABORT) write path not yet covered behaviourally."
