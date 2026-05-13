@@ -1157,6 +1157,19 @@ pub struct AdminState {
     pub cluster_live: std::sync::Arc<crate::admin::cluster_live::ClusterLiveState>,
     pub onboarding: std::sync::Arc<crate::admin::onboarding::OnboardingState>,
     pub global_search: std::sync::Arc<crate::admin::global_search::GlobalSearchIndex>,
+
+    // ── 2026-05-13 P1 scratch pages ───────────────────────────────
+    pub iceberg_tables: RwLock<Vec<crate::admin::iceberg::IcebergTable>>,
+    pub mlflow_experiments: RwLock<Vec<crate::admin::mlflow::MlflowExperiment>>,
+    pub mlflow_runs: RwLock<Vec<crate::admin::mlflow::MlflowRun>>,
+    pub mlflow_models: RwLock<Vec<crate::admin::mlflow::RegisteredModel>>,
+    pub mlflow_model_versions: RwLock<Vec<crate::admin::mlflow::ModelVersion>>,
+    pub mlflow_deployments: RwLock<Vec<crate::admin::mlflow::ModelDeployment>>,
+    pub litellm_models: RwLock<Vec<crate::admin::litellm::LiteLlmModel>>,
+    pub litellm_routes: RwLock<Vec<crate::admin::litellm::LiteLlmRoute>>,
+    pub litellm_api_keys: RwLock<Vec<crate::admin::litellm::LiteLlmApiKey>>,
+    pub litellm_budgets: RwLock<Vec<crate::admin::litellm::LiteLlmBudget>>,
+    pub litellm_traffic: RwLock<Vec<crate::admin::litellm::LiteLlmTraffic>>,
 }
 
 impl Default for AdminState {
@@ -1335,6 +1348,17 @@ impl AdminState {
             global_search: std::sync::Arc::new(
                 crate::admin::global_search::GlobalSearchIndex::new(),
             ),
+            iceberg_tables: RwLock::new(Vec::new()),
+            mlflow_experiments: RwLock::new(Vec::new()),
+            mlflow_runs: RwLock::new(Vec::new()),
+            mlflow_models: RwLock::new(Vec::new()),
+            mlflow_model_versions: RwLock::new(Vec::new()),
+            mlflow_deployments: RwLock::new(Vec::new()),
+            litellm_models: RwLock::new(Vec::new()),
+            litellm_routes: RwLock::new(Vec::new()),
+            litellm_api_keys: RwLock::new(Vec::new()),
+            litellm_budgets: RwLock::new(Vec::new()),
+            litellm_traffic: RwLock::new(Vec::new()),
         }
     }
 

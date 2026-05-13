@@ -207,6 +207,11 @@ pub enum Permission {
     ClusterLiveRead,
     /// Submit a bulk command across multiple admin resources.
     BulkOpsSubmit,
+
+    // ── 2026-05-13 P1 scratch pages ───────────────────────────────────
+    IcebergRead,
+    MlflowRead,
+    LiteLlmRead,
 }
 
 impl Permission {
@@ -334,6 +339,9 @@ impl Permission {
             Permission::QuickActionTrigger => "portal.quickaction.trigger",
             Permission::ClusterLiveRead => "portal.cluster.live.read",
             Permission::BulkOpsSubmit => "portal.bulkops.submit",
+            Permission::IcebergRead => "iceberg.catalog.read",
+            Permission::MlflowRead => "mlflow.experiment.read",
+            Permission::LiteLlmRead => "litellm.proxy.read",
         }
     }
 }
