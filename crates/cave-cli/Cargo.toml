@@ -42,3 +42,4 @@ uuid.workspace = true
 [dev-dependencies]
 axum.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
+httpmock = "0.7"

@@ -57,6 +57,11 @@ pub struct LeaderInfo {
     pub role: String,
     pub current_term: Term,
     pub leader_id: Option<NodeId>,
+    /// HTTPS URL the client can issue writes to. Populated from the
+    /// peer registry when `leader_id` is known. `None` during an
+    /// election window or partition.
+    #[serde(default)]
+    pub leader_url: Option<String>,
     pub commit_index: LogIndex,
     pub last_applied: LogIndex,
     pub log_len: usize,
@@ -112,11 +117,14 @@ async fn handle_raft_rpc(
 
 async fn handle_leader_info(State(handle): State<RaftHandle>) -> Json<LeaderInfo> {
     let core = handle.core.lock().await;
+    let leader_id = core.leader();
+    let leader_url = leader_id.and_then(|id| handle.registry.url_for(id));
     Json(LeaderInfo {
         local_id: core.local_id,
         role: format!("{:?}", core.role()),
         current_term: core.current_term(),
-        leader_id: core.leader(),
+        leader_id,
+        leader_url,
         commit_index: core.commit_index(),
         last_applied: core.last_applied(),
         log_len: core.log_len(),
@@ -257,11 +265,14 @@ pub async fn run_driver(handle: RaftHandle, ca_pem: String) -> Result<()> {
 #[allow(dead_code)]
 pub async fn snapshot_leader_info(handle: &RaftHandle) -> LeaderInfo {
     let core = handle.core.lock().await;
+    let leader_id = core.leader();
+    let leader_url = leader_id.and_then(|id| handle.registry.url_for(id));
     LeaderInfo {
         local_id: core.local_id,
         role: format!("{:?}", core.role()),
         current_term: core.current_term(),
-        leader_id: core.leader(),
+        leader_id,
+        leader_url,
         commit_index: core.commit_index(),
         last_applied: core.last_applied(),
         log_len: core.log_len(),

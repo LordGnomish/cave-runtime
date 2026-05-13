@@ -289,19 +289,69 @@ async fn kv_put(
 
 async fn kv_delete_range(
     State(store): State<Arc<KvStore>>,
+    bridge: Option<Extension<SharedRaftBridge>>,
     headers: HeaderMap,
     Json(req): Json<DeleteRangeRequest>,
-) -> Result<Json<DeleteRangeResponse>, (StatusCode, String)> {
+) -> Response {
     let token = extract_token(&headers);
     let req = decode_delete_request(req);
-    store
-        .check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
-        .map_err(|e| (StatusCode::UNAUTHORIZED, e.to_string()))?;
+    if let Err(e) =
+        store.check_auth_token(token.as_deref(), req.key.as_bytes(), PermType::Write)
+    {
+        return (StatusCode::UNAUTHORIZED, e.to_string()).into_response();
+    }
+    // Multi-node Raft mode: propose-and-wait through the bridge.
+    if let Some(Extension(b)) = bridge {
+        match b
+            .propose_delete(req.key.clone(), req.range_end.clone())
+            .await
+        {
+            Ok(()) => {
+                // The bridge has already applied through the daemon;
+                // return an empty response shaped like the direct
+                // path so clients see header.revision and an empty
+                // prev_kvs slice.
+                let resp = DeleteRangeResponse {
+                    header: ResponseHeader::default(),
+                    deleted: 0,
+                    prev_kvs: Vec::new(),
+                };
+                return Json(resp).into_response();
+            }
+            Err(RaftBridgeError::NotLeader { leader_url }) => {
+                let mut r = (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    format!(
+                        "not leader; leader_url={}",
+                        leader_url.as_deref().unwrap_or("unknown")
+                    ),
+                )
+                    .into_response();
+                if let Some(url) = leader_url {
+                    if let Ok(hv) = axum::http::HeaderValue::from_str(&url) {
+                        r.headers_mut().insert(axum::http::header::LOCATION, hv);
+                    }
+                }
+                return r;
+            }
+            Err(RaftBridgeError::Timeout) => {
+                return (
+                    StatusCode::GATEWAY_TIMEOUT,
+                    "timed out waiting for raft commit+apply".to_string(),
+                )
+                    .into_response();
+            }
+            Err(RaftBridgeError::Internal(msg)) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, msg).into_response();
+            }
+        }
+    }
+    // Single-node mode: direct apply.
     let mut resp = store.delete_range(&req);
     for kv in &mut resp.prev_kvs {
         encode_kv(kv);
     }
-    Ok(Json(resp))
+    Json(resp).into_response()
 }
 
 async fn kv_txn(
@@ -1319,6 +1369,73 @@ mod tests {
         )
         .await;
         assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    #[tokio::test]
+    async fn kv_delete_range_leader_proposes_and_returns_200() {
+        let bridge = Arc::new(RecordingBridge::leader());
+        let (app, b) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/deleterange",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "range_end": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let calls = b.delete_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "/foo");
+        assert_eq!(calls[0].1, None);
+    }
+
+    #[tokio::test]
+    async fn kv_delete_range_follower_returns_503_with_location() {
+        let bridge = Arc::new(RecordingBridge::follower(Some(
+            "https://10.0.0.2:6443".to_string(),
+        )));
+        let (app, _) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/deleterange",
+            serde_json::json!({
+                "key": b64::encode(b"/foo"),
+                "range_end": null,
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            resp.headers()
+                .get(axum::http::header::LOCATION)
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "https://10.0.0.2:6443"
+        );
+    }
+
+    #[tokio::test]
+    async fn kv_delete_range_with_range_end_propagates_to_bridge() {
+        let bridge = Arc::new(RecordingBridge::leader());
+        let (app, b) = app_with_bridge(bridge);
+        let resp = post_json(
+            app,
+            "/api/etcd/v3/kv/deleterange",
+            serde_json::json!({
+                "key": b64::encode(b"/a"),
+                "range_end": b64::encode(b"/z"),
+                "prev_kv": false,
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let calls = b.delete_calls.lock().unwrap();
+        assert_eq!(calls[0].1.as_deref(), Some("/z"));
     }
 
     #[tokio::test]
