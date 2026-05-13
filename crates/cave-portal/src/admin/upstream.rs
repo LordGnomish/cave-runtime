@@ -15,6 +15,7 @@ use crate::admin::render::{escape, page_shell, table};
 use crate::admin::state::{scope, AdminState, UpstreamProject};
 use crate::admin::types::Cite;
 use cave_upstream_watchd::diff::Severity;
+use cave_upstream_watchd::auto_port::{AutoPortStatus, DispatchedRecord};
 use cave_upstream_watchd::event::{read_events, GapEvent, JsonlSink};
 use std::path::PathBuf;
 
@@ -198,13 +199,145 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, UpstreamVi
         })
         .collect();
     let watchd_panel = render_watchd_panel_in(ctx, &watchd_events_path(), 20);
+    let auto_port_panel = render_auto_port_panel_in(ctx, &dispatched_path(), 20);
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Upstream ({n})</h2>{tbl}</section>{watchd}"#,
+        r#"<section><h2 class="text-lg font-semibold mb-2">Upstream ({n})</h2>{tbl}</section>{watchd}{auto}"#,
         n = rows.len(),
         tbl = table(&["name", "repo", "version", "last_check"], &table_rows),
         watchd = watchd_panel,
+        auto = auto_port_panel,
     );
     Ok(page_shell(&format!("upstream · {}", escape(ctx.tenant.as_str())), &body))
+}
+
+/// Locate the auto-port dispatcher's `dispatched.jsonl`. Mirrors
+/// `AutoPortDispatcher::default_paths()` so the on-disk shape stays
+/// in sync.
+fn dispatched_path() -> PathBuf {
+    let (_events, dispatched, _audit) =
+        cave_upstream_watchd::AutoPortDispatcher::default_paths();
+    dispatched
+}
+
+/// Public read-side helper — tests + the portal panel both consume
+/// it. Newest-first ordering + a `max_rows` cap.
+pub fn read_dispatched(path: &std::path::Path, max_rows: usize) -> Vec<DispatchedRecord> {
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut out: Vec<DispatchedRecord> = text
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .filter_map(|l| serde_json::from_str::<DispatchedRecord>(l).ok())
+        .collect();
+    out.sort_by(|a, b| b.dispatched_at.cmp(&a.dispatched_at));
+    out.truncate(max_rows);
+    out
+}
+
+fn auto_port_status_class(s: &AutoPortStatus) -> &'static str {
+    match s {
+        AutoPortStatus::Merged => "bg-green-200 text-green-900",
+        AutoPortStatus::Dispatched | AutoPortStatus::Running => {
+            "bg-blue-200 text-blue-900"
+        }
+        AutoPortStatus::CharterFail => "bg-orange-200 text-orange-900",
+        AutoPortStatus::BackendFail => "bg-red-200 text-red-900",
+    }
+}
+
+fn auto_port_status_label(s: &AutoPortStatus) -> &'static str {
+    match s {
+        AutoPortStatus::Merged => "MERGED",
+        AutoPortStatus::Dispatched => "DISPATCHED",
+        AutoPortStatus::Running => "RUNNING",
+        AutoPortStatus::CharterFail => "CHARTER_FAIL",
+        AutoPortStatus::BackendFail => "BACKEND_FAIL",
+    }
+}
+
+/// Render the auto-port panel as HTML. Tenant persona filter
+/// matches the watchd panel — TenantAdmin only sees the 7 tenant-
+/// relevant modules; PlatformAdmin sees everything.
+pub fn render_auto_port_panel_in(
+    ctx: &RequestCtx,
+    state_path: &std::path::Path,
+    max_rows: usize,
+) -> String {
+    let mut records = read_dispatched(state_path, max_rows * 4);
+    if !ctx.persona.is_platform() {
+        records.retain(|r| is_tenant_relevant(&r.cave_module));
+    }
+    records.truncate(max_rows);
+
+    let n = records.len();
+    let table_rows: Vec<Vec<String>> = records
+        .iter()
+        .map(|r| {
+            let badge = format!(
+                r#"<span class="px-2 py-0.5 rounded text-xs {cls}">{lbl}</span>"#,
+                cls = auto_port_status_class(&r.status),
+                lbl = auto_port_status_label(&r.status),
+            );
+            let commit = r
+                .commit_sha
+                .as_deref()
+                .map(|s| s.chars().take(7).collect::<String>())
+                .unwrap_or_else(|| "-".to_string());
+            vec![
+                escape(&r.cave_module),
+                escape(&r.task_id),
+                escape(&r.backend),
+                badge,
+                commit,
+                escape(&r.target_branch),
+                r.dispatched_at.format("%Y-%m-%d %H:%M").to_string(),
+            ]
+        })
+        .collect();
+
+    let header = format!(
+        r#"<div class="flex items-center justify-between mb-2">
+                <h2 class="text-lg font-semibold">Auto-port dispatcher ({n})</h2>
+                <span class="text-xs text-zinc-500">source: <code>{src}</code></span>
+            </div>"#,
+        src = escape(state_path.display().to_string().as_str()),
+    );
+
+    let tenant_note = if !ctx.persona.is_platform() {
+        r#"<p class="text-xs text-zinc-500 mb-2">
+            Tenant view — only auto-port records for tenant-relevant
+            crates are shown. Charter `merged` events are platform-
+            wide; sign in as <code>platform_admin</code> for the full
+            audit trail.
+           </p>"#
+    } else {
+        ""
+    };
+
+    let table_html = if records.is_empty() {
+        "<p class=\"text-xs text-zinc-500\">No auto-port records yet — the dispatcher writes one row per dispatched gap (see <code>cave-upstream-watchd dispatch</code>).</p>".to_string()
+    } else {
+        table(
+            &[
+                "cave-module",
+                "task_id",
+                "backend",
+                "status",
+                "commit",
+                "branch",
+                "dispatched_at",
+            ],
+            &table_rows,
+        )
+    };
+
+    format!(
+        r#"<section class="mt-6 p-3 border rounded">{header}{note}{tbl}</section>"#,
+        header = header,
+        note = tenant_note,
+        tbl = table_html,
+    )
 }
 
 #[allow(dead_code)]
@@ -422,5 +555,150 @@ mod tests {
         assert!(is_tenant_relevant("cave-kubelet"));
         assert!(!is_tenant_relevant("cave-runtime"));
         assert!(!is_tenant_relevant("cave-apiserver"));
+    }
+
+    // ── 2026-05-13: auto-port panel ───────────────────────────
+
+    fn dispatched_record(
+        event_id: &str,
+        module: &str,
+        status: AutoPortStatus,
+        commit: Option<&str>,
+    ) -> DispatchedRecord {
+        use cave_upstream_watchd::charter_gate::CharterBaseline;
+        DispatchedRecord {
+            event_id: event_id.into(),
+            cave_module: module.into(),
+            backend: "dryrun".into(),
+            task_id: format!("dryrun-{event_id}"),
+            target_branch: format!("auto-port/{event_id}"),
+            status,
+            commit_sha: commit.map(str::to_string),
+            charter_report: None,
+            dispatched_at: chrono::Utc::now(),
+            last_checked_at: chrono::Utc::now(),
+            reason: None,
+            baseline: CharterBaseline {
+                crate_name: module.into(),
+                commit_sha_before: "0".repeat(40),
+                fill_ratio_before: 0.7,
+                workspace_stub_count_before: 0,
+            },
+        }
+    }
+
+    fn write_dispatched(path: &std::path::Path, records: &[DispatchedRecord]) {
+        let mut s = String::new();
+        for r in records {
+            s.push_str(&serde_json::to_string(r).unwrap());
+            s.push('\n');
+        }
+        std::fs::write(path, s).unwrap();
+    }
+
+    #[test]
+    fn auto_port_panel_renders_empty_when_no_records() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("dispatched.jsonl");
+        let plat = RequestCtx::developer_as(
+            "platform",
+            &[Permission::UpstreamRead],
+            Persona::PlatformAdmin,
+        );
+        let html = render_auto_port_panel_in(&plat, &path, 10);
+        assert!(html.contains("No auto-port records"));
+    }
+
+    #[test]
+    fn auto_port_panel_renders_status_badges_for_each_lifecycle_state() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("dispatched.jsonl");
+        write_dispatched(
+            &path,
+            &[
+                dispatched_record("e1", "cave-x", AutoPortStatus::Merged, Some("abcdef0123456789abcdef0123456789abcdef01")),
+                dispatched_record("e2", "cave-y", AutoPortStatus::Dispatched, None),
+                dispatched_record("e3", "cave-z", AutoPortStatus::CharterFail, Some("0011223344556677889900112233445566778899")),
+                dispatched_record("e4", "cave-w", AutoPortStatus::BackendFail, None),
+            ],
+        );
+        let plat = RequestCtx::developer_as(
+            "platform",
+            &[Permission::UpstreamRead],
+            Persona::PlatformAdmin,
+        );
+        let html = render_auto_port_panel_in(&plat, &path, 10);
+        assert!(html.contains("MERGED"));
+        assert!(html.contains("DISPATCHED"));
+        assert!(html.contains("CHARTER_FAIL"));
+        assert!(html.contains("BACKEND_FAIL"));
+        // Commit shortened to 7 chars.
+        assert!(html.contains("abcdef0"));
+    }
+
+    #[test]
+    fn auto_port_panel_tenant_persona_filters_to_tenant_relevant_modules() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("dispatched.jsonl");
+        write_dispatched(
+            &path,
+            &[
+                dispatched_record("e1", "cave-runtime", AutoPortStatus::Merged, None),
+                dispatched_record("e2", "cave-vault", AutoPortStatus::Merged, None),
+            ],
+        );
+        let tenant = RequestCtx::developer_as(
+            "tenant1",
+            &[Permission::UpstreamRead],
+            Persona::TenantAdmin,
+        );
+        let html = render_auto_port_panel_in(&tenant, &path, 10);
+        assert!(html.contains("cave-vault"));
+        assert!(!html.contains("cave-runtime"));
+        assert!(html.contains("Tenant view"));
+    }
+
+    #[test]
+    fn auto_port_panel_max_rows_cap_respected() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("dispatched.jsonl");
+        let many: Vec<DispatchedRecord> = (0..30)
+            .map(|i| {
+                dispatched_record(
+                    &format!("e{i}"),
+                    &format!("cave-{i}"),
+                    AutoPortStatus::Dispatched,
+                    None,
+                )
+            })
+            .collect();
+        write_dispatched(&path, &many);
+        let plat = RequestCtx::developer_as(
+            "platform",
+            &[Permission::UpstreamRead],
+            Persona::PlatformAdmin,
+        );
+        let html = render_auto_port_panel_in(&plat, &path, 5);
+        assert!(html.contains("Auto-port dispatcher (5)"));
+    }
+
+    #[test]
+    fn read_dispatched_returns_newest_first() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("dispatched.jsonl");
+        let older = dispatched_record("e-old", "cave-x", AutoPortStatus::Merged, None);
+        let mut newer = dispatched_record("e-new", "cave-y", AutoPortStatus::Merged, None);
+        newer.dispatched_at = older.dispatched_at + chrono::Duration::seconds(10);
+        write_dispatched(&path, &[older, newer]);
+        let out = read_dispatched(&path, 10);
+        assert_eq!(out[0].cave_module, "cave-y");
+        assert_eq!(out[1].cave_module, "cave-x");
+    }
+
+    #[test]
+    fn read_dispatched_missing_file_returns_empty() {
+        let path = std::path::PathBuf::from("/tmp/__no_such_dispatched_file__.jsonl");
+        let out = read_dispatched(&path, 10);
+        assert!(out.is_empty());
     }
 }

@@ -23,6 +23,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dirs = "5"
 semver = "1"
+async-trait = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 httpmock = "0.7"
