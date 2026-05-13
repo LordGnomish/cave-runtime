@@ -18,12 +18,12 @@ url     = "https://github.com/istio/istio"
 # istioctl/, operator/, cni/, pkg/) plus the ztunnel repo.
 # The ambient-mode layer in `src/ambient/` is the cave-side entry
 # point; legacy control-plane bits live alongside.
-mapped_count   = 14
+mapped_count   = 17
 skipped_count  = 13
-unmapped_count = 8
+unmapped_count = 5
 total          = 35
-fill_ratio     = 0.7714
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8571
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -215,9 +215,10 @@ note         = "mesh CLI subcommand"
 
 # ─── Unmapped (8) — honest gaps ────────────────────────────────────────────
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
-note         = "WASM filter chain (EnvoyFilter / WasmPlugin). Cave-mesh has no WASM extension surface."
+local_files  = ["src/wasm_plugin.rs"]
+note         = "WasmPlugin CRD lifecycle + filter-chain projection: PluginPhase (Authn / Authz / Stats / Unspecified), URL/sha256 validation (https requires sha; oci is sha-by-digest), reconcile against workload-label selector, project_chain emits a stable phase+priority+name ordering ready for xDS proxy translation. Honest scope cut: no embedded wasmtime/wasmer runtime — the actual bytecode execution stays in the bound envoy."
 
 [[unmapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/federation/"
@@ -227,9 +228,10 @@ note         = "Multi-network federation gateway. Single-network today."
 upstream_pkg = "istio/istio:pilot/pkg/networking/serviceentry/external/"
 note         = "VM-mesh expansion — non-k8s workloads (VirtualMachine + WorkloadEntry CRD). Not implemented."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "istio/istio:security/pkg/jwt/"
-note         = "JWT validation pipeline (cache + JWKS refresh). auth.rs has basic JWT; full pipeline is a gap."
+local_files  = ["src/jwks.rs", "src/auth.rs"]
+note         = "JWT validation pipeline: JwkSet parser (RFC 7517) covering RSA / EC / oct kty, pluggable JwksTransport (production reqwest + tests StubTransport), per-issuer JwksCache with TTL refresh + force_refresh, RFC 7515 §4.1.4 single-key kid-less lookup, IssuerValidation builder that drives jsonwebtoken::Validation with audience / issuer / leeway. auth.rs already enforces RequestAuthentication/AuthorizationPolicy semantics; this module covers key resolution."
 
 [[unmapped]]
 upstream_pkg = "istio/istio:telemetry/api/v1/AnalyticsClient"
@@ -239,9 +241,10 @@ note         = "Backend analytics protocol — sends mesh usage to Istio team. O
 upstream_pkg = "istio/istio:istioctl/pkg/{analyze,debug}/"
 note         = "Static analysis + diagnose. Distinct from runtime mesh."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/serviceregistry/serviceentry/"
-note         = "ServiceEntry CRD — manual service catalog. registry.rs handles auto-discovery only."
+local_files  = ["src/service_entry.rs", "src/models.rs"]
+note         = "ServiceEntry CRD manager: create / get / list / update / delete with validation (hosts/ports non-empty, Static/DNS modes require endpoints), resolve(host, port_name) under all four ServiceResolution modes (None passthrough / Static / Dns first-record / DnsRoundRobin cycle), pluggable DnsResolver trait so tests stay offline. registry.rs continues to handle auto-discovery; this module owns the operator-curated entries."
 
 [[unmapped]]
 upstream_pkg = "ztunnel:src/state/policy/L7"

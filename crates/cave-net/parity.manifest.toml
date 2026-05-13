@@ -19,7 +19,7 @@ org     = "cilium"
 repo    = "cilium"
 version = "v1.19.3"
 # inventory fetched via GitHub API (recursive=1)
-upstream_files_total       = 2827  # non-vendor non-generated non-test .go
+upstream_files_total           = 134  # non-vendor non-generated non-test .go
 upstream_pkg_dirs_total    = 118   # distinct pkg/<name>/ directories
 upstream_bpf_c_h_files     = 302   # bpf/**/*.{c,h}
 name    = "Cilium"
@@ -38,23 +38,20 @@ tests_passing     = 1759
 todos_unimpl      = 0     # 0 todo!/unimplemented! (verified by rg)
 
 [parity]
-mapped_count    = 117
+mapped_count    = 106
 skipped_count   = 17
-unmapped_count  = 0
+unmapped_count  = 11
 total           = 134
-fill_ratio      = 1.0000
+fill_ratio      = 0.9179
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
-last_audit  = "2026-05-12"
+last_audit  = "2026-05-13"
 infra_only  = false
 
 [[mapped]]
 upstream_pkg = "pkg/act/"
 local_files  = ["src/cilium/act.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/alibabacloud/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/alignchecker/"
@@ -72,13 +69,7 @@ local_files  = ["src/cilium/idiom_map.rs"]
 upstream_pkg = "pkg/auth/"
 local_files  = ["src/cilium/auth.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/aws/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/azure/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/backoff/"
@@ -88,9 +79,6 @@ local_files  = ["src/cilium/idiom_map.rs"]
 upstream_pkg = "pkg/bgp/"
 local_files  = ["src/cilium/bgp_types.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/bpf/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/bufuuid/"
@@ -100,9 +88,6 @@ local_files  = ["src/cilium/idiom_map.rs"]
 upstream_pkg = "pkg/byteorder/"
 local_files  = ["src/cilium/idiom_map.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/cgroups/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/cidr/"
@@ -176,9 +161,6 @@ local_files  = ["src/cilium/idiom_map.rs"]
 upstream_pkg = "pkg/dynamiclifecycle/"
 local_files  = ["src/cilium/idiom_map.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/ebpf/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/egressgateway/"
@@ -328,9 +310,6 @@ local_files  = ["src/cilium/maglev.rs"]
 upstream_pkg = "pkg/maps/"
 local_files  = ["src/cilium/bpf_dump.rs", "src/cilium/bpfmaps.rs", "src/cilium/conntrack.rs", "src/cilium/maps_gc.rs", "src/cilium/policy.rs", "src/cilium/tunnel.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/mcastmanager/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/metrics/"
@@ -340,25 +319,16 @@ local_files  = ["src/cilium/metrics.rs"]
 upstream_pkg = "pkg/monitor/"
 local_files  = ["src/cilium/hubble_metrics.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/mountinfo/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/mtu/"
 local_files  = ["src/cilium/tunnel.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/multicast/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/murmur3/"
 local_files  = ["src/cilium/idiom_map.rs"]
 
-[[mapped]]
-upstream_pkg = "pkg/netns/"
-local_files  = ["src/cilium/idiom_map.rs"]
 
 [[mapped]]
 upstream_pkg = "pkg/node/"
@@ -500,9 +470,6 @@ local_files  = ["src/cilium/xds.rs"]
 upstream_pkg = "pkg/ztunnel/"
 local_files  = ["src/cilium/ztunnel.rs"]
 
-[[mapped]]
-upstream_pkg = "bpf/"
-local_files  = ["src/cilium/binary_cites.rs"]
 
 [[mapped]]
 upstream_pkg = "clustermesh-apiserver/"
@@ -603,6 +570,50 @@ category      = "CLI"
 reason        = "codegen + spec tools"
 
 # ─── Unmapped (acknowledged port gaps) ───────────────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "bpf/"
+note         = "Real eBPF bytecode generation (302 C/H files). cave-net ports the semantic state machines (conntrack/nat/lb/srv6/ipv6/bpf_loader) but does not emit BPF bytecode — would need libbpf + clang + kernel-verifier integration on the build host. Wire-faithful exclusion #1."
+
+[[unmapped]]
+upstream_pkg = "pkg/aws/"
+note         = "Cloud-provider IPAM (ENI). Cluster-pool IPAM is the supported path; AWS ENI needs the AWS SDK + credentials story. Wire-faithful exclusion #4."
+
+[[unmapped]]
+upstream_pkg = "pkg/azure/"
+note         = "Cloud-provider IPAM (Azure). Cluster-pool IPAM is the supported path; Azure-IPAM needs the Azure SDK. Wire-faithful exclusion #4."
+
+[[unmapped]]
+upstream_pkg = "pkg/alibabacloud/"
+note         = "Cloud-provider IPAM (AlibabaCloud). Cluster-pool IPAM is the supported path; needs the Alibaba SDK. Wire-faithful exclusion #4."
+
+[[unmapped]]
+upstream_pkg = "pkg/bpf/"
+note         = "Userspace eBPF map/program management. cave-net keeps a semantic state-machine port (in-process map model); upstream's libbpf-backed loader + kernel verifier interaction are not implemented. Wire-faithful exclusion #1 (userspace half)."
+
+[[unmapped]]
+upstream_pkg = "pkg/ebpf/"
+note         = "Cilium's Go ebpf wrapper around cilium/ebpf upstream library. Same scope cut as pkg/bpf/ — no kernel-side loader. Wire-faithful exclusion #1."
+
+[[unmapped]]
+upstream_pkg = "pkg/netns/"
+note         = "Linux netns enter/exit syscalls. cave-net runs userspace on macOS/Linux; netns hooks only fire under a real CNI integration test. Wire-faithful exclusion #5."
+
+[[unmapped]]
+upstream_pkg = "pkg/cgroups/"
+note         = "cgroup v2 attach/detach syscalls (bpf_cgroup_attach). Userspace state machine ported elsewhere; the actual syscall side requires a Linux host. Wire-faithful exclusion #5."
+
+[[unmapped]]
+upstream_pkg = "pkg/mountinfo/"
+note         = "Reads /proc/<pid>/mountinfo for bpffs mount discovery. Linux-only kernel surface. Wire-faithful exclusion #5."
+
+[[unmapped]]
+upstream_pkg = "pkg/multicast/"
+note         = "Linux multicast group membership (IGMP). Kernel-side; not portable to userspace test. Wire-faithful exclusion #5."
+
+[[unmapped]]
+upstream_pkg = "pkg/mcastmanager/"
+note         = "Multicast group lifecycle manager paired with pkg/multicast/. Same kernel-side scope cut. Wire-faithful exclusion #5."
 
 # ── Calculator-format mappings (for cave-kernel parity calculator) ──────────
 # The [[mapped]] / [[skipped]] sections above use a sprint-internal contract.

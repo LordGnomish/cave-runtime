@@ -68,6 +68,15 @@ pub mod server;
 /// Defines core data structures and value types.
 pub mod types;
 
+/// Sentinel HA — monitor/failover state machine.
+pub mod sentinel;
+
+/// Master/replica replication — repl id, offset, backlog, PSYNC.
+pub mod replication;
+
+/// Native TLS listener config + PEM loader.
+pub mod tls_listener;
+
 /// Re-exports the main server run function.
 pub use server::run;
 
