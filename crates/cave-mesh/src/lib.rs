@@ -40,6 +40,7 @@ pub mod xds;
 pub mod wasm_plugin;
 pub mod service_entry;
 pub mod jwks;
+pub mod wasm_runtime;
 
 /// Ambient-mode parity batch (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
 /// SPIFFE SVID, telemetry). Pinned to istio/istio v1.29.2.

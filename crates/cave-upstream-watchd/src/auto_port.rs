@@ -712,6 +712,7 @@ mod tests {
                 no_breaking_change: pass,
                 overall_pass: pass,
                 notes: if pass { vec![] } else { vec!["ratio did not rise".into()] },
+                tdd_compliance: None,
             })
             .and_then(|r| { let _ = self.crate_name; Ok(r) })
         }

@@ -35,3 +35,5 @@ regex              = { workspace = true }
 ring               = { workspace = true }
 rcgen              = "0.13"
 rand               = { workspace = true }
+wasmtime           = { version = "26", default-features = false, features = ["cranelift", "runtime"] }
+wat                = "1.219"

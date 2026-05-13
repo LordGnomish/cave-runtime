@@ -124,6 +124,11 @@ pub mod onboarding;
 pub mod cluster_live;
 pub mod bulk;
 
+// ── 2026-05-13 P1 scratch pages (iceberg / mlflow / litellm) ───────
+pub mod iceberg;
+pub mod mlflow;
+pub mod litellm;
+
 use axum::{
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
@@ -279,6 +284,10 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::QuickActionTrigger,
         Permission::ClusterLiveRead,
         Permission::BulkOpsSubmit,
+        // 2026-05-13 P1 scratch pages.
+        Permission::IcebergRead,
+        Permission::MlflowRead,
+        Permission::LiteLlmRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
 }
@@ -1076,6 +1085,29 @@ async fn bulk_submit_handler(
     Ok(axum::Json(result))
 }
 
+// ── 2026-05-13 P1 scratch handlers ──────────────────────────────────
+
+async fn iceberg_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_tables_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::tables::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_snapshots_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::snapshots::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_partitions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::partitions::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_schemas_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::schemas::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn iceberg_manifests_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); iceberg::manifests::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
+async fn mlflow_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_experiments_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::experiments::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_runs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::runs::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::models::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_registered_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::registered_models::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn mlflow_deployments_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); mlflow::deployments::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
+async fn litellm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_models_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::models::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_routes_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::routes::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_api_keys_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::api_keys::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_budgets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::budgets::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn litellm_monitoring_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); litellm::monitoring::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
 async fn tenant_dashboard_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Path(tenant): Path<String>,
@@ -1261,6 +1293,25 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/global-search", get(global_search_handler))
         .route("/api/events/stream", get(events_stream_handler))
         .route("/api/bulk/submit", axum::routing::post(bulk_submit_handler))
+        // 2026-05-13 P1 scratch pages.
+        .route("/admin/iceberg", get(iceberg_handler))
+        .route("/admin/iceberg/tables", get(iceberg_tables_handler))
+        .route("/admin/iceberg/snapshots", get(iceberg_snapshots_handler))
+        .route("/admin/iceberg/partitions", get(iceberg_partitions_handler))
+        .route("/admin/iceberg/schemas", get(iceberg_schemas_handler))
+        .route("/admin/iceberg/manifests", get(iceberg_manifests_handler))
+        .route("/admin/mlflow", get(mlflow_handler))
+        .route("/admin/mlflow/experiments", get(mlflow_experiments_handler))
+        .route("/admin/mlflow/runs", get(mlflow_runs_handler))
+        .route("/admin/mlflow/models", get(mlflow_models_handler))
+        .route("/admin/mlflow/registered-models", get(mlflow_registered_models_handler))
+        .route("/admin/mlflow/deployments", get(mlflow_deployments_handler))
+        .route("/admin/litellm", get(litellm_handler))
+        .route("/admin/litellm/models", get(litellm_models_handler))
+        .route("/admin/litellm/routes", get(litellm_routes_handler))
+        .route("/admin/litellm/api-keys", get(litellm_api_keys_handler))
+        .route("/admin/litellm/budgets", get(litellm_budgets_handler))
+        .route("/admin/litellm/monitoring", get(litellm_monitoring_handler))
         .with_state(state)
 }
 

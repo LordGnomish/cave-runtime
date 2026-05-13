@@ -219,8 +219,8 @@ note         = "mesh CLI subcommand"
 
 [[partial]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
-local_files  = ["src/wasm_plugin.rs"]
-note         = "WasmPlugin CRD lifecycle + filter-chain projection: PluginPhase (Authn / Authz / Stats / Unspecified), URL/sha256 validation (https requires sha; oci is sha-by-digest), reconcile against workload-label selector, project_chain emits a stable phase+priority+name ordering ready for xDS proxy translation. Honest scope cut: no embedded wasmtime/wasmer runtime — the actual bytecode execution stays in the bound envoy."
+local_files  = ["src/wasm_plugin.rs", "src/wasm_runtime.rs"]
+note         = "WasmPlugin CRD lifecycle + filter-chain projection (wasm_plugin.rs) plus an embedded wasmtime-backed runtime (wasm_runtime.rs): wat/wasm compile + validate, ResourceLimits with fuel cap + memory ceiling, proxy-wasm ABI shim (proxy_log + proxy_set_header_map_value + 10 stub responders returning WasmResultUnimplemented = 12), per-invocation RequestContext capturing log records / set_header calls / response body, fuel exhaustion → typed FuelExhausted error. Filter modules built against proxy-wasm-rust-sdk run end-to-end in process; the full ~50-function proxy-wasm host surface is documented as a follow-up."
 
 # pilot/pkg/networking/federation/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 

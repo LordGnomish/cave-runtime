@@ -32,9 +32,11 @@ use std::sync::RwLock;
 
 pub mod file;
 pub mod inmemory;
+pub mod raft;
 
 pub use file::FileBackend;
 pub use inmemory::InMemoryBackend;
+pub use raft::{LogEntry, LogOp, RaftBackend, RaftLog, RaftSnapshot, RaftStorageError};
 
 /// Errors any backend can surface. Modelled on OpenBao's
 /// `physical.Error` variants — the IO + invalid-path cases the
