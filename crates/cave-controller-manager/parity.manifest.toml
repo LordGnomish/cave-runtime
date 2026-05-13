@@ -17,11 +17,11 @@ version = "v1.36.0"
 # (DRA ResourceClaim controller MVP — finalizer + allocation +
 # reservedFor reconciliation + deletion drain, 23 deterministic tests).
 # See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
-mapped_count   = 26
+mapped_count   = 31
 skipped_count  = 10
-unmapped_count = 9
+unmapped_count = 4
 total          = 45
-fill_ratio     = 0.8000
+fill_ratio     = 0.9111
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -177,13 +177,15 @@ upstream_pkg = "pkg/controller/volume/attachdetach/"
 reason       = "parallel-track"
 note         = "Volume attach/detach — kubelet's volume manager"
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/storageversiongarbagecollector/"
-note         = "Cleans up StorageVersion objects whose owning APIService is gone. cave-apiserver has storage_version.rs but no GC reconciler."
+local_files  = ["src/storageversiongarbagecollector.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: GC for StorageVersion rows whose owning APIServer is gone. `GarbageCollector` tracks live apiservers + observed SVs; `gc_plan()` emits alphabetical target list. Empty owner-set treated as orphan immediately. 9 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/legacyserviceaccounttokencleaner/"
-note         = "Removes auto-generated SA secrets (post-v1.24 deprecation). cave never created them but the upgrade-cleanup job is not implemented."
+local_files  = ["src/legacyserviceaccounttokencleaner.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: KEP-2799 deprecated SA token Secret cleanup. `evaluate` per-secret (Skip / PreservedByReference / Delete) with grace-window check (default 365 d) + SA reference preservation; `plan_pass` returns alphabetical (ns, name) capped at `max_per_pass`. 9 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/controller/storageversionmigrator/"
@@ -207,22 +209,25 @@ note         = "Legacy v1 Endpoints controller — superseded by endpointslice/.
 upstream_pkg = "pkg/controller/replication/"
 note         = "Legacy ReplicationController — superseded by ReplicaSet. cave does not ship this."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/volume/pvprotection/"
-note         = "PV-side protection finalizer. PVC-side covered via pv/; PV-side reconciler missing."
+local_files  = ["src/pvprotection.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: PV-side protection finalizer. `evaluate(ObservedPv) → Action::{EnsureFinalizer / BlockDeletion / ReleaseFinalizer / NoOp}`. In-use means Phase=Bound OR claimRef set. `PvProtector` tracks last-action for admin UI. 11 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/volume/ephemeral/"
-note         = "Generic-ephemeral-volume controller. Inline emptyDir+downwardAPI handled by cave-kubelet; generic-ephemeral unmapped."
+local_files  = ["src/ephemeralvolume.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: generic-ephemeral-volume controller. `EphemeralVolumeDecl` from pod spec → `evaluate(decl, observed_pvc)` returns Create / AlreadyAdopted / OwnerConflict; PVC name = `<pod>-<volume>`. Reconciler refuses to hijack PVCs already owned by a different pod (KEP-1698 hijack-safety). 8 tests."
 
 [[mapped]]
 upstream_pkg = "pkg/controller/resourceclaim/"
 local_files  = ["src/resourceclaim.rs"]
 note         = "k8s-core push 2026-05-13: DRA (KEP-4381) cluster-side ResourceClaim reconciler — finalizer dance + Immediate/WaitForFirstConsumer allocation + reservedFor[] reconciliation + deletion drain. 23 deterministic tests covering the full state machine. Scheduler hooks remain in cave-scheduler/src/dra.rs (device-fitness)."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/validatingadmissionpolicystatus/"
-note         = "Status reconciler for VAP type-check results across CRD versions. cave-apiserver vap_advanced.rs validates at write time, no status loop."
+local_files  = ["src/validatingadmissionpolicystatus.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: VAP status reconciler. `aggregate(generation, &[TypeCheck])` reduces per-GVK Ok/Err results into ConditionState + sorted warnings; `StatusReconciler` rejects stale generations. apiserver vap_advanced.rs still owns the write-time type-check; this is the post-write status loop. 10 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/controller/storageversionmigrator/migrator/"
