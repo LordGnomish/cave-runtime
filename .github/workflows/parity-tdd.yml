@@ -1,0 +1,93 @@
+name: Charter v2 — TDD-strict gate
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  tdd-gate:
+    name: TDD-strict gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history so `main..HEAD` works.
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build cave-tdd-check
+        run: cargo build -p cave-upstream-watchd --bin cave-tdd-check
+
+      - name: Determine base ref
+        id: base
+        run: |
+          # PR event: GITHUB_BASE_REF holds the target branch (e.g. main).
+          BASE="origin/${GITHUB_BASE_REF:-main}"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "base resolved to $BASE"
+
+      - name: Run cave-tdd-check (soft mode)
+        # `--soft` keeps parity_ratio_delta out of the verdict so the gate
+        # is driven by stub_count + TDD compliance + tests_pass. The
+        # parity-index job below contributes its own signal.
+        run: |
+          ./target/debug/cave-tdd-check \
+            --base "${{ steps.base.outputs.base }}" \
+            --branch HEAD \
+            --tests-pass=true \
+            --json \
+            --soft > tdd-report.json
+          cat tdd-report.json
+
+      - name: Upload TDD report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tdd-report
+          path: tdd-report.json
+
+  unit-tests-and-gate:
+    name: Tests + composite gate
+    runs-on: ubuntu-latest
+    needs: tdd-gate
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo test — cave-upstream-watchd
+        # The Charter v2 gate's own tests must pass.
+        run: cargo test -p cave-upstream-watchd
+
+      - name: Build cave-tdd-check
+        run: cargo build -p cave-upstream-watchd --bin cave-tdd-check
+
+      - name: Composite gate (with tests_pass=true)
+        run: |
+          BASE="origin/${GITHUB_BASE_REF:-main}"
+          ./target/debug/cave-tdd-check \
+            --base "$BASE" \
+            --branch HEAD \
+            --tests-pass=true \
+            --soft
+
+  pre-commit-smoke:
+    name: tdd_check.sh smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run hook smoke harness
+        run: |
+          chmod +x scripts/tdd_check.sh scripts/tdd_check_smoke.sh
+          bash scripts/tdd_check_smoke.sh
