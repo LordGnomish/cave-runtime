@@ -60,6 +60,14 @@ pub struct VerifyResult {
     pub no_breaking_change: bool,
     pub overall_pass: bool,
     pub notes: Vec<String>,
+
+    /// TDD-strict compliance signal. `None` when the legacy
+    /// [`CharterGate::verify`] path was used (no git inspector / base ref
+    /// supplied). `Some` when [`CharterV2Gate::verify_with_tdd`] populated
+    /// it. The composite `overall_pass` gates on `is_pass()` when this
+    /// is `Some`, and ignores it (does not fail) when `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tdd_compliance: Option<crate::tdd::TddCompliance>,
 }
 
 #[async_trait]
@@ -320,7 +328,74 @@ impl CharterGate for CharterV2Gate {
             no_breaking_change,
             overall_pass,
             notes,
+            tdd_compliance: None,
         })
+    }
+}
+
+impl CharterV2Gate {
+    /// Composite gate + TDD-strict overlay.
+    ///
+    /// Runs [`CharterGate::verify`] first to produce the four legacy
+    /// signals (cargo check, cargo test, fill_ratio movement, no-new-stubs),
+    /// then layers the TDD analyzer over it:
+    ///
+    ///   1. invoke [`crate::tdd::analyze_tdd_compliance`] against
+    ///      `base_ref..branch_ref` using the supplied [`GitInspector`];
+    ///   2. populate [`VerifyResult::tdd_compliance`];
+    ///   3. if TDD compliance is *not* a pass, flip `overall_pass` to
+    ///      false and append a note.
+    ///
+    /// The `green_proof` fed into the analyzer is `result.tests_pass` —
+    /// the cargo test outcome the dispatcher just observed.
+    ///
+    /// On TDD analyzer error (e.g. ambiguous ref, git not on PATH) the gate
+    /// degrades gracefully: `tdd_compliance` stays `None`, a note records
+    /// the failure, and `overall_pass` is **not** forced false purely on
+    /// the analyzer error — the four legacy signals still rule. This keeps
+    /// the gate usable in environments without git history (CI shallow
+    /// clones, ephemeral checkouts).
+    pub async fn verify_with_tdd<I>(
+        &self,
+        baseline: &CharterBaseline,
+        commit_sha_after: &str,
+        inspector: &I,
+        base_ref: &str,
+        branch_ref: &str,
+    ) -> Result<VerifyResult, GateError>
+    where
+        I: crate::tdd::GitInspector,
+    {
+        let mut result = <Self as CharterGate>::verify(self, baseline, commit_sha_after).await?;
+
+        match crate::tdd::analyze_tdd_compliance(
+            inspector,
+            base_ref,
+            branch_ref,
+            result.tests_pass,
+        ) {
+            Ok(tdd) => {
+                if !tdd.is_pass() {
+                    result.overall_pass = false;
+                    result
+                        .notes
+                        .push(format!("TDD-strict failure: {}", tdd.summary()));
+                    // Surface the first 3 violations inline so CI logs are
+                    // actionable without dumping the entire ledger.
+                    for v in tdd.details.violations.iter().take(3) {
+                        result.notes.push(format!("  tdd violation: {v:?}"));
+                    }
+                }
+                result.tdd_compliance = Some(tdd);
+            }
+            Err(e) => {
+                result.notes.push(format!(
+                    "TDD analyzer error (gate degraded, tdd_compliance=None): {e}"
+                ));
+            }
+        }
+
+        Ok(result)
     }
 }
 
