@@ -17,11 +17,11 @@ version = "v1.28.0"
 #   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
 #   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
-mapped_count   = 24
+mapped_count   = 28
 skipped_count  = 9
-unmapped_count = 5
+unmapped_count = 1
 total          = 38
-fill_ratio     = 0.8684
+fill_ratio     = 0.9737
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -171,9 +171,10 @@ upstream_pkg = "pkg/kubelet/prober/"
 local_files  = ["src/prober.rs"]
 note         = "k8s-core push 2026-05-13: ProberCoordinator on top of probe::ProberManager — concurrency control via cave_kernel::semaphore (default 16 concurrent probes), restart-coordination ledger (suppresses duplicate liveness-restart fan-out, auto-clears on safety window), readiness flip dedupe. 17 deterministic tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
-note         = "v2 unified-hierarchy cgroup writer. cave-kubelet writes cpu/mem limits via CRI; direct cgroup writes for systemd-cgroup-driver mode are not implemented."
+local_files  = ["src/cgroups.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: cgroup v2 unified-hierarchy writer abstraction. CgroupBackend trait + InMemoryCgroups impl (production Cgroupv2FsBackend that touches /sys/fs/cgroup is deferred), QosTier slice naming (kubepods.slice / kubepods-burstable.slice / kubepods-besteffort.slice), pod_cgroup_path + container_cgroup_path conventions matching upstream, validation on cpu.max zero quota + empty cpuset. 12 tests."
 
 [[mapped]]
 upstream_pkg = "pkg/kubelet/lifecycle/"
@@ -185,17 +186,20 @@ upstream_pkg = "pkg/kubelet/preemption/"
 local_files  = ["src/preemption.rs"]
 note         = "k8s-cri push batch2 2026-05-13: critical-pod preemption admit. `evaluate(PreemptionRequest)` returns AdmitNoVictims / Evict{victim_uids} / Insufficient. Lowest-priority-first selection, greedy on resources, deterministic tie-break by name. 12 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/nodeshutdown/"
-note         = "Graceful node shutdown handler (KEP-2000). systemd-inhibitor integration + pod-priority-based termination ordering are not implemented."
+local_files  = ["src/nodeshutdown.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: graceful node-shutdown ordering (KEP-2000). ShutdownTier (Regular / ClusterCritical / NodeCritical), build_plan(pods, cfg) deterministic per-tier + per-priority ordering, ShutdownConfig (total_grace / critical_grace) with saturating regular_grace, ShutdownClock budget tracker. systemd-inhibitor integration intentionally outside this module. 10 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/userns/"
-note         = "User namespace remapping (KEP-127, v1.30 beta). cave-kubelet runs containers under the kubelet's UID."
+local_files  = ["src/userns.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: user-namespace allocator (KEP-127). UserNsAllocator (POD_RANGE_SIZE=65536, HOST_BASE=100_000) with free-list LIFO reuse, idempotent allocate per pod uid, release-makes-reusable, exhaustion error, assignments-disjoint invariant. CRI-side unshare(CLONE_NEWUSER) + uid_map writes stay in the runtime. 11 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/runonce/"
-note         = "Standalone runonce mode (boot static pod manifest without apiserver). Useful for boot-time control-plane components."
+local_files  = ["src/runonce.rs"]
+note         = "k8s-streams-mesh batch 2026-05-13: standalone runonce mode for boot static-pod manifests. StaticPodManifest validation (name + images + restart policy), RunOnceResult outcomes (Running / Completed / Failed / Rejected), all_settled() driver-exit predicate. CRI-side container start delegated. 11 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/kubelet/checkpoint/"
