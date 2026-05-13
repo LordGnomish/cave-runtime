@@ -263,6 +263,13 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_workflows::router(workflows_state))
         .merge(cave_scan::router(scan_state))
         .merge(cave_portal::router(portal_state))
+        // Per-module /admin/* views (compliance dashboard, keda, vault,
+        // grafana, ...). `admin_state` was built at line ~120 above
+        // (with the optional RaftBridge-backed runtime client wired
+        // via probe_data_dir_for_runtime). Mount the admin router
+        // here so the HTTPS surface actually serves what the
+        // dashboard tests verify.
+        .merge(cave_portal::admin::router(admin_state.clone()))
         .merge(cave_scaffold::router(scaffold_state))
         .merge(cave_chaos::router(chaos_state))
         .merge(cave_policy::router(policy_state))
@@ -344,6 +351,17 @@ async fn main() -> anyhow::Result<()> {
                 "/v2/".into(),
                 "/loki/".into(), "/tempo/".into(),
                 "/api/registry/".into(),
+                // Per-module admin views are mounted via
+                // `cave_portal::admin::router`. Authorisation is
+                // enforced inside each handler via
+                // `RequestCtx::authorise(Permission::...)` against the
+                // dev-token granted in `extract_ctx_from_query`. The
+                // JWT middleware shouldn't double-gate — that would
+                // make the dashboard unreachable without an
+                // externally-issued session, which is the wrong UX
+                // for the development serve.
+                "/admin/".into(),
+                "/api/compliance/".into(),
             ],
         })))
         // Middleware
