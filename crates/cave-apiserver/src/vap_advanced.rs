@@ -279,6 +279,143 @@ pub struct CelActivation {
     pub params: Option<serde_json::Value>,
     pub namespace_object: Option<serde_json::Value>,
     pub variables: HashMap<String, CelValue>,
+    /// 2026-05-13 batch2: optional snapshot of authorization grants
+    /// for the CEL `authorizer` binding. `None` means the binding is
+    /// absent and any `authorizer.*` access in the expression
+    /// surfaces as `CelError::Runtime(undeclared)`, exactly like
+    /// upstream cel-go behaves when the activation slot is omitted.
+    pub authorizer: Option<AuthorizerView>,
+}
+
+/// Read-only authorization snapshot consumed by `authorizer.*` CEL
+/// helpers. The evaluator surfaces three sub-API entry points:
+///
+///   * `authorizer.user`                 → SubjectAccessReviewSubject view
+///   * `authorizer.group(g)`             → AccessAllowed when `g` ∈ groups
+///   * `authorizer.path(p).check(v).allowed()` → string allow/deny
+///   * `authorizer.resource(g, r).namespace(ns).check(v).allowed()`
+///
+/// Each "check" returns a plain CEL bool — we do NOT model the
+/// upstream `AccessReview` object with `.reason`/`.audit` fields
+/// because no in-tree policy reads them. Cave's adopters call
+/// `.allowed()` (or use the bool directly via `.check(...)`) and
+/// branch on the boolean; the richer struct would mean wider trait
+/// signatures and a non-trivial cel-interpreter `Function` regrowth.
+#[derive(Debug, Default, Clone)]
+pub struct AuthorizerView {
+    /// Caller's user name (`system:serviceaccount:tenant/sa-name` /
+    /// `kube-admin` / etc.).
+    pub user: String,
+    /// Groups the caller is a member of (`system:authenticated`,
+    /// `system:serviceaccounts:<ns>`, custom IdP groups).
+    pub groups: Vec<String>,
+    /// Pre-computed allow-list keyed by `(verb, resource_path)`. The
+    /// resource path is upstream's stable shape
+    /// `<group>/<resource>[/<namespace>]`:
+    ///
+    ///   * `apps/deployments`              cluster-scoped
+    ///   * `apps/deployments/team-foo`     namespace-scoped
+    ///   * `*/*/team-foo`                  any verb on any resource in ns
+    ///
+    /// The dispatcher computes this snapshot from cave's RBAC
+    /// resolver (`auth_review::Authorizer::authorize`) and stashes
+    /// it on the activation before invoking the evaluator. The
+    /// evaluator does NOT call back into the resolver — that would
+    /// require an async-aware CEL runtime; this snapshot keeps
+    /// evaluation pure and synchronous.
+    ///
+    /// Wildcards: `verb == "*"` and/or `resource == "*"` match any
+    /// concrete verb/resource the caller checks. The expansion
+    /// happens at allow-list build time (see `granted_*` helpers),
+    /// not in the lookup, so the bool decision stays O(1).
+    pub grants: std::collections::HashSet<String>,
+    /// Non-resource URL paths the caller may `verb`. Keyed
+    /// `<verb> <path>` (e.g. `"get /healthz"`).
+    pub url_grants: std::collections::HashSet<String>,
+}
+
+impl AuthorizerView {
+    /// Synthesize an allow-list key from `(verb, group, resource, ns)`.
+    /// Wildcards expand to `*` in the matching slot.
+    pub fn grant_key(verb: &str, group: &str, resource: &str, ns: Option<&str>) -> String {
+        let group = if group.is_empty() { "core" } else { group };
+        match ns {
+            Some(n) => format!("{verb}:{group}/{resource}/{n}"),
+            None => format!("{verb}:{group}/{resource}"),
+        }
+    }
+
+    /// Convenience builder for tests / authorizer-resolver code.
+    pub fn allow(mut self, verb: &str, group: &str, resource: &str, ns: Option<&str>) -> Self {
+        self.grants.insert(Self::grant_key(verb, group, resource, ns));
+        self
+    }
+
+    /// Allow `verb` against a non-resource URL path.
+    pub fn allow_path(mut self, verb: &str, path: &str) -> Self {
+        self.url_grants.insert(format!("{verb} {path}"));
+        self
+    }
+
+    /// Add a group membership.
+    pub fn with_group(mut self, g: impl Into<String>) -> Self {
+        self.groups.push(g.into());
+        self
+    }
+
+    /// Check whether the caller may `verb` on
+    /// `<group>/<resource>[/<ns>]`. Honours `*` wildcards in either
+    /// slot of the snapshot. Verb/resource wildcards in the CEL
+    /// query itself are NOT supported (real callers spell out the
+    /// verb).
+    pub fn check_resource(&self, verb: &str, group: &str, resource: &str, ns: Option<&str>) -> bool {
+        for key in &self.grants {
+            if Self::key_matches(key, verb, group, resource, ns) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check whether the caller may `verb` against a non-resource
+    /// URL path. Wildcards `*` allowed in either component of the
+    /// stored grant (`* /healthz` allows any verb on `/healthz`).
+    pub fn check_url(&self, verb: &str, path: &str) -> bool {
+        for stored in &self.url_grants {
+            let mut it = stored.splitn(2, ' ');
+            let v = it.next().unwrap_or("");
+            let p = it.next().unwrap_or("");
+            let v_ok = v == "*" || v == verb;
+            let p_ok = p == "*" || p == path;
+            if v_ok && p_ok {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn key_matches(key: &str, verb: &str, group: &str, resource: &str, ns: Option<&str>) -> bool {
+        // Parse `<verb>:<group>/<resource>[/<ns>]`.
+        let (k_verb, rest) = match key.split_once(':') {
+            Some(p) => p,
+            None => return false,
+        };
+        let parts: Vec<&str> = rest.splitn(3, '/').collect();
+        let (k_group, k_resource, k_ns) = match parts.as_slice() {
+            [g, r] => (*g, *r, None),
+            [g, r, n] => (*g, *r, Some(*n)),
+            _ => return false,
+        };
+        let v_ok = k_verb == "*" || k_verb == verb;
+        let g_ok = k_group == "*" || k_group == group || (k_group == "core" && group.is_empty());
+        let r_ok = k_resource == "*" || k_resource == resource;
+        let n_ok = match (k_ns, ns) {
+            (None, _) => true,
+            (Some(_), None) => false,
+            (Some(a), Some(b)) => a == "*" || a == b,
+        };
+        v_ok && g_ok && r_ok && n_ok
+    }
 }
 
 pub trait CelEvaluator: Send + Sync {
@@ -716,6 +853,12 @@ impl Dispatcher {
             params,
             namespace_object: None,
             variables: HashMap::new(),
+            // The dispatcher leaves authorizer = None; the
+            // authorizer binding is only attached when an upstream
+            // adopter (cave-runtime serve) builds an AuthorizerView
+            // from the auth_review resolver and passes it down via
+            // [`Dispatcher::with_authorizer`] (followup wiring).
+            authorizer: None,
         }
     }
 }

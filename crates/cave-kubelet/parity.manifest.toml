@@ -17,11 +17,11 @@ version = "v1.28.0"
 #   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
 #   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
-mapped_count   = 22
+mapped_count   = 24
 skipped_count  = 9
-unmapped_count = 7
+unmapped_count = 5
 total          = 38
-fill_ratio     = 0.8158
+fill_ratio     = 0.8684
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -175,13 +175,15 @@ note         = "k8s-core push 2026-05-13: ProberCoordinator on top of probe::Pro
 upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
 note         = "v2 unified-hierarchy cgroup writer. cave-kubelet writes cpu/mem limits via CRI; direct cgroup writes for systemd-cgroup-driver mode are not implemented."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/lifecycle/"
-note         = "Pod-lifecycle event hooks (preStop, postStart). CRI execution wired in cave-cri but kubelet's per-event timeout + log-correlation orchestration is missing."
+local_files  = ["src/lifecycle.rs"]
+note         = "k8s-cri push batch2 2026-05-13: PreStop / PostStart hook orchestration. `HookExecution` + `evaluate(sample, now)` state machine handles Fire / Pending / Completed / TimedOut / Failed with per-hook timeout independent of `terminationGracePeriodSeconds`. Sample-driven (success/failure stickiness). 8 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/preemption/"
-note         = "Critical-pod preemption admit. cave-kubelet admits pods based on resource availability but does not evict lower-priority pods for system-critical ones."
+local_files  = ["src/preemption.rs"]
+note         = "k8s-cri push batch2 2026-05-13: critical-pod preemption admit. `evaluate(PreemptionRequest)` returns AdmitNoVictims / Evict{victim_uids} / Insufficient. Lowest-priority-first selection, greedy on resources, deterministic tie-break by name. 12 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/kubelet/nodeshutdown/"

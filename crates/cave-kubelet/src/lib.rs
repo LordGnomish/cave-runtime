@@ -103,6 +103,15 @@ pub mod pod_status_manager;
 /// Mirrors `pkg/kubelet/prober/worker.go` + `prober/results/`.
 pub mod prober;
 
+/// k8s-core push batch2 2026-05-13: preStop / postStart hook
+/// orchestration with per-hook timeouts. Mirrors `pkg/kubelet/lifecycle/`.
+pub mod lifecycle;
+
+/// k8s-core push batch2 2026-05-13: critical-pod preemption admit
+/// handler. Selects lowest-priority pods to evict for a system-
+/// critical incoming pod. Mirrors `pkg/kubelet/preemption/`.
+pub mod preemption;
+
 use agent::KubeletState;
 use std::sync::Arc;
 

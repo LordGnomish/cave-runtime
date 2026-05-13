@@ -13,12 +13,12 @@ version = "v1.36.0"
 # measured value: kubernetes/kubernetes v1.31.x pkg/scheduler/* packages
 # enumerated and classified honestly.
 # See docs/parity/cave-scheduler-port-2026-05-12.md for methodology.
-mapped_count   = 18
+mapped_count   = 19
 skipped_count  = 7
-unmapped_count = 4
+unmapped_count = 3
 total          = 29
-fill_ratio     = 0.8621
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8966
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -146,9 +146,10 @@ upstream_pkg = "pkg/scheduler/metrics/"
 reason       = "parallel-track"
 note         = "Prometheus metric definitions — cave uses prometheus-client crate directly"
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/scheduler/framework/plugins/imagelocality/"
-note         = "Score plugin that prefers nodes already holding the pod's container images. plugins.rs declares an image-locality scorer but it computes 0 because cave-kubelet's image cache is not yet exposed to the scheduler."
+local_files  = ["src/plugins.rs"]
+note         = "k8s-cri push batch2 2026-05-13: ImageLocality scorer ported with upstream's size-weighted formula. `scaled_image_score = size × (num_nodes_with_image / total_nodes)`; `calculate_priority` linearly maps the sum onto [0, MAX_NODE_SCORE] between min/max thresholds (23 MiB / 1000 MiB × containers). 14 deterministic tests + `update_node_images` / `set_cluster_state` APIs for cave-kubelet image GC or cave-cri ListImages to populate."
 
 [[unmapped]]
 upstream_pkg = "pkg/scheduler/framework/plugins/interpodaffinity/"

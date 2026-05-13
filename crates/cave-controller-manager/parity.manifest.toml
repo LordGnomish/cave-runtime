@@ -17,11 +17,11 @@ version = "v1.36.0"
 # (DRA ResourceClaim controller MVP — finalizer + allocation +
 # reservedFor reconciliation + deletion drain, 23 deterministic tests).
 # See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
-mapped_count   = 24
+mapped_count   = 26
 skipped_count  = 10
-unmapped_count = 11
+unmapped_count = 9
 total          = 45
-fill_ratio     = 0.7556
+fill_ratio     = 0.8000
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -189,13 +189,15 @@ note         = "Removes auto-generated SA secrets (post-v1.24 deprecation). cave
 upstream_pkg = "pkg/controller/storageversionmigrator/"
 note         = "StorageVersionMigration CRD reconciler. cave-apiserver storage_migration.rs has the trigger surface but the loop is missing."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/tainteviction/"
-note         = "Per-pod taint-based eviction with grace period. node_lifecycle/ handles NoExecute at node level; per-pod toleration timers missing."
+local_files  = ["src/tainteviction.rs"]
+note         = "k8s-cri push batch2 2026-05-13: per-pod NoExecute eviction with tolerationSeconds timers. Pure-function `evaluate` returns EvictionAction (Tolerated / EvictNow / Schedule / Expired); `EvictionLedger` tracks pending evictions with deterministic `due(now)` polling. 12 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/cidrallocator/"
-note         = "Allocates pod CIDRs to nodes when running without a cloud provider. cave-net pre-provisioned today; on-the-fly allocator missing."
+local_files  = ["src/cidrallocator.rs"]
+note         = "k8s-cri push batch2 2026-05-13: pod-CIDR slice allocator for clusters without a cloud provider. `CidrAllocator::new(cluster, node_mask)` carves the cluster CIDR into N slots; `allocate(node)` / `occupy(node, cidr)` / `release(node)` + idempotency + slot reuse + cluster-range bounds checking. 17 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/controller/endpoint/"
