@@ -85,6 +85,9 @@ pub mod stats;
 pub mod streaming;
 pub mod transport;
 pub mod userns;
+pub mod content;
+pub mod diff;
+pub mod leases;
 
 #[cfg(test)]
 mod upstream_tests;

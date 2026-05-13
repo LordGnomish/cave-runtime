@@ -18,12 +18,12 @@
 # Hand-curated against the CNPG repository layout
 # (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
 # fill_ratio = (mapped + skipped) / total
-mapped_count   = 9
+mapped_count   = 11
 skipped_count  = 10
-unmapped_count = 5
-total          = 24
-fill_ratio     = 0.7917
-last_audit     = "2026-05-12"
+unmapped_count = 4
+total          = 25
+fill_ratio     = 0.84
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -738,6 +738,11 @@ local_files  = ["src/pool.rs"]
 note         = "PgBouncer pool spec + lifecycle (acts as the bridge upstream)"
 
 [[mapped]]
+upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/pgbouncer/"
+local_files  = ["src/pooler.rs"]
+note         = "Pooler CRD reconciler: PoolerSpec/Status with phase + conditions (Available/Progressing/Failed), spec validation, generation/observed_generation tracking, render_pgbouncer_ini for the per-pod pgbouncer.ini projection, reconcile(observed_ready) phase advancement (Pending → Configuring → Degraded → Ready). Upstream's k8s pod-spec emission lives in cave-runtime cluster glue; this module owns the CRD object + reconcile loop."
+
+[[mapped]]
 upstream_pkg = "pgbouncer:src/{pooler.c,objects.c,admin.c}"
 local_files  = ["src/pool.rs"]
 note         = "Connection pool primitives — acquire / release / stats / list"
@@ -807,9 +812,10 @@ note         = "Per-pod sidecar webserver (status JSON, backup endpoints). The o
 upstream_pkg = "cloudnative-pg:pkg/reconciler/instance/replica/replicacluster.go"
 note         = "Replica-cluster (cross-cluster replication) failover. Single-cluster HA only today."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "cloudnative-pg:pkg/specs/scheduledbackup_types.go"
-note         = "ScheduledBackup CRD with cron expression. backup.rs covers one-shot Backup; cron scheduler is a gap."
+local_files  = ["src/scheduled_backup.rs"]
+note         = "ScheduledBackup CRD: 5-field cron parser (* / lists / ranges / steps), CronSchedule::next_after / matches, ScheduledBackupManager with create / get / list / suspend / resume / delete / trigger_due + retain_runs trim. Couples to backup.rs for the underlying one-shot Backup. Cron resolution is 1 minute, in UTC, matching the cloudnative-pg behaviour."
 
 [[unmapped]]
 upstream_pkg = "cloudnative-pg:pkg/postgres/monitoring/default_queries.go"
