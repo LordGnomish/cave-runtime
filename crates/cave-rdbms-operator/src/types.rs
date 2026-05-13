@@ -33,7 +33,7 @@ pub struct PgInstance {
     pub replication_lag_bytes: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PoolMode {
     Session,
     Transaction,
@@ -52,7 +52,7 @@ pub struct PoolConfig {
     pub client_idle_timeout_secs: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BackupType {
     Full,
     Incremental,

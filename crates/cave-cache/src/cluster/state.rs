@@ -150,7 +150,7 @@ impl Default for ClusterState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClusterNode {
     pub id: String,
     pub addr: String,
@@ -160,7 +160,7 @@ pub struct ClusterNode {
     pub slots: Vec<(u16, u16)>,
 }
 
-fn generate_node_id() -> String {
+pub fn generate_node_id() -> String {
     use std::fmt::Write;
     let mut id = String::with_capacity(40);
     for _ in 0..20 {

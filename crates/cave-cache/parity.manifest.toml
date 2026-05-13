@@ -21,12 +21,12 @@ url     = "https://github.com/redis/redis"
 # (`src/{server,networking,db,t_*,replication,cluster,scripting,
 # expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
 # cache `src/commands/` directory mirrors Redis's `t_*.c` 1:1.
-mapped_count   = 18
+mapped_count   = 20
 skipped_count  = 13
-unmapped_count = 7
+unmapped_count = 5
 total          = 38
-fill_ratio     = 0.8158
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8684
+last_audit     = "2026-05-13"
 infra_only     = false
 [module]
 name        = "cave-cache"
@@ -528,9 +528,10 @@ note         = "Build + config templates"
 
 # ─── Unmapped (7) — honest gaps ────────────────────────────────────────────
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "redis:src/cluster.c"
-note         = "Cluster mode (slot routing, gossip, MOVED/ASK redirects). cave-cache is single-node today; src/cluster.rs has slot config but no actual gossip."
+local_files  = ["src/cluster/mod.rs", "src/cluster/state.rs", "src/cluster/slots.rs", "src/cluster/gossip.rs", "src/cluster/migration.rs", "src/cluster/epoch.rs"]
+note         = "Cluster mode: 16,384-slot SlotMap with hash-tag-aware routing, MOVED / ASK redirect computation, IMPORTING/MIGRATING ledger, configEpoch/currentEpoch atomic counters, and a GossipBus state machine (PING/PONG/MEET/FAIL/UPDATE message effects). Honest scope cut: the on-wire bus serializer for upstream's port-16380 listener is not implemented — gossip flows through the same control plane as the rest of the runtime."
 
 [[unmapped]]
 upstream_pkg = "redis:src/sentinel.c"
@@ -544,9 +545,10 @@ note         = "Master/replica replication (psync / partial resync). Single-node
 upstream_pkg = "redis:src/modules/"
 note         = "Loadable module API (redis-modules SDK). External-plugin loading is out of scope."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "redis:src/cluster_slot_stats.c"
-note         = "Per-slot stats for cluster mode. Coupled with the cluster gap above."
+local_files  = ["src/cluster/slots.rs"]
+note         = "Per-slot stats (key_count, cpu_usec, network_bytes_in/out) via SlotMap::record_access + top_slots_by_keys for the CLUSTER SLOT-STATS surface."
 
 [[unmapped]]
 upstream_pkg = "redis:src/functions.c"

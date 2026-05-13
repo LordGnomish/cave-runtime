@@ -22,7 +22,9 @@ pub mod manager;
 pub mod models;
 pub mod monitoring;
 pub mod pool;
+pub mod pooler;
 pub mod routes;
+pub mod scheduled_backup;
 pub mod types;
 pub mod user;
 
