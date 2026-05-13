@@ -102,13 +102,51 @@ pub struct TrackerRow {
     pub manifest_present: bool,
 }
 
-/// GET /upstream — tracker HTML page (auth-gated by the runtime middleware).
-pub async fn page() -> Html<&'static str> {
-    Html(PAGE_HTML)
+/// GET /upstream — tracker HTML page. Auth-gated by the runtime
+/// middleware (`/upstream` is NOT in the JWT bypass list, so the
+/// middleware redirects to /login on no-cookie). Additionally
+/// persona-gated to `platform_admin` here — the upstream parity
+/// tracker is cross-tenant control-plane info.
+pub async fn page(
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return persona_denied_response("/upstream", "platform_admin");
+    }
+    Html(PAGE_HTML).into_response()
 }
 
-/// GET /api/upstream/tracker — live tracker rows.
-pub async fn api_tracker() -> Json<serde_json::Value> {
+/// GET /api/upstream/tracker — JSON rows, gated identically to the
+/// HTML page so a tenant admin can't bypass via the API.
+pub fn is_platform_admin(
+    claims: Option<&axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> bool {
+    match claims {
+        Some(axum::Extension(c)) => c.roles.iter().any(|r| r == "platform_admin"),
+        None => false,
+    }
+}
+
+pub fn persona_denied_response(path: &str, required: &str) -> Response {
+    let body = format!(
+        "<html><body><h1>403 Forbidden</h1><p>{path} requires persona <code>{required}</code>. \
+         <a href=\"/login\">Sign in</a> with a platform_admin account.</p></body></html>"
+    );
+    (StatusCode::FORBIDDEN, Html(body)).into_response()
+}
+
+/// GET /api/upstream/tracker — live tracker rows. Persona-gated
+/// identically to the HTML page (platform_admin only).
+pub async fn api_tracker(
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "platform_admin role required" })),
+        )
+            .into_response();
+    }
     let parity_index = build_parity_index().await;
     let last_touched = ensure_last_touched().await;
 
@@ -130,10 +168,22 @@ pub async fn api_tracker() -> Json<serde_json::Value> {
         },
         "rows": rows,
     }))
+    .into_response()
 }
 
 /// GET /api/upstream/{owner/repo}/details — manifest TOML + recent commits.
-pub async fn api_details(Path(repo): Path<String>) -> Response {
+/// Persona-gated to `platform_admin`.
+pub async fn api_details(
+    Path(repo): Path<String>,
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "platform_admin role required" })),
+        )
+            .into_response();
+    }
     let project = match TRACKED_PROJECTS.iter().find(|p| p.github_repo == repo) {
         Some(p) => p,
         None => {
@@ -357,8 +407,23 @@ mod tests {
     use super::*;
     use axum::body::to_bytes;
     use axum::http::Request;
+    use cave_auth::jwt_middleware::JwtClaims;
     use http_body_util::BodyExt;
     use tower::ServiceExt;
+
+    /// Test helper: build the upstream router with a platform_admin
+    /// `JwtClaims` extension pre-injected. The persona gate is
+    /// uniform across page/tracker/details, so every endpoint test
+    /// uses this.
+    fn router_as_platform() -> Router {
+        let claims = JwtClaims {
+            sub: "admin@platform.cave".into(),
+            email: "admin@platform.cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 4102444800,
+        };
+        router().layer(axum::Extension(claims))
+    }
 
     #[test]
     fn parse_log_extracts_first_commit_per_crate() {
@@ -380,9 +445,12 @@ crates/cave-runtime/src/main.rs
 
     #[tokio::test]
     async fn tracker_endpoint_returns_all_projects() {
-        // SAFETY: tests run sequentially in the same binary.
+        let _g = crate::portal::WORKSPACE_ROOT_TEST_GUARD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root()); }
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(
                 Request::builder()
@@ -418,7 +486,7 @@ crates/cave-runtime/src/main.rs
 
     #[tokio::test]
     async fn details_endpoint_unknown_repo_404s() {
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(
                 Request::builder()
@@ -433,9 +501,12 @@ crates/cave-runtime/src/main.rs
 
     #[tokio::test]
     async fn details_endpoint_returns_project_for_known_repo() {
-        // SAFETY: tests run sequentially in the same binary.
+        let _g = crate::portal::WORKSPACE_ROOT_TEST_GUARD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        // SAFETY: guarded by WORKSPACE_ROOT_TEST_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", repo_root()); }
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(
                 Request::builder()

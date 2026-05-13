@@ -34,6 +34,11 @@ pub mod chat;
 pub mod cloud_controller_manager;
 pub mod cluster;
 pub mod compliance;
+
+/// 2026-05-13 portal-persona fix: `/admin/adr` Architecture Decision
+/// Record browser. Platform-only — walks `docs/adr/*.md` and
+/// excludes `docs/adr/internal/`.
+pub mod adr;
 pub mod container_scan;
 pub mod contributions;
 pub mod controller_manager;
@@ -114,9 +119,11 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 
-pub use permission::{AuthError, Permission, RequestCtx};
+pub use permission::{AuthError, Permission, Persona, RequestCtx};
 pub use state::AdminState;
 pub use types::{Cite, TenantId, UPSTREAM_VERSION};
+
+use cave_auth::jwt_middleware::JwtClaims;
 
 #[derive(Debug, Deserialize)]
 pub struct AdminQuery {
@@ -249,6 +256,38 @@ pub fn extract_ctx_from_query(q: AdminQuery) -> RequestCtx {
         Permission::KialiRead,
     ];
     RequestCtx::developer(&q.tenant_id, &perms)
+}
+
+/// Like [`extract_ctx_from_query`], but derives the [`Persona`] from
+/// the JWT cookie when one is present. Used by *platform-only*
+/// handlers (compliance dashboard, upstream parity, ADR Browser)
+/// that must reject `tenant_admin` cookies — the plain extractor
+/// defaults to `Persona::PlatformAdmin` to keep the dev
+/// `?tenant_id=...` shortcut backwards compatible for tenant-scoped
+/// views.
+///
+/// * No claims  → `Persona::Anonymous` (rejected by every
+///   `require_persona` gate).
+/// * Claims present → persona derived via [`Persona::from_roles`].
+///
+/// The permission bag is unchanged from the plain extractor — every
+/// dev request keeps grant-all semantics so a handler that opts in
+/// only adds the persona check, doesn't lose its existing permission
+/// flow.
+pub fn extract_ctx_from_query_with_claims(
+    q: AdminQuery,
+    claims: Option<&JwtClaims>,
+) -> RequestCtx {
+    let mut ctx = extract_ctx_from_query(q);
+    ctx.persona = match claims {
+        Some(c) => Persona::from_roles(&c.roles),
+        None => Persona::Anonymous,
+    };
+    ctx.principal = match claims {
+        Some(c) => c.sub.clone(),
+        None => ctx.principal,
+    };
+    ctx
 }
 
 fn load_contributions() -> Vec<contributions::Contribution> {
@@ -576,6 +615,7 @@ pub struct ComplianceQuery {
 
 async fn compliance_handler(
     Query(q): Query<ComplianceQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     let view = compliance::ViewQuery {
         sort: q
@@ -589,9 +629,13 @@ async fn compliance_handler(
             .map(compliance::FilterMode::parse)
             .unwrap_or_default(),
     };
-    let ctx = extract_ctx_from_query(AdminQuery {
-        tenant_id: q.tenant_id,
-    });
+    let ctx = extract_ctx_from_query_with_claims(
+        AdminQuery { tenant_id: q.tenant_id },
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    // Platform-only gate — Charter compliance is cross-tenant.
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
     let snap = compliance::cached_snapshot_or_refresh();
     compliance::render_with_view(&snap, &ctx, view)
         .map(Html)
@@ -601,8 +645,14 @@ async fn compliance_handler(
 async fn compliance_detail_handler(
     Query(q): Query<AdminQuery>,
     axum::extract::Path(crate_name): axum::extract::Path<String>,
+    claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(q);
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
     let root = compliance::workspace_root();
     let detail = compliance::build_crate_detail(&root, &crate_name)
         .map_err(|e| err_to_response(e))?;
@@ -613,9 +663,54 @@ async fn compliance_detail_handler(
 
 async fn compliance_refresh_handler(
     Query(q): Query<AdminQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(q);
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
     compliance::handle_refresh(&ctx).map(Html).map_err(err_to_response)
+}
+
+// 2026-05-13 portal-persona fix: ADR Browser. Platform-only — the
+// route handler builds the persona-aware ctx, the module re-checks
+// the persona inside its `render` so misconfiguration anywhere up
+// the chain fails closed.
+async fn adr_handler(
+    Query(q): Query<AdminQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    adr::render(&ctx).map(Html).map_err(err_to_response)
+}
+
+async fn adr_detail_handler(
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(stem): axum::extract::Path<String>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    adr::render_detail(&ctx, &stem)
+        .map(Html)
+        .map_err(|e| match e {
+            adr::AdrViewError::NotFound(_) => (
+                StatusCode::NOT_FOUND,
+                Html(render::permission_denied(&e.to_string())),
+            ),
+            _ => err_to_response(e),
+        })
 }
 
 async fn policy_handler(
@@ -722,7 +817,20 @@ async fn knative_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Que
 async fn llm_gateway_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); llm_gateway::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn local_llm_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); local_llm::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn tracker_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); tracker::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn upstream_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); upstream::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn upstream_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    // Platform-only — upstream parity is a cross-tenant control-plane view.
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    upstream::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
 async fn container_scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); container_scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn admission_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); admission::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn cdc_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cdc::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -850,6 +958,9 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/compliance", get(compliance_handler))
         .route("/admin/compliance/refresh", get(compliance_refresh_handler))
         .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))
+        // 2026-05-13 portal-persona fix: ADR Browser (Platform-only).
+        .route("/admin/adr", get(adr_handler))
+        .route("/admin/adr/{stem}", get(adr_detail_handler))
         .route("/admin/policy", get(policy_handler))
         .route("/admin/artifacts", get(artifacts_handler))
         .route("/admin/alerts", get(alerts_handler))

@@ -318,6 +318,60 @@ pub enum AuthError {
     TenantMismatch { principal: String, tenant: TenantId },
     #[error("missing permission {missing}")]
     MissingPermission { missing: &'static str },
+    #[error("persona {actual:?} cannot access {required:?} surfaces")]
+    PersonaForbidden { actual: Persona, required: Persona },
+}
+
+/// High-level role the caller has at sign-in time. Derived from the
+/// JWT cookie's `roles` claim (`platform_admin` → `PlatformAdmin`,
+/// `tenant_admin` → `TenantAdmin`). Anonymous callers (no cookie)
+/// land in `Anonymous`, which is exactly the dev `?tenant_id=...`
+/// shortcut that already drives the smoke / portal-mount tests.
+///
+/// Cite: cave-auth dev users in
+/// `crates/cave-runtime/src/portal/auth.rs::DEV_USERS`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum Persona {
+    /// Platform staff — full Cave control plane access (Charter
+    /// dashboard, ADR Browser, upstream parity, sweep planner).
+    PlatformAdmin,
+    /// Tenant admin — manages a single tenant's workloads (KEDA
+    /// ScaledObjects, Vault secrets, kubelet pods, …) but does NOT
+    /// see Charter/ADR/cross-tenant compliance.
+    TenantAdmin,
+    /// No JWT cookie — dev shortcut that grants tenant-scoped
+    /// surfaces but is blocked from platform-only ones.
+    Anonymous,
+}
+
+impl Persona {
+    /// Parse from a list of JWT role strings. First matching role
+    /// wins; missing input → `Anonymous`.
+    pub fn from_roles<S: AsRef<str>>(roles: &[S]) -> Persona {
+        for r in roles {
+            match r.as_ref() {
+                "platform_admin" => return Persona::PlatformAdmin,
+                "tenant_admin" => return Persona::TenantAdmin,
+                _ => {}
+            }
+        }
+        Persona::Anonymous
+    }
+
+    /// Stable wire name for logs / JSON.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Persona::PlatformAdmin => "platform_admin",
+            Persona::TenantAdmin => "tenant_admin",
+            Persona::Anonymous => "anonymous",
+        }
+    }
+
+    /// Whether this persona can access platform-wide surfaces (ADR
+    /// browser, compliance dashboard, upstream parity).
+    pub fn is_platform(&self) -> bool {
+        matches!(self, Persona::PlatformAdmin)
+    }
 }
 
 /// Request context carried by every admin handler.
@@ -333,6 +387,9 @@ pub struct RequestCtx {
     pub tenant_grants: BTreeSet<String>,
     /// Permissions granted within `tenant`.
     pub permissions: BTreeSet<Permission>,
+    /// High-level role derived from the JWT cookie's `roles` claim.
+    /// Anonymous in the dev `?tenant_id=...` smoke flow.
+    pub persona: Persona,
 }
 
 impl RequestCtx {
@@ -353,7 +410,26 @@ impl RequestCtx {
         Ok(())
     }
 
-    /// Convenience: build a "developer" context for tests.
+    /// Persona-only gate for routes that are platform-wide (Charter
+    /// compliance, ADR Browser, upstream parity). Runs BEFORE
+    /// permission/tenant checks so a misconfigured permission bag
+    /// can't accidentally grant a tenant the Charter dashboard.
+    pub fn require_persona(&self, required: Persona) -> Result<(), AuthError> {
+        match (required, self.persona) {
+            // Exact match always passes.
+            (a, b) if a == b => Ok(()),
+            // Platform admin can access anything a lower persona can.
+            (Persona::TenantAdmin, Persona::PlatformAdmin) => Ok(()),
+            _ => Err(AuthError::PersonaForbidden {
+                actual: self.persona,
+                required,
+            }),
+        }
+    }
+
+    /// Convenience: build a "developer" context for tests. Defaults
+    /// to `Persona::PlatformAdmin` so existing tests (which pre-date
+    /// the persona gate) keep passing.
     pub fn developer(tenant: &str, perms: &[Permission]) -> Self {
         let mut grants = BTreeSet::new();
         grants.insert(tenant.to_string());
@@ -363,7 +439,16 @@ impl RequestCtx {
             has_webauthn: true,
             tenant_grants: grants,
             permissions: perms.iter().copied().collect(),
+            persona: Persona::PlatformAdmin,
         }
+    }
+
+    /// Like [`developer`] but with an explicit persona — used by
+    /// tests that exercise the persona gate.
+    pub fn developer_as(tenant: &str, perms: &[Permission], persona: Persona) -> Self {
+        let mut ctx = Self::developer(tenant, perms);
+        ctx.persona = persona;
+        ctx
     }
 }
 
@@ -428,5 +513,75 @@ mod tests {
         for p in [Permission::EtcdRead, Permission::EtcdWatch, Permission::CriRead] {
             assert!(ctx.authorise(p).is_ok());
         }
+    }
+
+    // ── Persona gate ────────────────────────────────────────────
+
+    #[test]
+    fn persona_from_roles_picks_first_match() {
+        assert_eq!(
+            Persona::from_roles(&["platform_admin"]),
+            Persona::PlatformAdmin
+        );
+        assert_eq!(
+            Persona::from_roles(&["tenant_admin"]),
+            Persona::TenantAdmin
+        );
+        assert_eq!(Persona::from_roles::<&str>(&[]), Persona::Anonymous);
+        assert_eq!(Persona::from_roles(&["unknown"]), Persona::Anonymous);
+        // Multiple roles: platform wins over tenant.
+        assert_eq!(
+            Persona::from_roles(&["tenant_admin", "platform_admin"]),
+            Persona::TenantAdmin,
+            "first-matching-role semantics — order matters in the JWT"
+        );
+    }
+
+    #[test]
+    fn platform_admin_can_access_tenant_surfaces() {
+        let ctx = RequestCtx::developer_as(
+            "tenant-platform-down",
+            &[Permission::KedaRead],
+            Persona::PlatformAdmin,
+        );
+        assert!(ctx.require_persona(Persona::TenantAdmin).is_ok());
+        assert!(ctx.require_persona(Persona::PlatformAdmin).is_ok());
+    }
+
+    #[test]
+    fn tenant_admin_cannot_access_platform_surfaces() {
+        let ctx = RequestCtx::developer_as(
+            "tenant-blocked",
+            &[Permission::DashboardRead],
+            Persona::TenantAdmin,
+        );
+        let err = ctx.require_persona(Persona::PlatformAdmin).unwrap_err();
+        assert_eq!(
+            err,
+            AuthError::PersonaForbidden {
+                actual: Persona::TenantAdmin,
+                required: Persona::PlatformAdmin,
+            }
+        );
+        // Tenant surfaces still work.
+        assert!(ctx.require_persona(Persona::TenantAdmin).is_ok());
+    }
+
+    #[test]
+    fn anonymous_cannot_access_platform_surfaces() {
+        let ctx = RequestCtx::developer_as(
+            "tenant-anon",
+            &[Permission::DashboardRead],
+            Persona::Anonymous,
+        );
+        assert!(ctx.require_persona(Persona::PlatformAdmin).is_err());
+        assert!(ctx.require_persona(Persona::TenantAdmin).is_err());
+    }
+
+    #[test]
+    fn persona_as_str_round_trips_to_wire_name() {
+        assert_eq!(Persona::PlatformAdmin.as_str(), "platform_admin");
+        assert_eq!(Persona::TenantAdmin.as_str(), "tenant_admin");
+        assert_eq!(Persona::Anonymous.as_str(), "anonymous");
     }
 }

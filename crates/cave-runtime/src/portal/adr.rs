@@ -38,11 +38,45 @@ pub struct AdrSummary {
     pub linked_upstreams: Vec<String>,
 }
 
-pub async fn page() -> Html<&'static str> {
-    Html(PAGE_HTML)
+/// GET /adr — platform-only ADR browser page. Persona-gated:
+/// `platform_admin` only. Tenant admins get 403, anon gets bounced
+/// to /login by the JWT middleware before reaching here.
+pub async fn page(
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return persona_denied_html("/adr", "platform_admin");
+    }
+    Html(PAGE_HTML).into_response()
 }
 
-pub async fn api_list() -> Json<serde_json::Value> {
+fn is_platform_admin(
+    claims: Option<&axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> bool {
+    match claims {
+        Some(axum::Extension(c)) => c.roles.iter().any(|r| r == "platform_admin"),
+        None => false,
+    }
+}
+
+fn persona_denied_html(path: &str, required: &str) -> Response {
+    let body = format!(
+        "<html><body><h1>403 Forbidden</h1><p>{path} requires persona <code>{required}</code>. \
+         <a href=\"/login\">Sign in</a> with a platform_admin account.</p></body></html>"
+    );
+    (StatusCode::FORBIDDEN, Html(body)).into_response()
+}
+
+pub async fn api_list(
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "platform_admin role required" })),
+        )
+            .into_response();
+    }
     let mut summaries = scan_adrs(&adr_dir());
     summaries.sort_by(|a, b| a.id.cmp(&b.id));
 
@@ -57,9 +91,20 @@ pub async fn api_list() -> Json<serde_json::Value> {
         "categories": by_cat,
         "adrs": summaries,
     }))
+    .into_response()
 }
 
-pub async fn api_get(Path(id): Path<String>) -> Response {
+pub async fn api_get(
+    Path(id): Path<String>,
+    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
+) -> Response {
+    if !is_platform_admin(claims.as_ref()) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "platform_admin role required" })),
+        )
+            .into_response();
+    }
     let id = id.trim().to_string();
     let dir = adr_dir();
     let resolved = match resolve_adr_file(&dir, &id) {
@@ -241,11 +286,27 @@ pub fn router() -> Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::portal::WORKSPACE_ROOT_TEST_GUARD as ENV_GUARD;
     use axum::body::to_bytes;
     use axum::http::Request;
+    use cave_auth::jwt_middleware::JwtClaims;
     use http_body_util::BodyExt;
     use std::fs;
     use tower::ServiceExt;
+
+    /// Test helper: build the ADR router with a platform_admin
+    /// `JwtClaims` extension pre-injected. Mirrors what the JWT
+    /// middleware does for an authed request without spinning up the
+    /// full middleware stack.
+    fn router_as_platform() -> Router {
+        let claims = JwtClaims {
+            sub: "admin@platform.cave".into(),
+            email: "admin@platform.cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 4102444800,
+        };
+        router().layer(axum::Extension(claims))
+    }
 
     fn tmpdir(name: &str) -> PathBuf {
         let p = std::env::temp_dir().join(format!(
@@ -327,9 +388,11 @@ mod tests {
 
     #[tokio::test]
     async fn list_endpoint_returns_seeded_adrs() {
+        let _g = ENV_GUARD.lock().unwrap_or_else(|p| p.into_inner());
         let d = tmpdir("list");
         seed_adrs(&d);
-        // SAFETY: tests run sequentially in the same binary.
+        // SAFETY: guarded by ENV_GUARD above — only one test at a
+        // time writes CAVE_WORKSPACE_ROOT.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", d.parent().unwrap()); }
         // adr_dir() uses workspace_root()/docs/adr — recreate that layout
         let adr_actual = d.parent().unwrap().join("docs").join("adr");
@@ -338,7 +401,7 @@ mod tests {
             let dest = adr_actual.join(f.file_name());
             fs::copy(f.path(), dest).unwrap();
         }
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(Request::builder().uri("/api/adr").body(axum::body::Body::empty()).unwrap())
             .await
@@ -352,13 +415,14 @@ mod tests {
 
     #[tokio::test]
     async fn get_endpoint_renders_markdown() {
+        let _g = ENV_GUARD.lock().unwrap_or_else(|p| p.into_inner());
         let d = tmpdir("get");
         let adr_actual = d.join("docs").join("adr");
         fs::create_dir_all(&adr_actual).unwrap();
         seed_adrs(&adr_actual);
-        // SAFETY: tests run sequentially in the same binary.
+        // SAFETY: guarded by ENV_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", &d); }
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(
                 Request::builder()
@@ -378,12 +442,13 @@ mod tests {
 
     #[tokio::test]
     async fn get_endpoint_404_for_unknown() {
+        let _g = ENV_GUARD.lock().unwrap_or_else(|p| p.into_inner());
         let d = tmpdir("get404");
         let adr_actual = d.join("docs").join("adr");
         fs::create_dir_all(&adr_actual).unwrap();
-        // SAFETY: tests run sequentially in the same binary.
+        // SAFETY: guarded by ENV_GUARD.
         unsafe { std::env::set_var("CAVE_WORKSPACE_ROOT", &d); }
-        let app = router();
+        let app = router_as_platform();
         let resp = app
             .oneshot(
                 Request::builder()

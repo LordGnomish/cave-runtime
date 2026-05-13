@@ -92,6 +92,25 @@ pub async fn auth_middleware_inner(
 
     if state.should_bypass(&path) {
         debug!(path = %path, "Bypassing auth");
+        // Best-effort claim decode on bypassed paths: when a valid
+        // session cookie is present we still propagate `JwtClaims`
+        // into the request extensions so downstream handlers can
+        // persona-gate (e.g. `/admin/adr` is bypassed for the
+        // middleware but only `platform_admin` should see it).
+        // No enforcement here — a missing or expired token just
+        // means no claims, which is the dev `?tenant_id=...`
+        // shortcut path.
+        if let Some(token) =
+            extract_bearer_token(&req).or_else(|| extract_session_cookie(&req))
+        {
+            let key = DecodingKey::from_secret(state.jwt_secret.as_bytes());
+            let mut v = Validation::new(Algorithm::HS256);
+            v.validate_exp = true;
+            v.required_spec_claims.clear();
+            if let Ok(t) = decode::<JwtClaims>(&token, &key, &v) {
+                req.extensions_mut().insert(t.claims);
+            }
+        }
         return next.run(req).await;
     }
 
