@@ -87,6 +87,18 @@ pub struct CrateCompliance {
     /// completion can never masquerade as real upstream parity.
     #[serde(default)]
     pub parity_ratio: Option<f64>,
+    /// Where `parity_ratio` came from: `"manifest"` (live on-disk
+    /// `parity.manifest.toml::[parity] fill_ratio`), `"audit"`
+    /// (2026-05-01 audit-doc snapshot), or `"none"` (never
+    /// measured). Added 2026-05-13 by Fix-A so the dashboard can
+    /// render the provenance.
+    #[serde(default)]
+    pub parity_ratio_source: Option<String>,
+    /// `last_audit` date from the on-disk manifest, propagated when
+    /// `parity_ratio_source == "manifest"`. `None` when audit-doc
+    /// snapshot or never measured.
+    #[serde(default)]
+    pub parity_ratio_last_audit: Option<String>,
     /// `Some(true)` when the crate's `parity.manifest.toml` declares at
     /// least one of `[[files]]`/`[[functions]]`/`[[tests]]`/`[[surfaces]]`;
     /// `Some(false)` when the manifest exists but every section is empty
@@ -513,6 +525,19 @@ pub struct ParityIndexEntry {
     pub tier: String,
     #[serde(default)]
     pub parity_ratio: Option<f64>,
+    /// Where `parity_ratio` came from: `"manifest"` (on-disk
+    /// `parity.manifest.toml::[parity] fill_ratio`), `"audit"`
+    /// (2026-05-01 audit-doc snapshot), or `"none"` (never measured).
+    /// Added 2026-05-13 by Fix-A so the dashboard can render the
+    /// provenance and the live handler can re-read the manifest as
+    /// the source of truth.
+    #[serde(default)]
+    pub parity_ratio_source: Option<String>,
+    /// `last_audit` date from the on-disk manifest, propagated by the
+    /// build script when `parity_ratio_source == "manifest"`. Lets
+    /// the dashboard show "measured YYYY-MM-DD" alongside the ratio.
+    #[serde(default)]
+    pub last_audit_disk: Option<String>,
     #[serde(default)]
     pub manifest_filled: Option<bool>,
     #[serde(default)]
@@ -873,6 +898,8 @@ pub fn analyse_crate(
         // [`attach_parity_index`] so the filesystem walk stays pure and
         // testable without the audit JSON.
         parity_ratio: None,
+        parity_ratio_source: None,
+        parity_ratio_last_audit: None,
         manifest_filled: None,
         audit_tier: None,
         portal_ui_status: manifest.portal_ui_status,
@@ -894,6 +921,8 @@ pub fn attach_parity_index(
     for c in &mut snapshot.crates {
         if let Some(entry) = index.get(&c.name) {
             c.parity_ratio = entry.parity_ratio;
+            c.parity_ratio_source = entry.parity_ratio_source.clone();
+            c.parity_ratio_last_audit = entry.last_audit_disk.clone();
             c.manifest_filled = entry.manifest_filled;
             c.audit_tier = Some(entry.tier.clone());
             // Backfill upstream metadata from the audit when the crate's
@@ -907,6 +936,82 @@ pub fn attach_parity_index(
             }
         }
     }
+
+    // Fix-A 2026-05-13 second pass: even when the parity-index JSON
+    // wasn't regenerated since the last manifest edit, re-read the
+    // on-disk `[parity] fill_ratio` for any crate the dashboard
+    // analyses. The JSON is built by `scripts/build-parity-index.py`
+    // (offline) and may lag a few commits behind master; the
+    // dashboard renders are live so they should always reflect the
+    // newest measured value.
+    for c in &mut snapshot.crates {
+        if let Some((live_ratio, live_audit)) = read_manifest_fill_ratio(&c.name) {
+            // Only override if the manifest value differs OR the
+            // index didn't carry a source — that way audit-doc-only
+            // crates (no manifest) keep their original entry.
+            if c.parity_ratio.map(|r| (r - live_ratio).abs() > 0.000_5).unwrap_or(true) {
+                c.parity_ratio = Some(live_ratio);
+            }
+            c.parity_ratio_source = Some("manifest".into());
+            c.parity_ratio_last_audit = Some(live_audit);
+        }
+    }
+}
+
+/// Live-read `crates/<name>/parity.manifest.toml` and return
+/// `(fill_ratio, last_audit)` if both are present. Returns `None`
+/// when the manifest doesn't exist or doesn't carry a measured
+/// ratio. Pure I/O; the caller decides whether to substitute.
+///
+/// Looks for `fill_ratio = X` first (the post-2026-05-12 measured
+/// shape), then falls back to legacy `ratio = X`. The regex
+/// tolerates surrounding whitespace + trailing comments.
+fn read_manifest_fill_ratio(crate_name: &str) -> Option<(f64, String)> {
+    let path = workspace_root().join("crates").join(crate_name).join("parity.manifest.toml");
+    let text = fs::read_to_string(&path).ok()?;
+
+    // Find the [parity] section so we don't accidentally match
+    // ratio= in a comment elsewhere in the file.
+    let mut in_section = false;
+    let mut ratio: Option<f64> = None;
+    let mut audit: Option<String> = None;
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("[parity]") {
+            in_section = true;
+            continue;
+        }
+        if in_section {
+            // A new section header ends the [parity] block.
+            if trimmed.starts_with('[') && !trimmed.starts_with("[parity]") && !trimmed.starts_with('#') {
+                break;
+            }
+            // Strip a trailing `# comment` so the regex sees a clean value.
+            let value_part = trimmed.split('#').next().unwrap_or(trimmed);
+            if ratio.is_none() {
+                if let Some(rest) = value_part
+                    .strip_prefix("fill_ratio")
+                    .or_else(|| value_part.strip_prefix("ratio"))
+                {
+                    if let Some(after_eq) = rest.split_once('=') {
+                        if let Ok(v) = after_eq.1.trim().parse::<f64>() {
+                            ratio = Some(v);
+                        }
+                    }
+                }
+            }
+            if audit.is_none() {
+                if let Some(rest) = value_part.strip_prefix("last_audit") {
+                    if let Some(after_eq) = rest.split_once('=') {
+                        audit = Some(after_eq.1.trim().trim_matches('"').to_string());
+                    }
+                }
+            }
+        }
+    }
+    let r = ratio?;
+    let a = audit.unwrap_or_default();
+    Some((r, a))
 }
 
 /// Build a compliance snapshot for the given crate name list. Loads
@@ -2000,6 +2105,8 @@ version = "7.2.0"
                     four_track_score: 25,
                     infra_only: false,
                     parity_ratio: None,
+                    parity_ratio_source: None,
+                    parity_ratio_last_audit: None,
                     manifest_filled: None,
                     audit_tier: None,
                     portal_ui_status: None,
@@ -2093,6 +2200,8 @@ version = "7.2.0"
             four_track_score: score,
             infra_only: false,
             parity_ratio: None,
+            parity_ratio_source: None,
+            parity_ratio_last_audit: None,
             manifest_filled: None,
             audit_tier: None,
             portal_ui_status: None,
@@ -2310,6 +2419,8 @@ version = "7.2.0"
                 four_track_score: 87,
                 infra_only: false,
                 parity_ratio: Some(0.42),
+                parity_ratio_source: Some("manifest".into()),
+                parity_ratio_last_audit: Some("2026-05-13".into()),
                 manifest_filled: Some(true),
                 audit_tier: Some("B".into()),
                 portal_ui_status: Some("partial".into()),
