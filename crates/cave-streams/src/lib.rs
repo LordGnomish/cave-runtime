@@ -28,6 +28,7 @@ pub mod acl;
 pub mod broker;
 pub mod compression;
 pub mod connect;
+pub mod connect_worker;
 pub mod consumer_group;
 pub mod error;
 pub mod idempotent_producer;

@@ -33,11 +33,11 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 20
+mapped_count   = 21
 skipped_count  = 16
-unmapped_count = 7
+unmapped_count = 6
 total          = 43
-fill_ratio     = 0.8372
+fill_ratio     = 0.8605
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -486,6 +486,19 @@ local_files  = [
 ]
 note         = "KRaft RPCs (KIP-595) over the Kafka binary wire — Vote (52) + BeginQuorumEpoch (53) + EndQuorumEpoch (54) + DescribeQuorum (55) encode/decode + KraftHandler receiver-side rules (epoch fencing, log-up-to-date check, voter-set membership) + server.rs dispatch from kafka_wire."
 
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/runtime/"
+local_files  = [
+  "src/connect.rs",
+  "src/connect_worker/mod.rs",
+  "src/connect_worker/task_runtime.rs",
+  "src/connect_worker/offset_store.rs",
+  "src/connect_worker/assignment.rs",
+  "src/connect_worker/connector_runtime.rs",
+  "src/connect_worker/worker.rs",
+]
+note         = "Connect Worker runtime — SourceTask/SinkTask traits + tick lifecycle, OffsetStore (in-memory `OffsetStorageReader/Writer` surface, Kafka-backed swap-in tracked), rendezvous-hash AssignmentTable (cooperative rebalance protocol tracked), ConnectorRuntime lifecycle, Worker with start/stop/pause/resume/delete + failed-task isolation. SMT chain + DLQ + Kafka producer/consumer adapter tracked-not-shipped."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -568,9 +581,7 @@ note         = "BC crypto provider — Rust uses ring"
 upstream_pkg = "apache/kafka:storage/tiered/"
 note         = "Tiered storage (KIP-405) — cold partition offload to object store. Not implemented."
 
-[[unmapped]]
-upstream_pkg = "apache/kafka:connect/runtime/"
-note         = "Connect worker runtime — task scheduling, offset management, dead-letter queue. connect.rs has the REST surface only."
+# connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 
 [[unmapped]]
 upstream_pkg = "apache/kafka:streams/processor-api"
