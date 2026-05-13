@@ -124,6 +124,16 @@ pub mod deeper;
 /// device-fitness logic in `cave-scheduler/src/dra.rs`.
 pub mod resourceclaim;
 
+/// k8s-core push batch2 2026-05-13: per-pod taint-based eviction
+/// with toleration timers. Closes the gap from `node_lifecycle/`
+/// which only handles node-level NoExecute marking.
+pub mod tainteviction;
+
+/// k8s-core push batch2 2026-05-13: pod-CIDR allocator for clusters
+/// running without a cloud provider. Slices the cluster CIDR into
+/// per-node sub-CIDRs at node-add events.
+pub mod cidrallocator;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
 
 #[cfg(test)]
@@ -165,6 +175,8 @@ pub const CONTROLLERS: &[&str] = &[
     "namespace-controller",
     "bootstrap-signer",
     "resourceclaim",
+    "tainteviction",
+    "cidrallocator",
 ];
 
 /// Stable identifier of the in-process leader. We do not yet run a real

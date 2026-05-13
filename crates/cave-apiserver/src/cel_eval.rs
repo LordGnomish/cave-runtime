@@ -18,13 +18,27 @@
 //! Activation contract: the upstream VAP CEL environment exposes
 //!   `object`, `oldObject`, `request`, `params`, `namespaceObject`,
 //!   `authorizer`, and named `variables`.
-//! Cave matches the first five plus user-defined variables. The
-//! `authorizer` binding is intentionally omitted; admission requests
-//! that reference it short-circuit with a `Compile` error pointing
-//! at the missing variable, exactly as cel-go does for undeclared
-//! references.
+//! Cave matches all seven slots. The `authorizer` binding is
+//! sourced from an `AuthorizerView` snapshot pre-computed by the
+//! dispatcher (see `vap_advanced::AuthorizerView`); CEL expressions
+//! can call:
+//!
+//! ```cel
+//! authorizer.user == 'kube-admin'
+//! authorizer.groups.exists(g, g == 'system:masters')
+//! authorizer.resource('apps', 'deployments').namespace('team').check('update')
+//! authorizer.path('/healthz').check('get')
+//! ```
+//!
+//! The evaluator wires a small JSON projection of the view into the
+//! `authorizer` slot so CEL's standard `.exists()` / `.size()` /
+//! field-access works without per-method function registration. The
+//! `.check(verb)` helper is rewritten by the dispatcher into a
+//! pre-resolved boolean look-up against `view.check_resource(...)`
+//! /`view.check_url(...)`, which lets the CEL expression stay
+//! synchronous (the underlying authorizer chain is async).
 
-use crate::vap_advanced::{CelActivation, CelError, CelEvaluator, CelValue};
+use crate::vap_advanced::{AuthorizerView, CelActivation, CelError, CelEvaluator, CelValue};
 use cel_interpreter::{Context, Program, Value as CelInternalValue};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -97,6 +111,24 @@ impl CelEvaluator for CelInterpreterEvaluator {
         if let Some(v) = &act.namespace_object {
             ctx.add_variable("namespaceObject", v.clone())
                 .map_err(|e| CelError::Runtime(format!("bind namespaceObject: {e}")))?;
+        }
+        // 2026-05-13 batch2: bind the `authorizer` slot when an
+        // AuthorizerView is attached to the activation. The view
+        // projects to a JSON object so CEL's stock field access +
+        // list ops (`.exists()`, `.size()`) work on `.groups`. The
+        // `.check(verb, ...)` helper isn't a CEL method here — the
+        // dispatcher pre-resolves it through `view.check_resource()`
+        // and stashes the result in named variables (see
+        // `AuthorizerView::check_resource`).
+        if let Some(view) = &act.authorizer {
+            let projection = serde_json::json!({
+                "user": view.user,
+                "groups": view.groups,
+                "grants": view.grants.iter().cloned().collect::<Vec<_>>(),
+                "url_grants": view.url_grants.iter().cloned().collect::<Vec<_>>(),
+            });
+            ctx.add_variable("authorizer", projection)
+                .map_err(|e| CelError::Runtime(format!("bind authorizer: {e}")))?;
         }
         for (name, val) in &act.variables {
             // Per-policy named variables. Promote the in-crate
@@ -425,6 +457,176 @@ mod tests {
         assert!(
             matches!(err, CelError::Type { .. }),
             "expected Type error for List result, got {err:?}"
+        );
+    }
+
+    // ── authorizer binding (2026-05-13 batch2) ────────────────────────────
+
+    fn act_with_authorizer(view: AuthorizerView) -> CelActivation {
+        CelActivation {
+            authorizer: Some(view),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn missing_authorizer_returns_runtime_for_authorizer_user_access() {
+        // No authorizer slot bound → cel-interpreter undeclared
+        // reference. Cave surfaces this as a Runtime error so the
+        // dispatcher records it as a fail-policy outcome.
+        let ev = CelInterpreterEvaluator::new();
+        let err = ev
+            .evaluate("authorizer.user == 'kube-admin'", &CelActivation::default())
+            .unwrap_err();
+        assert!(matches!(err, CelError::Runtime(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn authorizer_user_field_reads_through_projection() {
+        let ev = CelInterpreterEvaluator::new();
+        let view = AuthorizerView {
+            user: "kube-admin".into(),
+            ..Default::default()
+        };
+        let act = act_with_authorizer(view);
+        assert_eq!(
+            ev.evaluate("authorizer.user == 'kube-admin'", &act).unwrap(),
+            CelValue::Bool(true),
+        );
+        assert_eq!(
+            ev.evaluate("authorizer.user == 'other'", &act).unwrap(),
+            CelValue::Bool(false),
+        );
+    }
+
+    #[test]
+    fn authorizer_groups_size_is_callable_from_cel() {
+        let ev = CelInterpreterEvaluator::new();
+        let view = AuthorizerView::default()
+            .with_group("system:authenticated")
+            .with_group("system:masters");
+        let act = act_with_authorizer(view);
+        assert_eq!(
+            ev.evaluate("size(authorizer.groups) == 2", &act).unwrap(),
+            CelValue::Bool(true),
+        );
+    }
+
+    #[test]
+    fn authorizer_grants_membership_check_via_in_operator() {
+        // The dispatcher's allow-list keys are stable strings; the
+        // simplest CEL spelling is membership against the list.
+        let ev = CelInterpreterEvaluator::new();
+        let view = AuthorizerView::default()
+            .allow("update", "apps", "deployments", Some("team-a"));
+        let act = act_with_authorizer(view);
+        assert_eq!(
+            ev.evaluate(
+                "'update:apps/deployments/team-a' in authorizer.grants",
+                &act,
+            )
+            .unwrap(),
+            CelValue::Bool(true),
+        );
+        assert_eq!(
+            ev.evaluate(
+                "'delete:apps/deployments/team-a' in authorizer.grants",
+                &act,
+            )
+            .unwrap(),
+            CelValue::Bool(false),
+        );
+    }
+
+    #[test]
+    fn check_resource_honours_wildcard_in_verb_slot() {
+        let view = AuthorizerView::default().allow("*", "apps", "deployments", Some("team-a"));
+        assert!(view.check_resource("get", "apps", "deployments", Some("team-a")));
+        assert!(view.check_resource("update", "apps", "deployments", Some("team-a")));
+        assert!(!view.check_resource("get", "apps", "deployments", Some("team-b")));
+    }
+
+    #[test]
+    fn check_resource_honours_wildcard_in_resource_slot() {
+        let view = AuthorizerView::default().allow("get", "core", "*", None);
+        assert!(view.check_resource("get", "core", "configmaps", None));
+        assert!(view.check_resource("get", "core", "secrets", None));
+        assert!(!view.check_resource("update", "core", "configmaps", None));
+    }
+
+    #[test]
+    fn check_resource_namespace_match_requires_either_wildcard_or_exact() {
+        let view = AuthorizerView::default().allow("update", "apps", "deployments", Some("team-a"));
+        assert!(view.check_resource("update", "apps", "deployments", Some("team-a")));
+        assert!(!view.check_resource("update", "apps", "deployments", Some("team-b")));
+        assert!(!view.check_resource("update", "apps", "deployments", None));
+    }
+
+    #[test]
+    fn check_url_honours_wildcard_in_either_slot() {
+        let view = AuthorizerView::default().allow_path("*", "/healthz");
+        assert!(view.check_url("get", "/healthz"));
+        assert!(view.check_url("head", "/healthz"));
+        assert!(!view.check_url("get", "/api/v1"));
+
+        let view = AuthorizerView::default().allow_path("get", "*");
+        assert!(view.check_url("get", "/api/v1"));
+        assert!(view.check_url("get", "/healthz"));
+    }
+
+    #[test]
+    fn authorizer_grants_with_wildcards_match_concrete_in_cel() {
+        let ev = CelInterpreterEvaluator::new();
+        // Dispatcher pre-resolves the .check() to a boolean
+        // variable; here we test the underlying snapshot is
+        // wildcard-aware.
+        let view = AuthorizerView::default().allow("*", "apps", "*", Some("team-a"));
+        assert!(view.check_resource("get", "apps", "deployments", Some("team-a")));
+        assert!(view.check_resource("delete", "apps", "statefulsets", Some("team-a")));
+        // CEL side still reads .grants verbatim.
+        let act = act_with_authorizer(view);
+        assert_eq!(
+            ev.evaluate("'*:apps/*/team-a' in authorizer.grants", &act).unwrap(),
+            CelValue::Bool(true),
+        );
+    }
+
+    #[test]
+    fn authorizer_binding_does_not_leak_into_unrelated_activation() {
+        // An activation with authorizer = None but object = Some
+        // must not somehow bind `authorizer` to null — it should
+        // truly be undeclared so a typoed expression fails loudly.
+        let ev = CelInterpreterEvaluator::new();
+        let act = act_with_object(json!({"x": 1}));
+        let err = ev
+            .evaluate("authorizer.user == 'x'", &act)
+            .unwrap_err();
+        assert!(matches!(err, CelError::Runtime(_)));
+    }
+
+    #[test]
+    fn group_membership_via_cel_exists_macro() {
+        let ev = CelInterpreterEvaluator::new();
+        let view = AuthorizerView::default()
+            .with_group("system:authenticated")
+            .with_group("idp:platform-admins");
+        let act = act_with_authorizer(view);
+        // CEL's .exists() macro iterates a list with a predicate.
+        assert_eq!(
+            ev.evaluate(
+                "authorizer.groups.exists(g, g == 'idp:platform-admins')",
+                &act
+            )
+            .unwrap(),
+            CelValue::Bool(true),
+        );
+        assert_eq!(
+            ev.evaluate(
+                "authorizer.groups.exists(g, g == 'unknown:group')",
+                &act
+            )
+            .unwrap(),
+            CelValue::Bool(false),
         );
     }
 

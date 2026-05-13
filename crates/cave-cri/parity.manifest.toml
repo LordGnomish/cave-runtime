@@ -24,11 +24,11 @@ notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/c
 # measured value: containerd v2.2.x pkg/cri/* + core/* + plugins/*
 # packages enumerated and classified honestly.
 # See docs/parity/cave-cri-port-2026-05-12.md for methodology.
-mapped_count   = 20
+mapped_count   = 21
 skipped_count  = 11
-unmapped_count = 3
+unmapped_count = 2
 total          = 34
-fill_ratio     = 0.9118
+fill_ratio     = 0.9412
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -191,9 +191,10 @@ upstream_pkg = "core/leases/"
 local_files  = ["src/leases/mod.rs", "src/leases/manager.rs", "src/leases/resource.rs"]
 note         = "Lease lifecycle + GC interlock: LeaseManager wired to LocalStore.mark_in_use/release_lease so content blobs held by an active lease cannot be reaped. Supports Content/Snapshot/Ingest resource kinds, TTL reaping, and live_content() set query for the GC walker. Scope cut: no boltdb persistence — leases are in-memory and must be re-registered after restart."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/cri/server/podsandbox/sandbox_run_other.go (non-Linux)"
-note         = "Windows/FreeBSD sandbox runners. cave-cri Linux-only by design; left as an honest gap rather than a skip because the Charter does not explicitly limit platform support."
+local_files  = ["src/sandbox_other.rs"]
+note         = "k8s-cri push batch2 2026-05-13: Windows + FreeBSD sandbox state machine. `WindowsSandbox` (job-object + HCS container id), `FreeBsdJail` (jail id + per-jail rootfs path), unified `OtherSandbox` enum + `run_pod_sandbox_other(spec, platform, now)`. Spec validation, idempotent stop, Ready→NotReady transitions. Tests run on every host (no #[cfg] gate). Platform-syscall layer (jail_create / CreateJobObjectW / HCS::CreateContainer) belongs to the runtime backend; this is the deterministic state-machine half. 15 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/oom/"
