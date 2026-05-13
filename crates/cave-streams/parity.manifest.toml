@@ -33,12 +33,12 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 18
+mapped_count   = 19
 skipped_count  = 16
-unmapped_count = 9
+unmapped_count = 8
 total          = 43
-fill_ratio     = 0.7907
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8140
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -466,6 +466,17 @@ upstream_pkg = "common:tenant + cursor + mirror"
 local_files  = ["src/tenant.rs", "src/unified_cursor.rs", "src/mirror.rs", "src/compression.rs", "src/admin.rs"]
 note         = "Cave-side multi-tenant scoping + unified consumer cursor + mirroring + compression"
 
+[[mapped]]
+upstream_pkg = "apache/kafka:raft/ + metadata/ + controller/"
+local_files  = [
+  "src/kraft/mod.rs",
+  "src/kraft/epoch.rs",
+  "src/kraft/metadata.rs",
+  "src/kraft/metadata_log.rs",
+  "src/kraft/quorum_controller.rs",
+]
+note         = "KRaft mode (KIP-500) — MetadataRecord types (Topic/Partition/Broker/Config + tombstones), ControllerEpoch + VoterSet, compacted MetadataLog with by-key compaction, QuorumController state machine (CreateTopic/DeleteTopic/Register/Unregister/SetConfig). Replication transport delegates to a future RaftTransport trait; on-disk snapshots and KRaft RPC endpoints tracked-not-shipped."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -542,9 +553,7 @@ note         = "BC crypto provider — Rust uses ring"
 
 # ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
 
-[[unmapped]]
-upstream_pkg = "apache/kafka:raft/"
-note         = "KRaft consensus (KIP-500) — Kafka's ZooKeeper-replacement metadata quorum. Single-node only today."
+# KRaft promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 
 [[unmapped]]
 upstream_pkg = "apache/kafka:storage/tiered/"
