@@ -187,6 +187,26 @@ pub enum Permission {
     K8sDashboardRead,
     /// Read Istio Kiali topology + traffic data (backed by cave-mesh).
     KialiRead,
+
+    // ── 2026-05-13 batch: realtime + power-user ───────────────────────
+    /// Subscribe to the live SSE event bus (multiplexed cluster events).
+    EventsSubscribe,
+    /// Read entries from the audit log (Platform admin gate also applies).
+    AuditRead,
+    /// Append a synthetic entry to the audit log (test + CLI helpers).
+    AuditWrite,
+    /// Read tour progress + advance the onboarding wizard.
+    OnboardRead,
+    /// Mark a tour step complete on behalf of a persona.
+    OnboardWrite,
+    /// Read the global search index.
+    GlobalSearchRead,
+    /// Trigger a quick-action fix from the compliance dashboard.
+    QuickActionTrigger,
+    /// Read the live cluster snapshot (Raft term / leader / WAL apply).
+    ClusterLiveRead,
+    /// Submit a bulk command across multiple admin resources.
+    BulkOpsSubmit,
 }
 
 impl Permission {
@@ -305,6 +325,15 @@ impl Permission {
             Permission::LokiRead => "loki.logql.read",
             Permission::K8sDashboardRead => "k8s-dashboard.resource.read",
             Permission::KialiRead => "kiali.topology.read",
+            Permission::EventsSubscribe => "portal.events.subscribe",
+            Permission::AuditRead => "portal.audit.read",
+            Permission::AuditWrite => "portal.audit.write",
+            Permission::OnboardRead => "portal.onboard.read",
+            Permission::OnboardWrite => "portal.onboard.write",
+            Permission::GlobalSearchRead => "portal.search.read",
+            Permission::QuickActionTrigger => "portal.quickaction.trigger",
+            Permission::ClusterLiveRead => "portal.cluster.live.read",
+            Permission::BulkOpsSubmit => "portal.bulkops.submit",
         }
     }
 }

@@ -362,6 +362,13 @@ async fn main() -> anyhow::Result<()> {
                 // for the development serve.
                 "/admin/".into(),
                 "/api/compliance/".into(),
+                // 2026-05-13 realtime + power-user batch: SSE event
+                // stream + bulk-op submit endpoints. The handlers
+                // re-check Permission inside the request context
+                // (extract_ctx_from_query grants a dev-token), so
+                // the JWT layer doesn't double-gate.
+                "/api/events/".into(),
+                "/api/bulk/".into(),
             ],
         })))
         // Middleware

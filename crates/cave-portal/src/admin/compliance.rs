@@ -2786,12 +2786,18 @@ version = "7.2.0"
             vault.parity_ratio
         );
         // cave-net still reports tier C (audit doc was frozen 2026-05-01),
-        // but its on-disk manifest now carries `fill_ratio = 1.0` and a
-        // `[parity]` block; the disk-overlay propagates those to the
-        // index so the dashboard reflects the live state.
+        // but the on-disk manifest now carries an honest `fill_ratio`
+        // (the 2026-05-13 audit demoted 11 breadcrumb-only mappings to
+        // unmapped, bringing the ratio down from 1.0 to 0.9179). The
+        // disk-overlay propagates the live value to the index so the
+        // dashboard reflects the honest state.
         let net = m.get("cave-net").unwrap();
         assert_eq!(net.tier, "C");
-        assert_eq!(net.parity_ratio, Some(1.0));
+        let net_ratio = net.parity_ratio.expect("cave-net has a measured ratio");
+        assert!(
+            net_ratio > 0.90 && net_ratio < 0.95,
+            "expected cave-net ratio ~0.917, got {net_ratio:?}"
+        );
         assert_eq!(net.manifest_filled, Some(true));
     }
 
