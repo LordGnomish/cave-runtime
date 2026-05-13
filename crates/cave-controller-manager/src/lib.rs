@@ -118,6 +118,12 @@ pub mod root_ca_deeper;
 /// allocator + LoadBalancer reconciler).
 pub mod deeper;
 
+/// k8s-core push 2026-05-13: DRA (KEP-4381) cluster-side ResourceClaim
+/// controller — finalizer + Immediate/WaitForFirstConsumer allocation
+/// + `reservedFor[]` reconciliation + deletion drain. Pairs with the
+/// device-fitness logic in `cave-scheduler/src/dra.rs`.
+pub mod resourceclaim;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
 
 #[cfg(test)]
@@ -158,6 +164,7 @@ pub const CONTROLLERS: &[&str] = &[
     "resource-quota",
     "namespace-controller",
     "bootstrap-signer",
+    "resourceclaim",
 ];
 
 /// Stable identifier of the in-process leader. We do not yet run a real

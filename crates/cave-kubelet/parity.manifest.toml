@@ -13,13 +13,16 @@ version = "v1.28.0"
 # On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
 # measured value: kubernetes/kubernetes v1.31.x pkg/kubelet/* +
 # pkg/volume/* + pkg/probe/* packages enumerated and classified honestly.
+# 2026-05-13 k8s-core push: TWO previously-unmapped packages closed —
+#   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
+#   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
-mapped_count   = 20
+mapped_count   = 22
 skipped_count  = 9
-unmapped_count = 9
+unmapped_count = 7
 total          = 38
-fill_ratio     = 0.7632
-last_audit     = "2026-05-12"
+fill_ratio     = 0.8158
+last_audit     = "2026-05-13"
 infra_only     = false
 
 [module]
@@ -158,13 +161,15 @@ upstream_pkg = "pkg/probe/exec/"
 reason       = "wire-format-detail"
 note         = "Folded into probe.rs"
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/status/"
-note         = "Pod status manager — reconciles observed pod phase + conditions back to apiserver. cave-kubelet's sync loop writes status during agent.rs reconciliation but does not maintain the full StatusManager queue + retry semantics."
+local_files  = ["src/pod_status_manager.rs"]
+note         = "k8s-core push 2026-05-13: PodStatusManager queue + retry. Lazy hash-dedupe via PodStatus::content_hash, bounded queue with oldest-eviction, exponential backoff via cave_kernel::backoff::Backoff, transient/permanent failure separation, deleted-pod drop semantics. 15 deterministic tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/kubelet/prober/"
-note         = "Probe results manager + container-restart trigger. probe.rs runs probes but the worker pool + restart-coordination ledger is missing."
+local_files  = ["src/prober.rs"]
+note         = "k8s-core push 2026-05-13: ProberCoordinator on top of probe::ProberManager — concurrency control via cave_kernel::semaphore (default 16 concurrent probes), restart-coordination ledger (suppresses duplicate liveness-restart fan-out, auto-clears on safety window), readiness flip dedupe. 17 deterministic tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/kubelet/cm/util/cgroups/"
