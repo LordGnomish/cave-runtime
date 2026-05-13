@@ -323,6 +323,13 @@ pub struct Broker {
     pending_reassignments: DashMap<String, HashMap<i32, Vec<i32>>>,
     #[allow(dead_code)]
     generation: AtomicI32,
+    /// Optional KRaft handler. `None` for non-controller brokers
+    /// and for installs that haven't switched to KRaft mode yet
+    /// (the broker still runs against in-memory metadata).
+    /// `Some(...)` enables Vote / BeginQuorumEpoch /
+    /// EndQuorumEpoch / DescribeQuorum dispatch in
+    /// `server::dispatch_request`.
+    kraft: std::sync::OnceLock<Arc<crate::kraft::KraftHandler>>,
 }
 
 impl Broker {
@@ -338,7 +345,20 @@ impl Broker {
             committed_offsets: DashMap::new(),
             pending_reassignments: DashMap::new(),
             generation: AtomicI32::new(0),
+            kraft: std::sync::OnceLock::new(),
         }
+    }
+
+    /// Install a KRaft handler. Idempotent — first call wins;
+    /// subsequent calls are no-ops (cluster init only mints one
+    /// handler).
+    pub fn set_kraft_handler(&self, handler: Arc<crate::kraft::KraftHandler>) {
+        let _ = self.kraft.set(handler);
+    }
+
+    /// Borrow the KRaft handler if installed.
+    pub fn kraft_handler(&self) -> Option<Arc<crate::kraft::KraftHandler>> {
+        self.kraft.get().cloned()
     }
 
     // ── Topic management ──────────────────────────────────────────────────────

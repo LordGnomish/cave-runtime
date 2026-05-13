@@ -33,11 +33,11 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 19
+mapped_count   = 20
 skipped_count  = 16
-unmapped_count = 8
+unmapped_count = 7
 total          = 43
-fill_ratio     = 0.8140
+fill_ratio     = 0.8372
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -475,7 +475,16 @@ local_files  = [
   "src/kraft/metadata_log.rs",
   "src/kraft/quorum_controller.rs",
 ]
-note         = "KRaft mode (KIP-500) — MetadataRecord types (Topic/Partition/Broker/Config + tombstones), ControllerEpoch + VoterSet, compacted MetadataLog with by-key compaction, QuorumController state machine (CreateTopic/DeleteTopic/Register/Unregister/SetConfig). Replication transport delegates to a future RaftTransport trait; on-disk snapshots and KRaft RPC endpoints tracked-not-shipped."
+note         = "KRaft mode (KIP-500) — MetadataRecord types (Topic/Partition/Broker/Config + tombstones), ControllerEpoch + VoterSet, compacted MetadataLog with by-key compaction, QuorumController state machine (CreateTopic/DeleteTopic/Register/Unregister/SetConfig). Replication transport delegates to a future RaftTransport trait; on-disk snapshots tracked-not-shipped."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:raft/RaftRpc.java + KafkaRaftClient + KRaft RPC dispatch"
+local_files  = [
+  "src/kraft/rpc.rs",
+  "src/protocol.rs",
+  "src/server.rs",
+]
+note         = "KRaft RPCs (KIP-595) over the Kafka binary wire — Vote (52) + BeginQuorumEpoch (53) + EndQuorumEpoch (54) + DescribeQuorum (55) encode/decode + KraftHandler receiver-side rules (epoch fencing, log-up-to-date check, voter-set membership) + server.rs dispatch from kafka_wire."
 
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 

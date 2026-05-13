@@ -45,6 +45,7 @@ pub mod epoch;
 pub mod metadata;
 pub mod metadata_log;
 pub mod quorum_controller;
+pub mod rpc;
 
 pub use epoch::{ControllerEpoch, VoterSet};
 pub use metadata::{
@@ -52,3 +53,8 @@ pub use metadata::{
 };
 pub use metadata_log::MetadataLog;
 pub use quorum_controller::{ControllerRequest, ControllerResponse, QuorumController};
+pub use rpc::{
+    BeginQuorumEpochRequest, BeginQuorumEpochResponse, DescribeQuorumRequest,
+    DescribeQuorumResponse, EndQuorumEpochRequest, EndQuorumEpochResponse, KraftHandler,
+    VoteRequest, VoteResponse,
+};
