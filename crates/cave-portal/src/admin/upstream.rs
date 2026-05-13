@@ -565,7 +565,7 @@ mod tests {
         status: AutoPortStatus,
         commit: Option<&str>,
     ) -> DispatchedRecord {
-        use cave_upstream_watchd::charter_gate::CharterBaseline;
+        use cave_upstream_watchd::auto_port_gate::CharterBaseline;
         DispatchedRecord {
             event_id: event_id.into(),
             cave_module: module.into(),

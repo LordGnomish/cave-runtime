@@ -193,7 +193,7 @@ async fn run_dispatch(
 ) -> anyhow::Result<()> {
     use cave_upstream_watchd::{
         auto_port::{AutoPortDispatcher, DispatcherConfig, WorkspaceContextResolver},
-        charter_gate::CharterV2Gate,
+        auto_port_gate::CharterV2Gate,
         task_queue::{DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskQueue},
     };
     use std::sync::Arc;

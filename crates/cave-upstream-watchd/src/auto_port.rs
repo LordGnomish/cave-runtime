@@ -41,7 +41,7 @@
 //!   charter_fail) appends one line to `audit.jsonl` next to the
 //!   state file. The portal `/admin/upstream` panel reads this.
 
-use crate::charter_gate::{CharterBaseline, CharterGate, VerifyResult};
+use crate::auto_port_gate::{CharterBaseline, CharterGate, VerifyResult};
 use crate::event::{read_events, GapEvent};
 use crate::prompt::{build_prompt, PortContext};
 use crate::task_queue::{TaskId, TaskOutput, TaskQueue, TaskQueueError, TaskStatus};
@@ -62,7 +62,7 @@ pub enum AutoPortError {
     #[error("task queue: {0}")]
     TaskQueue(#[from] TaskQueueError),
     #[error("charter gate: {0}")]
-    Gate(#[from] crate::charter_gate::GateError),
+    Gate(#[from] crate::auto_port_gate::GateError),
     #[error("disabled via CAVE_AUTOPORT_DISABLE")]
     Disabled,
 }
@@ -593,7 +593,7 @@ pub fn read_audit(path: &Path) -> Result<Vec<AuditEntry>, AutoPortError> {
 mod tests {
     use super::*;
     use crate::changelog::Changelog;
-    use crate::charter_gate::CharterV2Gate;
+    use crate::auto_port_gate::CharterV2Gate;
     use crate::diff::Severity;
     use crate::event::{GapEventSink, JsonlSink};
     use crate::task_queue::DryRunTaskQueue;
@@ -696,7 +696,7 @@ mod tests {
     }
     #[async_trait]
     impl CharterGate for ScriptedGate {
-        async fn verify(&self, baseline: &CharterBaseline, sha: &str) -> Result<VerifyResult, crate::charter_gate::GateError> {
+        async fn verify(&self, baseline: &CharterBaseline, sha: &str) -> Result<VerifyResult, crate::auto_port_gate::GateError> {
             let pass = self.will_pass.load(Ordering::SeqCst);
             Ok(VerifyResult {
                 crate_name: baseline.crate_name.clone(),

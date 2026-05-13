@@ -44,7 +44,7 @@ pub mod tracked;
 /// result against the charter-v2 gate, and records the outcome to
 /// the audit JSONL.
 pub mod auto_port;
-pub mod charter_gate;
+pub mod auto_port_gate;
 pub mod prompt;
 pub mod task_queue;
 
@@ -59,7 +59,7 @@ pub use auto_port::{
     AutoPortDispatcher, AutoPortError, AutoPortStatus, DispatchedRecord, DispatchSummary,
     DispatcherConfig, VerifySummary,
 };
-pub use charter_gate::{CharterBaseline, CharterGate, CharterV2Gate, VerifyResult};
+pub use auto_port_gate::{CharterBaseline, CharterGate, CharterV2Gate, VerifyResult};
 pub use prompt::{build_prompt, PortContext};
 pub use task_queue::{
     DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput, TaskQueue, TaskQueueError,
