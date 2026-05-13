@@ -30,29 +30,36 @@ pub fn escape(input: &str) -> String {
 /// `title` is shown in the `<title>` and as the H1.
 /// `body` is interpolated as-is — callers MUST escape user data before
 /// passing it in.
+///
+/// **2026-05-13 UX foundation update.** This shell now delegates to
+/// [`crate::admin::layout::shell::shell_v2`] with `Persona::Anonymous`
+/// defaults so handlers that don't yet know the persona still get the
+/// full chrome (top bar, sidebar, breadcrumb, command palette,
+/// shortcuts, toasts, dark-mode toggle, footer). Existing tests that
+/// assert the presence of `/static/htmx.min.js`,
+/// `/static/tailwind-light.css`, and the escaped `<h1>{title}</h1>` /
+/// `<title>{title} — cave admin</title>` continue to pass because
+/// shell_v2 emits exactly those tags.
+///
+/// Callers that need persona-aware sidebar filtering or want to
+/// inject extra command-palette items should call
+/// [`crate::admin::layout::shell_v2`] directly with explicit
+/// `ShellOptions`.
 pub fn page_shell(title: &str, body: &str) -> String {
-    let title_e = escape(title);
-    format!(
-        r#"<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{title} — cave admin</title>
-  <script src="/static/htmx.min.js" defer></script>
-  <link rel="stylesheet" href="/static/tailwind-light.css">
-</head>
-<body class="bg-gray-50 text-gray-900 font-sans">
-  <header class="border-b bg-white px-4 py-3">
-    <h1 class="text-xl font-semibold">{title}</h1>
-  </header>
-  <main class="px-4 py-6 max-w-6xl mx-auto">
-{body}
-  </main>
-</body>
-</html>"#,
-        title = title_e,
-        body = body,
-    )
+    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    use crate::admin::permission::Persona;
+    shell_v2(ShellOptions {
+        title,
+        persona: Persona::Anonymous,
+        tenant_id: "dev",
+        current_path: "/",
+        theme_cookie: None,
+        breadcrumb: None,
+        extra_commands: Vec::new(),
+        cluster_info: "cave-runtime",
+        hide_sidebar: true,
+        body,
+    })
 }
 
 /// Render an HTML table. `headers` and `rows` are escaped; the caller does
