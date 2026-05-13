@@ -1739,6 +1739,184 @@ pub fn render(
     render_with_view(snapshot, ctx, ViewQuery::default())
 }
 
+/// Liveness signal for the compliance dashboard. The dashboard reads
+/// `docs/parity/parity-index.json` at boot + on cache refresh; the
+/// running binary is recompiled less often than manifests change. The
+/// banner fires when either is older than the latest `main` commit
+/// touching parity sources — i.e. the data the dashboard is serving is
+/// older than what's on disk. Surfaced as a yellow banner at the top
+/// of the page so Burak (and anyone else) sees stale state immediately
+/// instead of staring at a number that lags reality by hours.
+///
+/// "Staleness" is computed against three signals:
+///   1. parity-index.json mtime vs the newest crates/*/parity.manifest.toml
+///      mtime — the index is stale when a manifest is newer.
+///   2. running-binary build time (best-effort: `cave-runtime` binary mtime)
+///      vs the newest source file mtime — the binary is stale when the
+///      source has changed since the last build.
+///   3. last git commit on `main` that touched parity files vs both above
+///      — a sanity floor.
+///
+/// Pure I/O on the workspace root; no network. Returns the snapshot so
+/// the renderer can decide whether to show the banner + what to say.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StaleStateBanner {
+    /// `parity-index.json` mtime (Unix seconds), or `None` when the file
+    /// doesn't exist.
+    pub parity_index_mtime: Option<i64>,
+    /// Newest `crates/*/parity.manifest.toml` mtime — what the index
+    /// SHOULD reflect, if it's in sync. `None` when no manifests found.
+    pub newest_manifest_mtime: Option<i64>,
+    /// `target/release/cave-runtime` or `target/debug/cave-runtime`
+    /// binary mtime — when the running daemon was last built. `None`
+    /// when neither exists (CI environment, for example).
+    pub binary_mtime: Option<i64>,
+    /// Newest source file under `crates/*/src/**/*.rs`. If the binary
+    /// is older than this, the running daemon is on a stale build.
+    pub newest_source_mtime: Option<i64>,
+    /// True when `parity-index.json` is older than the newest manifest.
+    /// Renders a banner pointing the user to
+    /// `python3 scripts/build-parity-index.py` (or the post-commit hook).
+    pub index_stale: bool,
+    /// True when the running binary is older than the newest source.
+    /// Renders a banner pointing the user to
+    /// `./scripts/cave-runtime-rebuild-restart.sh`.
+    pub binary_stale: bool,
+}
+
+impl StaleStateBanner {
+    /// Convenience: any kind of staleness present.
+    pub fn is_stale(&self) -> bool {
+        self.index_stale || self.binary_stale
+    }
+}
+
+/// Walk the workspace and compute the staleness signals. Idempotent +
+/// cheap (a directory walk; no compilation). Always returns a banner —
+/// callers check `is_stale()`.
+pub fn check_stale_state(workspace_root: &Path) -> StaleStateBanner {
+    let parity_index_mtime = mtime_secs(&workspace_root.join("docs/parity/parity-index.json"));
+    let newest_manifest_mtime = newest_mtime_in(
+        &workspace_root.join("crates"),
+        |p| p.file_name().and_then(|n| n.to_str()) == Some("parity.manifest.toml"),
+    );
+    // Prefer the release binary if both exist (production-style); fall back
+    // to debug for dev installs.
+    let release_bin = workspace_root.join("target/release/cave-runtime");
+    let debug_bin = workspace_root.join("target/debug/cave-runtime");
+    let binary_mtime = mtime_secs(&release_bin).or_else(|| mtime_secs(&debug_bin));
+    let newest_source_mtime = newest_mtime_in(
+        &workspace_root.join("crates"),
+        |p| p.extension().and_then(|e| e.to_str()) == Some("rs"),
+    );
+
+    // Tolerance: clocks + git checkouts can introduce 1–2s of jitter. Only
+    // flag staleness when the gap is meaningful (5 seconds).
+    let gap_threshold: i64 = 5;
+    let index_stale = match (parity_index_mtime, newest_manifest_mtime) {
+        (Some(i), Some(m)) => m > i + gap_threshold,
+        _ => false,
+    };
+    let binary_stale = match (binary_mtime, newest_source_mtime) {
+        (Some(b), Some(s)) => s > b + gap_threshold,
+        _ => false,
+    };
+
+    StaleStateBanner {
+        parity_index_mtime,
+        newest_manifest_mtime,
+        binary_mtime,
+        newest_source_mtime,
+        index_stale,
+        binary_stale,
+    }
+}
+
+fn mtime_secs(p: &Path) -> Option<i64> {
+    let md = fs::metadata(p).ok()?;
+    let mt = md.modified().ok()?;
+    mt.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs() as i64)
+}
+
+/// Walk `root` recursively and return the newest mtime among files matching
+/// `pred`. Returns `None` when no matching files exist. Skips `target/`
+/// trees so this stays fast in workspaces with deep build caches.
+fn newest_mtime_in(root: &Path, pred: impl Fn(&Path) -> bool + Copy) -> Option<i64> {
+    fn walk(dir: &Path, pred: &impl Fn(&Path) -> bool, best: &mut Option<i64>) {
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+        for entry in entries.flatten() {
+            let p = entry.path();
+            // Skip target/, .git/, node_modules/ — large dirs no one cares about.
+            if p.is_dir() {
+                if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                    if matches!(name, "target" | ".git" | "node_modules") {
+                        continue;
+                    }
+                }
+                walk(&p, pred, best);
+                continue;
+            }
+            if pred(&p) {
+                if let Some(t) = mtime_secs(&p) {
+                    *best = Some(best.map_or(t, |cur| cur.max(t)));
+                }
+            }
+        }
+    }
+    let mut best: Option<i64> = None;
+    walk(root, &pred, &mut best);
+    best
+}
+
+/// Render a yellow staleness banner. Empty string when nothing is stale.
+/// Plain HTML — the call site interpolates this verbatim.
+pub fn render_stale_banner(banner: &StaleStateBanner) -> String {
+    if !banner.is_stale() {
+        return String::new();
+    }
+    let mut messages: Vec<String> = Vec::new();
+    if banner.index_stale {
+        let gap = banner
+            .newest_manifest_mtime
+            .zip(banner.parity_index_mtime)
+            .map(|(m, i)| m - i)
+            .unwrap_or(0);
+        messages.push(format!(
+            "<li><strong>parity-index.json is stale</strong> — \
+             the newest <code>parity.manifest.toml</code> is {gap}s newer than the index. \
+             Run <code>python3 scripts/build-parity-index.py</code> \
+             (or install the post-commit hook with \
+             <code>./scripts/install-git-hooks.sh</code>) to refresh.</li>"
+        ));
+    }
+    if banner.binary_stale {
+        let gap = banner
+            .newest_source_mtime
+            .zip(banner.binary_mtime)
+            .map(|(s, b)| s - b)
+            .unwrap_or(0);
+        messages.push(format!(
+            "<li><strong>The running cave-runtime binary is older than the source</strong> — \
+             source is {gap}s newer. \
+             Run <code>./scripts/cave-runtime-rebuild-restart.sh</code> to rebuild + restart the \
+             local daemon so the portal serves the latest code.</li>"
+        ));
+    }
+    let body = messages.join("");
+    format!(
+        r#"<section class="mb-6 p-4 rounded border-2 border-amber-400 bg-amber-50 text-amber-900">
+  <div class="flex items-baseline gap-3 mb-2">
+    <span class="text-2xl" aria-hidden="true">⚠️</span>
+    <strong class="text-lg">Portal is serving stale state.</strong>
+  </div>
+  <ul class="ml-8 list-disc text-sm">{body}</ul>
+</section>"#
+    )
+}
+
 pub fn render_with_view(
     snapshot: &ComplianceSnapshot,
     ctx: &RequestCtx,
@@ -1968,8 +2146,10 @@ pub fn render_with_view(
         total = total,
     );
 
+    let banner = check_stale_state(&workspace_root());
+    let stale_banner_html = render_stale_banner(&banner);
     let body = format!(
-        r#"<section class="mb-6 p-4 bg-gray-100 rounded">
+        r#"{stale_banner_html}<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
 <section class="grid grid-cols-4 gap-4 mb-6">
@@ -2064,6 +2244,7 @@ pub fn render_with_view(
         portal_ui_grade = portal_ui_grade,
         portal_ui_measured = portal_ui_measured,
         portal_ui_p0_gaps = portal_ui_p0_gaps,
+        stale_banner_html = stale_banner_html,
         behavioral_avg = behavioral_avg,
         behavioral_color = behavioral_color,
         behavioral_grade = behavioral_grade,
@@ -3963,6 +4144,309 @@ priority = "P0"
             Some(n) => assert_eq!(n, 0, "infra crate has no partials"),
         }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Stale-state banner (added 2026-05-13 by the live-state-guarantees pass).
+    // Surfaces "your portal is serving stale state — rebuild the binary or
+    // regen the parity index" at the top of /admin/compliance so a daemon
+    // running on yesterday's binary can't silently hide the fix that landed
+    // on main.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    fn write_tmp_file(path: &Path, content: &str) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, content).unwrap();
+    }
+
+    /// Stamp `path`'s mtime to a fixed Unix-seconds value. Uses POSIX
+    /// `utimes(2)` directly via `nix`-less libc to avoid pulling a new
+    /// dev-dep. Falls back to a no-op on platforms where the syscall is
+    /// unavailable; tests guard themselves with mtime reads.
+    fn touch_mtime_to(path: &Path, secs_since_epoch: i64) {
+        use std::ffi::CString;
+        use std::os::raw::c_long;
+        // `timeval { tv_sec, tv_usec }` — same atime as mtime here.
+        #[repr(C)]
+        struct Timeval {
+            tv_sec: c_long,
+            tv_usec: c_long,
+        }
+        unsafe extern "C" {
+            fn utimes(filename: *const i8, times: *const Timeval) -> i32;
+        }
+        let c_path = CString::new(path.as_os_str().to_str().unwrap()).unwrap();
+        let tv = [
+            Timeval { tv_sec: secs_since_epoch as c_long, tv_usec: 0 },
+            Timeval { tv_sec: secs_since_epoch as c_long, tv_usec: 0 },
+        ];
+        // SAFETY: c_path is a valid NUL-terminated string; tv is a fixed-
+        // size local array passed by pointer.
+        unsafe {
+            utimes(c_path.as_ptr(), tv.as_ptr());
+        }
+    }
+
+    #[test]
+    fn check_stale_state_returns_no_staleness_for_empty_workspace() {
+        let tmp = tempfile::tempdir().unwrap();
+        let banner = check_stale_state(tmp.path());
+        assert!(!banner.is_stale());
+        assert!(!banner.index_stale);
+        assert!(!banner.binary_stale);
+        // No files → all None.
+        assert!(banner.parity_index_mtime.is_none());
+        assert!(banner.newest_manifest_mtime.is_none());
+    }
+
+    #[test]
+    fn check_stale_state_flags_index_when_manifest_newer() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        // Write an index file with an old mtime, then a manifest with a newer one.
+        let index = root.join("docs/parity/parity-index.json");
+        let manifest = root.join("crates/cave-foo/parity.manifest.toml");
+        write_tmp_file(&index, "{}");
+        write_tmp_file(&manifest, "[parity]\nfill_ratio = 0.5\n");
+        touch_mtime_to(&index, 1_700_000_000);
+        touch_mtime_to(&manifest, 1_700_000_100); // 100s newer
+
+        let banner = check_stale_state(root);
+        assert!(banner.is_stale());
+        assert!(banner.index_stale, "index should be flagged stale");
+        assert!(!banner.binary_stale);
+        assert_eq!(banner.parity_index_mtime, Some(1_700_000_000));
+        assert_eq!(banner.newest_manifest_mtime, Some(1_700_000_100));
+    }
+
+    #[test]
+    fn check_stale_state_tolerates_small_gap() {
+        // Files within the 5-second jitter tolerance are NOT flagged stale.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let index = root.join("docs/parity/parity-index.json");
+        let manifest = root.join("crates/cave-foo/parity.manifest.toml");
+        write_tmp_file(&index, "{}");
+        write_tmp_file(&manifest, "[parity]\nfill_ratio = 0.5\n");
+        touch_mtime_to(&index, 1_700_000_000);
+        touch_mtime_to(&manifest, 1_700_000_003); // 3s newer — within tolerance
+
+        let banner = check_stale_state(root);
+        assert!(!banner.index_stale, "3s gap should be within tolerance");
+    }
+
+    #[test]
+    fn check_stale_state_flags_binary_when_source_newer() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let bin = root.join("target/debug/cave-runtime");
+        let src = root.join("crates/cave-foo/src/lib.rs");
+        write_tmp_file(&bin, "binary content");
+        write_tmp_file(&src, "// rust source");
+        touch_mtime_to(&bin, 1_700_000_000);
+        touch_mtime_to(&src, 1_700_001_000); // 1000s newer
+
+        let banner = check_stale_state(root);
+        assert!(banner.binary_stale, "binary older than source → stale");
+        assert!(banner.is_stale());
+        assert_eq!(banner.binary_mtime, Some(1_700_000_000));
+        assert_eq!(banner.newest_source_mtime, Some(1_700_001_000));
+    }
+
+    #[test]
+    fn check_stale_state_prefers_release_binary_over_debug() {
+        // Release binary mtime wins over the debug one when both exist —
+        // releases ship to production, debug is local-dev-only.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let release_bin = root.join("target/release/cave-runtime");
+        let debug_bin = root.join("target/debug/cave-runtime");
+        write_tmp_file(&release_bin, "release");
+        write_tmp_file(&debug_bin, "debug");
+        // Debug is newer than release — but the staleness check should still
+        // pick release as the canonical "running daemon" mtime.
+        touch_mtime_to(&release_bin, 1_700_000_000);
+        touch_mtime_to(&debug_bin, 1_700_005_000);
+
+        let banner = check_stale_state(root);
+        assert_eq!(
+            banner.binary_mtime,
+            Some(1_700_000_000),
+            "release binary mtime preferred over debug",
+        );
+    }
+
+    #[test]
+    fn check_stale_state_skips_target_tree_when_walking_sources() {
+        // The walker must NOT descend into target/ — otherwise the binary
+        // itself (a .rs sibling in some setups) or a build-script-generated
+        // .rs would become "newest source" and the check would always flag
+        // the binary stale on a fresh build.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let bin = root.join("target/debug/cave-runtime");
+        let real_src = root.join("crates/cave-foo/src/lib.rs");
+        let target_rs = root.join("target/build/script.rs");
+        write_tmp_file(&bin, "binary");
+        write_tmp_file(&real_src, "src");
+        write_tmp_file(&target_rs, "should be ignored");
+        touch_mtime_to(&bin, 1_700_000_100);
+        touch_mtime_to(&real_src, 1_700_000_050);
+        touch_mtime_to(&target_rs, 1_700_000_999); // newest if not skipped
+
+        let banner = check_stale_state(root);
+        // target_rs is under target/ → ignored; real_src is newest.
+        assert_eq!(banner.newest_source_mtime, Some(1_700_000_050));
+        assert!(!banner.binary_stale, "real source older than binary → not stale");
+    }
+
+    #[test]
+    fn render_stale_banner_returns_empty_when_in_sync() {
+        let banner = StaleStateBanner {
+            parity_index_mtime: Some(1_700_000_100),
+            newest_manifest_mtime: Some(1_700_000_050),
+            binary_mtime: Some(1_700_000_100),
+            newest_source_mtime: Some(1_700_000_050),
+            index_stale: false,
+            binary_stale: false,
+        };
+        assert_eq!(render_stale_banner(&banner), "");
+    }
+
+    #[test]
+    fn render_stale_banner_emits_yellow_section_with_actionable_command() {
+        let banner = StaleStateBanner {
+            parity_index_mtime: Some(1_700_000_000),
+            newest_manifest_mtime: Some(1_700_001_000),
+            binary_mtime: None,
+            newest_source_mtime: None,
+            index_stale: true,
+            binary_stale: false,
+        };
+        let html = render_stale_banner(&banner);
+        assert!(html.contains("Portal is serving stale state"));
+        // The actionable command must be visible — that's the whole point.
+        assert!(html.contains("python3 scripts/build-parity-index.py"));
+        // The gap (in seconds) must be surfaced so the user can gauge severity.
+        assert!(html.contains("1000s"));
+        // Should NOT mention the rebuild script (binary not stale here).
+        assert!(!html.contains("cave-runtime-rebuild-restart.sh"));
+    }
+
+    #[test]
+    fn render_stale_banner_surfaces_both_kinds_when_both_stale() {
+        let banner = StaleStateBanner {
+            parity_index_mtime: Some(1_700_000_000),
+            newest_manifest_mtime: Some(1_700_000_100),
+            binary_mtime: Some(1_700_000_000),
+            newest_source_mtime: Some(1_700_002_000),
+            index_stale: true,
+            binary_stale: true,
+        };
+        let html = render_stale_banner(&banner);
+        // Two <li> items — one per kind of staleness.
+        assert_eq!(html.matches("<li>").count(), 2, "one bullet per stale axis");
+        assert!(html.contains("python3 scripts/build-parity-index.py"));
+        assert!(html.contains("cave-runtime-rebuild-restart.sh"));
+    }
+
+    #[test]
+    fn dashboard_renders_stale_banner_when_workspace_is_out_of_sync() {
+        // End-to-end: build a tmp workspace with deliberate staleness, set
+        // CAVE_WORKSPACE_ROOT to point at it, render the dashboard. The
+        // yellow banner must appear at the top of the HTML.
+        //
+        // Serialised with CACHE_TEST_LOCK because we mutate the workspace-
+        // root env var, which other tests also read.
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_tmp_file(&root.join("Cargo.toml"), "");
+        // Manifest newer than the index → index_stale = true.
+        write_tmp_file(&root.join("docs/parity/parity-index.json"), "{}");
+        write_tmp_file(
+            &root.join("crates/cave-foo/parity.manifest.toml"),
+            "[parity]\nfill_ratio = 0.5\n",
+        );
+        touch_mtime_to(&root.join("docs/parity/parity-index.json"), 1_700_000_000);
+        touch_mtime_to(
+            &root.join("crates/cave-foo/parity.manifest.toml"),
+            1_700_000_500,
+        );
+
+        // SAFETY: serialised with CACHE_TEST_LOCK above.
+        let prev = std::env::var("CAVE_WORKSPACE_ROOT").ok();
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", root);
+        }
+
+        let snap = ComplianceSnapshot { crates: vec![] };
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        assert!(
+            html.contains("Portal is serving stale state"),
+            "stale banner must render at the top of /admin/compliance"
+        );
+        assert!(html.contains("python3 scripts/build-parity-index.py"));
+
+        // Restore env var.
+        unsafe {
+            match prev {
+                Some(v) => std::env::set_var("CAVE_WORKSPACE_ROOT", v),
+                None => std::env::remove_var("CAVE_WORKSPACE_ROOT"),
+            }
+        }
+    }
+
+    #[test]
+    fn dashboard_omits_stale_banner_when_in_sync() {
+        // Same setup as above but index is NEWER than manifest → no banner.
+        let _guard = CACHE_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_tmp_file(&root.join("Cargo.toml"), "");
+        write_tmp_file(&root.join("docs/parity/parity-index.json"), "{}");
+        write_tmp_file(
+            &root.join("crates/cave-foo/parity.manifest.toml"),
+            "[parity]\nfill_ratio = 0.5\n",
+        );
+        touch_mtime_to(
+            &root.join("crates/cave-foo/parity.manifest.toml"),
+            1_700_000_000,
+        );
+        touch_mtime_to(&root.join("docs/parity/parity-index.json"), 1_700_000_500);
+
+        let prev = std::env::var("CAVE_WORKSPACE_ROOT").ok();
+        unsafe {
+            std::env::set_var("CAVE_WORKSPACE_ROOT", root);
+        }
+
+        let snap = ComplianceSnapshot { crates: vec![] };
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        assert!(
+            !html.contains("Portal is serving stale state"),
+            "no banner when index ≥ manifests"
+        );
+
+        unsafe {
+            match prev {
+                Some(v) => std::env::set_var("CAVE_WORKSPACE_ROOT", v),
+                None => std::env::remove_var("CAVE_WORKSPACE_ROOT"),
+            }
+        }
+    }
+
+    // (end stale-state-banner tests)
 
     #[test]
     fn render_dashboard_matrix_emits_real_span_not_escaped_text() {
