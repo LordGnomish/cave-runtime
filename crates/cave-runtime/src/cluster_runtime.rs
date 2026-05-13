@@ -185,7 +185,58 @@ impl ClusterRuntime {
         let etcd_addr = SocketAddr::new(advertise_ip, etcd_port);
         let api_addr = SocketAddr::new(advertise_ip, advertise_port);
 
-        let etcd_router = etcd_router(self.etcd_store.clone());
+        // Multi-node mode: install a RaftBridge so write handlers
+        // propose-and-wait through the Raft core. Single-node mode
+        // (empty peer list) keeps the direct-apply path. The bridge
+        // shares an `ApplyNotifier` with the apply daemon so writes
+        // observe their entry land before responding.
+        let raft_bridge: Option<cave_etcd::raft_bridge::SharedRaftBridge> =
+            if self.manifest.peers.is_empty() {
+                None
+            } else {
+                let notifier = crate::raft_apply::ApplyNotifier::new();
+                // Spawn the apply daemon — drains
+                // `take_committed_entries` and writes into the local
+                // KvStore + ResourceStore. The notifier publishes each
+                // applied index so `propose_and_wait` unblocks.
+                let targets = std::sync::Arc::new(crate::raft_apply::ApplyTargets {
+                    kv: self.etcd_store.clone(),
+                    resources: self.apiserver_store.clone(),
+                });
+                let metrics =
+                    std::sync::Arc::new(crate::raft_apply::ApplyMetrics::default());
+                let source: std::sync::Arc<
+                    dyn crate::raft_apply::CommittedEntrySource,
+                > = std::sync::Arc::new(crate::raft_apply::RaftCoreSource {
+                    core: self.raft.core.clone(),
+                });
+                let (_apply_shutdown_tx, apply_shutdown_rx) =
+                    tokio::sync::watch::channel(false);
+                let notifier_for_loop = notifier.clone();
+                tokio::spawn(async move {
+                    crate::raft_apply::run_apply_loop_with_notifier(
+                        source,
+                        targets,
+                        metrics,
+                        Some(notifier_for_loop),
+                        apply_shutdown_rx,
+                        std::time::Duration::from_millis(50),
+                    )
+                    .await;
+                });
+                let bridge = crate::raft_apply::RaftBridgeImpl::new(
+                    self.raft.core.clone(),
+                    notifier,
+                    self.peer_registry.clone(),
+                );
+                info!(
+                    peers = self.manifest.peers.len(),
+                    "raft bridge mounted — etcd writes will propose through Raft"
+                );
+                Some(std::sync::Arc::new(bridge)
+                    as cave_etcd::raft_bridge::SharedRaftBridge)
+            };
+        let etcd_router = etcd_router_with_bridge(self.etcd_store.clone(), raft_bridge);
         let api_router = apiserver_router(
             self.apiserver_store.clone(),
             self.bootstrap_tokens.clone(),
@@ -493,6 +544,18 @@ pub struct BootstrapTokenEntry {
 
 fn etcd_router(state: Arc<cave_etcd::store::KvStore>) -> Router {
     cave_etcd::router(state).route("/healthz", get(|| async { "ok\n" }))
+}
+
+/// Variant that mounts the etcd router with an optional `RaftBridge`.
+/// `Some(bridge)` is used in multi-node mode so writes propose
+/// through Raft before responding; `None` keeps the single-node
+/// direct-apply behaviour.
+fn etcd_router_with_bridge(
+    state: Arc<cave_etcd::store::KvStore>,
+    bridge: Option<cave_etcd::raft_bridge::SharedRaftBridge>,
+) -> Router {
+    cave_etcd::router_with_bridge(state, bridge)
+        .route("/healthz", get(|| async { "ok\n" }))
 }
 
 #[derive(Clone)]
