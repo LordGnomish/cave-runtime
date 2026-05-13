@@ -9,6 +9,10 @@ license.workspace = true
 name = "cave-upstream-watchd"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "cave-tdd-check"
+path = "src/bin/cave-tdd-check.rs"
+
 [dependencies]
 reqwest = { workspace = true }
 serde = { workspace = true }
