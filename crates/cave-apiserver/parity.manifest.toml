@@ -19,11 +19,13 @@ version = "v1.36.0"
 # `cel-interpreter` crate). New ratio: 27 mapped / 17 skipped / 6
 # unmapped = 0.88.
 # See docs/parity/cave-apiserver-port-2026-05-12.md for methodology.
-mapped_count   = 27
-skipped_count  = 17
+mapped_count   = 26
+partial_count  = 1
+skipped_count  = 18
 unmapped_count = 6
-total          = 50
-fill_ratio     = 0.88
+total          = 51
+fill_ratio     = 0.8824
+honest_ratio   = 0.8627
 last_audit     = "2026-05-12"
 infra_only     = false
 
@@ -247,7 +249,7 @@ upstream_pkg = "staging/src/k8s.io/legacy-cloud-providers/"
 reason       = "wire-format-detail"
 note         = "Legacy CCM stubs slated for removal upstream"
 
-[[mapped]]
+[[partial]]
 upstream_pkg = "staging/src/k8s.io/apiserver/pkg/cel/"
 local_files  = ["src/cel_eval.rs"]
 note         = "Real CEL evaluator (CelInterpreterEvaluator) backed by the cel-interpreter crate. Supports the VAP CEL subset: boolean / int / string / has() / startsWith() / logical ops / object.{spec,metadata,...} field traversal / oldObject diffs / params / request / named variables. Program-cache shares compiled expressions across calls. Wired into vap_advanced::Dispatcher via the existing CelEvaluator trait (PanicEvaluator → CelInterpreterEvaluator)."

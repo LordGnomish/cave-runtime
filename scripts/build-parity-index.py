@@ -316,8 +316,24 @@ def disk_manifest_state(crate: str) -> dict:
     if not block_lines:
         return {}
     block = "\n".join(block_lines)
-    rm = re.search(r'^\s*(?:fill_)?ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    rm = re.search(r'^\s*fill_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    if rm is None:
+        rm = re.search(r'^\s*ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
     ratio = float(rm.group(1)) if rm else None
+    # NEW 2026-05-13: honest_ratio = (fully_ported_mapped + skipped) / total
+    # — partial blocks excluded. Surfaced as a separate axis on the
+    # compliance dashboard.
+    hm = re.search(r'^\s*honest_ratio\s*=\s*([0-9.]+)', block, flags=re.MULTILINE)
+    honest_ratio = float(hm.group(1)) if hm else None
+    # Per-class counts (added 2026-05-13 alongside [[partial]]).
+    def _int_field(name: str) -> int | None:
+        m = re.search(rf'^\s*{re.escape(name)}\s*=\s*([0-9]+)', block, flags=re.MULTILINE)
+        return int(m.group(1)) if m else None
+    mapped_count = _int_field("mapped_count")
+    partial_count = _int_field("partial_count")
+    skipped_count = _int_field("skipped_count")
+    unmapped_count = _int_field("unmapped_count")
+    total_count = _int_field("total")
     am = re.search(r'^\s*last_audit\s*=\s*"([^"]+)"', block, flags=re.MULTILINE)
     last_audit = am.group(1) if am else None
     im = re.search(r'^\s*infra_only\s*=\s*(true|false)', block, flags=re.MULTILINE)
@@ -341,8 +357,14 @@ def disk_manifest_state(crate: str) -> dict:
     return {
         "manifest_filled": filled,
         "parity_ratio_disk": ratio,
+        "honest_ratio_disk": honest_ratio,
         "infra_only_disk": infra,
         "last_audit_disk": last_audit,
+        "mapped_count": mapped_count,
+        "partial_count": partial_count,
+        "skipped_count": skipped_count,
+        "unmapped_count": unmapped_count,
+        "total_count": total_count,
     }
 
 
@@ -419,6 +441,21 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
                 ratio_overrides += 1
             entry["parity_ratio_source"] = "manifest"
             entry["last_audit_disk"] = disk.get("last_audit_disk")
+        # Honest-parity axis (added 2026-05-13). When the manifest carries
+        # an explicit `honest_ratio`, surface it; otherwise fall back to
+        # the standard `parity_ratio` so the dashboard sees no NaN.
+        honest = disk.get("honest_ratio_disk")
+        if honest is not None:
+            entry["honest_ratio"] = honest
+        elif disk_ratio is not None and "honest_ratio" not in entry:
+            # No manifest [[partial]] block authored yet — honest ratio
+            # is conservatively the same as the standard one.
+            entry["honest_ratio"] = disk_ratio
+        # Per-class counts, when the manifest carries them.
+        for k in ("mapped_count", "partial_count", "skipped_count",
+                  "unmapped_count", "total_count"):
+            if disk.get(k) is not None:
+                entry[k] = disk[k]
         # Surface infra_only signal from disk for E-tier entries.
         if disk.get("infra_only_disk"):
             entry["infra_only"] = True

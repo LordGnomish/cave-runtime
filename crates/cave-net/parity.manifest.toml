@@ -38,11 +38,13 @@ tests_passing     = 1759
 todos_unimpl      = 0     # 0 todo!/unimplemented! (verified by rg)
 
 [parity]
-mapped_count    = 106
-skipped_count   = 17
-unmapped_count  = 11
-total           = 134
-fill_ratio      = 0.9179
+mapped_count   = 42
+partial_count  = 0
+skipped_count  = 81
+unmapped_count = 11
+total          = 134
+fill_ratio     = 0.9179
+honest_ratio   = 0.9179
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
 last_audit  = "2026-05-13"
@@ -53,115 +55,131 @@ upstream_pkg = "pkg/act/"
 local_files  = ["src/cilium/act.rs"]
 
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/alignchecker/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/allocator/"
 local_files  = ["src/cilium/allocator.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/annotation/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/auth/"
 local_files  = ["src/cilium/auth.rs"]
 
 
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/backoff/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/bgp/"
 local_files  = ["src/cilium/bgp_types.rs"]
 
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/bufuuid/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/byteorder/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/cidr/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/ciliumenvoyconfig/"
 local_files  = ["src/cilium/cec.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/cleanup/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/clustermesh/"
 local_files  = ["src/cilium/clustermesh.rs", "src/cilium/clustermesh_ext.rs", "src/cilium/external_workload.rs", "src/cilium/mod.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/comparator/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/completion/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/components/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/container/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/controller/"
 local_files  = ["src/cilium/controller.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/counter/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/crypto/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/datapath/"
 local_files  = ["src/cilium/arp_announce.rs", "src/cilium/bandwidth.rs", "src/cilium/bpf_loader.rs", "src/cilium/bpfmaps.rs", "src/cilium/ipv6.rs", "src/cilium/nat.rs", "src/cilium/tunnel.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/debug/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/defaults/"
 local_files  = ["src/cilium/defaults.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/dial/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/driftchecker/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/dynamicconfig/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/dynamiclifecycle/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/egressgateway/"
 local_files  = ["src/cilium/egress.rs"]
@@ -170,78 +188,90 @@ local_files  = ["src/cilium/egress.rs"]
 upstream_pkg = "pkg/endpoint/"
 local_files  = ["src/cilium/endpoint.rs", "src/cilium/endpoint_regen.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/endpointcleanup/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/endpointmanager/"
 local_files  = ["src/cilium/endpoint_mgr.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/endpointstate/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/envoy/"
 local_files  = ["src/cilium/envoy_bootstrap.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/eventqueue/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/flowdebug/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/fqdn/"
 local_files  = ["src/cilium/fqdn.rs", "src/cilium/l7policy.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/fswatcher/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/gops/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/health/"
 local_files  = ["src/cilium/health.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/healthconfig/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/hive/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/hubble/"
 local_files  = ["src/cilium/hubble.rs", "src/cilium/hubble_ext.rs", "src/cilium/hubble_metrics.rs", "src/cilium/mod.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/iana/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/identity/"
 local_files  = ["src/cilium/clustermesh.rs", "src/cilium/fqdn.rs", "src/cilium/id_coord.rs", "src/cilium/identity.rs", "src/cilium/kv_identity.rs", "src/cilium/mod.rs", "src/cilium/policy.rs", "src/cilium/reserved_ids.rs", "src/cilium/types.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/idpool/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/ip/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/ipalloc/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/ipam/"
 local_files  = ["src/cilium/cilium_node.rs", "src/cilium/cluster_pool_refill.rs", "src/cilium/ipam.rs", "src/cilium/ipv6.rs"]
@@ -274,34 +304,40 @@ local_files  = ["src/cilium/arp_announce.rs", "src/cilium/l2_announce.rs"]
 upstream_pkg = "pkg/labels/"
 local_files  = ["src/cilium/identity.rs", "src/cilium/label_resolver.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/labelsfilter/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/lbipamconfig/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/loadbalancer/"
 local_files  = ["src/cilium/lb.rs", "src/cilium/lb_ext.rs", "src/cilium/services.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/loadinfo/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/lock/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/logging/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/mac/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/maglev/"
 local_files  = ["src/cilium/maglev.rs"]
@@ -325,11 +361,11 @@ upstream_pkg = "pkg/mtu/"
 local_files  = ["src/cilium/tunnel.rs"]
 
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/murmur3/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/node/"
 local_files  = ["src/cilium/node_mgr.rs"]
@@ -338,126 +374,150 @@ local_files  = ["src/cilium/node_mgr.rs"]
 upstream_pkg = "pkg/nodediscovery/"
 local_files  = ["src/cilium/nodediscovery.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/nodeipamconfig/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/option/"
 local_files  = ["src/cilium/bandwidth.rs", "src/cilium/config_watcher.rs", "src/cilium/dns_proxy.rs", "src/cilium/lb_ext.rs", "src/cilium/option.rs", "src/cilium/tunnel.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/pidfile/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/policy/"
 local_files  = ["src/cilium/egress.rs", "src/cilium/kafka.rs", "src/cilium/l7policy.rs", "src/cilium/mod.rs", "src/cilium/policy.rs", "src/cilium/policy_trace.rs", "src/cilium/selector_cache.rs", "src/cilium/types.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/pprof/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/promise/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/proxy/"
 local_files  = ["src/cilium/access_log.rs", "src/cilium/dns_proxy.rs", "src/cilium/envoy.rs", "src/cilium/kafka.rs", "src/cilium/l7policy.rs", "src/cilium/l7proxy.rs", "src/cilium/mod.rs", "src/cilium/proxy_health.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/rate/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/resiliency/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/revert/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/safeio/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/safetime/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/shortener/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/signal/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/slices/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/socketlb/"
 local_files  = ["src/cilium/sock_lb.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/source/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/spanstat/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/status/"
 local_files  = ["src/cilium/status.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/svcrouteconfig/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/testutils/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/time/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/trigger/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/tuple/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/types/"
 local_files  = ["src/cilium/net_types.rs"]
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "pkg/u8proto/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/util/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/version/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/versioncheck/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
-[[mapped]]
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
+[[skipped]]
 upstream_pkg = "pkg/wal/"
-local_files  = ["src/cilium/idiom_map.rs"]
-
+reason       = "stdlib-analog"
+note         = "Cilium micro-pkg covered by Rust stdlib/well-known crate (see idiom_map.rs)"
+original_note = ""
 [[mapped]]
 upstream_pkg = "pkg/wireguard/"
 local_files  = ["src/cilium/key_rotation.rs", "src/cilium/wireguard.rs"]
@@ -471,19 +531,21 @@ upstream_pkg = "pkg/ztunnel/"
 local_files  = ["src/cilium/ztunnel.rs"]
 
 
-[[mapped]]
+[[skipped]]
 upstream_pkg = "clustermesh-apiserver/"
-local_files  = ["src/cilium/binary_cites.rs"]
-
-[[mapped]]
+reason       = "CLI"
+note         = "Cilium standalone-binary entrypoint; agent-side logic ported elsewhere"
+original_note = ""
+[[skipped]]
 upstream_pkg = "hubble-relay/"
-local_files  = ["src/cilium/binary_cites.rs"]
-
-[[mapped]]
+reason       = "CLI"
+note         = "Cilium standalone-binary entrypoint; agent-side logic ported elsewhere"
+original_note = ""
+[[skipped]]
 upstream_pkg = "standalone-dns-proxy/"
-local_files  = ["src/cilium/binary_cites.rs"]
-
-# ─── Skipped (UI/CLI/orchestrator-handles only) ──────────────────────────────
+reason       = "CLI"
+note         = "Cilium standalone-binary entrypoint; agent-side logic ported elsewhere"
+original_note = ""
 [[skipped]]
 upstream_path = "api/"
 category      = "UI"

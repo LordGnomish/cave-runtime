@@ -17,11 +17,13 @@ version = "v1.36.0"
 # (DRA ResourceClaim controller MVP — finalizer + allocation +
 # reservedFor reconciliation + deletion drain, 23 deterministic tests).
 # See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
-mapped_count   = 26
+mapped_count   = 25
+partial_count  = 1
 skipped_count  = 10
 unmapped_count = 9
 total          = 45
-fill_ratio     = 0.8000
+fill_ratio     = 0.8
+honest_ratio   = 0.7778
 last_audit     = "2026-05-13"
 infra_only     = false
 
@@ -194,7 +196,7 @@ upstream_pkg = "pkg/controller/tainteviction/"
 local_files  = ["src/tainteviction.rs"]
 note         = "k8s-cri push batch2 2026-05-13: per-pod NoExecute eviction with tolerationSeconds timers. Pure-function `evaluate` returns EvictionAction (Tolerated / EvictNow / Schedule / Expired); `EvictionLedger` tracks pending evictions with deterministic `due(now)` polling. 12 tests."
 
-[[mapped]]
+[[partial]]
 upstream_pkg = "pkg/controller/cidrallocator/"
 local_files  = ["src/cidrallocator.rs"]
 note         = "k8s-cri push batch2 2026-05-13: pod-CIDR slice allocator for clusters without a cloud provider. `CidrAllocator::new(cluster, node_mask)` carves the cluster CIDR into N slots; `allocate(node)` / `occupy(node, cidr)` / `release(node)` + idempotency + slot reuse + cluster-range bounds checking. 17 tests."

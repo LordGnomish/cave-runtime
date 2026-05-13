@@ -19,10 +19,12 @@
 # (api/v1, controllers/, internal/, pkg/, plugin/) on 2026-05-12.
 # fill_ratio = (mapped + skipped) / total
 mapped_count   = 11
+partial_count  = 0
 skipped_count  = 10
 unmapped_count = 4
 total          = 25
 fill_ratio     = 0.84
+honest_ratio   = 0.84
 last_audit     = "2026-05-13"
 infra_only     = false
 

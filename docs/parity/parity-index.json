@@ -2,6 +2,7 @@
   "crates": {
     "cave-acme": {
       "cave_src_loc": 662,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -15,6 +16,7 @@
     },
     "cave-admission": {
       "cave_src_loc": 1620,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -27,6 +29,7 @@
     },
     "cave-ai-obs": {
       "cave_src_loc": 408,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -39,6 +42,7 @@
     },
     "cave-alerts": {
       "cave_src_loc": 3829,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -51,18 +55,25 @@
     },
     "cave-apiserver": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8627,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
+      "mapped_count": 26,
       "note": null,
-      "parity_ratio": 0.88,
+      "parity_ratio": 0.8824,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 18,
       "stubs": 0,
       "tier": "100",
+      "total_count": 51,
+      "unmapped_count": 6,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
     "cave-artifacts": {
       "cave_src_loc": 4994,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -75,18 +86,25 @@
     },
     "cave-auth": {
       "cave_src_loc": 8236,
+      "honest_ratio": 0.7568,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 12,
       "note": null,
       "parity_ratio": 0.7838,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 16,
       "stubs": null,
       "tier": "C",
+      "total_count": 37,
+      "unmapped_count": 8,
       "upstream": "keycloak/keycloak",
       "upstream_version": "v22.0.0"
     },
     "cave-backup": {
       "cave_src_loc": 2662,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -99,18 +117,25 @@
     },
     "cave-cache": {
       "cave_src_loc": 11602,
+      "honest_ratio": 0.8421,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 19,
       "note": null,
       "parity_ratio": 0.9474,
       "parity_ratio_source": "manifest",
+      "partial_count": 4,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "C",
+      "total_count": 38,
+      "unmapped_count": 2,
       "upstream": "redis/redis",
       "upstream_version": "7.2.0"
     },
     "cave-cdc": {
       "cave_src_loc": 1456,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely debezium / pg-logical-replication",
@@ -123,6 +148,7 @@
     },
     "cave-certs": {
       "cave_src_loc": 914,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -135,6 +161,7 @@
     },
     "cave-changelog": {
       "cave_src_loc": 463,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -148,6 +175,7 @@
     },
     "cave-chaos": {
       "cave_src_loc": 1125,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -160,6 +188,7 @@
     },
     "cave-chat": {
       "cave_src_loc": 419,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -172,6 +201,7 @@
     },
     "cave-cli": {
       "cave_src_loc": null,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -196,6 +226,7 @@
     },
     "cave-cluster": {
       "cave_src_loc": 4873,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -208,6 +239,7 @@
     },
     "cave-compliance": {
       "cave_src_loc": 2289,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -220,6 +252,7 @@
     },
     "cave-container-scan": {
       "cave_src_loc": 2340,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -232,18 +265,25 @@
     },
     "cave-controller-manager": {
       "cave_src_loc": null,
+      "honest_ratio": 0.7778,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 25,
       "note": "10/10 files only, **3 stubs** in src",
       "parity_ratio": 0.8,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 10,
       "stubs": null,
       "tier": "B",
+      "total_count": 45,
+      "unmapped_count": 9,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
     "cave-core": {
       "cave_src_loc": 1990,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -257,6 +297,7 @@
     },
     "cave-cost": {
       "cave_src_loc": 1965,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -269,6 +310,7 @@
     },
     "cave-cost-alloc": {
       "cave_src_loc": 1737,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -282,13 +324,19 @@
     },
     "cave-cri": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8529,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 18,
       "note": null,
       "parity_ratio": 0.9412,
       "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 11,
       "stubs": 0,
       "tier": "100",
+      "total_count": 34,
+      "unmapped_count": 2,
       "upstream": "containerd/containerd",
       "upstream_version": "v1.7.0"
     },
@@ -305,6 +353,7 @@
     },
     "cave-crossplane": {
       "cave_src_loc": 2328,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -317,6 +366,7 @@
     },
     "cave-dashboard": {
       "cave_src_loc": 8092,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -329,6 +379,7 @@
     },
     "cave-dast": {
       "cave_src_loc": 304,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -353,6 +404,7 @@
     },
     "cave-db": {
       "cave_src_loc": 707,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -366,6 +418,7 @@
     },
     "cave-deploy": {
       "cave_src_loc": 4743,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -378,6 +431,7 @@
     },
     "cave-desktop": {
       "cave_src_loc": 168,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -391,6 +445,7 @@
     },
     "cave-devlake": {
       "cave_src_loc": 526,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -403,6 +458,7 @@
     },
     "cave-dns": {
       "cave_src_loc": 7796,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -415,6 +471,7 @@
     },
     "cave-docdb": {
       "cave_src_loc": 3622,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -427,6 +484,7 @@
     },
     "cave-docs": {
       "cave_src_loc": 460,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -440,6 +498,7 @@
     },
     "cave-docs-site": {
       "cave_src_loc": 2185,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -453,6 +512,7 @@
     },
     "cave-ebpf-common": {
       "cave_src_loc": 127,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -466,6 +526,7 @@
     },
     "cave-erp": {
       "cave_src_loc": 5298,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -478,13 +539,19 @@
     },
     "cave-etcd": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8873,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
+      "mapped_count": 28,
       "note": null,
       "parity_ratio": 0.9155,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 35,
       "stubs": 0,
       "tier": "100",
+      "total_count": 71,
+      "unmapped_count": 6,
       "upstream": "etcd-io/etcd",
       "upstream_version": "v3.5.13"
     },
@@ -502,6 +569,7 @@
     },
     "cave-flags": {
       "cave_src_loc": 2948,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -515,6 +583,7 @@
     },
     "cave-forensics": {
       "cave_src_loc": 210,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -527,6 +596,7 @@
     },
     "cave-gateway": {
       "cave_src_loc": 12187,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -539,6 +609,7 @@
     },
     "cave-gitops-config": {
       "cave_src_loc": 2182,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -551,6 +622,7 @@
     },
     "cave-ha": {
       "cave_src_loc": 5882,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -587,6 +659,7 @@
     },
     "cave-incidents": {
       "cave_src_loc": 836,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -599,6 +672,7 @@
     },
     "cave-infra": {
       "cave_src_loc": 4648,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -611,6 +685,7 @@
     },
     "cave-kamaji": {
       "cave_src_loc": 199,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -623,18 +698,25 @@
     },
     "cave-karpenter": {
       "cave_src_loc": null,
+      "honest_ratio": 0.6471,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
+      "mapped_count": 3,
       "note": "added by disk-overlay; not in audit doc",
       "parity_ratio": 0.6471,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 8,
       "stubs": null,
       "tier": "C",
+      "total_count": 17,
+      "unmapped_count": 6,
       "upstream": null,
       "upstream_version": null
     },
     "cave-keda": {
       "cave_src_loc": 1145,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -647,6 +729,7 @@
     },
     "cave-kernel": {
       "cave_src_loc": null,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -660,6 +743,7 @@
     },
     "cave-knative": {
       "cave_src_loc": 1167,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -683,13 +767,19 @@
     },
     "cave-kubelet": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8684,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 24,
       "note": null,
       "parity_ratio": 0.8684,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 9,
       "stubs": 0,
       "tier": "100",
+      "total_count": 38,
+      "unmapped_count": 5,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
@@ -717,6 +807,7 @@
     },
     "cave-ledger": {
       "cave_src_loc": 821,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -730,6 +821,7 @@
     },
     "cave-lint": {
       "cave_src_loc": 625,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -743,6 +835,7 @@
     },
     "cave-llm-gateway": {
       "cave_src_loc": 3689,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -766,6 +859,7 @@
     },
     "cave-logs": {
       "cave_src_loc": 7285,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -778,18 +872,25 @@
     },
     "cave-mesh": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8286,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 16,
       "note": "8/8 files only \u2014 needs fn/test/surface mappings",
       "parity_ratio": 0.8571,
       "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "B",
+      "total_count": 35,
+      "unmapped_count": 5,
       "upstream": "istio/istio",
       "upstream_version": "1.20.0"
     },
     "cave-metrics": {
       "cave_src_loc": 9530,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -802,18 +903,25 @@
     },
     "cave-net": {
       "cave_src_loc": 36645,
+      "honest_ratio": 0.9179,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 42,
       "note": null,
       "parity_ratio": 0.9179,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 81,
       "stubs": null,
       "tier": "C",
+      "total_count": 134,
+      "unmapped_count": 11,
       "upstream": "cilium/cilium",
       "upstream_version": "v1.19.3"
     },
     "cave-oncall": {
       "cave_src_loc": 1846,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -826,6 +934,7 @@
     },
     "cave-pam": {
       "cave_src_loc": 353,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -838,6 +947,7 @@
     },
     "cave-permission": {
       "cave_src_loc": 586,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely casbin / authzed",
@@ -862,6 +972,7 @@
     },
     "cave-pii": {
       "cave_src_loc": 204,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -875,6 +986,7 @@
     },
     "cave-pipelines": {
       "cave_src_loc": 4211,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -887,6 +999,7 @@
     },
     "cave-pki": {
       "cave_src_loc": 607,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -900,6 +1013,7 @@
     },
     "cave-policy": {
       "cave_src_loc": 11624,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -924,6 +1038,7 @@
     },
     "cave-portal-api": {
       "cave_src_loc": null,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -937,6 +1052,7 @@
     },
     "cave-portal-web": {
       "cave_src_loc": null,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -950,6 +1066,7 @@
     },
     "cave-profiler": {
       "cave_src_loc": 180,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -963,6 +1080,7 @@
     },
     "cave-rdbms": {
       "cave_src_loc": 5073,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -975,18 +1093,25 @@
     },
     "cave-rdbms-operator": {
       "cave_src_loc": null,
+      "honest_ratio": 0.84,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": null,
+      "mapped_count": 11,
       "note": "added by disk-overlay; not in audit doc",
       "parity_ratio": 0.84,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 10,
       "stubs": null,
       "tier": "C",
+      "total_count": 25,
+      "unmapped_count": 4,
       "upstream": null,
       "upstream_version": null
     },
     "cave-registry": {
       "cave_src_loc": 5540,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1000,6 +1125,7 @@
     },
     "cave-rollouts": {
       "cave_src_loc": 1898,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1012,6 +1138,7 @@
     },
     "cave-runbook": {
       "cave_src_loc": 3237,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1025,6 +1152,7 @@
     },
     "cave-runtime": {
       "cave_src_loc": null,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1038,6 +1166,7 @@
     },
     "cave-sbom": {
       "cave_src_loc": 434,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -1050,6 +1179,7 @@
     },
     "cave-scaffold": {
       "cave_src_loc": 1398,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1063,6 +1193,7 @@
     },
     "cave-scan": {
       "cave_src_loc": 1189,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1075,18 +1206,25 @@
     },
     "cave-scheduler": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8966,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 19,
       "note": null,
       "parity_ratio": 0.8966,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 7,
       "stubs": 0,
       "tier": "100",
+      "total_count": 29,
+      "unmapped_count": 3,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
     "cave-search": {
       "cave_src_loc": 172,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "needs manifest; likely upstream: likely opensearch-project/OpenSearch",
@@ -1099,6 +1237,7 @@
     },
     "cave-secrets": {
       "cave_src_loc": 648,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1111,6 +1250,7 @@
     },
     "cave-security": {
       "cave_src_loc": 6350,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1123,6 +1263,7 @@
     },
     "cave-sign": {
       "cave_src_loc": 183,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1136,6 +1277,7 @@
     },
     "cave-slo": {
       "cave_src_loc": 476,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -1160,6 +1302,7 @@
     },
     "cave-status": {
       "cave_src_loc": 450,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1173,6 +1316,7 @@
     },
     "cave-store": {
       "cave_src_loc": 10711,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1185,18 +1329,25 @@
     },
     "cave-streams": {
       "cave_src_loc": null,
+      "honest_ratio": 0.8182,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 20,
       "note": "3 fn missing, 2 surfaces missing",
-      "parity_ratio": 0.8372,
+      "parity_ratio": 0.8182,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 16,
       "stubs": null,
       "tier": "A",
+      "total_count": 44,
+      "unmapped_count": 8,
       "upstream": "apache/kafka",
       "upstream_version": "3.6.0"
     },
     "cave-techdocs": {
       "cave_src_loc": 835,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1210,6 +1361,7 @@
     },
     "cave-trace": {
       "cave_src_loc": 8923,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1222,6 +1374,7 @@
     },
     "cave-tracing": {
       "cave_src_loc": 2502,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1235,6 +1388,7 @@
     },
     "cave-tracker": {
       "cave_src_loc": 4898,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
@@ -1247,6 +1401,7 @@
     },
     "cave-upstream": {
       "cave_src_loc": 3519,
+      "honest_ratio": 0.0,
       "infra_only": true,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
@@ -1271,6 +1426,7 @@
     },
     "cave-uptime": {
       "cave_src_loc": 299,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -1283,13 +1439,19 @@
     },
     "cave-vault": {
       "cave_src_loc": null,
+      "honest_ratio": 0.7895,
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
+      "mapped_count": 19,
       "note": "1 fn missing, 1 surface missing, **0 tests declared** \u2014 needs test mapping pass",
-      "parity_ratio": 0.8108,
+      "parity_ratio": 0.7895,
       "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 11,
       "stubs": null,
       "tier": "A",
+      "total_count": 38,
+      "unmapped_count": 8,
       "upstream": "hashicorp/vault",
       "upstream_version": "v1.15.0"
     },
@@ -1307,6 +1469,7 @@
     },
     "cave-vulns": {
       "cave_src_loc": 384,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
@@ -1319,6 +1482,7 @@
     },
     "cave-workflows": {
       "cave_src_loc": 666,
+      "honest_ratio": 0.0,
       "last_audit_disk": "2026-05-12",
       "manifest_filled": true,
       "note": null,
