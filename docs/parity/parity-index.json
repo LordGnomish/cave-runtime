@@ -1188,7 +1188,7 @@
       "last_audit_disk": "2026-05-13",
       "manifest_filled": true,
       "note": "3 fn missing, 2 surfaces missing",
-      "parity_ratio": 0.814,
+      "parity_ratio": 0.8372,
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "A",
@@ -1258,6 +1258,17 @@
       "upstream": null,
       "upstream_version": null
     },
+    "cave-upstream-watchd": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "parity_ratio_source": "none",
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-uptime": {
       "cave_src_loc": 299,
       "last_audit_disk": "2026-05-12",
@@ -1322,7 +1333,7 @@
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
     "flipped": 84,
-    "injected": 5,
+    "injected": 6,
     "new_filled": 84,
     "phantoms": 7,
     "ratio_overrides": 26

@@ -447,15 +447,53 @@ enum Commands {
     Oncall { #[command(subcommand)] cmd: OncallCmd },
     /// cave-search CLI parity
     Search { #[command(subcommand)] cmd: SearchCmd },
+    /// cave-spark-operator CLI parity
+    Spark { #[command(subcommand)] cmd: SparkCmd },
+    /// cave-jupyter CLI parity
+    Jupyter { #[command(subcommand)] cmd: JupyterCmd },
+    /// cave-mlflow CLI parity
+    Mlflow { #[command(subcommand)] cmd: MlflowCmd },
+    /// cave-flux CLI parity
+    Flux { #[command(subcommand)] cmd: FluxCmd },
 }
 
 // ── Per-module subcommand enums ───────────────────────────────────────────────
 
 #[derive(Subcommand)]
-enum AuthCmd { Status, Sessions, Users }
+enum AuthCmd {
+    Status,
+    Sessions,
+    Users,
+    /// List authentication realms (Keycloak `realms` resource).
+    Realms,
+    /// List OIDC client registrations.
+    Clients,
+    /// Audit-log of authentication events.
+    Events,
+    /// SAML 2.0 metadata download (`<md:EntityDescriptor>`).
+    SamlMetadata,
+    /// Verify an inbound SAML AuthnRequest by its `ID`.
+    SamlVerifyRequest,
+    /// Show the c14n-canonicalized form of an in-flight document.
+    SamlC14n,
+}
 
 #[derive(Subcommand)]
-enum ContainerScanCmd { List, Get, Scan }
+enum ContainerScanCmd {
+    List,
+    Get,
+    Scan,
+    /// Per-image CVE table (Trivy "Vulnerabilities" tab).
+    Vulnerabilities,
+    /// Deduplicated image roster (Trivy "Images" tab).
+    Images,
+    /// Admission-gate rules derived from scan output.
+    Policies,
+    /// Chronological scan log.
+    History,
+    /// Per-severity roll-up report.
+    Reports,
+}
 
 #[derive(Subcommand)]
 enum DashboardCmd { List, Get, Import }
@@ -467,7 +505,19 @@ enum DeployCmd { List, Get, Rollback }
 enum DnsCmd { Zones, Records, Query }
 
 #[derive(Subcommand)]
-enum ErpCmd { Invoices, Customers, Ledger }
+enum ErpCmd {
+    Invoices,
+    Customers,
+    Ledger,
+    /// Per-customer stock view (ERPNext "Stock" tab).
+    Inventory,
+    /// AR waterfall by status.
+    Accounting,
+    /// Relationship-manager directory.
+    Hr,
+    /// Per-customer project roll-up.
+    Projects,
+}
 
 #[derive(Subcommand)]
 enum HaCmd { Status, Failovers, Trigger }
@@ -511,7 +561,74 @@ enum UpstreamCmd { List, Check, Bump }
 #[derive(Subcommand)] enum AdmissionCmd { Decisions, Policies, Audit }
 #[derive(Subcommand)] enum CdcCmd { Pipelines, Lag, Snapshot }
 #[derive(Subcommand)] enum CertsCmd { List, Issue, Renew }
-#[derive(Subcommand)] enum CrmCmd { Accounts, Contacts, Opportunities }
+#[derive(Subcommand)]
+enum CrmCmd {
+    Accounts,
+    Contacts,
+    Opportunities,
+    /// Per-account next-touch list.
+    Activities,
+    /// Lifecycle workflows.
+    Workflows,
+    /// Per-plan revenue roll-up.
+    Reports,
+}
+
+#[derive(Subcommand)]
+enum SparkCmd {
+    /// Cluster-wide application list (Spark Operator).
+    Applications,
+    /// Scheduled application definitions.
+    Scheduled,
+    /// Completed-application history.
+    History,
+    /// Namespaces submitting Spark jobs.
+    Namespaces,
+    /// Per-application status + metrics.
+    Status,
+}
+
+#[derive(Subcommand)]
+enum JupyterCmd {
+    /// Notebook server list.
+    Servers,
+    /// Active kernel processes.
+    Kernels,
+    /// Notebook documents per user.
+    Notebooks,
+    /// Available kernel environments / images.
+    Environments,
+    /// Open user sessions.
+    Sessions,
+}
+
+#[derive(Subcommand)]
+enum MlflowCmd {
+    /// MLflow experiments.
+    Experiments,
+    /// Individual experiment runs.
+    Runs,
+    /// Registered ML models.
+    Models,
+    /// Model versions in the registry.
+    Versions,
+    /// Model-serving deployments.
+    Deployments,
+}
+
+#[derive(Subcommand)]
+enum FluxCmd {
+    /// HelmRelease CRs reconciled by Flux.
+    HelmReleases,
+    /// Kustomization CRs reconciled by Flux.
+    Kustomizations,
+    /// Source CRs (GitRepository / HelmRepository / OCIRepository).
+    Sources,
+    /// Image-automation CRs.
+    Images,
+    /// Notification provider + alert CRs.
+    Notifications,
+}
 #[derive(Subcommand)] enum CrossplaneCmd { Claims, Compositions, Providers }
 #[derive(Subcommand)] enum GitopsCmd { Apps, Sync, Diff }
 #[derive(Subcommand)] enum KarpenterCmd { Nodepools, Nodeclaims, Drift }
@@ -1269,6 +1386,27 @@ enum StreamsCmd {
         #[command(subcommand)]
         cmd: PulsarCmd,
     },
+    /// KRaft mode — controller quorum + metadata log
+    Kraft {
+        #[command(subcommand)]
+        cmd: KraftCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum KraftCmd {
+    /// Describe the current quorum (leader, voters, high-watermark).
+    DescribeQuorum,
+    /// List voters in the controller quorum.
+    Voters,
+    /// Report the current leader id + epoch.
+    Leader,
+    /// Show the metadata log high-water mark + live key count.
+    Log,
+    /// Inspect the materialised cluster-metadata snapshot.
+    Snapshot,
+    /// Show the set of MetadataRecord types the controller supports.
+    Records,
 }
 
 #[derive(Subcommand)]
@@ -2751,6 +2889,14 @@ async fn run(cli: Cli) -> Result<()> {
         Commands::Streams { cmd } => match cmd {
             StreamsCmd::Health => c.get("/api/streams/health").await,
             StreamsCmd::Kafka { cmd } => dispatch_kafka(&c, cmd).await,
+            StreamsCmd::Kraft { cmd } => match cmd {
+                KraftCmd::DescribeQuorum => c.get("/api/streams/kraft/describe-quorum").await,
+                KraftCmd::Voters         => c.get("/api/streams/kraft/voters").await,
+                KraftCmd::Leader         => c.get("/api/streams/kraft/leader").await,
+                KraftCmd::Log            => c.get("/api/streams/kraft/log").await,
+                KraftCmd::Snapshot       => c.get("/api/streams/kraft/snapshot").await,
+                KraftCmd::Records        => c.get("/api/streams/kraft/records").await,
+            },
             StreamsCmd::Pulsar { cmd } => match cmd {
                 PulsarCmd::Tenants => c.get("/api/streams/pulsar/tenants").await,
                 PulsarCmd::CreateTenant { name } => {
@@ -3631,14 +3777,25 @@ source_root = "src"
 
         // ── Tier1 cavectl batch (2026-05-11): 19 crates ────────────────────────
         Commands::Auth { cmd } => match cmd {
-            AuthCmd::Status => c.get("/api/auth/status").await,
-            AuthCmd::Sessions => c.get("/api/auth/sessions").await,
-            AuthCmd::Users => c.get("/api/auth/users").await,
+            AuthCmd::Status            => c.get("/api/auth/status").await,
+            AuthCmd::Sessions          => c.get("/api/auth/sessions").await,
+            AuthCmd::Users             => c.get("/api/auth/users").await,
+            AuthCmd::Realms            => c.get("/api/auth/realms").await,
+            AuthCmd::Clients           => c.get("/api/auth/clients").await,
+            AuthCmd::Events            => c.get("/api/auth/events").await,
+            AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
+            AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
+            AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
         },
         Commands::ContainerScan { cmd } => match cmd {
-            ContainerScanCmd::List => c.get("/api/container-scan/list").await,
-            ContainerScanCmd::Get => c.get("/api/container-scan/get").await,
-            ContainerScanCmd::Scan => c.get("/api/container-scan/scan").await,
+            ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
+            ContainerScanCmd::Get             => c.get("/api/container-scan/get").await,
+            ContainerScanCmd::Scan            => c.get("/api/container-scan/scan").await,
+            ContainerScanCmd::Vulnerabilities => c.get("/api/container-scan/vulnerabilities").await,
+            ContainerScanCmd::Images          => c.get("/api/container-scan/images").await,
+            ContainerScanCmd::Policies        => c.get("/api/container-scan/policies").await,
+            ContainerScanCmd::History         => c.get("/api/container-scan/history").await,
+            ContainerScanCmd::Reports         => c.get("/api/container-scan/reports").await,
         },
         Commands::Dashboard { cmd } => match cmd {
             DashboardCmd::List => c.get("/api/dashboard/list").await,
@@ -3656,9 +3813,13 @@ source_root = "src"
             DnsCmd::Query => c.get("/api/dns/query").await,
         },
         Commands::Erp { cmd } => match cmd {
-            ErpCmd::Invoices => c.get("/api/erp/invoices").await,
-            ErpCmd::Customers => c.get("/api/erp/customers").await,
-            ErpCmd::Ledger => c.get("/api/erp/ledger").await,
+            ErpCmd::Invoices   => c.get("/api/erp/invoices").await,
+            ErpCmd::Customers  => c.get("/api/erp/customers").await,
+            ErpCmd::Ledger     => c.get("/api/erp/ledger").await,
+            ErpCmd::Inventory  => c.get("/api/erp/inventory").await,
+            ErpCmd::Accounting => c.get("/api/erp/accounting").await,
+            ErpCmd::Hr         => c.get("/api/erp/hr").await,
+            ErpCmd::Projects   => c.get("/api/erp/projects").await,
         },
         Commands::Ha { cmd } => match cmd {
             HaCmd::Status => c.get("/api/ha/status").await,
@@ -3741,9 +3902,12 @@ source_root = "src"
             CertsCmd::Renew => c.get("/api/certs/renew").await,
         },
         Commands::Crm { cmd } => match cmd {
-            CrmCmd::Accounts => c.get("/api/crm/accounts").await,
-            CrmCmd::Contacts => c.get("/api/crm/contacts").await,
+            CrmCmd::Accounts      => c.get("/api/crm/accounts").await,
+            CrmCmd::Contacts      => c.get("/api/crm/contacts").await,
             CrmCmd::Opportunities => c.get("/api/crm/opportunities").await,
+            CrmCmd::Activities    => c.get("/api/crm/activities").await,
+            CrmCmd::Workflows     => c.get("/api/crm/workflows").await,
+            CrmCmd::Reports       => c.get("/api/crm/reports").await,
         },
         Commands::Crossplane { cmd } => match cmd {
             CrossplaneCmd::Claims => c.get("/api/crossplane/claims").await,
@@ -3779,6 +3943,36 @@ source_root = "src"
             SearchCmd::Indexes => c.get("/api/search/indexes").await,
             SearchCmd::Query => c.get("/api/search/query").await,
             SearchCmd::Reindex => c.get("/api/search/reindex").await,
+        },
+
+        // ── Batch 4 (2026-05-13): new subcommand groups ────────────────────────
+        Commands::Spark { cmd } => match cmd {
+            SparkCmd::Applications => c.get("/api/spark/applications").await,
+            SparkCmd::Scheduled    => c.get("/api/spark/scheduled").await,
+            SparkCmd::History      => c.get("/api/spark/history").await,
+            SparkCmd::Namespaces   => c.get("/api/spark/namespaces").await,
+            SparkCmd::Status       => c.get("/api/spark/status").await,
+        },
+        Commands::Jupyter { cmd } => match cmd {
+            JupyterCmd::Servers      => c.get("/api/jupyter/servers").await,
+            JupyterCmd::Kernels      => c.get("/api/jupyter/kernels").await,
+            JupyterCmd::Notebooks    => c.get("/api/jupyter/notebooks").await,
+            JupyterCmd::Environments => c.get("/api/jupyter/environments").await,
+            JupyterCmd::Sessions     => c.get("/api/jupyter/sessions").await,
+        },
+        Commands::Mlflow { cmd } => match cmd {
+            MlflowCmd::Experiments => c.get("/api/mlflow/experiments").await,
+            MlflowCmd::Runs        => c.get("/api/mlflow/runs").await,
+            MlflowCmd::Models      => c.get("/api/mlflow/models").await,
+            MlflowCmd::Versions    => c.get("/api/mlflow/versions").await,
+            MlflowCmd::Deployments => c.get("/api/mlflow/deployments").await,
+        },
+        Commands::Flux { cmd } => match cmd {
+            FluxCmd::HelmReleases   => c.get("/api/flux/helmreleases").await,
+            FluxCmd::Kustomizations => c.get("/api/flux/kustomizations").await,
+            FluxCmd::Sources        => c.get("/api/flux/sources").await,
+            FluxCmd::Images         => c.get("/api/flux/images").await,
+            FluxCmd::Notifications  => c.get("/api/flux/notifications").await,
         },
 
         Commands::Keda { cmd } => match cmd {
@@ -4248,5 +4442,219 @@ mod artifacts_parse_tests {
     fn registry_subcommand_still_works_for_back_compat() {
         let cli = parse(&["cavectl", "registry", "list"]);
         assert!(matches!(cli.command, Commands::Registry { cmd: RegistryCmd::List }));
+    }
+}
+
+#[cfg(test)]
+mod batch4_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    // ── Expanded auth subcommands ─────────────────────────────────────────────
+    #[test]
+    fn auth_realms_parses() {
+        let cli = parse(&["cavectl", "auth", "realms"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Realms }));
+    }
+
+    #[test]
+    fn auth_clients_parses() {
+        let cli = parse(&["cavectl", "auth", "clients"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Clients }));
+    }
+
+    #[test]
+    fn auth_events_parses() {
+        let cli = parse(&["cavectl", "auth", "events"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Events }));
+    }
+
+    #[test]
+    fn auth_saml_metadata_parses() {
+        let cli = parse(&["cavectl", "auth", "saml-metadata"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlMetadata }));
+    }
+
+    #[test]
+    fn auth_saml_verify_request_parses() {
+        let cli = parse(&["cavectl", "auth", "saml-verify-request"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlVerifyRequest }));
+    }
+
+    #[test]
+    fn auth_saml_c14n_parses() {
+        let cli = parse(&["cavectl", "auth", "saml-c14n"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+    }
+
+    // ── Expanded container-scan subcommands ───────────────────────────────────
+    #[test]
+    fn container_scan_vulnerabilities_parses() {
+        let cli = parse(&["cavectl", "container-scan", "vulnerabilities"]);
+        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Vulnerabilities }));
+    }
+
+    #[test]
+    fn container_scan_images_parses() {
+        let cli = parse(&["cavectl", "container-scan", "images"]);
+        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Images }));
+    }
+
+    #[test]
+    fn container_scan_policies_parses() {
+        let cli = parse(&["cavectl", "container-scan", "policies"]);
+        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Policies }));
+    }
+
+    #[test]
+    fn container_scan_history_parses() {
+        let cli = parse(&["cavectl", "container-scan", "history"]);
+        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::History }));
+    }
+
+    #[test]
+    fn container_scan_reports_parses() {
+        let cli = parse(&["cavectl", "container-scan", "reports"]);
+        assert!(matches!(cli.command, Commands::ContainerScan { cmd: ContainerScanCmd::Reports }));
+    }
+
+    // ── Expanded erp subcommands ──────────────────────────────────────────────
+    #[test]
+    fn erp_inventory_parses() {
+        let cli = parse(&["cavectl", "erp", "inventory"]);
+        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Inventory }));
+    }
+
+    #[test]
+    fn erp_accounting_parses() {
+        let cli = parse(&["cavectl", "erp", "accounting"]);
+        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Accounting }));
+    }
+
+    #[test]
+    fn erp_hr_parses() {
+        let cli = parse(&["cavectl", "erp", "hr"]);
+        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Hr }));
+    }
+
+    #[test]
+    fn erp_projects_parses() {
+        let cli = parse(&["cavectl", "erp", "projects"]);
+        assert!(matches!(cli.command, Commands::Erp { cmd: ErpCmd::Projects }));
+    }
+
+    // ── Expanded crm subcommands ──────────────────────────────────────────────
+    #[test]
+    fn crm_activities_parses() {
+        let cli = parse(&["cavectl", "crm", "activities"]);
+        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Activities }));
+    }
+
+    #[test]
+    fn crm_workflows_parses() {
+        let cli = parse(&["cavectl", "crm", "workflows"]);
+        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Workflows }));
+    }
+
+    #[test]
+    fn crm_reports_parses() {
+        let cli = parse(&["cavectl", "crm", "reports"]);
+        assert!(matches!(cli.command, Commands::Crm { cmd: CrmCmd::Reports }));
+    }
+
+    // ── streams kraft subcommands ─────────────────────────────────────────────
+    #[test]
+    fn streams_kraft_describe_quorum_parses() {
+        let cli = parse(&["cavectl", "streams", "kraft", "describe-quorum"]);
+        match cli.command {
+            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::DescribeQuorum } } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_kraft_voters_parses() {
+        let cli = parse(&["cavectl", "streams", "kraft", "voters"]);
+        match cli.command {
+            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Voters } } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_kraft_leader_parses() {
+        let cli = parse(&["cavectl", "streams", "kraft", "leader"]);
+        match cli.command {
+            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Leader } } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_kraft_snapshot_parses() {
+        let cli = parse(&["cavectl", "streams", "kraft", "snapshot"]);
+        match cli.command {
+            Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Snapshot } } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    // ── New top-level groups ──────────────────────────────────────────────────
+    #[test]
+    fn spark_applications_parses() {
+        let cli = parse(&["cavectl", "spark", "applications"]);
+        assert!(matches!(cli.command, Commands::Spark { cmd: SparkCmd::Applications }));
+    }
+
+    #[test]
+    fn spark_scheduled_parses() {
+        let cli = parse(&["cavectl", "spark", "scheduled"]);
+        assert!(matches!(cli.command, Commands::Spark { cmd: SparkCmd::Scheduled }));
+    }
+
+    #[test]
+    fn jupyter_servers_parses() {
+        let cli = parse(&["cavectl", "jupyter", "servers"]);
+        assert!(matches!(cli.command, Commands::Jupyter { cmd: JupyterCmd::Servers }));
+    }
+
+    #[test]
+    fn jupyter_kernels_parses() {
+        let cli = parse(&["cavectl", "jupyter", "kernels"]);
+        assert!(matches!(cli.command, Commands::Jupyter { cmd: JupyterCmd::Kernels }));
+    }
+
+    #[test]
+    fn mlflow_experiments_parses() {
+        let cli = parse(&["cavectl", "mlflow", "experiments"]);
+        assert!(matches!(cli.command, Commands::Mlflow { cmd: MlflowCmd::Experiments }));
+    }
+
+    #[test]
+    fn mlflow_models_parses() {
+        let cli = parse(&["cavectl", "mlflow", "models"]);
+        assert!(matches!(cli.command, Commands::Mlflow { cmd: MlflowCmd::Models }));
+    }
+
+    #[test]
+    fn flux_helmreleases_parses() {
+        let cli = parse(&["cavectl", "flux", "helm-releases"]);
+        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::HelmReleases }));
+    }
+
+    #[test]
+    fn flux_kustomizations_parses() {
+        let cli = parse(&["cavectl", "flux", "kustomizations"]);
+        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::Kustomizations }));
+    }
+
+    #[test]
+    fn flux_sources_parses() {
+        let cli = parse(&["cavectl", "flux", "sources"]);
+        assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::Sources }));
     }
 }
