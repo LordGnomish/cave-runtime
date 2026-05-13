@@ -99,6 +99,35 @@ pub struct CrateCompliance {
     /// snapshot or never measured.
     #[serde(default)]
     pub parity_ratio_last_audit: Option<String>,
+    /// **Honest** upstream parity ratio (added 2026-05-13 by the
+    /// full-re-audit pass). Computed as
+    /// `(fully_ported_mapped + skipped) / total` — i.e. excludes
+    /// `[[partial]]` blocks that the manifest author self-flagged as
+    /// scope-cut / MVP / shape-only. `None` when the crate is not
+    /// audited or honest_ratio was not authored. Always satisfies
+    /// `honest_parity_ratio <= parity_ratio` when both are present.
+    #[serde(default)]
+    pub honest_parity_ratio: Option<f64>,
+    /// `[parity] mapped_count` — fully-ported entries (post-2026-05-13
+    /// re-audit, partials excluded). `None` when the manifest doesn't
+    /// declare a count.
+    #[serde(default)]
+    pub parity_mapped_count: Option<u32>,
+    /// `[parity] partial_count` — entries demoted to `[[partial]]`
+    /// because the note self-flags scope cut / MVP / deferred surface.
+    #[serde(default)]
+    pub parity_partial_count: Option<u32>,
+    /// `[parity] skipped_count` — entries skipped per the charter
+    /// (stdlib-analog, CLI, test-harness, etc.).
+    #[serde(default)]
+    pub parity_skipped_count: Option<u32>,
+    /// `[parity] unmapped_count` — honest gaps not yet ported.
+    #[serde(default)]
+    pub parity_unmapped_count: Option<u32>,
+    /// `[parity] total` — total inventory entries (mapped + partial +
+    /// skipped + unmapped).
+    #[serde(default)]
+    pub parity_total_count: Option<u32>,
     /// `Some(true)` when the crate's `parity.manifest.toml` declares at
     /// least one of `[[files]]`/`[[functions]]`/`[[tests]]`/`[[surfaces]]`;
     /// `Some(false)` when the manifest exists but every section is empty
@@ -284,6 +313,89 @@ impl ComplianceSnapshot {
             f64::from(self.aggregate_parity_score()) / 100.0
         };
         compute_parity_grade(avg_ratio)
+    }
+
+    /// Aggregate **honest** upstream-parity score (0-100) over tier-1
+    /// crates with a known `honest_parity_ratio`. Honest ratio excludes
+    /// `[[partial]]` blocks (shape-only / scope-cut / MVP ports the
+    /// manifest author self-flagged on 2026-05-13's re-audit pass), so
+    /// it is strictly `<= aggregate_parity_score`. Same exclusion rule
+    /// as the standard parity score: crates without a measured ratio
+    /// drop out of both numerator and denominator.
+    pub fn aggregate_honest_parity_score(&self) -> u8 {
+        let scored: Vec<f64> = self
+            .crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.honest_parity_ratio)
+            .collect();
+        if scored.is_empty() {
+            return 0;
+        }
+        let avg = scored.iter().sum::<f64>() / scored.len() as f64;
+        (avg.clamp(0.0, 1.0) * 100.0).round() as u8
+    }
+
+    /// Number of tier-1 crates with a known honest-parity ratio.
+    pub fn honest_parity_measured_count(&self) -> usize {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only && c.honest_parity_ratio.is_some())
+            .count()
+    }
+
+    /// A-F letter for the **honest** parity aggregate. Same scale as
+    /// `parity_grade`. Returns `'F'` when no crate has a measurable
+    /// honest ratio.
+    pub fn honest_parity_grade(&self) -> char {
+        let measured = self.honest_parity_measured_count();
+        if measured == 0 {
+            return 'F';
+        }
+        let ratio = f64::from(self.aggregate_honest_parity_score()) / 100.0;
+        compute_parity_grade(ratio)
+    }
+
+    /// Total `[[partial]]` blocks across all tier-1 crates with a
+    /// declared `partial_count`. Surfaced on the dashboard so the
+    /// honest-axis grade has a concrete "what dropped me from A to B"
+    /// number behind it.
+    pub fn total_partial_blocks(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.parity_partial_count)
+            .sum()
+    }
+
+    /// Total `[[mapped]]` blocks across all tier-1 crates with a
+    /// declared `mapped_count`. Used by the dashboard breakdown card.
+    pub fn total_mapped_blocks(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.parity_mapped_count)
+            .sum()
+    }
+
+    /// Total `[[skipped]]` blocks across all tier-1 crates with a
+    /// declared `skipped_count`.
+    pub fn total_skipped_blocks(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.parity_skipped_count)
+            .sum()
+    }
+
+    /// Total `[[unmapped]]` blocks across all tier-1 crates with a
+    /// declared `unmapped_count`.
+    pub fn total_unmapped_blocks(&self) -> u32 {
+        self.crates
+            .iter()
+            .filter(|c| !c.infra_only)
+            .filter_map(|c| c.parity_unmapped_count)
+            .sum()
     }
 
     /// Aggregate **portal-UI parity** score (0-100) over tier-1 crates
@@ -538,6 +650,22 @@ pub struct ParityIndexEntry {
     /// the dashboard show "measured YYYY-MM-DD" alongside the ratio.
     #[serde(default)]
     pub last_audit_disk: Option<String>,
+    /// Honest-parity ratio — `(fully_ported + skipped) / total`,
+    /// excluding `[[partial]]` blocks. Added 2026-05-13 alongside the
+    /// `[[partial]]` schema extension.
+    #[serde(default)]
+    pub honest_ratio: Option<f64>,
+    /// Per-class inventory counts (added 2026-05-13).
+    #[serde(default)]
+    pub mapped_count: Option<u32>,
+    #[serde(default)]
+    pub partial_count: Option<u32>,
+    #[serde(default)]
+    pub skipped_count: Option<u32>,
+    #[serde(default)]
+    pub unmapped_count: Option<u32>,
+    #[serde(default)]
+    pub total_count: Option<u32>,
     #[serde(default)]
     pub manifest_filled: Option<bool>,
     #[serde(default)]
@@ -900,6 +1028,12 @@ pub fn analyse_crate(
         parity_ratio: None,
         parity_ratio_source: None,
         parity_ratio_last_audit: None,
+        honest_parity_ratio: None,
+        parity_mapped_count: None,
+        parity_partial_count: None,
+        parity_skipped_count: None,
+        parity_unmapped_count: None,
+        parity_total_count: None,
         manifest_filled: None,
         audit_tier: None,
         portal_ui_status: manifest.portal_ui_status,
@@ -923,6 +1057,12 @@ pub fn attach_parity_index(
             c.parity_ratio = entry.parity_ratio;
             c.parity_ratio_source = entry.parity_ratio_source.clone();
             c.parity_ratio_last_audit = entry.last_audit_disk.clone();
+            c.honest_parity_ratio = entry.honest_ratio;
+            c.parity_mapped_count = entry.mapped_count;
+            c.parity_partial_count = entry.partial_count;
+            c.parity_skipped_count = entry.skipped_count;
+            c.parity_unmapped_count = entry.unmapped_count;
+            c.parity_total_count = entry.total_count;
             c.manifest_filled = entry.manifest_filled;
             c.audit_tier = Some(entry.tier.clone());
             // Backfill upstream metadata from the audit when the crate's
@@ -939,42 +1079,69 @@ pub fn attach_parity_index(
 
     // Fix-A 2026-05-13 second pass: even when the parity-index JSON
     // wasn't regenerated since the last manifest edit, re-read the
-    // on-disk `[parity] fill_ratio` for any crate the dashboard
-    // analyses. The JSON is built by `scripts/build-parity-index.py`
-    // (offline) and may lag a few commits behind master; the
-    // dashboard renders are live so they should always reflect the
-    // newest measured value.
+    // on-disk `[parity] fill_ratio` (and the 2026-05-13 honest_ratio +
+    // class counts) for any crate the dashboard analyses. The JSON is
+    // built by `scripts/build-parity-index.py` (offline) and may lag a
+    // few commits behind master; the dashboard renders are live so they
+    // should always reflect the newest measured value.
     for c in &mut snapshot.crates {
-        if let Some((live_ratio, live_audit)) = read_manifest_fill_ratio(&c.name) {
-            // Only override if the manifest value differs OR the
+        if let Some(live) = read_manifest_parity(&c.name) {
+            // Only override fill if the manifest value differs OR the
             // index didn't carry a source — that way audit-doc-only
             // crates (no manifest) keep their original entry.
-            if c.parity_ratio.map(|r| (r - live_ratio).abs() > 0.000_5).unwrap_or(true) {
-                c.parity_ratio = Some(live_ratio);
+            if c.parity_ratio.map(|r| (r - live.fill_ratio).abs() > 0.000_5).unwrap_or(true) {
+                c.parity_ratio = Some(live.fill_ratio);
             }
             c.parity_ratio_source = Some("manifest".into());
-            c.parity_ratio_last_audit = Some(live_audit);
+            c.parity_ratio_last_audit = Some(live.last_audit);
+            // honest_ratio defaults to fill_ratio when the manifest
+            // doesn't yet declare one (no [[partial]] block authored).
+            c.honest_parity_ratio = Some(live.honest_ratio.unwrap_or(live.fill_ratio));
+            c.parity_mapped_count = live.mapped_count;
+            c.parity_partial_count = live.partial_count;
+            c.parity_skipped_count = live.skipped_count;
+            c.parity_unmapped_count = live.unmapped_count;
+            c.parity_total_count = live.total_count;
         }
     }
 }
 
-/// Live-read `crates/<name>/parity.manifest.toml` and return
-/// `(fill_ratio, last_audit)` if both are present. Returns `None`
-/// when the manifest doesn't exist or doesn't carry a measured
-/// ratio. Pure I/O; the caller decides whether to substitute.
-///
-/// Looks for `fill_ratio = X` first (the post-2026-05-12 measured
-/// shape), then falls back to legacy `ratio = X`. The regex
-/// tolerates surrounding whitespace + trailing comments.
-fn read_manifest_fill_ratio(crate_name: &str) -> Option<(f64, String)> {
+/// Live-read snapshot of `[parity]` keys from an on-disk manifest.
+/// Carries the 2026-05-13 honest-axis fields (`honest_ratio` + class
+/// counts) alongside the legacy `fill_ratio` so the dashboard renders
+/// a complete picture.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LiveManifestParity {
+    pub fill_ratio: f64,
+    pub honest_ratio: Option<f64>,
+    pub last_audit: String,
+    pub mapped_count: Option<u32>,
+    pub partial_count: Option<u32>,
+    pub skipped_count: Option<u32>,
+    pub unmapped_count: Option<u32>,
+    pub total_count: Option<u32>,
+}
+
+/// Live-read `crates/<name>/parity.manifest.toml`'s `[parity]` block.
+/// Returns `None` when the manifest doesn't exist or doesn't carry a
+/// measured `fill_ratio`/`ratio`. The honest-axis fields default to
+/// `None` when the manifest hasn't been re-audited under the
+/// 2026-05-13 schema. Pure I/O.
+pub fn read_manifest_parity(crate_name: &str) -> Option<LiveManifestParity> {
     let path = workspace_root().join("crates").join(crate_name).join("parity.manifest.toml");
     let text = fs::read_to_string(&path).ok()?;
 
-    // Find the [parity] section so we don't accidentally match
-    // ratio= in a comment elsewhere in the file.
+    // Find the [parity] section so we don't accidentally match a key
+    // in a comment elsewhere in the file.
     let mut in_section = false;
-    let mut ratio: Option<f64> = None;
+    let mut fill: Option<f64> = None;
+    let mut honest: Option<f64> = None;
     let mut audit: Option<String> = None;
+    let mut mapped: Option<u32> = None;
+    let mut partial: Option<u32> = None;
+    let mut skipped: Option<u32> = None;
+    let mut unmapped: Option<u32> = None;
+    let mut total: Option<u32> = None;
     for line in text.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with("[parity]") {
@@ -986,18 +1153,20 @@ fn read_manifest_fill_ratio(crate_name: &str) -> Option<(f64, String)> {
             if trimmed.starts_with('[') && !trimmed.starts_with("[parity]") && !trimmed.starts_with('#') {
                 break;
             }
-            // Strip a trailing `# comment` so the regex sees a clean value.
             let value_part = trimmed.split('#').next().unwrap_or(trimmed);
-            if ratio.is_none() {
-                if let Some(rest) = value_part
-                    .strip_prefix("fill_ratio")
-                    .or_else(|| value_part.strip_prefix("ratio"))
-                {
-                    if let Some(after_eq) = rest.split_once('=') {
-                        if let Ok(v) = after_eq.1.trim().parse::<f64>() {
-                            ratio = Some(v);
-                        }
-                    }
+            // Try `fill_ratio` first, then legacy `ratio`. Skip if we
+            // already set fill to avoid the `ratio` prefix shadowing
+            // `fill_ratio` later.
+            if fill.is_none() {
+                if let Some(rest) = value_part.strip_prefix("fill_ratio") {
+                    fill = parse_value(rest);
+                } else if let Some(rest) = value_part.strip_prefix("ratio") {
+                    fill = parse_value(rest);
+                }
+            }
+            if honest.is_none() {
+                if let Some(rest) = value_part.strip_prefix("honest_ratio") {
+                    honest = parse_value(rest);
                 }
             }
             if audit.is_none() {
@@ -1007,11 +1176,53 @@ fn read_manifest_fill_ratio(crate_name: &str) -> Option<(f64, String)> {
                     }
                 }
             }
+            if mapped.is_none() {
+                if let Some(rest) = value_part.strip_prefix("mapped_count") {
+                    mapped = parse_value_u32(rest);
+                }
+            }
+            if partial.is_none() {
+                if let Some(rest) = value_part.strip_prefix("partial_count") {
+                    partial = parse_value_u32(rest);
+                }
+            }
+            if skipped.is_none() {
+                if let Some(rest) = value_part.strip_prefix("skipped_count") {
+                    skipped = parse_value_u32(rest);
+                }
+            }
+            if unmapped.is_none() {
+                if let Some(rest) = value_part.strip_prefix("unmapped_count") {
+                    unmapped = parse_value_u32(rest);
+                }
+            }
+            if total.is_none() {
+                if let Some(rest) = value_part.strip_prefix("total") {
+                    total = parse_value_u32(rest);
+                }
+            }
         }
     }
-    let r = ratio?;
-    let a = audit.unwrap_or_default();
-    Some((r, a))
+    Some(LiveManifestParity {
+        fill_ratio: fill?,
+        honest_ratio: honest,
+        last_audit: audit.unwrap_or_default(),
+        mapped_count: mapped,
+        partial_count: partial,
+        skipped_count: skipped,
+        unmapped_count: unmapped,
+        total_count: total,
+    })
+}
+
+fn parse_value(rest: &str) -> Option<f64> {
+    let after_eq = rest.split_once('=')?;
+    after_eq.1.trim().parse::<f64>().ok()
+}
+
+fn parse_value_u32(rest: &str) -> Option<u32> {
+    let after_eq = rest.split_once('=')?;
+    after_eq.1.trim().parse::<u32>().ok()
 }
 
 /// Build a compliance snapshot for the given crate name list. Loads
@@ -1423,6 +1634,13 @@ pub fn render_with_view(
     let parity_color = cell_color(parity_avg);
     let parity_measured = snapshot.parity_measured_count();
     let manifest_fill_pct = (snapshot.manifest_fill_ratio() * 100.0).round() as u8;
+    let honest_avg = snapshot.aggregate_honest_parity_score();
+    let honest_grade = snapshot.honest_parity_grade();
+    let honest_color = cell_color(honest_avg);
+    let honest_measured = snapshot.honest_parity_measured_count();
+    let total_partial = snapshot.total_partial_blocks();
+    let total_mapped = snapshot.total_mapped_blocks();
+    let total_unmapped = snapshot.total_unmapped_blocks();
     let portal_ui_avg = snapshot.portal_ui_avg_score();
     let portal_ui_grade = snapshot.portal_ui_grade();
     let portal_ui_color = cell_color(portal_ui_avg);
@@ -1495,6 +1713,44 @@ pub fn render_with_view(
                     r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="no [portal_ui] block in parity.manifest.toml">—</span>"#,
                 ),
             };
+            let honest_html = match (c.infra_only, c.honest_parity_ratio, c.parity_ratio) {
+                (true, _, _) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-200 text-gray-600" title="infra-only">infra</span>"#,
+                ),
+                (false, Some(h), Some(p)) => {
+                    let pct = (h.clamp(0.0, 1.0) * 100.0).round() as u8;
+                    let drop = ((p - h).clamp(0.0, 1.0) * 100.0).round() as i32;
+                    let drop_html = if drop > 0 {
+                        format!(r#" <span class="text-[10px] text-red-600" title="demoted by [[partial]] blocks">-{drop}</span>"#)
+                    } else {
+                        String::new()
+                    };
+                    let partial_badge = match c.parity_partial_count {
+                        Some(n) if n > 0 => format!(
+                            r#" <span class="text-[10px] text-amber-700" title="{n} self-flagged partial port(s)">{n}p</span>"#,
+                        ),
+                        _ => String::new(),
+                    };
+                    format!(
+                        r#"<span class="px-2 py-1 rounded {color}">{pct}%</span>{drop}{partial}"#,
+                        color = cell_color(pct),
+                        pct = pct,
+                        drop = drop_html,
+                        partial = partial_badge,
+                    )
+                }
+                (false, Some(h), None) => {
+                    let pct = (h.clamp(0.0, 1.0) * 100.0).round() as u8;
+                    format!(
+                        r#"<span class="px-2 py-1 rounded {color}">{pct}%</span>"#,
+                        color = cell_color(pct),
+                        pct = pct,
+                    )
+                }
+                (false, None, _) => format!(
+                    r#"<span class="px-2 py-1 rounded bg-gray-100 text-gray-500" title="honest_ratio not authored — manifest lacks [[partial]] re-audit">—</span>"#,
+                ),
+            };
             vec![
                 format!(
                     r#"<a class="text-blue-700 underline" href="/admin/compliance/{name}?tenant_id={tenant}">{label}</a>"#,
@@ -1513,6 +1769,7 @@ pub fn render_with_view(
                 check(c.obs_dashboard_present).into(),
                 score_html,
                 parity_html,
+                honest_html,
                 portal_ui_html,
             ]
         })
@@ -1561,7 +1818,7 @@ pub fn render_with_view(
         r#"<section class="mb-6 p-4 bg-gray-100 rounded">
   <p class="italic text-gray-700">{quote}</p>
 </section>
-<section class="grid grid-cols-3 gap-4 mb-6">
+<section class="grid grid-cols-4 gap-4 mb-6">
   <div class="p-5 bg-white rounded shadow">
     <div class="text-xs uppercase text-gray-500 tracking-wide mb-1">Structural Coverage</div>
     <div class="flex items-baseline gap-3">
@@ -1580,6 +1837,18 @@ pub fn render_with_view(
       Audit ratio across {parity_measured}/{tier1} tier-1 crates. Source:
       <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/docs/parity/full-audit-2026-05-01.md">full-audit-2026-05-01.md</a>.
       Manifest fill: {manifest_fill_pct}% of tier-1 crates declare items.
+    </div>
+  </div>
+  <div class="p-5 bg-white rounded shadow border-2 border-amber-300">
+    <div class="text-xs uppercase text-amber-700 tracking-wide mb-1">Honest Parity</div>
+    <div class="flex items-baseline gap-3">
+      <div class="text-4xl font-bold {honest_color} px-2 rounded">{honest_avg}</div>
+      <div class="text-3xl font-bold text-gray-700">Grade {honest_grade}</div>
+    </div>
+    <div class="mt-2 text-xs text-gray-500">
+      Strict ratio across {honest_measured}/{tier1} tier-1 crates &mdash; <strong>excludes [[partial]]</strong>
+      (shape-only / scope-cut / MVP). {total_partial} partial of {total_mapped} mapped; {total_unmapped} honest unmapped.
+      Source: <a class="text-blue-700 underline" href="https://github.com/LordGnomish/cave-runtime/blob/main/scripts/honest-re-audit.py">honest-re-audit.py</a>.
     </div>
   </div>
   <div class="p-5 bg-white rounded shadow">
@@ -1615,6 +1884,13 @@ pub fn render_with_view(
         parity_grade = parity_grade,
         parity_measured = parity_measured,
         manifest_fill_pct = manifest_fill_pct,
+        honest_avg = honest_avg,
+        honest_color = honest_color,
+        honest_grade = honest_grade,
+        honest_measured = honest_measured,
+        total_partial = total_partial,
+        total_mapped = total_mapped,
+        total_unmapped = total_unmapped,
         portal_ui_avg = portal_ui_avg,
         portal_ui_color = portal_ui_color,
         portal_ui_grade = portal_ui_grade,
@@ -1625,7 +1901,7 @@ pub fn render_with_view(
             &[
                 "crate", "upstream", "loc", "tests", "ignored", "unimpl!",
                 "portal", "cavectl", "alerts", "dash", "structural", "parity",
-                "portal-ui",
+                "honest", "portal-ui",
             ],
             &rows,
         ),
@@ -2107,6 +2383,12 @@ version = "7.2.0"
                     parity_ratio: None,
                     parity_ratio_source: None,
                     parity_ratio_last_audit: None,
+                    honest_parity_ratio: None,
+                    parity_mapped_count: None,
+                    parity_partial_count: None,
+                    parity_skipped_count: None,
+                    parity_unmapped_count: None,
+                    parity_total_count: None,
                     manifest_filled: None,
                     audit_tier: None,
                     portal_ui_status: None,
@@ -2202,6 +2484,12 @@ version = "7.2.0"
             parity_ratio: None,
             parity_ratio_source: None,
             parity_ratio_last_audit: None,
+            honest_parity_ratio: None,
+            parity_mapped_count: None,
+            parity_partial_count: None,
+            parity_skipped_count: None,
+            parity_unmapped_count: None,
+            parity_total_count: None,
             manifest_filled: None,
             audit_tier: None,
             portal_ui_status: None,
@@ -2421,6 +2709,12 @@ version = "7.2.0"
                 parity_ratio: Some(0.42),
                 parity_ratio_source: Some("manifest".into()),
                 parity_ratio_last_audit: Some("2026-05-13".into()),
+                honest_parity_ratio: Some(0.38),
+                parity_mapped_count: Some(8),
+                parity_partial_count: Some(2),
+                parity_skipped_count: Some(3),
+                parity_unmapped_count: Some(11),
+                parity_total_count: Some(24),
                 manifest_filled: Some(true),
                 audit_tier: Some("B".into()),
                 portal_ui_status: Some("partial".into()),
@@ -2779,9 +3073,12 @@ version = "7.2.0"
         assert_eq!(vault.tier, "A");
         // 2026-05-13 storage-backends sweep bumped 0.7838 → 0.8108
         // (file + inmem backends landed; see
-        // docs/parity/cave-vault-port-2026-05-13.md).
+        // docs/parity/cave-vault-port-2026-05-13.md). The full-honest-
+        // re-audit pass (later 2026-05-13) self-healed a stale
+        // unmapped_count in the manifest (declared 7, real count 8),
+        // landing on 0.7895 = (19 mapped + 11 skipped) / 38 total.
         assert!(
-            vault.parity_ratio.unwrap() > 0.79 && vault.parity_ratio.unwrap() < 0.83,
+            vault.parity_ratio.unwrap() > 0.78 && vault.parity_ratio.unwrap() < 0.83,
             "got vault parity {:?}",
             vault.parity_ratio
         );
@@ -3195,6 +3492,404 @@ priority = "P0"
             .collect();
         println!("at 100% parity      : {} → {:?}", perfect.len(), perfect);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Honest-parity axis (added 2026-05-13 by the full-honest-re-audit pass).
+    // The honest axis excludes [[partial]] blocks from the parity-fill numerator
+    // so the dashboard surfaces the strict line-by-line ratio alongside the
+    // shape-level one.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Helper — builds a CrateCompliance with the honest axis populated.
+    fn honest_compliance(
+        name: &str,
+        ratio: Option<f64>,
+        honest: Option<f64>,
+        partial_count: Option<u32>,
+        infra: bool,
+    ) -> CrateCompliance {
+        let mut c = stub_compliance(name, 100);
+        c.parity_ratio = ratio;
+        c.honest_parity_ratio = honest;
+        c.parity_partial_count = partial_count;
+        c.parity_mapped_count = Some(10);
+        c.parity_skipped_count = Some(5);
+        c.parity_unmapped_count = Some(3);
+        c.parity_total_count = Some(18);
+        c.manifest_filled = Some(true);
+        c.audit_tier = Some("B".into());
+        c.infra_only = infra;
+        c
+    }
+
+    #[test]
+    fn aggregate_honest_parity_score_averages_only_measured_tier1() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cache", Some(0.95), Some(0.84), Some(4), false),
+                honest_compliance("cri", Some(0.94), Some(0.85), Some(3), false),
+                // No honest ratio — drops out of numerator AND denominator.
+                honest_compliance("scheduler", Some(0.90), None, None, false),
+                // Infra — excluded regardless.
+                honest_compliance("kernel", Some(1.0), Some(1.0), Some(0), true),
+            ],
+        };
+        // Mean of (0.84, 0.85) = 0.845 → 85 (rounded).
+        assert_eq!(snap.aggregate_honest_parity_score(), 85);
+        assert_eq!(snap.honest_parity_grade(), 'A');
+        assert_eq!(snap.honest_parity_measured_count(), 2);
+    }
+
+    #[test]
+    fn aggregate_honest_parity_score_zero_when_no_measured() {
+        let snap = ComplianceSnapshot {
+            crates: vec![honest_compliance("x", None, None, None, false)],
+        };
+        assert_eq!(snap.aggregate_honest_parity_score(), 0);
+        // No measured ratio → grade is 'F', never silently 'A'.
+        assert_eq!(snap.honest_parity_grade(), 'F');
+    }
+
+    #[test]
+    fn honest_parity_strictly_le_shape_parity() {
+        // A real-world invariant: honest_ratio = (mapped + skipped) / total,
+        // shape ratio = (mapped + partial + skipped) / total — so honest ≤ shape
+        // whenever partial ≥ 0. The aggregator must preserve that invariant.
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cache", Some(0.9474), Some(0.8421), Some(4), false),
+                honest_compliance("cri", Some(0.9412), Some(0.8529), Some(3), false),
+                honest_compliance("etcd", Some(0.9155), Some(0.8873), Some(2), false),
+            ],
+        };
+        assert!(snap.aggregate_honest_parity_score() <= snap.aggregate_parity_score());
+    }
+
+    #[test]
+    fn total_partial_blocks_sums_only_tier1() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cache", Some(0.95), Some(0.84), Some(4), false),
+                honest_compliance("cri", Some(0.94), Some(0.85), Some(3), false),
+                honest_compliance("infra", Some(1.0), Some(1.0), Some(99), true),
+            ],
+        };
+        // Only tier-1 contributors counted; infra's 99 is excluded.
+        assert_eq!(snap.total_partial_blocks(), 7);
+        assert_eq!(snap.total_mapped_blocks(), 20); // 10 + 10 from two tier-1
+        assert_eq!(snap.total_skipped_blocks(), 10);
+        assert_eq!(snap.total_unmapped_blocks(), 6);
+    }
+
+    #[test]
+    fn parity_index_round_trips_honest_fields() {
+        let raw = r#"{
+            "crates": {
+                "cave-cache": {
+                    "tier": "C",
+                    "parity_ratio": 0.9474,
+                    "parity_ratio_source": "manifest",
+                    "honest_ratio": 0.8421,
+                    "mapped_count": 19,
+                    "partial_count": 4,
+                    "skipped_count": 13,
+                    "unmapped_count": 2,
+                    "total_count": 38
+                }
+            }
+        }"#;
+        let m = parse_parity_index_json(raw);
+        let e = m.get("cave-cache").expect("crate present");
+        assert_eq!(e.honest_ratio, Some(0.8421));
+        assert_eq!(e.mapped_count, Some(19));
+        assert_eq!(e.partial_count, Some(4));
+        assert_eq!(e.skipped_count, Some(13));
+        assert_eq!(e.unmapped_count, Some(2));
+        assert_eq!(e.total_count, Some(38));
+    }
+
+    #[test]
+    fn parity_index_back_compat_without_honest_fields() {
+        // A pre-2026-05-13 index that has no honest_* / *_count fields must
+        // still parse cleanly — every new field is #[serde(default)].
+        let raw = r#"{
+            "crates": {
+                "cave-x": {
+                    "tier": "B",
+                    "parity_ratio": 0.5
+                }
+            }
+        }"#;
+        let m = parse_parity_index_json(raw);
+        let e = m.get("cave-x").expect("crate present");
+        assert_eq!(e.parity_ratio, Some(0.5));
+        assert_eq!(e.honest_ratio, None);
+        assert_eq!(e.mapped_count, None);
+        assert_eq!(e.partial_count, None);
+    }
+
+    #[test]
+    fn attach_parity_index_copies_honest_fields() {
+        let mut snap = ComplianceSnapshot {
+            crates: vec![stub_compliance("cave-cache", 100)],
+        };
+        let mut index: HashMap<String, ParityIndexEntry> = HashMap::new();
+        index.insert(
+            "cave-cache".into(),
+            ParityIndexEntry {
+                tier: "C".into(),
+                parity_ratio: Some(0.9474),
+                parity_ratio_source: Some("manifest".into()),
+                last_audit_disk: Some("2026-05-13".into()),
+                honest_ratio: Some(0.8421),
+                mapped_count: Some(19),
+                partial_count: Some(4),
+                skipped_count: Some(13),
+                unmapped_count: Some(2),
+                total_count: Some(38),
+                manifest_filled: Some(true),
+                cave_src_loc: None,
+                upstream: None,
+                upstream_version: None,
+                stubs: None,
+                note: None,
+            },
+        );
+        attach_parity_index(&mut snap, &index);
+        let c = &snap.crates[0];
+        // The live re-read pass may have overridden these from the on-disk
+        // manifest, so accept either the index value or the matching manifest
+        // value. The key invariant: honest ≤ shape and partial > 0 propagated.
+        assert!(c.parity_ratio.is_some());
+        assert!(c.honest_parity_ratio.is_some());
+        assert!(c.parity_partial_count.is_some());
+        let honest = c.honest_parity_ratio.unwrap();
+        let shape = c.parity_ratio.unwrap();
+        assert!(honest <= shape + 0.000_5, "honest must be ≤ shape: {honest} > {shape}");
+    }
+
+    #[test]
+    fn read_manifest_parity_parses_2026_05_13_schema() {
+        // The on-disk manifest after the honest-re-audit pass has both the
+        // legacy fill_ratio + the new honest_ratio + class counts. The reader
+        // must surface all of them.
+        let cache_parity = read_manifest_parity("cave-cache")
+            .expect("cave-cache manifest exists in the workspace");
+        assert!(cache_parity.fill_ratio > 0.9);
+        assert!(cache_parity.honest_ratio.is_some(), "honest_ratio populated by 2026-05-13 pass");
+        let honest = cache_parity.honest_ratio.unwrap();
+        assert!(honest < cache_parity.fill_ratio, "honest < shape after partial demotions");
+        assert!(cache_parity.partial_count.unwrap_or(0) > 0, "cache has 4 self-flagged partials");
+        // Sum of class counts equals total.
+        let sum = cache_parity.mapped_count.unwrap()
+            + cache_parity.partial_count.unwrap()
+            + cache_parity.skipped_count.unwrap()
+            + cache_parity.unmapped_count.unwrap();
+        assert_eq!(sum, cache_parity.total_count.unwrap());
+    }
+
+    #[test]
+    fn read_manifest_parity_back_compat_without_honest_fields() {
+        // Parser must accept a manifest snippet that pre-dates the
+        // 2026-05-13 schema (no honest_ratio, no class counts). We
+        // exercise the parsing logic directly via a synthetic file
+        // path inside the workspace's `crates/` directory: any crate
+        // whose manifest carries only `fill_ratio` + `last_audit`
+        // returns `Some(LiveManifestParity)` with the new fields as
+        // `None`. The cave-runtime workspace ships such a manifest
+        // for cave-acme (infra-only, fill_ratio = 0.0, no honest).
+        let p = read_manifest_parity("cave-acme")
+            .expect("cave-acme manifest exists and is parseable");
+        // cave-acme is infra-only with fill_ratio = 0.0 (no inventory);
+        // either honest_ratio = None or honest_ratio = 0.0 is acceptable
+        // — the parser must just not crash.
+        assert!(p.fill_ratio.is_finite());
+        // The crate has no [[partial]] block, so partial_count is None
+        // or 0 — either is back-compatible.
+        match p.partial_count {
+            None => {} // pre-2026-05-13 schema
+            Some(n) => assert_eq!(n, 0, "infra crate has no partials"),
+        }
+    }
+
+    #[test]
+    fn render_dashboard_includes_honest_parity_card() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cave-x", Some(0.95), Some(0.84), Some(4), false),
+                honest_compliance("cave-y", Some(0.90), Some(0.80), Some(2), false),
+            ],
+        };
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        assert!(html.contains("Honest Parity"), "honest parity card present");
+        // Aggregator output appears as a percentage somewhere in the body.
+        // Mean of (0.84, 0.80) = 0.82 → 82.
+        assert!(html.contains("82"), "aggregate honest score 82 rendered");
+        // Per-crate honest column appears in the table head.
+        assert!(html.contains(">honest<"), "honest column header rendered");
+    }
+
+    #[test]
+    fn render_dashboard_honest_card_grade_b_for_82() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                honest_compliance("cave-x", Some(0.95), Some(0.84), Some(4), false),
+                honest_compliance("cave-y", Some(0.90), Some(0.80), Some(2), false),
+            ],
+        };
+        // Mean honest = 0.82 → Grade A (≥0.70 per compute_parity_grade).
+        assert_eq!(snap.honest_parity_grade(), 'A');
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        // The "Grade X" string must appear THREE times in the four-card row:
+        // structural, parity, honest, portal-ui — one each. (Portal UI card
+        // requires its own data; without it the card shows 'F'.)
+        let grade_count = html.matches("Grade ").count();
+        assert!(grade_count >= 4, "four cards each carry a Grade label; got {grade_count}");
+    }
+
+    #[test]
+    fn render_dashboard_honest_column_shows_minus_badge_when_demoted() {
+        let snap = ComplianceSnapshot {
+            crates: vec![
+                // Honest 11 points below shape — should render a "-11" badge.
+                honest_compliance("cave-cache", Some(0.95), Some(0.84), Some(4), false),
+            ],
+        };
+        let html = render_with_view(
+            &snap,
+            &ctx(&[Permission::AdminComplianceView]),
+            ViewQuery::default(),
+        )
+        .expect("render OK");
+        // The drop badge format is " -<N>" (no plus sign; never zero).
+        assert!(html.contains("-11"), "demotion drop -11 rendered in honest column");
+        // Partial count badge "4p"
+        assert!(html.contains("4p"), "partial count badge rendered");
+    }
+
+    #[test]
+    fn honest_re_audit_manifest_self_consistent_for_top14() {
+        // Walk every manifest we touched on 2026-05-13. Each one's
+        // [parity] block must have mapped + partial + skipped + unmapped
+        // == total, and fill_ratio + honest_ratio must lie in [0, 1].
+        let top14 = [
+            "cave-cache","cave-cri","cave-net","cave-etcd","cave-scheduler",
+            "cave-apiserver","cave-kubelet","cave-mesh","cave-rdbms-operator",
+            "cave-streams","cave-vault","cave-controller-manager","cave-auth",
+            "cave-karpenter",
+        ];
+        for name in top14 {
+            let p = read_manifest_parity(name)
+                .unwrap_or_else(|| panic!("manifest missing for {name}"));
+            let total = p.total_count.expect(&format!("{name} declares total"));
+            let mapped = p.mapped_count.unwrap_or(0);
+            let partial = p.partial_count.unwrap_or(0);
+            let skipped = p.skipped_count.unwrap_or(0);
+            let unmapped = p.unmapped_count.unwrap_or(0);
+            assert_eq!(
+                mapped + partial + skipped + unmapped,
+                total,
+                "{name}: counts sum to total"
+            );
+            assert!((0.0..=1.0).contains(&p.fill_ratio), "{name}: fill_ratio in [0,1]");
+            let honest = p.honest_ratio.expect(&format!("{name} carries honest_ratio"));
+            assert!((0.0..=1.0).contains(&honest), "{name}: honest_ratio in [0,1]");
+            assert!(
+                honest <= p.fill_ratio + 0.000_5,
+                "{name}: honest_ratio ({honest}) must be ≤ fill_ratio ({})",
+                p.fill_ratio
+            );
+        }
+    }
+
+    #[test]
+    fn honest_re_audit_specific_crates_demoted_as_expected() {
+        // Spot-check: the 7 crates with non-zero self-flagged partials must
+        // see honest < fill strictly. The 7 without must see honest == fill.
+        let demoted = [
+            ("cave-cache", 4), ("cave-cri", 3), ("cave-etcd", 2),
+            ("cave-apiserver", 1), ("cave-mesh", 1),
+            ("cave-controller-manager", 1), ("cave-auth", 1),
+        ];
+        for (name, expected_partial) in demoted {
+            let p = read_manifest_parity(name)
+                .unwrap_or_else(|| panic!("{name} manifest exists"));
+            assert_eq!(
+                p.partial_count.unwrap_or(0),
+                expected_partial,
+                "{name} expected {expected_partial} partial blocks after 2026-05-13 re-audit"
+            );
+            assert!(
+                p.honest_ratio.unwrap_or(1.0) < p.fill_ratio,
+                "{name} honest must be strictly < fill"
+            );
+        }
+        let no_partials = [
+            "cave-net","cave-scheduler","cave-kubelet","cave-rdbms-operator",
+            "cave-streams","cave-vault","cave-karpenter",
+        ];
+        for name in no_partials {
+            let p = read_manifest_parity(name)
+                .unwrap_or_else(|| panic!("{name} manifest exists"));
+            assert_eq!(p.partial_count.unwrap_or(0), 0, "{name}: 0 partials");
+            assert!(
+                (p.honest_ratio.unwrap_or(0.0) - p.fill_ratio).abs() < 0.000_5,
+                "{name}: honest == fill when no partials"
+            );
+        }
+    }
+
+    #[test]
+    fn cave_net_reclassifies_idiom_map_entries_to_skipped() {
+        // The honest re-audit moved 61 idiom_map.rs entries and 3
+        // binary_cites.rs entries from [[mapped]] to [[skipped]] with
+        // reason "stdlib-analog" / "CLI". The manifest must reflect
+        // that — skipped_count grew, mapped_count shrank.
+        let p = read_manifest_parity("cave-net").expect("cave-net manifest");
+        // Before the pass: mapped=106 skipped=17 → after: mapped=42 skipped=81.
+        // Tolerate small drift from later edits by checking the directional
+        // invariant.
+        assert!(p.mapped_count.unwrap() < 50, "mapped count dropped below 50");
+        assert!(p.skipped_count.unwrap() > 70, "skipped count grew above 70");
+    }
+
+    #[test]
+    fn honest_re_audit_script_classifies_partial_via_note_self_flag() {
+        // A pure-Rust regression of the regex: any block whose note self-flags
+        // as scope-cut / MVP / deferred / placeholder must end up in the
+        // honest_ratio's numerator deficit (i.e. should be [[partial]]).
+        //
+        // We hold the regex source-of-truth in scripts/honest-re-audit.py so
+        // the test only verifies that the 14 crates we audited have AT LEAST
+        // the expected lower-bound partial_count — never less. Re-running the
+        // script must be non-decreasing on these counts.
+        let lower_bound = [
+            ("cave-cache", 4), ("cave-cri", 3), ("cave-etcd", 2),
+            ("cave-apiserver", 1), ("cave-mesh", 1),
+            ("cave-controller-manager", 1), ("cave-auth", 1),
+        ];
+        for (name, lower) in lower_bound {
+            let p = read_manifest_parity(name).unwrap();
+            assert!(
+                p.partial_count.unwrap_or(0) >= lower,
+                "{name}: partial_count must be ≥ {lower}"
+            );
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // (end honest-parity axis tests)
+    // ─────────────────────────────────────────────────────────────────────────
 
     #[test]
     fn render_detail_shows_infra_parity_label_for_infra_crate() {

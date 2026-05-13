@@ -34,10 +34,12 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
 mapped_count   = 20
+partial_count  = 0
 skipped_count  = 16
-unmapped_count = 7
-total          = 43
-fill_ratio     = 0.8372
+unmapped_count = 8
+total          = 44
+fill_ratio     = 0.8182
+honest_ratio   = 0.8182
 last_audit     = "2026-05-13"
 infra_only     = false
 
