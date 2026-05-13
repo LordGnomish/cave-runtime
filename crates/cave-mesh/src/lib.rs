@@ -22,6 +22,7 @@
 pub mod auth;
 pub mod circuit;
 pub mod error;
+pub mod federation;
 pub mod metrics;
 pub mod models;
 pub mod mtls;
