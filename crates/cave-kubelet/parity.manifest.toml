@@ -17,14 +17,14 @@ version = "v1.28.0"
 #   pkg/kubelet/status/  → MAPPED (PodStatusManager queue + retry, 15 tests)
 #   pkg/kubelet/prober/  → MAPPED (worker pool + ledger, 17 tests)
 # See docs/parity/cave-kubelet-port-2026-05-12.md for methodology.
-mapped_count   = 27
+mapped_count   = 28
 partial_count  = 1
 skipped_count  = 9
 unmapped_count = 1
-total          = 38
-fill_ratio     = 0.9737
-honest_ratio   = 0.9474
-last_audit     = "2026-05-13"
+total          = 39
+fill_ratio     = 0.9744
+honest_ratio   = 0.9487
+last_audit     = "2026-05-14"
 infra_only     = false
 
 [module]
@@ -202,6 +202,11 @@ note         = "k8s-streams-mesh batch 2026-05-13: user-namespace allocator (KEP
 upstream_pkg = "pkg/kubelet/runonce/"
 local_files  = ["src/runonce.rs"]
 note         = "k8s-streams-mesh batch 2026-05-13: standalone runonce mode for boot static-pod manifests. StaticPodManifest validation (name + images + restart policy), RunOnceResult outcomes (Running / Completed / Failed / Rejected), all_settled() driver-exit predicate. CRI-side container start delegated. 11 tests."
+
+[[mapped]]
+upstream_pkg = "pkg/kubelet/pleg/"
+local_files  = ["src/pleg.rs"]
+note         = "upstream test port batch4 2026-05-14: PodLifecycleEventGenerator diff state machine. Line-by-line port of generateEvents (generic.go:214-235) — five transition rules across container + sandbox snapshots. GenericPleg.relist() consumes Vec<PodSnapshot> from cave-cri-side caller, emits RelistOutcome { events, dropped } with channel-capacity-bounded buffering (matches eventChannel cap + pleg_events_dropped_total). IP preservation across exit, 3-min Healthy() threshold, cache eviction for gone pods. 16 upstream tests ported. Async timer / wait.NonSlidingUntil orchestration left to the agent::sync_loop caller (state machine only)."
 
 [[unmapped]]
 upstream_pkg = "pkg/kubelet/checkpoint/"
@@ -1262,3 +1267,141 @@ cave_path      = "tests/upstream_port_batch3.rs"
 cave_test_name = "upstream_probe_startup_kind_default_failure_then_threshold_success"
 status         = "ported"
 notes          = "Startup kind defaults to Failure pre-threshold, flips at successThreshold=1."
+
+# ── Batch 4 (2026-05-14): PLEG (PodLifecycleEventGenerator) ────────────────
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/first_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_first_pass_emits_started_and_died"
+status         = "ported"
+notes          = "First relist diff: Running→Started, Exited→Died, Unknown→Changed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/second_pass_no_change"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_second_pass_no_change_no_events"
+status         = "ported"
+notes          = "Identical snapshot two relists in a row emits nothing (generateEvents early-return)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelisting/third_pass_remove_and_transition"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_third_pass_remove_and_transition"
+status         = "ported"
+notes          = "Container set churn: exited→ø=Removed alone; running→exited=Died; new running=Started."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestEventChannelFull"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_event_channel_full_drops_excess"
+status         = "ported"
+notes          = "Cap=4 channel drops 1 of 5 events on second relist; dropped counter mirrors pleg_events_dropped_total."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistingWithSandboxes/first_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_sandboxes_first_pass"
+status         = "ported"
+notes          = "Sandbox state transitions diff identically to container state transitions."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistingWithSandboxes/third_pass"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relisting_sandboxes_third_pass_remove_and_transition"
+status         = "ported"
+notes          = "Sandbox set churn emits same Removed/Died/Started events as containers."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRemoveCacheEntry"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_remove_cache_entry_when_pod_gone"
+status         = "ported"
+notes          = "Pod missing from new runtime snapshot → cache entry purged after relist."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestHealthy"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_healthy_only_within_relist_threshold"
+status         = "ported"
+notes          = "3-minute relistThreshold window — Healthy = (now - last_relist) <= threshold."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "TestRelistIPChange"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_ip_change_preserves_previous_ip_on_exit"
+status         = "ported"
+notes          = "On container exit with no IP in new snapshot, cached IP is preserved (updateCache rule)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_exited"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_exited_emits_died"
+status         = "ported"
+notes          = "Direct state-machine probe: running→exited emits ContainerDied alone (not Removed)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_nonexistent"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_nonexistent_emits_died_and_removed"
+status         = "ported"
+notes          = "running→ø emits ContainerDied + ContainerRemoved pair (generic.go:230-232)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/exited_to_nonexistent"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_exited_to_nonexistent_emits_removed_only"
+status         = "ported"
+notes          = "exited→ø emits ContainerRemoved alone (Died already reported on prior relist)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "generateEvents/running_to_unknown"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_generate_events_running_to_unknown_emits_changed"
+status         = "ported"
+notes          = "running→unknown emits ContainerChanged."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic.go"
+upstream_name  = "Relist/last_relist_time"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_records_last_relist_time"
+status         = "ported"
+notes          = "Relist records relistTime — feeds Healthy()."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/pleg.go"
+upstream_name  = "PodLifeCycleEventType/distinct_constants"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_pleg_event_type_variants_are_distinct"
+status         = "ported"
+notes          = "All 7 event-type variants are distinct constants (pleg.go:26-34)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/pleg/generic_test.go"
+upstream_name  = "RelistOutcome/no_drop_when_unbounded"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_relist_outcome_no_drop_in_unbounded_run"
+status         = "ported"
+notes          = "Sanity: large channel capacity → no events dropped on small workload."
+
+# Deferred — upstream tests we did NOT port (honest scope):
+#   - TestReinspect (generic_test.go:547-633) — depends on a mock
+#     Runtime + pod-status cache failure injection scheme not yet
+#     modeled in cave-cri.
+#   - TestUpdateRunningPodAndContainerMetrics — kubelet metrics
+#     exporter is a separate parallel-track (cave-metrics).
+#   - TestRelistingMetricsCanary — same parallel-track.
