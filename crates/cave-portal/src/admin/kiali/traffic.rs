@@ -53,7 +53,7 @@ pub fn count_by_kind(rules: &[TrafficRule], kind: &str) -> usize {
     rules.iter().filter(|r| r.kind == kind).count()
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KialiViewError> {
