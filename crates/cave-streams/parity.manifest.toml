@@ -33,14 +33,14 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 21
+mapped_count   = 22
 partial_count  = 0
 skipped_count  = 16
 unmapped_count = 7
-total          = 44
-fill_ratio     = 0.8409
-honest_ratio   = 0.8409
-last_audit     = "2026-05-13"
+total          = 45
+fill_ratio     = 0.8444
+honest_ratio   = 0.8444
+last_audit     = "2026-05-14"
 infra_only     = false
 
 [module]
@@ -501,6 +501,13 @@ local_files  = [
 ]
 note         = "Connect Worker runtime — SourceTask/SinkTask traits + tick lifecycle, OffsetStore (in-memory `OffsetStorageReader/Writer` surface, Kafka-backed swap-in tracked), rendezvous-hash AssignmentTable (cooperative rebalance protocol tracked), ConnectorRuntime lifecycle, Worker with start/stop/pause/resume/delete + failed-task isolation. SMT chain + DLQ + Kafka producer/consumer adapter tracked-not-shipped."
 
+[[mapped]]
+upstream_pkg = "apache/kafka:connect/runtime/rest/"
+local_files  = [
+  "src/connect_rest.rs",
+]
+note         = "Kafka Connect REST admin state machine — ConnectorsResource (list/create/restart/pause/resume/delete/status) + ConnectorPluginsResource.validateConfigs + RootResource.serverInfo. Pure (status, body) dispatch: HttpStatus enum + typed CreatedConnector/RestartReport/ConnectorStatus/ValidationResult/ServerInfo DTOs + CreateError/RestartError/AdminError envelopes. POST /connectors name-trim + null-normalise + config-mismatch 400 + duplicate 409. 4.2.0 RestServerTest jersey/jetty framing layer deferred (HTTP-server bootstrapping, not REST semantics)."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -885,3 +892,153 @@ cave_path      = "tests/upstream_port_batch3.rs"
 cave_test_name = "upstream_connect_cluster_delete_connector_removes_from_list"
 status         = "ported"
 notes          = "delete_connector removes the connector + future get_connector → NotFound."
+
+# ── Batch 4 (2026-05-14) — Kafka Connect REST admin API ──────────────────────
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testListConnectors"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_list_connectors_returns_alphabetical_names"
+status         = "ported"
+notes          = "GET /connectors returns alphabetical list; empty admin returns empty Vec."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_returns_201_with_location"
+status         = "ported"
+notes          = "POST /connectors → 201 Created + Location: /connectors/{name} + ConnectorInfo body."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorExists"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_duplicate_returns_409_conflict"
+status         = "ported"
+notes          = "Duplicate connector name → AlreadyExistsException → 409 Conflict envelope."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNameTrimWhitespaces"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_trims_padding_whitespace_from_name"
+status         = "ported"
+notes          = "Padding whitespace + \\n in name field is trimmed before reaching herder."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNameAllWhitespaces"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_all_whitespace_name_normalises_to_empty"
+status         = "ported"
+notes          = "All-whitespace name normalises to \"\"; config map mirrors the empty name."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorNoName"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_null_name_normalises_to_empty"
+status         = "ported"
+notes          = "null name in request body normalises to \"\" (matches Java `name == null ? \"\" : name.trim()`)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testCreateConnectorConfigNameMismatch"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_create_connector_config_name_mismatch_returns_400"
+status         = "ported"
+notes          = "Body name != config.name throws BadRequestException → 400 (checkAndPutConnectorConfigName)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testRestartConnectorAndTasksRequestAccepted"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_restart_connector_and_tasks_returns_202_accepted_with_state_info"
+status         = "ported"
+notes          = "Successful restart → 202 Accepted + ConnectorStateInfo(state=RESTARTING)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testRestartConnectorAndTasksConnectorNotFound"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_restart_connector_not_found_returns_404"
+status         = "ported"
+notes          = "Restart unknown connector throws NotFoundException → 404."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java"
+upstream_name  = "ConnectorsResource/pauseConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_pause_connector_idempotent_returns_unit_or_404"
+status         = "ported"
+notes          = "PUT /pause idempotent (second call ok); unknown connector → AdminError::NotFound (404)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResource.java"
+upstream_name  = "ConnectorsResource/resumeConnector"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_resume_connector_after_pause_resumes_running"
+status         = "ported"
+notes          = "PUT /resume restores RUNNING state (visible via /status)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testDeleteConnector + testDeleteConnectorNotFound"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_delete_connector_returns_204_or_404"
+status         = "ported"
+notes          = "DELETE /connectors/{c} succeeds (removes from list) or 404 NotFound."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorsResourceTest.java"
+upstream_name  = "ConnectorsResourceTest/testGetConnectorConfigConnectorNotFound + status happy path"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_connector_status_present_or_none"
+status         = "ported"
+notes          = "GET /status returns ConnectorStateInfo with per-task state when known; None when unknown (HTTP 404)."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java"
+upstream_name  = "ConnectorPluginsResource/validateConfigs (error path)"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_validate_config_reports_missing_required_keys"
+status         = "ported"
+notes          = "Missing connector.class surfaces validation_errors entry + error_count ≥ 1; 200 OK envelope."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/ConnectorPluginsResource.java"
+upstream_name  = "ConnectorPluginsResource/validateConfigs (happy path)"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_validate_config_happy_path_reports_zero_errors"
+status         = "ported"
+notes          = "All required keys present → error_count=0, status 200, ConfigInfos.name echoes plugin class."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/rest/resources/RootResource.java"
+upstream_name  = "RootResource/serverInfo"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_rest_root_server_info_exposes_kafka_cluster_id"
+status         = "ported"
+notes          = "GET / returns 200 + ServerInfo {version, commit, kafka_cluster_id}; cluster_id sourced from constructor."
+
+# Honest deferral — RestServerTest.java was reorganised between 4.1 and 4.2;
+# the 4.2.0 raw fetch 404s on raw.githubusercontent.com. The HTTP-server
+# framing layer (jersey/jetty advertised-URL + error envelope mapping)
+# is out of scope for this state-machine port and not counted here.
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java"
+upstream_name  = "RestServerTest/advertisedUrlFormation"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Jersey/Jetty advertised-URL formation — HTTP-server bootstrap layer; not a REST-semantics test."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/rest/RestServerTest.java"
+upstream_name  = "RestServerTest/errorEnvelopeMapping"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Jersey ExceptionMapper → JSON envelope mapping — framework concern, deferred."
