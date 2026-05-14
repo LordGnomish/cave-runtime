@@ -2,7 +2,7 @@
 
 use super::types::{LiteLlmRoute, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmRoute>, LiteLlmViewError> {
@@ -66,7 +66,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
         chips = chips,
         tbl = table(&["name", "pattern", "targets", "strategy", "state"], &rows_html),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/litellm/routes",
         &format!("litellm/routes · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

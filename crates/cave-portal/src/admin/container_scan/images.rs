@@ -6,7 +6,7 @@
 //! Upstream: <https://aquasecurity.github.io/trivy>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use super::ContainerScanViewError;
 
@@ -71,7 +71,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ContainerS
             &table_rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/container_scan/images",
         &format!("container_scan/images · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

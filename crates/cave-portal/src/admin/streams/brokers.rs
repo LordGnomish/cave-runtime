@@ -8,7 +8,7 @@
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_cluster_id>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use super::StreamsViewError;
 
@@ -67,7 +67,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
             &table_rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/streams/brokers",
         &format!("streams/brokers · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

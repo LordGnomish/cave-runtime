@@ -4,7 +4,7 @@ use super::snapshots;
 use super::tables;
 use super::types::{IcebergManifest, IcebergSnapshot, IcebergTable, IcebergViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 
 pub fn list_all(
@@ -115,7 +115,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
                 .collect::<Vec<_>>(),
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/iceberg/manifests",
         &format!("iceberg/manifests · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

@@ -6,7 +6,7 @@
 //! Upstream UI: <https://grafana.com/docs/loki/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, LogStream};
 use crate::admin::types::Cite;
 
@@ -68,7 +68,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LogsViewEr
         chips = chips,
         tbl = table(&["name", "sink", "ingest/s", "retention_days"], &table_rows),
     );
-    Ok(page_shell(&format!("logs · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/logs", &format!("logs · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

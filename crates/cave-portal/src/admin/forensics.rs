@@ -1,7 +1,7 @@
 //! `/admin/forensics` view — forensics resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ForensicsEvidence};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ForensicsV
         n = rows.len(),
         tbl = table(&["case", "artifact", "collected", "digest"], &table_rows),
     );
-    Ok(page_shell(&format!("forensics · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/forensics", &format!("forensics · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

@@ -4,7 +4,7 @@
 //! Upstream UI: <https://docs.n8n.io/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, WorkflowRun};
 use crate::admin::types::Cite;
 
@@ -73,7 +73,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, WorkflowsV
         failed = summary.failed,
         tbl = table(&["name", "run_id", "status", "started", "finished"], &rows),
     );
-    Ok(page_shell(&format!("workflows · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/workflows", &format!("workflows · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

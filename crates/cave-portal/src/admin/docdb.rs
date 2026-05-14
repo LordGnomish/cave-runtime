@@ -4,7 +4,7 @@
 //! `mongo-explorer` plugin without exposing per-document data.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, DocdbCollection};
 use crate::admin::types::Cite;
 
@@ -45,7 +45,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DocdbViewE
         n = cols.len(),
         tbl = table(&["database", "collection", "documents"], &rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/docdb",
         &format!("docdb · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -125,7 +127,10 @@ mod tests {
         let html = render(&s, &ctx(&[Permission::DocdbRead])).unwrap();
         assert!(html.contains("orders"));
         assert!(html.contains("items"));
-        assert!(!html.contains("secrets"));
-        assert!(!html.contains("tokens"));
+        // Check table-cell text-content only (the sidebar legitimately
+        // links to /admin/secrets — that's the OpenBao route, unrelated
+        // to the foreign-tenant docdb leak this test is guarding).
+        assert!(!html.contains(">secrets<"));
+        assert!(!html.contains(">tokens<"));
     }
 }

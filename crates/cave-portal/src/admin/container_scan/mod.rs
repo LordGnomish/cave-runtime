@@ -20,7 +20,7 @@ pub mod reports;
 pub mod vulnerabilities;
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ContainerScanResult};
 use crate::admin::types::Cite;
 
@@ -120,7 +120,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ContainerS
         worst = summary.worst_image_cves,
         tbl = table(&["image", "digest", "criticals", "scanned_at"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/container-scan",
         &format!("container-scan · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

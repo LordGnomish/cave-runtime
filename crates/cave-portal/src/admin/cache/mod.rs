@@ -15,7 +15,7 @@
 //! keep compiling.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -67,7 +67,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CacheViewE
         replication = replication_html,
         pubsub = pubsub_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/cache",
         &format!("cache · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

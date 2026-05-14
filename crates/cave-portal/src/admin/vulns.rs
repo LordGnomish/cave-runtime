@@ -4,7 +4,7 @@
 //! Upstream UI: <https://www.defectdojo.org/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, VulnRecord};
 use crate::admin::types::Cite;
 
@@ -68,7 +68,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, VulnsViewE
         chips = chips,
         tbl = table(&["cve", "package", "installed", "fixed", "severity"], &rows),
     );
-    Ok(page_shell(&format!("vulns · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/vulns", &format!("vulns · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

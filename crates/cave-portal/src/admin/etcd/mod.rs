@@ -13,7 +13,7 @@
 //! Each submodule owns its accessors + tests; `mod.rs` composes them.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -63,7 +63,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, EtcdViewEr
         alarms = alarms_html,
         metrics = metrics_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/etcd",
         &format!("etcd · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

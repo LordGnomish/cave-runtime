@@ -4,7 +4,7 @@
 //! Upstream UI: <https://min.io/docs/minio/linux/operations/minio-console.html>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, StoreBucket};
 use crate::admin::types::Cite;
 
@@ -66,7 +66,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StoreViewE
         chips = chips,
         tbl = table(&["name", "backend", "objects", "size_bytes"], &table_rows),
     );
-    Ok(page_shell(&format!("store · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/store", &format!("store · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

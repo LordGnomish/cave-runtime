@@ -1,9 +1,23 @@
 //! Persona-filtered navigation menu.
 //!
 //! Returns a tree of [`NavItem`]s the sidebar renders. The tree is
-//! grouped by section (Platform / Workloads / Observability /
-//! Data); each item has a route, an icon glyph, and a persona
-//! filter so `TenantAdmin` only sees what's relevant.
+//! grouped by section (Cluster / K8s / Data / Identity / DevEx /
+//! Observability / Security / Networking); each item has a route, an
+//! icon glyph, and a persona filter so `TenantAdmin` only sees what's
+//! relevant.
+//!
+//! ## Persona policy
+//!
+//! * `PlatformAdmin` sees every entry — the function-level filter is
+//!   short-circuited in `is_visible`.
+//! * `TenantAdmin` sees entries whose `visible_to` includes it. The
+//!   rule of thumb: anything bound to a single tenant's data path
+//!   (KEDA queues, the tenant's vault key namespace, MLflow
+//!   experiments under their project) is tenant-visible; anything
+//!   cluster-wide (compliance dashboard, ADR browser, controller
+//!   manager, upstream watch) is platform-only.
+//! * `Anonymous` is the smoke-flow persona; it sees nothing by
+//!   default. The expectation is that real usage has a session.
 
 use crate::admin::permission::Persona;
 use crate::admin::render::escape;
@@ -134,11 +148,14 @@ const fn item(label: &'static str, href: &'static str, glyph: &'static str, visi
 const TENANT_AND_PLATFORM: &[Persona] = &[Persona::TenantAdmin, Persona::PlatformAdmin];
 const PLATFORM_ONLY: &[Persona] = &[];
 
+// Sections refreshed 2026-05-14: matches the canonical sidebar layout
+// (Cluster / K8s / Data / Identity / DevEx / Observability / Security
+// / Networking) so the chrome carries every reachable admin surface.
 const SECTIONS: &[NavSection] = &[
+    // ── Cluster — cross-cutting platform views ────────────────────────
     NavSection {
-        label: "Platform",
+        label: "Cluster",
         items: &[
-            // Platform-only: cross-tenant infra.
             item("Compliance", "/admin/compliance", "📋", PLATFORM_ONLY),
             // 2026-05-14 discoverability fix: `/admin/cluster/live` was
             // the canonical Raft snapshot view but had no sidebar entry,
@@ -146,51 +163,98 @@ const SECTIONS: &[NavSection] = &[
             // second platform item — the operator's "is the control
             // plane healthy" landing spot.
             item("Cluster Status", "/admin/cluster/live", "🫀", PLATFORM_ONLY),
+            item("Audit", "/admin/audit", "🧾", PLATFORM_ONLY),
             item("Upstream", "/admin/upstream", "⇪", PLATFORM_ONLY),
-            item("ADR Browser", "/admin/adr", "📜", PLATFORM_ONLY),
-            item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),
-            item("etcd", "/admin/etcd", "🗄", PLATFORM_ONLY),
+        ],
+    },
+    // ── K8s — control-plane surfaces ─────────────────────────────────
+    NavSection {
+        label: "K8s",
+        items: &[
             // 2026-05-14 consolidation: Scheduler + Kubelet folded into
             // the single K8s Dashboard surface — sub-tabs live under
             // /admin/k8s-dashboard/{pods,nodes,scheduler/queue,...}.
             item("K8s Dashboard", "/admin/k8s-dashboard", "☸", TENANT_AND_PLATFORM),
             item("Controller Manager", "/admin/controller-manager", "⚙", PLATFORM_ONLY),
             item("Cloud Controller", "/admin/ccm", "☁", PLATFORM_ONLY),
+            item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),
+            item("etcd", "/admin/etcd", "🗄", PLATFORM_ONLY),
+            item("Kamaji", "/admin/kamaji", "👶", PLATFORM_ONLY),
         ],
     },
+    // ── Data — stateful tenant-facing services ────────────────────────
     NavSection {
-        label: "Workloads",
+        label: "Data",
         items: &[
             item("KEDA", "/admin/keda", "📈", TENANT_AND_PLATFORM),
-            item("ScaledObjects", "/admin/keda/scaledobjects", "🪜", TENANT_AND_PLATFORM),
-            item("ScaledJobs", "/admin/keda/scaledjobs", "🛠", TENANT_AND_PLATFORM),
+            item("Vault", "/admin/vault", "🔐", TENANT_AND_PLATFORM),
+            item("Cache", "/admin/cache", "💾", TENANT_AND_PLATFORM),
+            item("Streams", "/admin/streams", "🌊", TENANT_AND_PLATFORM),
+            item("Lakehouse", "/admin/lakehouse", "🏞", TENANT_AND_PLATFORM),
+            item("Iceberg", "/admin/iceberg", "🧊", TENANT_AND_PLATFORM),
+            item("RDBMS", "/admin/rdbms", "🐘", TENANT_AND_PLATFORM),
+            item("DocDB", "/admin/docdb", "🍃", TENANT_AND_PLATFORM),
         ],
     },
+    // ── Identity — auth, secrets, sessions ───────────────────────────
+    NavSection {
+        label: "Identity",
+        items: &[
+            item("Keycloak", "/admin/auth", "🪪", PLATFORM_ONLY),
+            item("OpenBao", "/admin/secrets", "🗝", PLATFORM_ONLY),
+            item("Sessions", "/admin/auth-sessions", "👥", PLATFORM_ONLY),
+            item("Certs", "/admin/certs", "📜", PLATFORM_ONLY),
+            item("PAM", "/admin/pam", "🛡", PLATFORM_ONLY),
+        ],
+    },
+    // ── DevEx — dev/platform tooling ─────────────────────────────────
+    NavSection {
+        label: "DevEx",
+        items: &[
+            item("ADR Browser", "/admin/adr", "📜", PLATFORM_ONLY),
+            item("MLflow", "/admin/mlflow", "🧪", TENANT_AND_PLATFORM),
+            item("Backstage", "/admin/contributions", "📚", TENANT_AND_PLATFORM),
+            item("Pipelines", "/admin/pipelines", "🔧", TENANT_AND_PLATFORM),
+            item("LiteLLM", "/admin/litellm", "🤖", TENANT_AND_PLATFORM),
+            item("Local LLM", "/admin/local-llm", "🧠", PLATFORM_ONLY),
+        ],
+    },
+    // ── Observability ────────────────────────────────────────────────
     NavSection {
         label: "Observability",
         items: &[
             item("Grafana", "/admin/grafana", "📊", TENANT_AND_PLATFORM),
             item("Prometheus", "/admin/prometheus", "🔥", TENANT_AND_PLATFORM),
             item("Loki", "/admin/loki", "📝", TENANT_AND_PLATFORM),
-            item("Kiali", "/admin/kiali", "🕸", TENANT_AND_PLATFORM),
+            item("Tracing", "/admin/trace", "🧵", TENANT_AND_PLATFORM),
             item("Alerts", "/admin/alerts", "🚨", TENANT_AND_PLATFORM),
+            item("Incidents", "/admin/incidents", "🚒", PLATFORM_ONLY),
+            item("On-call", "/admin/oncall", "📟", PLATFORM_ONLY),
+            item("SLO", "/admin/slo", "🎯", TENANT_AND_PLATFORM),
         ],
     },
+    // ── Security ─────────────────────────────────────────────────────
     NavSection {
-        label: "Data",
+        label: "Security",
         items: &[
-            item("Vault", "/admin/vault", "🔐", TENANT_AND_PLATFORM),
-            item("Cache", "/admin/cache", "💾", TENANT_AND_PLATFORM),
-            item("RDBMS", "/admin/rdbms", "🐘", TENANT_AND_PLATFORM),
-            item("DocDB", "/admin/docdb", "🍃", TENANT_AND_PLATFORM),
-            item("Streams", "/admin/streams", "🌊", TENANT_AND_PLATFORM),
+            item("Vulns", "/admin/vulns", "🐛", PLATFORM_ONLY),
+            item("Container Scan", "/admin/container-scan", "🔬", TENANT_AND_PLATFORM),
+            item("DAST", "/admin/dast", "🕷", TENANT_AND_PLATFORM),
+            item("SBOM", "/admin/sbom", "📦", TENANT_AND_PLATFORM),
+            item("Policy", "/admin/policy", "📐", PLATFORM_ONLY),
+            item("Admission", "/admin/admission", "🛡", PLATFORM_ONLY),
+            item("Forensics", "/admin/forensics", "🕵", PLATFORM_ONLY),
         ],
     },
+    // ── Networking — mesh, ingress, DNS, etc. ────────────────────────
     NavSection {
         label: "Networking",
         items: &[
-            item("Networking", "/admin/net", "🌐", TENANT_AND_PLATFORM),
+            item("Mesh", "/admin/mesh", "🕸", TENANT_AND_PLATFORM),
+            item("Gateway", "/admin/gateway", "🚪", TENANT_AND_PLATFORM),
             item("CRI", "/admin/cri", "📦", TENANT_AND_PLATFORM),
+            item("Net", "/admin/net", "🌐", PLATFORM_ONLY),
+            item("DNS", "/admin/dns", "📡", PLATFORM_ONLY),
         ],
     },
 ];
@@ -265,5 +329,96 @@ mod tests {
         // Verify dark: variant is present on at least one element.
         assert!(html.contains("dark:bg-zinc-900"));
         assert!(html.contains("dark:hover:bg-zinc-800"));
+    }
+
+    // ── 2026-05-14 refreshed section coverage ──────────────────────────
+
+    #[test]
+    fn all_seven_sections_render_for_platform_admin() {
+        let html = sidebar(Persona::PlatformAdmin, "/admin", "dev");
+        for label in &[
+            "Cluster",
+            "K8s",
+            "Data",
+            "Identity",
+            "DevEx",
+            "Observability",
+            "Security",
+            "Networking",
+        ] {
+            assert!(html.contains(label), "section {label} missing");
+        }
+    }
+
+    #[test]
+    fn tenant_admin_sees_data_devex_obs_security_net_only() {
+        let html = sidebar(Persona::TenantAdmin, "/admin", "t");
+        // Cluster + Identity are platform-only — entire sections empty
+        // for TenantAdmin, so the headings should NOT appear.
+        assert!(!html.contains("Cluster Status"));
+        assert!(!html.contains("Keycloak"));
+        assert!(!html.contains("OpenBao"));
+        // Data + Networking items the tenant DOES see:
+        assert!(html.contains("KEDA"));
+        assert!(html.contains("Vault"));
+        assert!(html.contains("Lakehouse"));
+        assert!(html.contains("Mesh"));
+        // DevEx tenant-visible: MLflow, Backstage, Pipelines, LiteLLM.
+        assert!(html.contains("MLflow"));
+        assert!(html.contains("LiteLLM"));
+        // Observability tenant-visible.
+        assert!(html.contains("Grafana"));
+        assert!(html.contains("Tracing"));
+        // Security tenant-visible subset.
+        assert!(html.contains("Container Scan"));
+        assert!(html.contains("DAST"));
+        // Platform-only Security items hidden.
+        assert!(!html.contains("Forensics"));
+        assert!(!html.contains("Admission"));
+    }
+
+    #[test]
+    fn cluster_section_carries_audit_and_compliance() {
+        let html = sidebar(Persona::PlatformAdmin, "/admin/audit", "dev");
+        assert!(html.contains("Audit"));
+        assert!(html.contains("Compliance"));
+        assert!(html.contains("Cluster Status"));
+    }
+
+    #[test]
+    fn data_section_carries_lakehouse_iceberg_streams_rdbms() {
+        let html = sidebar(Persona::PlatformAdmin, "/admin/lakehouse", "dev");
+        assert!(html.contains("Lakehouse"));
+        assert!(html.contains("Iceberg"));
+        assert!(html.contains("Streams"));
+        assert!(html.contains("RDBMS"));
+        assert!(html.contains("DocDB"));
+    }
+
+    #[test]
+    fn devex_section_lists_mlflow_adr_backstage() {
+        let html = sidebar(Persona::PlatformAdmin, "/admin/mlflow", "dev");
+        assert!(html.contains("ADR Browser"));
+        assert!(html.contains("MLflow"));
+        assert!(html.contains("Backstage"));
+    }
+
+    #[test]
+    fn k8s_dashboard_route_active_highlight() {
+        let html = sidebar(Persona::PlatformAdmin, "/admin/k8s-dashboard/pods", "dev");
+        let idx = html.find(r#"href="/admin/k8s-dashboard"#).unwrap();
+        let suffix = &html[idx..idx + 200];
+        assert!(suffix.contains(r#"aria-current="page""#), "{suffix}");
+    }
+
+    #[test]
+    fn anonymous_sees_no_section_headings() {
+        // Anonymous has no `visible_to` matches → every section's
+        // filter empties → the section heading should not render.
+        let html = sidebar(Persona::Anonymous, "/", "x");
+        for label in &["Cluster", "K8s", "Data", "Identity", "DevEx"] {
+            // Anonymous sees nothing — labels should be absent.
+            assert!(!html.contains(label), "anonymous saw section {label}");
+        }
     }
 }

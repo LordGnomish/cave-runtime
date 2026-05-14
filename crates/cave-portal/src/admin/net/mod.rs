@@ -15,7 +15,7 @@
 //! `delete_policy`, `NetViewError` so legacy callers keep compiling.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -72,7 +72,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, NetViewErr
         nodes = nodes_html,
         identities = identities_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/net",
         &format!("net · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

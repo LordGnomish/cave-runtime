@@ -4,7 +4,7 @@
 //! Upstream UI: <https://chaos-mesh.org/docs/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ChaosExperiment};
 use crate::admin::types::Cite;
 
@@ -69,7 +69,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ChaosViewE
         chips = chips,
         tbl = table(&["name", "kind", "target", "schedule", "last_run"], &rows),
     );
-    Ok(page_shell(&format!("chaos · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/chaos", &format!("chaos · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

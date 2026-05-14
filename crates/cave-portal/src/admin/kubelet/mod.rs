@@ -17,7 +17,7 @@
 //! keeps compiling, and composes the five tabs into one page.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -71,7 +71,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeletVie
         events = events_html,
         metrics = metrics_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/kubelet",
         &format!("kubelet · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

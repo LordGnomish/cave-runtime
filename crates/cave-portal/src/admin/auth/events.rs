@@ -7,7 +7,7 @@
 //! Upstream: <https://www.keycloak.org/docs-api/latest/rest-api/index.html#_events_resource>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 use super::AuthViewError;
 
@@ -89,7 +89,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AuthViewEr
             &table_rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/auth/events",
         &format!("auth/events · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

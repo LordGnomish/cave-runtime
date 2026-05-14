@@ -6,7 +6,7 @@
 //! Upstream: <https://docs.erpnext.com/docs/v15/user/manual/en/stock>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use super::ErpViewError;
 
@@ -63,7 +63,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
         top = top,
         tbl = table(&["customer", "units_sold", "revenue"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/erp/inventory",
         &format!("erp/inventory · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

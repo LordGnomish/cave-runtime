@@ -1,7 +1,7 @@
 //! `/admin/dashboard` view — dashboard resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, DashboardCatalog};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DashboardV
         n = rows.len(),
         tbl = table(&["uid", "title", "folder", "panels"], &table_rows),
     );
-    Ok(page_shell(&format!("dashboard · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/dashboard", &format!("dashboard · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

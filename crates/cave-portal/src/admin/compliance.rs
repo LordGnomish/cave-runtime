@@ -21,7 +21,7 @@
 //! These show up in the doc-comment so a future commit can fill them in.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table, table_html};
+use crate::admin::render::{escape, page_shell, page_shell_full, table, table_html};
 use crate::admin::types::Cite;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -2266,7 +2266,9 @@ pub fn render_with_view(
             &rows,
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/compliance",
         &format!("compliance · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

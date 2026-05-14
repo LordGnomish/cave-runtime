@@ -1,7 +1,7 @@
 //! `/admin/backup` view — backup job browser + manual trigger.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, BackupJob};
 use crate::admin::types::Cite;
 
@@ -47,7 +47,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, BackupView
         n = jobs.len(),
         tbl = table(&["name", "source", "destination", "cron", "last_run", "state"], &rows),
     );
-    Ok(page_shell(&format!("backup · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/backup", &format!("backup · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

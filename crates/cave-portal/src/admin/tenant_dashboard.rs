@@ -4,7 +4,7 @@
 //! activity feed. Mirrors Backstage's `ExplorePage` shape.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, tally_by_kind, ActivityEntry, AdminState};
 use crate::admin::types::{Cite, TenantId};
 use std::collections::BTreeMap;
@@ -109,7 +109,9 @@ pub fn render(
         n = recent.len(),
         a_tbl = table(&["time", "kind", "summary"], &activity_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/dashboard",
         &format!("dashboard · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

@@ -16,7 +16,7 @@
 //! callers keep compiling.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -67,7 +67,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GrafanaVie
         explore = explore_html,
         alerts = alerts_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/grafana",
         &format!("grafana · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

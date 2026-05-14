@@ -31,33 +31,80 @@ pub fn escape(input: &str) -> String {
 /// `body` is interpolated as-is — callers MUST escape user data before
 /// passing it in.
 ///
-/// **2026-05-13 UX foundation update.** This shell now delegates to
-/// [`crate::admin::layout::shell::shell_v2`] with `Persona::Anonymous`
-/// defaults so handlers that don't yet know the persona still get the
-/// full chrome (top bar, sidebar, breadcrumb, command palette,
-/// shortcuts, toasts, dark-mode toggle, footer). Existing tests that
-/// assert the presence of `/static/htmx.min.js`,
-/// `/static/tailwind-light.css`, and the escaped `<h1>{title}</h1>` /
-/// `<title>{title} — cave admin</title>` continue to pass because
-/// shell_v2 emits exactly those tags.
+/// **2026-05-13 UX foundation update.** This shell delegates to
+/// [`crate::admin::layout::shell::shell_v2`] with the full chrome
+/// (top bar, sidebar, breadcrumb, command palette, shortcuts, toasts,
+/// dark-mode toggle, footer).
 ///
-/// Callers that need persona-aware sidebar filtering or want to
-/// inject extra command-palette items should call
-/// [`crate::admin::layout::shell_v2`] directly with explicit
-/// `ShellOptions`.
+/// **2026-05-14 sidebar mass adoption.** The default no longer hides
+/// the sidebar — every handler that calls `page_shell(title, body)`
+/// now ships with the navigation visible. The fallback persona is
+/// [`Persona::PlatformAdmin`] because the legacy callers (~136 of
+/// them) all sit behind the platform-admin JWT gate; rendering the
+/// full nav for them is the right default. Callers that want
+/// persona-aware filtering + active-route highlight should migrate
+/// to [`page_shell_full`].
+///
+/// Existing tests that assert the presence of `/static/htmx.min.js`,
+/// `/static/tailwind-light.css`, and the escaped
+/// `<h1>{title}</h1>` / `<title>{title} — cave admin</title>` continue
+/// to pass because shell_v2 emits exactly those tags.
 pub fn page_shell(title: &str, body: &str) -> String {
     use crate::admin::layout::shell::{shell_v2, ShellOptions};
     use crate::admin::permission::Persona;
     shell_v2(ShellOptions {
         title,
-        persona: Persona::Anonymous,
+        persona: Persona::PlatformAdmin,
         tenant_id: "dev",
         current_path: "/",
         theme_cookie: None,
         breadcrumb: None,
         extra_commands: Vec::new(),
         cluster_info: "cave-runtime",
-        hide_sidebar: true,
+        hide_sidebar: false,
+        body,
+    })
+}
+
+/// Render the admin-page shell with full request context.
+///
+/// This is the preferred form for any handler that has a
+/// [`crate::admin::permission::RequestCtx`] in scope (and they all
+/// should — the JWT middleware constructs one on every request).
+///
+/// Compared to [`page_shell`], this routes the *real* persona +
+/// tenant id + current URL path into the chrome, so:
+///
+///   * the sidebar's persona filter actually filters
+///     (TenantAdmin only sees the tenant-relevant items),
+///   * the active item in the sidebar gets the `aria-current="page"`
+///     marker + the highlighted styling, and
+///   * the breadcrumb resolves the right trail from the current URL.
+///
+/// `current_path` should be the path the user is viewing — e.g.
+/// `/admin/keda` for the keda list page. Pass an empty string and
+/// the breadcrumb will degrade to "Home" only.
+///
+/// 2026-05-14 — added during the sidebar mass-adoption sweep. New
+/// handlers should call this directly; legacy handlers continue to
+/// work via [`page_shell`].
+pub fn page_shell_full(
+    ctx: &crate::admin::permission::RequestCtx,
+    current_path: &str,
+    title: &str,
+    body: &str,
+) -> String {
+    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    shell_v2(ShellOptions {
+        title,
+        persona: ctx.persona,
+        tenant_id: ctx.tenant.as_str(),
+        current_path,
+        theme_cookie: None,
+        breadcrumb: None,
+        extra_commands: Vec::new(),
+        cluster_info: "cave-runtime",
+        hide_sidebar: false,
         body,
     })
 }

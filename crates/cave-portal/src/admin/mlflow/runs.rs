@@ -2,7 +2,7 @@
 
 use super::types::{MlflowRun, MlflowViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 pub fn list_all(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MlflowRun>, MlflowViewError> {
@@ -97,7 +97,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
             &rows_html,
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/mlflow/runs",
         &format!("mlflow/runs · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

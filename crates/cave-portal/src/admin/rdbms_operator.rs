@@ -7,7 +7,7 @@
 //! (out-of-schedule physical backup).
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, RdbmsOperatorBackup, RdbmsOperatorCluster};
 use crate::admin::types::Cite;
 
@@ -158,7 +158,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RdbmsOpera
             &b_rows,
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/rdbms-operator",
         &format!("rdbms-operator · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
