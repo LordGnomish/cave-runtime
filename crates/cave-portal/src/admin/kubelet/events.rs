@@ -70,7 +70,7 @@ pub fn warning_count(events: &[EventRow]) -> usize {
     events.iter().filter(|e| e.event_type == "Warning").count()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KubeletViewError> {

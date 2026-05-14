@@ -39,7 +39,7 @@ pub fn list_pending(
     Ok(out)
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, SchedulerViewError> {

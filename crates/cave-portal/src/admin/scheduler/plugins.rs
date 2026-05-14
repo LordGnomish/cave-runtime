@@ -119,7 +119,7 @@ pub fn count_enabled(rows: &[PluginRow]) -> usize {
     rows.iter().filter(|r| r.enabled).count()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, SchedulerViewError> {

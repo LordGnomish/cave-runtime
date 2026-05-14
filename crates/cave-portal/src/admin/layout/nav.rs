@@ -144,7 +144,10 @@ const SECTIONS: &[NavSection] = &[
             item("ADR Browser", "/admin/adr", "📜", PLATFORM_ONLY),
             item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),
             item("etcd", "/admin/etcd", "🗄", PLATFORM_ONLY),
-            item("Scheduler", "/admin/scheduler", "🧮", PLATFORM_ONLY),
+            // 2026-05-14 consolidation: Scheduler + Kubelet folded into
+            // the single K8s Dashboard surface — sub-tabs live under
+            // /admin/k8s-dashboard/{pods,nodes,scheduler/queue,...}.
+            item("K8s Dashboard", "/admin/k8s-dashboard", "☸", TENANT_AND_PLATFORM),
             item("Controller Manager", "/admin/controller-manager", "⚙", PLATFORM_ONLY),
             item("Cloud Controller", "/admin/ccm", "☁", PLATFORM_ONLY),
         ],
@@ -152,7 +155,6 @@ const SECTIONS: &[NavSection] = &[
     NavSection {
         label: "Workloads",
         items: &[
-            item("Kubelet", "/admin/kubelet", "🖧", TENANT_AND_PLATFORM),
             item("KEDA", "/admin/keda", "📈", TENANT_AND_PLATFORM),
             item("ScaledObjects", "/admin/keda/scaledobjects", "🪜", TENANT_AND_PLATFORM),
             item("ScaledJobs", "/admin/keda/scaledjobs", "🛠", TENANT_AND_PLATFORM),

@@ -43,23 +43,39 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, K8sDashboa
     let config_html = config::render_section(state, ctx)?;
     let storage_html = storage::render_section(state, ctx)?;
     let cluster_html = cluster::render_section(state, ctx)?;
+    let tid = escape(ctx.tenant.as_str());
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
   Kubernetes Dashboard Web UI parity (cave-apiserver + cave-kubelet + cave-scheduler).
   Upstream: <a class="text-blue-700 underline" href="https://github.com/kubernetes/dashboard">github.com/kubernetes/dashboard</a>.
+  <br/>
+  <span class="text-xs text-blue-700">2026-05-14 consolidation: <code>/admin/kubelet</code> + <code>/admin/scheduler</code> redirect here.</span>
 </section>
-<nav class="mb-4 flex gap-4 text-sm text-blue-700">
+<nav class="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-blue-700">
   <a href="#k8s-dashboard-workloads">Workloads</a>
   <a href="#k8s-dashboard-services">Services</a>
   <a href="#k8s-dashboard-config">Config</a>
   <a href="#k8s-dashboard-storage">Storage</a>
   <a href="#k8s-dashboard-cluster">Cluster</a>
+  <span class="text-gray-400">·</span>
+  <a href="/admin/k8s-dashboard/pods?tenant_id={tid}">Pods</a>
+  <a href="/admin/k8s-dashboard/nodes?tenant_id={tid}">Nodes</a>
+  <a href="/admin/k8s-dashboard/volumes?tenant_id={tid}">Volumes</a>
+  <a href="/admin/k8s-dashboard/events?tenant_id={tid}">Events</a>
+  <a href="/admin/k8s-dashboard/metrics?tenant_id={tid}">Metrics</a>
+  <span class="text-gray-400">·</span>
+  <a href="/admin/k8s-dashboard/scheduler/queue?tenant_id={tid}">Scheduler · Queue</a>
+  <a href="/admin/k8s-dashboard/scheduler/plugins?tenant_id={tid}">Plugins</a>
+  <a href="/admin/k8s-dashboard/scheduler/bindings?tenant_id={tid}">Bindings</a>
+  <a href="/admin/k8s-dashboard/scheduler/nodescores?tenant_id={tid}">Node scores</a>
+  <a href="/admin/k8s-dashboard/scheduler/events?tenant_id={tid}">Scheduler events</a>
 </nav>
 {workloads}
 {services}
 {config}
 {storage}
 {cluster}"##,
+        tid = tid,
         workloads = workloads_html,
         services = services_html,
         config = config_html,

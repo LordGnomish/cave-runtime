@@ -44,7 +44,7 @@ pub fn highest_score(rows: &[NodeScoreRow]) -> Option<&NodeScoreRow> {
     rows.iter().max_by_key(|r| r.total)
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, SchedulerViewError> {

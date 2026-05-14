@@ -51,7 +51,7 @@ pub fn warning_count(rows: &[EventRow]) -> usize {
     rows.iter().filter(|r| r.kind == "Warning").count()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, SchedulerViewError> {

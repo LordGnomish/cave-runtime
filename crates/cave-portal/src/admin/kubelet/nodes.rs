@@ -67,7 +67,7 @@ pub fn ready_count(rows: &[NodeRow]) -> usize {
     rows.iter().filter(|n| n.ready).count()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KubeletViewError> {

@@ -527,16 +527,11 @@ async fn keda_metrics_handler(
         .map_err(err_to_response)
 }
 
-async fn scheduler_handler(
-    AxumState(state): AxumState<Arc<AdminState>>,
-    Query(q): Query<AdminQuery>,
-) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(q);
-    if let Err(e) = state.materialise_scheduler_nodes(&ctx.tenant).await {
-        tracing::warn!(error = %e, "scheduler materialise failed; falling back to cached rows");
-    }
-    scheduler::render(&state, &ctx).map(Html).map_err(err_to_response)
-}
+// 2026-05-14 K8s pages consolidation:
+// `scheduler_handler` + `kubelet_handler` removed — their routes now
+// redirect 308 to /admin/k8s-dashboard/{scheduler/queue,pods}. The
+// per-tab content is served from kubelet::*::render_section +
+// scheduler::*::render_section via k8s_dash_*_handler wrappers below.
 
 async fn controller_manager_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
@@ -546,17 +541,6 @@ async fn controller_manager_handler(
     controller_manager::render(&state, &ctx)
         .map(Html)
         .map_err(err_to_response)
-}
-
-async fn kubelet_handler(
-    AxumState(state): AxumState<Arc<AdminState>>,
-    Query(q): Query<AdminQuery>,
-) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    let ctx = extract_ctx_from_query(q);
-    if let Err(e) = state.materialise_kubelet_pods(&ctx.tenant).await {
-        tracing::warn!(error = %e, "kubelet materialise failed; falling back to cached rows");
-    }
-    kubelet::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
 async fn cloud_controller_handler(
@@ -929,6 +913,161 @@ async fn kiali_handler(
     .into_response()
 }
 
+// ── 2026-05-14 K8s pages consolidation ─────────────────────────────
+// Wrap kubelet + scheduler sub-tabs under the canonical
+// /admin/k8s-dashboard/ surface. Each handler enforces both the
+// K8sDashboardRead gate (for the parent surface) and the per-tab
+// upstream permission (KubeletRead / SchedulerRead).
+
+fn k8s_dash_section(
+    ctx: &RequestCtx,
+    title: &str,
+    section: String,
+) -> Html<String> {
+    Html(render::page_shell(
+        &format!("k8s-dashboard / {title} · {}", render::escape(ctx.tenant.as_str())),
+        &section,
+    ))
+}
+
+async fn k8s_dash_pods_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    if let Err(e) = s.materialise_kubelet_pods(&ctx.tenant).await {
+        tracing::warn!(error = %e, "kubelet materialise failed; falling back to cached rows");
+    }
+    let section = kubelet::pods::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "pods", section))
+}
+
+async fn k8s_dash_nodes_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = kubelet::nodes::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "nodes", section))
+}
+
+async fn k8s_dash_volumes_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = kubelet::volumes::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "volumes", section))
+}
+
+async fn k8s_dash_events_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = kubelet::events::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "events", section))
+}
+
+async fn k8s_dash_metrics_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = kubelet::metrics::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "metrics", section))
+}
+
+async fn k8s_dash_queue_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    if let Err(e) = s.materialise_scheduler_nodes(&ctx.tenant).await {
+        tracing::warn!(error = %e, "scheduler materialise failed; falling back to cached rows");
+    }
+    let section = scheduler::queue::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "scheduler-queue", section))
+}
+
+async fn k8s_dash_sched_plugins_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = scheduler::plugins::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "scheduler-plugins", section))
+}
+
+async fn k8s_dash_sched_bindings_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = scheduler::bindings::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "scheduler-bindings", section))
+}
+
+async fn k8s_dash_sched_nodescores_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = scheduler::nodescores::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "scheduler-nodescores", section))
+}
+
+async fn k8s_dash_sched_events_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    ctx.authorise(Permission::K8sDashboardRead).map_err(err_to_response)?;
+    let section = scheduler::events::render_section(&s, &ctx).map_err(err_to_response)?;
+    Ok(k8s_dash_section(&ctx, "scheduler-events", section))
+}
+
+/// Build a 308 Permanent Redirect to the canonical `/admin/k8s-dashboard/...`
+/// URL. Preserves the tenant query string.
+fn redirect_308(target: String) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+    let mut resp = axum::response::Response::builder()
+        .status(axum::http::StatusCode::PERMANENT_REDIRECT)
+        .header(axum::http::header::LOCATION, target)
+        .body(axum::body::Body::empty())
+        .map_err(|e| err_to_response(e.to_string()))?;
+    resp.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-cache"),
+    );
+    Ok(resp)
+}
+
+fn redirect_with_tenant(target_path: &str, q: &AdminQuery) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+    redirect_308(format!("{target_path}?tenant_id={}", q.tenant_id))
+}
+
+// Legacy /admin/kubelet redirects → /admin/k8s-dashboard/pods (landing tab).
+async fn legacy_kubelet_redirect(
+    Query(q): Query<AdminQuery>,
+) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+    redirect_with_tenant("/admin/k8s-dashboard/pods", &q)
+}
+
+async fn legacy_scheduler_redirect(
+    Query(q): Query<AdminQuery>,
+) -> Result<axum::response::Response, (StatusCode, Html<String>)> {
+    redirect_with_tenant("/admin/k8s-dashboard/scheduler/queue", &q)
+}
+
 // ── 2026-05-13 realtime + power-user handlers ──────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -1248,9 +1387,11 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/keda/scalers", get(keda_scalers_list_handler))
         .route("/admin/keda/scalers/{kind}", get(keda_scalers_detail_handler))
         .route("/admin/keda/metrics", get(keda_metrics_handler))
-        .route("/admin/scheduler", get(scheduler_handler))
+        // 2026-05-14 consolidation: legacy top-level routes redirect 308
+        // to the canonical /admin/k8s-dashboard/ landing tabs.
+        .route("/admin/scheduler", get(legacy_scheduler_redirect))
         .route("/admin/controller-manager", get(controller_manager_handler))
-        .route("/admin/kubelet", get(kubelet_handler))
+        .route("/admin/kubelet", get(legacy_kubelet_redirect))
         .route("/admin/cloud-controller", get(cloud_controller_handler))
         .route("/admin/kamaji", get(kamaji_handler))
         .route("/admin/net", get(net_handler))
@@ -1325,6 +1466,18 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/prometheus", get(prometheus_handler))
         .route("/admin/loki", get(loki_handler))
         .route("/admin/k8s-dashboard", get(k8s_dashboard_handler))
+        // 2026-05-14 K8s pages consolidation — sub-tabs absorbed from
+        // /admin/kubelet/* and /admin/scheduler/*.
+        .route("/admin/k8s-dashboard/pods", get(k8s_dash_pods_handler))
+        .route("/admin/k8s-dashboard/nodes", get(k8s_dash_nodes_handler))
+        .route("/admin/k8s-dashboard/volumes", get(k8s_dash_volumes_handler))
+        .route("/admin/k8s-dashboard/events", get(k8s_dash_events_handler))
+        .route("/admin/k8s-dashboard/metrics", get(k8s_dash_metrics_handler))
+        .route("/admin/k8s-dashboard/scheduler/queue", get(k8s_dash_queue_handler))
+        .route("/admin/k8s-dashboard/scheduler/plugins", get(k8s_dash_sched_plugins_handler))
+        .route("/admin/k8s-dashboard/scheduler/bindings", get(k8s_dash_sched_bindings_handler))
+        .route("/admin/k8s-dashboard/scheduler/nodescores", get(k8s_dash_sched_nodescores_handler))
+        .route("/admin/k8s-dashboard/scheduler/events", get(k8s_dash_sched_events_handler))
         .route("/admin/kiali", get(kiali_handler))
         .route("/admin/contributions", get(contributions_overview_handler))
         .route("/admin/contributions/timeline", get(contributions_timeline_handler))

@@ -158,8 +158,12 @@ pub fn default_commands(tenant_id: &str) -> Vec<CommandItem> {
         CommandItem::nav("Go to ADR Browser",    &format!("/admin/adr?tenant_id={t}")),
         CommandItem::nav("Go to KEDA",           &format!("/admin/keda?tenant_id={t}")),
         CommandItem::nav("Go to Vault",          &format!("/admin/vault?tenant_id={t}")),
-        CommandItem::nav("Go to Kubelet",        &format!("/admin/kubelet?tenant_id={t}")),
-        CommandItem::nav("Go to Scheduler",      &format!("/admin/scheduler?tenant_id={t}")),
+        // 2026-05-14 consolidation: Kubelet + Scheduler land on K8s
+        // Dashboard sub-tabs.
+        CommandItem::nav("Go to K8s Dashboard",  &format!("/admin/k8s-dashboard?tenant_id={t}")),
+        CommandItem::nav("K8s · Pods",           &format!("/admin/k8s-dashboard/pods?tenant_id={t}")),
+        CommandItem::nav("K8s · Nodes",          &format!("/admin/k8s-dashboard/nodes?tenant_id={t}")),
+        CommandItem::nav("K8s · Scheduler Queue", &format!("/admin/k8s-dashboard/scheduler/queue?tenant_id={t}")),
         CommandItem::nav("Go to API Server",     &format!("/admin/apiserver?tenant_id={t}")),
         CommandItem::nav("Go to etcd",           &format!("/admin/etcd?tenant_id={t}")),
         CommandItem::nav("Go to Networking",     &format!("/admin/net?tenant_id={t}")),

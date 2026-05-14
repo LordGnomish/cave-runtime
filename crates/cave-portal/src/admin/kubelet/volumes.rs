@@ -48,7 +48,7 @@ pub fn bound_count(volumes: &[VolumeBinding]) -> usize {
     volumes.iter().filter(|v| v.status == "Bound").count()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KubeletViewError> {

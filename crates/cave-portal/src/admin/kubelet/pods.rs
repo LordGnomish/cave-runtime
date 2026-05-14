@@ -82,7 +82,7 @@ pub fn pods_with_status<'a>(pods: &'a [KubeletPod], status: &str) -> Vec<&'a Kub
     pods.iter().filter(|p| p.status == status).collect()
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KubeletViewError> {
