@@ -102,11 +102,41 @@ unmapped modules :
 4. Update `crates/{crate_name}/parity.manifest.toml`:
    * flip the chosen `[[unmapped]]` block to `[[mapped]]` with `local_files`.
    * bump `mapped_count`, `unmapped_count`, `fill_ratio`, `last_audit`.
-5. Open a commit on branch `{branch}` with message:
-       feat({crate_name}): auto-port {latest} — {short_desc}
-   where short_desc summarises the module ported.
-6. Push the branch. Do NOT merge to main — the charter-v2 gate is
-   responsible for verifying + merging.
+5. Push the branch — TWO commits required (see TDD STRICT MODE below).
+   Do NOT merge to main — the charter-v2 gate is responsible for
+   verifying + merging.
+
+== TDD STRICT MODE (REQUIRED — gate enforced) ==
+The dispatcher runs cave-upstream-watchd's tdd_analyzer over your
+branch's commit chain. Output MUST be at least TWO commits in this
+exact order; a single combined commit FAILS the gate.
+
+1. RED commit (push this FIRST):
+   * touches ONLY `tests/` or `src/<module>/tests.rs` (cfg(test) mod)
+   * adds failing tests for the module you are about to port
+   * `cargo test -p {crate_name}` MUST fail at this commit
+     (the analyzer verifies via `git stash apply <red>` + run)
+   * commit message: `test({crate_name}): red — <feature> tests fail before impl`
+
+2. GREEN commit (push this SECOND):
+   * touches `src/<module>.rs` (and optionally `parity.manifest.toml`)
+   * implements the module so the red tests now pass
+   * NO new stubs anywhere in the workspace
+     (forbidden: `unimplemented!()`, `todo!()`, `panic!("not yet")`,
+      `#[ignore = "impl pending"]`)
+   * `cargo test -p {crate_name} --include-ignored` MUST exit 0
+   * commit message: `feat({crate_name}): green — auto-port {latest} {short_desc}`
+
+3. REFACTOR commit (OPTIONAL, push LAST if present):
+   * idiomatic cleanup, NO behaviour change
+   * tests still green
+   * commit message: `refactor({crate_name}): cleanup`
+
+The gate's `verify_with_tdd` rejects branches where:
+  - the first commit's diff doesn't classify as `CommitKind::TestsOnly`
+  - the second commit's diff doesn't classify as `CommitKind::ImplOnly`
+  - any commit reintroduces a stub (stub_scan delta > 0)
+  - the test count between RED and GREEN doesn't strictly increase
 
 == CHARTER v2 GATE (the dispatcher runs this — pass to merge) ==
   cargo check --workspace --tests                            (must be clean)
@@ -245,6 +275,52 @@ mod tests {
         assert!(p.contains("CHARTER v2 GATE"));
         assert!(p.contains("cargo check --workspace"));
         assert!(p.contains("zero new stub"));
+    }
+
+    /// TDD STRICT MODE (charter v2 enforcement) must be baked into the
+    /// prompt so the model knows the gate requires red → green → refactor
+    /// commit chain. Added 2026-05-13 (feat/auto-port-prod-activation-tdd-strict).
+    #[test]
+    fn prompt_declares_tdd_strict_mode_red_green_refactor() {
+        let p = build_prompt(&sample_event(), &sample_ctx());
+        // Top-level section heading.
+        assert!(
+            p.contains("TDD STRICT MODE"),
+            "prompt must declare TDD STRICT MODE section"
+        );
+        // Three phase markers — order matters for the analyzer.
+        assert!(p.contains("RED commit"), "prompt must name the RED phase");
+        assert!(p.contains("GREEN commit"), "prompt must name the GREEN phase");
+        assert!(
+            p.contains("REFACTOR commit"),
+            "prompt must mention the optional REFACTOR phase"
+        );
+        // Stub list reaffirmed inside TDD section (defence in depth).
+        assert!(
+            p.contains("panic!(\"not yet\")"),
+            "TDD section must explicitly forbid panic!(\"not yet\") as a stub form"
+        );
+        // Analyzer hook referenced so the model knows the gate is real.
+        assert!(
+            p.contains("verify_with_tdd"),
+            "prompt must reference CharterV2Gate::verify_with_tdd"
+        );
+        // Commit-message convention the gate's classifier matches on.
+        // The format!() in build_prompt substitutes `{crate_name}` so the
+        // rendered prompt carries the concrete crate name (sample_ctx
+        // uses "cave-scheduler").
+        assert!(
+            p.contains("test(cave-scheduler): red"),
+            "RED commit-message template missing for sample crate"
+        );
+        assert!(
+            p.contains("feat(cave-scheduler): green"),
+            "GREEN commit-message template missing for sample crate"
+        );
+        assert!(
+            p.contains("refactor(cave-scheduler): cleanup"),
+            "REFACTOR commit-message template missing for sample crate"
+        );
     }
 
     #[test]
