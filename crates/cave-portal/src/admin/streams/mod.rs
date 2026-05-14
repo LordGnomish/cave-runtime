@@ -16,6 +16,7 @@
 
 pub mod acls;
 pub mod brokers;
+pub mod connect;
 pub mod consumer_groups;
 pub mod partitions;
 pub mod topics;
