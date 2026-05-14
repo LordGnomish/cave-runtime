@@ -1,23 +1,35 @@
-//! `/admin/upstream` view — upstream resource browser.
+//! `/admin/upstream` view — upstream resource browser. **Canonical**
+//! upstream-tracker page as of 2026-05-14; the legacy `/upstream`
+//! handler in cave-runtime now 301-redirects here.
 //!
-//! Two halves:
+//! Four sections (top to bottom):
 //!
-//! 1. **Legacy seeded list** — the per-tenant `UpstreamProject`
-//!    fixtures that pre-date the watch daemon. Still rendered first
-//!    so existing tests + dashboard semantics don't change.
-//! 2. **Live watchd panel** (2026-05-13) — reads
+//! 1. **Upstream Parity Tracker** (2026-05-14) — server-rendered
+//!    `cave_upstream::TRACKED_PROJECTS` table with parity progress bars,
+//!    ADR refs, status badges. Replaces the JS-driven `/upstream` page;
+//!    persona-gated to `PlatformAdmin` (cross-tenant control-plane data).
+//! 2. **Legacy seeded list** — the per-tenant `UpstreamProject`
+//!    fixtures that pre-date the watch daemon. Still rendered so
+//!    existing tests + dashboard semantics don't change.
+//! 3. **Live watchd panel** (2026-05-13) — reads
 //!    `<data_dir>/watchd/events.jsonl` and renders the most recent
-//!    `GAP_OPENED` events with severity badges + gap-age. Refreshes
-//!    on every request — the daemon writes, we read.
+//!    `GAP_OPENED` events with severity badges + gap-age.
+//! 4. **Auto-port dispatcher panel** — recent `dispatched.jsonl` rows
+//!    with status badges + Dispatch Now controls.
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
 use crate::admin::render::{escape, page_shell, table, table_html as render_table_html};
 use crate::admin::state::{scope, AdminState, UpstreamProject};
 use crate::admin::types::Cite;
+use cave_kernel::parity::types::ParityReport;
+use cave_kernel::parity::DiscoveredReport;
+use cave_upstream::projects::TrackedProject;
+use cave_upstream::{adr_links, TRACKED_PROJECTS};
 use cave_upstream_watchd::diff::Severity;
 use cave_upstream_watchd::auto_port::{AutoPortStatus, DispatchedRecord};
 use cave_upstream_watchd::event::{read_events, GapEvent, JsonlSink};
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum UpstreamViewError {
@@ -189,6 +201,195 @@ pub fn render_watchd_panel_in(
     )
 }
 
+/// One row in the parity tracker — derived from
+/// `cave_upstream::TRACKED_PROJECTS` joined against the kernel's
+/// parity report for each cave_module.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrackerRow {
+    pub upstream_name: String,
+    pub upstream_repo: String,
+    pub cave_crate: String,
+    pub category: String,
+    pub adr_refs: Vec<String>,
+    /// 0.0 – 1.0 from the manifest's [parity] fill_ratio (preferred)
+    /// or the kernel heuristic. `-1.0` when no manifest report exists
+    /// (rendered as "—").
+    pub parity_overall: f32,
+    /// `"synced"` / `"behind"` / `"pending"` derived from
+    /// `parity_overall` thresholds (same buckets as `/api/upstream/tracker`).
+    pub parity_status: String,
+}
+
+fn parity_status_label(overall: f32) -> &'static str {
+    if overall >= 0.7 {
+        "synced"
+    } else if overall >= 0.3 {
+        "behind"
+    } else {
+        "pending"
+    }
+}
+
+/// Build tracker rows from in-memory TRACKED_PROJECTS + a pre-computed
+/// parity index. Pure function — easy to unit test. The caller is
+/// responsible for the parity index (which is built off the filesystem
+/// once per request).
+pub fn build_tracker_rows(
+    projects: &[TrackedProject],
+    parity_by_crate: &HashMap<String, ParityReport>,
+) -> Vec<TrackerRow> {
+    projects
+        .iter()
+        .map(|p| {
+            let parity = parity_by_crate.get(p.cave_module);
+            let (overall, status) = match parity {
+                Some(r) => (r.overall, parity_status_label(r.overall).to_string()),
+                None => (-1.0, "pending".to_string()),
+            };
+            TrackerRow {
+                upstream_name: p.name.to_string(),
+                upstream_repo: p.github_repo.to_string(),
+                cave_crate: p.cave_module.to_string(),
+                category: p.category.to_string(),
+                adr_refs: adr_links::adrs_for(p.github_repo)
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                parity_overall: overall,
+                parity_status: status,
+            }
+        })
+        .collect()
+}
+
+/// Discover every parity manifest under `workspace_root` and return
+/// the report keyed by both crate-dir name AND the manifest's bare
+/// module name (so lookups by either spelling succeed). Pure I/O —
+/// callers should run this on a blocking thread for non-trivial trees.
+pub fn build_parity_index_at(workspace_root: &Path) -> HashMap<String, ParityReport> {
+    let reports: Vec<DiscoveredReport> =
+        cave_kernel::parity::discover_workspace(workspace_root);
+    let mut idx = HashMap::new();
+    for d in reports {
+        if let Some(crate_dir) = d.manifest_path.parent() {
+            if let Some(name) = crate_dir.file_name().and_then(|s| s.to_str()) {
+                idx.insert(name.to_string(), d.report.clone());
+            }
+        }
+        idx.entry(d.report.module.clone()).or_insert(d.report);
+    }
+    idx
+}
+
+fn status_cell_class(status: &str) -> &'static str {
+    match status {
+        "synced" => "bg-green-100 text-green-900",
+        "behind" => "bg-yellow-100 text-yellow-900",
+        _ => "bg-red-100 text-red-900",
+    }
+}
+
+/// Render the canonical "Upstream Parity Tracker" section. Server-
+/// rendered with Tailwind classes so it inherits the admin shell's
+/// light/dark mode. Persona-gated: only `PlatformAdmin` sees it
+/// (TenantAdmin's view is scoped to legacy seeded list + tenant-relevant
+/// watchd events).
+///
+/// Returns the section HTML, or an empty string when the caller's
+/// persona isn't allowed to see cross-tenant tracker data.
+pub fn render_tracker_section(ctx: &RequestCtx, rows: &[TrackerRow]) -> String {
+    if !ctx.persona.is_platform() {
+        return String::new();
+    }
+    let total = rows.len();
+    let synced = rows.iter().filter(|r| r.parity_status == "synced").count();
+    let behind = rows.iter().filter(|r| r.parity_status == "behind").count();
+    let pending = rows.iter().filter(|r| r.parity_status == "pending").count();
+
+    let body_rows: String = rows
+        .iter()
+        .map(|r| {
+            let pct_text = if r.parity_overall < 0.0 {
+                r#"<span class="text-gray-400">no manifest</span>"#.to_string()
+            } else {
+                format!("{}%", (r.parity_overall * 100.0).round() as i32)
+            };
+            let bar_width = if r.parity_overall < 0.0 {
+                0
+            } else {
+                ((r.parity_overall * 100.0).round() as i32).clamp(2, 100)
+            };
+            let bar_color = match r.parity_status.as_str() {
+                "synced" => "bg-green-500",
+                "behind" => "bg-yellow-500",
+                _ => "bg-red-500",
+            };
+            let adr_chips: String = if r.adr_refs.is_empty() {
+                r#"<span class="text-gray-400">—</span>"#.to_string()
+            } else {
+                r.adr_refs
+                    .iter()
+                    .map(|a| {
+                        format!(
+                            r#"<span class="inline-block px-1.5 py-0.5 mr-1 rounded text-[10px] bg-blue-100 text-blue-800 border border-blue-200">{}</span>"#,
+                            escape(a)
+                        )
+                    })
+                    .collect()
+            };
+            let status_cls = status_cell_class(&r.parity_status);
+            format!(
+                r#"<tr class="border-t">
+  <td class="px-3 py-2"><a class="text-blue-700 underline" href="https://github.com/{repo}" target="_blank" rel="noopener">{repo}</a><div class="text-[11px] text-gray-500">{name}</div></td>
+  <td class="px-3 py-2"><a class="text-blue-700 underline" href="/admin/compliance/{crate_name}?tenant_id={tenant}">{crate_name}</a></td>
+  <td class="px-3 py-2 text-xs">{category}</td>
+  <td class="px-3 py-2">{adrs}</td>
+  <td class="px-3 py-2"><div class="flex items-center gap-2"><div class="w-24 h-2 bg-gray-200 rounded"><div class="h-full rounded {bar_color}" style="width:{bar_width}%"></div></div><span class="text-xs">{pct}</span></div></td>
+  <td class="px-3 py-2"><span class="px-2 py-1 rounded text-xs {status_cls}">{status}</span></td>
+</tr>"#,
+                repo = escape(&r.upstream_repo),
+                name = escape(&r.upstream_name),
+                crate_name = escape(&r.cave_crate),
+                tenant = escape(ctx.tenant.as_str()),
+                category = escape(&r.category),
+                adrs = adr_chips,
+                bar_color = bar_color,
+                bar_width = bar_width,
+                pct = pct_text,
+                status_cls = status_cls,
+                status = escape(&r.parity_status),
+            )
+        })
+        .collect();
+
+    format!(
+        r#"<section class="mb-6">
+  <div class="flex items-baseline justify-between mb-2">
+    <h2 class="text-lg font-semibold">Upstream Parity Tracker ({total})</h2>
+    <div class="flex gap-2 text-xs">
+      <span class="px-2 py-1 rounded bg-green-100 text-green-900">{synced} synced</span>
+      <span class="px-2 py-1 rounded bg-yellow-100 text-yellow-900">{behind} behind</span>
+      <span class="px-2 py-1 rounded bg-red-100 text-red-900">{pending} pending</span>
+    </div>
+  </div>
+  <p class="text-xs text-gray-500 mb-3">ADR-aware view of the upstream OSS projects re-implemented inside cave-runtime. Source: <code>cave_upstream::TRACKED_PROJECTS</code> joined with parity manifests.</p>
+  <table class="min-w-full text-sm border-collapse">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="px-3 py-2 text-left">Upstream</th>
+        <th class="px-3 py-2 text-left">Cave crate</th>
+        <th class="px-3 py-2 text-left">Category</th>
+        <th class="px-3 py-2 text-left">ADR</th>
+        <th class="px-3 py-2 text-left">Parity</th>
+        <th class="px-3 py-2 text-left">Status</th>
+      </tr>
+    </thead>
+    <tbody>{body_rows}</tbody>
+  </table>
+</section>"#
+    )
+}
+
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, UpstreamViewError> {
     let rows = list_records(state, ctx)?;
     let table_rows: Vec<Vec<String>> = rows
@@ -202,10 +403,22 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, UpstreamVi
             ]
         })
         .collect();
+    // Tracker section: only built for PlatformAdmin. Build the parity
+    // index off the workspace root so the section shows live ratios that
+    // match /admin/compliance.
+    let tracker_section = if ctx.persona.is_platform() {
+        let workspace = crate::admin::compliance::workspace_root();
+        let parity_index = build_parity_index_at(&workspace);
+        let rows = build_tracker_rows(TRACKED_PROJECTS, &parity_index);
+        render_tracker_section(ctx, &rows)
+    } else {
+        String::new()
+    };
     let watchd_panel = render_watchd_panel_in(ctx, &watchd_events_path(), 20);
     let auto_port_panel = render_auto_port_panel_in(ctx, &dispatched_path(), 20);
     let body = format!(
-        r#"<section><h2 class="text-lg font-semibold mb-2">Upstream ({n})</h2>{tbl}</section>{watchd}{auto}"#,
+        r#"{tracker}<section><h2 class="text-lg font-semibold mb-2">Upstream ({n})</h2>{tbl}</section>{watchd}{auto}"#,
+        tracker = tracker_section,
         n = rows.len(),
         tbl = table(&["name", "repo", "version", "last_check"], &table_rows),
         watchd = watchd_panel,
@@ -387,6 +600,204 @@ mod tests {
         let html = render(&AdminState::seeded(), &ctx(&[Permission::UpstreamRead])).unwrap();
         assert!(!html.contains("evil-upstream"));
     }
+
+    // ── 2026-05-14: consolidated tracker section ────────────────────────────
+    //
+    // /admin/upstream is now the canonical upstream-tracker page (the
+    // legacy /upstream JS-driven dark theme redirects here). New tests
+    // cover:
+    //  - build_tracker_rows joins TRACKED_PROJECTS with parity reports
+    //  - render_tracker_section honours PlatformAdmin persona gate
+    //  - render_tracker_section renders status badges + progress bars
+    //  - end-to-end render() includes the tracker section for platform admin
+    //    and OMITS it for tenant admin
+
+    fn platform_ctx(perms: &[Permission]) -> RequestCtx {
+        RequestCtx::developer_as("acme", perms, Persona::PlatformAdmin)
+    }
+
+    fn fake_parity_report(module: &str, overall: f32) -> cave_kernel::parity::types::ParityReport {
+        use cave_kernel::parity::types::{ParityMetric, ParityReport};
+        ParityReport {
+            module: module.into(),
+            upstream_ref: format!("upstream/{module} @ v1"),
+            measured_at: chrono::Utc::now(),
+            file_parity: ParityMetric { score: overall, matched: 1, total: 1 },
+            function_parity: ParityMetric { score: overall, matched: 1, total: 1 },
+            test_parity: ParityMetric { score: overall, matched: 1, total: 1 },
+            surface_parity: ParityMetric { score: overall, matched: 1, total: 1 },
+            overall,
+            stubs_detected: 0,
+            gaps: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn build_tracker_rows_joins_projects_with_parity_index() {
+        let projects = [
+            TrackedProject {
+                name: "Cilium",
+                github_repo: "cilium/cilium",
+                cave_module: "cave-net",
+                track_features: "",
+                check_frequency: "biweekly",
+                category: "networking",
+                phase: 1,
+            },
+            TrackedProject {
+                name: "Made-up",
+                github_repo: "fake/fake",
+                cave_module: "cave-does-not-exist",
+                track_features: "",
+                check_frequency: "biweekly",
+                category: "test",
+                phase: 1,
+            },
+        ];
+        let mut idx: HashMap<String, ParityReport> = HashMap::new();
+        idx.insert("cave-net".into(), fake_parity_report("cave-net", 0.9179));
+
+        let rows = build_tracker_rows(&projects, &idx);
+        assert_eq!(rows.len(), 2);
+
+        let cilium = &rows[0];
+        assert_eq!(cilium.upstream_name, "Cilium");
+        assert_eq!(cilium.cave_crate, "cave-net");
+        assert!((cilium.parity_overall - 0.9179).abs() < 1e-4);
+        assert_eq!(cilium.parity_status, "synced", "0.92 ≥ 0.7 threshold");
+
+        let fake = &rows[1];
+        assert_eq!(fake.parity_overall, -1.0, "no report → -1.0");
+        assert_eq!(fake.parity_status, "pending");
+    }
+
+    #[test]
+    fn parity_status_label_thresholds() {
+        assert_eq!(parity_status_label(1.0), "synced");
+        assert_eq!(parity_status_label(0.70), "synced");
+        assert_eq!(parity_status_label(0.69), "behind");
+        assert_eq!(parity_status_label(0.30), "behind");
+        assert_eq!(parity_status_label(0.29), "pending");
+        assert_eq!(parity_status_label(0.0), "pending");
+        assert_eq!(parity_status_label(-1.0), "pending");
+    }
+
+    #[test]
+    fn render_tracker_section_returns_empty_for_tenant_admin() {
+        // TenantAdmin: cross-tenant tracker data is not their concern.
+        let tenant_ctx = RequestCtx::developer_as("acme", &[], Persona::TenantAdmin);
+        let row = TrackerRow {
+            upstream_name: "Cilium".into(),
+            upstream_repo: "cilium/cilium".into(),
+            cave_crate: "cave-net".into(),
+            category: "networking".into(),
+            adr_refs: vec!["ADR-004".into()],
+            parity_overall: 0.92,
+            parity_status: "synced".into(),
+        };
+        let html = render_tracker_section(&tenant_ctx, &[row]);
+        assert_eq!(html, "", "TenantAdmin sees no tracker section");
+    }
+
+    #[test]
+    fn render_tracker_section_renders_status_badges_and_bars_for_platform() {
+        let plat = platform_ctx(&[Permission::UpstreamRead]);
+        let rows = vec![
+            TrackerRow {
+                upstream_name: "Cilium".into(),
+                upstream_repo: "cilium/cilium".into(),
+                cave_crate: "cave-net".into(),
+                category: "networking".into(),
+                adr_refs: vec!["ADR-004".into(), "ADR-014".into()],
+                parity_overall: 0.9179,
+                parity_status: "synced".into(),
+            },
+            TrackerRow {
+                upstream_name: "Skeleton".into(),
+                upstream_repo: "fake/skeleton".into(),
+                cave_crate: "cave-fake".into(),
+                category: "test".into(),
+                adr_refs: vec![],
+                parity_overall: -1.0,
+                parity_status: "pending".into(),
+            },
+        ];
+        let html = render_tracker_section(&plat, &rows);
+        // Heading + summary chips.
+        assert!(html.contains("Upstream Parity Tracker (2)"));
+        assert!(html.contains("1 synced"));
+        assert!(html.contains("1 pending"));
+        // Row content for Cilium: ADR chips + 92% + status badge.
+        assert!(html.contains("ADR-004"));
+        assert!(html.contains("ADR-014"));
+        assert!(html.contains("92%"));
+        assert!(html.contains("bg-green-100 text-green-900"), "synced badge color");
+        // Drill-down link to /admin/compliance for the crate.
+        assert!(html.contains("/admin/compliance/cave-net?"));
+        // Skeleton row: no-manifest text + 0% bar width.
+        assert!(html.contains("no manifest"));
+        assert!(html.contains("bg-red-100 text-red-900"), "pending badge color");
+    }
+
+    #[test]
+    fn render_tracker_section_escapes_user_visible_strings() {
+        // Defensive — TrackerRow fields are populated from string statics in
+        // TRACKED_PROJECTS today, but a future PR could thread user input
+        // through (e.g. manifest-driven category). Escaping must be in
+        // place so `<script>` payloads can't sneak through.
+        let plat = platform_ctx(&[Permission::UpstreamRead]);
+        let row = TrackerRow {
+            upstream_name: "<x>".into(),
+            upstream_repo: "fake/<repo>".into(),
+            cave_crate: "cave-<evil>".into(),
+            category: "<script>alert(1)</script>".into(),
+            adr_refs: vec!["<adr>".into()],
+            parity_overall: 0.5,
+            parity_status: "behind".into(),
+        };
+        let html = render_tracker_section(&plat, &[row]);
+        assert!(html.contains("&lt;script&gt;"));
+        assert!(!html.contains("<script>alert(1)</script>"));
+        assert!(html.contains("&lt;adr&gt;"));
+    }
+
+    #[test]
+    fn end_to_end_admin_upstream_renders_tracker_for_platform_admin() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "TrackerPlatform",
+            "acme"
+        );
+        // Use the real workspace so build_parity_index_at can discover
+        // manifests + populate the tracker.
+        let s = AdminState::seeded();
+        let plat = platform_ctx(&[Permission::UpstreamRead]);
+        let html = render(&s, &plat).unwrap();
+        assert!(html.contains("Upstream Parity Tracker"), "tracker section present");
+        // Cilium is a known TRACKED_PROJECT — must appear in the rendered HTML.
+        assert!(html.contains("cilium/cilium"));
+    }
+
+    #[test]
+    fn end_to_end_admin_upstream_omits_tracker_for_tenant_admin() {
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/upstream/src/components/ProjectsList.tsx",
+            "TrackerTenant",
+            "acme"
+        );
+        let s = AdminState::seeded();
+        let tenant_ctx = RequestCtx::developer_as(
+            "acme",
+            &[Permission::UpstreamRead],
+            Persona::TenantAdmin,
+        );
+        let html = render(&s, &tenant_ctx).unwrap();
+        // Tenant admin still gets the legacy seeded list + watchd panel,
+        // but NOT the cross-tenant tracker.
+        assert!(!html.contains("Upstream Parity Tracker"));
+    }
+
+    // ── end consolidated-tracker tests ─────────────────────────────────────
 
     #[test]
     fn render_shows_acme_count() {
