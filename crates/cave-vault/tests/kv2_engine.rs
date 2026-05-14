@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! KV v2 secret engine — parity tests against openbao v2.5.3.
 //!
 //! Exercises put / get / list / delete / destroy / undelete plus version &

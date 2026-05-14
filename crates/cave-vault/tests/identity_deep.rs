@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-001: Identity store — entity + alias + group + group_aliases +
 //! external-group member matching by mount_accessor + effective policy
 //! union. Pinned to openbao v2.5.3.

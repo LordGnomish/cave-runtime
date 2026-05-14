@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Token management and storage for the Vault runtime.
 //!
 //! This module provides structures and logic for creating, storing,

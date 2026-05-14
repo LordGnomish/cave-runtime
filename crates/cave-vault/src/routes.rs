@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP route handlers for cave-vault.
 //!
 //! Exposes a Vault-compatible REST API under /api/v1/vault/...

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-certs — DNS-01 + HTTP-01 solver tests.
 
 use cave_acme::{Challenge, ChallengeStatus, ChallengeType, Jwk};

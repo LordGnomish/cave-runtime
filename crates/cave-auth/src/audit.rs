@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Audit logging for every auth decision.
 //!
 //! Every allow/deny is logged via `tracing` with structured fields so that

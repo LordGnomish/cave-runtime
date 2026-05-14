@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Mount table — parity tests against openbao v2.5.3.
 //!
 //! Upstream package: `vault/mount.go`.

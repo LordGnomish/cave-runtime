@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Database Secrets Engine — dynamic credential generation for PostgreSQL and MySQL.
 //!
 //! Generates short-lived credentials without a live DB connection.

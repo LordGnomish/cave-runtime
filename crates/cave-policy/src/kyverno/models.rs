@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kyverno CRD data models.
 //!
 //! Covers: ClusterPolicy, Policy, all rule types (validate/mutate/generate/verifyImages),

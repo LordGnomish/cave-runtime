@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rego evaluator — tree-walking interpreter with backtracking.
 //!
 //! Implements OPA's evaluation model:

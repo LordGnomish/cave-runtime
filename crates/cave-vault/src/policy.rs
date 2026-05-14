@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Policy engine — path-based ACL with capabilities.
 
 use serde::{Deserialize, Serialize};

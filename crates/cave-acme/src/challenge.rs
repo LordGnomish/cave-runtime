@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ACMEv2 challenge types.
 //!
 //! Cite: RFC 8555 §8 (Challenge object), §8.3 (HTTP-01),

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Permission models — port from @backstage/permission-common
 //!
 //! Upstream: backstage/plugins/permission-common/src/types.ts

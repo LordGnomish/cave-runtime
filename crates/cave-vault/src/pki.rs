@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PKI secrets engine — certificate authority and issuance.
 //!
 //! Generates a root CA with rcgen, issues leaf TLS certs signed by that CA,

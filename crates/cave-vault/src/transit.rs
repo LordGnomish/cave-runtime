@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Transit secrets engine — encryption as a service.
 //!
 //! Provides AES-256-GCM encryption/decryption and Ed25519 sign/verify

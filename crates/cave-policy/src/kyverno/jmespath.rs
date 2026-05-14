@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! JMESPath evaluator — subset implementation for Kyverno variable substitution.
 //!
 //! Supports: field access, array index, array/object projections, pipe,

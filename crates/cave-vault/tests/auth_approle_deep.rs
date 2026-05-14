@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-001: AppRole — secret_id binding semantics, token policy /
 //! TTL / max_ttl propagation, role_id update, num_uses exhaustion.
 //! Pinned to openbao v2.5.3.

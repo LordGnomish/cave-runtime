@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CRL (Certificate Revocation List) responder.
 //!
 //! Cite: RFC 5280 §5 — CRL structure and revocation reasons; openbao
