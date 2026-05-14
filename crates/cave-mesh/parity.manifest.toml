@@ -255,3 +255,189 @@ note         = "ServiceEntry CRD manager: create / get / list / update / delete 
 upstream_pkg = "ztunnel:src/state/policy/L7"
 note         = "Ambient L7 policy (waypoint proxy filter chain). waypoint.rs has the routing stub; L7 filter ordering is unmapped."
 
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "hbone + authz + destinationrule + loadbalancer (istio v1.29.2)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/connects_with_valid_request"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_parses_valid_connect_request"
+status         = "ported"
+notes          = "CONNECT + :authority + Baggage tenant parsing."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_non_connect_method"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_non_connect_method"
+status         = "ported"
+notes          = "Only HTTP/2 CONNECT is valid for HBONE."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_non_root_path"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_non_root_path"
+status         = "ported"
+notes          = "HBONE CONNECT requires :path = \"/\"."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_authority_without_port"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_authority_without_port"
+status         = "ported"
+notes          = "Authority must be host:port form."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/baggage_test.go"
+upstream_name  = "TestParseBaggage/whitespace_and_properties"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_baggage_tolerates_whitespace_and_properties"
+status         = "ported"
+notes          = "W3C Baggage parser tolerates whitespace + drops `;property` suffix."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestAuthorise/refuses_mismatched_baggage_tenant"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_authorise_refuses_when_baggage_tenant_mismatches"
+status         = "ported"
+notes          = "cave invariant — tenant baggage must equal invoking ztunnel's tenant."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/accept_response_status_200"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_accept_response_carries_status_200"
+status         = "ported"
+notes          = "Successful CONNECT → :status 200."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/deny_first_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_deny_short_circuits_to_deny"
+status         = "ported"
+notes          = "DENY rules evaluated before ALLOW rules; DENY match terminates."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/no_policies_allows_by_default"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_no_policies_means_allow_by_default"
+status         = "ported"
+notes          = "Empty policy set → ALLOW (Istio's default-allow)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/allow_in_scope_no_match_denies"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_allow_in_scope_with_no_match_denies"
+status         = "ported"
+notes          = "ALLOW exists + no match → deny-by-default."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/allow_matches_principal_allows"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_allow_matches_principal_returns_allow"
+status         = "ported"
+notes          = "SPIFFE principal exact match → ALLOW."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/tenant_scoped_invisible_to_other_tenant"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_tenant_scoping_ignores_other_tenant_policies"
+status         = "ported"
+notes          = "cave Charter — cross-tenant policies are invisible."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/JWT_when_clause_enforced"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_jwt_when_clause_enforces_claim_match"
+status         = "ported"
+notes          = "when.jwt claim must match; missing claim → no rule match."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildDefaultCluster/no_subsets_one_cluster"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_compile_default_yields_one_cluster"
+status         = "ported"
+notes          = "DR with no subsets compiles to a single default cluster."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildDefaultCluster/extra_cluster_per_subset"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_compile_yields_extra_cluster_per_subset"
+status         = "ported"
+notes          = "Naming convention `<host>|<subset>` via model.BuildSubsetKey."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestCompile/empty_subset_labels_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_empty_subset_labels_rejected"
+status         = "ported"
+notes          = "Validation — subset must declare a non-empty label selector."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestApplyLocalityLBSetting/least_request"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_least_request_picks_lowest_active_count"
+status         = "ported"
+notes          = "LeastRequest LB picks min(active_requests)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestApplyLocalityLBSetting/round_robin_cycles"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_round_robin_cycles_through_pool"
+status         = "ported"
+notes          = "RoundRobin uses seed % pool.len() — deterministic cycle."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestSubsetEndpointSelection/label_filter"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_subset_filter_excludes_non_matching_endpoints"
+status         = "ported"
+notes          = "Subset label_selector filters the LB pool BEFORE LB policy applies."
+
+# Honest "still missing" entries — Istio is huge; this is a curated subset.
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildCluster/RingHash_consistent_under_header_value"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "RingHash deterministic-hash LB path not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/listener_test.go"
+upstream_name  = "TestBuildListener/HTTPListenerWithFilters"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Envoy listener/filter chain construction — distinct surface, not yet behaviourally cross-referenced."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/xds/ads_test.go"
+upstream_name  = "TestADSConnection"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "xDS aggregated discovery streaming — long-form integration, not yet covered."

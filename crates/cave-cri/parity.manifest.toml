@@ -1321,3 +1321,189 @@ loc          = 168
 priority     = "P2"
 notes        = "containerd is CLI"
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "content/local + diff/walking + leases + digest (containerd v1.7.20)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "pkg/digest/digest_test.go"
+upstream_name  = "TestParseDigest/sha256_wire_round_trips"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_digest_parse_round_trips_via_display"
+status         = "ported"
+notes          = "Display impl reproduces the parsed wire form."
+
+[[upstream_test]]
+upstream_path  = "pkg/digest/digest_test.go"
+upstream_name  = "TestParseDigest/rejects_uppercase_hex"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_digest_parse_rejects_uppercase_hex"
+status         = "ported"
+notes          = "go-digest's regex only matches lowercase hex."
+
+[[upstream_test]]
+upstream_path  = "pkg/digest/digest_test.go"
+upstream_name  = "TestParseDigest/rejects_md5"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_digest_parse_rejects_md5"
+status         = "ported"
+notes          = "Unsupported algorithm → ErrDigestUnsupported equivalent."
+
+[[upstream_test]]
+upstream_path  = "pkg/digest/digest_test.go"
+upstream_name  = "TestParseDigest/rejects_missing_colon"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_digest_parse_rejects_missing_colon"
+status         = "ported"
+notes          = "Wire form requires `<alg>:<hex>`."
+
+[[upstream_test]]
+upstream_path  = "pkg/digest/digest_test.go"
+upstream_name  = "TestDigesterHashOfEmpty/sha256"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_digest_compute_sha256_of_empty_matches_reference"
+status         = "ported"
+notes          = "Reference vector — every impl must match."
+
+[[upstream_test]]
+upstream_path  = "core/content/local/store_test.go"
+upstream_name  = "TestLocalStore/Open_creates_blobs_and_ingest_layout"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_store_open_creates_blobs_and_ingest_layout"
+status         = "ported"
+notes          = "Fresh open creates blobs/sha256 + blobs/sha512 + ingest dirs."
+
+[[upstream_test]]
+upstream_path  = "core/content/local/writer_test.go"
+upstream_name  = "TestLocalStoreWriter/commit_when_digest_matches"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_store_writer_commit_succeeds_when_digest_matches"
+status         = "ported"
+notes          = "Streaming write + commit produces an addressable blob."
+
+[[upstream_test]]
+upstream_path  = "core/content/local/store_test.go"
+upstream_name  = "TestLocalStore/delete_refused_when_leased"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_store_delete_refused_when_lease_holds_blob"
+status         = "ported"
+notes          = "GC interlock: leased blob → StoreError::InUse."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking_test.go"
+upstream_name  = "TestApplyLayer/unpacks_regular_files"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_walking_apply_unpacks_regular_files"
+status         = "ported"
+notes          = "Plain tar entries unpacked into target dir."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking_test.go"
+upstream_name  = "TestApplyLayer/whiteout_delete_sibling"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_walking_apply_whiteout_removes_named_sibling"
+status         = "ported"
+notes          = "OCI .wh.<name> removes the named sibling."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking_test.go"
+upstream_name  = "TestApplyLayer/opaque_whiteout"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_walking_apply_opaque_whiteout_clears_dir"
+status         = "ported"
+notes          = ".wh..wh..opq empties the parent directory."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking_test.go"
+upstream_name  = "TestApplyLayer/empty_layer_is_noop"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_walking_apply_empty_layer_returns_zero_stats"
+status         = "ported"
+notes          = "Empty tar → all-zero ApplyStats."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking.go::DiffID"
+upstream_name  = "TestComputeDiffID/sha256_of_uncompressed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_diff_id_is_sha256_of_uncompressed_tar"
+status         = "ported"
+notes          = "OCI image spec — diff_id is SHA-256 of the *uncompressed* tar stream."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/compression_test.go"
+upstream_name  = "TestGzipRoundTrip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_gzip_compress_decompress_round_trips"
+status         = "ported"
+notes          = "Compress/decompress is a stable identity."
+
+[[upstream_test]]
+upstream_path  = "core/leases/manager_test.go"
+upstream_name  = "TestLeaseManager/create_then_get"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_manager_create_then_get_returns_lease"
+status         = "ported"
+notes          = "Created lease survives + returns its TTL."
+
+[[upstream_test]]
+upstream_path  = "core/leases/manager_test.go"
+upstream_name  = "TestLeaseManager/duplicate_id_errors"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_manager_duplicate_create_errors"
+status         = "ported"
+notes          = "Re-create with same id → AlreadyExists."
+
+[[upstream_test]]
+upstream_path  = "core/leases/manager_test.go"
+upstream_name  = "TestLeaseManager/live_content_returns_held_digests"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_manager_live_content_returns_held_content_digests"
+status         = "ported"
+notes          = "GC walker input — content kind only, snapshot/ingest excluded."
+
+[[upstream_test]]
+upstream_path  = "core/leases/manager_test.go"
+upstream_name  = "TestLeaseManager/reap_expired_removes_only_expired"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_manager_reap_expired_removes_only_expired"
+status         = "ported"
+notes          = "TTL=0 lease reaped, TTL=None lease survives."
+
+[[upstream_test]]
+upstream_path  = "core/leases/resource_test.go"
+upstream_name  = "TestResource/content_kind_carries_digest"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_resource_content_kind_carries_digest"
+status         = "ported"
+notes          = "Resource::content + Resource::snapshot kind discriminator + digest extraction."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "core/content/local/store_test.go"
+upstream_name  = "TestLocalStoreWalk/visits_all_blobs"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "ContentStore::walk visitor pattern not yet covered by an upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "core/content/local/writer_test.go"
+upstream_name  = "TestLocalStoreWriter/abort_removes_tmp"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Writer::abort cleanup path covered by in-src test but not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "core/diff/walking/walking_test.go"
+upstream_name  = "TestApplyLayer/symlinks_preserved_unix_only"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Symlink unpack covered by in-src #[cfg(unix)] test but not yet expressed as upstream-port test."

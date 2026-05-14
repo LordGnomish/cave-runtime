@@ -563,3 +563,197 @@ upstream_pkg = "redis:src/tls.c"
 local_files  = ["src/tls_listener.rs"]
 note         = "Native TLS listener configuration: TlsListenerConfig (bind/tls_port/plain_port/cert+key/ca/client_auth/alpn/allowed_protocols), ClientAuth parser matching upstream `tls-auth-clients yes|no|optional`, validate() (port clash, ALPN whitelist, TLS version whitelist, CA-required-when-mTLS), load() via rustls-pemfile for PKCS#8/PKCS#1/SEC1 keys. Honest scope cut: cryptographic key-cert match + handshake live in rustls server-config builder the caller drives; this module owns the config + PEM-load surface."
 
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "t_string + t_list + t_hash + t_set + t_zset (redis 7.4.0)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "SET and GET an item"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_set_then_get_round_trips"
+status         = "ported"
+notes          = "SET → OK; GET retrieves the bulk value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "GET against non-existing key"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_get_missing_returns_nil"
+status         = "ported"
+notes          = "Missing key → nil bulk reply."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "SET with NX option fails on collision"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_set_nx_is_idempotent_under_collision"
+status         = "ported"
+notes          = "NX flag preserves the existing value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "INCR against new key creates and returns 1"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_incr_against_new_key_starts_at_one"
+status         = "ported"
+notes          = "INCR on missing key starts at 1, second call returns 2."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "APPEND extends the existing value"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_append_extends_existing_value"
+status         = "ported"
+notes          = "APPEND returns new length; STRLEN matches."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "RPUSH then LRANGE preserves insertion order"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_rpush_lrange_preserves_insertion_order"
+status         = "ported"
+notes          = "Tail push preserves order in LRANGE."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LPUSH prepends multiple elements in reverse"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_lpush_prepends_in_reverse_order"
+status         = "ported"
+notes          = "LPUSH key a b c yields [c, b, a]."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LLEN returns 0 for missing key"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_llen_returns_zero_for_missing_key"
+status         = "ported"
+notes          = "LLEN on missing key → 0, populated key → element count."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LPOP removes head element"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_lpop_removes_head_element"
+status         = "ported"
+notes          = "LPOP returns + removes the head."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HSET + HGET round trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hset_then_hget_round_trips"
+status         = "ported"
+notes          = "HSET returns 1 for new field; HGET retrieves value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HSET overwrite returns 0 new fields"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hset_overwrite_returns_zero_new_fields"
+status         = "ported"
+notes          = "Return value tracks NEW fields, not modified."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HGETALL returns field-value pairs"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hgetall_returns_field_value_pairs"
+status         = "ported"
+notes          = "Pairs interleaved [k1, v1, k2, v2 ...] in array reply."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HDEL removes specified fields"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hdel_removes_field_and_returns_count"
+status         = "ported"
+notes          = "HDEL returns number of removed fields; survives partial removal."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SADD + SCARD returns set size"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_sadd_then_scard_returns_size"
+status         = "ported"
+notes          = "SADD returns NEW member count, idempotent on duplicates."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SISMEMBER returns 1/0 for membership"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_sismember_returns_membership_bool_as_int"
+status         = "ported"
+notes          = "Returns int 1 or 0 per Redis convention (no bool type in RESP2)."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SREM removes member, returns count"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_srem_removes_member_returns_count"
+status         = "ported"
+notes          = "Returns count of removed; missing members are silent."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZADD + ZCARD returns size"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zadd_then_zcard_returns_size"
+status         = "ported"
+notes          = "ZADD returns added count; ZCARD returns total."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZSCORE returns score of present member, nil otherwise"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zscore_returns_score_or_nil"
+status         = "ported"
+notes          = "Float score returned as bulk string; missing → nil."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZRANK returns 0-indexed position by ascending score"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zrank_returns_zero_indexed_position"
+status         = "ported"
+notes          = "Position by score asc; missing member → nil."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZREM removes member, decrements cardinality"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zrem_removes_and_decrements_cardinality"
+status         = "ported"
+notes          = "Returns count of removed; ZCARD reflects removal."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "WRONGTYPE error across types"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wrongtype_when_get_targets_list_key"
+status         = "ported"
+notes          = "Cross-type op (GET on list) returns CacheError::WrongType."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "tests/unit/expire.tcl"
+upstream_name  = "EXPIRE with PX/EX option"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Expiry TTL semantics covered by commands/expiry.rs but not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/scripting.tcl"
+upstream_name  = "EVAL returns Lua value as RESP"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Lua scripting end-to-end not yet covered behaviourally."
