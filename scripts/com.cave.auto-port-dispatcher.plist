@@ -19,11 +19,20 @@
     launchctl unsetenv CAVE_AUTOPORT_DISABLE
 
   Backend selection:
-    The default below is `dryrun` so the dispatcher records what it
-    WOULD have submitted but never side-effects. Edit the
-    ProgramArguments to flip `--backend pump` (local LLM via the
-    qwen-pump queue dir) or `--backend opus` (Anthropic API; the
-    operator must also export ANTHROPIC_API_KEY in launchd's env).
+    The default below is `claude-cli` so the dispatcher uses the
+    operator's locally-installed Claude Code binary (no external
+    API key required — the CLI carries the existing session).
+    Alternatives:
+      --backend dryrun    — record submissions to JSONL, no side-effects
+      --backend pump      — local LLM via the qwen-pump queue dir
+      --backend opus      — Anthropic Messages API direct (requires
+                            ANTHROPIC_API_KEY in launchd's env; legacy)
+    Edit the ProgramArguments below to flip backends.
+
+  Binary path:
+    Defaults to ~/.local/bin/cave-upstream-watchd (workspace cargo
+    install) — adjust for your install. The Claude Code `claude`
+    binary is auto-discovered via PATH and $HOME/.local/bin.
 
   Logs:
     ~/Library/Application Support/cave-runtime/watchd/dispatch.{log,err}
@@ -51,8 +60,19 @@
     <string>/usr/local/bin/cave-upstream-watchd</string>
     <string>dispatch</string>
     <string>--backend</string>
-    <string>dryrun</string>
+    <string>claude-cli</string>
   </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- ClaudeCliTaskQueue::locate_binary walks PATH then
+         $HOME/.local/bin then /usr/local/bin. Make sure both
+         the watchd binary AND the `claude` binary are reachable. -->
+    <key>PATH</key>
+    <string>/Users/gnomish/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/gnomish</string>
+  </dict>
 
   <key>StartInterval</key>
   <integer>900</integer>
@@ -66,16 +86,10 @@
   <key>StandardErrorPath</key>
   <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/dispatch.err</string>
 
-  <!-- Operator: uncomment + populate when flipping to opus backend. -->
-  <!--
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>ANTHROPIC_API_KEY</key>
-    <string>sk-REPLACE_ME_DO_NOT_COMMIT</string>
-    <key>CAVE_OPUS_MODEL</key>
-    <string>claude-opus-4-7</string>
-  </dict>
-  -->
+  <!-- ANTHROPIC_API_KEY block removed 2026-05-14: ClaudeCliTaskQueue
+       uses the operator's local Claude Code session (no external key
+       required). If you flip back to `--backend opus`, re-add an
+       EnvironmentVariables entry with ANTHROPIC_API_KEY. -->
 
   <key>LowPriorityIO</key>
   <true/>

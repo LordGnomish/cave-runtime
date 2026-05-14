@@ -78,8 +78,12 @@ enum Cmd {
         /// Override audit.jsonl path.
         #[arg(long)]
         audit: Option<PathBuf>,
-        /// Backend: `dryrun` | `pump` | `opus`. Default: dryrun
-        /// (safe — never side-effects until the operator opts in).
+        /// Backend: `dryrun` | `pump` | `claude-cli` | `opus`.
+        /// Default: dryrun (safe — never side-effects until the operator
+        /// opts in). `claude-cli` is the recommended production default
+        /// when Claude Code is installed locally — no external API key
+        /// required; `opus` keeps the Anthropic-API path for headless
+        /// hosts that don't have the CLI.
         #[arg(long, default_value = "dryrun")]
         backend: String,
         /// Skip the verify_completed pass (only run scan_and_dispatch).
@@ -194,7 +198,9 @@ async fn run_dispatch(
     use cave_upstream_watchd::{
         auto_port::{AutoPortDispatcher, DispatcherConfig, WorkspaceContextResolver},
         auto_port_gate::CharterV2Gate,
-        task_queue::{DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskQueue},
+        task_queue::{
+            ClaudeCliTaskQueue, DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskQueue,
+        },
     };
     use std::sync::Arc;
 
@@ -231,14 +237,27 @@ async fn run_dispatch(
             let q = OpusTaskQueue::from_env(state_dir).ok_or_else(|| {
                 anyhow::anyhow!(
                     "ANTHROPIC_API_KEY not set — refusing to construct OpusTaskQueue. \
-                     Set the env var or use --backend dryrun/pump."
+                     Set the env var or use --backend dryrun/pump/claude-cli."
                 )
             })?;
             tracing::info!(backend = "opus", "auto-port dispatcher up");
             Arc::new(q)
         }
+        "claude-cli" => {
+            let log_dir = state_path.with_file_name("claude-cli");
+            let q = ClaudeCliTaskQueue::from_env(log_dir).map_err(|e| {
+                anyhow::anyhow!(
+                    "could not initialise ClaudeCliTaskQueue: {e} \
+                     (install Claude Code: https://claude.com/code; or use --backend pump)"
+                )
+            })?;
+            tracing::info!(backend = "claude-cli", "auto-port dispatcher up");
+            Arc::new(q)
+        }
         other => {
-            anyhow::bail!("unknown backend '{other}' — pick dryrun | pump | opus");
+            anyhow::bail!(
+                "unknown backend '{other}' — pick dryrun | pump | opus | claude-cli"
+            );
         }
     };
 
