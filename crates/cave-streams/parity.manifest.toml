@@ -754,3 +754,134 @@ cave_path      = "—"
 cave_test_name = "—"
 status         = "missing"
 notes          = "Transaction markers (COMMIT/ABORT) write path not yet covered behaviourally."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit.
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testJoinGroupAssignsMemberId"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_join_group_assigns_member_id_and_starts_rebalance"
+status         = "ported"
+notes          = "Empty member_id → fresh id + state=PreparingRebalance + generation=1."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testJoinGroupReusesProvidedMemberId"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_join_group_reuses_provided_member_id"
+status         = "ported"
+notes          = "Non-empty member_id on rejoin reused verbatim."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatUnknownMember"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_unknown_member_errors"
+status         = "ported"
+notes          = "Heartbeat for non-member → StreamsError::MemberNotFound."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatIllegalGeneration"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_illegal_generation_errors"
+status         = "ported"
+notes          = "Wrong generation → StreamsError::IllegalGeneration."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testHeartbeatDuringRebalance"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_heartbeat_during_rebalance_returns_rebalance_in_progress"
+status         = "ported"
+notes          = "PreparingRebalance state → heartbeat returns Kafka error_code=27 (REBALANCE_IN_PROGRESS)."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testSyncGroupTransitionsToStable"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_sync_group_transitions_to_stable"
+status         = "ported"
+notes          = "SyncGroup with leader's assignment → state=Stable; heartbeat returns 0."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testLeaveGroup"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_leave_group_removes_member_and_bumps_generation"
+status         = "ported"
+notes          = "LeaveGroup drops the member and elects a new leader from remaining members."
+
+[[upstream_test]]
+upstream_path  = "core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala"
+upstream_name  = "GroupCoordinatorTest/testDeleteGroupRefusesActiveMembers"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_group_coordinator_delete_group_refuses_when_active_members"
+status         = "ported"
+notes          = "DeleteGroup refuses while members are active; succeeds after all leave."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java"
+upstream_name  = "ConnectorConfigTest/derive_source_type_from_class"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_connector_derives_source_type_from_class_name"
+status         = "ported"
+notes          = "Connector::new infers Source/Sink from `connector.class` substring."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/ConnectorConfigTest.java"
+upstream_name  = "ConnectorConfigTest/tasks_max_creates_task_slots"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_connector_tasks_max_creates_task_slots"
+status         = "ported"
+notes          = "tasks.max = N → N pre-allocated Task slots with deterministic ids."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java"
+upstream_name  = "WorkerTest/start_transitions_to_running"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_worker_start_transitions_connector_and_tasks_to_running"
+status         = "ported"
+notes          = "Connector.start() → state=Running + every task to TaskState::Running."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/createConnectorRejectsDuplicate"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_create_connector_rejects_duplicate"
+status         = "ported"
+notes          = "create_connector with existing name → ConnectorAlreadyExists."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/pauseConnectorTransitionsTasks"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_pause_connector_transitions_tasks_to_paused"
+status         = "ported"
+notes          = "pause_connector pauses the connector AND every task."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/restartTaskClearsFailureTrace"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_restart_task_clears_failure_trace"
+status         = "ported"
+notes          = "restart_task brings task to Running and clears the failure trace."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/PluginConfigTest.java"
+upstream_name  = "PluginConfigTest/validate_config_rejects_missing_connector_class"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_validate_config_rejects_missing_connector_class"
+status         = "ported"
+notes          = "validate_config returns error_count=1 when connector.class missing."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/deleteConnectorRemovesFromCluster"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_connect_cluster_delete_connector_removes_from_list"
+status         = "ported"
+notes          = "delete_connector removes the connector + future get_connector → NotFound."

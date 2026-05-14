@@ -284,3 +284,213 @@ loc          = 700
 priority     = "P0"
 notes        = "Folder split: controllers/leader_election/events/queues/reconciler_metrics (22 tests)."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "deployment + replicaset + job + cronjob + daemonset (kubernetes v1.36.0)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/deployment_controller_test.go"
+upstream_name  = "TestSyncDeployment/replicas_match_observed_is_noop"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_deployment_steady_state_is_noop"
+status         = "ported"
+notes          = "Reconcile returns NoOp when observed_replicas == spec.replicas."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/deployment_controller_test.go"
+upstream_name  = "TestSyncDeployment/paused_freezes_rollout"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_deployment_pause_freezes_rollout"
+status         = "ported"
+notes          = "paused=true blocks reconcile regardless of replica diff."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/util/deployment_util_test.go"
+upstream_name  = "TestMaxSurge/rolling_includes_max_surge"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_deployment_max_pods_during_surge_includes_max_surge"
+status         = "ported"
+notes          = "max_pods_during_surge = spec.replicas + max_surge (RollingUpdate)."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/rollback_test.go"
+upstream_name  = "TestRollback/unknown_revision_requeues"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_deployment_rollback_unknown_revision_requeues"
+status         = "ported"
+notes          = "Missing revision → Requeue (upstream surfaces RollbackRevisionNotFound condition); 0 → InvalidSpec."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/rolling_test.go"
+upstream_name  = "TestRollingUpdate/surge_room_caps_new_rs_target"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_deployment_rolling_step_caps_new_rs_at_replicas_plus_surge"
+status         = "ported"
+notes          = "new_rs scales up by max_surge; with max_unavailable>0 old_rs sheds pods in same pass."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/replicaset/replica_set_test.go"
+upstream_name  = "TestManageReplicas/empty_selector_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_replicaset_empty_selector_rejected"
+status         = "ported"
+notes          = "Empty selector matches everything → reject to prevent runaway deletes."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/replicaset/replica_set_test.go"
+upstream_name  = "TestManageReplicas/under_replicated_creates_diff"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_replicaset_under_replicated_creates_diff"
+status         = "ported"
+notes          = "Diff = spec.replicas − status.running_pods → Reconcile::Create(diff)."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/replicaset/replica_set_test.go"
+upstream_name  = "TestBurstReplicas/slow_start_caps_creates"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_replicaset_burst_replicas_caps_per_pass_creates"
+status         = "ported"
+notes          = "clamp_burst caps Create/Delete at burst_replicas; passes NoOp through."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/controller_ref_manager_test.go"
+upstream_name  = "TestClaimPods/adopts_orphans_matching_selector"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_replicaset_adopts_orphan_matching_selector_only"
+status         = "ported"
+notes          = "Adoption criteria: no controllerRef + matching selector + same namespace."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/controller_ref_manager_test.go"
+upstream_name  = "TestReleasePods/release_when_labels_drift"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_replicaset_releases_owned_pod_when_labels_drift"
+status         = "ported"
+notes          = "Owned pod with mismatching selector → released; other-owner is ignored."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/job_controller_test.go"
+upstream_name  = "TestManageJob/fresh_creates_up_to_parallelism"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_job_fresh_creates_up_to_parallelism"
+status         = "ported"
+notes          = "Initial reconcile creates exactly min(parallelism, remaining)."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/util/job_utils_test.go"
+upstream_name  = "TestIsJobFinished/succeeded_ge_completions"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_job_is_complete_at_succeeded_equals_completions"
+status         = "ported"
+notes          = "is_complete uses >= so over-completion still counts as done (idempotency)."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/job_controller_test.go"
+upstream_name  = "TestPastBackoffLimitOnFailure/strictly_greater"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_job_past_backoff_is_strictly_greater_than_limit"
+status         = "ported"
+notes          = "Boundary case — failed==backoff_limit is NOT past the limit yet."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/job_controller_test.go"
+upstream_name  = "TestSuspendedJob/deletes_active_pods"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_job_suspended_deletes_active_pods"
+status         = "ported"
+notes          = "suspended=true → Delete(active) on every pass until cleared."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/indexed_job_utils_test.go"
+upstream_name  = "TestFirstPendingIndexes/lowest_within_budget"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_indexed_job_picks_lowest_pending_within_budget"
+status         = "ported"
+notes          = "Indexed-job scheduler picks lowest pending indexes up to parallelism−active."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/cronjob/utils_test.go"
+upstream_name  = "TestParseSchedule/five_field_required"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_cronjob_validate_schedule_requires_five_fields"
+status         = "ported"
+notes          = "Cron expression must be exactly 5 whitespace-separated fields."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/cronjob/cronjob_controllerv2_test.go"
+upstream_name  = "TestSyncCronJob/Forbid_skips_when_active"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_cronjob_forbid_policy_skips_when_active_jobs_exist"
+status         = "ported"
+notes          = "ConcurrencyPolicy::Forbid → NoOp when active_jobs > 0."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/cronjob/cronjob_controllerv2_test.go"
+upstream_name  = "TestSyncCronJob/Replace_deletes_active"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_cronjob_replace_policy_deletes_active_jobs"
+status         = "ported"
+notes          = "ConcurrencyPolicy::Replace → Delete(active) before next fire."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/daemon/daemon_controller_test.go"
+upstream_name  = "TestNodeShouldRunDaemonPod/unschedulable_skipped"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_daemonset_node_should_run_skips_unschedulable_node"
+status         = "ported"
+notes          = "Cordoned/unschedulable nodes never run a DS pod."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/daemon/daemon_controller_test.go"
+upstream_name  = "TestManage/evicts_when_node_no_longer_matches"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_daemonset_evicts_pod_when_node_no_longer_matches_selector"
+status         = "ported"
+notes          = "Label drift → Reconcile::Delete(1) for the now-ineligible node."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/api/v1/helper/helpers_test.go"
+upstream_name  = "TestToleratesTaint/Exists_with_no_key_tolerates_all"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_daemonset_toleration_exists_with_no_key_tolerates_any_taint"
+status         = "ported"
+notes          = "Toleration{key:None, op:Exists} matches every taint of the given effect."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/api/v1/helper/helpers_test.go"
+upstream_name  = "TestFindMatchingUntoleratedTaint/PreferNoSchedule_advisory"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_daemonset_tolerates_all_ignores_prefer_no_schedule_taints"
+status         = "ported"
+notes          = "PreferNoSchedule is never a hard block — tolerates_all returns true even with no tolerations."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/deployment/deployment_controller_test.go"
+upstream_name  = "TestRolloutProgress/conditions_track_phase"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Deployment rollout progress conditions (Progressing/Available/ReplicaFailure) not yet modelled."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/job/job_controller_test.go"
+upstream_name  = "TestActiveDeadlineSeconds/job_fails_after_deadline"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Job activeDeadlineSeconds timer not yet wired into reconcile."
+
+[[upstream_test]]
+upstream_path  = "pkg/controller/cronjob/cronjob_controllerv2_test.go"
+upstream_name  = "TestNextScheduleTime/cron_evaluation"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "next_fire_time is unimplemented! (cron parser deferred to robfig/cron port)."

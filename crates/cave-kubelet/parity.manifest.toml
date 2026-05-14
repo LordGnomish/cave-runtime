@@ -1146,3 +1146,119 @@ cave_path      = "—"
 cave_test_name = "—"
 status         = "missing"
 notes          = "Status-manager dedupe behaviour (already implemented) not yet expressed as upstream-port test."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit; build-parity-index.py
+# picks up every [[upstream_test]] entry across the whole manifest file.
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSetPodStatus/identical_status_is_deduped"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_dedupes_identical_status_writes"
+status         = "ported"
+notes          = "Hash-compare against pending → drop with DropReason::Deduped."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSetPodStatus/deleted_pod_drops_writes"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_drops_writes_for_deleted_pod"
+status         = "ported"
+notes          = "delete_pod ⇒ subsequent set_status returns Some(PodDeleted)."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/pop_ready_idle_when_empty"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_pop_ready_idle_when_no_pending"
+status         = "ported"
+notes          = "Empty queue → DispatchOutcome::Idle."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/transient_failure_schedules_backoff"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_transient_failure_schedules_backoff"
+status         = "ported"
+notes          = "TransientFailure schedules exponential backoff via cave_kernel::Backoff."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestSyncPod/success_records_confirmed_hash"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_success_records_confirmed_hash_and_dedupes_repeat"
+status         = "ported"
+notes          = "Success-attempt stores hash in `confirmed`; re-submit dedupes."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/status/status_manager_test.go"
+upstream_name  = "TestNeedsUpdate/uses_confirmed_hash"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_status_manager_needs_update_false_when_matches_confirmed_hash"
+status         = "ported"
+notes          = "Sync loop can short-circuit using needs_update() before building a status."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/restart_suppression"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_suppresses_duplicate_restart_requests"
+status         = "ported"
+notes          = "Coordinator emits at most one RestartContainer event until mark_restart_completed."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestProberManager/readiness_fires_on_transition"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_dedupes_steady_state_readiness"
+status         = "ported"
+notes          = "MarkReady only fires when the recorded readiness transitions."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/startup_complete_fires_once"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_emits_startup_complete_once"
+status         = "ported"
+notes          = "StartupComplete is sticky — only the first transition emits an event."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestProberManager/worker_pool_capacity_bound"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_pool_capacity_bounded"
+status         = "ported"
+notes          = "try_reserve fails past max_concurrent; permits return slot on drop."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/worker_test.go"
+upstream_name  = "TestNeedsRestartBackoff/clears_after_max"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_prober_coordinator_restart_suppression_clears_after_window"
+status         = "ported"
+notes          = "Defensive — suppression flag self-clears after restart_suppression_max elapses."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/completion_is_sticky"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_lifecycle_success_completion_is_sticky"
+status         = "ported"
+notes          = "HookOutcome::Completed survives later NotFiredYet ticks."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/lifecycle/handlers_test.go"
+upstream_name  = "TestRunHandlerExec/pending_within_timeout"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_lifecycle_pending_within_timeout_window"
+status         = "ported"
+notes          = "Hook in flight, no sample yet, still within timeout → HookOutcome::Pending."
+
+[[upstream_test]]
+upstream_path  = "pkg/kubelet/prober/results/manager_test.go"
+upstream_name  = "TestStartupProbe/default_failure_then_success_at_threshold"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_probe_startup_kind_default_failure_then_threshold_success"
+status         = "ported"
+notes          = "Startup kind defaults to Failure pre-threshold, flips at successThreshold=1."
