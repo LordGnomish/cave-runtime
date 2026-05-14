@@ -26,7 +26,7 @@ use std::{
 use axum::{
     extract::Path,
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::get,
     Json, Router,
 };
@@ -38,7 +38,10 @@ use tokio::sync::RwLock;
 
 use super::workspace_root;
 
-static PAGE_HTML: &str = include_str!("templates/upstream.html");
+// PAGE_HTML and templates/upstream.html were removed on 2026-05-14 when
+// `/upstream` was redirected to `/admin/upstream`. The fancy JS-driven
+// dark-themed tracker was replaced by a Tailwind-styled server-rendered
+// section inside the admin shell so the two pages stop diverging.
 
 /// In-memory snapshot of "last touched" data per crate. Computed on first
 /// `/api/upstream/tracker` hit and cached for 60 s — every subsequent caller
@@ -102,19 +105,22 @@ pub struct TrackerRow {
     pub manifest_present: bool,
 }
 
-/// GET /upstream — tracker HTML page. Auth-gated by the runtime
-/// middleware (`/upstream` is NOT in the JWT bypass list, so the
-/// middleware redirects to /login on no-cookie). Additionally
-/// persona-gated to `platform_admin` here — the upstream parity
-/// tracker is cross-tenant control-plane info.
-pub async fn page(
-    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
-) -> Response {
-    if !is_platform_admin(claims.as_ref()) {
-        return persona_denied_response("/upstream", "platform_admin");
-    }
-    Html(PAGE_HTML).into_response()
+/// GET /upstream — **deprecated** as of 2026-05-14. Permanently
+/// redirects to `/admin/upstream`, the canonical upstream-tracker
+/// page (admin shell, persona-aware, includes the watchd events +
+/// auto-port dispatcher panels alongside the parity tracker).
+///
+/// History: Burak confirmed two upstream-tracker pages existed
+/// (`/upstream` JS-driven dark theme in cave-runtime, and
+/// `/admin/upstream` server-rendered in cave-portal). The
+/// /admin/upstream side already had nav/sidebar/shortcuts wiring
+/// and RBAC plumbing; we ported the tracker table over there and
+/// pointed `/upstream` at it. HTTP 301 (Moved Permanently) so
+/// browsers + Backstage/Backstage-like crawlers update their links.
+pub async fn page() -> Response {
+    Redirect::permanent("/admin/upstream").into_response()
 }
+
 
 /// GET /api/upstream/tracker — JSON rows, gated identically to the
 /// HTML page so a tenant admin can't bypass via the API.
@@ -423,6 +429,36 @@ mod tests {
             exp: 4102444800,
         };
         router().layer(axum::Extension(claims))
+    }
+
+    #[tokio::test]
+    async fn page_handler_returns_301_redirect_to_admin_upstream() {
+        // 2026-05-14 consolidation: /upstream is permanently redirected
+        // to /admin/upstream. No persona gate at this layer (the target
+        // page does its own RBAC); the redirect must work even for
+        // anonymous callers so bookmarks transparently update.
+        let app = router(); // no JWT extension layer
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/upstream")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::PERMANENT_REDIRECT,
+            "expected 308 Permanent Redirect (axum::Redirect::permanent)"
+        );
+        let location = resp
+            .headers()
+            .get("location")
+            .expect("redirect carries Location header")
+            .to_str()
+            .unwrap();
+        assert_eq!(location, "/admin/upstream");
     }
 
     #[test]

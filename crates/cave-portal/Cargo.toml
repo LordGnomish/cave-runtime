@@ -11,6 +11,7 @@ cave-kernel = { path = "../cave-kernel" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
 cave-upstream-watchd = { path = "../cave-upstream-watchd" }
+cave-upstream = { path = "../cave-upstream" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
