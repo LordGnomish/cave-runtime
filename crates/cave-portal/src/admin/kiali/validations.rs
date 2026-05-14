@@ -59,7 +59,7 @@ pub fn count_by_severity(rows: &[ValidationRow], severity: &str) -> usize {
     rows.iter().filter(|r| r.severity == severity).count()
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KialiViewError> {

@@ -51,7 +51,7 @@ pub fn list_agents(
         .collect())
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, NetViewError> {

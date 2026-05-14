@@ -79,7 +79,7 @@ pub fn edge_health(edge: &TopologyEdge) -> &'static str {
     }
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, KialiViewError> {

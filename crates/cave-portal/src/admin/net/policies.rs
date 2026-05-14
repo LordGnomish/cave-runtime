@@ -75,7 +75,7 @@ pub fn policy_impact(
         .count() as u32)
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, NetViewError> {

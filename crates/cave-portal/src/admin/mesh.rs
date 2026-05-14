@@ -193,6 +193,13 @@ pub fn service_health(svc: &MeshService) -> &'static str {
     }
 }
 
+/// One unified service-mesh dashboard. 2026-05-14 consolidation:
+/// `/admin/kiali` and `/admin/net` now 308-redirect into this page
+/// with anchor hashes (`#kiali-topology`, `#net-flows`, etc.) so
+/// existing deep-links still land on the right tab. The renderer
+/// composes mesh's own AuthZ + Flows + Workloads + Services PLUS
+/// kiali's exclusive Topology / Traffic / Validations PLUS net's
+/// exclusive NetworkPolicies / Nodes / Identities sections.
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewError> {
     let policies = list_policies(state, ctx)?;
     let flows = list_flows(state, ctx)?;
@@ -225,21 +232,60 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewEr
             service_health(s).into(),
         ])
         .collect();
+    // 2026-05-14 consolidation: pull in kiali's exclusive sections
+    // (Topology, Traffic, Validations) + net's exclusive sections
+    // (NetworkPolicies, Nodes, Identities). Each is gated on the
+    // appropriate permission; if a caller is missing one, the
+    // corresponding render_section returns an Auth error which we
+    // silently swallow so the page still renders the parts the
+    // caller can see (matches the dashboard pattern elsewhere).
+    let topology_html = crate::admin::kiali::topology::render_section(state, ctx)
+        .unwrap_or_default();
+    let traffic_html = crate::admin::kiali::traffic::render_section(state, ctx)
+        .unwrap_or_default();
+    let validations_html = crate::admin::kiali::validations::render_section(state, ctx)
+        .unwrap_or_default();
+    let net_flows_html = crate::admin::net::flows::render_section(state, ctx)
+        .unwrap_or_default();
+    let net_policies_html = crate::admin::net::policies::render_section(state, ctx)
+        .unwrap_or_default();
+    let net_nodes_html = crate::admin::net::nodes::render_section(state, ctx)
+        .unwrap_or_default();
+    let net_identities_html = crate::admin::net::identities::render_section(state, ctx)
+        .unwrap_or_default();
+
     let body = format!(
         r##"<section class="mb-4 p-3 bg-blue-50 rounded text-sm text-blue-900">
-  Kiali-parity service mesh dashboard (cave-mesh).
-  Upstream: <a class="text-blue-700 underline" href="https://kiali.io/">kiali.io</a>.
+  Unified service-mesh dashboard (cave-mesh + cave-net + Kiali parity).
+  Upstreams: <a class="text-blue-700 underline" href="https://istio.io/">istio.io</a>,
+  <a class="text-blue-700 underline" href="https://kiali.io/">kiali.io</a>,
+  <a class="text-blue-700 underline" href="https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/">cilium hubble</a>.
+  Note: <code>/admin/kiali</code> and <code>/admin/net</code> 308-redirect here.
 </section>
-<nav class="mb-4 flex gap-4 text-sm text-blue-700">
+<nav class="mb-4 flex gap-4 flex-wrap text-sm text-blue-700">
+  <a href="#kiali-topology">Topology</a>
   <a href="#mesh-workloads">Workloads</a>
   <a href="#mesh-services">Services</a>
+  <a href="#kiali-traffic">Traffic</a>
   <a href="#mesh-authz">AuthZ</a>
-  <a href="#mesh-flows">Flows</a>
+  <a href="#mesh-flows">Mesh Flows</a>
+  <a href="#net-flows">Network Flows</a>
+  <a href="#net-policies">NetworkPolicies</a>
+  <a href="#kiali-validations">Validations</a>
+  <a href="#net-nodes">Nodes</a>
+  <a href="#net-identities">Identities</a>
 </nav>
-<section id="mesh-workloads"><h2 class="text-lg font-semibold mb-2">Workloads ({n_w})</h2>{w_tbl}</section>
-<section id="mesh-services" class="mt-6"><h2 class="text-lg font-semibold mb-2">Services ({n_s})</h2>{s_tbl}</section>
+{topology}
+<section id="mesh-workloads"><span id="kiali-workloads"></span><h2 class="text-lg font-semibold mb-2">Workloads ({n_w})</h2>{w_tbl}</section>
+<section id="mesh-services" class="mt-6"><span id="kiali-services"></span><span id="net-services"></span><h2 class="text-lg font-semibold mb-2">Services ({n_s})</h2>{s_tbl}</section>
+{traffic}
 <section id="mesh-authz" class="mt-6"><h2 class="text-lg font-semibold mb-2">AuthZ ({n_p})</h2>{p_tbl}</section>
-<section id="mesh-flows" class="mt-6"><h2 class="text-lg font-semibold mb-2">Flows ({n_f})</h2>{f_tbl}</section>"##,
+<section id="mesh-flows" class="mt-6"><h2 class="text-lg font-semibold mb-2">Mesh Flows ({n_f})</h2>{f_tbl}</section>
+{net_flows}
+{net_policies}
+{validations}
+{net_nodes}
+{net_identities}"##,
         n_p = policies.len(),
         n_f = flows.len(),
         n_w = workloads.len(),
@@ -248,6 +294,13 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MeshViewEr
         f_tbl = table(&["src", "dst", "verdict", "bytes"], &f_rows),
         w_tbl = table(&["workload", "edges", "bytes out", "bytes dropped"], &w_rows),
         s_tbl = table(&["service", "edges", "bytes in", "bytes dropped", "health"], &s_rows),
+        topology = topology_html,
+        traffic = traffic_html,
+        validations = validations_html,
+        net_flows = net_flows_html,
+        net_policies = net_policies_html,
+        net_nodes = net_nodes_html,
+        net_identities = net_identities_html,
     );
     Ok(page_shell(
         &format!("mesh · {}", escape(ctx.tenant.as_str())),
@@ -450,6 +503,113 @@ mod tests {
         assert!(html.contains("#mesh-authz"));
         assert!(html.contains("#mesh-flows"));
         assert!(html.contains("kiali.io"));
+    }
+
+    // ── 2026-05-14 consolidation ────────────────────────────────
+
+    #[test]
+    fn render_consolidated_includes_every_kiali_anchor() {
+        // After /admin/kiali → /admin/mesh#kiali-topology 308 redirect,
+        // every legacy kiali anchor must resolve on the mesh page.
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kiali/src/components/Topology.tsx",
+            "KialiAnchorsOnMesh",
+            "acme"
+        );
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[
+                Permission::MeshRead,
+                Permission::KialiRead,
+            ]),
+        )
+        .unwrap();
+        for anchor in [
+            "id=\"kiali-topology\"",
+            "id=\"kiali-workloads\"",
+            "id=\"kiali-services\"",
+            "id=\"kiali-traffic\"",
+            "id=\"kiali-validations\"",
+        ] {
+            assert!(html.contains(anchor), "missing kiali anchor: {anchor}");
+        }
+    }
+
+    #[test]
+    fn render_consolidated_includes_every_net_anchor() {
+        // After /admin/net → /admin/mesh#net-flows 308 redirect,
+        // every legacy net anchor must resolve on the mesh page.
+        let (_c, _t) = portal_test_ctx!(
+            "plugins/kubernetes/src/components/Network/NetworkPoliciesTab.tsx",
+            "NetAnchorsOnMesh",
+            "acme"
+        );
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[
+                Permission::MeshRead,
+                Permission::NetRead,
+            ]),
+        )
+        .unwrap();
+        for anchor in [
+            "id=\"net-flows\"",
+            "id=\"net-policies\"",
+            "id=\"net-services\"",
+            "id=\"net-nodes\"",
+            "id=\"net-identities\"",
+        ] {
+            assert!(html.contains(anchor), "missing net anchor: {anchor}");
+        }
+    }
+
+    #[test]
+    fn render_consolidated_mentions_redirect_note() {
+        // Operators visiting /admin/mesh deserve to know that
+        // /admin/kiali and /admin/net 308 here. The intro section
+        // calls this out.
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::MeshRead]),
+        )
+        .unwrap();
+        assert!(html.contains("/admin/kiali"));
+        assert!(html.contains("/admin/net"));
+        assert!(html.contains("308"));
+    }
+
+    #[test]
+    fn render_consolidated_includes_cilium_upstream_reference() {
+        // Net features (Cilium Hubble) keep their upstream attribution.
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::MeshRead, Permission::NetRead]),
+        )
+        .unwrap();
+        assert!(html.contains("cilium"));
+        assert!(html.contains("istio.io"));
+    }
+
+    #[test]
+    fn render_consolidated_works_with_mesh_only_permission() {
+        // MeshRead-only callers still get a working page — the
+        // consolidated kiali/net sections silently drop their
+        // permission-gated bodies. The mesh-native sections remain;
+        // the kiali/net data sections (#kiali-topology body,
+        // #net-flows body) are absent.
+        let html = render(
+            &AdminState::seeded(),
+            &ctx(&[Permission::MeshRead]),
+        )
+        .unwrap();
+        assert!(html.contains("Workloads"));
+        assert!(html.contains("AuthZ"));
+        // No KialiRead → topology section content absent. The
+        // anchor link in the nav remains (`href="#kiali-topology"`)
+        // but the body never renders.
+        assert!(!html.contains("id=\"kiali-topology\""));
+        // No NetRead → flows section content absent.
+        assert!(!html.contains("id=\"net-flows\""));
     }
 
     #[test]

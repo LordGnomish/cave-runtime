@@ -28,7 +28,7 @@ pub fn total_bytes(rows: &[MeshFlow]) -> u64 {
     rows.iter().map(|f| f.bytes).sum()
 }
 
-pub(super) fn render_section(
+pub(crate) fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, NetViewError> {

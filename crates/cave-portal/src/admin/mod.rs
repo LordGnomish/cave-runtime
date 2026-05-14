@@ -577,15 +577,46 @@ async fn kamaji_handler(
     kamaji::render(&state, &ctx).map(Html).map_err(err_to_response)
 }
 
+/// 2026-05-14 consolidation: `/admin/net` 308-redirects into the
+/// unified `/admin/mesh` page so the dashboard has one canonical
+/// service-mesh + network surface. Cilium-specific sections
+/// (Flows, NetworkPolicies, Nodes, Identities) are composed into
+/// the mesh page with anchor IDs preserved (`#net-flows`,
+/// `#net-policies`, `#net-nodes`, `#net-identities`), so existing
+/// deep-links land on the right tab.
 async fn net_handler(
     AxumState(state): AxumState<Arc<AdminState>>,
     Query(q): Query<AdminQuery>,
-) -> Result<Html<String>, (StatusCode, Html<String>)> {
+) -> axum::response::Response {
+    use axum::response::{IntoResponse, Redirect};
+    let tenant_id = q.tenant_id.clone();
+    // Pre-warm the state cache so the redirected mesh page renders
+    // fresh net data on first paint.
     let ctx = extract_ctx_from_query(q);
     if let Err(e) = state.materialise_net_endpoints(&ctx.tenant).await {
-        tracing::warn!(error = %e, "net materialise failed; falling back to cached rows");
+        tracing::warn!(error = %e, "net materialise failed; mesh page will use cached rows");
     }
-    net::render(&state, &ctx).map(Html).map_err(err_to_response)
+    Redirect::permanent(&format!(
+        "/admin/mesh?tenant_id={}#net-flows",
+        urlencode_query(&tenant_id),
+    ))
+    .into_response()
+}
+
+/// Minimal URL encoder for query-string segments. Mirrors the same
+/// helper used by `admin::layout::nav`; kept local here to avoid an
+/// extra cross-module import.
+fn urlencode_query(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            _ => out.push_str(&format!("%{:02X}", b)),
+        }
+    }
+    out
 }
 
 async fn rdbms_handler(
@@ -881,7 +912,22 @@ async fn grafana_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Que
 async fn prometheus_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); prometheus::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn loki_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); loki::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn k8s_dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); k8s_dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
-async fn kiali_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); kiali::render(&s, &ctx).map(Html).map_err(err_to_response) }
+/// 2026-05-14 consolidation: `/admin/kiali` 308-redirects into the
+/// unified `/admin/mesh` page. Topology / Traffic / Validations /
+/// Workloads / Services are composed into mesh; anchor IDs
+/// preserved (`#kiali-topology`, `#kiali-traffic`, etc.) so old
+/// links keep working.
+async fn kiali_handler(
+    AxumState(_s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+) -> axum::response::Response {
+    use axum::response::{IntoResponse, Redirect};
+    Redirect::permanent(&format!(
+        "/admin/mesh?tenant_id={}#kiali-topology",
+        urlencode_query(&q.tenant_id),
+    ))
+    .into_response()
+}
 
 // ── 2026-05-13 realtime + power-user handlers ──────────────────────
 
