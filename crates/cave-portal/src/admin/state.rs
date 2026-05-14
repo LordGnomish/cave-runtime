@@ -418,6 +418,38 @@ impl StreamsConsumerGroup {
     }
 }
 
+// ── Kafka Connect ────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamsConnector {
+    pub tenant: TenantId,
+    pub name: String,
+    pub kind: &'static str,    // "Source" | "Sink"
+    pub state: &'static str,   // "Running" | "Paused" | "Failed" | "Stopped"
+    pub tasks_max: u32,
+    pub class: String,
+    pub topics: String, // CSV
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamsConnectWorker {
+    pub tenant: TenantId,
+    pub id: String,
+    pub state: &'static str, // "Running" | "Dead"
+    pub host: String,
+    pub connectors_owned: u32,
+    pub tasks_owned: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StreamsConnectTask {
+    pub tenant: TenantId,
+    pub connector: String,
+    pub task: u32,
+    pub state: &'static str, // "Running" | "Failed" | "Paused" | "Stopped"
+    pub failure_trace: Option<String>,
+}
+
 // ── policy ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1095,6 +1127,9 @@ pub struct AdminState {
     pub lakehouse_snapshots: RwLock<Vec<LakehouseSnapshot>>,
     pub streams_topics: RwLock<Vec<StreamsTopic>>,
     pub streams_consumer_groups: RwLock<Vec<StreamsConsumerGroup>>,
+    pub streams_connectors: RwLock<Vec<StreamsConnector>>,
+    pub streams_connect_workers: RwLock<Vec<StreamsConnectWorker>>,
+    pub streams_connect_tasks: RwLock<Vec<StreamsConnectTask>>,
     pub policy_rules: RwLock<Vec<PolicyRule>>,
     pub artifact_records: RwLock<Vec<ArtifactRecord>>,
     pub alert_rules: RwLock<Vec<AlertRule>>,
@@ -1284,6 +1319,9 @@ impl AdminState {
             lakehouse_snapshots: RwLock::new(Vec::new()),
             streams_topics: RwLock::new(Vec::new()),
             streams_consumer_groups: RwLock::new(Vec::new()),
+            streams_connectors: RwLock::new(Vec::new()),
+            streams_connect_workers: RwLock::new(Vec::new()),
+            streams_connect_tasks: RwLock::new(Vec::new()),
             policy_rules: RwLock::new(Vec::new()),
             artifact_records: RwLock::new(Vec::new()),
             alert_rules: RwLock::new(Vec::new()),
@@ -1618,6 +1656,22 @@ impl AdminState {
             StreamsConsumerGroup { tenant: acme.clone(), group_id: "orders-consumer".into(), topic: "orders".into(), members: 4, current_offset: 9_500, log_end_offset: 10_000, state: "Stable" },
             StreamsConsumerGroup { tenant: acme.clone(), group_id: "events-consumer".into(), topic: "events".into(), members: 2, current_offset: 5_000, log_end_offset: 50_000, state: "Rebalancing" },
             StreamsConsumerGroup { tenant: evil.clone(), group_id: "evil-consumer".into(), topic: "evil-topic".into(), members: 1, current_offset: 0, log_end_offset: 0, state: "Empty" },
+        ]);
+        s.streams_connectors.write().unwrap().extend([
+            StreamsConnector { tenant: acme.clone(), name: "jdbc-source".into(), kind: "Source", state: "Running", tasks_max: 2, class: "io.confluent.connect.jdbc.JdbcSourceConnector".into(), topics: "orders,refunds".into() },
+            StreamsConnector { tenant: acme.clone(), name: "hdfs-sink".into(), kind: "Sink", state: "Failed", tasks_max: 1, class: "io.confluent.connect.hdfs.HdfsSinkConnector".into(), topics: "events".into() },
+            StreamsConnector { tenant: evil.clone(), name: "evil-connector".into(), kind: "Source", state: "Running", tasks_max: 1, class: "evil.SourceConnector".into(), topics: "evil-topic".into() },
+        ]);
+        s.streams_connect_workers.write().unwrap().extend([
+            StreamsConnectWorker { tenant: acme.clone(), id: "worker-1".into(), state: "Running", host: "connect-1.acme.local:8083".into(), connectors_owned: 1, tasks_owned: 2 },
+            StreamsConnectWorker { tenant: acme.clone(), id: "worker-2".into(), state: "Running", host: "connect-2.acme.local:8083".into(), connectors_owned: 1, tasks_owned: 1 },
+            StreamsConnectWorker { tenant: evil.clone(), id: "evil-worker".into(), state: "Running", host: "evil.local:8083".into(), connectors_owned: 1, tasks_owned: 1 },
+        ]);
+        s.streams_connect_tasks.write().unwrap().extend([
+            StreamsConnectTask { tenant: acme.clone(), connector: "jdbc-source".into(), task: 0, state: "Running", failure_trace: None },
+            StreamsConnectTask { tenant: acme.clone(), connector: "jdbc-source".into(), task: 1, state: "Running", failure_trace: None },
+            StreamsConnectTask { tenant: acme.clone(), connector: "hdfs-sink".into(), task: 0, state: "Failed", failure_trace: Some("java.io.IOException: connection refused".into()) },
+            StreamsConnectTask { tenant: evil.clone(), connector: "evil-connector".into(), task: 0, state: "Running", failure_trace: None },
         ]);
         s.policy_rules.write().unwrap().extend([
             PolicyRule { tenant: acme.clone(), name: "deny-internet-prod".into(), action: "Deny", subject: "spiffe://*/ns/prod/sa/*".into(), resource: "egress:0.0.0.0/0".into(), enabled: true },

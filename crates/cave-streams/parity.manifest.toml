@@ -33,13 +33,13 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 22
+mapped_count   = 23
 partial_count  = 0
 skipped_count  = 16
-unmapped_count = 7
+unmapped_count = 6
 total          = 45
-fill_ratio     = 0.8444
-honest_ratio   = 0.8444
+fill_ratio     = 0.8667
+honest_ratio   = 0.8667
 last_audit     = "2026-05-14"
 infra_only     = false
 
@@ -92,6 +92,22 @@ local    = "src/kafka_wire.rs"
 [[files]]
 upstream = "core/src/main/scala/kafka/log/UnifiedLog.scala"
 local    = "src/segment_log.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerder.java"
+local    = "src/connect_worker/standalone_herder.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/distributed/DistributedHerder.java"
+local    = "src/connect_worker/distributed_herder.rs"
+
+[[files]]
+upstream = "connect/runtime/src/main/java/org/apache/kafka/connect/runtime/KafkaOffsetBackingStore.java"
+local    = "src/connect_worker/kafka_offset_backing_store.rs"
+
+[[files]]
+upstream = "storage/src/main/java/org/apache/kafka/storage/internals/log/RemoteLogManager.java"
+local    = "src/tiered_storage/mod.rs"
 
 # Pulsar
 [[files]]
@@ -498,8 +514,16 @@ local_files  = [
   "src/connect_worker/assignment.rs",
   "src/connect_worker/connector_runtime.rs",
   "src/connect_worker/worker.rs",
+  "src/connect_worker/standalone_herder.rs",
+  "src/connect_worker/distributed_herder.rs",
+  "src/connect_worker/kafka_offset_backing_store.rs",
 ]
-note         = "Connect Worker runtime — SourceTask/SinkTask traits + tick lifecycle, OffsetStore (in-memory `OffsetStorageReader/Writer` surface, Kafka-backed swap-in tracked), rendezvous-hash AssignmentTable (cooperative rebalance protocol tracked), ConnectorRuntime lifecycle, Worker with start/stop/pause/resume/delete + failed-task isolation. SMT chain + DLQ + Kafka producer/consumer adapter tracked-not-shipped."
+note         = "Connect Worker runtime — SourceTask/SinkTask + tick lifecycle, OffsetStore + KafkaOffsetBackingStore (replay/commit/tombstone), rendezvous-hash AssignmentTable + DistributedHerder cooperative-rebalance state machine (Empty/Joining/Assigning/Rebalancing/Stable, lowest-id leader, generation bump on join/leave, stale-generation rejection, sync_group per-member assignment), StandaloneHerder (single-process put/delete/patch/pause/stop/restart_task/alter_offsets/reset_offsets — distributed-only put_task_configs + fence_zombies return Unsupported), ConnectorRuntime lifecycle, Worker with start/stop/pause/resume/delete + failed-task isolation. SMT chain + DLQ + Kafka producer/consumer adapter + full IncrementalAssignor (KIP-415) revoke-then-assign tracked-not-shipped."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:storage/tiered/"
+local_files  = ["src/tiered_storage/mod.rs"]
+note         = "KIP-405 tiered storage skeleton. RemoteStorageManager + RemoteLogMetadataManager traits, InMemoryRemoteStorageManager + InMemoryRemoteLogMetadataManager exercisers, RemoteIndexCache LRU, RemoteLogManager orchestrator (copy_log_segment / list_segments / find_segment_for_offset / apply_retention). Overlap detection on segment insert. S3/HDFS/GCS plugins + tiered fetch wiring through broker Fetch RPC tracked-not-shipped."
 
 [[mapped]]
 upstream_pkg = "apache/kafka:connect/runtime/rest/"
@@ -585,12 +609,9 @@ note         = "BC crypto provider — Rust uses ring"
 # ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
 
 # KRaft promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
-
-[[unmapped]]
-upstream_pkg = "apache/kafka:storage/tiered/"
-note         = "Tiered storage (KIP-405) — cold partition offload to object store. Not implemented."
-
+# storage/tiered/ promoted to mapped 2026-05-14 (skeleton) — see `[[mapped]]` entry below.
 # connect/runtime/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+# connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
 
 [[unmapped]]
 upstream_pkg = "apache/kafka:streams/processor-api"
@@ -1042,3 +1063,117 @@ cave_path      = ""
 cave_test_name = ""
 status         = "missing"
 notes          = "Jersey ExceptionMapper → JSON envelope mapping — framework concern, deferred."
+
+# ── batch4 (2026-05-14) — StandaloneHerder + DistributedHerder + KafkaOffsetBackingStore + Tiered Storage ─
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testCreateSourceConnector"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_create_source_connector_starts_in_running"
+status         = "ported"
+notes          = "put_connector_config returns ConnectorInfo with created=true, kind=Source, tasks_max slots."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testCreateConnectorAlreadyExists"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_create_duplicate_returns_already_exists"
+status         = "ported"
+notes          = "duplicate name without allow_replace returns HerderError::AlreadyExists."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testTargetStates (PAUSED)"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_pause_transitions_target_state"
+status         = "ported"
+notes          = "set_target_state(Paused) toggles target_state but keeps tasks_max slots."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testRestartTask"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_restart_task_clears_failure_trace"
+status         = "ported"
+notes          = "fail_task sets trace; restart_task clears it."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/testPutTaskConfigs"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_standalone_put_task_configs_unsupported"
+status         = "ported"
+notes          = "Standalone mode throws UnsupportedOperationException on put_task_configs."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/standalone/StandaloneHerderTest.java"
+upstream_name  = "StandaloneHerderTest/fenceZombieSourceTasks"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "KRaft EOS feature (fence zombie source tasks) — out-of-scope for this batch."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testJoinAssignment"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_first_member_becomes_leader"
+status         = "ported"
+notes          = "First member joining becomes leader; generation bumps to 1."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRebalanceAssignment"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_assign_distributes_tasks_rendezvous"
+status         = "ported"
+notes          = "Rendezvous-hash assign distributes 4 tasks across 2 members with both members owning ≥1."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRebalanceOnLeave"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_distributed_member_leave_triggers_rebalance"
+status         = "ported"
+notes          = "Member leave bumps generation + transitions state → Rebalancing."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/distributed/DistributedHerderTest.java"
+upstream_name  = "DistributedHerderTest/testRollingBounceUpgrade"
+cave_path      = ""
+cave_test_name = ""
+status         = "missing"
+notes          = "Depends on real config-topic rebalance + version-handshake; tracked under IncrementalAssignor follow-up."
+
+[[upstream_test]]
+upstream_path  = "connect/runtime/src/test/java/org/apache/kafka/connect/runtime/KafkaOffsetBackingStoreTest.java"
+upstream_name  = "KafkaOffsetBackingStoreTest/testReplayHonorsTombstones"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_kafka_offset_store_replay_tombstone_deletes_key"
+status         = "ported"
+notes          = "Replay applies Put then Tombstone in order; key disappears from materialised view."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteLogManagerTest.java"
+upstream_name  = "RemoteLogManagerTest/testFindSegmentForOffset"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_log_mgr_find_segment_for_offset"
+status         = "ported"
+notes          = "find_segment_for_offset returns the segment whose [start..=end] contains the offset."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteLogManagerTest.java"
+upstream_name  = "RemoteLogManagerTest/testRetentionDeletesOldSegments"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_log_mgr_retention_removes_old"
+status         = "ported"
+notes          = "apply_retention removes every segment whose end_offset < min_kept_offset."
+
+[[upstream_test]]
+upstream_path  = "storage/src/test/java/org/apache/kafka/storage/internals/log/RemoteIndexCacheTest.java"
+upstream_name  = "RemoteIndexCacheTest/testLruEviction"
+cave_path      = "tests/upstream_port_batch4_connect.rs"
+cave_test_name = "upstream_tiered_remote_index_cache_evicts_coldest"
+status         = "ported"
+notes          = "Inserting beyond capacity evicts the least-recently-used entry."

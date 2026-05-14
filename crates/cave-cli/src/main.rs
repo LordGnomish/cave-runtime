@@ -1391,6 +1391,98 @@ enum StreamsCmd {
         #[command(subcommand)]
         cmd: KraftCmd,
     },
+    /// Kafka Connect — workers, connectors, tasks
+    Connect {
+        #[command(subcommand)]
+        cmd: ConnectCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConnectCmd {
+    /// Worker roster + per-worker status
+    Worker {
+        #[command(subcommand)]
+        cmd: ConnectWorkerCmd,
+    },
+    /// Connector CRUD + lifecycle
+    Connector {
+        #[command(subcommand)]
+        cmd: ConnectConnectorCmd,
+    },
+    /// Task list + status + restart
+    Task {
+        #[command(subcommand)]
+        cmd: ConnectTaskCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConnectWorkerCmd {
+    /// List workers in the Connect cluster
+    List,
+    /// Show one worker's owned-connector + owned-task counts
+    Status {
+        /// Worker id (e.g. "worker-1")
+        id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConnectConnectorCmd {
+    /// List connectors in the cluster
+    List,
+    /// Get connector info + tasks
+    Get {
+        name: String,
+    },
+    /// Get connector source offsets
+    Offsets {
+        name: String,
+    },
+    /// Create a connector. Each `--config k=v` is a connector property.
+    Create {
+        /// Connector name
+        name: String,
+        /// Repeatable `k=v` connector property (`tasks.max=2`,
+        /// `connector.class=...`, `topics=orders`).
+        #[arg(long = "config", value_name = "k=v")]
+        configs: Vec<String>,
+    },
+    /// Delete a connector + drop its task state.
+    Delete {
+        name: String,
+    },
+    /// Pause a connector — its tasks stop ticking.
+    Pause {
+        name: String,
+    },
+    /// Resume a paused connector.
+    Resume {
+        name: String,
+    },
+    /// Restart a connector + every task.
+    Restart {
+        name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConnectTaskCmd {
+    /// List tasks for one connector
+    List {
+        connector: String,
+    },
+    /// Show one task's state + failure_trace
+    Status {
+        connector: String,
+        task: u32,
+    },
+    /// Restart one task (clears failure_trace)
+    Restart {
+        connector: String,
+        task: u32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2491,6 +2583,74 @@ async fn dispatch_kafka(c: &ApiClient, cmd: KafkaCmd) -> Result<()> {
     }
 }
 
+/// `streams connect ...` dispatch. Mirrors the upstream Kafka
+/// Connect REST API surface (`/connectors/*`,
+/// `/connectors/{name}/tasks/*`) plus the cave-runtime
+/// extension routes (`/api/streams/connect/workers`).
+async fn dispatch_connect(c: &ApiClient, cmd: ConnectCmd) -> Result<()> {
+    match cmd {
+        ConnectCmd::Worker { cmd } => match cmd {
+            ConnectWorkerCmd::List => c.get("/api/streams/connect/workers").await,
+            ConnectWorkerCmd::Status { id } => {
+                c.get(&format!("/api/streams/connect/workers/{id}")).await
+            }
+        },
+        ConnectCmd::Connector { cmd } => match cmd {
+            ConnectConnectorCmd::List => c.get("/connectors").await,
+            ConnectConnectorCmd::Get { name } => {
+                c.get(&format!("/connectors/{name}")).await
+            }
+            ConnectConnectorCmd::Offsets { name } => {
+                c.get(&format!("/connectors/{name}/offsets")).await
+            }
+            ConnectConnectorCmd::Create { name, configs } => {
+                let mut cfg_map = serde_json::Map::new();
+                for kv in &configs {
+                    if let Some((k, v)) = kv.split_once('=') {
+                        cfg_map.insert(k.trim().to_string(), json!(v.trim()));
+                    }
+                }
+                c.post(
+                    "/connectors",
+                    json!({ "name": name, "config": cfg_map }),
+                )
+                .await
+            }
+            ConnectConnectorCmd::Delete { name } => {
+                c.delete(&format!("/connectors/{name}")).await
+            }
+            ConnectConnectorCmd::Pause { name } => {
+                c.put_bytes(&format!("/connectors/{name}/pause"), Vec::new())
+                    .await
+            }
+            ConnectConnectorCmd::Resume { name } => {
+                c.put_bytes(&format!("/connectors/{name}/resume"), Vec::new())
+                    .await
+            }
+            ConnectConnectorCmd::Restart { name } => {
+                c.post(&format!("/connectors/{name}/restart"), json!({}))
+                    .await
+            }
+        },
+        ConnectCmd::Task { cmd } => match cmd {
+            ConnectTaskCmd::List { connector } => {
+                c.get(&format!("/connectors/{connector}/tasks")).await
+            }
+            ConnectTaskCmd::Status { connector, task } => {
+                c.get(&format!("/connectors/{connector}/tasks/{task}/status"))
+                    .await
+            }
+            ConnectTaskCmd::Restart { connector, task } => {
+                c.post(
+                    &format!("/connectors/{connector}/tasks/{task}/restart"),
+                    json!({}),
+                )
+                .await
+            }
+        },
+    }
+}
+
 async fn run(cli: Cli) -> Result<()> {
     let c = ApiClient::new(cli.server, cli.token, cli.format);
 
@@ -2897,6 +3057,7 @@ async fn run(cli: Cli) -> Result<()> {
                 KraftCmd::Snapshot       => c.get("/api/streams/kraft/snapshot").await,
                 KraftCmd::Records        => c.get("/api/streams/kraft/records").await,
             },
+            StreamsCmd::Connect { cmd } => dispatch_connect(&c, cmd).await,
             StreamsCmd::Pulsar { cmd } => match cmd {
                 PulsarCmd::Tenants => c.get("/api/streams/pulsar/tenants").await,
                 PulsarCmd::CreateTenant { name } => {
@@ -4601,6 +4762,290 @@ mod batch4_parse_tests {
             Commands::Streams { cmd: StreamsCmd::Kraft { cmd: KraftCmd::Snapshot } } => {}
             other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
         }
+    }
+
+    // ── streams connect subcommands ───────────────────────────────────────────
+    #[test]
+    fn streams_connect_worker_list_parses() {
+        let cli = parse(&["cavectl", "streams", "connect", "worker", "list"]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Worker { cmd: ConnectWorkerCmd::List },
+                    },
+            } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_worker_status_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "worker", "status", "worker-1",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Worker {
+                            cmd: ConnectWorkerCmd::Status { id },
+                        },
+                    },
+            } => assert_eq!(id, "worker-1"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_list_parses() {
+        let cli = parse(&["cavectl", "streams", "connect", "connector", "list"]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector { cmd: ConnectConnectorCmd::List },
+                    },
+            } => {}
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_get_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "get", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Get { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_offsets_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "offsets", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Offsets { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_create_with_multiple_configs_parses() {
+        let cli = parse(&[
+            "cavectl",
+            "streams",
+            "connect",
+            "connector",
+            "create",
+            "jdbc",
+            "--config",
+            "connector.class=...JdbcSource",
+            "--config",
+            "tasks.max=2",
+            "--config",
+            "topics=orders,refunds",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Create { name, configs },
+                        },
+                    },
+            } => {
+                assert_eq!(name, "jdbc");
+                assert_eq!(configs.len(), 3);
+                assert!(configs.iter().any(|c| c == "topics=orders,refunds"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_delete_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "delete", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Delete { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_pause_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "pause", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Pause { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_resume_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "resume", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Resume { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_connector_restart_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "connector", "restart", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Connector {
+                            cmd: ConnectConnectorCmd::Restart { name },
+                        },
+                    },
+            } => assert_eq!(name, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_task_list_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "task", "list", "jdbc",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Task {
+                            cmd: ConnectTaskCmd::List { connector },
+                        },
+                    },
+            } => assert_eq!(connector, "jdbc"),
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_task_status_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "task", "status", "jdbc", "0",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Task {
+                            cmd: ConnectTaskCmd::Status { connector, task },
+                        },
+                    },
+            } => {
+                assert_eq!(connector, "jdbc");
+                assert_eq!(task, 0);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_task_restart_parses() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "task", "restart", "jdbc", "1",
+        ]);
+        match cli.command {
+            Commands::Streams {
+                cmd:
+                    StreamsCmd::Connect {
+                        cmd: ConnectCmd::Task {
+                            cmd: ConnectTaskCmd::Restart { connector, task },
+                        },
+                    },
+            } => {
+                assert_eq!(connector, "jdbc");
+                assert_eq!(task, 1);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn streams_connect_global_format_flag_applies() {
+        let cli = parse(&[
+            "cavectl",
+            "--format",
+            "json",
+            "streams",
+            "connect",
+            "connector",
+            "list",
+        ]);
+        assert!(matches!(cli.format, Format::Json));
+    }
+
+    #[test]
+    fn streams_connect_yaml_format_applies() {
+        let cli = parse(&[
+            "cavectl",
+            "--format",
+            "yaml",
+            "streams",
+            "connect",
+            "worker",
+            "list",
+        ]);
+        assert!(matches!(cli.format, Format::Yaml));
+    }
+
+    #[test]
+    fn streams_connect_table_default_format() {
+        let cli = parse(&[
+            "cavectl", "streams", "connect", "task", "list", "jdbc",
+        ]);
+        assert!(matches!(cli.format, Format::Table));
     }
 
     // ── New top-level groups ──────────────────────────────────────────────────

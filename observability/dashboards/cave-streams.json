@@ -443,6 +443,133 @@
         }
       },
       "description": "0 = at least one instance failing the scrape."
+    },
+    {
+      "id": 11,
+      "title": "Connect: workers (Running)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 0, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(cave_streams_connect_worker_up{job=\"cave-streams\"} == 1)",
+          "legendFormat": "running workers",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "description": "Live Connect worker count."
+    },
+    {
+      "id": 12,
+      "title": "Connect: tasks by state",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 6, "y": 40, "w": 12, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (state) (cave_streams_connect_task_state{job=\"cave-streams\"})",
+          "legendFormat": "{{ state }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "description": "Tasks bucketed by state (Running / Paused / Failed / Stopped)."
+    },
+    {
+      "id": 13,
+      "title": "Connect: records/sec by connector",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 18, "y": 40, "w": 6, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (connector) (rate(cave_streams_connect_records_total{job=\"cave-streams\"}[1m]))",
+          "legendFormat": "{{ connector }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "rps" }, "overrides": [] },
+      "description": "Records per second produced or consumed, grouped by connector name."
+    },
+    {
+      "id": 14,
+      "title": "Connect: offset-commit lag (seconds)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 0, "y": 46, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max by (connector) (cave_streams_connect_offset_commit_lag_seconds{job=\"cave-streams\"})",
+          "legendFormat": "{{ connector }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "description": "Time since last successful offset commit (source connectors only)."
+    },
+    {
+      "id": 15,
+      "title": "Connect: DLQ records/sec",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 8, "y": 46, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum by (connector) (rate(cave_streams_connect_dlq_records_total{job=\"cave-streams\"}[1m]))",
+          "legendFormat": "{{ connector }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "rps" }, "overrides": [] },
+      "description": "Records being rerouted to the dead-letter queue per second."
+    },
+    {
+      "id": 16,
+      "title": "Tiered storage: remote copy rate (bytes/sec)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": { "x": 16, "y": 46, "w": 8, "h": 6 },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cave_streams_tiered_remote_copy_bytes_total{job=\"cave-streams\"}[1m]))",
+          "legendFormat": "copy bytes/sec",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cave_streams_tiered_fetch_bytes_total{job=\"cave-streams\"}[1m]))",
+          "legendFormat": "fetch bytes/sec",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps" }, "overrides": [] },
+      "description": "Throughput of remote-storage copy (KIP-405) and tiered fetch."
     }
   ],
   "annotations": {

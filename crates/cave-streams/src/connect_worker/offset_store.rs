@@ -28,11 +28,34 @@ pub struct OffsetKey {
 /// "42"}`).
 pub type OffsetValue = BTreeMap<String, String>;
 
+/// Common surface between the in-memory [`OffsetStore`] and the
+/// Kafka-backed
+/// [`super::kafka_offset_backing_store::KafkaOffsetBackingStore`].
+/// Mirrors upstream `OffsetBackingStore` (Java interface).
+pub trait OffsetBackingStore {
+    fn get(&self, key: &OffsetKey) -> Option<OffsetValue>;
+    fn commit(&mut self, key: OffsetKey, value: OffsetValue);
+    fn forget(&mut self, key: OffsetKey);
+}
+
 /// `&self` everywhere — interior mutability via `RwLock` so the
 /// store can be `Arc`-shared across runtime tasks.
 #[derive(Default)]
 pub struct OffsetStore {
     inner: RwLock<BTreeMap<OffsetKey, OffsetValue>>,
+}
+
+impl OffsetBackingStore for OffsetStore {
+    fn get(&self, key: &OffsetKey) -> Option<OffsetValue> {
+        OffsetStore::get(self, key)
+    }
+    fn commit(&mut self, key: OffsetKey, value: OffsetValue) {
+        OffsetStore::commit(self, key, value)
+    }
+    fn forget(&mut self, key: OffsetKey) {
+        let mut g = self.inner.write().expect("poisoned");
+        g.remove(&key);
+    }
 }
 
 impl OffsetStore {
