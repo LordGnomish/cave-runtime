@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTML rendering primitives.
 //!
 //! Server-rendered htmx + Tailwind-light. Mirrors the layout shell from

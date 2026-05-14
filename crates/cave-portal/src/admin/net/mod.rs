@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/net` — Cilium Hubble Web UI parity surface.
 //!
 //! Tabs mirror Cilium Hubble UI + the Kubernetes Dashboard Network

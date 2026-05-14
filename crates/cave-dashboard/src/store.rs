@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-memory store — CRUD for all dashboard entities with versioning.
 
 use crate::models::*;

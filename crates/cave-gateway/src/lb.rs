@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Load balancing algorithms: round-robin, least-connections,
 //! consistent-hash (ketama), and weighted random.
 

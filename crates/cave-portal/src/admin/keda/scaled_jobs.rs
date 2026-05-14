@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/keda/scaledjobs` — ScaledJob CRUD UI.
 //!
 //! Mirrors upstream's `ScaledJob` CRD. ScaledJob differs from ScaledObject

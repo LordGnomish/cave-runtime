@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ztunnel cross-crate cite.
 //!
 //! Mirrors `pkg/ztunnel/`. The full ztunnel/HBONE state machine lives in

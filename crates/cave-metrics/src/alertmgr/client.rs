@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! AlertManager HTTP client for pushing alerts and creating silences.
 
 use crate::error::{MetricsError, Result};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OTLP Logs ingestion — HTTP/JSON format.
 //!
 //! Implements the OpenTelemetry Protocol log format as received via:

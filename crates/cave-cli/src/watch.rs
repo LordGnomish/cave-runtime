@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Watch mode + JSON streaming + exit code propagation.
 //!
 //! `cavectl ... --watch` periodic poll, `cavectl ... --json-stream` line-delimited

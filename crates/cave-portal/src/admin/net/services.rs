@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Services tab — Kubernetes services (ClusterIP / NodePort / LB).
 //! Derived from the endpoint set so each tenant sees its own services.
 

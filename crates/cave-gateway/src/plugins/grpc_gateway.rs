@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! grpc-gateway plugin — REST→gRPC transcoding.
 //!
 //! Converts HTTP/JSON requests to gRPC binary frames and back.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/pipelines` — Tekton Dashboard parity. PipelineRun graph
 //! grouped by pipeline + per-status summary cards.
 //!

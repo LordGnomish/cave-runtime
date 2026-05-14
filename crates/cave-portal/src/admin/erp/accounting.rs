@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/erp/accounting` — ERPNext "Accounting" tab. Synthesises
 //! a per-status revenue waterfall from the invoice dataset:
 //! `Paid` → recognised, `Pending` → AR, `Overdue` → bad-debt

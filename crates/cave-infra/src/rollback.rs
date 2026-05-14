@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rollback support — revert resource changes using stored history.
 
 use crate::error::{InfraError, InfraResult};

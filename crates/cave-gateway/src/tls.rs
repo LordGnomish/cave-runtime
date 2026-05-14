@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TLS subsystem — SNI-based routing, TLS termination, mTLS upstream, ACME.
 //!
 //! Uses rustls for TLS handling. Certificates are stored in the GatewayStore

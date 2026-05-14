@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! NodeManager — multi-node identity exchange.
 //!
 //! Mirrors `pkg/node/types/node.go::Node` and the in-memory NodeManager

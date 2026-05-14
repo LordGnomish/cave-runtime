@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP surface for the Nexus module.
 //!
 //! Endpoint base mirrors Nexus' `/service/rest/v1` surface but rooted under

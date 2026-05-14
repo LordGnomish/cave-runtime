@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Attribution dashboard — answers "who wrote what" by parsing `git log`.
 //!
 //! Three author buckets, derived from commit metadata:

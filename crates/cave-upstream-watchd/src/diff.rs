@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Version diff — `parity.manifest` pin vs `release.tag_name`.
 //!
 //! Both sides are normalised before comparison (`v` prefix stripped,

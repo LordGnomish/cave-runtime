@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ACL plugin — allow/deny lists based on consumer groups.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

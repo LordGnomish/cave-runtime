@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Userspace simulation of Cilium's `bpf_host.c` policy map.
 //!
 //! Cite: cilium/bpf/host/bpf_host.c + cilium/pkg/maps/policymap (v1.19.3).

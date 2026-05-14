@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Plan executor — run steps in dependency order, rollback, dry-run, stream progress.
 
 use crate::mcp_bridge::McpRegistry;

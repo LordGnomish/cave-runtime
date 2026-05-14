@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/etcd` — etcdctl/etcd web-UI parity surface.
 //!
 //! etcd has no canonical web UI; this page mirrors the operator-

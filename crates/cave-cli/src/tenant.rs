@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant lifecycle — suspend/resume support for `cavectl tenant suspend|resume`.
 //!
 //! ADR-012 v7 destekleyici: tenant operasyonlarında suspend reason zorunlu, audit'e

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenant primitives for cave-metrics.
 //!
 //! - `tenant_from_headers` parses `X-Scope-OrgID` (Cortex/Mimir convention).

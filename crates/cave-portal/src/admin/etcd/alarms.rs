@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Alarms tab — `etcdctl alarm list` parity (NOSPACE / CORRUPT).
 
 use super::EtcdViewError;

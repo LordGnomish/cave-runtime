@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TDD-strict mode analyzer — the Charter Golden Rule §1
 //! ("line-by-line TDD upstream parity") turned into a verifiable signal.
 //!

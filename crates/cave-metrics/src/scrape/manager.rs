@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Scrape manager: discovers, scrapes, and injects metrics into the TSDB.
 
 use std::sync::Arc;

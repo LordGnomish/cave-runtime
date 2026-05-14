@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OpenMetrics format parser (text/openmetrics-text; version=1.0.0).
 //! Superset of Prometheus exposition format with EOF marker and additional types.
 

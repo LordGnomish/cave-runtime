@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TechDocs data models — port of Backstage TechDocs types.
 //!
 //! Upstream: @backstage/techdocs-common TechDocsMetadata, EntityName, EntityMetadata

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! VirtualService → ordered route table compiler.
 //!
 //! Mirrors `pilot/pkg/networking/core/v1alpha3/route/route.go::translateRoutes`.

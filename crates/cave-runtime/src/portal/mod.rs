@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Portal-facing handlers for cave-runtime.
 //!
 //! Provides the user-facing surface: persona login (Keycloak / dev mode),

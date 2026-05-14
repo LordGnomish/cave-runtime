@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/apiserver` view — RBAC-filtered Kubernetes resource browser.
 //!
 //! Mirrors the `kubernetes-resources` panes Backstage's Kubernetes plugin

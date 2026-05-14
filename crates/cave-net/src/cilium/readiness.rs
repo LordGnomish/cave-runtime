@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pod readiness gate — `cilium-startup-conf` integration.
 //!
 //! Mirrors `pkg/k8s/podreadinessgate.go` and the readiness-gate

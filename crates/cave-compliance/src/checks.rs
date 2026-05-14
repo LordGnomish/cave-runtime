@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Automated control check implementations.
 use crate::models::{Control, Evidence, EvidenceType, Finding, FindingStatus};
 use chrono::Utc;

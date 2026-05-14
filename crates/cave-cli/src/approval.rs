@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Approval workflow — `cavectl approval list|approve|cancel|show`.
 //!
 //! Two-person rule: bir kullanıcı kendi talep ettiği approval'ı approve edemez,

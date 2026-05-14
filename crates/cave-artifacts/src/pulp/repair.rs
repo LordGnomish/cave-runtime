@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Repair — reclaim space, verify checksums, re-download missing content.
 
 use crate::pulp::models::Artifact;

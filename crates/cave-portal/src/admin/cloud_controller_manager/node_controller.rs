@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node controller tab — node registration + InitializeProvider state.
 //! Derived from scheduler_nodes; one row per node with provider + zone.
 

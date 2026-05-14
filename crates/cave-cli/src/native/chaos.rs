@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl chaos run/list/abort` — native chaos engineering verb.
 
 use anyhow::{bail, Result};

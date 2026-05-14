@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/crm/workflows` — Twenty CRM "Workflows" tab. Lists
 //! the lifecycle automation operators have configured. cave-portal
 //! exposes a fixed canonical set keyed off the plan tiers

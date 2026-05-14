@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! BGPv1 / BGPv2 shared types — root pkg/bgp/.
 //!
 //! Mirrors `pkg/bgp/cell.go` and the small CRD-shaped types used across

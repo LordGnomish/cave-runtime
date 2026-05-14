@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/controller-manager` — kube-controller-manager Web UI parity.
 //!
 //! Tabs mirror the upstream controller-manager's per-controller scope

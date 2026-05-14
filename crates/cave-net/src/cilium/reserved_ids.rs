@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Reserved identity full table — well-known IDs 1..256.
 //!
 //! Mirrors `pkg/identity/numericidentity.go`. Cilium reserves identity

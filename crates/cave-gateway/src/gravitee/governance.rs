@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! API design-time governance (Spectral-like linting + quality gates).
 //!
 //! Rules for OpenAPI validation, consistency checks, and quality scoring.

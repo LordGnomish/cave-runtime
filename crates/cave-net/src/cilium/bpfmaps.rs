@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! BPF map abstractions — userspace models of the kernel-side maps.
 //!
 //! Mirrors the various map definitions under `bpf/` and the Go-side

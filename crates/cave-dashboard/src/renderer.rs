@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTML dashboard renderer — produces self-contained Bootstrap-based HTML
 //! for embedding or standalone viewing. Mirrors Grafana's dark-theme aesthetics.
 

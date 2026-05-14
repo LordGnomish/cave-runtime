@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Loader for the YAML panel catalog under `crates/cave-dashboard/dashboards/`.
 //!
 //! Each YAML file describes one crate's ten standard observability panels

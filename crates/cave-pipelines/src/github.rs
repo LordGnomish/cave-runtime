@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! GitHub integration: commit status updates and PR check runs.
 
 use crate::models::RunStatus;

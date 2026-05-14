@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Forward plugin — recursive resolution with multiple upstreams.
 use std::net::SocketAddr;
 use std::sync::{

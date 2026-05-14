@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Ledger entry types — the fundamental unit of the audit trail.
 
 use chrono::{DateTime, Utc};

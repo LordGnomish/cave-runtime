@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Chat message types + pipe-mode (script-friendly) output formatting.
 //!
 //! `cavectl chat --pipe` writes assistant tokens to stdout as they arrive,

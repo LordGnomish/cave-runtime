@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Runtime build/migration progress endpoints.
 //!
 //! Surfaces a JSON snapshot of platform port progress so the dev portal can

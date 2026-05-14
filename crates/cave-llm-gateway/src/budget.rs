@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Token budget tracking — per user/team/project, daily/weekly/monthly limits.
 
 use crate::models::{BudgetPeriod, BudgetScope};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Priority queue backed by per-repo YAML files in `<repo>/queue/`.
 //!
 //! File-lock (exclusive flock) + atomic rename guarantee concurrent-safe

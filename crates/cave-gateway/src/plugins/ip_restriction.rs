@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ip-restriction plugin — allow/deny by CIDR or exact IP.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! proxy-cache plugin — in-memory LRU cache for GET responses.
 //!
 //! Config:

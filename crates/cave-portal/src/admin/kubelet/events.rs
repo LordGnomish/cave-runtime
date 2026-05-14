@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Events tab — chronological per-node feed derived from pod state.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's Events view (timestamp,

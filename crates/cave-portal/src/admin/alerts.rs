@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/alerts` — Alertmanager UI parity. Rules + active alerts
 //! with severity-grouped pills and the existing ack mutator.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! IP Address Management — Cilium's IPAM modes.
 //!
 //! Mirrors `pkg/ipam/ipam.go` plus `pkg/ipam/types.go` (the

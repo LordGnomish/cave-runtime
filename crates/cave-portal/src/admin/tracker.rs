@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/tracker` — Linear / Plane parity. Issue browser grouped
 //! by state with assignee summary.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Runtime configuration — loaded from YAML, env vars, and Kubernetes ConfigMaps.
 //!
 //! Configuration resolves in this order:

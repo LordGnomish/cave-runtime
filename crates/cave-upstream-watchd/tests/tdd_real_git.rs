@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Integration tests that drive `ShellGitInspector` against a real temp
 //! git repo. They prove the gate works end-to-end with `git` CLI, not just
 //! the mocked inspector.

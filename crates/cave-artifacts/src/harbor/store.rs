@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PostgreSQL migrations for Harbor-compatible metadata
 //! (projects, robots, audit, webhooks, quotas, labels, scan results).
 //! The actual blob/manifest bytes live in RegistryStorage (in-memory / object store).

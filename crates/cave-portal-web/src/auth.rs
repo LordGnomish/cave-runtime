@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Auth context — resolves the principal for the current request.
 //!
 //! Plugins inspect the [`AuthContext`] to decide whether the caller may render

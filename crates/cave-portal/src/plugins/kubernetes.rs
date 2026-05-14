@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kubernetes plugin — per-crate panels for the K8s control-plane and
 //! data-plane modules cave-runtime ships.
 //!

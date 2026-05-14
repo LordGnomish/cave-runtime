@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Route53 plugin — serve records fetched from AWS Route53.
 ///
 /// Uses the AWS Route53 REST API directly via reqwest (no AWS SDK dependency).

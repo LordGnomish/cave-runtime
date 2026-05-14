@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cosign module unit + integration tests.
 //!
 //! Real ECDSA round-trip, real Ed25519 half of the hybrid composite

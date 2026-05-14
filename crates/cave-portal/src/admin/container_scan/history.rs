@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/container_scan/history` — Trivy "Scan History" tab.
 //! Surfaces every scan execution in reverse-chronological order
 //! — operators land here to answer "when was this image last

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pulp v3 RBAC — roles, permissions per object, domain-aware.
 
 use crate::pulp::models::ContentType;

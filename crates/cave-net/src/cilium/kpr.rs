@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! kube-proxy-replacement (KPR) config.
 //!
 //! Mirrors `pkg/kpr/kpr.go`. The agent has a small per-feature config

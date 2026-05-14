@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// DNS-over-TLS server (port 853, RFC 7858).
 use std::net::SocketAddr;
 use std::sync::Arc;

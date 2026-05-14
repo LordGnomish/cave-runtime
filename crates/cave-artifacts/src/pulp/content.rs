@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Content type operations — search, filter, verification.
 
 use crate::pulp::models::*;

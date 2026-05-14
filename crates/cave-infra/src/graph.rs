@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Resource dependency graph — topological sort for apply ordering.
 
 use crate::error::{InfraError, InfraResult};

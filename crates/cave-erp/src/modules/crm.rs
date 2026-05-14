@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! DEPRECATED: This module is being phased out in favor of standalone Twenty CRM
 //! (`crates/cave-crm/`). See `docs/adr/ADR-145_CRM_Upstream_Selection_Twenty.md`.
 //! Will be removed in v0.2 OSS launch hijyen.

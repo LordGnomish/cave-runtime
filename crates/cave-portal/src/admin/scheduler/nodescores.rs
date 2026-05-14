@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node scores tab — per-node aggregate Score-phase output, last cycle.
 
 use super::SchedulerViewError;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prometheus text exposition format parser (0.0.4) and OpenMetrics is handled
 //! by openmetrics.rs.  This parser handles the standard `/metrics` text format.
 

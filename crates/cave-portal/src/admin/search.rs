@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/search` — OpenSearch Dashboards parity. Index list with
 //! doc-count + size summary, status-grouped chips.
 //!

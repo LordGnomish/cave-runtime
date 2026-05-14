@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Artifact-platform portal page.
 //!
 //! Renders the consolidated artifact dashboard (Harbor + Pulp + Nexus +

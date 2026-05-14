@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! API catalog + versioning (Gravitee API Registry).
 //!
 //! Manages API definitions, versions, publication states, deprecation.

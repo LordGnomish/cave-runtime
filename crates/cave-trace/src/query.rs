@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Query engine — wraps the store with higher-level search and analysis APIs.
 //!
 //! This layer sits between routes and storage; it owns no state itself.

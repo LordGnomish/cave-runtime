@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Ingestion protocol handlers.
 //!
 //! Each submodule converts a wire format into `Vec<crate::types::Span>` for

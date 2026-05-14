@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Gravitee feature pack — the canonical Gravitee API/Plan/Application/
 //! Subscription surface plus developer portal, API analytics, debug mode,
 //! design-time governance (linting + quality gates), and federation gateway

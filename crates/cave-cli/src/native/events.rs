@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl events` — federated event stream.
 //!
 //! A native cross-module verb: events surface from cave-kernel's

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cilium agent Status API — `cilium status` shape.
 //!
 //! Mirrors `pkg/status/status.go` plus the

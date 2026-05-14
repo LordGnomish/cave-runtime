@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Queues tab — per-controller work-queue depth + processing rate.
 //! Mirrors `workqueue_depth` + `workqueue_adds_total` Prometheus
 //! series that k-c-m exports.

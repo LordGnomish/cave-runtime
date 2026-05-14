@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Built-in runbook templates — operators instantiate these into live runbooks.
 
 use crate::models::{ActionType, OnFailure, RunbookStep, RunbookTemplate, TriggerKind};
