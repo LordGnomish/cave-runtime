@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cgroup v2 resource limit management.
 //!
 //! Creates and manages cgroup directories under /sys/fs/cgroup/ for

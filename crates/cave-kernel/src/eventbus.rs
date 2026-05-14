@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Type-safe in-process pub/sub bus for fan-out events.
 //!
 //! Backed by `tokio::sync::broadcast`. Topic separation is provided by

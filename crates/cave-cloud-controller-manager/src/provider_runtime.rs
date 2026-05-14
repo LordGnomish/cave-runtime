@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Provider runtime — error classification, rate limits, controller
 //! options, pre-init hooks.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CronJob deeper — `pkg/controller/cronjob/cronjob_controllerv2.go`.
 //!
 //! Beyond the deeper-002 cron parser, this module models:

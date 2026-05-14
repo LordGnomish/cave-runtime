@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Service-side data model + change tracker.
 //!
 //! Cite: `pkg/proxy/serviceport.go:35` (ServicePort interface),

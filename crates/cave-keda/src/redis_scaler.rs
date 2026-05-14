@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Redis scaler — scales on Redis list-length / stream-length.
 //! upstream: kedacore/keda v2.x — pkg/scalers/redis_scaler.go
 

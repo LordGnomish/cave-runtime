@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! VM lifecycle stub.
 //!
 //! Upstream reference: pkg/virt-controller/watch/vm.go (Reconcile)

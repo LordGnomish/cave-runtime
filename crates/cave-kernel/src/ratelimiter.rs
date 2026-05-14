@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Token bucket + leaky bucket rate limiters with per-tenant scoping.
 //!
 //! Upstream cite: `governor` (Rust crate, MIT) for bucket pattern reference;

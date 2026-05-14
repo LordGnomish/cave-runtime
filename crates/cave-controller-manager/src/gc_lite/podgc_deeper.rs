@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PodGC deeper — `pkg/controller/podgc/gc_controller.go`.
 //!
 //! Beyond the M3 baseline (terminated-threshold + orphaned), this module

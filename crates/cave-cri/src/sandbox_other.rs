@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cross-platform sandbox runners — Windows + FreeBSD.
 //!
 //! Cite: containerd `pkg/cri/server/podsandbox/sandbox_run_other.go`

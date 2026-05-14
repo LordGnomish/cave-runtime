@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Plugin watcher — kubelet's `/var/lib/kubelet/plugins_registry/`
 //! observation + registration handshake for CSI / DRA / DevicePlugin.
 //!

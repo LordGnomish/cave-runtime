@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TTLAfterFinished jitter — `pkg/controller/ttlafterfinished/ttlafterfinished_controller.go::enqueueTTL`.
 //!
 //! Adding jitter to the TTL requeue prevents thundering-herd deletes when

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Lightweight CSR PEM extractor — `cfssl_signer.go::parseCSR`.
 //!
 //! Extracts the base64 inner block and the boundary header. We don't do full

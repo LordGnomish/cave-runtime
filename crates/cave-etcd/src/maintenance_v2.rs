@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Maintenance API extensions — full `StatusResponse`, `AlarmList`, and
 //! revision-bounded `Hash`.
 //!

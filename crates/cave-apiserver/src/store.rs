@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Resource store — namespaced, versioned storage for K8s resources.
 
 use crate::error::{ApiError, ApiResult};

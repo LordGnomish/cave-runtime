@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! NodeLease deeper — `pkg/kubelet/nodelease/controller.go` +
 //! `pkg/controller/nodelifecycle`.
 //!

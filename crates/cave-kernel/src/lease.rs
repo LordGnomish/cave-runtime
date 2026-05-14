@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Distributed-lease primitive — etcd-style leader-election lease
 //! with renewal + expiry. Adopters use this to implement
 //! "exactly one controller is the active leader at any moment"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Device plugin manager — vendor-extension hardware advertisement.
 //!
 //! Mirrors `pkg/kubelet/cm/devicemanager` and the device plugin gRPC

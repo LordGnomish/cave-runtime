@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cloud-controller-manager — parity scaffold for `cloud-controller-manager`.
 //!
 //! Mirrors the `staging/src/k8s.io/cloud-provider` tree of upstream Kubernetes

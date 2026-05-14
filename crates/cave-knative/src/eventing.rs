@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Knative Eventing — Source/Sink/Channel/Subscription/Trigger primitives.
 //! upstream: knative/eventing v1.18.x — pkg/apis/{sources,messaging,eventing}/v1/
 

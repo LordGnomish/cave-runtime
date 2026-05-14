@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-etcd — Distributed key-value store.
 //!
 //! Reimplements etcd's v3 API with MVCC, watch, leases, transactions, auth,

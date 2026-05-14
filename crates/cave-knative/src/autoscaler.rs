@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Knative Pod Autoscaler (KPA) — concurrency-based scaling.
 //! upstream: knative/serving v1.18.x — pkg/autoscaler/scaling/
 

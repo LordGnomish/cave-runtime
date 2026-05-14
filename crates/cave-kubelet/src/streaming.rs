@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Streaming endpoints: exec, attach, port-forward.
 //!
 //! Mirrors `pkg/kubelet/cri/streaming` and the upstream streaming protocol

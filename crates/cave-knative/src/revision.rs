@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Knative Revision — immutable snapshot of code + config.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/revision_types.go
 

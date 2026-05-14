@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! GC dependency graph — `pkg/controller/garbagecollector/dependent_graph.go`.
 //!
 //! Each cluster object is a node keyed by UID. Edges go from owner to

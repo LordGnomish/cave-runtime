@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Integration test — WAL ↔ KvStore replay.
 //!
 //! Demonstrates the durability contract the cave-etcd WAL provides:

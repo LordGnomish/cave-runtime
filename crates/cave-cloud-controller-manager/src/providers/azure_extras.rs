@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Azure provider extras — Application Gateway, AvailabilityZones,
 //! Disk CSI shape, AAD Workload Identity.
 //!

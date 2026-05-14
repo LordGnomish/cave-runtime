@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! GarbageCollector controller — `pkg/controller/garbagecollector`.
 //!
 //! Mirrors the Kubernetes GC controller. Three propagation modes:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! DaemonSet controller — one pod per (eligible) node.
 //!
 //! Upstream: [`pkg/controller/daemon`]. The full controller computes the

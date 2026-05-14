@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Zone state classifier — `pkg/controller/nodelifecycle/node_lifecycle_controller.go::ComputeZoneState`.
 //!
 //! Each topology zone in the cluster has a state that drives the per-zone

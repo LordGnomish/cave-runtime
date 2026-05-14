@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-002: real security-context injection into the OCI runtime spec.
 //!
 //! Upstream: containerd v2.2.3

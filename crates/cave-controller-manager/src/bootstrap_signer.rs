@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Bootstrap-token signer — `pkg/controller/bootstrap/bootstrapsigner.go`.
 //!
 //! Maintains a JWT-style signature on the `cluster-info` ConfigMap in

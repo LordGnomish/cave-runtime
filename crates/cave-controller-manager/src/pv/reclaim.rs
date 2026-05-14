@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PersistentVolume reclaim — `pkg/controller/volume/persistentvolume/pv_controller.go::reclaimVolume`.
 //!
 //! When a bound PVC is deleted, the PV transitions to `Released`. The

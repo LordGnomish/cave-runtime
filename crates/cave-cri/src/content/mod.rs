@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Content-addressable storage (CAS).
 //!
 //! Ports `core/content/` from upstream containerd

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Image pull progress tracking.
 //!
 //! Mirrors containerd's `pkg/cri/server/image_pull.go` ProgressTracker

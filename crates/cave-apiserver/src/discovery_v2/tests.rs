@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! discovery v2 + OpenAPI v3 transport tests.
 
 use super::*;

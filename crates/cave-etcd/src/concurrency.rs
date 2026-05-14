@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Distributed concurrency primitives — `Mutex`, `RWMutex`, and `Election`.
 //!
 //! Mirrors etcd's `clientv3/concurrency` package which builds these on top

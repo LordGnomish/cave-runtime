@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP scaler (KEDA HTTP add-on) — scales on inbound HTTP request rate.
 //! upstream: kedacore/http-add-on v0.x
 

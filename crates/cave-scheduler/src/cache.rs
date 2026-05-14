@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Scheduler cache — assume/finish/forget mechanism for in-flight bindings.
 //!
 //! Mirrors upstream kube-scheduler's `pkg/scheduler/internal/cache/cache.go`.

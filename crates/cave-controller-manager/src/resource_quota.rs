@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ResourceQuota controller — `pkg/controller/resourcequota/resource_quota_controller.go`.
 //!
 //! Maintains `ResourceQuota.status.used` by aggregating usage of
