@@ -1018,8 +1018,16 @@ last_audit   = "2026-05-11"
 # (2026-05-13 upstream-test-port batch).
 
 [behavioral_parity]
-audit_scope = "identity/cache + endpoint/endpoint + policy/{api,cidr,l4,distillery} (cilium v1.19.3, eBPF tests skipped)"
+audit_scope = "identity/cache + endpoint/endpoint + policy/{api,cidr,l4,distillery} + L7 HTTP + lxc/ctmap/policymap via ebpf_sim userspace simulation (cilium v1.19.3)"
 audit_at    = "2026-05-14"
+# (ported + skipped-with-reason) / total across all [[upstream_test]] blocks.
+# Sweep 2026-05-14: 21/24 → 26/31 — 3 missing flipped to ported (world_fallback +
+# TestL7HTTPMatch + TestLxcMapUpdate/TestConntrackV4/TestPolicyMapV4 via ebpf_sim),
+# 4 new honest "missing" entries added (real kernel/clang dependencies).
+ratio       = 0.8387
+mapped      = 26
+missing     = 5
+total       = 31
 
 [[upstream_test]]
 upstream_path  = "pkg/identity/cache/local_test.go"
@@ -1189,29 +1197,86 @@ cave_test_name = "upstream_policy_map_wildcard_port_zero_covers_specific_port"
 status         = "ported"
 notes          = "Map lookup precedence — (peer, port=0, exact-proto) covers (peer, P, exact-proto)."
 
-# Honest "still missing" entries — Cilium has thousands of tests; this is
-# a representative behavioural subset.
+# 2026-05-14 — three "missing" entries below are now ported via the
+# `ebpf_sim/` userspace simulator + a direct upstream port. See
+# `docs/synergy/cave-net-ebpf-userspace-sim-2026-05-14.md`.
 
 [[upstream_test]]
 upstream_path  = "pkg/policy/distillery_test.go"
 upstream_name  = "TestPolicyMap/world_fallback_for_non_cluster_peer"
-cave_path      = "—"
-cave_test_name = "—"
-status         = "missing"
-notes          = "PolicyMap entry 5 (peer=ID_ALL fallback) not yet covered by an upstream-port test."
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_map_world_fallback_for_non_cluster_peer"
+status         = "ported"
+notes          = "Direct upstream port. Validates PolicyMap precedence step 5 (ID_ALL world entry catches non-cluster peers when no other rule matches)."
 
 [[upstream_test]]
 upstream_path  = "pkg/policy/l7_test.go"
 upstream_name  = "TestL7HTTPMatch"
-cave_path      = "—"
-cave_test_name = "—"
-status         = "missing"
-notes          = "L7 HTTP rule matching not yet expressed as upstream-port test (cilium/l7policy.rs has it but un-cross-referenced)."
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_l7_http_match_method_path_host_header"
+status         = "ported"
+notes          = "Direct upstream port. Covers HTTP rule matching across method / exact-path / host / required-header. Six scenarios: all-match Allow, wrong method/path/host/header Deny, missing header Deny."
+
+[[upstream_test]]
+upstream_path  = "pkg/maps/lxcmap/lxcmap_test.go"
+upstream_name  = "TestLxcMapUpdate"
+cave_path      = "src/ebpf_sim/bpf_lxc_sim.rs"
+cave_test_name = "upstream_test_lxc_map_update_create_replace_delete_cycle"
+status         = "ported"
+notes          = "Userspace simulation via `ebpf_sim::bpf_lxc_sim`. Covers insert → replace identity → delete → second-delete-is-error cycle. Companion NoExist-flag-rejects-duplicate test in the same module."
+
+[[upstream_test]]
+upstream_path  = "pkg/maps/ctmap/ctmap_test.go"
+upstream_name  = "TestConntrackV4"
+cave_path      = "src/ebpf_sim/conntrack_sim.rs"
+cave_test_name = "upstream_test_conntrack_v4_new_then_established"
+status         = "ported"
+notes          = "Userspace simulation. CT entry New → Established with packet counter bump; expiration semantics tested separately; ingress/egress key isolation enforced."
+
+[[upstream_test]]
+upstream_path  = "pkg/maps/policymap/policymap_test.go"
+upstream_name  = "TestPolicyMapV4"
+cave_path      = "src/ebpf_sim/bpf_host_sim.rs"
+cave_test_name = "upstream_test_policy_map_v4_exact_match_beats_wildcard"
+status         = "ported"
+notes          = "Userspace simulation. Six scenarios: exact-match precedence, wildcard-port fallback, default-deny, world fallback (ID_ALL precedence step 4), wildcard-proto, audit-mode-as-allow, direction isolation."
 
 [[upstream_test]]
 upstream_path  = "bpf/tests/datapath_test.sh"
-upstream_name  = "BPF datapath integration"
+upstream_name  = "BPF datapath integration (kernel)"
 cave_path      = "—"
 cave_test_name = "—"
 status         = "missing"
-notes          = "DELIBERATELY skipped — kernel/clang toolchain dependency. cave-net runs as userspace simulation."
+notes          = "DELIBERATELY skipped — kernel hot-path needs a Linux kernel + clang toolchain to compile the BPF objects and an isolated network namespace to attach them. cave-net's userspace simulation (`ebpf_sim/`) covers the control-plane state machine (maps + verdict tables + conntrack expiry); the packet-emulator part (header parsing, checksum updates, tail-call chain attachment) is out of scope and requires a separate per-kernel-version test harness."
+
+[[upstream_test]]
+upstream_path  = "bpf/tests/xdp_test.sh"
+upstream_name  = "XDP fast-path datapath"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Same dependency as datapath_test.sh — kernel + clang + XDP-capable NIC."
+
+[[upstream_test]]
+upstream_path  = "pkg/datapath/loader/loader_test.go"
+upstream_name  = "TestLoaderReloadEndpointBPF"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Loader compiles BPF objects with clang and pins them in /sys/fs/bpf. cave-net doesn't ship a compiler-bundled binary so this test is out of reach."
+
+[[upstream_test]]
+upstream_path  = "pkg/maps/lbmap/lbmap_test.go"
+upstream_name  = "TestLBMapV4ServiceUpsert"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Load-balancer service map — next userspace sim sweep can pick this up via the same ebpf_sim::Map primitives. Out of scope for this batch."
+
+[[upstream_test]]
+upstream_path  = "pkg/maps/encrypt/encrypt_test.go"
+upstream_name  = "TestEncryptKeyRotation"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "WireGuard / IPsec key-rotation map — same ebpf_sim shape applies, deferred to next sweep."

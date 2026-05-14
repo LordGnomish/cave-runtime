@@ -1,0 +1,41 @@
+//! eBPF userspace simulation.
+//!
+//! Cilium's hot path lives in BPF programs compiled by clang and
+//! attached to TC/XDP hooks. Running the upstream tests against
+//! that requires a live kernel + a clang toolchain, neither of
+//! which fits a deterministic `cargo test` run.
+//!
+//! This module provides a userspace simulator with the **observable
+//! state-machine behaviour** every Cilium BPF program ships:
+//!
+//!   * **Maps** — `Map<K, V>` with `lookup` / `update` / `delete` /
+//!     `iter_keys` / `len` mirroring the kernel `bpf_map_*` helpers.
+//!     LRU + LFU + Array variants approximate the kernel choices.
+//!   * **Helpers** — `bpf_ktime_get_ns`, `bpf_get_smp_processor_id`,
+//!     `perf_event_output`, `bpf_redirect`, … reduced to deterministic
+//!     userspace shims so a test can pin time and CPU.
+//!   * **Program trait** — `Program::run(&self, &mut Context)` returns
+//!     a `Verdict` (`Pass`, `Drop`, `Redirect(ifindex)`). Concrete
+//!     programs (`bpf_lxc_sim`, `bpf_host_sim`, `conntrack_sim`)
+//!     live as siblings.
+//!
+//! The simulator is NOT a packet emulator. Buffer manipulation,
+//! header parsing, and checksum updates are out of scope — Cilium's
+//! datapath tests cover those at the kernel level. This sim covers
+//! the **control-plane behaviour**: map state transitions, policy
+//! verdict tables, conntrack expiry semantics. That's the shape the
+//! 2026-05-14 cave-net behavioral-parity audit measured.
+
+pub mod bpf_host_sim;
+pub mod bpf_lxc_sim;
+pub mod conntrack_sim;
+pub mod helpers;
+pub mod map;
+pub mod program;
+
+pub use bpf_host_sim::{HostProgram, HostVerdict};
+pub use bpf_lxc_sim::{LxcEndpointInfo, LxcMap, LxcProgram};
+pub use conntrack_sim::{ConntrackEntry, ConntrackKey, ConntrackMap, CtAction, CtDirection};
+pub use helpers::{Helpers, MockClock};
+pub use map::{Map, MapError, MapKind};
+pub use program::{Context, Program, Verdict};

@@ -21,7 +21,10 @@ use cave_net::cilium::identity::{
 };
 use cave_net::cilium::policy::{
     CidrRule, Direction, EndpointSelector, L4Protocol, MatchExpression, PolicyKey, PolicyMap,
-    PortProtocol, SelectorOp, Verdict,
+    PortProtocol, SelectorOp, Verdict, ID_ALL,
+};
+use cave_net::cilium::l7policy::{
+    evaluate as l7_evaluate, CnpRule, HttpRule, L4Verdict, L7Request, PortRule,
 };
 use cave_net::cilium::types::TenantId;
 use std::collections::HashMap;
@@ -321,4 +324,131 @@ fn upstream_policy_map_wildcard_port_zero_covers_specific_port() {
     let entry443 = map.lookup(42, 443, L4Protocol::TCP, Direction::Ingress);
     assert_eq!(entry80.verdict, Verdict::Allow);
     assert_eq!(entry443.verdict, Verdict::Allow);
+}
+
+/// Upstream port — Cilium `pkg/policy/distillery_test.go::TestPolicyMap/world_fallback_for_non_cluster_peer`.
+///
+/// Verifies PolicyMap lookup precedence #5: when no cluster identity
+/// matches AND no `(peer, *, *)` wildcard matches, fall back to the
+/// `ID_ALL` entry (`peer=0, port=0, proto=Any`). This is the path
+/// that lets Cilium policies of the form
+/// `toEndpoints: [ {matchLabels: { reserved.world: ""} } ]`
+/// authorise traffic to peers Cilium has never seen labels for.
+///
+/// Cave's `PolicyMap::lookup` (see `cilium/policy.rs:411`) reduces
+/// upstream's BPF-side multi-key world-table to the single
+/// `(ID_ALL, 0, Any)` entry — Cilium's userspace policy resolver
+/// behaves the same way (the BPF side just exposes more knobs for
+/// the JIT-compiled hot path).
+#[test]
+fn upstream_policy_map_world_fallback_for_non_cluster_peer() {
+    let mut map = PolicyMap::new();
+    map.ingress_enforced = true;
+    // Allow world (ID_ALL=0) with the broad `port=0, proto=Any`
+    // entry that cave's userspace policy walk recognises as
+    // "fall through to world".
+    let world_key = PolicyKey {
+        peer_identity: ID_ALL,
+        port: 0,
+        protocol: L4Protocol::Any,
+        direction: Direction::Ingress,
+    };
+    map.allow(world_key, None);
+
+    // Peer 9999 has no direct entry. The lookup walks precedence
+    // steps 1–4 (all miss), then step 5 picks up the world entry.
+    let entry = map.lookup(9999, 443, L4Protocol::TCP, Direction::Ingress);
+    assert_eq!(entry.verdict, Verdict::Allow);
+
+    // A different port still routes through the same fallback —
+    // the world entry doesn't pin a port.
+    let entry80 = map.lookup(9999, 80, L4Protocol::TCP, Direction::Ingress);
+    assert_eq!(entry80.verdict, Verdict::Allow);
+
+    // Without the world entry, the same lookup defaults to Deny
+    // under ingress_enforced.
+    map.entries.remove(&world_key);
+    let no_world = map.lookup(9999, 443, L4Protocol::TCP, Direction::Ingress);
+    assert_eq!(no_world.verdict, Verdict::Deny);
+}
+
+/// Upstream port — Cilium `pkg/policy/l7_test.go::TestL7HTTPMatch`.
+///
+/// Verifies the HTTP rule matcher honours every component the CNP
+/// schema documents: method, exact path, host, header equality.
+/// A request that fails ANY component falls through to the next
+/// rule; falling through every rule yields Deny.
+#[test]
+fn upstream_l7_http_match_method_path_host_header() {
+    let tenant = TenantId::new("acme").unwrap();
+    use cave_net::cilium::l7policy::PathRule;
+    let rule = CnpRule {
+        name: "allow-get-api-from-payments".into(),
+        tenant: tenant.clone(),
+        port: PortRule {
+            http: vec![HttpRule {
+                method: Some("GET".into()),
+                path: Some(PathRule::Exact("/api/v1/orders".into())),
+                host: Some("orders.svc.cluster.local".into()),
+                headers: vec![("x-team".into(), "payments".into())],
+            }],
+            grpc: vec![],
+            dns: vec![],
+        },
+    };
+
+    // (1) Every component matches → Allow.
+    let ok = L7Request::Http {
+        method: "GET".into(),
+        path: "/api/v1/orders".into(),
+        host: "orders.svc.cluster.local".into(),
+        headers: vec![("x-team".into(), "payments".into())],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &ok).unwrap(), L4Verdict::Allow);
+
+    // (2) Wrong method → Deny.
+    let bad_method = L7Request::Http {
+        method: "POST".into(),
+        path: "/api/v1/orders".into(),
+        host: "orders.svc.cluster.local".into(),
+        headers: vec![("x-team".into(), "payments".into())],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &bad_method).unwrap(), L4Verdict::Deny);
+
+    // (3) Wrong path → Deny.
+    let bad_path = L7Request::Http {
+        method: "GET".into(),
+        path: "/api/v2/orders".into(),
+        host: "orders.svc.cluster.local".into(),
+        headers: vec![("x-team".into(), "payments".into())],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &bad_path).unwrap(), L4Verdict::Deny);
+
+    // (4) Wrong host → Deny.
+    let bad_host = L7Request::Http {
+        method: "GET".into(),
+        path: "/api/v1/orders".into(),
+        host: "evil.example.com".into(),
+        headers: vec![("x-team".into(), "payments".into())],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &bad_host).unwrap(), L4Verdict::Deny);
+
+    // (5) Missing required header → Deny.
+    let bad_header = L7Request::Http {
+        method: "GET".into(),
+        path: "/api/v1/orders".into(),
+        host: "orders.svc.cluster.local".into(),
+        headers: vec![],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &bad_header).unwrap(), L4Verdict::Deny);
+
+    // (6) Header value mismatch → Deny (key matches case-insensitively
+    // but value is exact).
+    let wrong_value = L7Request::Http {
+        method: "GET".into(),
+        path: "/api/v1/orders".into(),
+        host: "orders.svc.cluster.local".into(),
+        headers: vec![("x-team".into(), "fraud".into())],
+    };
+    assert_eq!(l7_evaluate(&rule, &tenant, &wrong_value).unwrap(), L4Verdict::Deny);
 }
