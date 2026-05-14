@@ -1,14 +1,18 @@
 //! `TaskQueue` — pluggable backend for submitting auto-port tasks.
 //!
-//! Three implementations ship today:
+//! Four implementations ship today:
 //!
 //!   * [`PumpTaskQueue`] — writes a prompt file to the local
 //!     `cave-qwen-pump` queue dir. The pump daemon picks it up,
 //!     runs the local LLM against the prompt, and writes a
 //!     completion marker the dispatcher polls.
+//!   * [`ClaudeCliTaskQueue`] — spawns the local `claude` binary
+//!     (Claude Code) with `-p <prompt> --output-format json`.
+//!     Production default — uses the operator's existing Claude
+//!     Code session, no external `ANTHROPIC_API_KEY` required.
 //!   * [`OpusTaskQueue`] — submits the prompt to Anthropic's
-//!     Messages API. Synchronous-style: the completion response
-//!     IS the task output. Wraps the long-running coder loop.
+//!     Messages API directly. Useful on headless hosts without
+//!     the Claude Code CLI; requires `ANTHROPIC_API_KEY`.
 //!   * [`DryRunTaskQueue`] — records the submission to a JSONL
 //!     log and never side-effects. Default in dev so an operator
 //!     can audit what the dispatcher would have sent before going
@@ -505,6 +509,294 @@ impl TaskQueue for OpusTaskQueue {
 /// Parse the four contract fields from the completion text.
 /// `commit_sha` must be exactly 40 hex chars; everything else is
 /// optional. Returns `None` if the SHA isn't present.
+// ── ClaudeCliTaskQueue (added 2026-05-14) ──────────────────────────────────
+//
+// Production default backend. Spawns the locally-installed `claude` binary
+// (Claude Code, 2.1.x+) with `-p <prompt> --output-format json`, captures the
+// JSON stream, and parses the trailing assistant message via
+// [`parse_completion_text`] so the dispatcher sees the same `commit_sha /
+// branch / files_changed / test_count` shape it gets from
+// [`OpusTaskQueue`]. No external API key required — the local CLI carries
+// the operator's Anthropic session.
+//
+// Locator: walks `$PATH` AND `$HOME/.local/bin` (where the Claude Code
+// installer puts the symlink), in that order. `from_env` returns
+// `TaskQueueError::Disabled` if no binary is found.
+//
+// State: per-task JSON records under `output_log_dir/<task_id>.json` with
+// the task envelope (prompt, branch, ctx, started_at, pid, stdout_path,
+// status, result_text). status/output replay these records, no in-memory
+// map required so the dispatcher survives restart.
+
+#[derive(Clone)]
+pub struct ClaudeCliTaskQueue {
+    workspace_root: PathBuf,
+    claude_binary: PathBuf,
+    max_turns: u32,
+    output_log_dir: PathBuf,
+    /// Skip the actual subprocess when true (used by integration tests).
+    test_mode_echo: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClaudeCliRecord {
+    task_id: String,
+    branch: String,
+    prompt: String,
+    ctx: HashMap<String, String>,
+    started_at: chrono::DateTime<chrono::Utc>,
+    completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    cmd_args: Vec<String>,
+    stdout_path: PathBuf,
+    /// `dispatched` until the subprocess returns, then `completed` /
+    /// `failed`.
+    status: String,
+    exit_code: Option<i32>,
+    /// Final assistant text used by [`parse_completion_text`]. Populated
+    /// only on success.
+    result_text: Option<String>,
+}
+
+impl ClaudeCliTaskQueue {
+    /// Locate `claude` on standard install paths. Walks `$PATH` first
+    /// (so any operator-managed override wins), then falls back to
+    /// `$HOME/.local/bin/claude` (default Claude Code installer target).
+    /// Returns the first executable found.
+    pub fn locate_binary() -> Option<PathBuf> {
+        // 1. PATH walk.
+        if let Ok(path_env) = std::env::var("PATH") {
+            for dir in path_env.split(':') {
+                let p = PathBuf::from(dir).join("claude");
+                if Self::is_executable(&p) {
+                    return Some(p);
+                }
+            }
+        }
+        // 2. $HOME/.local/bin/claude (Claude Code installer default).
+        if let Ok(home) = std::env::var("HOME") {
+            let p = PathBuf::from(home).join(".local/bin/claude");
+            if Self::is_executable(&p) {
+                return Some(p);
+            }
+        }
+        // 3. /usr/local/bin/claude (legacy Homebrew install).
+        let p = PathBuf::from("/usr/local/bin/claude");
+        if Self::is_executable(&p) {
+            return Some(p);
+        }
+        None
+    }
+
+    fn is_executable(p: &Path) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(p) {
+            Ok(m) => m.is_file() && (m.permissions().mode() & 0o111 != 0),
+            Err(_) => false,
+        }
+    }
+
+    /// Construct from environment — discovers `claude` via
+    /// [`locate_binary`], uses `CAVE_WORKSPACE_ROOT` env var (or the
+    /// passed `output_log_dir`'s parent as a sensible fallback).
+    /// Returns `TaskQueueError::Disabled` when no binary is found.
+    pub fn from_env(output_log_dir: PathBuf) -> Result<Self, TaskQueueError> {
+        let claude_binary = Self::locate_binary().ok_or_else(|| {
+            TaskQueueError::Disabled(
+                "no `claude` binary found in $PATH, $HOME/.local/bin, \
+                 or /usr/local/bin — install Claude Code first \
+                 (https://claude.com/code) or use --backend pump/dryrun",
+            )
+        })?;
+        let workspace_root = std::env::var("CAVE_WORKSPACE_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                output_log_dir
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| PathBuf::from("."))
+            });
+        std::fs::create_dir_all(&output_log_dir)?;
+        Ok(Self {
+            workspace_root,
+            claude_binary,
+            max_turns: 50,
+            output_log_dir,
+            test_mode_echo: false,
+        })
+    }
+
+    /// Override the discovered binary path (integration tests use a
+    /// fast-exiting sentinel like `/bin/echo`). Flips `test_mode_echo`
+    /// so submit() skips the JSON-output flag set.
+    pub fn set_claude_binary_for_test(&mut self, p: PathBuf) {
+        self.claude_binary = p;
+        self.test_mode_echo = true;
+    }
+
+    fn record_path(&self, task_id: &TaskId) -> PathBuf {
+        self.output_log_dir.join(format!("{}.json", task_id.0))
+    }
+
+    fn stdout_path(&self, task_id: &TaskId) -> PathBuf {
+        self.output_log_dir.join(format!("{}.stdout", task_id.0))
+    }
+
+    fn read_record(&self, task_id: &TaskId) -> Result<ClaudeCliRecord, TaskQueueError> {
+        let p = self.record_path(task_id);
+        let raw = std::fs::read(&p)
+            .map_err(|_| TaskQueueError::NotFound(task_id.0.clone()))?;
+        let rec: ClaudeCliRecord = serde_json::from_slice(&raw)?;
+        Ok(rec)
+    }
+
+    fn write_record(&self, rec: &ClaudeCliRecord) -> Result<(), TaskQueueError> {
+        let p = self.output_log_dir.join(format!("{}.json", rec.task_id));
+        let raw = serde_json::to_vec_pretty(rec)?;
+        std::fs::write(&p, raw)?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl TaskQueue for ClaudeCliTaskQueue {
+    async fn submit(
+        &self,
+        prompt: &str,
+        target_branch: &str,
+        context: HashMap<String, String>,
+    ) -> Result<TaskId, TaskQueueError> {
+        let task_id = TaskId::new(format!(
+            "claude-cli-{}",
+            chrono::Utc::now().format("%Y%m%dT%H%M%S%3f")
+        ));
+        let stdout_path = self.stdout_path(&task_id);
+
+        // Build args: `claude -p <prompt> --output-format json
+        // --max-turns N --working-directory <wt> --dangerously-skip-permissions`.
+        // In test_mode_echo we just pass the prompt as a positional arg
+        // so /bin/echo exits cleanly and we exercise the record-write path.
+        let args: Vec<String> = if self.test_mode_echo {
+            vec![prompt.to_string()]
+        } else {
+            vec![
+                "-p".into(),
+                prompt.into(),
+                "--output-format".into(),
+                "json".into(),
+                "--max-turns".into(),
+                self.max_turns.to_string(),
+                "--add-dir".into(),
+                self.workspace_root.display().to_string(),
+                "--dangerously-skip-permissions".into(),
+            ]
+        };
+
+        let rec = ClaudeCliRecord {
+            task_id: task_id.0.clone(),
+            branch: target_branch.to_string(),
+            prompt: prompt.to_string(),
+            ctx: context,
+            started_at: chrono::Utc::now(),
+            completed_at: None,
+            cmd_args: {
+                let mut a = vec![self.claude_binary.display().to_string()];
+                a.extend(args.iter().cloned());
+                a
+            },
+            stdout_path: stdout_path.clone(),
+            status: "dispatched".to_string(),
+            exit_code: None,
+            result_text: None,
+        };
+        self.write_record(&rec)?;
+
+        // Spawn subprocess capturing stdout. In test_mode_echo this
+        // returns essentially instantly; in production claude CLI may
+        // take minutes — the dispatcher's max_concurrent gate is what
+        // limits parallelism, not this await.
+        let mut cmd = tokio::process::Command::new(&self.claude_binary);
+        cmd.args(&args);
+        cmd.stdin(std::process::Stdio::null());
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| TaskQueueError::Http(format!("claude spawn: {e}")))?;
+
+        // Persist stdout for later inspection.
+        std::fs::write(&stdout_path, &output.stdout)?;
+
+        let result_text = String::from_utf8_lossy(&output.stdout).into_owned();
+        let exit_code = output.status.code();
+        let status = if output.status.success() {
+            "completed"
+        } else {
+            "failed"
+        };
+        let rec_done = ClaudeCliRecord {
+            completed_at: Some(chrono::Utc::now()),
+            status: status.to_string(),
+            exit_code,
+            result_text: Some(result_text),
+            ..rec
+        };
+        self.write_record(&rec_done)?;
+        Ok(task_id)
+    }
+
+    async fn status(&self, task_id: &TaskId) -> Result<TaskStatus, TaskQueueError> {
+        let rec = self.read_record(task_id)?;
+        match (rec.status.as_str(), rec.exit_code) {
+            ("dispatched", _) => Ok(TaskStatus::Running),
+            ("completed", _) => {
+                let text = rec.result_text.clone().unwrap_or_default();
+                // Parse the contract fields the prompt instructs the
+                // model to emit. If the parse fails (Claude went off-
+                // script and didn't echo commit_sha:), surface as Failed
+                // so the charter gate can re-queue / cooldown.
+                if let Some(o) = parse_completion_text(&text, &rec.branch) {
+                    Ok(TaskStatus::Completed {
+                        commit_sha: o.commit_sha,
+                        branch: o.branch,
+                    })
+                } else {
+                    Ok(TaskStatus::Failed {
+                        reason: format!(
+                            "claude exit 0 but no commit_sha: line in stdout (record at {})",
+                            self.record_path(task_id).display()
+                        ),
+                    })
+                }
+            }
+            ("failed", code) => Ok(TaskStatus::Failed {
+                reason: format!(
+                    "claude exited {} (record at {})",
+                    code.map(|c| c.to_string())
+                        .unwrap_or_else(|| "signal".to_string()),
+                    self.record_path(task_id).display()
+                ),
+            }),
+            (other, _) => Err(TaskQueueError::Http(format!(
+                "unknown record status: {other}"
+            ))),
+        }
+    }
+
+    async fn output(&self, task_id: &TaskId) -> Result<Option<TaskOutput>, TaskQueueError> {
+        let rec = self.read_record(task_id)?;
+        if rec.status != "completed" {
+            return Ok(None);
+        }
+        let text = rec.result_text.unwrap_or_default();
+        Ok(parse_completion_text(&text, &rec.branch))
+    }
+
+    fn backend_name(&self) -> &'static str {
+        "claude-cli"
+    }
+}
+
 pub fn parse_completion_text(text: &str, fallback_branch: &str) -> Option<TaskOutput> {
     let mut commit_sha: Option<String> = None;
     let mut branch: Option<String> = None;
