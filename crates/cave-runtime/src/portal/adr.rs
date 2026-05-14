@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use axum::{
     extract::Path,
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::get,
     Json, Router,
 };
@@ -26,7 +26,14 @@ use serde_json::json;
 
 use super::workspace_root;
 
-static PAGE_HTML: &str = include_str!("templates/adr.html");
+// PAGE_HTML and templates/adr.html were removed on 2026-05-14 when
+// `/adr` was redirected to `/admin/adr` (the canonical ADR Browser in
+// the admin shell, persona-gated, internal/ folder excluded). The
+// fancy JS-driven dark-themed page lived inside cave-runtime; the
+// admin one lives inside cave-portal with sidebar/breadcrumb wiring.
+// Same dedup pattern as `/upstream` (2026-05-13). The `/api/adr` +
+// `/api/adr/{id}` JSON endpoints below are kept for cavectl /
+// scripts / external tools that may consume them.
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AdrSummary {
@@ -38,16 +45,17 @@ pub struct AdrSummary {
     pub linked_upstreams: Vec<String>,
 }
 
-/// GET /adr — platform-only ADR browser page. Persona-gated:
-/// `platform_admin` only. Tenant admins get 403, anon gets bounced
-/// to /login by the JWT middleware before reaching here.
-pub async fn page(
-    claims: Option<axum::Extension<cave_auth::jwt_middleware::JwtClaims>>,
-) -> Response {
-    if !is_platform_admin(claims.as_ref()) {
-        return persona_denied_html("/adr", "platform_admin");
-    }
-    Html(PAGE_HTML).into_response()
+/// GET /adr — **deprecated** as of 2026-05-14. Permanently redirects
+/// to `/admin/adr`, the canonical ADR Browser (admin shell, persona-
+/// aware, sibling to /admin/upstream / /admin/compliance).
+///
+/// History: Burak flagged the duplication ("ADR Browser, Decisions —
+/// 2 ayrı sayfa ama aynı konsept"). Three places rendered the same
+/// docs/adr content: `/adr` (this page), `/admin/adr` (canonical),
+/// and the legacy `/` SPA "Decisions" tab. /adr now redirects; the
+/// SPA tab was also removed in the same change.
+pub async fn page() -> Response {
+    Redirect::permanent("/admin/adr").into_response()
 }
 
 fn is_platform_admin(
@@ -57,14 +65,6 @@ fn is_platform_admin(
         Some(axum::Extension(c)) => c.roles.iter().any(|r| r == "platform_admin"),
         None => false,
     }
-}
-
-fn persona_denied_html(path: &str, required: &str) -> Response {
-    let body = format!(
-        "<html><body><h1>403 Forbidden</h1><p>{path} requires persona <code>{required}</code>. \
-         <a href=\"/login\">Sign in</a> with a platform_admin account.</p></body></html>"
-    );
-    (StatusCode::FORBIDDEN, Html(body)).into_response()
 }
 
 pub async fn api_list(
@@ -384,6 +384,37 @@ mod tests {
         seed_adrs(&d);
         let path = resolve_adr_file(&d, "ADR-PORTAL-PERSONAS-001").unwrap();
         assert!(path.to_string_lossy().contains("ADR-PORTAL-PERSONAS-001"));
+    }
+
+    #[tokio::test]
+    async fn page_handler_returns_permanent_redirect_to_admin_adr() {
+        // 2026-05-14 consolidation: /adr is permanently redirected to
+        // /admin/adr (canonical admin shell page). No persona gate at
+        // this layer — the target page does its own RBAC; the
+        // redirect must work even for anonymous callers so bookmarks
+        // transparently update.
+        let app = router(); // no JWT extension layer
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/adr")
+                    .body(axum::body::Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::PERMANENT_REDIRECT,
+            "expected 308 Permanent Redirect (axum::Redirect::permanent)"
+        );
+        let location = resp
+            .headers()
+            .get("location")
+            .expect("redirect carries Location header")
+            .to_str()
+            .unwrap();
+        assert_eq!(location, "/admin/adr");
     }
 
     #[tokio::test]
