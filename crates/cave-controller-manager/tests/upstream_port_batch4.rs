@@ -21,14 +21,14 @@
 
 use cave_controller_manager::cronjob::{next_schedule_time, CronJobSpec, ScheduleError};
 use cave_controller_manager::deployment::{
-    compute_conditions, DeploymentSpec, DeploymentStatus, RolloutCondition, RolloutConditionType,
-    RolloutConditionStatus, RolloutReason, Strategy,
+    compute_conditions, DeploymentSpec, DeploymentStatus, RolloutConditionStatus,
+    RolloutConditionType, RolloutReason, Strategy,
 };
 use cave_controller_manager::job::{
-    past_active_deadline, reconcile as job_reconcile, JobSpec, JobStatus,
+    past_active_deadline, reconcile_with_clock as job_reconcile, JobSpec, JobStatus,
 };
 use cave_controller_manager::types::{Reconcile, TenantId};
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{Duration, TimeZone, Utc};
 
 fn tenant(s: &str) -> TenantId {
     TenantId::new(s).expect("valid tenant fixture")

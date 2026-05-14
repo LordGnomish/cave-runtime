@@ -54,6 +54,7 @@ fn upstream_deployment_steady_state_is_noop() {
             max_unavailable: 0,
         },
         paused: false,
+        progress_deadline_seconds: None,
     };
     let status = DeploymentStatus {
         observed_replicas: 4,
@@ -77,6 +78,7 @@ fn upstream_deployment_pause_freezes_rollout() {
             max_unavailable: 0,
         },
         paused: true,
+        progress_deadline_seconds: None,
     };
     let status = DeploymentStatus::default(); // 0 observed
     // Even with replicas=10 and observed=0, paused → NoOp.
@@ -98,6 +100,7 @@ fn upstream_deployment_max_pods_during_surge_includes_max_surge() {
             max_unavailable: 0,
         },
         paused: false,
+        progress_deadline_seconds: None,
     };
     assert_eq!(max_pods_during_surge(&spec), 11);
 }
@@ -116,6 +119,7 @@ fn upstream_deployment_rollback_unknown_revision_requeues() {
             max_unavailable: 0,
         },
         paused: false,
+        progress_deadline_seconds: None,
     };
     let mut history = RevisionHistory::new(5);
     history.record("h1");
@@ -141,6 +145,7 @@ fn upstream_deployment_rolling_step_caps_new_rs_at_replicas_plus_surge() {
             max_unavailable: 2,
         },
         paused: false,
+        progress_deadline_seconds: None,
     };
     // Start of rollout: 0 new pods, 10 old.
     let step = plan_rolling_step(&spec, 0, 10).unwrap();
@@ -289,6 +294,7 @@ fn job(parallelism: u32, completions: u32, backoff: u32, suspended: bool) -> Job
         parallelism,
         backoff_limit: backoff,
         suspended,
+        active_deadline_seconds: None,
     }
 }
 
@@ -311,6 +317,7 @@ fn upstream_job_is_complete_at_succeeded_equals_completions() {
         active: 0,
         succeeded: 5,
         failed: 0,
+        start_time: None,
     };
     assert!(is_complete(&spec, &status));
     // Past completions also counts as complete (idempotency).
@@ -318,6 +325,7 @@ fn upstream_job_is_complete_at_succeeded_equals_completions() {
         active: 0,
         succeeded: 6,
         failed: 0,
+        start_time: None,
     };
     assert!(is_complete(&spec, &over));
 }
@@ -331,12 +339,14 @@ fn upstream_job_past_backoff_is_strictly_greater_than_limit() {
         active: 0,
         succeeded: 0,
         failed: 3,
+        start_time: None,
     };
     assert!(!past_backoff(&spec, &at_limit));
     let over = JobStatus {
         active: 0,
         succeeded: 0,
         failed: 4,
+        start_time: None,
     };
     assert!(past_backoff(&spec, &over));
 }
@@ -349,6 +359,7 @@ fn upstream_job_suspended_deletes_active_pods() {
         active: 3,
         succeeded: 0,
         failed: 0,
+        start_time: None,
     };
     assert_eq!(
         job_reconcile(&spec, &status, &tenant("ci")).unwrap(),
