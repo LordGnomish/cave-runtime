@@ -63,34 +63,53 @@ Plus expansions to the existing modules:
 
 | Bucket | 2026-05-13 | 2026-05-14 |
 |--------|-----------:|-----------:|
-| Mapped | 21 | **24** |
+| Mapped | 21 | **22** |
 | Partial | 0 | 0 |
 | Skipped | 16 | 16 |
-| Unmapped | 7 | **4** |
+| Unmapped | 7 | **6** |
 | **Total** | 44 | 44 |
-| **fill_ratio** | 0.8409 | **0.9091** |
+| **fill_ratio** | 0.8409 | **0.8636** |
+
+The +1 mapped is `apache/kafka:storage/tiered/` (skeleton). The
+existing `apache/kafka:connect/runtime/` mapped entry's
+`local_files` list grew to include `standalone_herder.rs`,
+`distributed_herder.rs`, and `kafka_offset_backing_store.rs` —
+that's deeper coverage of the same top-level inventory item,
+not a new item. Honest accounting: one item flipped from
+unmapped→mapped.
 
 Upstream-test behavioral count (`[[upstream_test]]`):
 | | 2026-05-13 | 2026-05-14 |
 |-|-:|-:|
-| ported | 31 | **41** |
-| missing | 2 | 2 |
-| total | 33 | 43 |
-| **behavioral_ratio** | 0.94 | **0.95** |
+| ported | 31 | **43** |
+| missing | 2 | **4** |
+| total | 33 | 47 |
+| **behavioral_ratio** | 0.94 | **0.915** |
+
+(12 new `[[upstream_test]]` rows landed: 5 StandaloneHerder
+ported + 1 missing — fence-zombie-source-tasks; 3
+DistributedHerder ported + 1 missing —
+testRollingBounceUpgrade; 1 KafkaOffsetBackingStore ported;
+2 RemoteLogManager + 1 RemoteIndexCache ported. behavioral
+ratio dipped because adding `missing` rows is honest
+bookkeeping, not regression — those tests document gaps
+rather than hide them.)
 
 ## What changed in the inventory
 
-* `[[mapped]]` gained:
-  - `apache/kafka:connect/runtime/distributed/` → `src/connect_worker/distributed_herder.rs`
-  - `apache/kafka:connect/runtime/standalone/` → `src/connect_worker/standalone_herder.rs`
-  - `apache/kafka:storage/tiered/` → `src/tiered_storage/`
-* `[[unmapped]]` Kafka tiered-storage entry removed (now mapped).
-* `[[files]]` gains five new rows pointing the four new modules at
-  their upstream Java sources, plus a sixth row mapping
-  `KafkaOffsetBackingStore.java` to
-  `src/connect_worker/kafka_offset_backing_store.rs`.
-* `[[upstream_test]]` gains 10 new rows:
-  Standalone (5), Distributed (3), Offset (1), Tiered (1).
+* `[[mapped]]` `apache/kafka:connect/runtime/` `local_files` list
+  expanded with `standalone_herder.rs`, `distributed_herder.rs`,
+  and `kafka_offset_backing_store.rs`.
+* `[[mapped]]` gained `apache/kafka:storage/tiered/` →
+  `src/tiered_storage/mod.rs` (skeleton — InMemory exercisers
+  only).
+* `[[unmapped]]` Kafka tiered-storage entry removed.
+* `[[files]]` gains four new rows pointing the new modules at
+  their upstream Java sources (`StandaloneHerder.java`,
+  `DistributedHerder.java`, `KafkaOffsetBackingStore.java`,
+  `RemoteLogManager.java`).
+* `[[upstream_test]]` gains 14 new rows: 12 ported + 2 missing
+  (fence-zombie-source-tasks, testRollingBounceUpgrade).
 
 ## 4-track follow-through
 
@@ -125,15 +144,15 @@ Upstream-test behavioral count (`[[upstream_test]]`):
 
 ## What this PR does NOT claim
 
-* `fill_ratio = 0.9091` covers TOP-LEVEL inventory only.
+* `fill_ratio = 0.8636` covers TOP-LEVEL inventory only.
   Tiered storage is `mapped` as a *skeleton* — the trait surface
   exists with an `InMemoryRemoteStorageManager` exerciser, but
   no S3 or filesystem backend is shipped. KIP-405 tiered fetch
   via the Fetch RPC is tracked separately.
-* `behavioral_ratio = 0.95` (41/43) is the ratio of ported
+* `behavioral_ratio = 0.915` (43/47) is the ratio of ported
   `[[upstream_test]]` rows for the audited connect+streams
   surface, **not** the ratio of all Kafka tests. The honest
-  `missing` rows are kept (2): the `StandaloneHerderTest`
+  `missing` rows include the `StandaloneHerderTest`
   fence-zombie-source-tasks behaviour (KRaft EOS feature,
   out-of-scope for this batch) and `DistributedHerderTest`
   rolling-bounce upgrade path (depends on a real config-topic
