@@ -18,7 +18,7 @@
 //!    with status badges + Dispatch Now controls.
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell, table, table_html as render_table_html};
+use crate::admin::render::{escape, page_shell_full, table, table_html as render_table_html};
 use crate::admin::state::{scope, AdminState, UpstreamProject};
 use crate::admin::types::Cite;
 use cave_kernel::parity::types::ParityReport;
@@ -424,7 +424,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, UpstreamVi
         watchd = watchd_panel,
         auto = auto_port_panel,
     );
-    Ok(page_shell(&format!("upstream · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/upstream", &format!("upstream · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 /// Locate the auto-port dispatcher's `dispatched.jsonl`. Mirrors

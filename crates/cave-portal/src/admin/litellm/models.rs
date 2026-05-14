@@ -2,7 +2,7 @@
 
 use super::types::{LiteLlmModel, LiteLlmViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<LiteLlmModel>, LiteLlmViewError> {
@@ -75,7 +75,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LiteLlmVie
             &rows_html,
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/litellm/models",
         &format!("litellm/models · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

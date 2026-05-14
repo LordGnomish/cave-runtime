@@ -1,7 +1,7 @@
 //! `/admin/cdc` view — cdc resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, CdcPipeline};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CdcViewErr
         n = rows.len(),
         tbl = table(&["name", "source", "sink", "state"], &table_rows),
     );
-    Ok(page_shell(&format!("cdc · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/cdc", &format!("cdc · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

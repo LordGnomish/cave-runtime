@@ -4,7 +4,7 @@
 //! Upstream UI: <https://prometheus.io/docs/alerting/latest/clients/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ActiveAlert, AlertRule};
 use crate::admin::types::Cite;
 
@@ -89,7 +89,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AlertsView
         r_tbl = table(&["name", "severity", "expr", "for"], &r_rows),
         a_tbl = table(&["rule", "state", "fired"], &a_rows),
     );
-    Ok(page_shell(&format!("alerts · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/alerts", &format!("alerts · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

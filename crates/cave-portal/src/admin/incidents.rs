@@ -4,7 +4,7 @@
 //! Upstream UI: <https://grafana.com/docs/oncall/latest/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, IncidentRecord};
 use crate::admin::types::Cite;
 
@@ -79,7 +79,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IncidentsV
         chips = chips,
         tbl = table(&["id", "title", "severity", "state", "opened"], &rows),
     );
-    Ok(page_shell(&format!("incidents · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/incidents", &format!("incidents · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

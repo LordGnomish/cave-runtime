@@ -6,7 +6,7 @@
 //! Upstream: <https://karpenter.sh/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, NodePool};
 use crate::admin::types::Cite;
 
@@ -111,7 +111,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KarpenterV
         near_cap = summary.near_cap_count,
         tbl = table(&["name", "class", "max", "active", "util"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/karpenter",
         &format!("karpenter · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

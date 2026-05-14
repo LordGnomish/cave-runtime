@@ -1,7 +1,7 @@
 //! `/admin/ai-obs` view — ai-obs resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, AiModelMetric};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AiObsViewE
         n = rows.len(),
         tbl = table(&["model", "tokens_in", "tokens_out", "p99_ms"], &table_rows),
     );
-    Ok(page_shell(&format!("ai-obs · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/ai-obs", &format!("ai-obs · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

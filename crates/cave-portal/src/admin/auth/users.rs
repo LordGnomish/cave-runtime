@@ -8,7 +8,7 @@
 use std::collections::BTreeSet;
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 use super::AuthViewError;
 
@@ -69,7 +69,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AuthViewEr
         n = rows.len(),
         tbl = table(&["realm", "principal"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/auth/users",
         &format!("auth/users · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

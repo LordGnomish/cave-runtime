@@ -1,7 +1,7 @@
 //! `/admin/knative` view — knative resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, KnativeService};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KnativeVie
         n = rows.len(),
         tbl = table(&["name", "image", "replicas", "min_scale", "max_scale"], &table_rows),
     );
-    Ok(page_shell(&format!("knative · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/knative", &format!("knative · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

@@ -1,7 +1,7 @@
 //! `/admin/gateway` view — gateway resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, GatewayRoute};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, GatewayVie
         n = rows.len(),
         tbl = table(&["name", "listener", "hostname", "backend"], &table_rows),
     );
-    Ok(page_shell(&format!("gateway · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/gateway", &format!("gateway · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

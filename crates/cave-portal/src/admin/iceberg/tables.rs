@@ -2,7 +2,7 @@
 
 use super::types::{IcebergTable, IcebergViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<IcebergTable>, IcebergViewError> {
@@ -98,7 +98,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
             &table_rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/iceberg/tables",
         &format!("iceberg/tables · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -215,6 +217,9 @@ mod tests {
     fn render_excludes_evil_rows() {
         let s = seeded();
         let html = render(&s, &ctx(&[Permission::IcebergRead])).unwrap();
-        assert!(!html.contains("secret"), "leaked foreign tenant row");
+        // Check rendered cell text only — the sidebar links to
+        // /admin/secrets (OpenBao), which legitimately injects the
+        // substring `secret` outside the data area.
+        assert!(!html.contains(">secret"), "leaked foreign tenant row");
     }
 }

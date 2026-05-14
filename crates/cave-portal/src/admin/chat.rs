@@ -1,7 +1,7 @@
 //! `/admin/chat` view — chat resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ChatThread};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ChatViewEr
         n = rows.len(),
         tbl = table(&["id", "topic", "members", "last_message"], &table_rows),
     );
-    Ok(page_shell(&format!("chat · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/chat", &format!("chat · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

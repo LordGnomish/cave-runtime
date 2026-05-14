@@ -4,7 +4,7 @@
 //! Upstream UI: <https://pulpproject.org/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ArtifactRecord};
 use crate::admin::types::Cite;
 
@@ -62,7 +62,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ArtifactsV
         chips = chips,
         tbl = table(&["registry", "name", "digest", "size", "pushed"], &rows),
     );
-    Ok(page_shell(&format!("artifacts · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/artifacts", &format!("artifacts · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

@@ -18,7 +18,7 @@ pub mod reports;
 pub mod workflows;
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, CrmAccount};
 use crate::admin::types::Cite;
 
@@ -85,7 +85,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         chips = chips,
         tbl = table(&["id", "name", "plan", "MRR"], &table_rows),
     );
-    Ok(page_shell(&format!("crm · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/crm", &format!("crm · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

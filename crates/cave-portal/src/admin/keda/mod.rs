@@ -19,7 +19,7 @@ pub mod trigger_authentications;
 pub mod types;
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, KedaScaledObject, KedaScalerEvent};
 use crate::admin::types::Cite;
 
@@ -147,7 +147,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KedaViewEr
         ),
     );
 
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda",
         &format!("keda · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

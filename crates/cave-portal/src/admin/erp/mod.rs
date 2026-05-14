@@ -18,7 +18,7 @@ pub mod invoices;
 pub mod projects;
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ErpInvoice};
 use crate::admin::types::Cite;
 
@@ -89,7 +89,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ErpViewErr
         chips = chips,
         tbl = table(&["invoice", "customer", "amount", "status"], &table_rows),
     );
-    Ok(page_shell(&format!("erp · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/erp", &format!("erp · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

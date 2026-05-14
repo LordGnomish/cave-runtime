@@ -1,7 +1,7 @@
 //! `/admin/security` view — security resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, SecurityEvent};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SecurityVi
         n = rows.len(),
         tbl = table(&["id", "kind", "severity", "at"], &table_rows),
     );
-    Ok(page_shell(&format!("security · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/security", &format!("security · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

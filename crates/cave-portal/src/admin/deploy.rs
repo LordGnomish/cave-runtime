@@ -6,7 +6,7 @@
 //! Upstream UI: <https://argo-cd.readthedocs.io/en/stable/user-guide/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, DeployActivity};
 use crate::admin::types::Cite;
 
@@ -138,7 +138,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, DeployView
         app_tbl = table(&["service", "version", "status", "activity"], &app_rows),
         act_tbl = table(&["id", "service", "version", "status"], &activity_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/deploy",
         &format!("deploy · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

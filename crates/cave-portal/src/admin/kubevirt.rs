@@ -7,7 +7,7 @@
 //! Upstream UI: <https://kubevirt.io/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, VirtualMachine};
 use crate::admin::types::Cite;
 
@@ -119,7 +119,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubevirtVi
         mem = summary.total_mem_mib,
         tbl = table(&["name", "phase", "cpu", "memory_mib"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/kubevirt",
         &format!("kubevirt · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

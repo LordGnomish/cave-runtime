@@ -6,7 +6,7 @@
 //! Upstream: <https://twenty.com/docs>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use super::CrmViewError;
 
@@ -70,7 +70,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, CrmViewErr
         pipe_d = (pipeline as f64 / 100.0),
         tbl = table(&["deal_id", "account", "acv", "stage"], &table_rows),
     );
-    Ok(page_shell(&format!("crm/deals · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/crm/deals", &format!("crm/deals · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[cfg(test)]

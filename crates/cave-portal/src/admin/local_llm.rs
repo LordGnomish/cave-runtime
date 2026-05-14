@@ -1,7 +1,7 @@
 //! `/admin/local-llm` view — local-llm resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, LocalLlmModel};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LocalLlmVi
         n = rows.len(),
         tbl = table(&["tag", "size_bytes", "quant", "loaded"], &table_rows),
     );
-    Ok(page_shell(&format!("local-llm · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/local-llm", &format!("local-llm · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

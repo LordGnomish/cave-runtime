@@ -13,7 +13,7 @@
 pub mod entries;
 
 use crate::admin::permission::{Permission, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use std::sync::Arc;
 
 pub use entries::{AuditAction, AuditEntry, AuditResult, AuditStore};
@@ -153,7 +153,7 @@ pub fn render(
             &table_rows
         ),
     );
-    Ok(page_shell(&format!("audit · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/audit", &format!("audit · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 fn action_summary(rows: &[AuditEntry]) -> Vec<(String, usize)> {

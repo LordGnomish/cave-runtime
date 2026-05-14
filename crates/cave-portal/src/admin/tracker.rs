@@ -4,7 +4,7 @@
 //! Upstream UI: <https://linear.app/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, TrackerIssue};
 use crate::admin::types::Cite;
 
@@ -64,7 +64,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, TrackerVie
         chips = chips,
         tbl = table(&["id", "title", "state", "assignee"], &table_rows),
     );
-    Ok(page_shell(&format!("tracker · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/tracker", &format!("tracker · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

@@ -4,7 +4,7 @@
 //! Upstream UI: <https://opensearch.org/docs/>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, SearchIndex};
 use crate::admin::types::Cite;
 
@@ -71,7 +71,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SearchView
         chips = chips,
         tbl = table(&["name", "doc_count", "size_bytes", "status"], &table_rows),
     );
-    Ok(page_shell(&format!("search · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/search", &format!("search · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

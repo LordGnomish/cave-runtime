@@ -1,7 +1,7 @@
 //! `/admin/scan` view — scan resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, ScanResult};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, ScanViewEr
         n = rows.len(),
         tbl = table(&["scan_id", "scanner", "findings", "worst_severity"], &table_rows),
     );
-    Ok(page_shell(&format!("scan · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/scan", &format!("scan · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

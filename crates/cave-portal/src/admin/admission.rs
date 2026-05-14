@@ -1,7 +1,7 @@
 //! `/admin/admission` view — admission resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, AdmissionDecision};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, AdmissionV
         n = rows.len(),
         tbl = table(&["id", "resource", "decision", "reason"], &table_rows),
     );
-    Ok(page_shell(&format!("admission · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/admission", &format!("admission · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

@@ -12,7 +12,7 @@
 //! Each submodule owns its accessors + tests; `mod.rs` composes them.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -63,7 +63,9 @@ pub fn render(
         volumes = volumes_html,
         meta = meta_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/cloud-controller",
         &format!("cloud-controller · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

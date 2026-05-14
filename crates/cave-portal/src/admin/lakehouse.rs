@@ -7,7 +7,7 @@
 //! reference (Iceberg branches/tags semantics).
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, LakehouseSnapshot, LakehouseTable};
 use crate::admin::types::Cite;
 use std::collections::BTreeMap;
@@ -160,7 +160,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LakehouseV
         ),
         n_tbl = table(&["namespace", "files", "size"], &n_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/lakehouse",
         &format!("lakehouse · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -289,6 +291,9 @@ mod tests {
         let html = render(&s, &ctx(&[Permission::LakehouseRead])).unwrap();
         assert!(html.contains("Tables (2)"));
         assert!(html.contains("warehouse"));
-        assert!(!html.contains("secrets"));
+        // Check rendered cell text only — the sidebar links to
+        // /admin/secrets (OpenBao), which legitimately injects the
+        // substring `secrets` outside the data area.
+        assert!(!html.contains(">secrets<"));
     }
 }

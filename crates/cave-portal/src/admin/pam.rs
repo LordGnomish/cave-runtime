@@ -1,7 +1,7 @@
 //! `/admin/pam` view — pam resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, PamSession};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, PamViewErr
         n = rows.len(),
         tbl = table(&["id", "principal", "target", "started", "ended"], &table_rows),
     );
-    Ok(page_shell(&format!("pam · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/pam", &format!("pam · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

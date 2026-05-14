@@ -2,7 +2,7 @@
 
 use super::types::{MlflowExperiment, MlflowViewError};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 pub fn list(state: &AdminState, ctx: &RequestCtx) -> Result<Vec<MlflowExperiment>, MlflowViewError> {
@@ -70,7 +70,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
         chips = chips,
         tbl = table(&["id", "name", "stage", "artifact", "updated"], &rows_html),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/mlflow/experiments",
         &format!("mlflow/experiments · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -161,6 +163,9 @@ mod tests {
     fn render_excludes_foreign_tenant() {
         let s = seeded();
         let html = render(&s, &ctx(&[Permission::MlflowRead])).unwrap();
-        assert!(!html.contains("secret"));
+        // Check rendered cell text only — the sidebar links to
+        // /admin/secrets (OpenBao), which legitimately injects the
+        // substring `secret` outside the data area.
+        assert!(!html.contains(">secret"));
     }
 }

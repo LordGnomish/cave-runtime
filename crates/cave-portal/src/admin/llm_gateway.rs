@@ -1,7 +1,7 @@
 //! `/admin/llm-gateway` view — llm-gateway resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, LlmRoute};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LlmGateway
         n = rows.len(),
         tbl = table(&["name", "upstream", "rpm_limit", "daily_tokens"], &table_rows),
     );
-    Ok(page_shell(&format!("llm-gateway · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/llm-gateway", &format!("llm-gateway · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

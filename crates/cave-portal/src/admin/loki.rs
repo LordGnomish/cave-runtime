@@ -10,7 +10,7 @@
 //! Status: scaffold. The 5 tests below pin the list/render contracts.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
@@ -121,7 +121,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, LokiViewEr
         n = rows.len(),
         tbl = table(&["name", "sink", "rate/s", "retention_days"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/loki",
         &format!("loki · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

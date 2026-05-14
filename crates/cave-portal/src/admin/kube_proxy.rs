@@ -1,7 +1,7 @@
 //! `/admin/kube-proxy` view — kube-proxy resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, KubeProxyService};
 use crate::admin::types::Cite;
 
@@ -25,7 +25,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KubeProxyV
         n = rows.len(),
         tbl = table(&["name", "namespace", "cluster_ip", "backends"], &table_rows),
     );
-    Ok(page_shell(&format!("kube-proxy · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/kube-proxy", &format!("kube-proxy · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

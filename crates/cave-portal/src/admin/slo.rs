@@ -1,7 +1,7 @@
 //! `/admin/slo` view — SLO catalog + error-budget burn snapshot.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, Slo};
 use crate::admin::types::Cite;
 
@@ -35,7 +35,7 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, SloViewErr
         n = slos.len(),
         tbl = table(&["name", "service", "objective", "window", "current", "budget"], &rows),
     );
-    Ok(page_shell(&format!("slo · {}", escape(ctx.tenant.as_str())), &body))
+    Ok(page_shell_full(ctx, "/admin/slo", &format!("slo · {}", escape(ctx.tenant.as_str())), &body))
 }
 
 #[allow(dead_code)]

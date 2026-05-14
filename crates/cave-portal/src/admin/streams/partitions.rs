@@ -7,7 +7,7 @@
 //! Upstream: <https://kafka.apache.org/documentation/#basic_ops_modify_topic>
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 use super::StreamsViewError;
 
@@ -95,7 +95,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
         n = rows.len(),
         tbl = table(&["topic", "partition", "leader", "replicas"], &table_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/streams/partitions",
         &format!("streams/partitions · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

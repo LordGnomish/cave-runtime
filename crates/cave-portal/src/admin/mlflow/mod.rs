@@ -22,7 +22,7 @@ pub use types::{
 };
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell};
+use crate::admin::render::{escape, page_shell_full};
 use crate::admin::state::AdminState;
 
 pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowViewError> {
@@ -54,7 +54,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, MlflowView
         dc = deployed,
         tid = escape(ctx.tenant.as_str()),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/mlflow",
         &format!("mlflow · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
