@@ -33,13 +33,19 @@
 
 pub mod assignment;
 pub mod connector_runtime;
+pub mod distributed_herder;
+pub mod kafka_offset_backing_store;
 pub mod offset_store;
+pub mod standalone_herder;
 pub mod task_runtime;
 pub mod worker;
 
 pub use assignment::{AssignmentTable, Rebalance, WorkerId};
 pub use connector_runtime::{ConnectorRuntime, ConnectorSpec};
-pub use offset_store::{OffsetKey, OffsetStore, OffsetValue};
+pub use distributed_herder::{DistributedHerder, HerderState, MemberId};
+pub use kafka_offset_backing_store::{KafkaOffsetBackingStore, OffsetRecord, RecordLog};
+pub use offset_store::{OffsetBackingStore, OffsetKey, OffsetStore, OffsetValue};
+pub use standalone_herder::{ConnectorInfo, HerderError, StandaloneHerder, TargetState, TaskInfo};
 pub use task_runtime::{
     SinkRecord, SinkTask, SourceRecord, SourceTask, TaskHandle, TaskKind, TaskRuntime, TaskStatus,
 };

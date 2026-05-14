@@ -51,6 +51,7 @@ pub mod schema_registry;
 pub mod segment_log;
 pub mod server;
 pub mod tenant;
+pub mod tiered_storage;
 pub mod transactions;
 pub mod txn_markers;
 pub mod unified_cursor;
