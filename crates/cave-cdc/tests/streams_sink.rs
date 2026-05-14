@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cdc — cave-streams sink tests (no Kafka Connect).
 
 use cave_cdc::routing::{RoutingPolicy, TopicRouter};

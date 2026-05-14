@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! UPDATE statement execution.
 
 use crate::sql::ast::{UpdateStmt, Literal};

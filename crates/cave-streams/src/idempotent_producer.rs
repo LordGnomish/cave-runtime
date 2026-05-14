@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kafka idempotent producer — `(producer_id, epoch, sequence)` triple
 //! tracking with the broker-side semantics defined in KIP-98.
 //!

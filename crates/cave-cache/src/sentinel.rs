@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Sentinel HA.
 //!
 //! Ports the master-failover half of upstream Redis's `src/sentinel.c`.

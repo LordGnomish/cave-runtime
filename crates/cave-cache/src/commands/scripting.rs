@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Lua scripting: EVAL, EVALSHA, SCRIPT LOAD/EXISTS/FLUSH/DEBUG.
 //!
 //! Implements a Redis-compatible Lua environment subset.

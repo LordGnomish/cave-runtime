@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Iceberg Snapshot — atomic table version pointing at a manifest list.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/snapshot.rs and

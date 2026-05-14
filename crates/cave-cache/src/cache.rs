@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-memory cache store with TTL, pattern matching, atomic ops, pipeline, and pub/sub.
 
 use crate::models::{CacheEntry, CacheStats, EvictionPolicy, PubSubMessage};

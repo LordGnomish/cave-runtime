@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-iceberg — Apache Iceberg table format primitives.
 //!
 //! Models the on-disk JSON metadata documented in the

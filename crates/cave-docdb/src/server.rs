@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MongoDB OP_MSG wire protocol server.
 //!
 //! Framing runs through [`crate::codec::OpMsgCodec`], which delegates to

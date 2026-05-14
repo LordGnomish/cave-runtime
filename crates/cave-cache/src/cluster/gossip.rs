@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cluster bus message envelope + in-process gossip log.
 //!
 //! Mirrors the state-machine half of `src/cluster.c`'s

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Iceberg PartitionSpec — partition transforms bound to source field ids.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/partition.rs and

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kafka wire-protocol — additions for v3.9 / 4.x KIP-482 group-membership
 //! APIs (OffsetCommit / JoinGroup / SyncGroup / Heartbeat) on top of the
 //! producer / fetch / metadata primitives in [`crate::protocol`].

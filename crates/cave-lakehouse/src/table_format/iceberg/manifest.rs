@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Iceberg Manifest — list of data files belonging to one snapshot.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/manifest.rs and

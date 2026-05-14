@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! RDBMS execution engine.
 
 use crate::storage::schema::{ColumnDef, Database, Table};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! LogicalPlan — declarative operator tree (Scan, Projection, Filter, Limit, Aggregate).
 //!
 //! Mirrors apache/datafusion datafusion-expr/src/logical_plan/plan.rs `LogicalPlan` enum

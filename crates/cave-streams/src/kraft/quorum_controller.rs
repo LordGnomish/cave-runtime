@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `QuorumController` — the state machine that owns the
 //! metadata log. Accepts client requests (create topic, register
 //! broker, set config), validates them against the current

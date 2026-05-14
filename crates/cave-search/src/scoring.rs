@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Relevance scoring (BM25).
 //! upstream: opensearch v3.0/server/src/main/java/org/opensearch/index/similarity/
 

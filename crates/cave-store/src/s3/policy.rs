@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! S3 bucket policy evaluation.
 //!
 //! Parses a subset of the AWS IAM policy language to allow/deny S3 actions.

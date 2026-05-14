@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Lifecycle rule evaluation and background enforcement.
 
 use crate::s3::types::{LifecycleRule, ObjectVersion, StorageClass};

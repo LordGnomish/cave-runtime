@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! JSON request/response models for the HTTP admin API.
 
 use serde::{Deserialize, Serialize};

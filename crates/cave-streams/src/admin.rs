@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Admin API — topic, consumer group, and broker-level management operations.
 
 use crate::compaction::{CompactionEngine, CompactionStats, RetentionStats};
