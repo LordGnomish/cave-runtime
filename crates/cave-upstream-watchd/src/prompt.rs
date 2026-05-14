@@ -247,6 +247,49 @@ mod tests {
         assert!(p.contains("zero new stub"));
     }
 
+    /// TDD STRICT MODE (charter v2 enforcement) must be baked into the
+    /// prompt so the model knows the gate requires red → green → refactor
+    /// commit chain. Added 2026-05-13 (feat/auto-port-prod-activation-tdd-strict).
+    #[test]
+    fn prompt_declares_tdd_strict_mode_red_green_refactor() {
+        let p = build_prompt(&sample_event(), &sample_ctx());
+        // Top-level section heading.
+        assert!(
+            p.contains("TDD STRICT MODE"),
+            "prompt must declare TDD STRICT MODE section"
+        );
+        // Three phase markers — order matters for the analyzer.
+        assert!(p.contains("RED commit"), "prompt must name the RED phase");
+        assert!(p.contains("GREEN commit"), "prompt must name the GREEN phase");
+        assert!(
+            p.contains("REFACTOR commit"),
+            "prompt must mention the optional REFACTOR phase"
+        );
+        // Stub list reaffirmed inside TDD section (defence in depth).
+        assert!(
+            p.contains("panic!(\"not yet\")"),
+            "TDD section must explicitly forbid panic!(\"not yet\") as a stub form"
+        );
+        // Analyzer hook referenced so the model knows the gate is real.
+        assert!(
+            p.contains("verify_with_tdd"),
+            "prompt must reference CharterV2Gate::verify_with_tdd"
+        );
+        // Commit-message convention the gate's classifier matches on.
+        assert!(
+            p.contains("test({crate_name}): red"),
+            "RED commit-message template missing"
+        );
+        assert!(
+            p.contains("feat({crate_name}): green"),
+            "GREEN commit-message template missing"
+        );
+        assert!(
+            p.contains("refactor({crate_name}): cleanup"),
+            "REFACTOR commit-message template missing"
+        );
+    }
+
     #[test]
     fn prompt_carries_target_branch_default_event_id() {
         let p = build_prompt(&sample_event(), &sample_ctx());
