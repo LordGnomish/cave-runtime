@@ -123,6 +123,13 @@
       "upstream_version": "v1.12.0"
     },
     "cave-cache": {
+      "behavioral_audit_at": "2026-05-14",
+      "behavioral_audit_scope": "t_string + t_list + t_hash + t_set + t_zset (redis 7.4.0)",
+      "behavioral_missing": 2,
+      "behavioral_parity": 0.9130434782608695,
+      "behavioral_partial": 0,
+      "behavioral_ported": 21,
+      "behavioral_total": 23,
       "cave_src_loc": 11602,
       "honest_ratio": 0.8421,
       "last_audit_disk": "2026-05-13",
@@ -330,6 +337,13 @@
       "upstream_version": "v1.108.0"
     },
     "cave-cri": {
+      "behavioral_audit_at": "2026-05-14",
+      "behavioral_audit_scope": "content/local + diff/walking + leases + digest (containerd v1.7.20)",
+      "behavioral_missing": 3,
+      "behavioral_parity": 0.8636363636363636,
+      "behavioral_partial": 0,
+      "behavioral_ported": 19,
+      "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.8529,
       "last_audit_disk": "2026-05-13",
@@ -892,6 +906,13 @@
       "upstream_version": "v2.9.0"
     },
     "cave-mesh": {
+      "behavioral_audit_at": "2026-05-14",
+      "behavioral_audit_scope": "hbone + authz + destinationrule + loadbalancer (istio v1.29.2)",
+      "behavioral_missing": 3,
+      "behavioral_parity": 0.8636363636363636,
+      "behavioral_partial": 0,
+      "behavioral_ported": 19,
+      "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.8286,
       "last_audit_disk": "2026-05-13",
@@ -923,6 +944,13 @@
       "upstream_version": "v2.48.0"
     },
     "cave-net": {
+      "behavioral_audit_at": "2026-05-14",
+      "behavioral_audit_scope": "identity/cache + endpoint/endpoint + policy/{api,cidr,l4,distillery} (cilium v1.19.3, eBPF tests skipped)",
+      "behavioral_missing": 3,
+      "behavioral_parity": 0.875,
+      "behavioral_partial": 0,
+      "behavioral_ported": 21,
+      "behavioral_total": 24,
       "cave_src_loc": 36645,
       "honest_ratio": 0.9179,
       "last_audit_disk": "2026-05-13",
@@ -1473,6 +1501,13 @@
       "upstream_version": "v1.23.0"
     },
     "cave-vault": {
+      "behavioral_audit_at": "2026-05-14",
+      "behavioral_audit_scope": "policy + token_store + audit + shamir + parseutil (openbao v2.0.0)",
+      "behavioral_missing": 3,
+      "behavioral_parity": 0.8636363636363636,
+      "behavioral_partial": 0,
+      "behavioral_ported": 19,
+      "behavioral_total": 22,
       "cave_src_loc": null,
       "honest_ratio": 0.7895,
       "last_audit_disk": "2026-05-13",

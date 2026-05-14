@@ -524,3 +524,189 @@ note         = "Vault Agent — sidecar that auto-auths + auto-renews. Client-si
 upstream_pkg = "openbao:vault/activity/"
 note         = "Client-activity tracking (for licensing + usage reports). Not in scope."
 
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "policy + token_store + audit + shamir + parseutil (openbao v2.0.0)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicyMatching/matching_path_grants_listed_caps"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_matching_path_grants_listed_capabilities"
+status         = "ported"
+notes          = "Policy.allows returns true only for capabilities listed under a matching path."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_Deny/deny_overrides_grants"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_deny_capability_overrides_grants"
+status         = "ported"
+notes          = "Deny capability beats any allow on the same path."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_Glob/most_specific_pattern_wins"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_most_specific_glob_wins"
+status         = "ported"
+notes          = "Longest-prefix path glob wins."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_Root/root_grants_arbitrary"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_root_grants_arbitrary_path_and_cap"
+status         = "ported"
+notes          = "Root policy via Sudo-equivalent grants anything."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_Combination/policies_OR_combine"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_check_combines_grants_from_multiple_policies"
+status         = "ported"
+notes          = "Multiple attached policies combine grants additively."
+
+[[upstream_test]]
+upstream_path  = "vault/acl_test.go"
+upstream_name  = "TestACL_NoPolicy/permission_denied"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_check_denied_returns_permission_denied"
+status         = "ported"
+notes          = "Unmatched capability → VaultError::PermissionDenied."
+
+[[upstream_test]]
+upstream_path  = "vault/policy_test.go"
+upstream_name  = "TestPolicy_BuiltIn/builtins_immutable"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_engine_delete_builtins_is_no_op"
+status         = "ported"
+notes          = "root + default policies cannot be deleted (returns false)."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_CreateLookup/root_token"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_create_root_returns_root_token"
+status         = "ported"
+notes          = "create_root produces is_root=true + policies=[root]."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Lookup/by_accessor"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_lookup_by_accessor"
+status         = "ported"
+notes          = "lookup_by_accessor resolves to the same token."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Revoke/token_and_accessor_removed"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_revoke_removes_token_and_accessor"
+status         = "ported"
+notes          = "Revoke removes both id-indexed entry and accessor-indexed entry."
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_CreateChild/inherits_parent_link"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_token_store_child_token_inherits_parent_policies"
+status         = "ported"
+notes          = "Child token carries policies + parent link."
+
+[[upstream_test]]
+upstream_path  = "helper/parseutil/parseutil_test.go"
+upstream_name  = "TestParseDurationSecond/bare_integer"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_parse_duration_bare_integer_is_seconds"
+status         = "ported"
+notes          = "Bare integers parse as seconds."
+
+[[upstream_test]]
+upstream_path  = "helper/parseutil/parseutil_test.go"
+upstream_name  = "TestParseDurationSecond/unit_suffixes"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_parse_duration_recognises_unit_suffixes"
+status         = "ported"
+notes          = "s/m/h/d unit suffixes parse to the matching second count."
+
+[[upstream_test]]
+upstream_path  = "audit/format_json_test.go"
+upstream_name  = "TestAuditFormatter/hash_auth_redacts_token"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_redacts_client_token"
+status         = "ported"
+notes          = "Signed envelope JSON does not contain plaintext token or accessor."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditFormatter/verify_envelope_round_trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_verify_round_trips"
+status         = "ported"
+notes          = "HMAC over canonical JSON verifies under the same key."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditFormatter/tamper_breaks_verify"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_signed_envelope_tampered_signature_fails_verify"
+status         = "ported"
+notes          = "Signature mutation → verify returns false."
+
+[[upstream_test]]
+upstream_path  = "audit/audit_test.go"
+upstream_name  = "TestAuditBroker_Enable/enable_then_list"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_audit_logger_enable_then_list_backends"
+status         = "ported"
+notes          = "Backend lifecycle — enable, list returns, disable removes."
+
+[[upstream_test]]
+upstream_path  = "shamir/shamir_test.go"
+upstream_name  = "TestShamir/split_then_combine"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_shamir_split_then_combine_reconstructs_secret"
+status         = "ported"
+notes          = "Split into N shares, combine first T → original secret."
+
+[[upstream_test]]
+upstream_path  = "shamir/shamir_test.go"
+upstream_name  = "TestShamir/any_subset_works"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_shamir_any_subset_of_threshold_size_reconstructs"
+status         = "ported"
+notes          = "Lagrange interpolation — any subset of size ≥ threshold reconstructs."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "vault/token_store_test.go"
+upstream_name  = "TestTokenStore_Renew/extends_expiry_within_max_ttl"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "renew() path covered by in-src tests but not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "vault/auth_userpass_test.go"
+upstream_name  = "TestUserpass_Login"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "userpass auth method not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "vault/identity_test.go"
+upstream_name  = "TestIdentity_CreateAlias"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Identity/alias/entity model — distinct subsystem, deferred."

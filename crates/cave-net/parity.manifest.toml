@@ -1012,3 +1012,206 @@ loc          = 800
 priority     = "P0"
 notes        = "Folder split: flows+policies+services+nodes+identities (23 tests). Cilium Hubble UI parity."
 last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "identity/cache + endpoint/endpoint + policy/{api,cidr,l4,distillery} (cilium v1.19.3, eBPF tests skipped)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/cache/local_test.go"
+upstream_name  = "TestLocalIdentityCache/first_alloc_is_min_local_id"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_identity_cache_first_alloc_is_min_local_id"
+status         = "ported"
+notes          = "First non-reserved allocation starts at MIN_LOCAL_IDENTITY = 256."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/cache/local_test.go"
+upstream_name  = "TestLocalIdentityCache/same_labels_same_id"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_identity_cache_same_labels_same_id"
+status         = "ported"
+notes          = "Idempotent allocation — repeated lookup returns the same id."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/cache/local_test.go"
+upstream_name  = "TestLocalIdentityCache/labels_order_independent"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_local_identity_cache_label_order_does_not_affect_id"
+status         = "ported"
+notes          = "Labels.Sort normalisation — input order ≠ id key."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/numericidentity_test.go"
+upstream_name  = "TestReservedIdentity/host"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_reserved_identity_for_host_resolves_to_id_host"
+status         = "ported"
+notes          = "reserved:host → ID_HOST (1)."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/numericidentity_test.go"
+upstream_name  = "TestReservedIdentity/world"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_reserved_identity_for_world_resolves_to_id_world"
+status         = "ported"
+notes          = "reserved:world → ID_WORLD (2)."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/numericidentity_test.go"
+upstream_name  = "TestReservedIdentity/unknown_returns_zero"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_reserved_identity_for_unknown_reserved_label_is_none"
+status         = "ported"
+notes          = "Unknown reserved name → None (upstream returns 0)."
+
+[[upstream_test]]
+upstream_path  = "pkg/identity/cache/local_test.go"
+upstream_name  = "TestLocalIdentityCache/reserved_does_not_consume_slot"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_reserved_label_does_not_consume_local_slot"
+status         = "ported"
+notes          = "Allocating reserved labels returns reserved id, doesn't advance next_id."
+
+[[upstream_test]]
+upstream_path  = "pkg/endpoint/endpoint_test.go"
+upstream_name  = "TestEndpoint/state_transitions_creating_to_ready"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_state_transitions_creating_to_ready"
+status         = "ported"
+notes          = "Creating → WaitingForIdentity → Ready state machine."
+
+[[upstream_test]]
+upstream_path  = "pkg/endpoint/endpoint_test.go"
+upstream_name  = "TestEndpoint/bad_transition_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_bad_state_transition_rejected"
+status         = "ported"
+notes          = "SetState rejects Creating → Ready (must go via WaitingForIdentity)."
+
+[[upstream_test]]
+upstream_path  = "pkg/endpoint/endpoint_test.go"
+upstream_name  = "TestEndpoint/lookup_by_pod_ip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_lookup_by_pod_ip_returns_endpoint"
+status         = "ported"
+notes          = "Reverse index: pod IP → endpoint."
+
+[[upstream_test]]
+upstream_path  = "pkg/endpoint/endpoint_test.go"
+upstream_name  = "TestEndpointManager/duplicate_id_errors"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_manager_insert_duplicate_id_errors"
+status         = "ported"
+notes          = "Insert with same id → DuplicateId."
+
+[[upstream_test]]
+upstream_path  = "bpf/bpf_lxc.c::cil_from_container"
+upstream_name  = "TestProgramChain/persists_into_endpoint"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_set_program_chain_persists"
+status         = "ported"
+notes          = "Per-endpoint BPF tail-call chain model (FromContainer → Conntrack → Policy → ToLxc)."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/api/selector_test.go"
+upstream_name  = "TestEndpointSelector/match_labels_AND_semantics"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_selector_match_labels_AND_semantics"
+status         = "ported"
+notes          = "match_labels — every key/value AND-conjoined."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/api/selector_test.go"
+upstream_name  = "TestEndpointSelector/In_operator"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_endpoint_selector_in_operator_matches_value_in_set"
+status         = "ported"
+notes          = "matchExpressions In operator — value in set."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/l4_test.go"
+upstream_name  = "TestProtoMatch/Any_excludes_ICMP"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_l4_protocol_any_covers_tcp_udp_sctp_but_not_icmp"
+status         = "ported"
+notes          = "Cilium spec — Any covers L4 (TCP/UDP/SCTP) but not ICMP."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/l4_test.go"
+upstream_name  = "TestPortRule/port_zero_is_wildcard"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_l4_port_zero_in_rule_matches_any_wire_port"
+status         = "ported"
+notes          = "PortProtocol with port=0 matches any port; protocol mismatch still rejects."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/cidr_test.go"
+upstream_name  = "TestCIDRRule/contains_inside_cidr"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_cidr_rule_contains_address_inside_cidr"
+status         = "ported"
+notes          = "Address inside cidr → true; outside → false."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/cidr_test.go"
+upstream_name  = "TestCIDRRule/except_subblock_excluded"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_cidr_rule_except_subblock_excluded"
+status         = "ported"
+notes          = "Except subblock excludes addresses within outer cidr."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/distillery_test.go"
+upstream_name  = "TestPolicyMap/default_deny_when_enforced"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_map_default_deny_when_enforced_no_match"
+status         = "ported"
+notes          = "ingress_enforced + no match → Deny."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/distillery_test.go"
+upstream_name  = "TestPolicyMap/exact_allow_overrides_default_deny"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_map_exact_match_allow_overrides_default_deny"
+status         = "ported"
+notes          = "Explicit allow precedence — beats default-deny."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/distillery_test.go"
+upstream_name  = "TestPolicyMap/wildcard_port_zero_covers_specific"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_policy_map_wildcard_port_zero_covers_specific_port"
+status         = "ported"
+notes          = "Map lookup precedence — (peer, port=0, exact-proto) covers (peer, P, exact-proto)."
+
+# Honest "still missing" entries — Cilium has thousands of tests; this is
+# a representative behavioural subset.
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/distillery_test.go"
+upstream_name  = "TestPolicyMap/world_fallback_for_non_cluster_peer"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "PolicyMap entry 5 (peer=ID_ALL fallback) not yet covered by an upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "pkg/policy/l7_test.go"
+upstream_name  = "TestL7HTTPMatch"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "L7 HTTP rule matching not yet expressed as upstream-port test (cilium/l7policy.rs has it but un-cross-referenced)."
+
+[[upstream_test]]
+upstream_path  = "bpf/tests/datapath_test.sh"
+upstream_name  = "BPF datapath integration"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "DELIBERATELY skipped — kernel/clang toolchain dependency. cave-net runs as userspace simulation."
