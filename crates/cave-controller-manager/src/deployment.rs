@@ -7,6 +7,7 @@
 //! defers strategy bodies to [`unimplemented!`].
 
 use crate::types::{Cite, ControllerError, Reconcile, TenantId};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 /// `apps/v1.DeploymentStrategy.Type`.
@@ -23,6 +24,13 @@ pub struct DeploymentSpec {
     pub replicas: u32,
     pub strategy: Strategy,
     pub paused: bool,
+    /// Mirrors `Deployment.Spec.ProgressDeadlineSeconds`. When set, the
+    /// controller emits a `Progressing` condition and trips it to
+    /// `False` / `ProgressDeadlineExceeded` once `now - last_progress`
+    /// exceeds this value. `None` means no deadline (no Progressing
+    /// condition emitted at all — upstream parity).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub progress_deadline_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -171,6 +179,178 @@ pub fn plan_rolling_step(
     Ok(RollingStep { new_rs_target, old_rs_target })
 }
 
+// ── Rollout progress conditions ─────────────────────────────────────────────
+//
+// Upstream: pkg/controller/deployment/progress.go +
+//           pkg/controller/deployment/util/deployment_util.go
+//
+// Three condition types track a rollout (k8s.io/api/apps/v1.DeploymentConditionType):
+//
+//   * Progressing    — controller is actively bringing the desired template
+//                       up. Flips to False with reason=ProgressDeadlineExceeded
+//                       once `now - last_progress >= progressDeadlineSeconds`.
+//   * Available      — at least `replicas - max_unavailable` pods are
+//                       Available right now.
+//   * ReplicaFailure — at least one underlying ReplicaSet emitted a failure.
+//
+// `compute_conditions` is a pure function over (spec, status, now,
+// last_progress_at) — the controller layer reads the resulting Vec and
+// applies it to `Deployment.Status.Conditions`.
+
+/// `Deployment.Status.Conditions[i].Type` — mirrors the apps/v1 enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RolloutConditionType {
+    Progressing,
+    Available,
+    ReplicaFailure,
+}
+
+/// Tri-state `metav1.ConditionStatus`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RolloutConditionStatus {
+    True,
+    False,
+    Unknown,
+}
+
+/// String reason codes from
+/// `pkg/controller/deployment/util/deployment_util.go`. Spelled out as an
+/// enum so the API contract is enforced at compile time instead of via
+/// loose `&'static str` constants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RolloutReason {
+    /// `NewReplicaSetAvailable` — rollout finished: replicas==updated==available.
+    NewReplicaSetAvailable,
+    /// `ReplicaSetUpdated` — controller is still making progress.
+    ReplicaSetUpdated,
+    /// `ProgressDeadlineExceeded` — `now - last_progress >= deadline`.
+    ProgressDeadlineExceeded,
+    /// `DeploymentPaused` — `spec.paused == true`.
+    DeploymentPaused,
+    /// `MinimumReplicasAvailable` — Available condition is True.
+    MinimumReplicasAvailable,
+    /// `MinimumReplicasUnavailable` — Available condition is False.
+    MinimumReplicasUnavailable,
+    /// `ReplicaSetCreateError` — underlying RS failed to be created /
+    /// scaled. Used on the ReplicaFailure condition only.
+    ReplicaSetCreateError,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RolloutCondition {
+    pub kind: RolloutConditionType,
+    pub status: RolloutConditionStatus,
+    pub reason: RolloutReason,
+}
+
+/// Compute the rollout conditions that the controller would write back to
+/// `Deployment.Status.Conditions`. Pure function — does not mutate inputs.
+///
+/// Mirrors `pkg/controller/deployment/progress.go::syncRolloutStatus` +
+/// `util.DeploymentComplete` + `util.DeploymentTimedOut`. Behaviour:
+///
+///   * If `spec.progress_deadline_seconds.is_none()` — no Progressing
+///     condition emitted (upstream test `nil progressDeadlineSeconds
+///     specified`).
+///   * If `spec.paused` — Progressing condition with reason
+///     `DeploymentPaused`.
+///   * Otherwise, if completion criteria met
+///     (`observed == replicas == updated == available`), reason is
+///     `NewReplicaSetAvailable`, status True.
+///   * Otherwise, if `now - last_progress >= deadline` (and last_progress
+///     known), Progressing flips to False / `ProgressDeadlineExceeded`.
+///   * Otherwise Progressing is True with `ReplicaSetUpdated`.
+///
+/// `Available` is always emitted: True iff
+/// `available_replicas >= replicas - max_unavailable`, otherwise False.
+pub fn compute_conditions(
+    spec: &DeploymentSpec,
+    status: &DeploymentStatus,
+    now: DateTime<Utc>,
+    last_progress_at: Option<DateTime<Utc>>,
+) -> Vec<RolloutCondition> {
+    let mut out = Vec::with_capacity(2);
+
+    // ── Progressing ─────────────────────────────────────────────────────
+    if let Some(deadline) = spec.progress_deadline_seconds {
+        let cond = progressing_condition(spec, status, now, last_progress_at, deadline);
+        out.push(cond);
+    }
+
+    // ── Available ───────────────────────────────────────────────────────
+    let max_unavailable = match spec.strategy {
+        Strategy::Recreate => 0,
+        Strategy::RollingUpdate {
+            max_unavailable, ..
+        } => max_unavailable,
+    };
+    let min_available = spec.replicas.saturating_sub(max_unavailable);
+    let (avail_status, avail_reason) = if status.available_replicas >= min_available {
+        (
+            RolloutConditionStatus::True,
+            RolloutReason::MinimumReplicasAvailable,
+        )
+    } else {
+        (
+            RolloutConditionStatus::False,
+            RolloutReason::MinimumReplicasUnavailable,
+        )
+    };
+    out.push(RolloutCondition {
+        kind: RolloutConditionType::Available,
+        status: avail_status,
+        reason: avail_reason,
+    });
+
+    out
+}
+
+fn progressing_condition(
+    spec: &DeploymentSpec,
+    status: &DeploymentStatus,
+    now: DateTime<Utc>,
+    last_progress_at: Option<DateTime<Utc>>,
+    deadline_seconds: i64,
+) -> RolloutCondition {
+    // Paused deployments freeze the rollout — upstream surfaces the
+    // PausedDeployReason and short-circuits the deadline check.
+    if spec.paused {
+        return RolloutCondition {
+            kind: RolloutConditionType::Progressing,
+            status: RolloutConditionStatus::Unknown,
+            reason: RolloutReason::DeploymentPaused,
+        };
+    }
+    // Completion: observed == replicas == updated == available.
+    if status.observed_replicas == spec.replicas
+        && status.updated_replicas == spec.replicas
+        && status.available_replicas == spec.replicas
+    {
+        return RolloutCondition {
+            kind: RolloutConditionType::Progressing,
+            status: RolloutConditionStatus::True,
+            reason: RolloutReason::NewReplicaSetAvailable,
+        };
+    }
+    // Deadline check — only flip to False once we have a measurable
+    // last_progress timestamp AND elapsed >= deadline.
+    if let Some(t0) = last_progress_at {
+        if (now - t0) >= Duration::seconds(deadline_seconds) {
+            return RolloutCondition {
+                kind: RolloutConditionType::Progressing,
+                status: RolloutConditionStatus::False,
+                reason: RolloutReason::ProgressDeadlineExceeded,
+            };
+        }
+    }
+    // Default: still making progress.
+    RolloutCondition {
+        kind: RolloutConditionType::Progressing,
+        status: RolloutConditionStatus::True,
+        reason: RolloutReason::ReplicaSetUpdated,
+    }
+}
+
 #[allow(dead_code)]
 const FILE_CITE: Cite = Cite::new(
     "pkg/controller/deployment/deployment_controller.go",
@@ -189,6 +369,7 @@ mod tests {
             replicas,
             strategy: Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
             paused,
+            progress_deadline_seconds: None,
         }
     }
 
