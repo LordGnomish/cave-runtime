@@ -140,6 +140,12 @@ const SECTIONS: &[NavSection] = &[
         items: &[
             // Platform-only: cross-tenant infra.
             item("Compliance", "/admin/compliance", "📋", PLATFORM_ONLY),
+            // 2026-05-14 discoverability fix: `/admin/cluster/live` was
+            // the canonical Raft snapshot view but had no sidebar entry,
+            // no command-palette nav, no shortcut. Adding it as the
+            // second platform item — the operator's "is the control
+            // plane healthy" landing spot.
+            item("Cluster Status", "/admin/cluster/live", "🫀", PLATFORM_ONLY),
             item("Upstream", "/admin/upstream", "⇪", PLATFORM_ONLY),
             item("ADR Browser", "/admin/adr", "📜", PLATFORM_ONLY),
             item("API Server", "/admin/apiserver", "🛰", PLATFORM_ONLY),

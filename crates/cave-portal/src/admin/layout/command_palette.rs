@@ -154,6 +154,10 @@ pub fn default_commands(tenant_id: &str) -> Vec<CommandItem> {
     let t = tenant_id;
     vec![
         CommandItem::nav("Go to Compliance",     &format!("/admin/compliance?tenant_id={t}")),
+        // 2026-05-14 discoverability fix — /admin/cluster/live was not
+        // reachable from the palette before; this is the canonical
+        // Raft snapshot.
+        CommandItem::nav("Go to Cluster Status", &format!("/admin/cluster/live?tenant_id={t}")),
         CommandItem::nav("Go to Upstream",       &format!("/admin/upstream?tenant_id={t}")),
         CommandItem::nav("Go to ADR Browser",    &format!("/admin/adr?tenant_id={t}")),
         CommandItem::nav("Go to KEDA",           &format!("/admin/keda?tenant_id={t}")),

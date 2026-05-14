@@ -28,6 +28,9 @@ pub const DEFAULT_BINDINGS: &[ShortcutBinding] = &[
     ShortcutBinding { keys: "cmd k", description: "Open command palette",                 href: None },
     ShortcutBinding { keys: "g h",   description: "Go to home",                           href: Some("/") },
     ShortcutBinding { keys: "g c",   description: "Go to Compliance",                     href: Some("/admin/compliance") },
+    // 2026-05-14 discoverability fix — Cluster Status had no leader-
+    // key shortcut despite being the canonical Raft live view.
+    ShortcutBinding { keys: "g l",   description: "Go to Cluster Status (live)",          href: Some("/admin/cluster/live") },
     ShortcutBinding { keys: "g k",   description: "Go to KEDA",                           href: Some("/admin/keda") },
     ShortcutBinding { keys: "g v",   description: "Go to Vault",                          href: Some("/admin/vault") },
     ShortcutBinding { keys: "g u",   description: "Go to Upstream",                       href: Some("/admin/upstream") },
