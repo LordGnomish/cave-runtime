@@ -599,6 +599,103 @@ mod tests {
         m
     }
 
+    // ── ClaudeCliTaskQueue (RED phase — added 2026-05-14) ──────
+    //
+    // These tests reference [`ClaudeCliTaskQueue`] which does NOT exist
+    // yet on this branch. `cargo test --no-run` MUST therefore fail to
+    // compile this module — that is the RED proof the GREEN commit will
+    // flip. Charter v2 TDD STRICT MODE applied to the dispatcher itself.
+
+    #[tokio::test]
+    async fn claude_cli_task_queue_from_env_locates_binary_on_standard_paths() {
+        // ClaudeCliTaskQueue::from_env should resolve the `claude` binary
+        // by walking PATH and ~/.local/bin in order — no env var required.
+        let dir = tempfile::TempDir::new().unwrap();
+        let q = ClaudeCliTaskQueue::from_env(dir.path().to_path_buf())
+            .expect("must locate claude on a Mac with Claude Code installed");
+        assert_eq!(q.backend_name(), "claude-cli");
+    }
+
+    #[tokio::test]
+    async fn claude_cli_task_queue_submit_records_task_and_worktree_path() {
+        // Submit must return a stable TaskId and stash a per-task record
+        // under output_log_dir so status() / output() can find it later.
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut q = ClaudeCliTaskQueue::from_env(dir.path().to_path_buf())
+            .expect("claude binary present");
+        // Use a sentinel binary that just echoes a fake completion line.
+        q.set_claude_binary_for_test(std::path::PathBuf::from("/bin/echo"));
+        let id = q
+            .submit("test prompt", "auto-port/test-event", ctx())
+            .await
+            .expect("submit ok");
+        assert!(id.0.starts_with("claude-cli-"), "TaskId prefix");
+        // Record file must exist.
+        let record = dir.path().join(format!("{}.json", id.0));
+        assert!(
+            record.exists(),
+            "submit must persist task record at {}",
+            record.display()
+        );
+    }
+
+    #[tokio::test]
+    async fn claude_cli_task_queue_status_returns_pending_for_unknown_task() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let q = ClaudeCliTaskQueue::from_env(dir.path().to_path_buf()).unwrap();
+        let err = q
+            .status(&TaskId::new("claude-cli-nonexistent"))
+            .await
+            .unwrap_err();
+        // Unknown task → NotFound (mirrors OpusTaskQueue behaviour).
+        assert!(
+            matches!(err, TaskQueueError::NotFound(_)),
+            "got {:?}",
+            err
+        );
+    }
+
+    #[test]
+    fn claude_cli_parse_completion_extracts_commit_sha_and_branch() {
+        // The result line emitted by `claude -p --output-format json`
+        // includes a final assistant message; we re-use the existing
+        // parse_completion_text helper for the commit_sha / branch /
+        // file count fields the dispatcher reads from `git log -1`.
+        let body = "commit_sha: 0a45a85b6e1fb43f6177b5181285cf2c0973974f\n\
+                    branch: auto-port/GAP-1234\n\
+                    files_changed: 3\n\
+                    lines_added: 142\n\
+                    test_count: 7\n";
+        let out = parse_completion_text(body, "auto-port/fallback").unwrap();
+        assert_eq!(out.commit_sha.len(), 40);
+        assert_eq!(out.branch, "auto-port/GAP-1234");
+        assert_eq!(out.test_count, 7);
+    }
+
+    #[test]
+    fn claude_cli_locate_binary_finds_local_bin_symlink() {
+        // The locator function used by from_env() is exposed for testing.
+        // On the dev box, ~/.local/bin/claude is the canonical install
+        // (Claude Code installer puts it there). The function must
+        // discover it even if PATH doesn't include ~/.local/bin.
+        if !std::path::Path::new(
+            &std::env::var("HOME")
+                .map(|h| format!("{h}/.local/bin/claude"))
+                .unwrap_or_default(),
+        )
+        .exists()
+        {
+            eprintln!("skipping — no ~/.local/bin/claude on this host");
+            return;
+        }
+        let p = ClaudeCliTaskQueue::locate_binary().expect("must find claude");
+        assert!(
+            p.ends_with("claude"),
+            "located path should end with `claude`: {}",
+            p.display()
+        );
+    }
+
     // ── DryRun ─────────────────────────────────────────────────
 
     #[tokio::test]
