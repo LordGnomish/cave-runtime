@@ -32,7 +32,8 @@ pub const DEFAULT_BINDINGS: &[ShortcutBinding] = &[
     ShortcutBinding { keys: "g v",   description: "Go to Vault",                          href: Some("/admin/vault") },
     ShortcutBinding { keys: "g u",   description: "Go to Upstream",                       href: Some("/admin/upstream") },
     ShortcutBinding { keys: "g a",   description: "Go to ADR Browser",                    href: Some("/admin/adr") },
-    ShortcutBinding { keys: "g s",   description: "Go to Scheduler",                      href: Some("/admin/scheduler") },
+    // 2026-05-14 consolidation: Scheduler folded into K8s Dashboard.
+    ShortcutBinding { keys: "g s",   description: "Go to K8s · Scheduler Queue",          href: Some("/admin/k8s-dashboard/scheduler/queue") },
     ShortcutBinding { keys: "/",     description: "Focus search (where present)",         href: None },
     ShortcutBinding { keys: "j",     description: "Next row (list pages)",                href: None },
     ShortcutBinding { keys: "k",     description: "Previous row (list pages)",            href: None },

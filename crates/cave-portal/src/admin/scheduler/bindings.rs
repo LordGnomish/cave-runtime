@@ -47,7 +47,7 @@ pub fn avg_latency_ms(rows: &[BindingRow]) -> u32 {
     sum / rows.len() as u32
 }
 
-pub(super) fn render_section(
+pub fn render_section(
     state: &AdminState,
     ctx: &RequestCtx,
 ) -> Result<String, SchedulerViewError> {
