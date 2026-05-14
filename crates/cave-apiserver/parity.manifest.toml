@@ -914,3 +914,110 @@ cave_path      = "—"
 cave_test_name = "—"
 status         = "missing"
 notes          = "VAP messageExpression CEL field not yet evaluated (see cel_eval.rs deferred list)."
+
+# ── Batch 3 upstream tests (2026-05-14) ──────────────────────────────────────
+# Appended to the existing [behavioral_parity] audit.
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/converter_test.go"
+upstream_name  = "TestConvert/stamps_desired_api_version"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_core_converter_stamps_desired_api_version"
+status         = "ported"
+notes          = "Converter rewrites apiVersion to the request's desired_api_version."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/converter_test.go"
+upstream_name  = "cave-specific:preserves_tenant_id_invariant"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_core_converter_preserves_tenant_id_through_conversion"
+status         = "ported"
+notes          = "cave Charter — tenant_id MUST survive version transitions."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion/converter_test.go"
+upstream_name  = "TestConvert/applies_field_rename"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_core_converter_applies_field_rename_rule"
+status         = "ported"
+notes          = "Registered rename rule rewrites the field name while preserving the value."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "TestApply/first_apply_assigns_ownership"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_first_apply_assigns_field_ownership"
+status         = "ported"
+notes          = "Initial Apply registers manager + field set; owner_of returns the manager."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "TestApply/conflict_when_field_owned"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_conflict_emitted_when_field_owned_by_other_manager"
+status         = "ported"
+notes          = "Second manager → ApplyOutcome::Conflicts with AppliedBy reason."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "TestApply/force_transfers_ownership"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_force_transfers_ownership_and_logs_transfer"
+status         = "ported"
+notes          = "force=true rewrites ownership + records OwnershipTransfer in audit log."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "TestUpdate/seeds_UpdatedBy_conflict_reason"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_update_seeds_updated_by_conflict_reason"
+status         = "ported"
+notes          = "record_update (imperative path) → next Apply sees ConflictReason::UpdatedBy."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "cave-specific:tenant_scoping_isolates_ownership"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_tenant_scoped_entries_do_not_cross_tenant"
+status         = "ported"
+notes          = "cave Charter — same uid across tenants does not produce cross-tenant conflict."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/util/managedfields/internal/structuredmerge_test.go"
+upstream_name  = "TestEntries/lists_active_managers"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_ssa_entries_lists_active_managers_in_registration_order"
+status         = "ported"
+notes          = "entries() returns all live ManagedFieldsEntry for an ObjectKey."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apimachinery/pkg/api/meta/discovery_test.go"
+upstream_name  = "TestDiscoveryGroupList/register_and_list_round_trips"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_discovery_register_and_list_round_trips"
+status         = "ported"
+notes          = "register_resources + list_for round-trip the APIResourceList."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/apiserver/pkg/endpoints/discovery/group_test.go"
+upstream_name  = "cave-specific:cross_tenant_isolation"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_discovery_cross_tenant_lookup_is_isolated"
+status         = "ported"
+notes          = "cross-tenant list_for + aggregated_for_tenant return None / empty."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/kube-openapi/pkg/handler3/handler_test.go"
+upstream_name  = "TestOpenAPIV3/register_then_fetch_schema"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_discovery_openapi_v3_schema_round_trips"
+status         = "ported"
+notes          = "register_schema + schema_for round-trip the OpenAPI v3 shape (type, required, properties)."
+
+[[upstream_test]]
+upstream_path  = "staging/src/k8s.io/kube-openapi/pkg/handler3/handler_test.go"
+upstream_name  = "TestOpenAPIV3Discovery/index_includes_hash_query"
+cave_path      = "tests/upstream_port_batch3.rs"
+cave_test_name = "upstream_discovery_openapi_v3_index_url_includes_hash_query"
+status         = "ported"
+notes          = "/openapi/v3 index URL shape: serverRelativeURL with `?hash=…` query param."
