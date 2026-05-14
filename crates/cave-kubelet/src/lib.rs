@@ -129,6 +129,13 @@ pub mod userns;
 /// `pkg/kubelet/cm/util/cgroups/`.
 pub mod cgroups;
 
+/// upstream test port batch4 2026-05-14: PLEG
+/// (PodLifecycleEventGenerator) diff state machine. Mirrors
+/// `pkg/kubelet/pleg/generic.go` — produces ContainerStarted /
+/// Died / Removed / Changed events from successive runtime
+/// snapshots.
+pub mod pleg;
+
 use agent::KubeletState;
 use std::sync::Arc;
 

@@ -36,6 +36,7 @@ pub mod spiffe;
 pub mod store;
 pub mod telemetry;
 pub mod traffic;
+pub mod traffic_policy;
 pub mod xds;
 pub mod wasm_plugin;
 pub mod service_entry;
