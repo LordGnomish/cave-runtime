@@ -14,21 +14,27 @@ license = "Apache-2.0"
 language= "Java"
 url     = "https://github.com/keycloak/keycloak"
 
+[[upstreams]]
+# Secondary upstream — WebAuthn / FIDO2 server library.  Ported
+# line-by-line into src/webauthn/ in the 2026-05-15 batch.
+org     = "webauthn4j"
+repo    = "webauthn4j"
+version = "82345b8"
+notes   = "WebAuthn L3 RP ceremonies + 7 attestation formats + MDS3."
+
 [parity]
-# Package-level inventory against keycloak/keycloak v22.0.0 — a
-# ~500K-LOC Java codebase. The inventory focuses on Keycloak's
-# domain packages (services/, model/, federation/, oidc/, saml/,
-# admin-rest/) rather than the JVM stack underneath. Java-stdlib
-# analog packages are aggressively skipped — they're not the cave
-# port target.
-mapped_count   = 12
-partial_count  = 1
+# Package-level inventory against keycloak/keycloak v22.0.0 +
+# webauthn4j/webauthn4j 82345b8 (the WebAuthn / FIDO2 / passkey port,
+# 2026-05-15 batch).  Java-stdlib analog packages are aggressively
+# skipped — they're not the cave port target.
+mapped_count   = 15
+partial_count  = 3
 skipped_count  = 16
 unmapped_count = 8
-total          = 37
-fill_ratio     = 0.7838
-honest_ratio   = 0.7568
-last_audit     = "2026-05-13"
+total          = 42
+fill_ratio     = 0.8095
+honest_ratio   = 0.7857
+last_audit     = "2026-05-15"
 infra_only     = false
 [module]
 name        = "cave-auth"
@@ -458,6 +464,48 @@ local_files  = [
   "src/saml/broker.rs",
 ]
 note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exc-c14n canonicalization (rfc3741 subset) — caller-pluggable hook remains for strict-mode IdPs. (2026-05-13 c14n landed.)"
+
+# ─── WebAuthn (2026-05-15) — webauthn4j 82345b8 line-by-line port ──────────
+
+[[mapped]]
+upstream_pkg = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnRegistrationManager"
+local_files  = [
+  "src/webauthn/registration.rs",
+  "src/webauthn/mod.rs",
+]
+note         = "Registration ceremony — start_registration emits 32B challenge + 4 pubKeyCredParams; finish_registration validates origin allow-list, clientData type, challenge, SHA-256(rpId), UP/UV flags, dispatches attestation, returns Credential record."
+
+[[mapped]]
+upstream_pkg = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnAuthenticationManager"
+local_files  = ["src/webauthn/authentication.rs"]
+note         = "Authentication ceremony — start_authentication issues challenge; finish_authentication runs §7.2 steps 11-21 incl. assertion-signature verification, strict signCounter advance, passkey userHandle equality."
+
+[[mapped]]
+upstream_pkg = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/AuthenticatorData"
+local_files  = [
+  "src/webauthn/model.rs",
+  "src/webauthn/cose.rs",
+]
+note         = "AuthenticatorData parser (32B rpIdHash + flags byte + 4B BE signCount + optional attestedCredentialData + optional CBOR ext), COSE_Key (RFC 8152) for ES256 / ES384 / RS256 / EdDSA, Credential record."
+
+[[partial]]
+upstream_pkg = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/validator/attestation/statement"
+local_files  = [
+  "src/webauthn/attestation/mod.rs",
+  "src/webauthn/attestation/none.rs",
+  "src/webauthn/attestation/packed.rs",
+  "src/webauthn/attestation/fido_u2f.rs",
+  "src/webauthn/attestation/apple.rs",
+  "src/webauthn/attestation/android_key.rs",
+  "src/webauthn/attestation/android_safetynet.rs",
+  "src/webauthn/attestation/tpm.rs",
+]
+note         = "Attestation format dispatch — 'none' real, 'packed' real for SELF path (ES256/ES384/RS256/EdDSA via p256/p384/rsa/ed25519-dalek). 5 formats refuse with AttestationError::Unsupported documenting what's missing (X.509 chain, MDS root store, TPM struct parsers). No silent passes."
+
+[[partial]]
+upstream_pkg = "webauthn4j:webauthn4j-metadata/src/main/java/com/webauthn4j/metadata"
+local_files  = ["src/webauthn/mds.rs"]
+note         = "MDS3 structural parse: 3-segment JWT split, base64url payload decode, JSON → MdsBlob{legalHeader,no,nextUpdate,entries[]} + AAGUID case-insensitive lookup.  verify_chain() returns ChainNotValidated so callers cannot trust unsigned payload — pinned FIDO Alliance root + X.509 chain are Phase 2."
 
 # ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
 
