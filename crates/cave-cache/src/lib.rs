@@ -13,6 +13,13 @@ pub mod acl;
 /// Manages cluster topology, node communication, and data sharding.
 pub mod cluster;
 
+/// On-wire cluster bus codec (binary frame format + heartbeat scheduler).
+pub mod cluster_gossip;
+
+/// Cluster sharding + resharding state machine — 16,384-slot ownership,
+/// CLUSTER SETSLOT, ASK/MOVED redirection, MIGRATE semantics.
+pub mod cluster_shard;
+
 /// The codec module.
 ///
 /// Handles serialization and deserialization of data types.
