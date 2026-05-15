@@ -41,3 +41,5 @@ p384      = { workspace = true }
 aes-gcm   = { workspace = true }
 rsa       = { workspace = true }
 sha2      = { workspace = true }
+# AttributeStatement → role mapper predicates.
+regex     = { workspace = true }

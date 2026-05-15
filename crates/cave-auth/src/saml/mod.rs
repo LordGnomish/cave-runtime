@@ -41,6 +41,7 @@
 //!   every IdP cave customers federate with.
 
 pub mod artifact;
+pub mod attrmap;
 pub mod authn_request;
 pub mod binding;
 pub mod broker;
