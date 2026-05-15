@@ -15,6 +15,7 @@
 
 pub mod clients;
 pub mod events;
+pub mod federation;
 pub mod realms;
 pub mod sessions;
 pub mod users;

@@ -905,6 +905,63 @@ async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query
 async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
+// ── /admin/auth/federation — LDAP + Kerberos federation (Keycloak parity) ──
+
+async fn auth_federation_index_handler(
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::federation::render_index(&ctx).map(Html).map_err(fed_err_to_response)
+}
+
+async fn auth_federation_detail_handler(
+    Path(id): Path<String>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::federation::render_detail(&ctx, &id).map(Html).map_err(fed_err_to_response)
+}
+
+async fn auth_federation_test_handler(
+    Path(id): Path<String>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::federation::render_test(&ctx, &id).map(Html).map_err(fed_err_to_response)
+}
+
+async fn auth_federation_mappers_handler(
+    Path(id): Path<String>,
+    Query(q): Query<AdminQuery>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::federation::render_mapper(&ctx, &id).map(Html).map_err(fed_err_to_response)
+}
+
+fn fed_err_to_response(e: auth::federation::FederationViewError) -> (StatusCode, Html<String>) {
+    use auth::federation::FederationViewError;
+    match e {
+        FederationViewError::Auth(a) => err_to_response(a),
+        FederationViewError::NotFound(id) => (
+            StatusCode::NOT_FOUND,
+            Html(format!("<h1>provider `{}` not found</h1>", html_escape_str(&id))),
+        ),
+    }
+}
+
+fn html_escape_str(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            '&' => "&amp;".to_string(),
+            '"' => "&quot;".to_string(),
+            _ => c.to_string(),
+        })
+        .collect()
+}
+
 async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -1497,6 +1554,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/metrics", get(metrics_handler))
         .route("/admin/trace", get(trace_handler))
         .route("/admin/auth-sessions", get(auth_sessions_handler))
+        .route("/admin/auth/federation", get(auth_federation_index_handler))
+        .route("/admin/auth/federation/{id}", get(auth_federation_detail_handler))
+        .route("/admin/auth/federation/{id}/test", get(auth_federation_test_handler))
+        .route("/admin/auth/federation/{id}/mappers", get(auth_federation_mappers_handler))
         .route("/admin/dashboard-catalog", get(dashboard_handler))
         .route("/admin/dns", get(dns_handler))
         .route("/admin/logs", get(logs_handler))
@@ -1798,5 +1859,65 @@ mod router_tests {
         assert!(body.contains("alice"));
         assert!(body.contains("bob"));
         assert!(!body.contains("mallory"));
+    }
+
+    #[tokio::test]
+    async fn auth_federation_index_route_lists_providers() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/auth/federation?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp).await;
+        assert!(body.contains("OpenLDAP"));
+        assert!(body.contains("SPNEGO"));
+    }
+
+    #[tokio::test]
+    async fn auth_federation_detail_route_returns_ldap_form() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/auth/federation/acme-openldap?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp).await;
+        assert!(body.contains("Connection URL"));
+        assert!(body.contains("ldap.eng.acme.corp"));
+    }
+
+    #[tokio::test]
+    async fn auth_federation_unknown_id_returns_404() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/auth/federation/nope?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }
