@@ -45,3 +45,11 @@ rsa           = "0.9"
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
 sha2          = { workspace = true, features = ["oid"] }
 hex           = { workspace = true }
+# UMA 2.0 + Token Exchange (RFC 8693) + DPoP (RFC 9449) + JWE (RFC 7516) — src/{uma,token_exchange,dpop,jwe}/
+sha1    = "0.10"
+aes-gcm = "0.10"
+aes     = "0.8"
+cbc     = { version = "0.1", features = ["alloc"] }
+cipher  = { version = "0.4", features = ["block-padding", "alloc"] }
+hmac    = "0.12"
+hkdf    = "0.12"
