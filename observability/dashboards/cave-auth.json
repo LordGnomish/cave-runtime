@@ -277,6 +277,66 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "WebAuthn registration rate (by attestation format)",
+      "description": "Per-minute count of successful WebAuthn registrations grouped by attestation fmt (none, packed, fido-u2f, apple, android-key, android-safetynet, tpm).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (format) (rate(cave_auth_webauthn_registrations_total{result=\"success\"}[1m]))", "legendFormat": "{{format}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "WebAuthn authentication outcome",
+      "description": "Per-minute rate of authentication ceremony outcomes (success / counter_regression / bad_signature / uv_required / origin_mismatch).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_webauthn_authn_total[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "WebAuthn replay attempts (signCounter regression)",
+      "description": "W3C §6.1.1: a sign-counter that does not strictly advance is a signal of a cloned authenticator. Every increment here corresponds to a refused assertion.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(increase(cave_auth_webauthn_replay_attempts_total[1h]))", "refId": "A" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "WebAuthn algorithm mix (ES256 / ES384 / RS256 / EdDSA)",
+      "description": "Distribution of registered credentials by signing algorithm.  Useful for capacity planning and algorithm deprecation.",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (alg) (cave_auth_webauthn_credentials)", "legendFormat": "{{alg}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "MDS3 blob age",
+      "description": "Seconds since the cached FIDO Alliance Metadata Service v3 blob was last refreshed. Warning threshold: 7 days (see WebauthnMdsBlobStale alert).",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "time() - cave_auth_webauthn_mds_last_update_unix", "refId": "A" }
+      ]
     }
   ]
 }

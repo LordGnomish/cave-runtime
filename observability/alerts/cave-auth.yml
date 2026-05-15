@@ -229,3 +229,58 @@ groups:
             with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
             the hybrid path live before the OSS launch (target 21 May).
           runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+      # ─── WebAuthn / FIDO2 / passkey — 2026-05-15 batch ───────────────────
+      - alert: WebauthnRegistrationFailureRateHigh
+        expr: |
+          (
+            sum(rate(cave_auth_webauthn_registrations_total{result="failure"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_webauthn_registrations_total[5m])), 1e-9)
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "WebAuthn registration failure rate >10%"
+          description: |
+            More than 10% of attempted credential registrations are failing.
+            Common causes: clientDataJSON.origin mismatch, attestation format
+            unsupported, AAGUID not in MDS allow-list.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-registration-failures"
+
+      - alert: WebauthnReplayAttempts
+        expr: |
+          sum(increase(cave_auth_webauthn_replay_attempts_total[5m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+        annotations:
+          summary: "WebAuthn signCounter regression detected — possible cloned authenticator"
+          description: |
+            One or more assertions arrived with a signCounter at or below
+            the value the RP last recorded.  Per W3C §6.1.1 this MAY indicate
+            a cloned authenticator.  Investigate the affected credentialId
+            immediately and consider revoking it.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-replay"
+
+      - alert: WebauthnMdsBlobStale
+        expr: |
+          (time() - cave_auth_webauthn_mds_last_update_unix) > 86400 * 7
+        for: 1h
+        labels:
+          severity: info
+          team: security
+          tier: "1"
+        annotations:
+          summary: "MDS3 blob older than 7 days"
+          description: |
+            The cached FIDO Alliance Metadata Service blob has not been
+            refreshed in more than a week.  AAGUID lookups will be stale.
+            Run `cavectl auth webauthn mds-update --path …` or wait for
+            the daily fetch loop to recover.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-mds-refresh"
