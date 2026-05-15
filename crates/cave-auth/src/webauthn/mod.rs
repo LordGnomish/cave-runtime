@@ -10,5 +10,6 @@
 pub mod attestation;
 pub mod authentication;
 pub mod cose;
+pub mod mds;
 pub mod model;
 pub mod registration;
