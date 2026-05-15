@@ -192,8 +192,17 @@ k8s-openapi = { version = "0.23", features = ["latest"] }
 # Crypto / Signing
 ring = "0.17"
 ed25519-dalek = "2"
-# ECDSA over NIST P-256 — real signer/verifier for Cosign classical mode.
+# ECDSA over NIST P-256 — real signer/verifier for Cosign classical mode +
+# SAML XML DSig `ecdsa-sha256` (cave-auth/src/saml).
 p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+# ECDSA over NIST P-384 — SAML XML DSig `ecdsa-sha384` companion.
+p384 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+# AES-GCM AEAD — XML-ENC EncryptedData payload cipher for
+# `<saml:EncryptedAssertion>`.
+aes-gcm = "0.10"
+# RSA — used by `rsa-oaep-mgf1p-sha256` key-transport for XML-ENC
+# `<xenc:EncryptedKey>`.
+rsa = { version = "0.9", features = ["sha2"] }
 # HTTP client (for upstream tracking, uptime probes)
 reqwest-middleware = "0.4"
 # Persistence

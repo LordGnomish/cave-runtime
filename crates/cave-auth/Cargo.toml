@@ -34,3 +34,10 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# SAML XML DSig — ECDSA-{P256,P384} signers + verifiers.
+p256      = { workspace = true }
+p384      = { workspace = true }
+# XML-ENC for `<saml:EncryptedAssertion>` — AES-128/256-GCM + RSA-OAEP-SHA256.
+aes-gcm   = { workspace = true }
+rsa       = { workspace = true }
+sha2      = { workspace = true }
