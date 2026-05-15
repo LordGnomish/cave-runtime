@@ -16,6 +16,12 @@
 /// `cargo test -p cavectl` run.
 pub mod client;
 
+/// `cavectl auth ldap` + `cavectl auth kerberos` HTTP path constants.
+/// Lives alongside the rest of the per-feature command modules so
+/// the dispatch table in `main.rs` is a single-line match per
+/// variant.
+pub mod auth;
+
 /// The approval workflow module, providing backend traits and in-memory
 /// implementations for managing approval records and states.
 pub mod approval;

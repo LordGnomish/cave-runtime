@@ -474,6 +474,18 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    // ── LDAP federation (Keycloak federation/ldap parity) ────────────────────
+    /// Bind against the LDAP federation provider and report resultCode.
+    LdapTestConnection,
+    /// Run a full user-federation sync (LDAP → cave user model).
+    LdapSyncUsers,
+    /// Run a group + memberOf sync.
+    LdapSyncGroups,
+    // ── Kerberos / SPNEGO (Keycloak federation/kerberos parity) ──────────────
+    /// Parse the configured keytab file; dump principal + enctype + vno.
+    KerberosValidateKeytab,
+    /// Drive the SPNEGO 401-challenge / Negotiate handshake.
+    KerberosTestSpnego,
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +3973,13 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            // LDAP federation
+            AuthCmd::LdapTestConnection => c.get(cavectl::auth::ldap::PATH_TEST_CONNECTION).await,
+            AuthCmd::LdapSyncUsers      => c.get(cavectl::auth::ldap::PATH_SYNC_USERS).await,
+            AuthCmd::LdapSyncGroups     => c.get(cavectl::auth::ldap::PATH_SYNC_GROUPS).await,
+            // Kerberos / SPNEGO
+            AuthCmd::KerberosValidateKeytab => c.get(cavectl::auth::kerberos::PATH_VALIDATE_KEYTAB).await,
+            AuthCmd::KerberosTestSpnego     => c.get(cavectl::auth::kerberos::PATH_TEST_SPNEGO).await,
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -4664,6 +4683,37 @@ mod batch4_parse_tests {
     fn auth_saml_c14n_parses() {
         let cli = parse(&["cavectl", "auth", "saml-c14n"]);
         assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+    }
+
+    // ── LDAP federation + Kerberos/SPNEGO sub-commands ───────────────────────
+    #[test]
+    fn auth_ldap_test_connection_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-test-connection"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapTestConnection }));
+    }
+
+    #[test]
+    fn auth_ldap_sync_users_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-sync-users"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncUsers }));
+    }
+
+    #[test]
+    fn auth_ldap_sync_groups_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-sync-groups"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncGroups }));
+    }
+
+    #[test]
+    fn auth_kerberos_validate_keytab_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos-validate-keytab"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosValidateKeytab }));
+    }
+
+    #[test]
+    fn auth_kerberos_test_spnego_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos-test-spnego"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosTestSpnego }));
     }
 
     // ── Expanded container-scan subcommands ───────────────────────────────────
