@@ -103,6 +103,27 @@ impl ResourceStore {
     pub fn count(&self, kind: &str) -> usize {
         self.resources.iter().filter(|r| r.key().0 == kind).count()
     }
+
+    /// Snapshot-friendly accessor: returns every resource currently held,
+    /// in unspecified order. Used by the host runtime's persistence layer
+    /// to produce a periodic on-disk snapshot. Does NOT include any
+    /// revision history.
+    pub fn list_all(&self) -> Vec<Resource> {
+        self.resources.iter().map(|r| r.value().clone()).collect()
+    }
+
+    /// Idempotent insert — replaces the prior value if a row already exists
+    /// at `(kind, namespace, name)`. Persistence callers use this on replay
+    /// because a WAL record may be applied after the same row was already
+    /// loaded from a snapshot.
+    pub fn upsert(&self, resource: Resource) {
+        let key = (
+            resource.kind().to_string(),
+            resource.namespace().to_string(),
+            resource.name().to_string(),
+        );
+        self.resources.insert(key, resource);
+    }
 }
 
 impl Default for ResourceStore {

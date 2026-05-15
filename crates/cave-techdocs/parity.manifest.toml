@@ -8,9 +8,18 @@
 org     = "backstage"
 repo    = "backstage"
 version = "v1.50.4"
-
+name    = "Backstage"
+license = "Apache-2.0"
+language= "TypeScript"
+url     = "https://github.com/backstage/backstage"
 [module]
 name        = "cave-techdocs"
 description = "TechDocs (Backstage docs-as-code) — sub-crate of cave-portal"
 source_root = "src"
 parent_module = "cave-portal"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

@@ -6,7 +6,15 @@
 org     = "grafana"
 repo    = "oncall"
 version = "v1.4.0"
+name    = "Grafana OnCall"
+license = "AGPL-3.0"
+language= "Python"
+url     = "https://github.com/grafana/oncall"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-incidents"
 description = "Incident management — Grafana OnCall replacement"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/incidents/endpoint"
+
+[portal_ui]
+upstream_ui  = "Grafana OnCall"
+upstream_url = "https://grafana.com/docs/oncall/latest/"
+status       = "partial"
+loc          = 157
+priority     = "P1"
+notes        = "Schedules, escalations"
+last_audit   = "2026-05-11"

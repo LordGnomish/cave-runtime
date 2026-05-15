@@ -414,6 +414,7 @@ impl MapDispatcher {
             old_object: req.old_object.as_ref().and_then(|o| serde_json::to_value(o).ok()),
             params, namespace_object: None,
             variables: HashMap::new(),
+            authorizer: None,
         }
     }
 }

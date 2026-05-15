@@ -10,7 +10,15 @@
 org     = "knative"
 repo    = "serving"
 version = "knative-v1.22.0"
+name    = "Knative Serving"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/knative/serving"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-knative"
 description = "Serverless workloads — Knative replacement"
@@ -37,3 +45,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/knative/endpoint"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://knative.dev/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "knative is CRD"
+last_audit   = "2026-05-11"

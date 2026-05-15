@@ -311,17 +311,17 @@ fn psa_plugin_tenant_scoping() {
     assert!(globex_r.allowed, "globex has no policy, allowed");
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn psa_audit_emits_audit_annotation() {
     // pending: M4 hand-off — audit annotation map population
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn psa_pod_template_propagation() {
     // pending: requires Deployment/StatefulSet pod template introspection
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn psa_exemptions_by_user_and_namespace() {
     // pending: requires PodSecurityConfiguration exemptions list
 }

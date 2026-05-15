@@ -9,14 +9,20 @@ use crate::types::{Cite, ControllerError};
 
 /// PEM block kinds we recognize.
 pub const KIND_CERTIFICATE_REQUEST: &str = "CERTIFICATE REQUEST";
+
+/// PEM block kinds we recognize.
 pub const KIND_CERTIFICATE: &str = "CERTIFICATE";
 
+/// Represents a parsed PEM block containing a kind and base64-encoded body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PemBlock {
+    /// The kind of the PEM block (e.g., "CERTIFICATE REQUEST").
     pub kind: String,
+    /// The base64-encoded body of the PEM block.
     pub b64_body: String,
 }
 
+/// Parses a PEM string into a `PemBlock`, validating structure and content.
 pub fn parse_pem(input: &str) -> Result<PemBlock, ControllerError> {
     let begin_marker = "-----BEGIN ";
     let end_marker = "-----END ";
@@ -48,8 +54,8 @@ pub fn parse_pem(input: &str) -> Result<PemBlock, ControllerError> {
     // Strip whitespace; valid base64 chars: A-Z, a-z, 0-9, +, /, =.
     let body: String = raw_body
         .chars()
-        .filter(|c| !c.is_whitespace())
-        .collect();
+         .filter(|c| !c.is_whitespace())
+         .collect();
     if body.is_empty() {
         return Err(ControllerError::InvalidSpec {
             kind: "PEM",
@@ -65,6 +71,7 @@ pub fn parse_pem(input: &str) -> Result<PemBlock, ControllerError> {
     Ok(PemBlock { kind, b64_body: body })
 }
 
+/// Citation for the source Go function this Rust code mirrors.
 #[allow(dead_code)]
 const FILE_CITE: Cite = Cite::new(
     "pkg/controller/certificates/signer/cfssl_signer.go",

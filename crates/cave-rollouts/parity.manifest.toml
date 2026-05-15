@@ -6,7 +6,15 @@
 org     = "argoproj"
 repo    = "argo-rollouts"
 version = "v1.6.0"
+name    = "Argo Rollouts"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/argoproj/argo-rollouts"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-rollouts"
 description = "Progressive delivery — Argo Rollouts replacement"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/rollouts/endpoint"
+
+[portal_ui]
+upstream_ui  = "Argo Rollouts UI"
+upstream_url = "https://argo-rollouts.readthedocs.io/en/stable/dashboard/"
+status       = "partial"
+loc          = 150
+priority     = "P1"
+notes        = "Canary progress"
+last_audit   = "2026-05-11"

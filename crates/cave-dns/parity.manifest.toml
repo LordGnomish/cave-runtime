@@ -9,7 +9,15 @@
 org     = "coredns"
 repo    = "coredns"
 version = "v1.11.0"
+name    = "CoreDNS"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/coredns/coredns"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-dns"
 description = "CoreDNS reimplementation — plugin chain + DNSSEC + UDP/TCP/DoH/DoT servers + REST zone management"
@@ -414,3 +422,12 @@ local_path    = "/api/v1/zones/{zone}/export"
 kind          = "http"
 upstream_path = "/api/v1/zones/{zone}/records/batch"
 local_path    = "/api/v1/zones/{zone}/records/batch"
+
+[portal_ui]
+upstream_ui  = "(config-only)"
+upstream_url = "https://coredns.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "CoreDNS is corefile-only"
+last_audit   = "2026-05-11"

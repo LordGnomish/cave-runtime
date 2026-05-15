@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# .git/hooks/post-commit — regenerate docs/parity/parity-index.json
+# whenever a commit touched a parity manifest, then stage + amend so
+# the regen lands in the same commit.
+#
+# Why: build-parity-index.py reads every crates/*/parity.manifest.toml
+# and emits the live snapshot. When a manifest changes but the index
+# doesn't get re-emitted, the compliance dashboard renders stale data
+# until someone notices. This hook closes the gap.
+#
+# Source-controlled at scripts/git-hooks/post-commit. Install with:
+#   ./scripts/install-git-hooks.sh
+#
+# Edge cases handled:
+#   - No manifest changes in HEAD → no-op.
+#   - parity-index already in sync → no-op (git diff is empty).
+#   - Recursive amend → guarded by CAVE_PARITY_HOOK_RUNNING env var.
+#   - HEAD has no parent (initial commit) → diff vs empty tree.
+
+set -euo pipefail
+
+# Guard against re-entry — `git commit --amend` re-fires post-commit.
+if [ -n "${CAVE_PARITY_HOOK_RUNNING:-}" ]; then
+    exit 0
+fi
+export CAVE_PARITY_HOOK_RUNNING=1
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# What did this commit touch?
+if git rev-parse HEAD~1 >/dev/null 2>&1; then
+    changed=$(git diff --name-only HEAD~1 HEAD)
+else
+    # Initial commit — diff vs the empty tree.
+    EMPTY_TREE=$(git hash-object -t tree /dev/null)
+    changed=$(git diff --name-only "$EMPTY_TREE" HEAD)
+fi
+
+if ! echo "$changed" | grep -q 'parity\.manifest\.toml$'; then
+    exit 0  # No manifests touched; nothing to regen.
+fi
+
+echo "[post-commit] manifest changed — regenerating docs/parity/parity-index.json"
+
+# Regenerate the index.
+if ! python3 scripts/build-parity-index.py >/dev/null 2>&1; then
+    echo "[post-commit] ⚠️  build-parity-index.py failed; skipping auto-regen" >&2
+    exit 0
+fi
+
+# If the regen produced no diff, we're already in sync — done.
+if git diff --quiet -- docs/parity/parity-index.json; then
+    exit 0
+fi
+
+# Stage the regenerated index and amend it into the just-made commit.
+# --no-verify skips pre-commit hooks (we're already past them); --no-edit
+# preserves the original commit message.
+echo "[post-commit] amending parity-index.json into the last commit"
+git add docs/parity/parity-index.json
+git commit --amend --no-edit --no-verify >/dev/null
+echo "[post-commit] ✅ parity-index.json now in sync (commit amended)"

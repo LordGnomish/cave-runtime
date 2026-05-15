@@ -48,6 +48,12 @@ pub mod gc_lite;
 /// transition + taint-based eviction trigger.
 pub mod node_lease;
 
+/// Sweep-012 adoption: controller-manager *own* leader election —
+/// active-passive scheduling for multiple replicas via
+/// `cave_kernel::lease`. Distinct from `node_lease` (per-kubelet
+/// liveness signal that this controller watches).
+pub mod leader_election;
+
 /// 100-pct PUSH-HARD M8: Node lifecycle deeper — taints + zone-state
 /// classifier + per-zone rate-limited eviction queue.
 pub mod node_lifecycle;
@@ -112,6 +118,48 @@ pub mod root_ca_deeper;
 /// allocator + LoadBalancer reconciler).
 pub mod deeper;
 
+/// k8s-core push 2026-05-13: DRA (KEP-4381) cluster-side ResourceClaim
+/// controller — finalizer + Immediate/WaitForFirstConsumer allocation
+/// + `reservedFor[]` reconciliation + deletion drain. Pairs with the
+/// device-fitness logic in `cave-scheduler/src/dra.rs`.
+pub mod resourceclaim;
+
+/// k8s-core push batch2 2026-05-13: per-pod taint-based eviction
+/// with toleration timers. Closes the gap from `node_lifecycle/`
+/// which only handles node-level NoExecute marking.
+pub mod tainteviction;
+
+/// k8s-core push batch2 2026-05-13: pod-CIDR allocator for clusters
+/// running without a cloud provider. Slices the cluster CIDR into
+/// per-node sub-CIDRs at node-add events.
+pub mod cidrallocator;
+
+/// k8s-streams-mesh batch 2026-05-13: VAP status reconciler.
+/// Aggregates per-GVK type-check outcomes onto policy status.
+/// Mirrors `pkg/controller/validatingadmissionpolicystatus/`.
+pub mod validatingadmissionpolicystatus;
+
+/// k8s-streams-mesh batch 2026-05-13: PV-side protection
+/// finalizer. Blocks deletion while still bound / referenced.
+/// Mirrors `pkg/controller/volume/pvprotection/`.
+pub mod pvprotection;
+
+/// k8s-streams-mesh batch 2026-05-13: StorageVersion garbage
+/// collector. Removes SV objects whose owning APIService is gone.
+/// Mirrors `pkg/controller/storageversiongarbagecollector/`.
+pub mod storageversiongarbagecollector;
+
+/// k8s-streams-mesh batch 2026-05-13: legacy SA token cleaner
+/// (KEP-2799 deprecation). Mirrors
+/// `pkg/controller/legacyserviceaccounttokencleaner/`.
+pub mod legacyserviceaccounttokencleaner;
+
+/// k8s-streams-mesh batch 2026-05-13: generic-ephemeral-volume
+/// controller — materialises PVCs from pod's volumeClaimTemplate
+/// with owner-reference adoption. Mirrors
+/// `pkg/controller/volume/ephemeral/`.
+pub mod ephemeralvolume;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
 
 #[cfg(test)]
@@ -152,6 +200,9 @@ pub const CONTROLLERS: &[&str] = &[
     "resource-quota",
     "namespace-controller",
     "bootstrap-signer",
+    "resourceclaim",
+    "tainteviction",
+    "cidrallocator",
 ];
 
 /// Stable identifier of the in-process leader. We do not yet run a real

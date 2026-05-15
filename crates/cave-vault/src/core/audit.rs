@@ -205,3 +205,119 @@ impl AuditLogger {
         }).unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_logger() -> AuditLogger {
+        AuditLogger::new(b"test-key-32-bytes-padding-here!!".to_vec())
+    }
+
+    fn make_entry() -> AuditEntry {
+        AuditEntry {
+            time: "2026-05-02T00:00:00Z".to_string(),
+            audit_type: "request".to_string(),
+            request: AuditRequest {
+                id: "req-1".into(),
+                operation: "read".into(),
+                mount_type: "kv".into(),
+                path: "secret/foo".into(),
+                remote_address: "127.0.0.1".into(),
+            },
+            auth: Some(AuditAuth {
+                client_token: "tok-plain".into(),
+                accessor: "acc-plain".into(),
+                display_name: "alice".into(),
+                policies: vec!["default".into()],
+                token_type: "service".into(),
+            }),
+            error: None,
+        }
+    }
+
+    #[test]
+    fn test_hmac_value_deterministic() {
+        let l = make_logger();
+        assert_eq!(l.hmac_value("foo"), l.hmac_value("foo"));
+        assert_ne!(l.hmac_value("foo"), l.hmac_value("bar"));
+    }
+
+    #[test]
+    fn test_signed_envelope_redacts_token_and_accessor() {
+        let l = make_logger();
+        let entry = make_entry();
+        let env = l.signed_envelope(&entry);
+        assert!(!env.json.contains("tok-plain"));
+        assert!(!env.json.contains("acc-plain"));
+        // Hex-encoded HMAC sums.
+        assert_eq!(env.signature.len(), 64);
+    }
+
+    #[test]
+    fn test_verify_envelope_roundtrip_succeeds() {
+        let l = make_logger();
+        let env = l.signed_envelope(&make_entry());
+        assert!(l.verify_envelope(&env));
+    }
+
+    #[test]
+    fn test_verify_envelope_tampered_signature_fails() {
+        let l = make_logger();
+        let mut env = l.signed_envelope(&make_entry());
+        env.signature = "00".repeat(32);
+        assert!(!l.verify_envelope(&env));
+    }
+
+    #[test]
+    fn test_log_writes_into_buffer() {
+        let l = make_logger();
+        l.log(make_entry());
+        let recent = l.recent_entries(10);
+        assert_eq!(recent.len(), 1);
+    }
+
+    #[test]
+    fn test_enable_disable_backend() {
+        let l = make_logger();
+        let backend = AuditBackend {
+            path: "syslog/".to_string(),
+            backend_type: AuditBackendType::Syslog,
+            description: "test".to_string(),
+            options: HashMap::new(),
+            local: false,
+            seal_wrap: false,
+        };
+        l.enable("syslog/", backend);
+        assert!(l.list_backends().contains_key("syslog/"));
+        assert!(l.disable("syslog/"));
+        assert!(!l.list_backends().contains_key("syslog/"));
+    }
+
+    #[test]
+    fn test_syslog_format_local0_default() {
+        let backend = AuditBackend {
+            path: "p".into(),
+            backend_type: AuditBackendType::Syslog,
+            description: String::new(),
+            options: HashMap::new(),
+            local: false,
+            seal_wrap: false,
+        };
+        let line = backend.syslog_format("{\"a\":1}").unwrap();
+        assert!(line.starts_with("<134> vault: "));
+    }
+
+    #[test]
+    fn test_syslog_format_returns_none_for_file_backend() {
+        let backend = AuditBackend {
+            path: "p".into(),
+            backend_type: AuditBackendType::File,
+            description: String::new(),
+            options: HashMap::new(),
+            local: false,
+            seal_wrap: false,
+        };
+        assert!(backend.syslog_format("{}").is_none());
+    }
+}

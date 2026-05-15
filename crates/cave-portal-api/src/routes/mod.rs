@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod attribution;
 pub mod contributions;
 pub mod deployments;

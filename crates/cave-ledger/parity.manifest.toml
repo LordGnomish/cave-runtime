@@ -7,6 +7,11 @@ org     = "cave-runtime"
 repo    = "cave-runtime"
 version = "v0.1.0"
 
+
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = true
 [module]
 name        = "cave-ledger"
 description = "Sovereign ledger and audit log"
@@ -33,3 +38,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/ledger/endpoint"
+
+[portal_ui]
+upstream_ui  = "(cave-original)"
+upstream_url = "(internal)"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Internal audit ledger"
+last_audit   = "2026-05-11"

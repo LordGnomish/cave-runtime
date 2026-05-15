@@ -443,6 +443,111 @@
         }
       },
       "description": "0 = at least one instance failing the scrape."
+    },
+    {
+      "id": 11,
+      "title": "Registry push/pull rate by backend",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(artifacts_registry_ops_total{job=\"cave-artifacts\"}[5m])) by (backend, op)",
+          "legendFormat": "{{backend}} {{op}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "Push/pull/delete rate broken down by backend (harbor/pulp/nexus) and op."
+    },
+    {
+      "id": 12,
+      "title": "Vulnerability scan p99 latency",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.99, sum(rate(artifacts_scan_duration_seconds_bucket{job=\"cave-artifacts\"}[5m])) by (le, scanner))",
+          "legendFormat": "{{scanner}} p99", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "Trivy/Grype scan duration tail — feeds backlog SLO."
+    },
+    {
+      "id": 13,
+      "title": "Replication policy lag (seconds behind)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "max(artifacts_replication_lag_seconds{job=\"cave-artifacts\"}) by (policy, target)",
+          "legendFormat": "{{policy}} → {{target}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "How far each replication target is behind the source."
+    },
+    {
+      "id": 14,
+      "title": "Sync job duration p95 by remote",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 48, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "histogram_quantile(0.95, sum(rate(artifacts_sync_duration_seconds_bucket{job=\"cave-artifacts\"}[5m])) by (le, remote))",
+          "legendFormat": "{{remote}} p95", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "Pulp remote-sync wallclock distribution per remote."
+    },
+    {
+      "id": 15,
+      "title": "Storage usage by repository type",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 56, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(artifacts_storage_bytes{job=\"cave-artifacts\"}) by (backend, repo_type)",
+          "legendFormat": "{{backend}}/{{repo_type}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "On-disk bytes by (backend, repo_type) — dedupe-aware."
+    },
+    {
+      "id": 16,
+      "title": "Cosign verify rate (PQC vs classic split)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 12, "y": 56, "w": 12, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "sum(rate(cosign_verify_total{job=\"cave-artifacts\"}[5m])) by (alg, outcome)",
+          "legendFormat": "{{alg}} / {{outcome}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "options": { "legend": { "showLegend": true } },
+      "description": "Verify rate split by algorithm (ecdsa-p256 vs ml-dsa-65) and pass/fail."
+    },
+    {
+      "id": 17,
+      "title": "Cosign key age (days since rotation)",
+      "type": "table",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "gridPos": { "x": 0, "y": 64, "w": 24, "h": 8 },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "expr": "(time() - max(cosign_key_created_timestamp_seconds{job=\"cave-artifacts\"}) by (key_id, alg)) / 86400",
+          "format": "table", "instant": true, "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "d" }, "overrides": [] },
+      "options": {},
+      "description": "Per-key age — feeds the PqcKeyMaterialExpiring + CosignKeyRotationOverdue alerts."
     }
   ],
   "annotations": {

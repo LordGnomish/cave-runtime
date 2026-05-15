@@ -241,22 +241,22 @@ fn build_index_hash_changes_on_content_change() {
 // `#[ignore]` — gated on real flate2 + sha2 deps.
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn gzip_real_deflate_round_trip() {
     // pending: requires `flate2` crate — full RFC 1951 deflate round-trip
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn etag_uses_sha256_when_dep_landed() {
     // pending: requires `sha2` crate — etag should be sha256-hex per upstream
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn aggregated_discovery_serves_via_http_handler() {
     // pending: requires axum wiring + Accept-Encoding negotiation
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn protobuf_response_for_application_vnd_kubernetes_protobuf() {
     // pending: requires Kubernetes protobuf wire format — `runtime.protobuf`
 }

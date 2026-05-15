@@ -21,6 +21,8 @@ bytes = "1"
 async-trait = "0.1"
 base64 = "0.22"
 tokio-stream = { version = "0.1", features = ["sync"] }
+crc32fast = "1"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+tempfile = "3"

@@ -169,6 +169,14 @@ The Hetzner deployment consists of a self-managed Talos Kubernetes cluster runni
 
 **Storage:** Hetzner CSI driver provides persistent volume support. Volumes are Hetzner block storage instances that are attached to worker nodes on demand. etcd backups are stored in Hetzner S3-compatible object storage.
 
+**Autoscaling & Workload Variety (Hetzner):** Three CAVE-native modules carry the workload-elasticity story without leaving the sovereign-OSS boundary:
+
+- **cave-karpenter** (ADR-145, tracks `kubernetes-sigs/karpenter v1.12.0`) — node autoscaling. NodePool / NodeClaim / NodeClass v1 CRDs, scheduler scoring, drift detection, consolidation. Provider plug-point: `HetznerNodeClass` over the cave-cloud-controller-manager Hetzner provider; bare-metal + cloud-server pools.
+- **cave-keda** (tracks `kedacore/keda v2.12.0`) — pod-level event-driven autoscaling. ScaledObject / ScaledJob / TriggerAuthentication CRDs, with Kafka-lag, Prometheus, Redis, cron, HTTP-pending, and CPU/Memory scaler types.
+- **cave-kubevirt** (ADR-146, tracks `kubevirt/kubevirt v1.8.2`) — VM-as-K8s-pod for sovereign customers running legacy appliances or kernel-module workloads that cannot be containerised. KVM/QEMU on Talos worker nodes; SR-IOV available where the hardware supports it.
+
+All three are first-party Rust reimplementations under `crates/cave-*` (not forked Go binaries) so they share the runtime kernel, auth, and telemetry with the rest of the platform. Status as of 2026-05-06 is scaffold-only on each (Backend 1/4, Portal/cavectl/Observ. partial); see `crates/cave-{karpenter,keda,kubevirt}/parity.manifest.toml` for the honest per-track gap.
+
 **Upgrades & Rotations:** Kubernetes upgrades on Talos are atomic and rolling. The cluster triggers a rolling upgrade of the Talos image across all nodes sequentially. Each node reboots once and either transitions to the new image or rolls back automatically if health checks fail. The entire upgrade process is orchestrated through the Talos API—no manual intervention required.
 
 ### Azure Deployment Architecture
@@ -197,7 +205,7 @@ CAVE defines seven operational profiles, each with different node counts and siz
 | **dev-azure** | 1 | 2 | 2 | 4 GB | Azure development, managed control plane |
 | **staging-hetzner** | 3 | 5 | 4 | 8 GB | Pre-production testing, self-managed |
 | **staging-azure** | — | 5 | 4 | 8 GB | Pre-production testing, AKS |
-| **production-hetzner** | 3 | 10–20 | 8 | 16 GB | Production workloads, autoscaling enabled |
+| **production-hetzner** | 3 | 10–20 | 8 | 16 GB | Production workloads, cave-karpenter (nodes) + cave-keda (pods) + cave-kubevirt (VMs) |
 | **production-azure** | — | 10–20 | 8 | 16 GB | Production workloads, Karpenter autoscaling |
 | **high-perf** | 3 | 5–15 | 16 | 32 GB | GPU workloads, large compute jobs |
 

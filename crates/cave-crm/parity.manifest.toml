@@ -1,0 +1,48 @@
+# parity.manifest.toml — cave-crm
+# Upstream: twentyhq/twenty  https://github.com/twentyhq/twenty
+# Skeleton — fill in mappings as qwen-amele drafts land.
+
+[upstream]
+org     = "twentyhq"
+repo    = "twenty"
+version = "v2.2.0"
+
+[module]
+name        = "cave-crm"
+description = "Sovereign CRM — Twenty replacement, function-based crate (ADR-145)"
+source_root = "src"
+
+# ── File mappings ────────────────────────────────────────────────────────────
+# [[files]]
+# upstream = "packages/twenty-server/src/modules/person/standard-objects/person.workspace-entity.ts"
+# local    = "src/models/mod.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# [[functions]]
+# upstream_name = "createPerson"
+# local_name    = "create_person"
+# file          = "src/routes.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# [[tests]]
+# upstream_test = "person.service.spec.ts"
+# local_test    = "test_create_person"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# [[surfaces]]
+# kind          = "http"
+# upstream_path = "/rest/people"
+# local_path    = "/api/crm/people"
+# [[surfaces]]
+# kind          = "graphql"
+# upstream_path = "/graphql"
+# local_path    = "/api/crm/graphql"
+
+[portal_ui]
+upstream_ui  = "Twenty CRM"
+upstream_url = "https://twenty.com/"
+status       = "partial"
+loc          = 144
+priority     = "P1"
+notes        = "Full CRM React app"
+last_audit   = "2026-05-11"

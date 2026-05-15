@@ -1,0 +1,55 @@
+# cave-ledger alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-ledger-slo
+    interval: 30s
+    rules:
+      - alert: LedgerSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_ledger_total{job="cave-ledger",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_ledger_total{job="cave-ledger"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-ledger fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-ledger/slo-burn-fast.md"
+      - alert: LedgerLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_ledger_request_duration_seconds_bucket{job="cave-ledger"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-ledger p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-ledger/latency.md"
+      - alert: LedgerSaturationHigh
+        expr: 'sum(rate(cave_ledger_inflight_requests{job="cave-ledger"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-ledger inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-ledger/saturation.md"
+      - alert: LedgerMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-ledger"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-ledger RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-ledger/memory.md"
+      - alert: LedgerHealthProbeFailing
+        expr: 'min(up{job="cave-ledger"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-ledger health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-ledger/health.md"

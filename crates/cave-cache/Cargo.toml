@@ -1,22 +1,35 @@
 [package]
 name = "cave-cache"
 description = "CAVE Cache — full Redis parity: RESP3, all data types, pub/sub, transactions, Lua, persistence"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-cache"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["redis", "cache", "database", "async", "networking"]
+categories = ["api-bindings", "database-implementations", "network-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-cave-core     = { path = "../cave-core" }
-tokio         = { workspace = true }
-serde         = { workspace = true }
-serde_json    = { workspace = true }
-uuid          = { workspace = true }
-chrono        = { workspace = true }
-thiserror     = { workspace = true }
-tracing       = { workspace = true }
-ring          = { workspace = true }
-regex         = { workspace = true }
-rand          = { workspace = true }
+cave-core      = { path = "../cave-core" }
+cave-kernel    = { path = "../cave-kernel" }
+bytes          = { workspace = true }
+tokio          = { workspace = true }
+serde          = { workspace = true }
+serde_json     = { workspace = true }
+uuid           = { workspace = true }
+chrono         = { workspace = true }
+thiserror      = { workspace = true }
+tracing        = { workspace = true }
+ring           = { workspace = true }
+regex          = { workspace = true }
+rand           = { workspace = true }
+rustls-pemfile = "2"
 
 [dev-dependencies]
-tokio         = { workspace = true }
+tokio          = { workspace = true }
+tempfile       = "3"
+rcgen          = "0.13"

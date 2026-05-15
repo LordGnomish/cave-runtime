@@ -95,3 +95,88 @@ groups:
           summary: "cave-artifacts health probe failing"
           description: "At least one instance reports up == 0."
           runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/health.md"
+
+  # Artifact-platform-specific alerts (registry/scan/replication/cosign).
+  # These ride on the cave-artifacts metric surface introduced alongside
+  # the consolidated harbor + pulp + nexus + cosign module set.
+  - name: cave-artifacts-platform
+    interval: 30s
+    rules:
+      - alert: RegistryBackendDown
+        expr: 'min(artifacts_backend_up{job="cave-artifacts"}) by (backend) < 1'
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "false"
+        annotations:
+          summary: "cave-artifacts backend {{ $labels.backend }} reports down"
+          description: "Sub-module health probe (harbor / pulp / nexus / cosign) is failing."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/backend-down.md"
+      - alert: ScanBacklogGrowing
+        expr: 'sum(artifacts_scan_queue_depth{job="cave-artifacts"}) > 200'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Vulnerability scan queue depth > 200"
+          description: "Trivy/Grype workers cannot keep up with submission rate."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/scan-backlog.md"
+      - alert: ReplicationFallingBehind
+        expr: 'max(artifacts_replication_lag_seconds{job="cave-artifacts"}) by (policy, target) > 900'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Replication policy {{ $labels.policy }} → {{ $labels.target }} > 15 min behind"
+          description: "Replication lag = {{ $value }}s. Investigate target reachability + bandwidth."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/replication-lag.md"
+      - alert: StorageHighWatermark
+        expr: 'sum(artifacts_storage_bytes{job="cave-artifacts"}) by (backend) > 1.5 * 1024 * 1024 * 1024 * 1024'
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-artifacts {{ $labels.backend }} storage > 1.5 TiB"
+          description: "Per-backend on-disk usage crossed the high-watermark threshold; consider cleanup policies or capacity bump."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/storage-watermark.md"
+      - alert: SignatureVerifyFailuresSpike
+        expr: |
+          (
+            sum(rate(cosign_verify_total{job="cave-artifacts",outcome="failed"}[10m]))
+            /
+            clamp_min(sum(rate(cosign_verify_total{job="cave-artifacts"}[10m])), 1)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cosign verify failure rate > 5% over 10m"
+          description: "Failed verifications fraction = {{ $value | humanizePercentage }}. Possible key compromise, payload tampering, or broken trust store."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/cosign-verify-failures.md"
+      - alert: PqcKeyMaterialExpiring
+        expr: '(time() - min(cosign_key_created_timestamp_seconds{job="cave-artifacts",alg="ml-dsa-65"}) by (key_id)) / 86400 > 90'
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "PQC key {{ $labels.key_id }} > 90 days old"
+          description: "ML-DSA-65 keys should rotate at least quarterly per ADR-015."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/pqc-rotation.md"
+      - alert: CosignKeyRotationOverdue
+        expr: '(time() - min(cosign_key_created_timestamp_seconds{job="cave-artifacts",alg="ecdsa-p256"}) by (key_id)) / 86400 > 365'
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Classic key {{ $labels.key_id }} > 365 days old"
+          description: "ECDSA-P256 signing keys must rotate annually."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/cosign-classic-rotation.md"
+      - alert: RetentionPolicyViolation
+        expr: 'sum(artifacts_retention_violations_total{job="cave-artifacts"}) > 0'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Retention policy violations detected (count = {{ $value }})"
+          description: "Assets exist that should have been purged by an attached cleanup policy. Schedule run or investigate evaluator."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-artifacts/retention-violations.md"

@@ -11,7 +11,15 @@
 org     = "falcosecurity"
 repo    = "falco"
 version = "v0.36.0"
+name    = "Falco"
+license = "Apache-2.0"
+language= "C++"
+url     = "https://github.com/falcosecurity/falco"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-security"
 description = "Falco-equivalent runtime detection (rules engine + condition lang + alerts) + Trivy-style image/fs/config scanning + SBOM"
@@ -312,3 +320,12 @@ local_path    = "/api/sbom/{image}"
 kind          = "http"
 upstream_path = "/api/security/health"
 local_path    = "/api/security/health"
+
+[portal_ui]
+upstream_ui  = "Falco (limited)"
+upstream_url = "https://falco.org/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Falcosidekick UI is partial"
+last_audit   = "2026-05-11"

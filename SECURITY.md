@@ -27,7 +27,7 @@ We will:
 
 ## Post-quantum cryptography
 
-Cave Runtime is post-quantum-crypto ready (see [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md)). Reports that identify:
+Cave Runtime is on a post-quantum-crypto migration path (see [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md)). Reports that identify:
 
 - Classical-only paths in new code (RSA/ECDSA/Ed25519 without a PQC pair),
 - TLS handshakes that do not offer a hybrid PQC + classical key exchange,

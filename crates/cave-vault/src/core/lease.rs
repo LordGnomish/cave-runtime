@@ -105,3 +105,75 @@ impl LeaseStore {
         count
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_lease(path: &str, ttl: i64, renewable: bool) -> Lease {
+        Lease::new(path, "tok-test", "secret/", ttl, ttl, renewable)
+    }
+
+    #[test]
+    fn test_lease_creation_and_lookup() {
+        let mut store = LeaseStore::default();
+        let lease = make_lease("secret/data/foo", 60, true);
+        let id = store.put(lease);
+        assert!(store.get(&id).is_some());
+        assert_eq!(store.get(&id).unwrap().path, "secret/data/foo");
+        assert_eq!(store.get(&id).unwrap().ttl, 60);
+    }
+
+    #[test]
+    fn test_lease_renew() {
+        let mut store = LeaseStore::default();
+        let id = store.put(make_lease("secret/data/x", 30, true));
+        let renewed = store.renew(&id, 20).unwrap();
+        assert_eq!(renewed.ttl, 20);
+    }
+
+    #[test]
+    fn test_lease_renew_non_renewable_fails() {
+        let mut store = LeaseStore::default();
+        let id = store.put(make_lease("secret/data/y", 30, false));
+        assert!(store.renew(&id, 20).is_err());
+    }
+
+    #[test]
+    fn test_lease_revoke() {
+        let mut store = LeaseStore::default();
+        let id = store.put(make_lease("secret/data/z", 30, true));
+        assert!(store.revoke(&id));
+        assert!(store.get(&id).is_none());
+        assert!(!store.revoke(&id)); // second revoke is a no-op
+    }
+
+    #[test]
+    fn test_lease_revoke_by_token() {
+        let mut store = LeaseStore::default();
+        store.put(Lease::new("a", "tok-1", "m/", 30, 30, true));
+        store.put(Lease::new("b", "tok-1", "m/", 30, 30, true));
+        store.put(Lease::new("c", "tok-2", "m/", 30, 30, true));
+        let removed = store.revoke_by_token("tok-1");
+        assert_eq!(removed, 2);
+        assert_eq!(store.list_by_prefix("").len(), 1);
+    }
+
+    #[test]
+    fn test_lease_revoke_prefix() {
+        let mut store = LeaseStore::default();
+        store.put(Lease::new("kv/data/a", "t", "m/", 30, 30, true));
+        store.put(Lease::new("kv/data/b", "t", "m/", 30, 30, true));
+        store.put(Lease::new("other/x", "t", "m/", 30, 30, true));
+        let removed = store.revoke_prefix("kv/data");
+        assert_eq!(removed, 2);
+        assert_eq!(store.list_by_prefix("").len(), 1);
+    }
+
+    #[test]
+    fn test_lease_remaining_secs_positive_for_future_expiry() {
+        let lease = make_lease("p", 100, true);
+        assert!(lease.remaining_secs() > 0);
+        assert!(lease.remaining_secs() <= 100);
+    }
+}

@@ -3,10 +3,17 @@
 //! The portal renders log streams natively (no Grafana Loki UI handoff). The
 //! data layer ingests structured log entries and supports text-substring
 //! search plus level filtering.
+//!
+//! Sweep-009 adoption: [`LogEntry::as_kernel_record`] converts a
+//! portal-api log entry into a `cave_kernel::observability::LogRecord`.
+//! The kernel shape is what every other cave module emits to — by
+//! pinning the conversion here, an external log forwarder can ingest
+//! portal-api entries with the same parser it uses everywhere else.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
+use cave_kernel::observability::{LogLevel as KernelLogLevel, LogRecord};
 use serde::{Deserialize, Serialize};
 
 use crate::routes::rbac::{Guard, GuardError, Principal};
@@ -31,6 +38,19 @@ impl LogLevel {
             LogLevel::Error => 4,
         }
     }
+
+    /// Bridge to `cave_kernel::observability::LogLevel`. The variant
+    /// names match 1:1, so this is a tag-translation cast — no
+    /// information loss either way.
+    pub fn to_kernel(&self) -> KernelLogLevel {
+        match self {
+            LogLevel::Trace => KernelLogLevel::Trace,
+            LogLevel::Debug => KernelLogLevel::Debug,
+            LogLevel::Info => KernelLogLevel::Info,
+            LogLevel::Warn => KernelLogLevel::Warn,
+            LogLevel::Error => KernelLogLevel::Error,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,6 +62,39 @@ pub struct LogEntry {
     pub level: LogLevel,
     pub message: String,
     pub timestamp: String,
+}
+
+impl LogEntry {
+    /// Convert a portal-api log entry into the kernel's structured
+    /// `LogRecord`. The `tenant` / `app` / `instance` / `id` fields
+    /// surface as kernel record `fields`; the `target` is the app
+    /// name; the `message` is preserved verbatim. Timestamp parsing
+    /// is best-effort — a non-RFC3339 timestamp falls back to "now"
+    /// rather than failing.
+    pub fn as_kernel_record(&self) -> LogRecord {
+        let ts_ms = parse_rfc3339_to_unix_ms(&self.timestamp);
+        let mut rec = LogRecord {
+            level: self.level.to_kernel(),
+            timestamp_unix_ms: ts_ms,
+            target: self.app.clone(),
+            message: self.message.clone(),
+            fields: std::collections::BTreeMap::new(),
+        };
+        rec.fields.insert("tenant".into(), self.tenant.clone());
+        rec.fields.insert("instance".into(), self.instance.clone());
+        rec.fields.insert("id".into(), self.id.to_string());
+        rec
+    }
+}
+
+/// Parse a simplified RFC3339 timestamp (e.g. `1970-01-01T00:00:00Z`)
+/// into a unix-ms value. Failure path returns 0 so the kernel record
+/// always has a non-panicking timestamp.
+fn parse_rfc3339_to_unix_ms(s: &str) -> u64 {
+    match chrono::DateTime::parse_from_rfc3339(s) {
+        Ok(dt) => dt.timestamp_millis().max(0) as u64,
+        Err(_) => 0,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,6 +248,50 @@ mod tests {
         assert!(LogLevel::Trace.rank() < LogLevel::Debug.rank());
         assert!(LogLevel::Info.rank() < LogLevel::Warn.rank());
         assert!(LogLevel::Warn.rank() < LogLevel::Error.rank());
+    }
+
+    #[test]
+    fn level_to_kernel_preserves_ordering() {
+        assert!(LogLevel::Trace.to_kernel() < LogLevel::Debug.to_kernel());
+        assert!(LogLevel::Info.to_kernel() < LogLevel::Warn.to_kernel());
+        assert!(LogLevel::Warn.to_kernel() < LogLevel::Error.to_kernel());
+    }
+
+    #[test]
+    fn as_kernel_record_surfaces_portal_fields_as_kernel_fields() {
+        let entry = LogEntry {
+            id: 42,
+            tenant: "acme".into(),
+            app: "web".into(),
+            instance: "i-7".into(),
+            level: LogLevel::Warn,
+            message: "rate limited".into(),
+            timestamp: "2026-05-12T10:00:00Z".into(),
+        };
+        let rec = entry.as_kernel_record();
+        assert_eq!(rec.level, KernelLogLevel::Warn);
+        assert_eq!(rec.target, "web");
+        assert_eq!(rec.message, "rate limited");
+        assert_eq!(rec.fields.get("tenant").unwrap(), "acme");
+        assert_eq!(rec.fields.get("instance").unwrap(), "i-7");
+        assert_eq!(rec.fields.get("id").unwrap(), "42");
+        // 2026-05-12T10:00:00Z in unix ms.
+        assert!(rec.timestamp_unix_ms > 0);
+    }
+
+    #[test]
+    fn as_kernel_record_handles_malformed_timestamp() {
+        let entry = LogEntry {
+            id: 1,
+            tenant: "t".into(),
+            app: "a".into(),
+            instance: "i".into(),
+            level: LogLevel::Info,
+            message: "m".into(),
+            timestamp: "not-a-date".into(),
+        };
+        let rec = entry.as_kernel_record();
+        assert_eq!(rec.timestamp_unix_ms, 0);
     }
 
     #[test]

@@ -5,6 +5,7 @@
 //! the active-deadline timer.
 
 use crate::types::{Cite, ControllerError, Reconcile, TenantId};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,6 +16,12 @@ pub struct JobSpec {
     pub parallelism: u32,
     pub backoff_limit: u32,
     pub suspended: bool,
+    /// Mirrors `Job.Spec.ActiveDeadlineSeconds`. When set, the controller
+    /// drains active pods and emits `JobReasonDeadlineExceeded` once
+    /// `now - status.start_time >= active_deadline_seconds`. `None`
+    /// means no deadline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_deadline_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -22,6 +29,11 @@ pub struct JobStatus {
     pub active: u32,
     pub succeeded: u32,
     pub failed: u32,
+    /// Mirrors `Job.Status.StartTime`. Set by the controller when the
+    /// first pod is created. `pastActiveDeadline` is `false` until this
+    /// is populated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_time: Option<DateTime<Utc>>,
 }
 
 /// True iff `succeeded >= completions`. Mirrors `IsJobFinished` in
@@ -36,15 +48,81 @@ pub fn past_backoff(spec: &JobSpec, status: &JobStatus) -> bool {
     status.failed > spec.backoff_limit
 }
 
+/// Returns true once `now - status.start_time >= active_deadline_seconds`.
+/// Mirrors `pkg/controller/job/job_controller.go::pastActiveDeadline`:
+///
+/// ```go
+/// func (jm *Controller) pastActiveDeadline(job *batch.Job) bool {
+///     if job.Spec.ActiveDeadlineSeconds == nil ||
+///        job.Status.StartTime == nil ||
+///        jobSuspended(job) {
+///         return false
+///     }
+///     duration := jm.clock.Since(job.Status.StartTime.Time)
+///     allowedDuration := time.Duration(*job.Spec.ActiveDeadlineSeconds) * time.Second
+///     return duration >= allowedDuration
+/// }
+/// ```
+///
+/// `now` is passed in (rather than calling `Utc::now`) so tests can
+/// pin the clock — same pattern as the upstream `clock.Clock` interface.
+pub fn past_active_deadline(
+    spec: &JobSpec,
+    status: &JobStatus,
+    now: DateTime<Utc>,
+) -> bool {
+    if spec.suspended {
+        return false;
+    }
+    let Some(deadline) = spec.active_deadline_seconds else {
+        return false;
+    };
+    let Some(t0) = status.start_time else {
+        return false;
+    };
+    (now - t0) >= Duration::seconds(deadline)
+}
+
 /// Mirrors `manageJob` in `pkg/controller/job/job_controller.go`. Returns the
 /// number of pods to create (clamped by parallelism and remaining completions).
+///
+/// Uses [`Utc::now`] for the activeDeadlineSeconds clock; tests that need a
+/// deterministic clock should call [`reconcile_with_clock`].
 pub fn reconcile(
     spec: &JobSpec,
     status: &JobStatus,
+    tenant: &TenantId,
+) -> Result<Reconcile, ControllerError> {
+    reconcile_with_clock(spec, status, tenant, Utc::now())
+}
+
+/// Same as [`reconcile`] but with an injectable clock.
+///
+/// Upstream behaviour for `pastActiveDeadline`:
+///   * The controller marks the Job failed with reason
+///     `JobReasonDeadlineExceeded` and deletes every active pod.
+///   * Subsequent passes find `status.active == 0` and emit no further
+///     work, while the failure condition remains sticky on the status.
+///
+/// Mirrors `Controller.syncJob`'s ordering: deadline check sits *after*
+/// the `suspended` short-circuit and *before* the parallelism / completions
+/// calculation, so a deadline-expired Job never spawns new pods.
+pub fn reconcile_with_clock(
+    spec: &JobSpec,
+    status: &JobStatus,
     _tenant: &TenantId,
+    now: DateTime<Utc>,
 ) -> Result<Reconcile, ControllerError> {
     if spec.suspended {
         // Suspended jobs delete any active pods.
+        return Ok(if status.active > 0 {
+            Reconcile::Delete(status.active)
+        } else {
+            Reconcile::NoOp
+        });
+    }
+    if past_active_deadline(spec, status, now) {
+        // Deadline exceeded — drain any active pods; once drained, NoOp.
         return Ok(if status.active > 0 {
             Reconcile::Delete(status.active)
         } else {
@@ -137,6 +215,7 @@ mod tests {
             parallelism,
             backoff_limit: backoff,
             suspended,
+            active_deadline_seconds: None,
         }
     }
 
@@ -160,7 +239,7 @@ mod tests {
             "tenant-job-complete"
         );
         let s = job(3, 5, 6, false);
-        let st = JobStatus { active: 0, succeeded: 5, failed: 0 };
+        let st = JobStatus { active: 0, succeeded: 5, failed: 0, start_time: None };
         assert!(is_complete(&s, &st));
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
     }
@@ -173,7 +252,7 @@ mod tests {
             "tenant-job-backoff"
         );
         let s = job(2, 10, 3, false);
-        let st = JobStatus { active: 1, succeeded: 0, failed: 4 };
+        let st = JobStatus { active: 1, succeeded: 0, failed: 4, start_time: None };
         assert!(past_backoff(&s, &st));
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp);
     }
@@ -186,7 +265,7 @@ mod tests {
             "tenant-job-suspended"
         );
         let s = job(4, 10, 6, true);
-        let st = JobStatus { active: 4, succeeded: 0, failed: 0 };
+        let st = JobStatus { active: 4, succeeded: 0, failed: 0, start_time: None };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Delete(4));
     }
 
@@ -203,7 +282,7 @@ mod tests {
             "tenant-job-remaining-cap"
         );
         let s = job(/*par=*/ 5, /*compl=*/ 8, /*backoff=*/ 6, /*suspend=*/ false);
-        let st = JobStatus { active: 0, succeeded: 7, failed: 0 };
+        let st = JobStatus { active: 0, succeeded: 7, failed: 0, start_time: None };
         // remaining = 8 - 7 = 1, parallelism = 5 → launch 1.
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::Create(1));
     }
@@ -219,7 +298,7 @@ mod tests {
             "tenant-job-at-parallelism"
         );
         let s = job(3, 10, 6, false);
-        let st = JobStatus { active: 3, succeeded: 0, failed: 0 };
+        let st = JobStatus { active: 3, succeeded: 0, failed: 0, start_time: None };
         assert_eq!(reconcile(&s, &st, &tenant).unwrap(), Reconcile::NoOp,
             "no surge while at parallelism cap");
     }
@@ -298,10 +377,10 @@ mod tests {
         );
         let _ = tenant;
         let s = job(2, 10, /*backoff=*/ 3, false);
-        let on_edge = JobStatus { active: 0, succeeded: 0, failed: 3 };
+        let on_edge = JobStatus { active: 0, succeeded: 0, failed: 3, start_time: None };
         assert!(!past_backoff(&s, &on_edge),
             "failed == backoff_limit is at the boundary, not past");
-        let over = JobStatus { active: 0, succeeded: 0, failed: 4 };
+        let over = JobStatus { active: 0, succeeded: 0, failed: 4, start_time: None };
         assert!(past_backoff(&s, &over));
     }
 }

@@ -5,7 +5,7 @@
 //! exposes (`PodsTable`, `ContainerInfo`).
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, htmx_button, page_shell, table};
+use crate::admin::render::{escape, htmx_button, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, CriContainer, CriSandbox};
 use crate::admin::types::Cite;
 
@@ -75,7 +75,9 @@ pub fn render_list_page(state: &AdminState, ctx: &RequestCtx) -> Result<String, 
         tbl = table(&["sandbox", "pod", "state"], &table_rows),
         btn = htmx_button("/admin/cri?refresh=1", "main", "Refresh"),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/cri",
         &format!("cri · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

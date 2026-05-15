@@ -95,3 +95,69 @@ groups:
           summary: "cave-docdb health probe failing"
           description: "At least one instance reports up == 0."
           runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/health.md"
+
+  - name: cave-docdb-deep
+    interval: 30s
+    rules:
+      - alert: DocdbReplicationLagHigh
+        expr: 'max(docdb_replication_lag_seconds{job="cave-docdb"}) > 10'
+        for: 5m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Replica set lag > 10s"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/replication-lag.md"
+      - alert: DocdbOplogWindowShort
+        expr: 'min(docdb_oplog_window_seconds{job="cave-docdb"}) < 24 * 3600'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Oplog window < 24h"
+          description: "Replica catch-up window is too narrow — risk of full re-sync after outage."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/oplog-window.md"
+      - alert: DocdbChangeStreamLagHigh
+        expr: 'max(docdb_change_stream_lag_seconds{job="cave-docdb"}) > 60'
+        for: 10m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Change-stream consumer > 60s behind oplog"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/change-stream-lag.md"
+      - alert: DocdbCollscanRateHigh
+        expr: |
+          sum(rate(docdb_query_plan_total{job="cave-docdb",kind="collscan"}[5m]))
+          /
+          clamp_min(sum(rate(docdb_query_plan_total{job="cave-docdb"}[5m])), 1)
+          > 0.2
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Collection-scan rate > 20% of queries"
+          description: "Likely missing indexes — inspect index advisor."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/collscan-rate.md"
+      - alert: DocdbActiveCursorsLeak
+        expr: 'sum(docdb_active_cursors{job="cave-docdb"}) > 5000'
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "> 5000 open server-side cursors"
+          description: "Sustained growth indicates client-side cursor leak."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/cursor-leak.md"
+      - alert: DocdbWriteConflictRateHigh
+        expr: |
+          sum(rate(docdb_write_conflicts_total{job="cave-docdb"}[5m]))
+          /
+          clamp_min(sum(rate(docdb_writes_total{job="cave-docdb"}[5m])), 1)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          tenant_scoped: "true"
+        annotations:
+          summary: "Write conflict rate > 5%"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-docdb/write-conflicts.md"

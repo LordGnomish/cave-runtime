@@ -10,7 +10,15 @@
 org     = "prometheus"
 repo    = "prometheus"
 version = "v2.48.0"
+name    = "Prometheus"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/prometheus/prometheus"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-metrics"
 description = "Prometheus reimplementation — TSDB + PromQL + scrape + remote_write + rules + Alertmanager-equivalent silence/notify"
@@ -421,3 +429,12 @@ local_path    = "/api/v1/metrics/rules"
 kind          = "http"
 upstream_path = "/api/v1/targets"
 local_path    = "/api/v1/metrics/targets"
+
+[portal_ui]
+upstream_ui  = "Prometheus expr browser"
+upstream_url = "https://prometheus.io/docs/"
+status       = "complete"
+loc          = 650
+priority     = "P1"
+notes        = "admin/prometheus/: targets/rules/tsdb/flags/status (23 tests). See PORTAL_UI_OVERRIDE."
+last_audit   = "2026-05-11"

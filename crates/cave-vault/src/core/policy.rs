@@ -453,4 +453,102 @@ path "secret/admin/*" {
         };
         assert!(!policy.allows("secret/forbidden", &Capability::Read));
     }
+
+    #[test]
+    fn test_policy_allows_matching_path() {
+        let policy = Policy {
+            name: "p".into(),
+            rules: vec![PolicyRule {
+                path: "secret/data/myapp".into(),
+                capabilities: vec![Capability::Read, Capability::Update],
+                ..Default::default()
+            }],
+            raw: String::new(),
+        };
+        assert!(policy.allows("secret/data/myapp", &Capability::Read));
+        assert!(policy.allows("secret/data/myapp", &Capability::Update));
+        assert!(!policy.allows("secret/data/myapp", &Capability::Delete));
+        assert!(!policy.allows("secret/data/other", &Capability::Read));
+    }
+
+    #[test]
+    fn test_policy_deny_overrides() {
+        // A rule with Deny in capabilities must reject all caps regardless of others.
+        let r = PolicyRule {
+            path: "secret/x".into(),
+            capabilities: vec![Capability::Read, Capability::Deny],
+            ..Default::default()
+        };
+        assert!(!r.allows(&Capability::Read));
+        assert!(!r.allows(&Capability::Update));
+    }
+
+    #[test]
+    fn test_root_policy_allows_all() {
+        let store = PolicyStore::new();
+        let names = vec!["root".to_string()];
+        // Any path, any cap should be allowed for the root policy.
+        assert!(store.check(&names, "v1/secret/data/anything", &Capability::Delete));
+        assert!(store.check(&names, "sys/seal", &Capability::Sudo));
+        assert!(store.check(&names, "auth/token/revoke", &Capability::Update));
+    }
+
+    #[test]
+    fn test_policy_glob_suffix_match() {
+        let r = PolicyRule {
+            path: "kv/data/*".into(),
+            capabilities: vec![Capability::Read],
+            ..Default::default()
+        };
+        assert!(r.matches("kv/data/foo"));
+        assert!(r.matches("kv/data/foo/bar"));
+        assert!(!r.matches("kv/metadata/foo"));
+    }
+
+    #[test]
+    fn test_policy_plus_segment_match() {
+        // `+` matches a single segment without slashes.
+        let r = PolicyRule {
+            path: "kv/data/+".into(),
+            capabilities: vec![Capability::Read],
+            ..Default::default()
+        };
+        assert!(r.matches("kv/data/foo"));
+        assert!(!r.matches("kv/data/foo/bar"));
+    }
+
+    #[test]
+    fn test_policy_check_required_parameters() {
+        let r = PolicyRule {
+            path: "auth/x".into(),
+            capabilities: vec![Capability::Update],
+            required_parameters: vec!["username".into()],
+            ..Default::default()
+        };
+        assert!(r.check_parameters(["username"]).is_ok());
+        assert!(r.check_parameters(["password"]).is_err());
+    }
+
+    #[test]
+    fn test_policy_store_default_includes_default() {
+        let store = PolicyStore::new();
+        let names = store.list();
+        assert!(names.contains(&"root".to_string()));
+        assert!(names.contains(&"default".to_string()));
+    }
+
+    #[test]
+    fn test_policy_store_root_default_undeletable() {
+        let mut store = PolicyStore::new();
+        assert!(!store.delete("root"));
+        assert!(!store.delete("default"));
+    }
+
+    #[test]
+    fn test_policy_capability_from_str_all_variants() {
+        for s in ["create", "read", "update", "delete", "list", "sudo", "deny", "patch"] {
+            assert!(Capability::from_str(s).is_some(), "missing {s}");
+        }
+        assert!(Capability::from_str("invalid").is_none());
+    }
 }

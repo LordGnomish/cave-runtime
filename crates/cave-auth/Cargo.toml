@@ -1,6 +1,14 @@
 [package]
 name = "cave-auth"
 description = "Full Okta AuthN+AuthZ — OIDC, RBAC, ABAC, SCIM 2.0, PAT, sessions, multi-tenancy"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-auth"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["auth", "oidc", "rbac", "scim", "identity"]
+categories = ["authentication", "web-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -23,3 +31,6 @@ ring = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
 anyhow = { workspace = true }
+# SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
+quick-xml = "0.37"
+flate2    = "1.0"

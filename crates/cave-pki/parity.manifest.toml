@@ -13,8 +13,17 @@
 org     = "smallstep"
 repo    = "certificates"
 version = "v0.30.2"
-
+name    = "step-ca"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/smallstep/certificates"
 [module]
 name        = "cave-pki"
 description = "Private PKI / internal CA — step-ca reimplementation"
 source_root = "src"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

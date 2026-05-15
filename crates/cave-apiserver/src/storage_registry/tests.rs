@@ -339,22 +339,22 @@ fn tenant_index_upsert_overwrites_rv() {
 // `#[ignore]` — gated on real etcd / hyper streaming wire
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn etcd_consistent_read_round_trip() {
     // pending: requires real etcd v3 client to drive consistent-read fall-through
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn streaming_list_chunked_transfer_encoding() {
     // pending: requires hyper streaming response with `Transfer-Encoding: chunked`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn watch_progress_periodic_emit_via_timer() {
     // pending: requires real-time scheduler — assert bookmark every 10s
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn streaming_list_resumes_after_disconnect() {
     // pending: requires watch cache + RV continuity check
 }

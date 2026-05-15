@@ -383,27 +383,27 @@ fn claim_mappings_uid_extracted() {
 // `#[ignore]` — gated on real CEL / OIDC discovery
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn cel_claim_mapping_expression_evaluates() {
     // pending: requires CEL evaluator (M1) — `claims.email + '@' + claims.iss`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn oidc_discovery_fetches_jwks() {
     // pending: requires HTTPS + JSON parser for `<issuer>/.well-known/openid-configuration`
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn jwt_signature_verification_against_jwks() {
     // pending: requires `jsonwebtoken` or rustcrypto — RS256/ES256/EdDSA
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn ratcheting_validates_full_object_when_subtree_changed() {
     // pending: requires real CRD validator integration
 }
 
-#[test] #[ignore]
+#[test] #[cfg(feature = "live-integration")]
 fn in_place_resize_status_progression() {
     // pending: requires kubelet-side state machine — Proposed→InProgress→Deferred
 }

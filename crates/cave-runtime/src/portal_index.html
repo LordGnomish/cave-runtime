@@ -239,6 +239,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
         <span class="search-btn-kbd">⌘K</span>
       </button>
     </div>
+    <div style="padding:6px 0 4px;border-bottom:1px solid var(--border)">
+      <div style="padding:4px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text-muted);font-weight:600">Portal</div>
+      <a href="/admin/upstream" class="nav-item" style="text-decoration:none">⇪ Upstream Tracker</a>
+      <a href="/admin/adr" class="nav-item" style="text-decoration:none">📜 ADR Browser</a>
+      <a href="/attribution" class="nav-item" style="text-decoration:none">⌗ Attribution</a>
+    </div>
     <div class="sidebar-nav" id="sidebar-nav"></div>
     <div class="sidebar-footer">
       v<span id="rv">…</span> · <span id="ru">—</span>
@@ -255,6 +261,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       </div>
       <div class="topbar-right">
         <button class="btn-topbar" onclick="openScaffold()">＋ New Project</button>
+        <div class="hbadge" id="userbadge" title="Click to sign out" style="cursor:pointer" onclick="if(confirm('Sign out?'))location.href='/api/auth/logout'">
+          <span class="sdot" style="background:var(--text-muted)"></span>
+          <span id="userlabel">…</span>
+        </div>
         <div class="hbadge">
           <span class="sdot dm" id="gsdot"></span>
           <span id="gstext">Connecting…</span>
@@ -319,6 +329,22 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 </div>
 
 <script>
+// ── Persona session probe ────────────────────────────────────────────────────
+// Top-bar badge shows the signed-in user, or "sign in" if no session cookie.
+(async () => {
+  try {
+    const r = await fetch('/api/auth/whoami', { credentials: 'include' });
+    const j = await r.json();
+    const lab = document.getElementById('userlabel');
+    if (j.authenticated) {
+      lab.textContent = `${j.email} · ${(j.roles || []).join(',')}`;
+    } else {
+      lab.textContent = 'sign in';
+      document.getElementById('userbadge').onclick = () => location.href = '/login';
+    }
+  } catch (_) { /* offline mode — leave label blank */ }
+})();
+
 // ── Module Registry ──────────────────────────────────────────────────────────
 
 const MODS = {
@@ -359,10 +385,11 @@ const MODS = {
   // Operations
   backup:{id:'backup',name:'Backup',cat:'operations',desc:'Kubernetes backup and disaster recovery with CSI snapshots',up:'Velero',phase:2,status:'pending',icon:'💾',features:['PV snapshots','Schedule policies','Cross-cluster restore','CSI integration'],ep:null,loc:440,relatedAdrs:[46,80],github:'https://github.com/vmware-tanzu/velero'},
   cost:{id:'cost',name:'Cost',cat:'operations',desc:'Kubernetes cost allocation and team chargeback reports',up:'OpenCost',phase:2,status:'pending',icon:'💰',features:['Pod cost allocation','Namespace chargeback','Cloud pricing','Reports'],ep:null,loc:400,relatedAdrs:[96],github:'https://github.com/opencost/opencost'},
-  // Data persistence
-  pg:{id:'pg',name:'PostgreSQL',cat:'data',desc:'PostgreSQL management — instance registry, pool stats, slow-query log, pg_dump/pg_restore, replication health',up:'CloudNativePG',phase:2,status:'healthy',icon:'🐘',features:['Instance lifecycle','PgBouncer-style pooling','pg_stat_statements','pg_dump / pg_restore','Replication & PITR'],ep:'/api/pg/health',loc:1900,relatedAdrs:[47,43],github:'https://github.com/cloudnative-pg/cloudnative-pg'},
-  docdb:{id:'docdb',name:'DocDB',cat:'data',desc:'MongoDB-compatible document database — wire protocol + BSON + aggregation, fully in-memory Rust engine',up:'MongoDB CE',phase:2,status:'healthy',icon:'📄',features:['MongoDB wire protocol','BSON encode/decode','Query operators ($eq/$gt/$in/$or)','Update operators ($set/$inc/$push)','Aggregation pipeline'],ep:'/api/docdb/health',loc:2400,relatedAdrs:[],github:'https://github.com/mongodb/mongo'},
-  cache:{id:'cache',name:'Cache',cat:'data',desc:'Redis/Valkey-compatible cache — RESP3, all data types, pub/sub, transactions, Lua scripting, persistence',up:'Valkey',phase:2,status:'healthy',icon:'⚡',features:['RESP2 / RESP3 protocol','Strings, Lists, Sets, ZSets, Hashes, Streams','Pub/Sub & pattern subscribe','MULTI/EXEC transactions','EVAL / EVALSHA scripting','RDB & AOF persistence'],ep:'/api/cache/health',loc:4000,relatedAdrs:[],github:'https://github.com/valkey-io/valkey'},
+  // Data persistence (ADR-147)
+  'rdbms-operator':{id:'rdbms-operator',name:'RDBMS Operator',cat:'data',desc:'PostgreSQL operator (CloudNativePG-style) — clusters, primary/replica, backups, failover (renamed from cave-pg per ADR-147)',up:'CloudNativePG',phase:2,status:'healthy',icon:'🐘',features:['Cluster CRD reconciler','Primary/replica election','Barman backup integration','PgBouncer-style pooling','Failover history'],ep:'/api/pg/health',loc:1900,relatedAdrs:[47,43,147],github:'https://github.com/cloudnative-pg/cloudnative-pg'},
+  lakehouse:{id:'lakehouse',name:'Lakehouse',cat:'data',desc:'Iceberg + DataFusion lakehouse — table format, snapshots, time-travel, vectorized SQL (consolidated per ADR-147)',up:'Iceberg + DataFusion',phase:2,status:'healthy',icon:'🏔',features:['Iceberg spec v2 metadata','Snapshot isolation + time-travel','DataFusion logical/physical plans','RecordBatch vectorized executor','Compaction + small-file detection'],ep:null,loc:5800,relatedAdrs:[147],github:'https://github.com/apache/iceberg-rust'},
+  docdb:{id:'docdb',name:'DocDB',cat:'data',desc:'MongoDB-compatible document database — wire protocol + BSON + aggregation, fully in-memory Rust engine',up:'MongoDB CE',phase:2,status:'healthy',icon:'📄',features:['MongoDB wire protocol','BSON encode/decode','Query operators ($eq/$gt/$in/$or)','Update operators ($set/$inc/$push)','Aggregation pipeline'],ep:'/api/docdb/health',loc:2400,relatedAdrs:[147],github:'https://github.com/mongodb/mongo'},
+  cache:{id:'cache',name:'Cache',cat:'data',desc:'Redis/Valkey-compatible cache — RESP3, all data types, pub/sub, transactions, Lua scripting, persistence',up:'Valkey',phase:2,status:'healthy',icon:'⚡',features:['RESP2 / RESP3 protocol','Strings, Lists, Sets, ZSets, Hashes, Streams','Pub/Sub & pattern subscribe','MULTI/EXEC transactions','EVAL / EVALSHA scripting','RDB & AOF persistence'],ep:'/api/cache/health',loc:4000,relatedAdrs:[147],github:'https://github.com/valkey-io/valkey'},
   // Kubernetes Core
   apiserver:{id:'apiserver',name:'API Server',cat:'k8s',desc:'kube-apiserver replacement — REST surface for core/v1, apps/v1, batch/v1, networking.k8s.io/v1',up:'kube-apiserver',phase:1,status:'healthy',icon:'🛂',features:['core/v1 resources','apps/v1 (Deployments, StatefulSets, DaemonSets, ReplicaSets)','batch/v1 (Jobs, CronJobs)','networking.k8s.io/v1 (Ingresses)','healthz / readyz','kubectl-compatible REST'],ep:'/api/apiserver/health',loc:6941,relatedAdrs:[],github:'https://github.com/kubernetes/kubernetes'},
   etcd:{id:'etcd',name:'etcd',cat:'k8s',desc:'Distributed key-value store — etcd v3 wire-compatible (KV, watch, lease, auth, cluster, maintenance)',up:'etcd',phase:1,status:'healthy',icon:'🗝️',features:['MVCC store','Watch streams (SSE)','Lease grant/keepalive/revoke','Auth (users, roles, RBAC)','Cluster member ops','Maintenance (defrag, snapshot, hash, compact)'],ep:'/api/etcd/health',loc:5244,relatedAdrs:[],github:'https://github.com/etcd-io/etcd'},
@@ -378,7 +405,11 @@ const NAV=[
   {type:'link',id:'overview',label:'Overview',icon:'⊞'},
   {type:'link',id:'progress',label:'Runtime Progress',icon:'📈'},
   {type:'link',id:'upstream',label:'Upstream',icon:'📡'},
-  {type:'link',id:'adrs',label:'Decisions',icon:'📋'},
+  // 2026-05-14 dedup: the inline "Decisions" tab was the third UI
+  // showing the same docs/adr content. Removed in favour of the
+  // top-level "📜 ADR Browser" sidebar link that points at the
+  // canonical /admin/adr page (admin shell, persona-aware, internal/
+  // folder excluded). Hash `#/adrs` and `#/adr:NNN` now redirect.
   {type:'sec',id:'core',label:'Core Infrastructure',mods:['db','auth','upstream']},
   {type:'sec',id:'k8s',label:'Kubernetes Core',mods:['apiserver','etcd','cri','kubelet','scheduler','net','controller-manager','cloud-controller-manager']},
   {type:'sec',id:'security',label:'Security',mods:['secrets','certs','sign','policy','vulns','sbom','scan','pii','dast','pam']},
@@ -386,7 +417,7 @@ const NAV=[
   {type:'sec',id:'cicd',label:'CI / CD',mods:['lint','changelog','docs','registry','chaos']},
   {type:'sec',id:'platform',label:'Platform',mods:['flags','portal','chat','workflows','devlake']},
   {type:'sec',id:'operations',label:'Operations',mods:['backup','cost']},
-  {type:'sec',id:'data',label:'Data Persistence',mods:['pg','docdb','cache']},
+  {type:'sec',id:'data',label:'Data Persistence',mods:['rdbms-operator','lakehouse','docdb','cache']},
 ];
 
 const CAT_LABELS={core:'Core Infrastructure',k8s:'Kubernetes Core',security:'Security',observability:'Observability',cicd:'CI / CD',platform:'Platform',operations:'Operations',data:'Data Persistence'};
@@ -484,9 +515,6 @@ const S={
   searchOpen:false,
   sfocus:-1,
   sresults:[],
-  adrList:[],
-  adrScope:'All',
-  adrQuery:'',
   moduleHealth:{},
   upstreamCat:'All',
   upstreamQuery:'',
@@ -603,12 +631,16 @@ setInterval(fetchLiveParity,60000);
 // ── Router ───────────────────────────────────────────────────────────────────
 
 function go(page){
+  // 2026-05-14 dedup: ADR routes hop out to /admin/adr instead of
+  // taking over the SPA. Callers that still pass 'adrs' or 'adr:NNN'
+  // (e.g. lingering bookmarks) get a hard navigation to the canonical
+  // page; the SPA never tries to render them itself.
+  if(page==='adrs'){window.location='/admin/adr';return;}
+  if(page.startsWith('adr:')){window.location='/admin/adr/'+page.slice(4);return;}
   S.page=page;
   if(page==='overview') window.location.hash='#/';
   else if(page==='progress') window.location.hash='#/progress';
   else if(page==='upstream') window.location.hash='#/upstream';
-  else if(page==='adrs') window.location.hash='#/adrs';
-  else if(page.startsWith('adr:')) window.location.hash='#/adr/'+page.slice(4);
   else window.location.hash='#/m/'+page;
   renderPage();
   renderNav();
@@ -620,7 +652,9 @@ window.addEventListener('hashchange',()=>{
   if(!h||h==='#/'||h==='#'){S.page='overview';}
   else if(h==='#/progress'){S.page='progress';}
   else if(h==='#/upstream'){S.page='upstream';}
-  else if(h==='#/adrs'){S.page='adrs';}
+  // 2026-05-14: legacy `#/adrs` and `#/adr/NNN` bookmarks redirect.
+  else if(h==='#/adrs'){window.location='/admin/adr';return;}
+  else if(h.startsWith('#/adr/')){window.location='/admin/adr/'+h.slice(6);return;}
   else{
     const ma=h.match(/^#\/adr\/(.+)$/);
     if(ma){S.page='adr:'+ma[1];}
@@ -646,7 +680,9 @@ function closeSidebar(){
 
 function renderNav(){
   let h='';
-  const specialPages=['overview','upstream','adrs'];
+  // `adrs` removed from special-pages list 2026-05-14 — the Decisions
+  // tab no longer renders inside the SPA; it hops to /admin/adr.
+  const specialPages=['overview','upstream'];
   for(const item of NAV){
     if(item.type==='link'){
       const a=S.page===item.id;
@@ -669,8 +705,10 @@ function renderNav(){
       }
     }
   }
-  const bcMap={overview:'Overview',progress:'Runtime Progress',upstream:'Upstream',adrs:'Decisions'};
-  const label=S.page.startsWith('adr:')?'ADR-'+S.page.slice(4):(bcMap[S.page]||MODS[S.page]?.name||S.page);
+  // 2026-05-14: `adrs` + `adr:NNN` removed — SPA breadcrumb never
+  // sees those pages now because go() redirects them to /admin/adr.
+  const bcMap={overview:'Overview',progress:'Runtime Progress',upstream:'Upstream'};
+  const label=bcMap[S.page]||MODS[S.page]?.name||S.page;
   document.getElementById('sidebar-nav').innerHTML=h;
   document.getElementById('bc').textContent=label;
 }
@@ -682,8 +720,9 @@ function renderPage(){
   if(S.page==='overview') c.innerHTML=renderOverview();
   else if(S.page==='progress') loadProgress(c);
   else if(S.page==='upstream') c.innerHTML=renderUpstream();
-  else if(S.page==='adrs') loadAdrs(c);
-  else if(S.page.startsWith('adr:')) loadAdrDetail(S.page.slice(4),c);
+  // 2026-05-14: `adrs` + `adr:NNN` dispatch paths removed — go() and
+  // the hashchange handler now redirect to /admin/adr before the SPA
+  // ever sees these pages.
   else c.innerHTML=renderMod(MODS[S.page]);
 }
 
@@ -1020,156 +1059,6 @@ function renderUpstream(){
 function setUpstreamCat(cat){S.upstreamCat=cat;renderPage();}
 function setUpstreamQuery(q){S.upstreamQuery=q;renderPage();}
 
-// ── Feature 4: ADR Browser ───────────────────────────────────────────────────
-
-async function loadAdrs(container){
-  container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div><div class="page-sub">Architecture Decision Records — the full reasoning behind every platform choice</div></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
-  try{
-    const r=await fetch('/api/portal/adrs');
-    const d=await r.json();
-    S.adrList=d.adrs||[];
-    container.innerHTML=renderAdrList();
-  }catch{
-    container.innerHTML=`<div class="page-hdr"><div class="page-title">Decisions (ADRs)</div></div><div style="padding:40px;text-align:center;color:var(--red)">Failed to load ADRs — ensure the server is running from the workspace root.</div>`;
-  }
-}
-
-function renderAdrList(){
-  const q=S.adrQuery.toLowerCase();
-  const scope=S.adrScope;
-  const filtered=S.adrList.filter(a=>{
-    const mScope=scope==='All'||a.scope===scope;
-    const mQ=!q||a.title.toLowerCase().includes(q)||String(a.id).includes(q)||a.category.toLowerCase().includes(q)||a.scope.toLowerCase().includes(q);
-    return mScope&&mQ;
-  });
-
-  const scopes=['All',...new Set(S.adrList.map(a=>a.scope).filter(Boolean))].sort((a,b)=>a==='All'?-1:b==='All'?1:a.localeCompare(b));
-  const scopeBtns=scopes.map(s=>`<button class="scope-btn${s===scope?' active':''}" onclick="setAdrScope('${esc(s)}')">${esc(s)}</button>`).join('');
-
-  const rows=filtered.map(a=>{
-    const num=String(a.id).padStart(3,'0');
-    return`<div class="adr-row" onclick="go('adr:${num}')">
-      <span class="adr-num">ADR-${num}</span>
-      <span class="adr-title">${esc(a.title)}</span>
-      <span class="adr-scope">${esc(a.scope||'Universal')}</span>
-      <span class="adr-cat">${esc(a.category||'General')}</span>
-    </div>`;
-  }).join('');
-
-  return`<div class="page-hdr">
-    <div class="page-title">Decisions (ADRs)</div>
-    <div class="page-sub">Architecture Decision Records — ${S.adrList.length} decisions recorded · ${filtered.length} shown</div>
-  </div>
-  <div class="adr-filters">
-    <input class="adr-filter-inp" type="text" placeholder="Search title, category…" value="${esc(S.adrQuery)}" oninput="setAdrQuery(this.value)">
-    <div style="display:flex;gap:5px;flex-wrap:wrap">${scopeBtns}</div>
-  </div>
-  <div class="adr-list-grid">${rows||'<div style="padding:20px;text-align:center;color:var(--text-muted)">No ADRs match filters</div>'}</div>`;
-}
-
-function setAdrScope(s){S.adrScope=s;document.getElementById('content').innerHTML=renderAdrList();}
-function setAdrQuery(q){S.adrQuery=q;document.getElementById('content').innerHTML=renderAdrList();}
-
-async function loadAdrDetail(id,container){
-  const num=String(parseInt(id,10)).padStart(3,'0');
-  container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center"><div class="spinner" style="width:24px;height:24px;margin:0 auto"></div></div>`;
-  try{
-    const r=await fetch('/api/portal/adrs/'+num);
-    if(!r.ok)throw new Error('Not found');
-    const text=await r.text();
-    container.innerHTML=`
-      <div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div>
-      <div class="md-body">${mdToHtml(text)}</div>`;
-  }catch(e){
-    container.innerHTML=`<div style="margin-bottom:16px"><button class="btn btn-s" onclick="go('adrs')" style="font-size:12px">← Back to Decisions</button></div><div style="padding:40px;text-align:center;color:var(--red)">ADR-${num} not found — ${e.message}</div>`;
-  }
-}
-
-// Minimal markdown → HTML converter
-function mdToHtml(md){
-  const lines=md.split('\n');
-  const out=[];
-  let inUl=false,inOl=false,inPre=false,preBuf=[];
-
-  function flushList(){
-    if(inUl){out.push('</ul>');inUl=false;}
-    if(inOl){out.push('</ol>');inOl=false;}
-  }
-
-  for(let i=0;i<lines.length;i++){
-    const raw=lines[i];
-    const line=raw;
-
-    if(inPre){
-      if(line.startsWith('```')){inPre=false;out.push('<pre>'+esc(preBuf.join('\n'))+'</pre>');preBuf=[];}
-      else preBuf.push(raw);
-      continue;
-    }
-    if(line.startsWith('```')){flushList();inPre=true;continue;}
-
-    if(/^\s*$/.test(line)){flushList();continue;}
-
-    if(line.startsWith('#### ')){flushList();out.push('<h4>'+inl(line.slice(5))+'</h4>');continue;}
-    if(line.startsWith('### ')){flushList();out.push('<h3>'+inl(line.slice(4))+'</h3>');continue;}
-    if(line.startsWith('## ')){flushList();out.push('<h2>'+inl(line.slice(3))+'</h2>');continue;}
-    if(line.startsWith('# ')){flushList();out.push('<h1>'+inl(line.slice(2))+'</h1>');continue;}
-    if(/^---+$/.test(line.trim())){flushList();out.push('<hr>');continue;}
-
-    if(line.startsWith('> ')){
-      flushList();
-      out.push('<blockquote>'+inl(line.slice(2))+'</blockquote>');
-      continue;
-    }
-
-    // Table rows
-    if(line.includes('|')&&line.trimStart().startsWith('|')){
-      flushList();
-      if(/^\|[-| :]+\|/.test(line))continue; // separator row
-      const cells=line.split('|').slice(1,-1);
-      const tag=out.length>0&&out[out.length-1].startsWith('<tr')?'td':'th';
-      const cellHtml=cells.map(c=>`<${tag}>${inl(c.trim())}</${tag}>`).join('');
-      if(tag==='th'){
-        // Start table if not already
-        if(!out[out.length-1]?.startsWith('<table')){out.push('<table><thead>');}
-        out.push('<tr>'+cellHtml+'</tr></thead><tbody>');
-      } else {
-        out.push('<tr>'+cellHtml+'</tr>');
-      }
-      continue;
-    }
-    // Close open table
-    if(out.length>0&&out[out.length-1].startsWith('<tr')&&!line.includes('|')){
-      out.push('</tbody></table>');
-    }
-
-    if(line.match(/^[-*] /)){
-      if(!inUl){if(inOl){out.push('</ol>');inOl=false;}out.push('<ul>');inUl=true;}
-      out.push('<li>'+inl(line.slice(2))+'</li>');
-      continue;
-    }
-    if(line.match(/^\d+\. /)){
-      if(!inOl){if(inUl){out.push('</ul>');inUl=false;}out.push('<ol>');inOl=true;}
-      out.push('<li>'+inl(line.replace(/^\d+\. /,''))+'</li>');
-      continue;
-    }
-
-    flushList();
-    out.push('<p>'+inl(line)+'</p>');
-  }
-  if(inUl)out.push('</ul>');
-  if(inOl)out.push('</ol>');
-  return out.join('\n');
-}
-
-// Inline markdown (bold, italic, code, links)
-function inl(s){
-  return s
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/`([^`]+)`/g,'<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener" style="color:var(--accent)">$1</a>');
-}
 
 // ── Search ───────────────────────────────────────────────────────────────────
 
@@ -1236,11 +1125,14 @@ document.addEventListener('keydown',e=>{
   const h=window.location.hash;
   if(h&&h!=='#/'&&h!=='#'){
     if(h==='#/upstream'){S.page='upstream';}
-    else if(h==='#/adrs'){S.page='adrs';}
+    // 2026-05-14: ADR hashes redirect to /admin/adr at page load too,
+    // so a bookmarked `#/adrs` or `#/adr/NNN` lands on the canonical
+    // page instead of trying to render the SPA tab that no longer
+    // exists.
+    else if(h==='#/adrs'){window.location='/admin/adr';return;}
+    else if(h.startsWith('#/adr/')){window.location='/admin/adr/'+h.slice(6);return;}
     else{
-      const ma=h.match(/^#\/adr\/(.+)$/);
-      if(ma){S.page='adr:'+ma[1];}
-      else{const mm=h.match(/^#\/m\/(.+)$/);if(mm&&MODS[mm[1]])S.page=mm[1];}
+      const mm=h.match(/^#\/m\/(.+)$/);if(mm&&MODS[mm[1]])S.page=mm[1];
     }
   }
   renderNav();

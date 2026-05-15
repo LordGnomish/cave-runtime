@@ -22,6 +22,7 @@
 pub mod auth;
 pub mod circuit;
 pub mod error;
+pub mod federation;
 pub mod metrics;
 pub mod models;
 pub mod mtls;
@@ -35,7 +36,12 @@ pub mod spiffe;
 pub mod store;
 pub mod telemetry;
 pub mod traffic;
+pub mod traffic_policy;
 pub mod xds;
+pub mod wasm_plugin;
+pub mod service_entry;
+pub mod jwks;
+pub mod wasm_runtime;
 
 /// Ambient-mode parity batch (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
 /// SPIFFE SVID, telemetry). Pinned to istio/istio v1.29.2.

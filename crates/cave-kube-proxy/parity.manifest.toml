@@ -118,3 +118,12 @@ local_path    = "NftablesProxier::build_service_ips_map_entries"
 kind          = "http"
 upstream_path = "GET /healthz/<svcNamespace>/<svcName> on HealthCheckNodePort"
 local_path    = "HealthCheckServer::http_status"
+
+[portal_ui]
+upstream_ui  = "(iptables-only)"
+upstream_url = "https://kubernetes.io/docs/concepts/services-networking/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "no UI"
+last_audit   = "2026-05-11"

@@ -1,0 +1,35 @@
+[package]
+name = "cave-upstream-watchd"
+description = "Upstream release watch daemon — polls GitHub for new releases, detects parity gaps, emits GAP_OPENED events. Charter self-healing/self-improving foundation."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cave-upstream-watchd"
+path = "src/bin/main.rs"
+
+[[bin]]
+name = "cave-tdd-check"
+path = "src/bin/cave-tdd-check.rs"
+
+[dependencies]
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = "5"
+semver = "1"
+async-trait = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+httpmock = "0.7"
+tempfile = "3"

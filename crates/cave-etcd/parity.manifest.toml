@@ -3,14 +3,37 @@
 # Bumped from v3.6.0 in feat/cave-etcd-deeper-002.
 
 [upstream]
-org     = "etcd-io"
-repo    = "etcd"
-version = "v3.6.10"
+org      = "etcd-io"
+repo     = "etcd"
+version  = "v3.6.10"
+name     = "etcd"
+license  = "Apache-2.0"
+language = "Go"
+url      = "https://github.com/etcd-io/etcd"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio = (mapped + skipped) / total
+# On 2026-05-12 the audit-doc self-reported 1.0 was replaced with a
+# measured value: every etcd v3.6.x top-level package was enumerated
+# and classified honestly. WAL was newly ported in this pass.
+# See docs/parity/cave-etcd-port-2026-05-12.md for methodology.
+mapped_count   = 28
+partial_count  = 2
+skipped_count  = 35
+unmapped_count = 6
+total          = 71
+fill_ratio     = 0.9155
+honest_ratio   = 0.8873
+last_audit     = "2026-05-12"
+infra_only     = false
 
 [module]
-name        = "cave-etcd"
-description = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
-source_root = "src"
+name          = "cave-etcd"
+description   = "etcd v3 API reimplementation with MVCC, watch, leases, transactions, auth, cluster, maintenance"
+source_root   = "src"
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+pump_priority = "HIGH"  # charter-critical 7 — distributed KV foundation under cave-apiserver
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # upstream path (relative to etcd repo root) → local path (relative to this crate root)
@@ -839,3 +862,482 @@ local_path    = "/api/etcd/v3/cluster/joint/enter"
 kind          = "http"
 upstream_path = "/v3/cluster/joint/leave"
 local_path    = "/api/etcd/v3/cluster/joint/leave"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12 — measured, not self-reported)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Schema:
+#   [[mapped]]    upstream package has at least one cave-etcd source file
+#                 implementing its observable contract.
+#   [[skipped]]   upstream package is intentionally out of scope. Allowed
+#                 reasons (Charter): Go-stdlib analog | proxy mode | CLI |
+#                 test harness | wire-format detail covered by JSON shim |
+#                 v2 API (cave is v3-only) | parallel-track work.
+#   [[unmapped]]  real port gap, acknowledged honestly.
+#
+# Enumeration was hand-curated against the etcd v3.6.x repo layout
+# (server/, client/, api/, raft/, pkg/, etcdctl/, etcdutl/). Only
+# packages with non-trivial observable surface were counted; minor
+# helper sub-packages were folded into their parent.
+
+# ─── Mapped (30) ─────────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "server/storage/wal/"
+local_files  = ["src/wal.rs"]
+note         = "Newly ported 2026-05-12 — JSON-framed durable record stream"
+
+[[mapped]]
+upstream_pkg = "server/storage/mvcc/"
+local_files  = ["src/store.rs"]
+
+[[mapped]]
+upstream_pkg = "server/storage/backend/"
+local_files  = ["src/store.rs"]
+note         = "In-memory backend; bbolt-specific layers in skipped"
+
+[[mapped]]
+upstream_pkg = "server/storage/datadir/encryption.go"
+local_files  = ["src/kms.rs", "src/kms_chain.rs", "src/kms_v2.rs"]
+
+[[mapped]]
+upstream_pkg = "server/lease/"
+local_files  = ["src/store.rs", "src/lease_id_gen.rs"]
+
+[[mapped]]
+upstream_pkg = "server/auth/"
+local_files  = ["src/store.rs", "src/auth_v3.rs", "src/auth_token.rs", "src/rbac_deeper.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/"
+local_files  = ["src/routes.rs", "src/grpc_api.rs"]
+note         = "JSON-over-HTTP shim instead of gRPC; surface contract preserved"
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/maintenance.go"
+local_files  = ["src/maintenance.rs", "src/maintenance_v2.rs", "src/defrag_scheduler.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/watch.go"
+local_files  = ["src/routes.rs", "src/watch_filters.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3lock/"
+local_files  = ["src/lock_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/membership/"
+local_files  = ["src/membership_v2.rs", "src/membership_audit.rs", "src/cluster_status.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/snap/"
+local_files  = ["src/snap_db.rs", "src/snapshot_stream.rs", "src/snapshot_wire.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/errors/"
+local_files  = ["src/error.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3client/"
+local_files  = ["src/client.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v3/"
+local_files  = ["src/client.rs", "src/balancer.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v3/concurrency/"
+local_files  = ["src/concurrency.rs", "src/concurrency_extras.rs"]
+
+[[mapped]]
+upstream_pkg = "client/v2"
+local_files  = ["src/client_v2.rs"]
+note         = "Legacy v2 client retained for users mid-migration; v2 server API itself is skipped"
+
+[[mapped]]
+upstream_pkg = "api/etcdserverpb/"
+local_files  = ["src/models.rs"]
+note         = "Wire types reshaped as serde structs for JSON-over-HTTP"
+
+[[mapped]]
+upstream_pkg = "api/mvccpb/"
+local_files  = ["src/models.rs"]
+
+[[mapped]]
+upstream_pkg = "api/authpb/"
+local_files  = ["src/models.rs"]
+
+[[mapped]]
+upstream_pkg = "api/membershippb/"
+local_files  = ["src/models.rs"]
+note         = "Joint-consensus membership shapes"
+
+[[mapped]]
+upstream_pkg = "api/v3lockpb/"
+local_files  = ["src/lock_manager.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/kv.go"
+local_files  = ["src/routes.rs", "src/store.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/lease.go"
+local_files  = ["src/routes.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/auth.go"
+local_files  = ["src/routes.rs", "src/auth_v3.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3rpc/cluster.go"
+local_files  = ["src/routes.rs", "src/cluster_status.rs"]
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/txn/"
+local_files  = ["src/routes.rs", "src/store.rs"]
+
+[[partial]]
+upstream_pkg = "server/etcdserver/api/v3alarm/"
+local_files  = ["src/maintenance.rs"]
+note         = "Basic alarm surface — full alarm storage subset"
+
+[[partial]]
+upstream_pkg = "server/etcdserver/api/v3compactor/"
+local_files  = ["src/routes.rs"]
+note         = "Compaction is operator-triggered; auto-compactor is a subset"
+
+[[mapped]]
+upstream_pkg = "client/v3/credentials/"
+local_files  = ["../cave-runtime/src/cluster_runtime.rs"]
+note         = "TLS credential handling moved to cave-runtime cluster boot"
+
+# ─── Skipped (35) ────────────────────────────────────────────────────────────
+# Each entry must cite an allowed-reason: stdlib-analog | proxy-mode | CLI |
+# test-harness | wire-format-detail | v2-only | parallel-track | go-bootstrap.
+
+[[skipped]]
+upstream_pkg = "raft/"
+reason       = "parallel-track"
+note         = "Multi-node Raft tracked in cluster-plumbing Paket C"
+
+[[skipped]]
+upstream_pkg = "raft/confchange/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/quorum/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/tracker/"
+reason       = "parallel-track"
+
+[[skipped]]
+upstream_pkg = "raft/raftpb/"
+reason       = "wire-format-detail"
+
+[[skipped]]
+upstream_pkg = "raft/rafttest/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/rafthttp/"
+reason       = "parallel-track"
+note         = "Raft transport landed via cave-runtime TLS listener + Paket C"
+
+[[skipped]]
+upstream_pkg = "server/etcdmain/"
+reason       = "go-bootstrap"
+note         = "Replaced by cave-runtime serve + cluster init in cave-cli"
+
+[[skipped]]
+upstream_pkg = "server/embed/"
+reason       = "go-bootstrap"
+note         = "cave-etcd IS the embeddable library for cave-runtime"
+
+[[skipped]]
+upstream_pkg = "server/config/"
+reason       = "go-bootstrap"
+note         = "Config is cluster.json + cave-runtime flag parsing"
+
+[[skipped]]
+upstream_pkg = "server/verify/"
+reason       = "test-harness"
+note         = "Startup invariants asserted in cave-runtime cluster boot"
+
+[[skipped]]
+upstream_pkg = "server/proxy/grpcproxy/"
+reason       = "proxy-mode"
+note         = "Cluster-aware gateway is cave-gateway's job"
+
+[[skipped]]
+upstream_pkg = "server/proxy/httpproxy/"
+reason       = "proxy-mode"
+
+[[skipped]]
+upstream_pkg = "server/proxy/tcpproxy/"
+reason       = "proxy-mode"
+
+[[skipped]]
+upstream_pkg = "etcdctl/"
+reason       = "CLI"
+note         = "Replaced by `cavectl etcd` subcommand in cave-cli"
+
+[[skipped]]
+upstream_pkg = "tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "functional/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "tools/"
+reason       = "CLI"
+note         = "Release tooling — not part of runtime surface"
+
+[[skipped]]
+upstream_pkg = "contrib/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "pkg/transport/"
+reason       = "stdlib-analog"
+note         = "Rust uses rustls + tokio directly"
+
+[[skipped]]
+upstream_pkg = "pkg/fileutil/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/types/"
+reason       = "stdlib-analog"
+
+[[skipped]]
+upstream_pkg = "pkg/logutil/"
+reason       = "stdlib-analog"
+note         = "Rust uses tracing"
+
+[[skipped]]
+upstream_pkg = "pkg/featuregate/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "pkg/expect/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "pkg/testutil/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "pkg/grpc_testing/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2auth/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2discovery/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2error/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2http/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2store/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v2v3/"
+reason       = "v2-only"
+
+[[skipped]]
+upstream_pkg = "server/etcdserver/api/v3discovery/"
+reason       = "go-bootstrap"
+note         = "DNS-SRV discovery replaced by `cluster init/join` bootstrap"
+
+[[skipped]]
+upstream_pkg = "client/v3/yaml"
+reason       = "stdlib-analog"
+note         = "Rust uses serde directly"
+
+# ─── Unmapped (6) — real port gaps acknowledged ──────────────────────────────
+
+[[unmapped]]
+upstream_pkg = "server/storage/wal/walpb/"
+note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability in the single-node MVP; the protobuf shape is a follow-up for multi-node Raft compatibility."
+
+[[unmapped]]
+upstream_pkg = "server/etcdserver/api/v3election/"
+note         = "Election RPC service. Equivalent primitive (campaign/resign) is available via concurrency.rs but not exposed as a top-level v3rpc endpoint yet."
+
+[[unmapped]]
+upstream_pkg = "server/etcdserver/cindex/"
+note         = "Consistent-index helper — coupled with raft, will land alongside Paket C."
+
+[[unmapped]]
+upstream_pkg = "server/storage/quota/"
+note         = "Standalone quota module; basic db-size-bytes alarm is in maintenance.rs but per-tenant quota enforcement is a gap."
+
+[[unmapped]]
+upstream_pkg = "etcdutl/"
+note         = "Offline data-dir surgery utility (backup-restore, defrag without server). Tracked as a separate cavectl subcommand future."
+
+[[unmapped]]
+upstream_pkg = "server/lease/leasehttp/"
+note         = "HTTP transport for lease-keepalive between peers. Single-node MVP doesn't need it; multi-node will."
+
+[portal_ui]
+upstream_ui  = "etcdctl (CLI-only)"
+upstream_url = "https://etcd.io/docs/v3.5/op-guide/"
+status       = "complete"
+loc          = 800
+priority     = "P0"
+notes        = "Folder split: members/keyspace/leases/alarms/metrics (20 tests). etcdctl parity."
+last_audit   = "2026-05-11"
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head.
+
+[behavioral_parity]
+audit_scope = "mvcc/kvstore + etcdserver/txn + lessor + wal (v3.6.10)"
+audit_at    = "2026-05-13"
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/put_creates_key_with_version_1"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_creates_key_at_version_one"
+status         = "ported"
+notes          = "First put → version 1, mod_revision = create_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestPut/successive_puts_bump_version"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_put_bumps_version_and_mod_revision"
+status         = "ported"
+notes          = "Each put increments version and stamps mod_revision."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/range_keys_within_window"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_returns_keys_in_window"
+status         = "ported"
+notes          = "Range [a, c) returns a + b but not c (half-open interval)."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestRange/count_only_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_range_count_only_returns_count_without_payload"
+status         = "ported"
+notes          = "count_only → kvs cleared, count populated."
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestDeleteRange/returns_count_and_clears"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_kv_delete_range_removes_key_and_returns_count"
+status         = "ported"
+notes          = "DeleteRange returns deleted count and clears the keys."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/equal_runs_success_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_equal_value_runs_success_branch"
+status         = "ported"
+notes          = "Value-equal compare → success branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/txn/txn_test.go"
+upstream_name  = "TestTxnIfValueEqual/unequal_runs_failure_branch"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_txn_compare_unequal_runs_failure_branch"
+status         = "ported"
+notes          = "Value-unequal compare → failure branch ops applied."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/returns_positive_int63"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_returns_positive_int63"
+status         = "ported"
+notes          = "Lease IDs occupy positive int63 space."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/avoids_taken_ids"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_skips_collisions"
+status         = "ported"
+notes          = "Collision retry path skips taken candidates."
+
+[[upstream_test]]
+upstream_path  = "server/lease/lessor_test.go"
+upstream_name  = "assignNewLeaseID/retry_cap"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_lease_id_gen_allocate_returns_err_when_retries_exhausted"
+status         = "ported"
+notes          = "Hard-coded retry cap of 5 matches upstream."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestSave/monotonic_index_assignment"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_append_entry_assigns_monotonic_index"
+status         = "ported"
+notes          = "Each append_entry assigns last_index+1."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestReopen/preserves_last_entry_index"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_reopen_preserves_last_entry_index"
+status         = "ported"
+notes          = "Restart replays the on-disk WAL and restores last_entry_index."
+
+[[upstream_test]]
+upstream_path  = "server/storage/wal/wal_test.go"
+upstream_name  = "TestRelease/truncate_through_drops_entries"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wal_truncate_through_drops_entries_up_to_index"
+status         = "ported"
+notes          = "Snapshot-driven truncate keeps only entries with index > snapshot_index."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "server/storage/mvcc/kvstore_test.go"
+upstream_name  = "TestCompactRevisionDrops"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Compaction RevisionCompacted error path not yet ported as upstream cross-ref test."
+
+[[upstream_test]]
+upstream_path  = "server/etcdserver/api/v3rpc/watch_test.go"
+upstream_name  = "TestWatchProgressNotification"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Watch progress notification semantics not yet covered behaviourally."
+
+[[upstream_test]]
+upstream_path  = "server/auth/store_test.go"
+upstream_name  = "TestAuthenticate"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Auth v3 authenticate flow not yet expressed as upstream-port test."

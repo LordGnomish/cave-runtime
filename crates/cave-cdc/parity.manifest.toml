@@ -13,8 +13,25 @@
 org     = "debezium"
 repo    = "debezium-server"
 version = "v3.5.0.Final"
+name    = "Debezium Server"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/debezium/debezium-server"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-cdc"
 description = "Change Data Capture — Debezium server reimplementation"
 source_root = "src"
+
+[portal_ui]
+upstream_ui  = "Debezium UI (deprecated)"
+upstream_url = "https://debezium.io/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Historical UI"
+last_audit   = "2026-05-11"

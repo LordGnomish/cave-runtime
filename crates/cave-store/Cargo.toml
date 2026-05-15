@@ -1,6 +1,14 @@
 [package]
 name = "cave-store"
 description = "Unified storage engine — etcd v3 KV + MinIO/S3 object store with WAL and MVCC"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-store"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["storage", "etcd", "s3", "minio", "mvcc"]
+categories = ["database-implementations", "api-bindings", "asynchronous"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

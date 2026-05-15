@@ -4,7 +4,7 @@
 //! manages, including the elected primary and replica count.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, RdbmsCluster};
 use crate::admin::types::Cite;
 
@@ -54,7 +54,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, RdbmsViewE
         n = clusters.len(),
         tbl = table(&["name", "version", "replicas", "primary"], &rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/rdbms",
         &format!("rdbms · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

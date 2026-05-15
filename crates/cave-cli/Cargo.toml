@@ -6,6 +6,12 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 description = "CAVE Runtime CLI — single binary, native + compatibility surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001)"
+authors.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cavectl"
+readme = "README.md"
+keywords = ["cli", "runtime", "cave", "command-line", "utility"]
+categories = ["command-line-utilities", "development-tools", "network-programming"]
 
 [lib]
 name = "cavectl"
@@ -36,3 +42,4 @@ uuid.workspace = true
 [dev-dependencies]
 axum.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
+httpmock = "0.7"

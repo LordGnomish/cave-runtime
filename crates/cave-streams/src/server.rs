@@ -124,6 +124,11 @@ async fn dispatch_request(
 
         ApiKey::DeleteRecords => handle_delete_records(buf, broker)?,
 
+        ApiKey::Vote => handle_kraft_vote(buf, broker)?,
+        ApiKey::BeginQuorumEpoch => handle_kraft_begin_quorum_epoch(buf, broker)?,
+        ApiKey::EndQuorumEpoch => handle_kraft_end_quorum_epoch(buf, broker)?,
+        ApiKey::DescribeQuorum => handle_kraft_describe_quorum(buf, broker)?,
+
         _ => {
             // Unsupported API — return empty error response
             let mut b = BytesMut::new();
@@ -599,4 +604,175 @@ fn handle_delete_records(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Byte
         }
     }
     Ok(b.freeze())
+}
+
+// ── KRaft RPCs (KIP-595) ──────────────────────────────────────────────────────
+//
+// These four handlers route incoming Vote / BeginQuorumEpoch /
+// EndQuorumEpoch / DescribeQuorum requests to the
+// `KraftHandler` installed on the broker via
+// `Broker::set_kraft_handler`. If no handler is installed (the
+// broker isn't part of a controller quorum), we return error
+// code 50 (REASSIGNMENT_IN_PROGRESS — Kafka's nearest
+// "this broker can't currently serve this request" code).
+
+const ERR_BROKER_NOT_AVAILABLE: i16 = 8;
+
+fn handle_kraft_vote(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
+    use crate::kraft::rpc::{VoteRequest, VoteResponse};
+    let req = VoteRequest::decode(buf)?;
+    let mut b = BytesMut::new();
+    match broker.kraft_handler() {
+        Some(h) => h.handle_vote(&req).encode(&mut b),
+        None => {
+            let resp = VoteResponse {
+                error_code: ERR_BROKER_NOT_AVAILABLE,
+                topic_name: req.topic_name,
+                partition_index: req.partition_index,
+                leader_id: -1,
+                leader_epoch: -1,
+                vote_granted: false,
+            };
+            resp.encode(&mut b);
+        }
+    }
+    Ok(b.freeze())
+}
+
+fn handle_kraft_begin_quorum_epoch(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
+    use crate::kraft::rpc::{BeginQuorumEpochRequest, BeginQuorumEpochResponse};
+    let req = BeginQuorumEpochRequest::decode(buf)?;
+    let mut b = BytesMut::new();
+    match broker.kraft_handler() {
+        Some(h) => h.handle_begin_quorum_epoch(&req).encode(&mut b),
+        None => BeginQuorumEpochResponse {
+            error_code: ERR_BROKER_NOT_AVAILABLE,
+            topic_name: req.topic_name,
+            partition_index: req.partition_index,
+        }
+        .encode(&mut b),
+    }
+    Ok(b.freeze())
+}
+
+fn handle_kraft_end_quorum_epoch(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
+    use crate::kraft::rpc::{EndQuorumEpochRequest, EndQuorumEpochResponse};
+    let req = EndQuorumEpochRequest::decode(buf)?;
+    let mut b = BytesMut::new();
+    match broker.kraft_handler() {
+        Some(h) => h.handle_end_quorum_epoch(&req).encode(&mut b),
+        None => EndQuorumEpochResponse {
+            error_code: ERR_BROKER_NOT_AVAILABLE,
+            topic_name: req.topic_name,
+            partition_index: req.partition_index,
+        }
+        .encode(&mut b),
+    }
+    Ok(b.freeze())
+}
+
+fn handle_kraft_describe_quorum(buf: &mut Bytes, broker: &Broker) -> StreamsResult<Bytes> {
+    use crate::kraft::rpc::{DescribeQuorumRequest, DescribeQuorumResponse};
+    let req = DescribeQuorumRequest::decode(buf)?;
+    let mut b = BytesMut::new();
+    match broker.kraft_handler() {
+        Some(h) => h.handle_describe_quorum(&req).encode(&mut b),
+        None => DescribeQuorumResponse {
+            error_code: ERR_BROKER_NOT_AVAILABLE,
+            topic_name: req.topic_name,
+            partition_index: req.partition_index,
+            leader_id: -1,
+            leader_epoch: -1,
+            high_watermark: -1,
+            current_voters: Vec::new(),
+            observers: Vec::new(),
+        }
+        .encode(&mut b),
+    }
+    Ok(b.freeze())
+}
+
+#[cfg(test)]
+mod kraft_dispatch_tests {
+    use super::*;
+    use crate::broker::BrokerConfig;
+    use crate::kraft::{KraftHandler, MetadataLog, VoterSet};
+    use crate::protocol::encode_string;
+    use std::sync::Arc;
+
+    fn broker_with_kraft() -> Arc<Broker> {
+        let cfg = BrokerConfig::default();
+        let broker = Arc::new(Broker::new(cfg));
+        let handler = KraftHandler::new(VoterSet::new([1, 2, 3]), Arc::new(MetadataLog::new()));
+        broker.set_kraft_handler(Arc::new(handler));
+        broker
+    }
+
+    fn encode_request_with_header(api_key: ApiKey, body: &[u8]) -> Bytes {
+        let mut b = BytesMut::new();
+        b.put_i16(api_key as i16);
+        b.put_i16(0); // api_version
+        b.put_i32(42); // correlation_id
+        encode_string(&mut b, "test-client");
+        b.put_slice(body);
+        b.freeze()
+    }
+
+    #[tokio::test]
+    async fn dispatch_vote_returns_response_payload() {
+        use crate::kraft::rpc::{VoteRequest, VoteResponse};
+        let broker = broker_with_kraft();
+        let req = VoteRequest {
+            topic_name: "__cluster_metadata".into(),
+            partition_index: 0,
+            candidate_epoch: 1,
+            candidate_id: 2,
+            last_offset_epoch: 0,
+            last_offset: 0,
+        };
+        let mut body = BytesMut::new();
+        req.encode(&mut body);
+
+        let mut wire = encode_request_with_header(ApiKey::Vote, &body);
+        let resp = dispatch_request(&mut wire, &broker).await.unwrap();
+        // Strip the frame header (4-byte len + 4-byte correlation).
+        let mut payload = &resp[8..];
+        let r = VoteResponse::decode(&mut payload).unwrap();
+        assert!(r.vote_granted);
+    }
+
+    #[tokio::test]
+    async fn dispatch_describe_quorum_returns_payload() {
+        use crate::kraft::rpc::{DescribeQuorumRequest, DescribeQuorumResponse};
+        let broker = broker_with_kraft();
+        let req = DescribeQuorumRequest {
+            topic_name: "__cluster_metadata".into(),
+            partition_index: 0,
+        };
+        let mut body = BytesMut::new();
+        req.encode(&mut body);
+        let mut wire = encode_request_with_header(ApiKey::DescribeQuorum, &body);
+        let resp = dispatch_request(&mut wire, &broker).await.unwrap();
+        let mut payload = &resp[8..];
+        let r = DescribeQuorumResponse::decode(&mut payload).unwrap();
+        assert_eq!(r.error_code, 0);
+    }
+
+    #[tokio::test]
+    async fn dispatch_kraft_without_handler_yields_not_available() {
+        use crate::kraft::rpc::{DescribeQuorumRequest, DescribeQuorumResponse};
+        // Broker without set_kraft_handler.
+        let broker = Arc::new(Broker::new(BrokerConfig::default()));
+        let req = DescribeQuorumRequest {
+            topic_name: "__cluster_metadata".into(),
+            partition_index: 0,
+        };
+        let mut body = BytesMut::new();
+        req.encode(&mut body);
+        let mut wire = encode_request_with_header(ApiKey::DescribeQuorum, &body);
+        let resp = dispatch_request(&mut wire, &broker).await.unwrap();
+        let mut payload = &resp[8..];
+        let r = DescribeQuorumResponse::decode(&mut payload).unwrap();
+        assert_eq!(r.error_code, ERR_BROKER_NOT_AVAILABLE);
+    }
 }

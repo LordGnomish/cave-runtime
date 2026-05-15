@@ -33,25 +33,73 @@ pub enum WindowKind {
     Time(Duration),
 }
 
+/// What flips the breaker from Closed → Open.
+///
+/// Two flavours, both observed in production breakers:
+///
+/// * `WindowedRate` — resilience4j model. Failure **rate** over the last
+///   `minimum_calls` (or window-bounded) calls hits `threshold`. Good for
+///   high-traffic upstreams where a few bad responses shouldn't trip.
+/// * `Consecutive` — Envoy/Istio outlier-detection model used by
+///   `cave-gateway`. Strictly N consecutive failures (`count`) → Open.
+///   Half-open recovery requires `success_count` consecutive successes.
+///   Simpler to reason about for low-traffic upstreams where rate-based
+///   detection is too noisy.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TripCondition {
+    WindowedRate {
+        failure_rate_threshold: f64,
+        minimum_calls: usize,
+    },
+    Consecutive {
+        failure_count: u32,
+        success_count: u32,
+    },
+}
+
 #[derive(Debug, Clone)]
 pub struct BreakerConfig {
     pub window: WindowKind,
-    pub failure_rate_threshold: f64, // e.g. 0.5 for 50%
-    pub minimum_calls: usize,
+    pub trip: TripCondition,
     pub reset_timeout: Duration,
     pub half_open_permitted: usize,
 }
 
+// Field-style accessors that pre-date `TripCondition`. Kept as `pub fn`
+// so the older `cfg.failure_rate_threshold` / `cfg.minimum_calls` call
+// sites still compile after the enum split — they panic-free degrade to
+// 0/0 when the breaker is configured for the Consecutive trip mode.
 impl BreakerConfig {
     pub fn new(window: WindowKind, threshold: f64, minimum_calls: usize, reset: Duration) -> Self {
         assert!((0.0..=1.0).contains(&threshold), "threshold ∈ [0,1]");
         assert!(minimum_calls > 0, "minimum_calls must be > 0");
         Self {
             window,
-            failure_rate_threshold: threshold,
-            minimum_calls,
+            trip: TripCondition::WindowedRate {
+                failure_rate_threshold: threshold,
+                minimum_calls,
+            },
             reset_timeout: reset,
             half_open_permitted: 1,
+        }
+    }
+
+    /// Construct a breaker tuned for **Envoy/Istio outlier-detection**
+    /// semantics: trip after `failure_count` consecutive failures; close
+    /// from HalfOpen after `success_count` consecutive successes. The
+    /// `window` is forced to `Count(failure_count)` because consecutive
+    /// counting only needs `failure_count` samples to make a decision.
+    pub fn consecutive(failure_count: u32, success_count: u32, reset: Duration) -> Self {
+        assert!(failure_count > 0, "failure_count must be > 0");
+        assert!(success_count > 0, "success_count must be > 0");
+        Self {
+            window: WindowKind::Count(failure_count as usize),
+            trip: TripCondition::Consecutive {
+                failure_count,
+                success_count,
+            },
+            reset_timeout: reset,
+            half_open_permitted: success_count as usize,
         }
     }
 
@@ -59,6 +107,28 @@ impl BreakerConfig {
         assert!(n > 0, "half_open_permitted must be > 0");
         self.half_open_permitted = n;
         self
+    }
+
+    /// Legacy field accessor — returns the rate threshold when the breaker
+    /// is in `WindowedRate` mode, or `1.0` in `Consecutive` mode (any
+    /// failure rate at full saturation trivially trips on the consecutive
+    /// path; callers should consult `self.trip` for the real semantics).
+    pub fn failure_rate_threshold(&self) -> f64 {
+        match self.trip {
+            TripCondition::WindowedRate { failure_rate_threshold, .. } => failure_rate_threshold,
+            TripCondition::Consecutive { .. } => 1.0,
+        }
+    }
+
+    /// Legacy field accessor — returns the minimum-calls floor when the
+    /// breaker is in `WindowedRate` mode, or the consecutive failure count
+    /// in `Consecutive` mode (so the call-counting logic still has a sane
+    /// "have we seen enough calls to decide" answer).
+    pub fn minimum_calls(&self) -> usize {
+        match self.trip {
+            TripCondition::WindowedRate { minimum_calls, .. } => minimum_calls,
+            TripCondition::Consecutive { failure_count, .. } => failure_count as usize,
+        }
     }
 }
 
@@ -222,18 +292,41 @@ impl CircuitBreaker {
             }
         }
 
-        // Evaluate trip
+        // Evaluate trip — branch on the configured trip condition.
+        let trip = inner.cfg.trip;
         let total = inner.samples.len();
-        if total < inner.cfg.minimum_calls {
-            return;
-        }
-        let failures = inner
-            .samples
-            .iter()
-            .filter(|s| s.outcome == Outcome::Failure)
-            .count();
-        let rate = failures as f64 / total as f64;
-        if rate >= inner.cfg.failure_rate_threshold {
+        let should_open = match trip {
+            TripCondition::WindowedRate {
+                failure_rate_threshold,
+                minimum_calls,
+            } => {
+                if total < minimum_calls {
+                    false
+                } else {
+                    let failures = inner
+                        .samples
+                        .iter()
+                        .filter(|s| s.outcome == Outcome::Failure)
+                        .count();
+                    let rate = failures as f64 / total as f64;
+                    rate >= failure_rate_threshold
+                }
+            }
+            TripCondition::Consecutive { failure_count, .. } => {
+                // Walk samples from newest to oldest; count the trailing
+                // failures. Envoy/Istio outlier-detection semantics: any
+                // success resets the streak, so a single success in the
+                // tail keeps the breaker Closed.
+                let consecutive = inner
+                    .samples
+                    .iter()
+                    .rev()
+                    .take_while(|s| s.outcome == Outcome::Failure)
+                    .count() as u32;
+                consecutive >= failure_count
+            }
+        };
+        if should_open {
             inner.state = BreakerState::Open;
             inner.opened_at = Some(now);
         }
@@ -281,6 +374,14 @@ impl PerKeyBreakers {
         let mut v: Vec<String> = m.keys().cloned().collect();
         v.sort();
         v
+    }
+
+    /// Drop the breaker for `key`. The next `for_key(key)` call yields a
+    /// fresh Closed breaker. Used by Sweep-005 adopters that need an
+    /// explicit operator-reset path (e.g. `gateway::CircuitBreakerRegistry::reset`).
+    pub fn remove(&self, key: &str) -> bool {
+        let mut m = self.map.lock();
+        m.remove(key).is_some()
     }
 }
 
@@ -509,5 +610,77 @@ mod tests {
         pk.for_key("a-key");
         pk.for_key("m-key");
         assert_eq!(pk.known_keys(), vec!["a-key", "m-key", "z-key"]);
+    }
+
+    // ── Consecutive trip mode (Sweep-005 unblock) ────────────────────────────
+
+    /// cite: Envoy outlier-detection — N consecutive failures opens the breaker
+    #[test]
+    fn breaker_consecutive_opens_after_n_failures() {
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(
+            3,
+            2,
+            Duration::from_millis(100),
+        ));
+        assert_eq!(b.state(), BreakerState::Closed);
+        b.record_failure();
+        b.record_failure();
+        assert_eq!(b.state(), BreakerState::Closed, "2 failures < 3 stays closed");
+        b.record_failure();
+        assert_eq!(b.state(), BreakerState::Open, "3 consecutive failures trip");
+    }
+
+    /// cite: Envoy outlier-detection — a single success resets the streak
+    #[test]
+    fn breaker_consecutive_success_resets_streak() {
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(
+            3,
+            2,
+            Duration::from_millis(100),
+        ));
+        b.record_failure();
+        b.record_failure();
+        b.record_success(); // resets streak
+        b.record_failure();
+        b.record_failure();
+        assert_eq!(
+            b.state(),
+            BreakerState::Closed,
+            "streak reset by success; only 2 trailing failures"
+        );
+        b.record_failure();
+        assert_eq!(b.state(), BreakerState::Open, "now 3 trailing");
+    }
+
+    /// cite: Envoy outlier-detection — Open → HalfOpen → Closed via
+    /// `success_count` trial successes
+    #[test]
+    fn breaker_consecutive_halfopen_closes_after_n_successes() {
+        let b = CircuitBreaker::new(BreakerConfig::consecutive(
+            2,
+            2,
+            Duration::from_millis(10),
+        ));
+        b.record_failure();
+        b.record_failure();
+        assert_eq!(b.state(), BreakerState::Open);
+        let later = Instant::now() + Duration::from_millis(20);
+        assert!(b.can_proceed_at(later), "reset_timeout permits first trial");
+        b.record_success_at(later);
+        // success_count=2 means 2 consecutive HalfOpen successes close
+        assert!(b.can_proceed_at(later), "second trial slot");
+        b.record_success_at(later);
+        assert_eq!(b.state_at(later), BreakerState::Closed);
+    }
+
+    /// cite: legacy field accessors keep the older callers compiling
+    #[test]
+    fn breaker_legacy_accessors_match_trip_mode() {
+        let windowed = count_cfg(0.5, 4, 100);
+        assert_eq!(windowed.failure_rate_threshold(), 0.5);
+        assert_eq!(windowed.minimum_calls(), 4);
+        let consec = BreakerConfig::consecutive(5, 2, Duration::from_millis(100));
+        assert_eq!(consec.failure_rate_threshold(), 1.0);
+        assert_eq!(consec.minimum_calls(), 5);
     }
 }

@@ -1,20 +1,37 @@
 # parity.manifest.toml — cave-gateway
 # Upstream: Kong/kong  https://github.com/Kong/kong  pinned v3.5.0
 #
-# cave-gateway covers the Kong-equivalent surface (admin API, runloop proxy,
-# load balancer, healthchecks, plugin chain) plus an Envoy-style xDS shim
-# (src/xds.rs) and a Gravitee-derived API portal/catalog/federation slice
-# (src/gravitee/*). The calculator-format mappings below pin the Kong
-# correspondence; the wider feature set is documented in src/lib.rs.
+# cave-gateway is a Kong + Gravitee multi-upstream consolidation crate per
+# ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001. Kong covers the proxy data path
+# (admin API, runloop proxy, balancer, healthchecks, plugin chain) and is
+# recorded here as the primary upstream — cave-kernel's discover_workspace
+# reads one [upstream] per parity.manifest.toml. The Gravitee half (API /
+# Plan / Application / Subscription management surface, developer portal,
+# governance, federation) lives under src/gravitee/* and is documented in
+# the companion parity-gravitee.manifest.toml in this directory; same
+# multi-upstream + companion-manifest pattern as cave-artifacts (Pulp +
+# Harbor + Nexus).
+#
+# 2026-05-02 — Envoy xDS surface removed. Envoy was a "rejected alternative"
+# in seven ADRs and the previous src/xds.rs file along with its mappings
+# (LDS/RDS/CDS/EDS) is gone. The crate is now Kong + Gravitee canonical.
 
 [upstream]
 org     = "Kong"
 repo    = "kong"
 version = "v3.5.0"
+name    = "Kong"
+license = "Apache-2.0"
+language= "Lua"
+url     = "https://github.com/Kong/kong"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-gateway"
-description = "API gateway — Kong reimplementation + Envoy xDS surface + Gravitee API portal/catalog"
+description = "API gateway — Kong reimplementation + Gravitee API/plan/application/subscription surface + portal/catalog/governance"
 source_root = "src"
 
 # ── File mappings ────────────────────────────────────────────────────────────
@@ -46,14 +63,6 @@ local    = "src/store.rs"
 [[files]]
 upstream = "kong/router/atc.lua"
 local    = "src/matcher.rs"
-
-[[files]]
-upstream = "kong/router/init.lua"
-local    = "src/routes.rs"
-
-[[files]]
-upstream = "kong/clustering/init.lua"
-local    = "src/xds.rs"
 
 [[files]]
 upstream = "kong/conf_loader/init.lua"
@@ -153,7 +162,7 @@ file          = "src/admin.rs"
 [[functions]]
 upstream_name = "kong.runloop.balancer.execute"
 local_name    = "select_target"
-file          = "src/engine.rs"
+file          = "src/lb.rs"
 
 [[functions]]
 upstream_name = "kong.plugins.jwt.access.verify_signature_hs256"
@@ -184,21 +193,6 @@ file          = "src/health.rs"
 upstream_name = "kong.runloop.healthcheck.report_status"
 local_name    = "observe"
 file          = "src/health.rs"
-
-[[functions]]
-upstream_name = "kong.clustering.handle_cp_protocol_lds"
-local_name    = "lds_handler"
-file          = "src/xds.rs"
-
-[[functions]]
-upstream_name = "kong.clustering.handle_cp_protocol_rds"
-local_name    = "rds_handler"
-file          = "src/xds.rs"
-
-[[functions]]
-upstream_name = "kong.clustering.handle_cp_protocol_cds"
-local_name    = "cds_handler"
-file          = "src/xds.rs"
 
 [[functions]]
 upstream_name = "kong.runloop.certificate.parse_pem"
@@ -292,83 +286,56 @@ local_test    = "sni_resolver_exact_match"
 upstream_test = "spec.01-unit.tls.acme_challenge_store"
 local_test    = "acme_challenge_store"
 
-[[tests]]
-upstream_test = "spec.04-clustering.lb_policy_mapping"
-local_test    = "lb_policy_mapping"
-
-[[tests]]
-upstream_test = "spec.04-clustering.cluster_json_shape"
-local_test    = "cluster_json_shape"
-
-[[tests]]
-upstream_test = "spec.04-clustering.eds_empty_targets"
-local_test    = "eds_empty_targets"
-
 # ── Surface mappings ─────────────────────────────────────────────────────────
-# Kong admin API surfaces map to /api/v1/gateway/* under cave-gateway. Envoy
-# xDS surfaces also live in cave-gateway under /xds/v3/* (xds.rs).
+# Kong admin API surfaces map to /admin/v1/* (Kong-compatible) under
+# cave-gateway. Gravitee management surfaces map to /api/gateway/gravitee/*
+# (see parity-gravitee.manifest.toml for those entries).
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/services"
-local_path    = "/services"
+local_path    = "/admin/v1/services"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/services/{id}"
-local_path    = "/services/{id_or_name}"
+local_path    = "/admin/v1/services/{id_or_name}"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/upstreams"
-local_path    = "/upstreams"
+local_path    = "/admin/v1/upstreams"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/consumers"
-local_path    = "/consumers"
+local_path    = "/admin/v1/consumers"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/upstreams/{id}/targets"
-local_path    = "/upstreams/{id_or_name}/targets"
+local_path    = "/admin/v1/upstreams/{id_or_name}/targets"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/upstreams/{id}/health"
-local_path    = "/upstreams/{id_or_name}/health"
+local_path    = "/admin/v1/upstreams/{id_or_name}/health"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/status"
-local_path    = "/api/v1/gateway/billing/usage"
+upstream_path = "/routes"
+local_path    = "/admin/v1/routes"
 
 [[surfaces]]
 kind          = "http"
-upstream_path = "/clustering/v1/listeners"
-local_path    = "/xds/v3/discovery/listeners"
+upstream_path = "/plugins"
+local_path    = "/admin/v1/plugins"
 
-[[surfaces]]
-kind          = "http"
-upstream_path = "/clustering/v1/routes"
-local_path    = "/xds/v3/discovery/routes"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/clustering/v1/clusters"
-local_path    = "/xds/v3/discovery/clusters"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/clustering/v1/endpoints"
-local_path    = "/xds/v3/discovery/endpoints"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/apis"
-local_path    = "/apis"
-
-[[surfaces]]
-kind          = "http"
-upstream_path = "/subscriptions"
-local_path    = "/subscriptions"
+[portal_ui]
+upstream_ui  = "Kong Manager"
+upstream_url = "https://docs.konghq.com/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Plugin / route browser"
+last_audit   = "2026-05-11"

@@ -10,11 +10,32 @@
 org     = "redis"
 repo    = "redis"
 version = "7.2.0"
+name    = "Redis"
+license = "BSD-3-Clause"
+language= "C"
+url     = "https://github.com/redis/redis"
 
+[parity]
+# Package-level inventory against redis/redis 7.2.0. Inventory
+# hand-curated 2026-05-12 against the Redis source tree
+# (`src/{server,networking,db,t_*,replication,cluster,scripting,
+# expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
+# cache `src/commands/` directory mirrors Redis's `t_*.c` 1:1.
+mapped_count   = 19
+partial_count  = 4
+skipped_count  = 13
+unmapped_count = 2
+total          = 38
+fill_ratio     = 0.9474
+honest_ratio   = 0.8421
+last_audit     = "2026-05-13"
+infra_only     = false
 [module]
 name        = "cave-cache"
 description = "Redis 7.2 reimplementation — RESP wire + all data types + pub/sub + scripting + persistence + cluster slots + REST shim"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 
@@ -338,3 +359,401 @@ local_path    = "/api/v1/cache/pubsub/{channel}"
 kind          = "http"
 upstream_path = "MULTI/EXEC pipeline"
 local_path    = "/api/v1/cache/pipeline"
+
+[portal_ui]
+upstream_ui  = "RedisInsight (external)"
+upstream_url = "https://redis.io/insight/"
+status       = "complete"
+loc          = 850
+priority     = "P0"
+notes        = "Folder split: keyspace+commands+clients+replication+pubsub (26 tests). Valkey/Redis UI parity."
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (18) — every Redis data type + core engine ─────────────────────
+
+[[mapped]]
+upstream_pkg = "redis:src/server.c"
+local_files  = ["src/cache.rs", "src/engine.rs", "src/lib.rs"]
+note         = "Server bootstrap, event loop, command dispatch"
+
+[[mapped]]
+upstream_pkg = "redis:src/networking.c"
+local_files  = ["src/codec.rs", "src/resp.rs"]
+note         = "RESP2/RESP3 wire protocol parser + reply writer"
+
+[[mapped]]
+upstream_pkg = "redis:src/db.c"
+local_files  = ["src/db.rs", "src/keyspace.rs"]
+note         = "Multi-db keyspace + lookup primitives"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_string.c"
+local_files  = ["src/commands/strings.rs"]
+note         = "GET / SET / GETRANGE / SETRANGE / APPEND / INCR / DECR / GETSET"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_list.c"
+local_files  = ["src/commands/lists.rs", "src/lists.rs"]
+note         = "LPUSH / RPUSH / LPOP / RPOP / LRANGE / LINSERT / LREM / LSET / BLPOP"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_hash.c"
+local_files  = ["src/commands/hashes.rs", "src/hashes.rs"]
+note         = "HSET / HGET / HDEL / HEXISTS / HKEYS / HVALS / HINCRBY"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_set.c"
+local_files  = ["src/commands/sets.rs"]
+note         = "SADD / SREM / SISMEMBER / SUNION / SINTER / SDIFF / SPOP / SRANDMEMBER"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_zset.c"
+local_files  = ["src/commands/sorted_sets.rs"]
+note         = "ZADD / ZRANGE / ZRANGEBYSCORE / ZRANGEBYLEX / ZINCRBY / ZUNIONSTORE / ZINTERSTORE"
+
+[[mapped]]
+upstream_pkg = "redis:src/t_stream.c"
+local_files  = ["src/commands/streams.rs"]
+note         = "XADD / XREAD / XRANGE / XGROUP / XREADGROUP / XACK / XCLAIM"
+
+[[mapped]]
+upstream_pkg = "redis:src/bitops.c"
+local_files  = ["src/commands/bitmap.rs"]
+note         = "SETBIT / GETBIT / BITCOUNT / BITOP / BITPOS / BITFIELD"
+
+[[mapped]]
+upstream_pkg = "redis:src/geo.c"
+local_files  = ["src/commands/geo.rs"]
+note         = "GEOADD / GEOPOS / GEODIST / GEOSEARCH (geohash + zset backing)"
+
+[[mapped]]
+upstream_pkg = "redis:src/hyperloglog.c"
+local_files  = ["src/commands/hyperloglog.rs"]
+note         = "PFADD / PFCOUNT / PFMERGE"
+
+[[mapped]]
+upstream_pkg = "redis:src/expire.c"
+local_files  = ["src/expiry.rs", "src/commands/expiry.rs"]
+note         = "EXPIRE / EXPIREAT / TTL / PERSIST + lazy expiry sweep"
+
+[[mapped]]
+upstream_pkg = "redis:src/acl.c"
+local_files  = ["src/acl.rs"]
+note         = "ACL SETUSER / GETUSER / WHOAMI / LIST / CAT"
+
+[[mapped]]
+upstream_pkg = "redis:src/connection.c + src/pubsub.c"
+local_files  = ["src/pubsub.rs", "src/commands/pubsub.rs"]
+note         = "PUBLISH / SUBSCRIBE / PSUBSCRIBE / channel routing"
+
+[[mapped]]
+upstream_pkg = "redis:src/aof.c + src/rdb.c"
+local_files  = ["src/persistence.rs"]
+note         = "AOF append-only log + RDB snapshot writer"
+
+[[mapped]]
+upstream_pkg = "redis:src/eviction.c"
+local_files  = ["src/eviction.rs"]
+note         = "Maxmemory eviction policies (LRU, LFU, random, ttl)"
+
+[[mapped]]
+upstream_pkg = "redis:src/scripting.c"
+local_files  = ["src/commands/scripting.rs"]
+note         = "EVAL / EVALSHA / SCRIPT LOAD — Lua script execution"
+
+# ─── Skipped (13) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "redis:deps/lua/"
+reason       = "stdlib-analog"
+note         = "Bundled Lua interpreter source — Rust uses mlua/rlua crates"
+
+[[skipped]]
+upstream_pkg = "redis:deps/jemalloc/"
+reason       = "stdlib-analog"
+note         = "jemalloc allocator — Rust uses tikv-jemallocator opt-in"
+
+[[skipped]]
+upstream_pkg = "redis:deps/linenoise/"
+reason       = "CLI"
+note         = "redis-cli line-editor"
+
+[[skipped]]
+upstream_pkg = "redis:deps/hiredis/"
+reason       = "stdlib-analog"
+note         = "C client library — not server-side"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-cli.c"
+reason       = "CLI"
+note         = "Client binary; cavectl exposes equivalent"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-benchmark.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-sentinel.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/cli/redis-check-rdb.c"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/util.c + sds.c + dict.c"
+reason       = "stdlib-analog"
+note         = "C-stdlib analogs — Rust uses std + dashmap"
+
+[[skipped]]
+upstream_pkg = "redis:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "redis:utils/"
+reason       = "CLI"
+
+[[skipped]]
+upstream_pkg = "redis:src/anet.c + endianconv.c"
+reason       = "stdlib-analog"
+note         = "Socket + byte-order helpers — Rust uses tokio + byteorder"
+
+[[skipped]]
+upstream_pkg = "redis:Makefile + sentinel.conf + redis.conf"
+reason       = "go-bootstrap"
+note         = "Build + config templates"
+
+# ─── Unmapped (7) — honest gaps ────────────────────────────────────────────
+
+[[partial]]
+upstream_pkg = "redis:src/cluster.c"
+local_files  = ["src/cluster/mod.rs", "src/cluster/state.rs", "src/cluster/slots.rs", "src/cluster/gossip.rs", "src/cluster/migration.rs", "src/cluster/epoch.rs"]
+note         = "Cluster mode: 16,384-slot SlotMap with hash-tag-aware routing, MOVED / ASK redirect computation, IMPORTING/MIGRATING ledger, configEpoch/currentEpoch atomic counters, and a GossipBus state machine (PING/PONG/MEET/FAIL/UPDATE message effects). Honest scope cut: the on-wire bus serializer for upstream's port-16380 listener is not implemented — gossip flows through the same control plane as the rest of the runtime."
+
+[[partial]]
+upstream_pkg = "redis:src/sentinel.c"
+local_files  = ["src/sentinel.rs"]
+note         = "Sentinel HA state machine: monitor/remove, SDOWN→ODOWN ladder with quorum peer voting, replica registry, lowest-priority-then-offset-then-addr promotion candidate selection (priority=0 excluded per Redis convention), begin_failover/commit_failover with config_epoch bump and deposed-master re-registration. Honest scope cut: this is the pure state machine — the gossip TCP socket + SENTINEL command set surface lives in the server crate."
+
+[[partial]]
+upstream_pkg = "redis:src/replication.c"
+local_files  = ["src/replication.rs"]
+note         = "Master/replica replication: master-side MasterState (repl_id, master_repl_offset, ring-buffered backlog, replica registry), replica-side ReplicaSideState (WaitPsync→Syncing→Online ladder), PSYNC decision: partial when (repl_id matches AND requested_offset ≥ backlog_floor), full otherwise (incl. '?' first-time). INFO replication output (role / master_replid / master_repl_offset / lag). Honest scope cut: no on-the-wire RDB encoder + TCP socket lifecycle — caller bridges this state to the wire."
+
+[[unmapped]]
+upstream_pkg = "redis:src/modules/"
+note         = "Loadable module API (redis-modules SDK). External-plugin loading is out of scope."
+
+[[mapped]]
+upstream_pkg = "redis:src/cluster_slot_stats.c"
+local_files  = ["src/cluster/slots.rs"]
+note         = "Per-slot stats (key_count, cpu_usec, network_bytes_in/out) via SlotMap::record_access + top_slots_by_keys for the CLUSTER SLOT-STATS surface."
+
+[[unmapped]]
+upstream_pkg = "redis:src/functions.c"
+note         = "FUNCTION LOAD / FCALL — Redis 7's persisted Lua functions (distinct from EVAL). EVAL-only today."
+
+[[partial]]
+upstream_pkg = "redis:src/tls.c"
+local_files  = ["src/tls_listener.rs"]
+note         = "Native TLS listener configuration: TlsListenerConfig (bind/tls_port/plain_port/cert+key/ca/client_auth/alpn/allowed_protocols), ClientAuth parser matching upstream `tls-auth-clients yes|no|optional`, validate() (port clash, ALPN whitelist, TLS version whitelist, CA-required-when-mTLS), load() via rustls-pemfile for PKCS#8/PKCS#1/SEC1 keys. Honest scope cut: cryptographic key-cert match + handshake live in rustls server-config builder the caller drives; this module owns the config + PEM-load surface."
+
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "t_string + t_list + t_hash + t_set + t_zset (redis 7.4.0)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "SET and GET an item"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_set_then_get_round_trips"
+status         = "ported"
+notes          = "SET → OK; GET retrieves the bulk value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "GET against non-existing key"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_get_missing_returns_nil"
+status         = "ported"
+notes          = "Missing key → nil bulk reply."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "SET with NX option fails on collision"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_set_nx_is_idempotent_under_collision"
+status         = "ported"
+notes          = "NX flag preserves the existing value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "INCR against new key creates and returns 1"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_incr_against_new_key_starts_at_one"
+status         = "ported"
+notes          = "INCR on missing key starts at 1, second call returns 2."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "APPEND extends the existing value"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_string_append_extends_existing_value"
+status         = "ported"
+notes          = "APPEND returns new length; STRLEN matches."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "RPUSH then LRANGE preserves insertion order"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_rpush_lrange_preserves_insertion_order"
+status         = "ported"
+notes          = "Tail push preserves order in LRANGE."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LPUSH prepends multiple elements in reverse"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_lpush_prepends_in_reverse_order"
+status         = "ported"
+notes          = "LPUSH key a b c yields [c, b, a]."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LLEN returns 0 for missing key"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_llen_returns_zero_for_missing_key"
+status         = "ported"
+notes          = "LLEN on missing key → 0, populated key → element count."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/list.tcl"
+upstream_name  = "LPOP removes head element"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_list_lpop_removes_head_element"
+status         = "ported"
+notes          = "LPOP returns + removes the head."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HSET + HGET round trip"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hset_then_hget_round_trips"
+status         = "ported"
+notes          = "HSET returns 1 for new field; HGET retrieves value."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HSET overwrite returns 0 new fields"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hset_overwrite_returns_zero_new_fields"
+status         = "ported"
+notes          = "Return value tracks NEW fields, not modified."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HGETALL returns field-value pairs"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hgetall_returns_field_value_pairs"
+status         = "ported"
+notes          = "Pairs interleaved [k1, v1, k2, v2 ...] in array reply."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/hash.tcl"
+upstream_name  = "HDEL removes specified fields"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hash_hdel_removes_field_and_returns_count"
+status         = "ported"
+notes          = "HDEL returns number of removed fields; survives partial removal."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SADD + SCARD returns set size"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_sadd_then_scard_returns_size"
+status         = "ported"
+notes          = "SADD returns NEW member count, idempotent on duplicates."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SISMEMBER returns 1/0 for membership"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_sismember_returns_membership_bool_as_int"
+status         = "ported"
+notes          = "Returns int 1 or 0 per Redis convention (no bool type in RESP2)."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/set.tcl"
+upstream_name  = "SREM removes member, returns count"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_set_srem_removes_member_returns_count"
+status         = "ported"
+notes          = "Returns count of removed; missing members are silent."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZADD + ZCARD returns size"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zadd_then_zcard_returns_size"
+status         = "ported"
+notes          = "ZADD returns added count; ZCARD returns total."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZSCORE returns score of present member, nil otherwise"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zscore_returns_score_or_nil"
+status         = "ported"
+notes          = "Float score returned as bulk string; missing → nil."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZRANK returns 0-indexed position by ascending score"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zrank_returns_zero_indexed_position"
+status         = "ported"
+notes          = "Position by score asc; missing member → nil."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/zset.tcl"
+upstream_name  = "ZREM removes member, decrements cardinality"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_zset_zrem_removes_and_decrements_cardinality"
+status         = "ported"
+notes          = "Returns count of removed; ZCARD reflects removal."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/type/string.tcl"
+upstream_name  = "WRONGTYPE error across types"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_wrongtype_when_get_targets_list_key"
+status         = "ported"
+notes          = "Cross-type op (GET on list) returns CacheError::WrongType."
+
+# Honest "still missing" entries.
+
+[[upstream_test]]
+upstream_path  = "tests/unit/expire.tcl"
+upstream_name  = "EXPIRE with PX/EX option"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Expiry TTL semantics covered by commands/expiry.rs but not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/scripting.tcl"
+upstream_name  = "EVAL returns Lua value as RESP"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Lua scripting end-to-end not yet covered behaviourally."

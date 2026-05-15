@@ -13,8 +13,119 @@
 org     = "casbin"
 repo    = "casbin"
 version = "v3.10.0"
+name    = "Casbin"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/casbin/casbin"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-permission"
 description = "Fine-grained authorization — Casbin reimplementation"
 source_root = "src"
+
+[portal_ui]
+upstream_ui  = "Casbin (CLI)"
+upstream_url = "https://casbin.org/"
+status       = "partial"
+loc          = 432
+priority     = "P2"
+notes        = "RBAC primitive"
+last_audit   = "2026-05-11"
+
+# Qwen-pump B-prime cycle 1778764552 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_entity_create_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_entity_delete_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_entity_read_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_entity_refresh_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_entity_update_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_location_create_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_location_delete_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_catalog_location_read_permission_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_permission_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_authorize_request_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_authorize_response_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_authorize_result_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_policy_decision_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_allow_all_policy_implements_trait"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_backstage_principal_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_policy_query_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_permission_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_permission_attributes_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_evaluate_permission_request_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_evaluate_permission_response_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_permission_action_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_permission_state_type_exists"

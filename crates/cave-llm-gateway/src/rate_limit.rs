@@ -1,9 +1,21 @@
-//! Per-consumer rate limiting — token bucket per API key / user.
+//! Per-consumer rate limiting — request bucket + cost-weighted token bucket.
+//!
+//! **Sweep-006 adoption (2026-05-12)** — the bucket primitive is now
+//! `cave_kernel::ratelimiter::TokenBucket`. Cost-weighted consumption is
+//! supported natively (kernel's `try_consume(n)` accepts any positive
+//! amount); the deficit-to-retry-after conversion that used to live here
+//! has moved to `try_consume_or_retry_at`, which returns `Result<(), Duration>`.
+//!
+//! Per-consumer customisation (the `set_limit` / `get_limit` surface) is
+//! still done locally because each consumer may have a different
+//! capacity/refill pair — kernel's `PerTenant<B>` only supports a single
+//! factory, so we keep a `DashMap<String, ConsumerBuckets>` and build
+//! kernel buckets sized for each consumer's effective `RateLimit`.
 
 use crate::error::{GatewayError, GatewayResult};
+use cave_kernel::ratelimiter::{TokenBucket, TokenBucketConfig};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateLimit {
@@ -19,47 +31,29 @@ impl Default for RateLimit {
     }
 }
 
-struct TokenBucket {
-    capacity: f64,
-    tokens: f64,
-    refill_rate: f64, // tokens per second
-    last_refill: Instant,
-}
-
-impl TokenBucket {
-    fn new(capacity: f64, per_minute: f64) -> Self {
-        Self {
-            capacity,
-            tokens: capacity,
-            refill_rate: per_minute / 60.0,
-            last_refill: Instant::now(),
-        }
-    }
-
-    fn refill(&mut self) {
-        let now = Instant::now();
-        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
-        self.tokens = (self.tokens + elapsed * self.refill_rate).min(self.capacity);
-        self.last_refill = now;
-    }
-
-    /// Returns Ok if tokens are available, Err with retry_after_ms on exhaustion.
-    fn try_consume(&mut self, amount: f64) -> Result<(), u64> {
-        self.refill();
-        if self.tokens >= amount {
-            self.tokens -= amount;
-            Ok(())
-        } else {
-            let deficit = amount - self.tokens;
-            let wait_secs = deficit / self.refill_rate;
-            Err((wait_secs * 1000.0) as u64 + 1)
-        }
-    }
-}
-
+/// Two kernel buckets per consumer: one for request count, one for
+/// cost-weighted prompt+completion tokens.
+#[derive(Clone)]
 struct ConsumerBuckets {
     request_bucket: TokenBucket,
     token_bucket: TokenBucket,
+}
+
+impl ConsumerBuckets {
+    fn from_limit(limit: &RateLimit) -> Self {
+        let req_capacity = f64::from(limit.requests_per_minute).max(1.0);
+        let tok_capacity = f64::from(limit.tokens_per_minute).max(1.0);
+        Self {
+            request_bucket: TokenBucket::new(TokenBucketConfig::new(
+                req_capacity,
+                req_capacity / 60.0,
+            )),
+            token_bucket: TokenBucket::new(TokenBucketConfig::new(
+                tok_capacity,
+                tok_capacity / 60.0,
+            )),
+        }
+    }
 }
 
 pub struct RateLimiter {
@@ -83,26 +77,36 @@ impl RateLimiter {
     }
 
     pub fn get_limit(&self, consumer: &str) -> RateLimit {
-        self.custom_limits.get(consumer).map(|l| l.clone()).unwrap_or_else(|| self.default_limit.clone())
+        self.custom_limits
+            .get(consumer)
+            .map(|l| l.clone())
+            .unwrap_or_else(|| self.default_limit.clone())
     }
 
     /// Check whether a request is allowed. Consumes 1 request + `token_cost` tokens.
     pub fn check(&self, consumer: &str, token_cost: u32) -> GatewayResult<()> {
         let limit = self.get_limit(consumer);
+        let entry = self
+            .consumers
+            .entry(consumer.to_string())
+            .or_insert_with(|| ConsumerBuckets::from_limit(&limit));
 
-        let mut entry = self.consumers.entry(consumer.to_string()).or_insert_with(|| ConsumerBuckets {
-            request_bucket: TokenBucket::new(limit.requests_per_minute as f64, limit.requests_per_minute as f64),
-            token_bucket: TokenBucket::new(limit.tokens_per_minute as f64, limit.tokens_per_minute as f64),
-        });
-
-        entry.request_bucket.try_consume(1.0).map_err(|retry_ms| {
-            GatewayError::RateLimitExceeded { consumer: consumer.to_string(), retry_after_ms: retry_ms }
-        })?;
+        entry
+            .request_bucket
+            .try_consume_or_retry(1.0)
+            .map_err(|wait| GatewayError::RateLimitExceeded {
+                consumer: consumer.to_string(),
+                retry_after_ms: duration_to_ms_ceil(wait),
+            })?;
 
         if token_cost > 0 {
-            entry.token_bucket.try_consume(token_cost as f64).map_err(|retry_ms| {
-                GatewayError::RateLimitExceeded { consumer: consumer.to_string(), retry_after_ms: retry_ms }
-            })?;
+            entry
+                .token_bucket
+                .try_consume_or_retry(f64::from(token_cost))
+                .map_err(|wait| GatewayError::RateLimitExceeded {
+                    consumer: consumer.to_string(),
+                    retry_after_ms: duration_to_ms_ceil(wait),
+                })?;
         }
 
         Ok(())
@@ -122,6 +126,15 @@ impl Default for RateLimiter {
     fn default() -> Self {
         Self::new(RateLimit::default())
     }
+}
+
+/// Convert a `Duration` from `try_consume_or_retry` into the
+/// gateway's `retry_after_ms: u64` wire field. Sub-millisecond waits
+/// round up to 1ms so clients never see a zero retry hint.
+fn duration_to_ms_ceil(d: std::time::Duration) -> u64 {
+    let nanos = d.as_nanos();
+    let ms = nanos.div_ceil(1_000_000);
+    u64::try_from(ms).unwrap_or(u64::MAX).max(1)
 }
 
 #[cfg(test)]
@@ -161,5 +174,21 @@ mod tests {
         let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1000, tokens_per_minute: 50 });
         assert!(limiter.check("user", 40).is_ok());
         assert!(limiter.check("user", 40).is_err()); // 40 > remaining 10
+    }
+
+    /// Sweep-006 regression — exhausted consumer receives a non-zero
+    /// `retry_after_ms` so the HTTP layer can set a Retry-After header.
+    #[test]
+    fn rejection_carries_nonzero_retry_after() {
+        let limiter = RateLimiter::new(RateLimit { requests_per_minute: 1, tokens_per_minute: 100 });
+        // burn the single request slot
+        assert!(limiter.check("user", 1).is_ok());
+        let err = limiter.check("user", 1).expect_err("second call exhausts request_bucket");
+        match err {
+            GatewayError::RateLimitExceeded { retry_after_ms, .. } => {
+                assert!(retry_after_ms > 0, "Retry-After must be > 0, got {retry_after_ms}");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
     }
 }

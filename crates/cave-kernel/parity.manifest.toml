@@ -15,3 +15,9 @@ name        = "cave-kernel"
 description = "Shared kernel primitives — first-party infrastructure"
 source_root = "src"
 first_party = true
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

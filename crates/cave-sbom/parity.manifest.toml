@@ -6,7 +6,15 @@
 org     = "DependencyTrack"
 repo    = "dependency-track"
 version = "v4.9.0"
+name    = "Dependency-Track"
+license = "Apache-2.0"
+language= "Java"
+url     = "https://github.com/DependencyTrack/dependency-track"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-sbom"
 description = "SBOM and dependency tracking — DependencyTrack replacement"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/sbom/endpoint"
+
+[portal_ui]
+upstream_ui  = "Dependency-Track"
+upstream_url = "https://dependencytrack.org/"
+status       = "partial"
+loc          = 135
+priority     = "P1"
+notes        = "Component / vuln correlation"
+last_audit   = "2026-05-11"

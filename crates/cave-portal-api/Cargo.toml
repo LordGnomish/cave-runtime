@@ -3,13 +3,21 @@ name = "cave-portal-api"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-portal-api"
+readme = "README.md"
 rust-version.workspace = true
 description = "Cave Portal HTTP API — attribution, telemetry, dashboard endpoints"
+keywords = ["api", "http", "telemetry", "dashboard", "web"]
+categories = ["api-bindings", "web-programming", "network-programming"]
 
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+cave-kernel = { path = "../cave-kernel" }
+cave-portal = { path = "../cave-portal" }
 cave-upstream = { path = "../cave-upstream" }
 chrono.workspace = true
 prometheus-client.workspace = true

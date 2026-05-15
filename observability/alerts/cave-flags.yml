@@ -1,0 +1,55 @@
+# cave-flags alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-flags-slo
+    interval: 30s
+    rules:
+      - alert: FlagsSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_flags_total{job="cave-flags",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_flags_total{job="cave-flags"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-flags fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-flags/slo-burn-fast.md"
+      - alert: FlagsLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_flags_request_duration_seconds_bucket{job="cave-flags"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-flags p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-flags/latency.md"
+      - alert: FlagsSaturationHigh
+        expr: 'sum(rate(cave_flags_inflight_requests{job="cave-flags"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-flags inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-flags/saturation.md"
+      - alert: FlagsMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-flags"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-flags RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-flags/memory.md"
+      - alert: FlagsHealthProbeFailing
+        expr: 'min(up{job="cave-flags"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-flags health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-flags/health.md"
