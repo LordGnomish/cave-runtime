@@ -5147,4 +5147,87 @@ mod batch4_parse_tests {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
     }
+
+    // ── 2026-05-15 batch: WebAuthn subcommands ─────────────────────────────────
+    #[test]
+    fn auth_webauthn_list_parses() {
+        let cli = parse(&["cavectl", "auth", "webauthn", "list"]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Webauthn { cmd: WebauthnCmd::List },
+            } => {}
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_webauthn_register_parses() {
+        let cli = parse(&["cavectl", "auth", "webauthn", "register", "--user", "alice"]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Webauthn { cmd: WebauthnCmd::Register { user } },
+            } => assert_eq!(user, "alice"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_webauthn_delete_parses() {
+        let cli = parse(&[
+            "cavectl",
+            "auth",
+            "webauthn",
+            "delete",
+            "--credential-id",
+            "AABB",
+        ]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Webauthn { cmd: WebauthnCmd::Delete { credential_id } },
+            } => assert_eq!(credential_id, "AABB"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_webauthn_mds_update_parses() {
+        let cli = parse(&[
+            "cavectl",
+            "auth",
+            "webauthn",
+            "mds-update",
+            "--path",
+            "/tmp/mds.jwt",
+        ]);
+        match cli.command {
+            Commands::Auth {
+                cmd:
+                    AuthCmd::Webauthn {
+                        cmd: WebauthnCmd::MdsUpdate { path },
+                    },
+            } => assert_eq!(path, "/tmp/mds.jwt"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_webauthn_mds_show_parses() {
+        let cli = parse(&[
+            "cavectl",
+            "auth",
+            "webauthn",
+            "mds-show",
+            "--aaguid",
+            "fa2b99dc-9e39-4257-8f92-4a30d23c4118",
+        ]);
+        match cli.command {
+            Commands::Auth {
+                cmd:
+                    AuthCmd::Webauthn {
+                        cmd: WebauthnCmd::MdsShow { aaguid },
+                    },
+            } => assert_eq!(aaguid, "fa2b99dc-9e39-4257-8f92-4a30d23c4118"),
+            _ => panic!("wrong variant"),
+        }
+    }
 }
