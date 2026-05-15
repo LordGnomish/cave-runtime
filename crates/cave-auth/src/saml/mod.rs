@@ -48,6 +48,7 @@ pub mod canonicalization;
 pub mod metadata;
 pub mod response;
 pub mod signature;
+pub mod xmlenc;
 
 use thiserror::Error;
 
