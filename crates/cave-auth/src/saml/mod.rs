@@ -52,6 +52,7 @@ pub mod signature;
 // Appended-only — never edit the originals above.
 pub mod name_id;
 pub mod assertion;
+pub mod bindings;
 
 use thiserror::Error;
 
