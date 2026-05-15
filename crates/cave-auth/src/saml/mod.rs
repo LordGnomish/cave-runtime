@@ -40,6 +40,7 @@
 //!   the two front-channel bindings (Redirect + POST) cover
 //!   every IdP cave customers federate with.
 
+pub mod artifact;
 pub mod authn_request;
 pub mod binding;
 pub mod broker;
