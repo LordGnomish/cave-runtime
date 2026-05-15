@@ -53,3 +53,6 @@ cbc     = { version = "0.1", features = ["alloc"] }
 cipher  = { version = "0.4", features = ["block-padding", "alloc"] }
 hmac    = "0.12"
 hkdf    = "0.12"
+# OAuth/OIDC endpoints (oauth_endpoints/): URL-encoding + form deser for /auth + /par + /token
+urlencoding      = "2.1"
+serde_urlencoded = "0.7"
