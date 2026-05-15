@@ -229,3 +229,84 @@ groups:
             with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
             the hybrid path live before the OSS launch (target 21 May).
           runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # OIDC suite — `/auth` + device + revoke + PAR + CIBA + admin REST
+  # Metrics emitted by cave-auth/src/keycloak/metrics.rs.
+  # ──────────────────────────────────────────────────────────────────────────
+  - name: cave-auth.oidc-suite
+    interval: 30s
+    rules:
+      - alert: DeviceFlowExpiryStorm
+        expr: |
+          sum by (realm) (rate(cave_auth_device_flow_total{phase="poll"}[5m])) > 0
+          and
+          sum by (realm) (rate(cave_auth_device_flow_total{phase="complete"}[5m]))
+            / clamp_min(sum by (realm) (rate(cave_auth_device_flow_total{phase="auth"}[5m])), 1e-9) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "fewer than 10% of device-authorization requests are completing"
+          description: |
+            Operators are abandoning the device-flow user-verification page
+            in realm {{ $labels.realm }}. Most-likely cause is a misrouted
+            verification_uri or a missing operator approval workflow. Check
+            cave-auth `cave_auth_device_flow_total{phase="verify"}` for
+            user-side traffic.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/device-flow-abandonment"
+
+      - alert: CibaRequestsAllExpire
+        expr: |
+          sum by (realm) (rate(cave_auth_ciba_total{result="issued"}[10m])) > 0
+          and
+          sum by (realm) (rate(cave_auth_ciba_total{result=~"approved|denied"}[10m])) == 0
+        for: 15m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "CIBA backchannel requests issued but never resolved"
+          description: |
+            cave-auth issued CIBA auth_req_id values in realm {{ $labels.realm }}
+            but no operator approve/deny action followed. The out-of-band
+            push channel (cavectl auth ciba approve / portal) likely is not
+            wired.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/ciba-stalled"
+
+      - alert: RevokeBurst
+        expr: |
+          sum by (realm) (rate(cave_auth_revoke_total{result="ok"}[5m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "abnormal RFC 7009 token-revocation rate"
+          description: |
+            Revoke rate exceeded 50 tokens / s for 5m in realm
+            {{ $labels.realm }}. Either a compromised client is mass-revoking
+            its own tokens, or a misbehaving client is calling revoke instead
+            of logout. Check `cave_auth_revoke_total{token_type_hint}` for
+            the breakdown.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/revoke-burst"
+
+      - alert: AdminIdpOpFailureSpike
+        expr: |
+          sum(rate(cave_auth_idp_admin_operations_total{result!="ok"}[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "Identity-Provider admin operations failing"
+          description: |
+            More than 5 IdP-admin operations / s are failing across the
+            cluster. Most common cause: misconfigured import-config URLs
+            or expired federation metadata.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/idp-admin-failures"

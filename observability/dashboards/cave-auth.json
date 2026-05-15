@@ -277,6 +277,79 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "OIDC /auth requests by response_type",
+      "description": "Authorization endpoint hits — covers OAuth code / id_token / token / hybrid / none flows. Source: cave_auth_authorize_requests_total.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (response_type) (rate(cave_auth_authorize_requests_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{response_type}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Device-flow funnel (auth -> verify -> complete)",
+      "description": "RFC 8628 funnel: issuance / user-page hits / approve+deny. Diverging slopes signal an abandoned verification page or operator-approval bottleneck.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (phase) (rate(cave_auth_device_flow_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{phase}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "CIBA backchannel-auth — issued vs approved",
+      "description": "OIDC Client-Initiated Backchannel Authentication. Curve gap = pending requests; spike in `denied` = users rejecting unexpected prompts.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_ciba_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "PAR pushes + outcome",
+      "description": "RFC 9126 Pushed Authorization Requests. `ok` = request_uri minted, `bad_secret`/`unknown_client` = client-auth failure, `request_uri_forbidden` = inline RFC 9126 §2.1 violation.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_par_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "Token revocation rate + hint mix",
+      "description": "RFC 7009 token-revocation rate broken down by token_type_hint. Mass-revocation can indicate either a compromised client or an aggressive logout-as-revoke flow.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 63 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (token_type_hint) (rate(cave_auth_revoke_total{realm=~\"$realm\",result=\"ok\"}[1m]))", "legendFormat": "{{token_type_hint}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Admin REST ops — IdP & AuthFlow",
+      "description": "Identity-Provider + AuthenticationFlow REST admin operations. `result=fail` should sit at zero — spikes mean a misconfigured federation or built-in-flow edit attempts.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 63 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (op, result) (rate(cave_auth_idp_admin_operations_total[1m]))", "legendFormat": "idp/{{op}}/{{result}}", "refId": "A" },
+        { "expr": "sum by (op, result) (rate(cave_auth_flow_admin_operations_total[1m]))", "legendFormat": "flow/{{op}}/{{result}}", "refId": "B" }
+      ]
     }
   ]
 }
