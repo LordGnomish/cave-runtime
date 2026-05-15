@@ -48,6 +48,10 @@ pub mod metadata;
 pub mod response;
 pub mod signature;
 
+// ── A1 mission additions (Keycloak v22.0.0 SAML broker port) ────────────────
+// Appended-only — never edit the originals above.
+pub mod name_id;
+
 use thiserror::Error;
 
 /// Errors the SAML surface can surface. Modelled on Keycloak's
