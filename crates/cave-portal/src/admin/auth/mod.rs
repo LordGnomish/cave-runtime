@@ -14,7 +14,11 @@
 //! Upstream UI: <https://www.keycloak.org/documentation>
 
 pub mod clients;
+pub mod device;
 pub mod events;
+pub mod flows;
+pub mod idp;
+pub mod oidc_inspect;
 pub mod realms;
 pub mod sessions;
 pub mod users;

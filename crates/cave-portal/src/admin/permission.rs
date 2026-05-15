@@ -124,6 +124,14 @@ pub enum Permission {
     MetricsRead,
     TraceRead,
     AuthSessionsRead,
+    /// `/admin/auth/idp` — Identity Provider CRUD.
+    AuthIdpRead,
+    /// `/admin/auth/flows` — Authentication Flow CRUD.
+    AuthFlowRead,
+    /// `/admin/auth/device` — Device-flow user verification + inspector.
+    AuthDeviceRead,
+    /// `/admin/auth/oidc-inspect` — PAR + CIBA inspector.
+    AuthOidcInspect,
     DashboardRead2,
     DnsRead,
     LogsRead,
@@ -291,6 +299,10 @@ impl Permission {
             Permission::MetricsRead => "metrics.series.read",
             Permission::TraceRead => "trace.service.read",
             Permission::AuthSessionsRead => "auth.session.read",
+            Permission::AuthIdpRead => "auth.idp.read",
+            Permission::AuthFlowRead => "auth.flow.read",
+            Permission::AuthDeviceRead => "auth.device.read",
+            Permission::AuthOidcInspect => "auth.oidc.inspect",
             Permission::DashboardRead2 => "dashboard.catalog.read",
             Permission::DnsRead => "dns.zone.read",
             Permission::LogsRead => "logs.stream.read",

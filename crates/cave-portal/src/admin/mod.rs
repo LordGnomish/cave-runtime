@@ -905,6 +905,10 @@ async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query
 async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_idp_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::idp::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_flows_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::flows::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_device_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::device::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_oidc_inspect_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::oidc_inspect::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -1497,6 +1501,10 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/metrics", get(metrics_handler))
         .route("/admin/trace", get(trace_handler))
         .route("/admin/auth-sessions", get(auth_sessions_handler))
+        .route("/admin/auth/idp", get(auth_idp_handler))
+        .route("/admin/auth/flows", get(auth_flows_handler))
+        .route("/admin/auth/device", get(auth_device_handler))
+        .route("/admin/auth/oidc-inspect", get(auth_oidc_inspect_handler))
         .route("/admin/dashboard-catalog", get(dashboard_handler))
         .route("/admin/dns", get(dns_handler))
         .route("/admin/logs", get(logs_handler))
