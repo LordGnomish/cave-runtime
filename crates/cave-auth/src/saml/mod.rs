@@ -50,6 +50,7 @@ pub mod metadata;
 pub mod nameid;
 pub mod response;
 pub mod signature;
+pub mod slo;
 pub mod xmlenc;
 
 use thiserror::Error;
