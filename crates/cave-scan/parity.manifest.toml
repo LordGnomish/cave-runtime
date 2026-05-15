@@ -14,9 +14,13 @@ language= "Java"
 url     = "https://github.com/SonarSource/sonarqube"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# MEASURED 2026-05-15: counted by tomllib from this file:
+#   files=44, functions=24, tests=50, upstream_test=21, surfaces=7, missings=16
+#   ratio = (44+24+50+21+7) / (44+24+50+21+7+16) = 146/162 = 0.9012
+ratio        = 0.9012
+last_audit   = "2026-05-15"
+infra_only   = false
+notes        = "Dual upstream: SonarQube v10.4.1 (legacy SAST) + Trivy v0.70.0 (vuln/iac/secrets/license). See [parity_s1..s4] for per-packet breakdown."
 [module]
 name        = "cave-scan"
 description = "Code quality & SAST scanner — SonarQube-compatible findings, rules and coverage import"
@@ -551,3 +555,259 @@ fill_ratio = 0.875
 last_audit = "2026-05-15"
 notes      = "S3-port-only parity ratio; merge with global parity table after S1+S2+S4 land."
 # === S3 end ===
+
+# === S2 trivy scan engine ===
+# Second upstream: aquasecurity/trivy v0.70.0 @ 8a3177a (Apache-2.0 → AGPL-3.0 OK).
+# Scope: scan engine (analyzer/oci/scanners/target/report_agg).
+
+[upstream_trivy]
+org     = "aquasecurity"
+repo    = "trivy"
+version = "v0.70.0"
+sha     = "8a3177a"
+name    = "Trivy"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/aquasecurity/trivy"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/analyzer.go"
+local    = "src/analyzer/mod.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/executable/executable.go"
+local    = "src/analyzer/binary.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/pkg/apk/apk.go"
+local    = "src/analyzer/os.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/pkg/dpkg/dpkg.go"
+local    = "src/analyzer/os.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/language/nodejs/npm/npm.go"
+local    = "src/analyzer/language.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/analyzer/language/rust/cargo/cargo.go"
+local    = "src/analyzer/language.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/image/daemon/image.go"
+local    = "src/oci/manifest.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/image/img.go"
+local    = "src/oci/layer.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/artifact/local/fs.go"
+local    = "src/target.rs"
+
+[[files]]
+upstream = "trivy/pkg/fanal/artifact/local/fs.go"
+local    = "src/scanners/fs.rs"
+
+[[files]]
+upstream = "trivy/pkg/report/report.go"
+local    = "src/report_agg.rs"
+
+[[upstream_test]]
+upstream_test = "TestParseApkInfo"
+local_test    = "alpine_apk_parses_single_package"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestParseApkInfo (multi)"
+local_test    = "alpine_apk_parses_multiple_packages"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestApk_Required"
+local_test    = "alpine_apk_required_matches_lib_apk_db"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestParseDpkgStatus"
+local_test    = "dpkg_status_parses_single_installed_package"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestDpkg_Required"
+local_test    = "dpkg_required_matches_status_path"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestNpm (lockfile v2/v3)"
+local_test    = "npm_lock_v3_parses_packages_field"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestNpm (legacy v1)"
+local_test    = "npm_lock_v1_parses_dependencies_field"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestCargo (Cargo.lock parse)"
+local_test    = "cargo_lock_parses_packages"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestExecutable (ELF magic)"
+local_test    = "binary_recognises_elf_magic"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestImageManifest_Decode"
+local_test    = "oci_manifest_parses_v1_image_manifest"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestImageCompression (gzip)"
+local_test    = "layer_detects_gzip_magic"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestImageCompression (zstd)"
+local_test    = "layer_detects_zstd_magic"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestArtifact_Inspect (fs walker)"
+local_test    = "fs_scanner_finds_packages_in_temp_dir"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestReport_Merge"
+local_test    = "report_aggregate_merges_two_scanners"
+status        = "ported"
+
+[[missings]]
+upstream = "trivy/pkg/fanal/analyzer/pkg/rpm/rpm.go"
+note     = "RPM Berkeley DB parsing — needs librpm bindings or hand-port; deferred"
+
+[[missings]]
+upstream = "trivy/pkg/fanal/image/remote/remote.go"
+note     = "registry pull (auth, manifest discovery) — needs reqwest+OCI auth; deferred"
+
+[[missings]]
+upstream = "trivy/pkg/fanal/applier/applier.go"
+note     = "Layer overlay/whiteout merge for full image diff; only single-layer scanning in MVP"
+
+[[missings]]
+upstream = "trivy/pkg/vulnerability/scanner.go"
+note     = "Vuln matching pipeline — provided by cave-scan-db::matcher; not a direct port"
+
+# Honest fill_ratio (S2 trivy scan engine):
+#   mapped files     = 11
+#   mapped tests     = 14
+#   missings         = 4
+#   fill_ratio = (11 + 14) / (11 + 14 + 4) = 25/29 = 0.862
+[parity_s2]
+fill_ratio = 0.862
+last_audit = "2026-05-15"
+notes      = "S2 trivy scan engine — fs/image MVP; registry pull + RPM + overlay diff deferred."
+# === S2 end ===
+
+# === S1 rules rescue ===
+[[files]]
+upstream = "sonar-plugin-api/src/main/java/org/sonar/api/rules/RuleType.java"
+local    = "src/rules.rs"
+
+[[upstream_test]]
+upstream_test = "RuleListTest"
+local_test    = "all_rule_ids_unique_and_well_formed"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "RuleRegexTest"
+local_test    = "every_regex_pattern_compiles"
+status        = "partial"
+note          = "GEN007 regex uses PCRE negative-lookahead unsupported by regex crate"
+# === S1 end ===
+
+# === S4 reports + 4-track surfaces ===
+[[files]]
+upstream = "trivy/pkg/report/sarif/sarif.go"
+local    = "src/report/sarif.rs"
+
+[[files]]
+upstream = "trivy/pkg/report/cyclonedx/cyclonedx.go"
+local    = "src/report/cyclonedx.rs"
+
+[[files]]
+upstream = "trivy/pkg/report/spdx/spdx.go"
+local    = "src/report/spdx.rs"
+
+[[files]]
+upstream = "trivy/pkg/report/table/table.go"
+local    = "src/report/table.rs"
+
+[[files]]
+upstream = "trivy/pkg/report/template/template.go"
+local    = "src/report/template.rs"
+
+[[upstream_test]]
+upstream_test = "TestSARIF_Encode"
+local_test    = "sarif_top_level_shape"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestCycloneDX_Encode"
+local_test    = "cyclonedx_top_level_shape"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestSPDX_Encode"
+local_test    = "spdx_top_level_shape"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestTable_Render"
+local_test    = "table_includes_target_and_count"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "TestTemplate_Render"
+local_test    = "template_substitutes_target_and_count"
+status        = "ported"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "trivy serve (REST)"
+local_path    = "/admin/scan/trivy/{images,filesystems,iac,secrets}"
+
+[[surfaces]]
+kind          = "cli"
+upstream_path = "trivy image|fs|config|secret|license|sbom"
+local_path    = "cavectl scan {image,fs,config,secret,license,sbom}"
+
+[[surfaces]]
+kind          = "observability"
+upstream_path = "trivy /metrics"
+local_path    = "observability/{alerts/cave-scan.yml, dashboards/cave-scan.json}"
+
+[[missings]]
+upstream = "trivy/pkg/report/junit/junit.go"
+note     = "JUnit XML output not in S4 scope; can be added later"
+
+[[missings]]
+upstream = "trivy/pkg/report/asff/asff.go"
+note     = "AWS Security Hub ASFF format — out of scope (Trivy-AWS specific)"
+
+# Honest fill_ratio (S4 reports + 4-track surfaces):
+#   mapped files     = 5
+#   mapped tests     = 5
+#   surfaces         = 3
+#   missings         = 2
+#   fill_ratio = (5 + 5 + 3) / (5 + 5 + 3 + 2) = 13/15 = 0.867
+[parity_s4]
+fill_ratio = 0.867
+last_audit = "2026-05-15"
+notes      = "S4 reports SARIF/CycloneDX/SPDX/JSON/Table/Template + portal + cavectl + observability."
+# === S4 end ===
+
+# ── Global parity (rolling all packets) ─────────────────────────────────────
+# S1 + S2 + S3 + S4 combined. See top-level [parity] block for the measured ratio.
