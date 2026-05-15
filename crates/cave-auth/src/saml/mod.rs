@@ -47,6 +47,7 @@ pub mod binding;
 pub mod broker;
 pub mod canonicalization;
 pub mod metadata;
+pub mod nameid;
 pub mod response;
 pub mod signature;
 pub mod xmlenc;
