@@ -905,6 +905,11 @@ async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query
 async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_saml_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::saml::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_saml_metadata_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::saml::render_sp_metadata(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_saml_artifact_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::saml::render_artifact(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_saml_slo_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::saml::render_slo(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn auth_saml_mappers_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::saml::render_mappers(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -1497,6 +1502,12 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/metrics", get(metrics_handler))
         .route("/admin/trace", get(trace_handler))
         .route("/admin/auth-sessions", get(auth_sessions_handler))
+        // 2026-05-15 SAML deepen — IdP federation console under /admin/auth/saml.
+        .route("/admin/auth/saml", get(auth_saml_handler))
+        .route("/admin/auth/saml/metadata", get(auth_saml_metadata_handler))
+        .route("/admin/auth/saml/artifact", get(auth_saml_artifact_handler))
+        .route("/admin/auth/saml/slo", get(auth_saml_slo_handler))
+        .route("/admin/auth/saml/mappers", get(auth_saml_mappers_handler))
         .route("/admin/dashboard-catalog", get(dashboard_handler))
         .route("/admin/dns", get(dns_handler))
         .route("/admin/logs", get(logs_handler))

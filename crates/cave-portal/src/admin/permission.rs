@@ -212,6 +212,16 @@ pub enum Permission {
     IcebergRead,
     MlflowRead,
     LiteLlmRead,
+
+    // ── 2026-05-15 SAML 2.0 deepen ────────────────────────────────────
+    /// Read SAML 2.0 IdP federation config + SP metadata + signing keys.
+    SamlBrokerRead,
+    /// Mutate SAML IdP config (add/edit/delete IdP entries, swap signing
+    /// keys, edit attribute-to-role mappings).
+    SamlBrokerWrite,
+    /// Trigger an out-of-band SLO fan-out from the Portal (terminates
+    /// every active SP session for a principal).
+    SamlSloTrigger,
 }
 
 impl Permission {
@@ -342,6 +352,9 @@ impl Permission {
             Permission::IcebergRead => "iceberg.catalog.read",
             Permission::MlflowRead => "mlflow.experiment.read",
             Permission::LiteLlmRead => "litellm.proxy.read",
+            Permission::SamlBrokerRead => "auth.saml.broker.read",
+            Permission::SamlBrokerWrite => "auth.saml.broker.write",
+            Permission::SamlSloTrigger => "auth.saml.slo.trigger",
         }
     }
 }
