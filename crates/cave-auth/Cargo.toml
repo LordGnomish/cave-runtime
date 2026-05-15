@@ -34,3 +34,16 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# JWE (RFC 7516) + DPoP (RFC 9449) + RFC 8693 token exchange
+# RSA-OAEP / RSA-OAEP-256 key encryption + ES256/RS256/Ed25519 DPoP proof verification
+rsa       = { version = "0.9", features = ["sha2"] }
+aes-gcm   = "0.10"
+aes-kw    = "0.2"
+aes       = "0.8"
+cbc       = { version = "0.1", features = ["std"] }
+hmac      = "0.12"
+sha2      = { workspace = true }
+hkdf      = "0.12"
+subtle    = "2"
+ctr       = "0.9"
+sha1      = "0.10"
