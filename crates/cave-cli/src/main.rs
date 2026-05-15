@@ -474,6 +474,95 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    /// LDAP user-federation provider management (Keycloak parity).
+    Ldap {
+        #[command(subcommand)]
+        cmd: LdapCmd,
+    },
+    /// Kerberos / SPNEGO provider management.
+    Kerberos {
+        #[command(subcommand)]
+        cmd: KerberosCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum LdapCmd {
+    /// List configured LDAP providers.
+    List,
+    /// Create a new LDAP provider.  Requires `--url`, `--users-dn`.
+    Create {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        users_dn: String,
+        /// `ad` / `openldap` / `rhds` / `tivoli` / `novell` / `other`.
+        #[arg(long, default_value = "openldap")]
+        vendor: String,
+        /// `READ_ONLY` / `WRITABLE` / `UNSYNCED`.
+        #[arg(long, default_value = "READ_ONLY")]
+        edit_mode: String,
+    },
+    /// Update an existing provider's config.
+    Update {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        users_dn: Option<String>,
+        #[arg(long)]
+        url: Option<String>,
+    },
+    /// Delete a provider by id.
+    Delete {
+        #[arg(long)]
+        id: String,
+    },
+    /// Test a bind against the configured provider.
+    TestBind {
+        #[arg(long)]
+        id: String,
+    },
+    /// Trigger a one-shot full sync.
+    SyncNow {
+        #[arg(long)]
+        id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum KerberosCmd {
+    /// List configured Kerberos providers.
+    List,
+    /// Create a Kerberos provider.
+    Create {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        realm: String,
+        #[arg(long)]
+        spn: String,
+        #[arg(long)]
+        keytab: String,
+    },
+    /// Update a Kerberos provider.
+    Update {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        keytab: Option<String>,
+    },
+    /// Delete a Kerberos provider.
+    Delete {
+        #[arg(long)]
+        id: String,
+    },
+    /// Test ticket validation by sending a synthetic SPNEGO challenge.
+    TestTicket {
+        #[arg(long)]
+        id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +4050,21 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::Ldap { cmd } => match cmd {
+                LdapCmd::List                   => c.get("/api/auth/federation/ldap").await,
+                LdapCmd::Create { id, .. }      => c.get(&format!("/api/auth/federation/ldap/{id}/create")).await,
+                LdapCmd::Update { id, .. }      => c.get(&format!("/api/auth/federation/ldap/{id}/update")).await,
+                LdapCmd::Delete { id }          => c.get(&format!("/api/auth/federation/ldap/{id}/delete")).await,
+                LdapCmd::TestBind { id }        => c.get(&format!("/api/auth/federation/ldap/{id}/test-bind")).await,
+                LdapCmd::SyncNow { id }         => c.get(&format!("/api/auth/federation/ldap/{id}/sync-now")).await,
+            },
+            AuthCmd::Kerberos { cmd } => match cmd {
+                KerberosCmd::List               => c.get("/api/auth/federation/kerberos").await,
+                KerberosCmd::Create { id, .. }  => c.get(&format!("/api/auth/federation/kerberos/{id}/create")).await,
+                KerberosCmd::Update { id, .. }  => c.get(&format!("/api/auth/federation/kerberos/{id}/update")).await,
+                KerberosCmd::Delete { id }      => c.get(&format!("/api/auth/federation/kerberos/{id}/delete")).await,
+                KerberosCmd::TestTicket { id }  => c.get(&format!("/api/auth/federation/kerberos/{id}/test-ticket")).await,
+            },
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -5146,5 +5250,109 @@ mod batch4_parse_tests {
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+    }
+
+    // ── auth ldap / auth kerberos subcommands ──────────────────────────────────
+
+    #[test]
+    fn auth_ldap_list_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap", "list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Ldap { cmd: LdapCmd::List } }
+        ));
+    }
+
+    #[test]
+    fn auth_ldap_create_parses_required_flags() {
+        let cli = parse(&[
+            "cavectl", "auth", "ldap", "create",
+            "--id", "acme-openldap",
+            "--url", "ldap://ldap.acme.corp",
+            "--users-dn", "dc=acme,dc=corp",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Ldap { cmd: LdapCmd::Create { id, url, users_dn, vendor, edit_mode } } } => {
+                assert_eq!(id, "acme-openldap");
+                assert_eq!(url, "ldap://ldap.acme.corp");
+                assert_eq!(users_dn, "dc=acme,dc=corp");
+                assert_eq!(vendor, "openldap");
+                assert_eq!(edit_mode, "READ_ONLY");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_ldap_test_bind_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap", "test-bind", "--id", "acme-ad"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Ldap { cmd: LdapCmd::TestBind { id } } } => {
+                assert_eq!(id, "acme-ad");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_ldap_sync_now_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap", "sync-now", "--id", "acme-ad"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Ldap { cmd: LdapCmd::SyncNow { id } } } => {
+                assert_eq!(id, "acme-ad");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_kerberos_list_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos", "list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Kerberos { cmd: KerberosCmd::List } }
+        ));
+    }
+
+    #[test]
+    fn auth_kerberos_create_parses_required_flags() {
+        let cli = parse(&[
+            "cavectl", "auth", "kerberos", "create",
+            "--id", "acme-krb5",
+            "--realm", "ACME.CORP",
+            "--spn", "HTTP/portal.acme.corp@ACME.CORP",
+            "--keytab", "/etc/cave/portal.keytab",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Kerberos { cmd: KerberosCmd::Create { id, realm, spn, keytab } } } => {
+                assert_eq!(id, "acme-krb5");
+                assert_eq!(realm, "ACME.CORP");
+                assert_eq!(spn, "HTTP/portal.acme.corp@ACME.CORP");
+                assert_eq!(keytab, "/etc/cave/portal.keytab");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_kerberos_test_ticket_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos", "test-ticket", "--id", "acme-krb5"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Kerberos { cmd: KerberosCmd::TestTicket { id } } } => {
+                assert_eq!(id, "acme-krb5");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_ldap_delete_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap", "delete", "--id", "gone"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Ldap { cmd: LdapCmd::Delete { id } } } => {
+                assert_eq!(id, "gone");
+            }
+            _ => panic!("wrong variant"),
+        }
     }
 }
