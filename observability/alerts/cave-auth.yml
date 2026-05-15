@@ -229,3 +229,61 @@ groups:
             with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
             the hybrid path live before the OSS launch (target 21 May).
           runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+  - name: cave-auth.oauth-advanced
+    interval: 30s
+    rules:
+      - alert: DpopVerificationFailureSpike
+        expr: |
+          sum(rate(cave_auth_dpop_verifications_total{result="failure"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "DPoP proof verification failure rate >1/s (5m avg)"
+          description: |
+            DPoP proof verifications are failing at >1/s. Common causes:
+            client-side clock drift outside iat skew, replayed jti, or a
+            misconfigured nonce policy.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/dpop-failures"
+
+      - alert: UmaRptIssuanceFailures
+        expr: |
+          (
+            sum by (realm) (rate(cave_auth_uma_rpt_issued_total{result="failure"}[5m]))
+            /
+            clamp_min(sum by (realm) (rate(cave_auth_uma_rpt_issued_total[5m])), 1e-9)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "UMA RPT issuance failure rate >10% in {{ $labels.realm }}"
+          description: |
+            UMA permission-ticket → RPT issuance is failing >10% of the
+            time in realm {{ $labels.realm }} — typically a permission-ticket
+            TTL too short or a policy denying every request.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/uma-rpt-fail"
+
+      - alert: JweDecryptAuthFailureSpike
+        expr: |
+          sum by (alg, enc) (
+            rate(cave_auth_jwe_decrypt_total{result="auth_failed"}[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "JWE decryption auth tag failure spike (alg={{ $labels.alg }}, enc={{ $labels.enc }})"
+          description: |
+            JWE decrypt is reporting AEAD authentication-tag failures at
+            >0.5/s — almost always a key-rotation / tampering issue. Verify
+            the encryption-key rollover, then check the resource server for
+            forged JWE bodies.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/jwe-auth-fail"

@@ -14,9 +14,13 @@
 //! Upstream UI: <https://www.keycloak.org/documentation>
 
 pub mod clients;
+pub mod dpop;
 pub mod events;
+pub mod jwe;
 pub mod realms;
 pub mod sessions;
+pub mod token_exchange;
+pub mod uma;
 pub mod users;
 
 use crate::admin::permission::{Permission, RequestCtx};

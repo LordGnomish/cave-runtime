@@ -474,6 +474,60 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    /// UMA 2.0 resource / ticket / RPT operations.
+    Uma {
+        #[command(subcommand)]
+        cmd: UmaCmd,
+    },
+    /// RFC 8693 token-exchange operations.
+    TokenExchange {
+        #[command(subcommand)]
+        cmd: TokenExchangeCmd,
+    },
+    /// RFC 9449 DPoP operations.
+    Dpop {
+        #[command(subcommand)]
+        cmd: DpopCmd,
+    },
+    /// RFC 7516 JWE operations.
+    Jwe {
+        #[command(subcommand)]
+        cmd: JweCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum UmaCmd {
+    /// List registered resources.
+    ListResources,
+    /// Register a new resource set.
+    RegisterResource,
+    /// Mint a permission ticket.
+    Ticket,
+    /// Issue or upgrade an RPT.
+    Rpt,
+}
+
+#[derive(Subcommand)]
+enum TokenExchangeCmd {
+    /// Attempt a token exchange.
+    Try,
+}
+
+#[derive(Subcommand)]
+enum DpopCmd {
+    /// Construct a DPoP proof JWT for testing.
+    MakeProof,
+    /// Verify a DPoP proof JWT against expected htm/htu/iat.
+    VerifyProof,
+}
+
+#[derive(Subcommand)]
+enum JweCmd {
+    /// Encrypt a plaintext using the configured client alg/enc.
+    Encrypt,
+    /// Decrypt a JWE compact string.
+    Decrypt,
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +4015,23 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::Uma { cmd } => match cmd {
+                UmaCmd::ListResources    => c.get("/api/auth/uma/resources").await,
+                UmaCmd::RegisterResource => c.get("/api/auth/uma/resources/register").await,
+                UmaCmd::Ticket           => c.get("/api/auth/uma/tickets").await,
+                UmaCmd::Rpt              => c.get("/api/auth/uma/rpt").await,
+            },
+            AuthCmd::TokenExchange { cmd } => match cmd {
+                TokenExchangeCmd::Try => c.get("/api/auth/token-exchange/try").await,
+            },
+            AuthCmd::Dpop { cmd } => match cmd {
+                DpopCmd::MakeProof   => c.get("/api/auth/dpop/make-proof").await,
+                DpopCmd::VerifyProof => c.get("/api/auth/dpop/verify-proof").await,
+            },
+            AuthCmd::Jwe { cmd } => match cmd {
+                JweCmd::Encrypt => c.get("/api/auth/jwe/encrypt").await,
+                JweCmd::Decrypt => c.get("/api/auth/jwe/decrypt").await,
+            },
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -4664,6 +4735,90 @@ mod batch4_parse_tests {
     fn auth_saml_c14n_parses() {
         let cli = parse(&["cavectl", "auth", "saml-c14n"]);
         assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+    }
+
+    // ── OAuth-advanced cavectl batch (2026-05-15) ────────────────────────────
+    #[test]
+    fn auth_uma_list_resources_parses() {
+        let cli = parse(&["cavectl", "auth", "uma", "list-resources"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Uma { cmd: UmaCmd::ListResources } }
+        ));
+    }
+
+    #[test]
+    fn auth_uma_register_resource_parses() {
+        let cli = parse(&["cavectl", "auth", "uma", "register-resource"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Uma { cmd: UmaCmd::RegisterResource } }
+        ));
+    }
+
+    #[test]
+    fn auth_uma_ticket_parses() {
+        let cli = parse(&["cavectl", "auth", "uma", "ticket"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Uma { cmd: UmaCmd::Ticket } }
+        ));
+    }
+
+    #[test]
+    fn auth_uma_rpt_parses() {
+        let cli = parse(&["cavectl", "auth", "uma", "rpt"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Uma { cmd: UmaCmd::Rpt } }
+        ));
+    }
+
+    #[test]
+    fn auth_token_exchange_try_parses() {
+        let cli = parse(&["cavectl", "auth", "token-exchange", "try"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::TokenExchange { cmd: TokenExchangeCmd::Try }
+            }
+        ));
+    }
+
+    #[test]
+    fn auth_dpop_make_proof_parses() {
+        let cli = parse(&["cavectl", "auth", "dpop", "make-proof"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Dpop { cmd: DpopCmd::MakeProof } }
+        ));
+    }
+
+    #[test]
+    fn auth_dpop_verify_proof_parses() {
+        let cli = parse(&["cavectl", "auth", "dpop", "verify-proof"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Dpop { cmd: DpopCmd::VerifyProof } }
+        ));
+    }
+
+    #[test]
+    fn auth_jwe_encrypt_parses() {
+        let cli = parse(&["cavectl", "auth", "jwe", "encrypt"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Jwe { cmd: JweCmd::Encrypt } }
+        ));
+    }
+
+    #[test]
+    fn auth_jwe_decrypt_parses() {
+        let cli = parse(&["cavectl", "auth", "jwe", "decrypt"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Jwe { cmd: JweCmd::Decrypt } }
+        ));
     }
 
     // ── Expanded container-scan subcommands ───────────────────────────────────

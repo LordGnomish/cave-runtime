@@ -277,6 +277,57 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "UMA permission tickets + RPTs",
+      "description": "UMA-Grant §3.2 + §3.3 — rate of tickets minted vs RPTs issued, success vs failure. From cave_auth_uma_tickets_issued_total + cave_auth_uma_rpt_issued_total.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_uma_tickets_issued_total{realm=~\"$realm\"}[1m]))", "legendFormat": "tickets {{result}}", "refId": "A" },
+        { "expr": "sum by (result) (rate(cave_auth_uma_rpt_issued_total{realm=~\"$realm\"}[1m]))", "legendFormat": "RPT {{result}}", "refId": "B" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Token exchange (RFC 8693) by mode",
+      "description": "Rate of grant_type=urn:ietf:params:oauth:grant-type:token-exchange, split by source / destination token-type URI and result.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (src_type, dst_type, result) (rate(cave_auth_token_exchange_total[1m]))", "legendFormat": "{{src_type}}->{{dst_type}} {{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "DPoP verifications + nonce challenges",
+      "description": "RFC 9449 — DPoP proof-of-possession verifications (cave_auth_dpop_verifications_total) and DPoP-Nonce challenges (cave_auth_dpop_nonce_challenges_total). Split by reason so replay vs htm/htu vs iat-skew is visible.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result, reason) (rate(cave_auth_dpop_verifications_total[1m]))", "legendFormat": "{{result}} {{reason}}", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_dpop_nonce_challenges_total[5m]))", "legendFormat": "nonce challenges/s", "refId": "B" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "JWE encrypt + decrypt rate (alg / enc)",
+      "description": "RFC 7516 — JWE encrypt and decrypt counters grouped by alg+enc. Auth-tag failures on decrypt are alerted on separately (JweDecryptAuthFailureSpike).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (alg, enc, result) (rate(cave_auth_jwe_encrypt_total[1m]))", "legendFormat": "enc {{alg}}/{{enc}} {{result}}", "refId": "A" },
+        { "expr": "sum by (alg, enc, result) (rate(cave_auth_jwe_decrypt_total[1m]))", "legendFormat": "dec {{alg}}/{{enc}} {{result}}", "refId": "B" }
+      ]
     }
   ]
 }
