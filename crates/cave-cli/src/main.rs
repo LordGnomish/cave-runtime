@@ -474,6 +474,60 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    /// SAML 2.0 IdP federation broker subcommands.
+    Saml {
+        #[command(subcommand)]
+        cmd: AuthSamlCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuthSamlCmd {
+    /// List configured upstream SAML 2.0 IdPs.
+    #[command(name = "idp-list")]
+    IdpList,
+    /// Inspect one IdP entry by alias.
+    #[command(name = "idp-get")]
+    IdpGet {
+        /// IdP alias as listed by `idp-list`.
+        alias: String,
+    },
+    /// Create a new IdP entry.
+    #[command(name = "idp-create")]
+    IdpCreate {
+        /// IdP alias (unique within the tenant).
+        alias: String,
+        /// IdP EntityID (URI).
+        entity_id: String,
+        /// IdP SSO endpoint URL.
+        sso_url: String,
+    },
+    /// Update an existing IdP entry.
+    #[command(name = "idp-update")]
+    IdpUpdate {
+        /// IdP alias to update.
+        alias: String,
+    },
+    /// Delete an IdP entry.
+    #[command(name = "idp-delete")]
+    IdpDelete {
+        /// IdP alias to delete.
+        alias: String,
+    },
+    /// Download cave's SP `<md:EntityDescriptor>` XML.
+    #[command(name = "sp-metadata")]
+    SpMetadata,
+    /// Test an HTTP-Artifact back-channel resolve.
+    #[command(name = "test-artifact")]
+    TestArtifact {
+        /// Base64-encoded SAMLart= value.
+        samlart: String,
+    },
+    /// Trigger Single-Logout fan-out for a principal.
+    Slo {
+        /// Principal whose sessions should be terminated.
+        principal: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +4015,50 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::Saml { cmd } => match cmd {
+                AuthSamlCmd::IdpList => c.get("/api/auth/saml/idps").await,
+                AuthSamlCmd::IdpGet { alias } => {
+                    c.get(&format!("/api/auth/saml/idps/{}", urlencode(&alias))).await
+                }
+                AuthSamlCmd::IdpCreate { alias, entity_id, sso_url } => {
+                    c.get(&format!(
+                        "/api/auth/saml/idps?op=create&alias={}&entity_id={}&sso_url={}",
+                        urlencode(&alias),
+                        urlencode(&entity_id),
+                        urlencode(&sso_url),
+                    ))
+                    .await
+                }
+                AuthSamlCmd::IdpUpdate { alias } => {
+                    c.get(&format!(
+                        "/api/auth/saml/idps/{}?op=update",
+                        urlencode(&alias)
+                    ))
+                    .await
+                }
+                AuthSamlCmd::IdpDelete { alias } => {
+                    c.get(&format!(
+                        "/api/auth/saml/idps/{}?op=delete",
+                        urlencode(&alias)
+                    ))
+                    .await
+                }
+                AuthSamlCmd::SpMetadata => c.get("/api/auth/saml/sp-metadata").await,
+                AuthSamlCmd::TestArtifact { samlart } => {
+                    c.get(&format!(
+                        "/api/auth/saml/test-artifact?samlart={}",
+                        urlencode(&samlart)
+                    ))
+                    .await
+                }
+                AuthSamlCmd::Slo { principal } => {
+                    c.get(&format!(
+                        "/api/auth/saml/slo?principal={}",
+                        urlencode(&principal)
+                    ))
+                    .await
+                }
+            },
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -5146,5 +5244,115 @@ mod batch4_parse_tests {
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+    }
+}
+
+// 2026-05-15 SAML deepen parse tests
+#[cfg(test)]
+mod saml_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn auth_saml_idp_list_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "idp-list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::IdpList }
+            }
+        ));
+    }
+
+    #[test]
+    fn auth_saml_idp_get_carries_alias() {
+        let cli = parse(&["cavectl", "auth", "saml", "idp-get", "okta-customer"]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Saml {
+                    cmd: AuthSamlCmd::IdpGet { alias },
+                },
+            } => assert_eq!(alias, "okta-customer"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_saml_idp_create_takes_three_positional_args() {
+        let cli = parse(&[
+            "cavectl", "auth", "saml", "idp-create",
+            "newidp", "https://newidp/eid", "https://newidp/sso",
+        ]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Saml {
+                    cmd: AuthSamlCmd::IdpCreate { alias, entity_id, sso_url },
+                },
+            } => {
+                assert_eq!(alias, "newidp");
+                assert_eq!(entity_id, "https://newidp/eid");
+                assert_eq!(sso_url, "https://newidp/sso");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_saml_idp_update_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "idp-update", "x"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::IdpUpdate { .. } }
+            }
+        ));
+    }
+
+    #[test]
+    fn auth_saml_idp_delete_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "idp-delete", "x"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::IdpDelete { .. } }
+            }
+        ));
+    }
+
+    #[test]
+    fn auth_saml_sp_metadata_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "sp-metadata"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::SpMetadata }
+            }
+        ));
+    }
+
+    #[test]
+    fn auth_saml_test_artifact_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "test-artifact", "AAQAxxx"]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::TestArtifact { samlart } },
+            } => assert_eq!(samlart, "AAQAxxx"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_saml_slo_parses() {
+        let cli = parse(&["cavectl", "auth", "saml", "slo", "alice@cave.dev"]);
+        match cli.command {
+            Commands::Auth {
+                cmd: AuthCmd::Saml { cmd: AuthSamlCmd::Slo { principal } },
+            } => assert_eq!(principal, "alice@cave.dev"),
+            _ => panic!("wrong variant"),
+        }
     }
 }
