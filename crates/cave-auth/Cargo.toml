@@ -34,3 +34,7 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# OAuth/OIDC endpoints (oauth_endpoints/): SHA-256 for PKCE S256, base64url, urlencoding
+sha2             = { workspace = true }
+urlencoding      = "2.1"
+serde_urlencoded = "0.7"
