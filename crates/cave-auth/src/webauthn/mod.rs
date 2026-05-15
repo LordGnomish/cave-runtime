@@ -8,3 +8,4 @@
 // not the authenticator side.
 
 pub mod cose;
+pub mod model;
