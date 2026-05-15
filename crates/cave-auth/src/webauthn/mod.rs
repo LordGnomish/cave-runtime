@@ -8,6 +8,7 @@
 // not the authenticator side.
 
 pub mod attestation;
+pub mod authentication;
 pub mod cose;
 pub mod model;
 pub mod registration;
