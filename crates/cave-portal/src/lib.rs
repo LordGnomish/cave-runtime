@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Developer portal — compatible with Backstage.
 
 pub mod catalog;
@@ -11,6 +12,14 @@ pub mod ui;
 /// Per-module admin views (etcd / cri / apiserver / iam / mesh / pg / vault)
 /// + per-tenant dashboard. Pinned to backstage/backstage v1.50.3.
 pub mod admin;
+
+/// End-user account console — server-side port of
+/// `keycloak/keycloak@b825ba97 js/apps/account-ui/src/`.
+/// Mounted under `/account/...`.
+pub mod account;
+
+/// Metrics emitted by the `/account` + `/admin/auth` portal pages.
+pub mod metrics;
 
 use axum::Router;
 use cave_kernel::parity::ParityReport;
