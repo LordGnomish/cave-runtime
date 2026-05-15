@@ -130,6 +130,10 @@ pub mod iceberg;
 pub mod mlflow;
 pub mod litellm;
 
+// ── 2026-05-15 cave-auth deep push (sub-agent A6): account + auth_admin ──
+pub mod account;
+pub mod auth_admin;
+
 use axum::{
     extract::{Path, Query, State as AxumState},
     http::StatusCode,
@@ -1406,6 +1410,98 @@ async fn contributions_leaderboard_handler(
         .map_err(err_to_response)
 }
 
+// ── 2026-05-15 Account console (A6) ─────────────────────────────────
+async fn account_profile_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    account::profile::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn account_password_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    account::password::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn account_two_factor_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    account::two_factor::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn account_applications_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    account::applications::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn account_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    account::sessions::render(&s, &ctx).map(Html).map_err(err_to_response)
+}
+
+// ── 2026-05-15 Auth Admin console (A6) ──────────────────────────────
+async fn auth_admin_realms_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::realms::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_clients_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::clients::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_users_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::users::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_roles_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::roles::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_groups_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::groups::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_idp_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::idp::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_flows_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::flows::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_events_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::events::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_saml_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::saml::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_webauthn_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::webauthn::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_ldap_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::ldap::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_kerberos_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::kerberos::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_uma_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::uma::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_token_exchange_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::token_exchange::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_dpop_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::dpop::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_jwe_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::jwe::render(&ctx).map(Html).map_err(err_to_response)
+}
+async fn auth_admin_oauth_endpoints_handler(Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth_admin::oauth_endpoints::render(&ctx).map(Html).map_err(err_to_response)
+}
+
 /// Build the admin router. Mount as `app.merge(admin::router(state))`.
 pub fn router(state: Arc<AdminState>) -> Router {
     Router::new()
@@ -1573,6 +1669,30 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/litellm/api-keys", get(litellm_api_keys_handler))
         .route("/admin/litellm/budgets", get(litellm_budgets_handler))
         .route("/admin/litellm/monitoring", get(litellm_monitoring_handler))
+        // 2026-05-15 Account console (A6).
+        .route("/account/profile", get(account_profile_handler))
+        .route("/account/password", get(account_password_handler))
+        .route("/account/two-factor", get(account_two_factor_handler))
+        .route("/account/applications", get(account_applications_handler))
+        .route("/account/sessions", get(account_sessions_handler))
+        // 2026-05-15 Auth Admin console (A6).
+        .route("/admin/auth/realms", get(auth_admin_realms_handler))
+        .route("/admin/auth/clients", get(auth_admin_clients_handler))
+        .route("/admin/auth/users", get(auth_admin_users_handler))
+        .route("/admin/auth/roles", get(auth_admin_roles_handler))
+        .route("/admin/auth/groups", get(auth_admin_groups_handler))
+        .route("/admin/auth/idp", get(auth_admin_idp_handler))
+        .route("/admin/auth/flows", get(auth_admin_flows_handler))
+        .route("/admin/auth/events", get(auth_admin_events_handler))
+        .route("/admin/auth/saml", get(auth_admin_saml_handler))
+        .route("/admin/auth/webauthn", get(auth_admin_webauthn_handler))
+        .route("/admin/auth/ldap", get(auth_admin_ldap_handler))
+        .route("/admin/auth/kerberos", get(auth_admin_kerberos_handler))
+        .route("/admin/auth/uma", get(auth_admin_uma_handler))
+        .route("/admin/auth/token-exchange", get(auth_admin_token_exchange_handler))
+        .route("/admin/auth/dpop", get(auth_admin_dpop_handler))
+        .route("/admin/auth/jwe", get(auth_admin_jwe_handler))
+        .route("/admin/auth/oauth-endpoints", get(auth_admin_oauth_endpoints_handler))
         .with_state(state)
 }
 
