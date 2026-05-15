@@ -5,6 +5,17 @@
 //! The `cavectl` binary uses these modules; testers consume them directly with
 //! the in-memory backend implementations to avoid wire-level mocks.
 
+/// HTTP client used by the binary's command dispatcher to talk to
+/// the runtime. Re-exported by the lib so library-side modules
+/// (notably `native::auth::Cmd::run`) can reference
+/// `crate::client::ApiClient` regardless of whether they are
+/// compiled inside the binary or the lib target.
+///
+/// 2026-05-15 polish — fixes a pre-existing
+/// `cannot find client in crate root` E0433 that blocked any
+/// `cargo test -p cavectl` run.
+pub mod client;
+
 /// The approval workflow module, providing backend traits and in-memory
 /// implementations for managing approval records and states.
 pub mod approval;

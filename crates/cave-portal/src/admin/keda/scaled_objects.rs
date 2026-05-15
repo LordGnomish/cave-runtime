@@ -11,7 +11,7 @@ use crate::admin::keda::types::{
     KedaScaledObjectDetail, KedaScaledObjectStatus, KedaTrigger,
 };
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -214,7 +214,9 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
             &rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledobjects",
         &format!("keda · scaledobjects · {}", ctx.tenant.as_str()),
         &body,
     ))
@@ -284,7 +286,9 @@ pub fn render_detail(
         fallback = fallback,
         status_block = status_block,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledobjects",
         &format!("keda · {}/{}", so.namespace, so.name),
         &body,
     ))
@@ -325,7 +329,7 @@ pub fn render_new_form(_state: &AdminState, ctx: &RequestCtx) -> Result<String, 
         scaler_options = scaler_options,
         n_scalers = scalers::all().len(),
     );
-    Ok(page_shell("keda · new scaledobject", &body))
+    Ok(page_shell_full(ctx, "/admin/keda/scaledobjects", "keda · new scaledobject", &body))
 }
 
 pub fn render_edit_yaml(
@@ -351,7 +355,9 @@ pub fn render_edit_yaml(
         n = escape(&so.name),
         yaml = escape(&yaml),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledobjects",
         &format!("keda · edit {}/{}", so.namespace, so.name),
         &body,
     ))
@@ -379,7 +385,9 @@ pub fn render_delete_confirm(
         tgt = format!("{}/{}", so.scale_target_ref.kind, so.scale_target_ref.name),
         orig = so.status.original_replica_count,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledobjects",
         &format!("keda · delete {}/{}", so.namespace, so.name),
         &body,
     ))

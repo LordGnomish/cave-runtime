@@ -18,7 +18,7 @@
 
 use crate::admin::keda::types::KedaScaledObjectDetail;
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -126,7 +126,9 @@ for live cave-metrics queries when it lands.</p>"#,
             &cells
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/metrics",
         &format!("keda · metrics · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

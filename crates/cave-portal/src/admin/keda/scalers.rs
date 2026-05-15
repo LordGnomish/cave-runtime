@@ -77,7 +77,7 @@ pub fn render(
     ctx: &crate::admin::permission::RequestCtx,
 ) -> Result<String, crate::admin::permission::AuthError> {
     ctx.authorise(crate::admin::permission::Permission::KedaScalerCatalog)?;
-    use crate::admin::render::{escape, page_shell};
+    use crate::admin::render::{escape, page_shell_full};
     let mut body = format!(
         "<h2 class=\"text-lg font-semibold mb-2\">Scaler catalog ({} entries)</h2>\
          <p class=\"text-sm text-gray-600 mb-4\">Sourced from <a class=\"underline\" href=\"https://keda.sh/docs/2.14/scalers/\" target=\"_blank\" rel=\"noopener\">keda.sh/docs/2.14/scalers/</a>. \
@@ -131,7 +131,7 @@ pub fn render(
         }
         body.push_str("</tbody></table>");
     }
-    Ok(page_shell("keda · scaler catalog", &body))
+    Ok(page_shell_full(ctx, "/admin/keda/scalers", "keda · scaler catalog", &body))
 }
 
 /// Render a single-scaler detail page. Returns 404-shaped Error when the
@@ -142,7 +142,7 @@ pub fn render_detail(
     kind: &str,
 ) -> Result<String, RenderDetailError> {
     ctx.authorise(crate::admin::permission::Permission::KedaScalerCatalog)?;
-    use crate::admin::render::{escape, page_shell};
+    use crate::admin::render::{escape, page_shell_full};
     let e = lookup(kind).ok_or_else(|| RenderDetailError::Unknown(kind.into()))?;
     let metadata_list = e
         .metadata_keys
@@ -172,7 +172,7 @@ pub fn render_detail(
         md = metadata_list,
         example = escape(&example_trigger_yaml(e)),
     );
-    Ok(page_shell(&format!("keda · scaler · {}", e.kind), &body))
+    Ok(page_shell_full(ctx, "/admin/keda/scalers", &format!("keda · scaler · {}", e.kind), &body))
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

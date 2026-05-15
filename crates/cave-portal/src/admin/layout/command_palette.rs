@@ -12,6 +12,7 @@
 //! injected as JSON via `<script type="application/json">` so the
 //! HTML escaping route is preserved.
 
+use crate::admin::permission::Persona;
 use crate::admin::render::escape;
 use serde::Serialize;
 
@@ -23,6 +24,25 @@ pub struct CommandItem {
     /// Hint / group ("Navigate", "Action", "Toggle"). Optional.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hint: Option<String>,
+    /// Minimum persona required to see this command in the palette.
+    /// `Persona::Anonymous` (the default for `nav` / `action`) means
+    /// every signed-in caller — and the dev `?tenant_id=...` shortcut —
+    /// sees it. Use `nav_platform` / `action_platform` for entries
+    /// that should only surface to PlatformAdmin (Charter compliance,
+    /// ADR Browser, upstream parity, …).
+    ///
+    /// Skipped from JSON when set to the default so the existing
+    /// embedded-data tests stay byte-stable.
+    #[serde(skip_serializing_if = "is_anonymous", default = "default_persona")]
+    pub min_persona: Persona,
+}
+
+fn is_anonymous(p: &Persona) -> bool {
+    matches!(p, Persona::Anonymous)
+}
+
+fn default_persona() -> Persona {
+    Persona::Anonymous
 }
 
 impl CommandItem {
@@ -31,6 +51,7 @@ impl CommandItem {
             label: label.into(),
             href: href.into(),
             hint: Some("Navigate".into()),
+            min_persona: Persona::Anonymous,
         }
     }
 
@@ -39,7 +60,23 @@ impl CommandItem {
             label: label.into(),
             href: href.into(),
             hint: Some("Action".into()),
+            min_persona: Persona::Anonymous,
         }
+    }
+
+    /// Same as [`nav`] but only visible to PlatformAdmin callers.
+    pub fn nav_platform(label: &str, href: &str) -> Self {
+        Self { min_persona: Persona::PlatformAdmin, ..Self::nav(label, href) }
+    }
+
+    /// Same as [`action`] but only visible to PlatformAdmin callers.
+    pub fn action_platform(label: &str, href: &str) -> Self {
+        Self { min_persona: Persona::PlatformAdmin, ..Self::action(label, href) }
+    }
+
+    /// True iff a caller of `persona` is allowed to see this entry.
+    pub fn visible_to(&self, persona: Persona) -> bool {
+        persona.can_access(self.min_persona)
     }
 }
 
@@ -150,16 +187,32 @@ pub fn command_palette_modal(items: &[CommandItem]) -> String {
 
 /// Default command set — useful out-of-the-box. Callers can append
 /// per-tenant items or replace entirely.
+///
+/// Returns the **PlatformAdmin** view (every command). Use
+/// [`default_commands_for_persona`] inside the chrome / live handlers
+/// so TenantAdmin and Anonymous callers see only the entries they can
+/// actually navigate to.
 pub fn default_commands(tenant_id: &str) -> Vec<CommandItem> {
+    default_commands_for_persona(tenant_id, Persona::PlatformAdmin)
+}
+
+/// Persona-filtered command set. Charter / ADR Browser / upstream
+/// parity are PlatformAdmin-only; tenant resources (KEDA, Vault,
+/// kubelet, …) are visible to TenantAdmin too.
+pub fn default_commands_for_persona(tenant_id: &str, persona: Persona) -> Vec<CommandItem> {
     let t = tenant_id;
-    vec![
-        CommandItem::nav("Go to Compliance",     &format!("/admin/compliance?tenant_id={t}")),
-        // 2026-05-14 discoverability fix — /admin/cluster/live was not
-        // reachable from the palette before; this is the canonical
-        // Raft snapshot.
-        CommandItem::nav("Go to Cluster Status", &format!("/admin/cluster/live?tenant_id={t}")),
-        CommandItem::nav("Go to Upstream",       &format!("/admin/upstream?tenant_id={t}")),
-        CommandItem::nav("Go to ADR Browser",    &format!("/admin/adr?tenant_id={t}")),
+    let all = vec![
+        // Platform-only surfaces — Charter compliance, ADR, upstream.
+        CommandItem::nav_platform("Go to Compliance", &format!("/admin/compliance?tenant_id={t}")),
+        CommandItem::nav_platform("Go to Upstream",   &format!("/admin/upstream?tenant_id={t}")),
+        CommandItem::nav_platform("Go to ADR Browser", &format!("/admin/adr?tenant_id={t}")),
+        CommandItem::nav_platform("Go to Audit",      &format!("/admin/_audit?tenant_id={t}")),
+
+        // Cluster surfaces — visible to PlatformAdmin only (Raft
+        // snapshot exposes leader / term / log apply across tenants).
+        CommandItem::nav_platform("Go to Cluster Status", &format!("/admin/cluster/live?tenant_id={t}")),
+
+        // Tenant-scoped surfaces — visible to TenantAdmin and above.
         CommandItem::nav("Go to KEDA",           &format!("/admin/keda?tenant_id={t}")),
         CommandItem::nav("Go to Vault",          &format!("/admin/vault?tenant_id={t}")),
         // 2026-05-14 consolidation: Kubelet + Scheduler land on K8s
@@ -173,7 +226,8 @@ pub fn default_commands(tenant_id: &str) -> Vec<CommandItem> {
         CommandItem::nav("Go to Networking",     &format!("/admin/net?tenant_id={t}")),
         CommandItem::action("Toggle dark mode",  "/api/portal/theme/toggle"),
         CommandItem::action("Sign out",          "/api/auth/logout"),
-    ]
+    ];
+    all.into_iter().filter(|c| c.visible_to(persona)).collect()
 }
 
 #[cfg(test)]
@@ -228,8 +282,98 @@ mod tests {
 
     #[test]
     fn command_item_serializes_without_optional_hint_when_none() {
-        let c = CommandItem { label: "x".into(), href: "/".into(), hint: None };
+        let c = CommandItem {
+            label: "x".into(),
+            href: "/".into(),
+            hint: None,
+            min_persona: Persona::Anonymous,
+        };
         let json = serde_json::to_string(&c).unwrap();
         assert!(!json.contains("hint"));
+    }
+
+    // ── 2026-05-15 polish sweep — persona filter ─────────────────────
+
+    /// Tenant admin must NOT see the platform-only entries (ADR
+    /// Browser, Compliance dashboard, upstream parity, _audit). They
+    /// keep the tenant-scoped ones (KEDA, Vault, kubelet, …).
+    #[test]
+    fn tenant_admin_does_not_see_platform_only_commands() {
+        let cs = default_commands_for_persona("acme", Persona::TenantAdmin);
+        let labels: Vec<&str> = cs.iter().map(|c| c.label.as_str()).collect();
+        for forbidden in [
+            "Go to Compliance",
+            "Go to Upstream",
+            "Go to ADR Browser",
+            "Go to Audit",
+            "Go to Cluster Status",
+        ] {
+            assert!(
+                !labels.contains(&forbidden),
+                "tenant_admin should NOT see {forbidden}, palette = {labels:?}"
+            );
+        }
+        // But tenant items are still there.
+        assert!(labels.contains(&"Go to KEDA"));
+        assert!(labels.contains(&"Go to Vault"));
+    }
+
+    #[test]
+    fn platform_admin_sees_all_default_commands() {
+        let cs = default_commands_for_persona("acme", Persona::PlatformAdmin);
+        let labels: Vec<&str> = cs.iter().map(|c| c.label.as_str()).collect();
+        for required in [
+            "Go to Compliance",
+            "Go to Upstream",
+            "Go to ADR Browser",
+            "Go to Audit",
+            "Go to KEDA",
+            "Go to Vault",
+        ] {
+            assert!(
+                labels.contains(&required),
+                "platform_admin must see {required}"
+            );
+        }
+    }
+
+    #[test]
+    fn anonymous_persona_sees_only_anonymous_tier() {
+        // Dev `?tenant_id=...` shortcut without a JWT cookie. Sees
+        // neither platform-only nor tenant-admin-only entries — only
+        // the universally public ones (Toggle dark mode, Sign out).
+        let cs = default_commands_for_persona("acme", Persona::Anonymous);
+        // KEDA was nav() (default Anonymous), so anonymous DOES see
+        // it. The platform-only ones DO NOT show up.
+        let labels: Vec<&str> = cs.iter().map(|c| c.label.as_str()).collect();
+        assert!(!labels.contains(&"Go to Compliance"));
+        assert!(!labels.contains(&"Go to ADR Browser"));
+        assert!(labels.contains(&"Toggle dark mode"));
+        assert!(labels.contains(&"Sign out"));
+    }
+
+    #[test]
+    fn nav_platform_constructor_marks_min_persona_platform_admin() {
+        let c = CommandItem::nav_platform("X", "/x");
+        assert_eq!(c.min_persona, Persona::PlatformAdmin);
+        assert!(c.visible_to(Persona::PlatformAdmin));
+        assert!(!c.visible_to(Persona::TenantAdmin));
+        assert!(!c.visible_to(Persona::Anonymous));
+    }
+
+    #[test]
+    fn default_command_item_is_visible_to_everyone() {
+        let c = CommandItem::nav("X", "/x");
+        assert_eq!(c.min_persona, Persona::Anonymous);
+        assert!(c.visible_to(Persona::PlatformAdmin));
+        assert!(c.visible_to(Persona::TenantAdmin));
+        assert!(c.visible_to(Persona::Anonymous));
+    }
+
+    #[test]
+    fn min_persona_omitted_from_json_when_anonymous() {
+        let c = CommandItem::nav("X", "/x");
+        let json = serde_json::to_string(&c).unwrap();
+        assert!(!json.contains("min_persona"), "default min_persona must skip in JSON: {json}");
     }
 }

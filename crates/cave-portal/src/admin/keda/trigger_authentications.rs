@@ -9,7 +9,7 @@ use crate::admin::keda::types::{
     KedaAzureKvBinding, KedaEnvRef, KedaSecretRef, KedaTriggerAuthentication, KedaVaultBinding,
 };
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -149,7 +149,9 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
             &rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/triggerauthentications",
         &format!("keda · triggerauthentications · {}", ctx.tenant.as_str()),
         &body,
     ))
@@ -181,7 +183,9 @@ pub fn render_detail(
         vault = a.hashicorp_vault.as_ref().map(render_vault).unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
         azure = a.azure_key_vault.as_ref().map(render_azure_kv).unwrap_or_else(|| "<p class=\"text-sm text-gray-500\">—</p>".into()),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/triggerauthentications",
         &format!("keda · triggerauth {}/{}", a.namespace, a.name),
         &body,
     ))

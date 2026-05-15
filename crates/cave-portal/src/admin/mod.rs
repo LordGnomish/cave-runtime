@@ -34,6 +34,7 @@ pub mod chat;
 pub mod cloud_controller_manager;
 pub mod cluster;
 pub mod compliance;
+pub mod meta_audit;
 
 /// 2026-05-13 portal-persona fix: `/admin/adr` Architecture Decision
 /// Record browser. Platform-only — walks `docs/adr/*.md` and
@@ -662,6 +663,57 @@ pub struct ComplianceQuery {
     pub filter: Option<String>,
 }
 
+/// `/admin/_audit` — consolidated portal-wide audit roll-up.
+/// PlatformAdmin only.
+async fn meta_audit_handler(
+    Query(q): Query<AdminQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    meta_audit::render(&ctx)
+        .map(Html)
+        .map_err(meta_audit_err_to_response)
+}
+
+/// `/admin/_audit.json` — JSON feed consumed by `cavectl portal
+/// audit`.
+async fn meta_audit_json_handler(
+    Query(q): Query<AdminQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<axum::Json<meta_audit::AuditSummary>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query_with_claims(
+        q,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    meta_audit::render_json(&ctx)
+        .map(axum::Json)
+        .map_err(meta_audit_err_to_response)
+}
+
+fn meta_audit_err_to_response(
+    e: meta_audit::AuditViewError,
+) -> (StatusCode, Html<String>) {
+    use meta_audit::AuditViewError as E;
+    match e {
+        E::PersonaRequired => (
+            StatusCode::FORBIDDEN,
+            Html(format!(
+                "<p>{}</p>",
+                render::escape("audit dashboard requires platform_admin persona"),
+            )),
+        ),
+        E::Auth(a) => err_to_response(a),
+        E::Compliance(c) => err_to_response(c),
+    }
+}
+
 async fn compliance_handler(
     Query(q): Query<ComplianceQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
@@ -924,7 +976,9 @@ fn k8s_dash_section(
     title: &str,
     section: String,
 ) -> Html<String> {
-    Html(render::page_shell(
+    Html(render::page_shell_full(
+        ctx,
+        "/admin/k8s-dashboard",
         &format!("k8s-dashboard / {title} · {}", render::escape(ctx.tenant.as_str())),
         &section,
     ))
@@ -1135,7 +1189,9 @@ async fn cluster_live_handler(
         r#"<section><h2 class="text-lg font-semibold mb-2">Cluster · live</h2>{}</section>"#,
         snap.render_html()
     );
-    Ok(Html(render::page_shell(
+    Ok(Html(render::page_shell_full(
+        &ctx,
+        "/admin/cluster/live",
         &format!("cluster · {}", render::escape(ctx.tenant.as_str())),
         &body,
     )))
@@ -1166,7 +1222,9 @@ async fn onboard_handler(
         pct = pct,
         next = next_html,
     );
-    Ok(Html(render::page_shell(
+    Ok(Html(render::page_shell_full(
+        &ctx,
+        "/admin/onboard",
         &format!("onboard · {}", render::escape(ctx.tenant.as_str())),
         &body,
     )))
@@ -1211,7 +1269,9 @@ async fn global_search_handler(
         tid = render::escape(ctx.tenant.as_str()),
         rows = rows,
     );
-    Ok(Html(render::page_shell(
+    Ok(Html(render::page_shell_full(
+        &ctx,
+        "/admin/search",
         &format!("search · {}", render::escape(ctx.tenant.as_str())),
         &body,
     )))
@@ -1401,6 +1461,8 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/rdbms-operator", get(rdbms_operator_handler))
         .route("/admin/lakehouse", get(lakehouse_handler))
         .route("/admin/streams", get(streams_handler))
+        .route("/admin/_audit", get(meta_audit_handler))
+        .route("/admin/_audit.json", get(meta_audit_json_handler))
         .route("/admin/compliance", get(compliance_handler))
         .route("/admin/compliance/refresh", get(compliance_refresh_handler))
         .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))
@@ -1569,6 +1631,83 @@ mod router_tests {
             body.contains("upstream tests"),
             "expected behavioral card explanatory text"
         );
+    }
+
+    /// 2026-05-15 polish — `/admin/_audit` mount smoke. Drives the
+    /// router with a forged platform_admin JWT and asserts the
+    /// dashboard renders all 5 grade cards. Tenant-admin gets 403.
+    #[tokio::test]
+    async fn meta_audit_route_renders_five_axis_dashboard() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/_audit?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp).await;
+        for axis in [
+            "Structural",
+            "Upstream Parity",
+            "Honest Parity",
+            "Behavioral Parity",
+            "Accessibility",
+        ] {
+            assert!(body.contains(axis), "missing axis card: {axis}");
+        }
+        // Refresh + JSON action links must be reachable.
+        assert!(body.contains("/admin/_audit.json?tenant_id=acme"));
+        assert!(body.contains("/admin/compliance/refresh?tenant_id=acme"));
+    }
+
+    #[tokio::test]
+    async fn meta_audit_route_returns_403_for_tenant_admin() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "tenant-admin".into(),
+            email: "ta@cave".into(),
+            roles: vec!["tenant_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/_audit?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn meta_audit_json_route_returns_axes_payload() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let claims = cave_auth::jwt_middleware::JwtClaims {
+            sub: "platform-admin".into(),
+            email: "admin@cave".into(),
+            roles: vec!["platform_admin".into()],
+            exp: 9_999_999_999,
+        };
+        let mut req = Request::builder()
+            .uri("/admin/_audit.json?tenant_id=acme")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(claims);
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp).await;
+        let v: serde_json::Value = serde_json::from_str(&body).expect("valid JSON");
+        let axes = v["axes"].as_array().expect("axes array");
+        assert_eq!(axes.len(), 5);
+        let names: Vec<&str> = axes.iter().map(|a| a["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"structural"));
+        assert!(names.contains(&"accessibility"));
     }
 
     #[tokio::test]

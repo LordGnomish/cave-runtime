@@ -27,7 +27,7 @@ pub use types::{
 };
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::AdminState;
 
 /// Top-of-page summary: total tables, total snapshots, total bytes.
@@ -89,7 +89,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IcebergVie
             &table_rows,
         )
     };
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/iceberg",
         &format!("iceberg · {}", escape(ctx.tenant.as_str())),
         &format!("{body}<section>{table_body}</section>"),
     ))

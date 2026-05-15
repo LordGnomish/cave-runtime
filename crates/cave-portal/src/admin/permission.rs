@@ -359,6 +359,32 @@ pub enum AuthError {
     PersonaForbidden { actual: Persona, required: Persona },
 }
 
+#[cfg(test)]
+mod persona_can_access_tests {
+    use super::Persona;
+
+    #[test]
+    fn platform_admin_can_access_every_tier() {
+        assert!(Persona::PlatformAdmin.can_access(Persona::PlatformAdmin));
+        assert!(Persona::PlatformAdmin.can_access(Persona::TenantAdmin));
+        assert!(Persona::PlatformAdmin.can_access(Persona::Anonymous));
+    }
+
+    #[test]
+    fn tenant_admin_blocked_from_platform_only() {
+        assert!(!Persona::TenantAdmin.can_access(Persona::PlatformAdmin));
+        assert!(Persona::TenantAdmin.can_access(Persona::TenantAdmin));
+        assert!(Persona::TenantAdmin.can_access(Persona::Anonymous));
+    }
+
+    #[test]
+    fn anonymous_can_only_access_anonymous_tier() {
+        assert!(!Persona::Anonymous.can_access(Persona::PlatformAdmin));
+        assert!(!Persona::Anonymous.can_access(Persona::TenantAdmin));
+        assert!(Persona::Anonymous.can_access(Persona::Anonymous));
+    }
+}
+
 /// High-level role the caller has at sign-in time. Derived from the
 /// JWT cookie's `roles` claim (`platform_admin` → `PlatformAdmin`,
 /// `tenant_admin` → `TenantAdmin`). Anonymous callers (no cookie)
@@ -408,6 +434,25 @@ impl Persona {
     /// browser, compliance dashboard, upstream parity).
     pub fn is_platform(&self) -> bool {
         matches!(self, Persona::PlatformAdmin)
+    }
+
+    /// True iff a caller of `self` is allowed to view a surface that
+    /// requires at least `min`. PlatformAdmin can access everything;
+    /// TenantAdmin can access TenantAdmin + Anonymous-tier surfaces;
+    /// Anonymous can access only Anonymous-tier surfaces.
+    ///
+    /// Used by the command palette + shortcuts to filter their entry
+    /// lists per persona without going through the full
+    /// [`RequestCtx::require_persona`] error path. Same elevation
+    /// rules as `require_persona`, with `Anonymous` treated as the
+    /// public floor that everyone passes.
+    pub fn can_access(self, min: Persona) -> bool {
+        match (self, min) {
+            (a, b) if a == b => true,
+            (Persona::PlatformAdmin, _) => true,
+            (Persona::TenantAdmin, Persona::Anonymous) => true,
+            _ => false,
+        }
     }
 }
 

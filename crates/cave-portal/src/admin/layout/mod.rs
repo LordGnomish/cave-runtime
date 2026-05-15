@@ -16,6 +16,7 @@
 //! (`<h1>{title}</h1>` + `<main>...</main>`) is preserved inside the
 //! richer wrapper so the 1000+ existing tests don't churn.
 
+pub mod a11y;
 pub mod breadcrumb;
 pub mod command_palette;
 pub mod footer;
@@ -27,6 +28,7 @@ pub mod skeleton;
 pub mod theme;
 pub mod toast;
 
+pub use a11y::{audit as a11y_audit, A11yCode, A11yIssue};
 pub use breadcrumb::{breadcrumb_for_path, Crumb};
 pub use command_palette::{command_palette_modal, CommandItem};
 pub use footer::footer;

@@ -21,7 +21,7 @@
 //! These show up in the doc-comment so a future commit can fill them in.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, page_shell_full, table, table_html};
+use crate::admin::render::{escape, page_shell_full, table, table_html};
 use crate::admin::types::Cite;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -1487,6 +1487,18 @@ pub fn cached_snapshot_or_refresh_at(
     fresh
 }
 
+/// Read the wall-clock instant the cached snapshot was last
+/// materialised, if any. Used by `/admin/_audit` to surface a
+/// "Last refreshed at …" line — independent of whether the next
+/// `cached_snapshot_or_refresh` call would refresh.
+pub fn cache_cached_at() -> Option<DateTime<Utc>> {
+    cache_cell()
+        .lock()
+        .expect("compliance cache poisoned")
+        .as_ref()
+        .map(|c| c.cached_at)
+}
+
 /// Force-invalidate the cache. Returns the previous timestamp, if any,
 /// so callers can log the refresh delta.
 pub fn invalidate_cache() -> Option<DateTime<Utc>> {
@@ -1530,7 +1542,9 @@ pub fn handle_refresh(ctx: &RequestCtx) -> Result<String, ComplianceViewError> {
         ts = entry.cached_at.to_rfc3339(),
         n = entry.snapshot.crates.len(),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/compliance",
         &format!("compliance refresh · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -2487,7 +2501,9 @@ pub fn render_detail(
         manifest = manifest_html,
         commits = commits_html,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/compliance",
         &format!("compliance · {} · {}", escape(ctx.tenant.as_str()), escape(&c.name)),
         &body,
     ))

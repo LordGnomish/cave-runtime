@@ -9,7 +9,7 @@
 use crate::admin::keda::scalers;
 use crate::admin::keda::types::{KedaScaledJob, KedaTrigger};
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -149,7 +149,9 @@ pub fn render_list(state: &AdminState, ctx: &RequestCtx) -> Result<String, Error
             &rows
         ),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledjobs",
         &format!("keda · scaledjobs · {}", ctx.tenant.as_str()),
         &body,
     ))
@@ -202,7 +204,9 @@ pub fn render_detail(
         triggers = trig_html,
         tmpl = escape(&j.job_template_yaml),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/keda/scaledjobs",
         &format!("keda · scaledjob {}/{}", j.namespace, j.name),
         &body,
     ))

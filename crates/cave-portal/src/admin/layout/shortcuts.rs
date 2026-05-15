@@ -9,6 +9,7 @@
 //! The renderer emits both the help-modal HTML and the JS handler.
 //! Callers include this once near the bottom of `<body>`.
 
+use crate::admin::permission::Persona;
 use crate::admin::render::escape;
 use serde::Serialize;
 
@@ -21,69 +22,125 @@ pub struct ShortcutBinding {
     /// page-local (j/k list navigation, `/` focus search, …) and
     /// the help modal just documents it.
     pub href: Option<&'static str>,
+    /// Minimum persona that may use this shortcut. Bindings whose
+    /// persona is above the caller's are *visible* in the help modal
+    /// but greyed-out, and pressing them fires a toast instead of
+    /// navigating — same UX pattern as a disabled menu item.
+    ///
+    /// Defaults to `Persona::Anonymous` so `?`, `cmd k`, `j`, `k`,
+    /// `enter`, `esc`, `/` (purely page-local bindings) work for
+    /// every caller including the dev `?tenant_id=...` shortcut.
+    pub min_persona: Persona,
 }
 
 pub const DEFAULT_BINDINGS: &[ShortcutBinding] = &[
-    ShortcutBinding { keys: "?",     description: "Show this help",                       href: None },
-    ShortcutBinding { keys: "cmd k", description: "Open command palette",                 href: None },
-    ShortcutBinding { keys: "g h",   description: "Go to home",                           href: Some("/") },
-    ShortcutBinding { keys: "g c",   description: "Go to Compliance",                     href: Some("/admin/compliance") },
+    ShortcutBinding { keys: "?",     description: "Show this help",                       href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "cmd k", description: "Open command palette",                 href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "g h",   description: "Go to home",                           href: Some("/"),                                         min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "g c",   description: "Go to Compliance",                     href: Some("/admin/compliance"),                         min_persona: Persona::PlatformAdmin },
     // 2026-05-14 discoverability fix — Cluster Status had no leader-
     // key shortcut despite being the canonical Raft live view.
-    ShortcutBinding { keys: "g l",   description: "Go to Cluster Status (live)",          href: Some("/admin/cluster/live") },
-    ShortcutBinding { keys: "g k",   description: "Go to KEDA",                           href: Some("/admin/keda") },
-    ShortcutBinding { keys: "g v",   description: "Go to Vault",                          href: Some("/admin/vault") },
-    ShortcutBinding { keys: "g u",   description: "Go to Upstream",                       href: Some("/admin/upstream") },
-    ShortcutBinding { keys: "g a",   description: "Go to ADR Browser",                    href: Some("/admin/adr") },
+    ShortcutBinding { keys: "g l",   description: "Go to Cluster Status (live)",          href: Some("/admin/cluster/live"),                       min_persona: Persona::PlatformAdmin },
+    ShortcutBinding { keys: "g k",   description: "Go to KEDA",                           href: Some("/admin/keda"),                               min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "g v",   description: "Go to Vault",                          href: Some("/admin/vault"),                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "g u",   description: "Go to Upstream",                       href: Some("/admin/upstream"),                           min_persona: Persona::PlatformAdmin },
+    ShortcutBinding { keys: "g a",   description: "Go to ADR Browser",                    href: Some("/admin/adr"),                                min_persona: Persona::PlatformAdmin },
+    // 2026-05-15 polish: /admin/_audit roll-up.
+    ShortcutBinding { keys: "g _",   description: "Go to Audit roll-up",                  href: Some("/admin/_audit"),                             min_persona: Persona::PlatformAdmin },
     // 2026-05-14 consolidation: Scheduler folded into K8s Dashboard.
-    ShortcutBinding { keys: "g s",   description: "Go to K8s · Scheduler Queue",          href: Some("/admin/k8s-dashboard/scheduler/queue") },
-    ShortcutBinding { keys: "/",     description: "Focus search (where present)",         href: None },
-    ShortcutBinding { keys: "j",     description: "Next row (list pages)",                href: None },
-    ShortcutBinding { keys: "k",     description: "Previous row (list pages)",            href: None },
-    ShortcutBinding { keys: "enter", description: "Open highlighted row",                 href: None },
-    ShortcutBinding { keys: "esc",   description: "Close modal / cancel",                 href: None },
+    ShortcutBinding { keys: "g s",   description: "Go to K8s · Scheduler Queue",          href: Some("/admin/k8s-dashboard/scheduler/queue"),      min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "/",     description: "Focus search (where present)",         href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "j",     description: "Next row (list pages)",                href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "k",     description: "Previous row (list pages)",            href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "enter", description: "Open highlighted row",                 href: None,                                              min_persona: Persona::Anonymous },
+    ShortcutBinding { keys: "esc",   description: "Close modal / cancel",                 href: None,                                              min_persona: Persona::Anonymous },
 ];
+
+impl ShortcutBinding {
+    /// True iff a caller of `persona` is allowed to invoke this
+    /// shortcut. Disabled rows still appear in the help modal, but
+    /// pressing them only fires a toast.
+    pub fn enabled_for(&self, persona: Persona) -> bool {
+        persona.can_access(self.min_persona)
+    }
+}
 
 /// Render the help-modal HTML + the global keydown handler script.
 /// `tenant_id` is appended as a query param to the leader-key
 /// navigation hrefs so persona-scoped routes resolve correctly.
-pub fn shortcuts_help_modal(bindings: &[ShortcutBinding], tenant_id: &str) -> String {
-    // Build the table rows.
+///
+/// `persona` filters the leader-key map: bindings whose `min_persona`
+/// is not satisfied are listed in a separate "denied" map so the JS
+/// can fire a toast ("Shortcut requires Platform Admin") instead of
+/// silently ignoring the press. The help modal still lists every
+/// binding so the user can discover what's available — disabled rows
+/// get a `data-disabled` attribute + a "Platform" badge.
+pub fn shortcuts_help_modal(
+    bindings: &[ShortcutBinding],
+    persona: Persona,
+    tenant_id: &str,
+) -> String {
+    // Build the table rows. Disabled rows get a visible badge.
     let mut rows = String::new();
     for b in bindings {
+        let enabled = b.enabled_for(persona);
+        let row_attr = if enabled { "" } else { r#" data-disabled="true""# };
+        let row_cls = if enabled {
+            "border-t dark:border-zinc-800"
+        } else {
+            "border-t dark:border-zinc-800 opacity-60"
+        };
+        let badge = if enabled {
+            String::new()
+        } else {
+            r#" <span class="ml-2 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider bg-amber-200 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" title="Requires Platform Admin">Platform</span>"#.to_string()
+        };
         rows.push_str(&format!(
-            r#"<tr class="border-t dark:border-zinc-800">
+            r#"<tr class="{cls}"{attr}>
                 <td class="px-3 py-1.5"><kbd class="px-1.5 py-0.5 rounded border bg-zinc-100 dark:bg-zinc-800 dark:border-zinc-700 text-xs">{keys}</kbd></td>
-                <td class="px-3 py-1.5">{desc}</td>
+                <td class="px-3 py-1.5">{desc}{badge}</td>
               </tr>"#,
+            cls = row_cls,
+            attr = row_attr,
             keys = escape(b.keys),
             desc = escape(b.description),
+            badge = badge,
         ));
     }
 
-    // Build the leader-key → href map as JS object for the handler.
+    // Build TWO maps: enabled "g <key>" → href (navigates) and
+    // denied "g <key>" → description (fires toast). The handler
+    // checks `g_denied_map[key]` first so the user gets feedback.
     let mut map_entries: Vec<String> = Vec::new();
+    let mut denied_entries: Vec<String> = Vec::new();
     for b in bindings {
         if let Some(href) = b.href {
-            // Leader-key bindings are always `<leader> <key>`.
-            // We split at the space and key on the second char.
             let parts: Vec<&str> = b.keys.split_whitespace().collect();
             if parts.len() == 2 && parts[0] == "g" {
-                // Append tenant_id query so admin routes resolve.
-                let href_with_q = if href.starts_with("/admin/") || href == "/" {
-                    format!("{}?tenant_id={}", href, urlencode_minimal(tenant_id))
+                let key = parts[1].replace('"', "\\\"");
+                if b.enabled_for(persona) {
+                    let href_with_q = if href.starts_with("/admin/") || href == "/" {
+                        format!("{}?tenant_id={}", href, urlencode_minimal(tenant_id))
+                    } else {
+                        href.to_string()
+                    };
+                    map_entries.push(format!(
+                        "\"{}\": \"{}\"",
+                        key,
+                        href_with_q.replace('"', "\\\""),
+                    ));
                 } else {
-                    href.to_string()
-                };
-                map_entries.push(format!(
-                    "\"{}\": \"{}\"",
-                    parts[1].replace('"', "\\\""),
-                    href_with_q.replace('"', "\\\""),
-                ));
+                    denied_entries.push(format!(
+                        "\"{}\": \"{}\"",
+                        key,
+                        b.description.replace('"', "\\\""),
+                    ));
+                }
             }
         }
     }
     let g_map = format!("{{ {} }}", map_entries.join(", "));
+    let g_denied_map = format!("{{ {} }}", denied_entries.join(", "));
 
     format!(
         r##"<!-- Keyboard shortcuts -->
@@ -104,6 +161,7 @@ pub fn shortcuts_help_modal(bindings: &[ShortcutBinding], tenant_id: &str) -> St
   var modal = document.getElementById('cave-help');
   var close = document.getElementById('cave-help-close');
   var gMap = {g_map};
+  var gDeniedMap = {g_denied_map};
   var leader = null;
   var leaderTimer = null;
 
@@ -129,7 +187,13 @@ pub fn shortcuts_help_modal(bindings: &[ShortcutBinding], tenant_id: &str) -> St
       clearTimeout(leaderTimer);
       leader = null;
       var target = gMap[e.key];
-      if (target) {{ e.preventDefault(); window.location.href = target; }}
+      if (target) {{ e.preventDefault(); window.location.href = target; return; }}
+      // Persona-disabled binding — show toast instead of silent ignore.
+      var deniedDesc = gDeniedMap[e.key];
+      if (deniedDesc && window.caveToast) {{
+        e.preventDefault();
+        window.caveToast('warning', deniedDesc + ' — requires Platform Admin');
+      }}
       return;
     }}
     if (e.key === 'g' && !e.metaKey && !e.ctrlKey) {{
@@ -192,7 +256,7 @@ mod tests {
 
     #[test]
     fn help_modal_renders_every_binding_row() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "acme");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "acme");
         for b in DEFAULT_BINDINGS {
             assert!(html.contains(b.description), "missing: {}", b.description);
         }
@@ -200,7 +264,7 @@ mod tests {
 
     #[test]
     fn help_modal_has_dialog_role_and_aria_label() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "acme");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "acme");
         assert!(html.contains(r#"role="dialog""#));
         assert!(html.contains(r#"aria-modal="true""#));
         assert!(html.contains(r#"aria-label="Keyboard shortcuts""#));
@@ -208,20 +272,20 @@ mod tests {
 
     #[test]
     fn help_modal_kbd_elements_use_kbd_tag() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "acme");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "acme");
         assert!(html.contains("<kbd"));
     }
 
     #[test]
     fn leader_g_map_embeds_tenant_id_in_admin_routes() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "tenant1");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "tenant1");
         // "g k" → /admin/keda?tenant_id=tenant1
         assert!(html.contains(r#""k": "/admin/keda?tenant_id=tenant1""#));
     }
 
     #[test]
     fn typing_target_check_excludes_inputs_in_js() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "x");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "x");
         // The JS bails out if the keydown target is an INPUT/TEXTAREA/SELECT.
         assert!(html.contains("INPUT"));
         assert!(html.contains("TEXTAREA"));
@@ -229,14 +293,99 @@ mod tests {
 
     #[test]
     fn question_mark_keydown_handler_emits_preventDefault() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "x");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "x");
         assert!(html.contains("e.key === '?'"));
     }
 
     #[test]
     fn list_navigation_js_uses_data_list_row_attribute() {
-        let html = shortcuts_help_modal(DEFAULT_BINDINGS, "x");
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "x");
         // j/k navigation should use [data-list-row].
         assert!(html.contains("data-list-row"));
+    }
+
+    // ── 2026-05-15 polish sweep — persona filter ─────────────────────
+
+    #[test]
+    fn enabled_for_blocks_platform_only_bindings_for_tenant_admin() {
+        let g_a = DEFAULT_BINDINGS.iter().find(|b| b.keys == "g a").unwrap();
+        assert!(g_a.enabled_for(Persona::PlatformAdmin));
+        assert!(!g_a.enabled_for(Persona::TenantAdmin));
+        assert!(!g_a.enabled_for(Persona::Anonymous));
+
+        let g_k = DEFAULT_BINDINGS.iter().find(|b| b.keys == "g k").unwrap();
+        // KEDA is tenant-scoped — anyone can use it.
+        assert!(g_k.enabled_for(Persona::Anonymous));
+        assert!(g_k.enabled_for(Persona::TenantAdmin));
+        assert!(g_k.enabled_for(Persona::PlatformAdmin));
+    }
+
+    #[test]
+    fn tenant_admin_g_map_omits_platform_only_bindings() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::TenantAdmin, "tenant1");
+        // KEDA stays in the enabled map.
+        assert!(html.contains(r#""k": "/admin/keda?tenant_id=tenant1""#));
+        // ADR (g a), Compliance (g c), Upstream (g u), Cluster (g l)
+        // should NOT appear in the enabled gMap — they go into the
+        // denied map instead.
+        assert!(!html.contains(r#""a": "/admin/adr"#));
+        assert!(!html.contains(r#""c": "/admin/compliance"#));
+        assert!(!html.contains(r#""u": "/admin/upstream"#));
+        assert!(!html.contains(r#""l": "/admin/cluster/live"#));
+    }
+
+    #[test]
+    fn tenant_admin_help_modal_lists_disabled_rows_with_platform_badge() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::TenantAdmin, "tenant1");
+        // Disabled rows still appear (so the user can discover them).
+        assert!(html.contains("Go to ADR Browser"));
+        // …but they get the Platform badge + data-disabled marker.
+        assert!(html.contains(r#"data-disabled="true""#));
+        assert!(html.contains(">Platform</span>"));
+    }
+
+    #[test]
+    fn platform_admin_help_modal_has_no_disabled_rows() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "acme");
+        assert!(!html.contains(r#"data-disabled="true""#));
+        assert!(!html.contains(">Platform</span>"));
+    }
+
+    #[test]
+    fn denied_keys_route_through_caveToast_in_js() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::TenantAdmin, "tenant1");
+        // The handler must reference the denied map and call caveToast.
+        assert!(html.contains("gDeniedMap"));
+        assert!(html.contains("window.caveToast"));
+        assert!(html.contains("requires Platform Admin"));
+    }
+
+    #[test]
+    fn denied_map_carries_descriptions_for_blocked_bindings() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::TenantAdmin, "tenant1");
+        // Blocked g-key entries land in gDeniedMap with their description
+        // as the value (so the toast can say what the user wanted).
+        assert!(html.contains(r#""a": "Go to ADR Browser""#));
+        assert!(html.contains(r#""c": "Go to Compliance""#));
+        assert!(html.contains(r#""u": "Go to Upstream""#));
+    }
+
+    #[test]
+    fn platform_admin_denied_map_is_empty() {
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::PlatformAdmin, "acme");
+        // Empty {} when there's nothing to deny.
+        assert!(html.contains("var gDeniedMap = {  };") || html.contains("var gDeniedMap = { };"));
+    }
+
+    #[test]
+    fn anonymous_persona_treated_like_tenant_admin_for_platform_routes() {
+        // The dev `?tenant_id=...` shortcut without a JWT cookie
+        // resolves to Anonymous, which is below TenantAdmin in the
+        // capability lattice — must still NOT see ADR / Compliance.
+        let html = shortcuts_help_modal(DEFAULT_BINDINGS, Persona::Anonymous, "tenant1");
+        assert!(!html.contains(r#""a": "/admin/adr"#));
+        assert!(!html.contains(r#""c": "/admin/compliance"#));
+        // …but tenant-scoped routes (KEDA) are still accessible.
+        assert!(html.contains(r#""k": "/admin/keda?tenant_id=tenant1""#));
     }
 }

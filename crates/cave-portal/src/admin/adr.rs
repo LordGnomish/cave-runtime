@@ -15,7 +15,7 @@
 //! `render` runs, but `list_records` also re-checks defensively.
 
 use crate::admin::permission::{AuthError, Persona, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::types::Cite;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -286,7 +286,9 @@ pub fn render_in(ctx: &RequestCtx, dir: &Path) -> Result<String, AdrViewError> {
         tbl = table(&["id", "title", "status"], &table_rows),
     );
 
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/adr",
         &format!("ADR Browser · {}", escape(ctx.tenant.as_str())),
         &body,
     ))
@@ -318,7 +320,9 @@ pub fn render_detail(ctx: &RequestCtx, stem: &str) -> Result<String, AdrViewErro
         tenant = escape(ctx.tenant.as_str()),
         escaped = escaped,
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/adr",
         &format!("{id} · ADR Browser"),
         &html,
     ))

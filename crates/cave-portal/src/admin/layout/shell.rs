@@ -16,7 +16,7 @@
 
 use crate::admin::layout::{
     breadcrumb::{breadcrumb_for_path, render as render_breadcrumb, Crumb},
-    command_palette::{command_palette_modal, default_commands, CommandItem},
+    command_palette::{command_palette_modal, default_commands_for_persona, CommandItem},
     footer::footer,
     nav::sidebar,
     shortcuts::{shortcuts_help_modal, DEFAULT_BINDINGS},
@@ -82,10 +82,14 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
     let crumbs = opts.breadcrumb.clone().unwrap_or_else(|| breadcrumb_for_path(opts.current_path));
     let crumbs_html = render_breadcrumb(&crumbs);
 
-    let mut commands = default_commands(opts.tenant_id);
+    // Persona-filter the default commands so TenantAdmin doesn't see
+    // PlatformAdmin-only entries (Compliance / ADR / Upstream / live
+    // cluster). Caller-supplied extras are appended unfiltered — the
+    // caller already knows their audience.
+    let mut commands = default_commands_for_persona(opts.tenant_id, opts.persona);
     commands.extend(opts.extra_commands.clone());
     let cmd_palette = command_palette_modal(&commands);
-    let shortcuts = shortcuts_help_modal(DEFAULT_BINDINGS, opts.tenant_id);
+    let shortcuts = shortcuts_help_modal(DEFAULT_BINDINGS, opts.persona, opts.tenant_id);
     let toasts = toast_container();
 
     let topbar = topbar(opts.persona, opts.tenant_id, theme_class);
@@ -323,5 +327,63 @@ mod tests {
         o.hide_sidebar = true;
         let html_no_sidebar = shell_v2(o);
         assert!(!html_no_sidebar.contains("md:ml-56"));
+    }
+
+    // ── 2026-05-15 polish sweep — palette persona filter ────────────
+
+    /// Whole-document smoke: when the shell renders with `Persona::TenantAdmin`,
+    /// the embedded command-palette JSON must NOT carry the four
+    /// platform-only entries (Compliance / Upstream / ADR / _audit).
+    /// PlatformAdmin still gets all of them.
+    #[test]
+    fn shell_v2_palette_excludes_platform_entries_for_tenant_admin() {
+        let html = shell_v2(opts(Persona::TenantAdmin, "/admin/keda", "tenant1", ""));
+        // Palette JSON lives between the `cave-cmdk-data` script tags.
+        // Crude check: the platform-only labels must not appear in
+        // the command palette section of the HTML.
+        let cmd_section = html
+            .split(r#"id="cave-cmdk-data""#)
+            .nth(1)
+            .expect("palette data script present")
+            .split("</script>")
+            .next()
+            .unwrap();
+        for forbidden in [
+            "Go to Compliance",
+            "Go to ADR Browser",
+            "Go to Upstream",
+            "Go to Audit",
+            "Go to Cluster Status",
+        ] {
+            assert!(
+                !cmd_section.contains(forbidden),
+                "TenantAdmin palette must NOT contain `{forbidden}`; got section: {cmd_section}"
+            );
+        }
+        // KEDA is tenant-scoped, must still appear.
+        assert!(cmd_section.contains("Go to KEDA"));
+    }
+
+    #[test]
+    fn shell_v2_palette_includes_platform_entries_for_platform_admin() {
+        let html = shell_v2(opts(Persona::PlatformAdmin, "/admin/keda", "acme", ""));
+        let cmd_section = html
+            .split(r#"id="cave-cmdk-data""#)
+            .nth(1)
+            .expect("palette data script present")
+            .split("</script>")
+            .next()
+            .unwrap();
+        for required in [
+            "Go to Compliance",
+            "Go to ADR Browser",
+            "Go to Upstream",
+            "Go to Audit",
+        ] {
+            assert!(
+                cmd_section.contains(required),
+                "PlatformAdmin palette MUST contain `{required}`"
+            );
+        }
     }
 }

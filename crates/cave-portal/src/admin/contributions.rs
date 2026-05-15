@@ -17,6 +17,7 @@
 //!   - `/admin/contributions/leaderboard` — top contributors by composite score
 
 use crate::admin::permission::{AuthError, Permission, RequestCtx};
+use crate::admin::render::page_shell_full;
 use crate::admin::types::{Cite, TenantId};
 use chrono::{DateTime, Datelike, TimeZone, Timelike, Utc};
 use serde::{Deserialize, Serialize};
@@ -241,42 +242,28 @@ fn html_escape(s: &str) -> String {
         .replace('\'', "&#39;")
 }
 
-fn page_shell(title: &str, body: &str, tenant: &TenantId) -> String {
+/// Sub-nav (Overview / Timeline / Leaderboard) — rendered inside the
+/// chrome's `<main>`, since the chrome supplies the global sidebar +
+/// breadcrumb. Tenant pill is dropped because the chrome's top bar
+/// already shows the active tenant.
+fn sub_nav(tenant: &TenantId) -> String {
+    let t = html_escape(tenant.as_str());
     format!(
-        r#"<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{title} — Cave Portal</title>
-  <script src="https://unpkg.com/htmx.org@1.9.10" crossorigin="anonymous"></script>
-  <style>
-    body {{ font-family: ui-sans-serif, system-ui, sans-serif; margin: 1rem 2rem; color: #1f2937; }}
-    h1, h2 {{ font-weight: 600; }}
-    table {{ border-collapse: collapse; margin: 1rem 0; width: 100%; }}
-    th, td {{ text-align: left; padding: 0.4rem 0.8rem; border-bottom: 1px solid #e5e7eb; }}
-    th {{ background: #f3f4f6; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }}
-    .badge {{ background: #eef2ff; color: #4338ca; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }}
-    .num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-    nav a {{ margin-right: 1rem; color: #2563eb; text-decoration: none; }}
-  </style>
-</head>
-<body>
-  <header>
-    <nav>
-      <a href="/admin/contributions?tenant_id={t}">Overview</a>
-      <a href="/admin/contributions/timeline?tenant_id={t}">Timeline</a>
-      <a href="/admin/contributions/leaderboard?tenant_id={t}">Leaderboard</a>
-    </nav>
-    <h1>{title}</h1>
-    <p>Tenant <span class="badge">{t}</span></p>
-  </header>
-  <main>{body}</main>
-</body>
-</html>"#,
-        title = html_escape(title),
-        t = html_escape(tenant.as_str()),
-        body = body,
+        r#"<nav class="mb-4 flex gap-4 text-sm border-b border-zinc-200 dark:border-zinc-800 pb-2">
+  <a class="text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" href="/admin/contributions?tenant_id={t}">Overview</a>
+  <a class="text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" href="/admin/contributions/timeline?tenant_id={t}">Timeline</a>
+  <a class="text-blue-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600" href="/admin/contributions/leaderboard?tenant_id={t}">Leaderboard</a>
+</nav>"#,
     )
+}
+
+/// Wrap the per-page body in the contributions sub-nav and route
+/// through the chrome shell. Replaces the legacy bespoke
+/// `page_shell(title, body, tenant)` helper that drew its own
+/// HTML document.
+fn render_contributions_page(ctx: &RequestCtx, title: &str, body: &str) -> String {
+    let wrapped = format!("{nav}{body}", nav = sub_nav(&ctx.tenant), body = body);
+    page_shell_full(ctx, "/admin/contributions", title, &wrapped)
 }
 
 pub fn render_overview(
@@ -308,7 +295,7 @@ pub fn render_overview(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(page_shell("Contributions overview", &body, &ctx.tenant))
+    Ok(render_contributions_page(ctx, "Contributions overview", &body))
 }
 
 pub fn render_worker_detail(
@@ -341,10 +328,10 @@ pub fn render_worker_detail(
 </table>"#,
         wid = html_escape(worker_id),
     );
-    Ok(page_shell(
+    Ok(render_contributions_page(
+        ctx,
         &format!("Worker {worker_id}"),
         &body,
-        &ctx.tenant,
     ))
 }
 
@@ -376,7 +363,7 @@ pub fn render_timeline(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(page_shell("Contributions timeline", &body, &ctx.tenant))
+    Ok(render_contributions_page(ctx, "Contributions timeline", &body))
 }
 
 pub fn render_leaderboard(
@@ -408,7 +395,7 @@ pub fn render_leaderboard(
   <tbody>{rows}</tbody>
 </table>"#,
     );
-    Ok(page_shell("Contributions leaderboard", &body, &ctx.tenant))
+    Ok(render_contributions_page(ctx, "Contributions leaderboard", &body))
 }
 
 #[cfg(test)]
@@ -794,7 +781,12 @@ mod tests {
         }
     }
 
-    /// cite: render — overview prints tenant_id badge
+    /// cite: render — overview surfaces the active tenant_id.
+    /// 2026-05-15: bespoke `<span class="badge">{tenant}</span>` was
+    /// retired when this page was migrated onto the global chrome.
+    /// The chrome's top-bar persona pill renders tenant inline, AND
+    /// the contributions sub-nav links carry `?tenant_id=...` query
+    /// params — both are observable in the HTML.
     #[test]
     fn contributions_globex_overview_renders_tenant_badge() {
         let (_cite, _t) = portal_test_ctx!(
@@ -803,7 +795,16 @@ mod tests {
             "globex"
         );
         let html = render_overview(&[], &admin_ctx("globex")).unwrap();
-        assert!(html.contains(r#"<span class="badge">globex</span>"#));
+        assert!(
+            html.contains("?tenant_id=globex"),
+            "expected sub-nav links to carry tenant_id=globex"
+        );
+        // Chrome renders the tenant in the top-bar persona pill (see
+        // layout::topbar). It contains the tenant string verbatim.
+        assert!(
+            html.contains("globex"),
+            "expected globex tenant string somewhere in the chrome"
+        );
     }
 
     /// cite: render — empty corpus shows the empty-state

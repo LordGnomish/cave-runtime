@@ -1,10 +1,13 @@
 use anyhow::Result;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use serde_json::json;
 
-mod client;
-use client::ApiClient;
+// 2026-05-15 polish — `client` now lives in the lib (so library-side
+// modules can reference `crate::client::ApiClient` without breaking
+// the lib build). Re-import here so the bin keeps the same `ApiClient`
+// + `Format` types as before.
+use cavectl::client::ApiClient;
 
 // ── Root CLI ──────────────────────────────────────────────────────────────────
 
@@ -32,15 +35,10 @@ struct Cli {
     command: Commands,
 }
 
-#[derive(ValueEnum, Clone, Debug)]
-pub enum Format {
-    /// ASCII table (default)
-    Table,
-    /// Pretty-printed JSON
-    Json,
-    /// YAML
-    Yaml,
-}
+// 2026-05-15 polish — `Format` consolidated in the lib so the bin
+// and library targets agree on a single type. Re-export here so the
+// existing `--format` clap arg keeps working without callsite churn.
+use cavectl::client::Format;
 
 // ── Top-level subcommands ─────────────────────────────────────────────────────
 
@@ -2011,6 +2009,18 @@ enum AiObsCmd {
 enum PortalCmd {
     /// Show developer portal status
     Status,
+    /// Fetch the consolidated portal audit roll-up — five grades
+    /// (Structural, Upstream Parity, Honest Parity, Behavioral
+    /// Parity, Accessibility) plus crate count + total stub count.
+    /// Backed by `/admin/_audit.json`. PlatformAdmin only.
+    ///
+    /// `--tenant` defaults to the `CAVE_TENANT` env var or `default`.
+    Audit {
+        /// Tenant id to query as. Falls back to `CAVE_TENANT` env
+        /// var, then the literal string `default` if neither is set.
+        #[arg(long, env = "CAVE_TENANT")]
+        tenant: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3350,6 +3360,10 @@ async fn run(cli: Cli) -> Result<()> {
         // ── Portal ────────────────────────────────────────────────────────────
         Commands::Portal { cmd } => match cmd {
             PortalCmd::Status => c.get("/api/portal/status").await,
+            PortalCmd::Audit { tenant } => {
+                let t = tenant.unwrap_or_else(|| "default".to_string());
+                c.get(&format!("/admin/_audit.json?tenant_id={t}")).await
+            }
         },
 
         // ── Parity ────────────────────────────────────────────────────────────
@@ -5101,5 +5115,36 @@ mod batch4_parse_tests {
     fn flux_sources_parses() {
         let cli = parse(&["cavectl", "flux", "sources"]);
         assert!(matches!(cli.command, Commands::Flux { cmd: FluxCmd::Sources }));
+    }
+
+    // ── 2026-05-15 polish — `cavectl portal audit` ────────────────
+
+    #[test]
+    fn portal_audit_parses_without_tenant_flag() {
+        let cli = parse(&["cavectl", "portal", "audit"]);
+        match cli.command {
+            Commands::Portal { cmd: PortalCmd::Audit { tenant } } => {
+                // env-default may be present; only assert variant.
+                let _ = tenant;
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn portal_audit_accepts_explicit_tenant_flag() {
+        let cli = parse(&["cavectl", "portal", "audit", "--tenant", "acme"]);
+        match cli.command {
+            Commands::Portal { cmd: PortalCmd::Audit { tenant } } => {
+                assert_eq!(tenant.as_deref(), Some("acme"));
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn portal_status_still_parses_after_audit_was_added() {
+        let cli = parse(&["cavectl", "portal", "status"]);
+        assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
     }
 }
