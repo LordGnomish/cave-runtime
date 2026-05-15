@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Backend trait integration — RED→GREEN suite.
 
-use cave_docdb::backend::{Backend, MemoryBackend, WriteResult};
+use cave_docdb::backend::{Backend, BsonDoc, MemoryBackend, WriteResult};
 use serde_json::json;
 
-fn doc(v: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
-    v.as_object().unwrap().clone()
+fn doc(v: serde_json::Value) -> BsonDoc {
+    v.as_object()
+        .unwrap()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()
 }
 
 #[tokio::test]

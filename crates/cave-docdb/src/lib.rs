@@ -5,8 +5,15 @@
 //! in-memory Rust engine. Backs drivers (pymongo, mongo-rust-driver, Node
 //! mongoose, Java driver) without modification on port 27017.
 
+/// Pluggable storage backends (memory, postgres, …).
+pub mod backend;
+
 /// BSON serialization/deserialization utilities.
 pub mod bson;
+
+/// Clean-room MongoDB-specific feature surface (change streams,
+/// oplog, sharding) authored from the public wire spec only.
+pub mod clean_room;
 
 /// Codec implementations for BSON types.
 pub mod codec;
@@ -43,6 +50,9 @@ pub mod update;
 
 /// Wire protocol implementation.
 pub mod wire;
+
+/// Wire-protocol facade — re-exports + FerretDB-ported hello reply.
+pub mod wire_protocol;
 
 /// Re-export the Engine struct for easy access.
 pub use engine::Engine;
