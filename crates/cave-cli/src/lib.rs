@@ -69,10 +69,6 @@ pub mod tui;
 /// streaming output in various formats.
 pub mod watch;
 
-/// `cavectl auth …` subcommand surface — WebAuthn / FIDO2 today (other auth
-/// sub-surfaces will live alongside as they land). New file 2026-05-15.
-pub mod auth;
-
 /// Re-exports the approval backend traits and in-memory implementation.
 pub use approval::{ApprovalBackend, ApprovalRecord, ApprovalState, InMemoryApprovals};
 
@@ -99,7 +95,5 @@ pub use tenant::{
 /// streaming, formats, events, and tickers.
 pub use watch::{ExitCode, JsonStream, StreamFormat, WatchEvent, WatchTicker};
 
-// ── A1 mission addition (Keycloak v22.0.0 SAML broker port) ────────────────
-// Appended-only — the existing surface above is untouched.
-/// SAML 2.0 parse helpers for `cavectl auth saml` sub-verbs.
-pub mod auth;
+// ── 2026-05-15 cave-auth deep push: auth submodules consolidated at line 23 above
+// (saml / ldap / kerberos / webauthn parse-stubs all live in `crate::auth::*`).
