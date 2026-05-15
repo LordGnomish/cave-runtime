@@ -15,7 +15,9 @@
 //! - Database size monitoring and threshold alerts
 
 pub mod backup;
+pub mod backup_advanced;
 pub mod error;
+pub mod failover;
 pub mod ha;
 pub mod lifecycle;
 pub mod manager;
@@ -23,8 +25,10 @@ pub mod models;
 pub mod monitoring;
 pub mod pool;
 pub mod pooler;
+pub mod pvc_resize;
 pub mod routes;
 pub mod scheduled_backup;
+pub mod tablespace;
 pub mod types;
 pub mod user;
 
