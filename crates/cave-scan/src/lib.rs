@@ -35,3 +35,6 @@ pub mod report_agg;
 pub mod scanners;
 pub mod target;
 // === S2 end ===
+// === S4: Report formats ===
+pub mod report;
+// === S4 end ===
