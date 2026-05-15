@@ -8,6 +8,7 @@
 //! - [`discovery`] — OpenID discovery (.well-known/openid-configuration)
 //! - [`pqc`] — PQC-hybrid ML-DSA-65+Ed25519 JWT signing
 
+pub mod admin_meta;
 pub mod client;
 pub mod discovery;
 pub mod pqc;
@@ -36,4 +37,5 @@ pub fn router(
         .merge(user::router(user_store.clone(), realm_store.clone()))
         .merge(token_router(token_service.clone()))
         .merge(discovery_router(token_service))
+        .merge(admin_meta::router())
 }

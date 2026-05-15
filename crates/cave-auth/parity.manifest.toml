@@ -21,14 +21,20 @@ url     = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 12
+#
+# 2026-05-15 update: new mapped item is the read-only admin-meta
+# route bundle (`src/keycloak/admin_meta.rs`) covering client-scopes,
+# realm-roles, groups, identity-providers, authentication/flows,
+# authentication/config — backing the new portal admin-ui pages.
+# Mapped 12→13, total 37→38.
+mapped_count   = 13
 partial_count  = 1
 skipped_count  = 16
 unmapped_count = 8
-total          = 37
-fill_ratio     = 0.7838
-honest_ratio   = 0.7568
-last_audit     = "2026-05-13"
+total          = 38
+fill_ratio     = 0.7895
+honest_ratio   = 0.7632
+last_audit     = "2026-05-15"
 infra_only     = false
 [module]
 name        = "cave-auth"
@@ -369,14 +375,113 @@ kind          = "http"
 upstream_path = "/api/auth/token"
 local_path    = "/api/auth/token"
 
+# ── 2026-05-15 Keycloak admin-ui port — read-only admin meta surfaces ───────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/client-scopes"
+local_path    = "/admin/realms/{realm}/client-scopes"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/roles"
+local_path    = "/admin/realms/{realm}/roles"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/groups"
+local_path    = "/admin/realms/{realm}/groups"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/identity-provider/instances"
+local_path    = "/admin/realms/{realm}/identity-provider/instances"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/authentication/flows"
+local_path    = "/admin/realms/{realm}/authentication/flows"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/admin/realms/{realm}/authentication/config"
+local_path    = "/admin/realms/{realm}/authentication/config"
+
+# ── Portal UI surfaces (server-rendered HTML pages) ─────────────────────────
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/personal-info/PersonalInfo.tsx"
+local_path    = "/account/personal-info"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/account-security/SigningIn.tsx"
+local_path    = "/account/signin-methods"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/account-security/DeviceActivity.tsx"
+local_path    = "/account/device-activity"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/applications/Applications.tsx"
+local_path    = "/account/applications"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/account-security/LinkedAccounts.tsx"
+local_path    = "/account/linked-accounts"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/account-ui/src/groups/Groups.tsx"
+local_path    = "/account/groups"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/realm-settings/RealmSettingsSection.tsx"
+local_path    = "/admin/auth/realm-settings/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/client-scopes/ClientScopesSection.tsx"
+local_path    = "/admin/auth/client-scopes/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/realm-roles/RealmRoleTabs.tsx"
+local_path    = "/admin/auth/realm-roles/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/groups/GroupsSection.tsx"
+local_path    = "/admin/auth/groups/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/identity-providers/IdentityProvidersSection.tsx"
+local_path    = "/admin/auth/idp/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/authentication/AuthenticationSection.tsx"
+local_path    = "/admin/auth/flows/{realm}"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "js/apps/admin-ui/src/authentication/AuthenticationSection.tsx#authnConfig"
+local_path    = "/admin/auth/authn-config/{realm}"
+
 [portal_ui]
-upstream_ui  = "Keycloak Admin Console"
-upstream_url = "https://www.keycloak.org/documentation"
-status       = "partial"
-loc          = 174
-priority     = "P1"
-notes        = "Realm / client / user management"
-last_audit   = "2026-05-11"
+upstream_ui  = "Keycloak Admin Console + Account console"
+upstream_url = "https://github.com/keycloak/keycloak/tree/22.0.0/js/apps"
+status       = "substantial"
+loc          = 5417
+priority     = "P0"
+notes        = "13 server-side pages: 6 account-ui (personal-info / signin-methods / device-activity / applications / linked-accounts / groups) + 7 admin-ui (realm-settings / client-scopes / realm-roles / groups / idp / flows / authn-config). Read-only admin meta routes wired through cave-auth::keycloak::admin_meta. Source: keycloak/keycloak@b825ba97."
+last_audit   = "2026-05-15"
 
 
 # ═════════════════════════════════════════════════════════════════════════════

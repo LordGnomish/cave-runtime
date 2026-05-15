@@ -474,6 +474,95 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+
+    // ── 2026-05-15 Keycloak admin-ui port — extended verbs ────────────
+    /// Realm settings inspector — bundle of login flow toggles,
+    /// tokens, themes, security defenses, sessions.
+    #[command(name = "realm-settings")]
+    RealmSettings {
+        /// Realm name (Keycloak `realmName`).
+        #[arg(long)]
+        realm: String,
+    },
+    /// List client scopes within a realm.
+    #[command(name = "scopes")]
+    Scopes {
+        #[arg(long)]
+        realm: String,
+    },
+    /// Inspect a single client scope.
+    #[command(name = "scope-get")]
+    ScopeGet {
+        #[arg(long)]
+        realm: String,
+        /// Scope name (e.g. `openid`).
+        #[arg(long)]
+        name: String,
+    },
+    /// List realm-level roles.
+    #[command(name = "roles")]
+    Roles {
+        #[arg(long)]
+        realm: String,
+    },
+    /// Inspect a single realm role (composite info).
+    #[command(name = "role-get")]
+    RoleGet {
+        #[arg(long)]
+        realm: String,
+        #[arg(long)]
+        name: String,
+    },
+    /// List groups within a realm.
+    #[command(name = "groups")]
+    Groups {
+        #[arg(long)]
+        realm: String,
+    },
+    /// Inspect a single group by id.
+    #[command(name = "group-get")]
+    GroupGet {
+        #[arg(long)]
+        realm: String,
+        /// Group id (Keycloak `GroupRepresentation.id`).
+        #[arg(long)]
+        id: String,
+    },
+    /// List identity providers within a realm.
+    #[command(name = "idp")]
+    Idp {
+        #[arg(long)]
+        realm: String,
+    },
+    /// Inspect a single identity provider by alias.
+    #[command(name = "idp-get")]
+    IdpGet {
+        #[arg(long)]
+        realm: String,
+        /// Provider alias (e.g. `github`).
+        #[arg(long)]
+        alias: String,
+    },
+    /// List authentication flows within a realm.
+    #[command(name = "flows")]
+    Flows {
+        #[arg(long)]
+        realm: String,
+    },
+    /// Inspect a single flow by alias.
+    #[command(name = "flow-get")]
+    FlowGet {
+        #[arg(long)]
+        realm: String,
+        #[arg(long)]
+        alias: String,
+    },
+    /// Read the authentication config (flow bindings, policies, required actions).
+    #[command(name = "authn-config")]
+    AuthnConfig {
+        #[arg(long)]
+        realm: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +4050,80 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            // 2026-05-15 Keycloak admin-ui port verbs.
+            AuthCmd::RealmSettings { realm } => {
+                c.get(&format!("/api/auth/realms/{}/settings", urlencode(&realm))).await
+            }
+            AuthCmd::Scopes { realm } => {
+                c.get(&format!("/api/auth/realms/{}/client-scopes", urlencode(&realm))).await
+            }
+            AuthCmd::ScopeGet { realm, name } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/client-scopes/{}",
+                    urlencode(&realm),
+                    urlencode(&name)
+                ))
+                .await
+            }
+            AuthCmd::Roles { realm } => {
+                c.get(&format!("/api/auth/realms/{}/roles", urlencode(&realm))).await
+            }
+            AuthCmd::RoleGet { realm, name } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/roles/{}",
+                    urlencode(&realm),
+                    urlencode(&name)
+                ))
+                .await
+            }
+            AuthCmd::Groups { realm } => {
+                c.get(&format!("/api/auth/realms/{}/groups", urlencode(&realm))).await
+            }
+            AuthCmd::GroupGet { realm, id } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/groups/{}",
+                    urlencode(&realm),
+                    urlencode(&id)
+                ))
+                .await
+            }
+            AuthCmd::Idp { realm } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/identity-providers",
+                    urlencode(&realm)
+                ))
+                .await
+            }
+            AuthCmd::IdpGet { realm, alias } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/identity-providers/{}",
+                    urlencode(&realm),
+                    urlencode(&alias)
+                ))
+                .await
+            }
+            AuthCmd::Flows { realm } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/authentication/flows",
+                    urlencode(&realm)
+                ))
+                .await
+            }
+            AuthCmd::FlowGet { realm, alias } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/authentication/flows/{}",
+                    urlencode(&realm),
+                    urlencode(&alias)
+                ))
+                .await
+            }
+            AuthCmd::AuthnConfig { realm } => {
+                c.get(&format!(
+                    "/api/auth/realms/{}/authentication/config",
+                    urlencode(&realm)
+                ))
+                .await
+            }
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -4664,6 +4827,147 @@ mod batch4_parse_tests {
     fn auth_saml_c14n_parses() {
         let cli = parse(&["cavectl", "auth", "saml-c14n"]);
         assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+    }
+
+    // ── 2026-05-15 Keycloak admin-ui port — extended auth verbs ──────────────
+
+    #[test]
+    fn auth_realm_settings_parses_with_realm() {
+        let cli = parse(&["cavectl", "auth", "realm-settings", "--realm", "acme"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::RealmSettings { realm } } => assert_eq!(realm, "acme"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_scopes_parses() {
+        let cli = parse(&["cavectl", "auth", "scopes", "--realm", "acme"]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::Scopes { realm } } => assert_eq!(realm, "acme"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_scope_get_parses() {
+        let cli = parse(&[
+            "cavectl", "auth", "scope-get", "--realm", "acme", "--name", "openid",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::ScopeGet { realm, name } } => {
+                assert_eq!(realm, "acme");
+                assert_eq!(name, "openid");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_roles_parses() {
+        let cli = parse(&["cavectl", "auth", "roles", "--realm", "acme"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Roles { realm: _ } }
+        ));
+    }
+
+    #[test]
+    fn auth_role_get_parses() {
+        let cli = parse(&[
+            "cavectl", "auth", "role-get", "--realm", "acme", "--name", "platform_admin",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::RoleGet { realm, name } } => {
+                assert_eq!(realm, "acme");
+                assert_eq!(name, "platform_admin");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_groups_parses() {
+        let cli = parse(&["cavectl", "auth", "groups", "--realm", "acme"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Groups { realm: _ } }
+        ));
+    }
+
+    #[test]
+    fn auth_group_get_parses() {
+        let cli = parse(&[
+            "cavectl", "auth", "group-get", "--realm", "acme", "--id", "grp-root-eng",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::GroupGet { realm, id } } => {
+                assert_eq!(realm, "acme");
+                assert_eq!(id, "grp-root-eng");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_idp_list_parses() {
+        let cli = parse(&["cavectl", "auth", "idp", "--realm", "acme"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Idp { realm: _ } }
+        ));
+    }
+
+    #[test]
+    fn auth_idp_get_parses() {
+        let cli = parse(&[
+            "cavectl", "auth", "idp-get", "--realm", "acme", "--alias", "github",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::IdpGet { realm, alias } } => {
+                assert_eq!(realm, "acme");
+                assert_eq!(alias, "github");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_flows_list_parses() {
+        let cli = parse(&["cavectl", "auth", "flows", "--realm", "acme"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::Flows { realm: _ } }
+        ));
+    }
+
+    #[test]
+    fn auth_flow_get_parses() {
+        let cli = parse(&[
+            "cavectl", "auth", "flow-get", "--realm", "acme", "--alias", "browser",
+        ]);
+        match cli.command {
+            Commands::Auth { cmd: AuthCmd::FlowGet { realm, alias } } => {
+                assert_eq!(realm, "acme");
+                assert_eq!(alias, "browser");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn auth_authn_config_parses() {
+        let cli = parse(&["cavectl", "auth", "authn-config", "--realm", "acme"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Auth { cmd: AuthCmd::AuthnConfig { realm: _ } }
+        ));
+    }
+
+    #[test]
+    fn auth_realm_settings_requires_realm_flag() {
+        let parsed = Cli::try_parse_from(["cavectl", "auth", "realm-settings"]);
+        assert!(parsed.is_err(), "realm-settings without --realm must error");
     }
 
     // ── Expanded container-scan subcommands ───────────────────────────────────
