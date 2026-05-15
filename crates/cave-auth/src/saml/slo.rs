@@ -310,10 +310,8 @@ pub fn parse_logout_response(bytes: &[u8]) -> Result<LogoutResponse, SamlError> 
                     issuer = Some(txt);
                 }
             }
-            Ok(Event::End(ref e)) => {
-                if local_name(e.name().as_ref()) == "Issuer" {
-                    current = None;
-                }
+            Ok(Event::End(ref e)) if local_name(e.name().as_ref()) == "Issuer" => {
+                current = None;
             }
             _ => {}
         }

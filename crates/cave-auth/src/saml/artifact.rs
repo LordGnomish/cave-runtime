@@ -418,16 +418,12 @@ pub fn parse_artifact_response(bytes: &[u8]) -> Result<ArtifactResponse, SamlErr
                     .unescape()
                     .map_err(|err| SamlError::Parse(err.to_string()))?
                     .into_owned();
-                if matches!(current, Some("issuer")) {
-                    if issuer.is_none() {
-                        issuer = Some(txt);
-                    }
+                if matches!(current, Some("issuer")) && issuer.is_none() {
+                    issuer = Some(txt);
                 }
             }
-            Ok(Event::End(ref e)) => {
-                if local_name(e.name().as_ref()) == "Issuer" {
-                    current = None;
-                }
+            Ok(Event::End(ref e)) if local_name(e.name().as_ref()) == "Issuer" => {
+                current = None;
             }
             _ => {}
         }

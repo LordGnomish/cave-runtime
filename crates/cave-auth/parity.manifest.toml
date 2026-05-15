@@ -21,14 +21,14 @@ url     = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 12
-partial_count  = 1
+mapped_count   = 13
+partial_count  = 0
 skipped_count  = 16
 unmapped_count = 8
 total          = 37
-fill_ratio     = 0.7838
-honest_ratio   = 0.7568
-last_audit     = "2026-05-13"
+fill_ratio     = 0.8108
+honest_ratio   = 0.7838
+last_audit     = "2026-05-15"
 infra_only     = false
 [module]
 name        = "cave-auth"
@@ -144,6 +144,40 @@ local    = "src/auth_routes.rs"
 [[files]]
 upstream = "services/src/main/java/org/keycloak/protocol/scim/ScimResource.java"
 local    = "src/scim.rs"
+
+# ── SAML 2.0 broker (2026-05-15 deepen) ──────────────────────────────────────
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/core/saml/v2/protocol/ArtifactResolveType.java"
+local    = "src/saml/artifact.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/core/saml/v2/protocol/ArtifactResponseType.java"
+local    = "src/saml/artifact.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/core/util/XMLEncryptionUtil.java"
+local    = "src/saml/xmlenc.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/broker/saml/mappers/AttributeToRoleMapper.java"
+local    = "src/saml/attrmap.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/broker/saml/SAMLEndpoint.java"
+local    = "src/saml/nameid.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/processing/core/saml/v2/protocol/LogoutRequestType.java"
+local    = "src/saml/slo.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/SAML2LogoutResponseBuilder.java"
+local    = "src/saml/slo.rs"
+
+[[files]]
+upstream = "saml-core-api/src/main/java/org/keycloak/saml/SignatureAlgorithm.java"
+local    = "src/saml/signature.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -312,6 +346,76 @@ local_test    = "bypass_prefix_match"
 upstream_test = "AuthFilterTest::testRoleCheck"
 local_test    = "role_check"
 
+# ── SAML 2.0 deepen tests (2026-05-15) ──────────────────────────────────────
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testArtifactType4Roundtrip"
+local_test    = "artifact_round_trips_through_base64"
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testArtifactResolveSoapEnvelope"
+local_test    = "artifact_resolve_xml_round_trips"
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testArtifactResponseInnerResponse"
+local_test    = "artifact_response_wraps_inner_saml_response"
+
+[[tests]]
+upstream_test = "ArtifactBindingTest::testSingleShotResolution"
+local_test    = "artifact_resolution_store_resolves_once_then_evicts"
+
+[[tests]]
+upstream_test = "SignatureAlgorithmTest::testEcdsaSha256"
+local_test    = "ecdsa_p256_sign_then_verify_round_trips"
+
+[[tests]]
+upstream_test = "SignatureAlgorithmTest::testEcdsaSha384"
+local_test    = "ecdsa_p384_sign_then_verify_round_trips"
+
+[[tests]]
+upstream_test = "XMLEncryptionUtilTest::testAes256GcmRoundtrip"
+local_test    = "aes256_gcm_round_trips"
+
+[[tests]]
+upstream_test = "XMLEncryptionUtilTest::testRsaOaepKeyTransport"
+local_test    = "rsa_oaep_sha256_round_trips"
+
+[[tests]]
+upstream_test = "XMLEncryptionUtilTest::testEncryptedAssertionRoundtrip"
+local_test    = "encrypted_assertion_round_trips_through_xml"
+
+[[tests]]
+upstream_test = "AttributeToRoleMapperTest::testExactValueGrant"
+local_test    = "exact_value_match_grants_role"
+
+[[tests]]
+upstream_test = "AttributeToRoleMapperTest::testRegexGrant"
+local_test    = "regex_match_grants_role"
+
+[[tests]]
+upstream_test = "AttributeToRoleMapperTest::testMultipleMappings"
+local_test    = "multiple_mappings_accumulate_distinct_roles"
+
+[[tests]]
+upstream_test = "NameIDPolicyTest::testUnsupportedFormatRejected"
+local_test    = "unsupported_format_is_rejected_with_status"
+
+[[tests]]
+upstream_test = "NameIDPolicyTest::testMatchingFormatGranted"
+local_test    = "matching_format_is_granted"
+
+[[tests]]
+upstream_test = "LogoutProtocolTest::testLogoutRequestRoundtrip"
+local_test    = "logout_request_xml_round_trips"
+
+[[tests]]
+upstream_test = "LogoutProtocolTest::testLogoutResponseRoundtrip"
+local_test    = "logout_response_xml_round_trips"
+
+[[tests]]
+upstream_test = "LogoutProtocolTest::testSessionIndexLedgerDropAll"
+local_test    = "session_index_ledger_logout_all_for_principal"
+
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
 [[surfaces]]
@@ -445,8 +549,8 @@ upstream_pkg = "keycloak:adapters/oidc/okta"
 local_files  = ["src/okta.rs"]
 note         = "Okta adapter (specialised OIDC profile)"
 
-[[partial]]
-upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/"
+[[mapped]]
+upstream_pkg = "keycloak:saml-core/ + services/.../protocol/saml/ + services/.../broker/saml/"
 local_files  = [
   "src/saml/mod.rs",
   "src/saml/authn_request.rs",
@@ -456,8 +560,13 @@ local_files  = [
   "src/saml/signature.rs",
   "src/saml/canonicalization.rs",
   "src/saml/broker.rs",
+  "src/saml/artifact.rs",
+  "src/saml/xmlenc.rs",
+  "src/saml/attrmap.rs",
+  "src/saml/nameid.rs",
+  "src/saml/slo.rs",
 ]
-note         = "SAML 2.0 broker — AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST bindings, RSA-SHA256 sign+verify, SP-init + IdP-init flow state machines. Built-in exc-c14n canonicalization (rfc3741 subset) — caller-pluggable hook remains for strict-mode IdPs. (2026-05-13 c14n landed.)"
+note         = "SAML 2.0 broker — full front-channel + back-channel + xml-enc + RBAC mapper + SLO. 13 modules: AuthnRequest+Response parsers, EntityDescriptor metadata (SP+IdP), HTTP-Redirect/POST/Artifact bindings (artifact + SOAP envelope ArtifactResolutionStore single-shot per §3.6.5), RSA-SHA256 + ECDSA-SHA256(P-256) + ECDSA-SHA384(P-384) sign+verify (IEEE P1363), built-in exc-c14n canonicalization (rfc3741 subset), SP-init + IdP-init flow state machines, XML-ENC 1.1 EncryptedAssertion (AES-128/256-GCM + RSA-OAEP-MGF1-SHA256), AttributeToRoleMapper (ExactValue/Regex/AnyValue → cave_auth::rbac::Role), NameIDPolicy negotiation (§3.4.1.1 InvalidNameIDPolicy), Single-Logout (LogoutRequest/Response writers+parsers + SessionIndexLedger). 2026-05-15 SAML deepen sweep."
 
 # ─── Skipped (16) — Java-stack analogs + Quarkus runtime + UI ──────────────
 
