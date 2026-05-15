@@ -51,6 +51,7 @@ pub mod signature;
 // ── A1 mission additions (Keycloak v22.0.0 SAML broker port) ────────────────
 // Appended-only — never edit the originals above.
 pub mod name_id;
+pub mod assertion;
 
 use thiserror::Error;
 
