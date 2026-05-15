@@ -211,6 +211,72 @@ groups:
             sink (Loki / S3) is down or AuditLogger is silently failing.
           runbook_url: "https://portal.cave.dev/runbooks/auth/audit-stalled"
 
+  # ────────────────────────────────────────────────────────────────────
+  # 2026-05-15 SAML 2.0 deepen — Keycloak SAML broker port.
+  # Source: keycloak/keycloak@b825ba97
+  #         services/.../broker/saml/SAMLEndpoint.java
+  # ────────────────────────────────────────────────────────────────────
+  - name: cave-auth.saml
+    interval: 30s
+    rules:
+      - alert: SamlSignatureFailureRate
+        expr: |
+          (
+            sum by (algo) (rate(cave_auth_saml_signature_failures_total[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_saml_assertions_total[5m])), 1e-9)
+          ) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+          page: "true"
+        annotations:
+          summary: "SAML signature failure rate >2% (algo={{ $labels.algo }})"
+          description: |
+            More than 2% of SAML assertions arriving at cave-auth are
+            failing signature verification ({{ $labels.algo }}) over the
+            last 5 minutes (current ratio: {{ $value | humanizePercentage }}).
+            Likely causes: IdP key rotation that broke our trust bundle,
+            wrong canonicalization (xmlsec1 strict mode), or active forgery.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-sig-fail"
+
+      - alert: SamlAssertionDecryptFailures
+        expr: |
+          sum(rate(cave_auth_saml_assertions_total{result="decrypt_failed"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "SAML EncryptedAssertion decrypt failures sustained >0.1/s"
+          description: |
+            cave-auth is rejecting SAML EncryptedAssertion payloads with
+            AES-GCM tag / RSA-OAEP unwrap errors. Usually means the SP
+            decryption key got rotated without telling the IdP, or an
+            IdP-side encryption alg mismatch. Check the realm's SAML
+            crypto config + decryption-key alias.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-decrypt-fail"
+
+      - alert: SamlAuthnRequestBurst
+        expr: |
+          sum by (realm, binding) (rate(cave_auth_saml_authn_requests_total[1m])) > 50
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "SAML AuthnRequest burst >50/s on {{ $labels.binding }}"
+          description: |
+            cave-auth received more than 50 <samlp:AuthnRequest> per second
+            on the {{ $labels.binding }} binding for realm {{ $labels.realm }}.
+            Either a federation loop or a hot retry-storm at an SP — triage
+            and consider rate-limiting at the gateway.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-authn-burst"
+
       - alert: PqcSignBackendMissing
         expr: |
           (

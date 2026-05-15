@@ -277,6 +277,55 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "SAML AuthnRequest rate by realm + binding",
+      "description": "Rate of <samlp:AuthnRequest> received on cave-auth, split by realm and transport binding (HTTP-Redirect / HTTP-POST / HTTP-Artifact). Source: cave-auth/src/saml/* — 2026-05-15 SAML deepen.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (realm, binding) (rate(cave_auth_saml_authn_requests_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{realm}} / {{binding}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "SAML Assertion outcomes (success / signature_failed / decrypt_failed / expired)",
+      "description": "Per-result breakdown of how cave-auth disposes of incoming <samlp:Response> assertions. signature_failed + decrypt_failed are the security-relevant outcomes; expired tracks clock-skew + NotOnOrAfter rejections.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_saml_assertions_total{realm=~\"$realm\"}[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "SAML signature failures by algorithm",
+      "description": "Stacked failure rate of <ds:Signature> verification, split by algorithm (rsa-sha256 / ecdsa-sha256 / ecdsa-sha384). Used by the SamlSignatureFailureRate alert.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (algo) (rate(cave_auth_saml_signature_failures_total[5m]))", "legendFormat": "{{algo}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "SAML Single-Logout fan-out + ledger size",
+      "description": "Number of <samlp:LogoutRequest> the IdP role fanned out (per minute) + the active SessionIndexLedger principal count. Spike + low ledger = healthy logouts; spike + flat ledger = SLO not propagating.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_saml_logout_fanout_total[1m]))", "legendFormat": "logout fanouts/s", "refId": "A" },
+        { "expr": "cave_auth_saml_session_index_ledger_principals", "legendFormat": "ledger principals", "refId": "B" }
+      ]
     }
   ]
 }
