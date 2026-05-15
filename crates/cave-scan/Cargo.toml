@@ -33,3 +33,6 @@ serde_yaml = { workspace = true }
 hcl-rs = { workspace = true }
 aho-corasick = { workspace = true }
 # === S3 end ===
+# === S2 trivy scan engine ===
+toml = { workspace = true }
+# === S2 end ===

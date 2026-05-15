@@ -28,3 +28,10 @@ pub const MODULE_NAME: &str = "scan";
 pub mod iac;
 pub mod secrets;
 pub mod license;
+// === S2: Trivy scan engine ===
+pub mod analyzer;
+pub mod oci;
+pub mod report_agg;
+pub mod scanners;
+pub mod target;
+// === S2 end ===
