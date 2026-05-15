@@ -25,3 +25,7 @@ pub fn router(state: Arc<State>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "scan";
+
+pub mod iac;
+pub mod secrets;
+pub mod license;

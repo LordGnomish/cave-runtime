@@ -27,3 +27,9 @@ chrono = { workspace = true }
 thiserror = { workspace = true }
 tree-sitter = { workspace = true }
 regex = { workspace = true }
+# === S3 db+iac+secrets+license ===
+cave-scan-db = { path = "../cave-scan-db" }
+serde_yaml = { workspace = true }
+hcl-rs = { workspace = true }
+aho-corasick = { workspace = true }
+# === S3 end ===
