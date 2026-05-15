@@ -95,6 +95,7 @@ pub mod rdbms_operator;
 pub mod rollouts;
 pub mod sbom;
 pub mod scan;
+pub mod scan_trivy;
 pub mod scheduler;
 pub mod search;
 pub mod secrets;
@@ -903,6 +904,13 @@ async fn infra_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query
 async fn pam_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); pam::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn sbom_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); sbom::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn scan_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan::render(&s, &ctx).map(Html).map_err(err_to_response) }
+async fn scan_trivy_images_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Images).map(Html).map_err(err_to_response_scan_trivy) }
+async fn scan_trivy_fs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Filesystems).map(Html).map_err(err_to_response_scan_trivy) }
+async fn scan_trivy_iac_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Iac).map(Html).map_err(err_to_response_scan_trivy) }
+async fn scan_trivy_secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); scan_trivy::render(&s, &ctx, scan_trivy::Tab::Secrets).map(Html).map_err(err_to_response_scan_trivy) }
+fn err_to_response_scan_trivy(e: scan_trivy::ScanTrivyError) -> (StatusCode, Html<String>) {
+    match e { scan_trivy::ScanTrivyError::Auth(_) => (StatusCode::FORBIDDEN, Html("<h1>403</h1>".to_string())) }
+}
 async fn secrets_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); secrets::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn uptime_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); uptime::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn cluster_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); cluster::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -1587,6 +1595,11 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/pam", get(pam_handler))
         .route("/admin/sbom", get(sbom_handler))
         .route("/admin/scan", get(scan_handler))
+        .route("/admin/scan/trivy", get(scan_trivy_images_handler))
+        .route("/admin/scan/trivy/images", get(scan_trivy_images_handler))
+        .route("/admin/scan/trivy/filesystems", get(scan_trivy_fs_handler))
+        .route("/admin/scan/trivy/iac", get(scan_trivy_iac_handler))
+        .route("/admin/scan/trivy/secrets", get(scan_trivy_secrets_handler))
         .route("/admin/secrets", get(secrets_handler))
         .route("/admin/uptime", get(uptime_handler))
         .route("/admin/cluster", get(cluster_handler))
