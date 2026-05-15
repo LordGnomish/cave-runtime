@@ -474,6 +474,100 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    /// Identity Provider CRUD (`/admin/realms/{realm}/identity-provider/...`).
+    Idp {
+        #[command(subcommand)]
+        cmd: AuthIdpCmd,
+    },
+    /// Authentication Flow CRUD (`/admin/realms/{realm}/authentication/flows`).
+    Flow {
+        #[command(subcommand)]
+        cmd: AuthFlowCmd,
+    },
+    /// Device-flow operations (RFC 8628).
+    Device {
+        #[command(subcommand)]
+        cmd: AuthDeviceCmd,
+    },
+    /// Pushed Authorization Requests (RFC 9126).
+    Par {
+        #[command(subcommand)]
+        cmd: AuthParCmd,
+    },
+    /// Client-Initiated Backchannel Authentication.
+    Ciba {
+        #[command(subcommand)]
+        cmd: AuthCibaCmd,
+    },
+    /// Token revocation (RFC 7009).
+    Revoke {
+        #[command(subcommand)]
+        cmd: AuthRevokeCmd,
+    },
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthIdpCmd {
+    List,
+    Create,
+    Update,
+    Delete,
+    /// Auto-detect provider config from `.well-known/openid-configuration` (OIDC) or SAML metadata URL.
+    ImportConfig,
+    /// List available provider factories.
+    Providers,
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthFlowCmd {
+    List,
+    Create,
+    Clone,
+    Delete,
+    /// List execution steps inside a flow.
+    ExecutionList,
+    ExecutionAdd,
+    ExecutionUpdate,
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthDeviceCmd {
+    /// Initiate a device-authorization request.
+    Auth,
+    /// Poll the token endpoint with a device_code.
+    Poll,
+    /// Approve a pending user_code as an operator (admin path).
+    Approve,
+    /// Deny a pending user_code.
+    Deny,
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthParCmd {
+    /// Push an authorization request, returning a `request_uri`.
+    Push,
+    /// List the outstanding PAR records.
+    List,
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthCibaCmd {
+    /// Initiate a backchannel authentication request.
+    Request,
+    /// Poll the token endpoint with an `auth_req_id`.
+    Poll,
+    /// Operator approval of a pending CIBA request.
+    Approve,
+    /// Operator denial of a pending CIBA request.
+    Deny,
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum AuthRevokeCmd {
+    /// Revoke an access_token or refresh_token (RFC 7009).
+    Token,
+    /// List revoked tokens (admin debug view).
+    List,
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +4055,43 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::Idp { cmd } => match cmd {
+                AuthIdpCmd::List          => c.get("/api/auth/idp/list").await,
+                AuthIdpCmd::Create        => c.post("/api/auth/idp/create", json!({})).await,
+                AuthIdpCmd::Update        => c.post("/api/auth/idp/update", json!({})).await,
+                AuthIdpCmd::Delete        => c.post("/api/auth/idp/delete", json!({})).await,
+                AuthIdpCmd::ImportConfig  => c.post("/api/auth/idp/import-config", json!({})).await,
+                AuthIdpCmd::Providers     => c.get("/api/auth/idp/providers").await,
+            },
+            AuthCmd::Flow { cmd } => match cmd {
+                AuthFlowCmd::List            => c.get("/api/auth/flow/list").await,
+                AuthFlowCmd::Create          => c.post("/api/auth/flow/create", json!({})).await,
+                AuthFlowCmd::Clone           => c.post("/api/auth/flow/clone", json!({})).await,
+                AuthFlowCmd::Delete          => c.post("/api/auth/flow/delete", json!({})).await,
+                AuthFlowCmd::ExecutionList   => c.get("/api/auth/flow/execution-list").await,
+                AuthFlowCmd::ExecutionAdd    => c.post("/api/auth/flow/execution-add", json!({})).await,
+                AuthFlowCmd::ExecutionUpdate => c.post("/api/auth/flow/execution-update", json!({})).await,
+            },
+            AuthCmd::Device { cmd } => match cmd {
+                AuthDeviceCmd::Auth    => c.post("/api/auth/device/auth", json!({})).await,
+                AuthDeviceCmd::Poll    => c.get("/api/auth/device/poll").await,
+                AuthDeviceCmd::Approve => c.post("/api/auth/device/approve", json!({})).await,
+                AuthDeviceCmd::Deny    => c.post("/api/auth/device/deny", json!({})).await,
+            },
+            AuthCmd::Par { cmd } => match cmd {
+                AuthParCmd::Push => c.post("/api/auth/par/push", json!({})).await,
+                AuthParCmd::List => c.get("/api/auth/par/list").await,
+            },
+            AuthCmd::Ciba { cmd } => match cmd {
+                AuthCibaCmd::Request => c.post("/api/auth/ciba/request", json!({})).await,
+                AuthCibaCmd::Poll    => c.get("/api/auth/ciba/poll").await,
+                AuthCibaCmd::Approve => c.post("/api/auth/ciba/approve", json!({})).await,
+                AuthCibaCmd::Deny    => c.post("/api/auth/ciba/deny", json!({})).await,
+            },
+            AuthCmd::Revoke { cmd } => match cmd {
+                AuthRevokeCmd::Token => c.post("/api/auth/revoke/token", json!({})).await,
+                AuthRevokeCmd::List  => c.get("/api/auth/revoke/list").await,
+            },
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -4664,6 +4795,73 @@ mod batch4_parse_tests {
     fn auth_saml_c14n_parses() {
         let cli = parse(&["cavectl", "auth", "saml-c14n"]);
         assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
+    }
+
+    // ── Keycloak OIDC suite (idp/flow/device/par/ciba/revoke) ─────────────────
+    #[test]
+    fn auth_idp_list_parses() {
+        let cli = parse(&["cavectl", "auth", "idp", "list"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Idp { cmd: AuthIdpCmd::List } }));
+    }
+
+    #[test]
+    fn auth_idp_import_config_parses() {
+        let cli = parse(&["cavectl", "auth", "idp", "import-config"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Idp { cmd: AuthIdpCmd::ImportConfig } }));
+    }
+
+    #[test]
+    fn auth_idp_providers_parses() {
+        let cli = parse(&["cavectl", "auth", "idp", "providers"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Idp { cmd: AuthIdpCmd::Providers } }));
+    }
+
+    #[test]
+    fn auth_flow_clone_parses() {
+        let cli = parse(&["cavectl", "auth", "flow", "clone"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Flow { cmd: AuthFlowCmd::Clone } }));
+    }
+
+    #[test]
+    fn auth_flow_execution_list_parses() {
+        let cli = parse(&["cavectl", "auth", "flow", "execution-list"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Flow { cmd: AuthFlowCmd::ExecutionList } }));
+    }
+
+    #[test]
+    fn auth_device_auth_parses() {
+        let cli = parse(&["cavectl", "auth", "device", "auth"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Device { cmd: AuthDeviceCmd::Auth } }));
+    }
+
+    #[test]
+    fn auth_device_poll_parses() {
+        let cli = parse(&["cavectl", "auth", "device", "poll"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Device { cmd: AuthDeviceCmd::Poll } }));
+    }
+
+    #[test]
+    fn auth_par_push_parses() {
+        let cli = parse(&["cavectl", "auth", "par", "push"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Par { cmd: AuthParCmd::Push } }));
+    }
+
+    #[test]
+    fn auth_ciba_request_parses() {
+        let cli = parse(&["cavectl", "auth", "ciba", "request"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Ciba { cmd: AuthCibaCmd::Request } }));
+    }
+
+    #[test]
+    fn auth_ciba_approve_parses() {
+        let cli = parse(&["cavectl", "auth", "ciba", "approve"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Ciba { cmd: AuthCibaCmd::Approve } }));
+    }
+
+    #[test]
+    fn auth_revoke_token_parses() {
+        let cli = parse(&["cavectl", "auth", "revoke", "token"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::Revoke { cmd: AuthRevokeCmd::Token } }));
     }
 
     // ── Expanded container-scan subcommands ───────────────────────────────────
