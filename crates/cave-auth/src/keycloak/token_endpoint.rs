@@ -132,6 +132,12 @@ pub struct KeycloakTokenService {
     users: UserStore,
     clients: ClientStore,
     sessions: OidcSessionStore,
+    /// Shared with `auth_endpoint::AuthorizationService` for `authorization_code` grant.
+    pub auth_codes: super::auth_endpoint::AuthCodeStore,
+    /// Shared with `device_endpoint::DeviceService` for the `device_code` grant.
+    pub device_codes: super::device_endpoint::DeviceCodeStore,
+    /// Shared with `ciba_endpoint::CibaService` for the `urn:openid:params:grant-type:ciba` grant.
+    pub ciba_requests: super::ciba_endpoint::CibaRequestStore,
 }
 
 impl KeycloakTokenService {
@@ -141,7 +147,25 @@ impl KeycloakTokenService {
             users,
             clients,
             sessions: OidcSessionStore::new(),
+            auth_codes: super::auth_endpoint::AuthCodeStore::new(),
+            device_codes: super::device_endpoint::DeviceCodeStore::new(),
+            ciba_requests: super::ciba_endpoint::CibaRequestStore::new(),
         }
+    }
+
+    /// Plug in an already-shared `AuthCodeStore` so the `/auth` and `/token`
+    /// endpoints exchange codes via the same store.
+    pub fn with_auth_codes(mut self, store: super::auth_endpoint::AuthCodeStore) -> Self {
+        self.auth_codes = store;
+        self
+    }
+    pub fn with_device_codes(mut self, store: super::device_endpoint::DeviceCodeStore) -> Self {
+        self.device_codes = store;
+        self
+    }
+    pub fn with_ciba_requests(mut self, store: super::ciba_endpoint::CibaRequestStore) -> Self {
+        self.ciba_requests = store;
+        self
     }
 
     fn issuer(realm: &str) -> String {
@@ -370,6 +394,175 @@ impl KeycloakTokenService {
         })
     }
 
+    /// RFC 6749 §4.1.3 — authorization_code grant, with PKCE (RFC 7636).
+    pub async fn authorization_code_grant(
+        &self,
+        realm: &str,
+        code: &str,
+        redirect_uri: &str,
+        client_id: &str,
+        client_secret: Option<&str>,
+        code_verifier: Option<&str>,
+    ) -> Result<TokenResponse, &'static str> {
+        if self.realms.get(realm).await.is_none() {
+            return Err("realm_not_found");
+        }
+        let entry = self.auth_codes.redeem(code).await.ok_or("invalid_grant")?;
+        if entry.realm != realm { return Err("invalid_grant"); }
+        if entry.client_id != client_id { return Err("invalid_grant"); }
+        if entry.redirect_uri != redirect_uri { return Err("invalid_grant"); }
+
+        // Authenticate client.
+        let client = self.clients.get_by_client_id(realm, client_id).await.ok_or("invalid_client")?;
+        if client.public_client {
+            // Public client → PKCE required + must verify.
+            let v = code_verifier.ok_or("invalid_grant")?;
+            let challenge = entry.code_challenge.as_deref().ok_or("invalid_grant")?;
+            let method = entry.code_challenge_method.as_deref().unwrap_or("plain");
+            if !super::auth_endpoint::pkce_verify(challenge, method, v) {
+                return Err("invalid_grant");
+            }
+        } else {
+            // Confidential client → secret required.
+            let provided = client_secret.unwrap_or("");
+            let expected = client.secret.as_deref().unwrap_or("");
+            if provided != expected { return Err("invalid_client_secret"); }
+            // If PKCE was used at /auth, still verify it.
+            if let Some(challenge) = entry.code_challenge.as_deref() {
+                let v = code_verifier.ok_or("invalid_grant")?;
+                let method = entry.code_challenge_method.as_deref().unwrap_or("plain");
+                if !super::auth_endpoint::pkce_verify(challenge, method, v) {
+                    return Err("invalid_grant");
+                }
+            }
+        }
+
+        let session_state = Uuid::new_v4().to_string();
+        let (access, refresh) = Self::make_token_pair(
+            realm,
+            &entry.user_id,
+            &entry.username,
+            entry.email.as_deref(),
+            Some(client_id),
+            &entry.scope,
+            &session_state,
+        )?;
+        self.sessions.insert(session_state.clone(), SessionEntry {
+            realm: realm.to_string(),
+            sub: entry.user_id.clone(),
+            username: entry.username.clone(),
+            email: entry.email.clone(),
+            client_id: Some(client_id.to_string()),
+            scope: entry.scope.clone(),
+            exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
+        }).await;
+
+        Ok(TokenResponse {
+            access_token: access,
+            token_type: "Bearer".to_string(),
+            expires_in: ACCESS_TOKEN_TTL,
+            refresh_token: Some(refresh),
+            refresh_expires_in: Some(REFRESH_TOKEN_TTL),
+            scope: entry.scope,
+            session_state: Some(session_state),
+        })
+    }
+
+    /// RFC 8628 §3.4 — device_code grant.
+    pub async fn device_code_grant(
+        &self,
+        realm: &str,
+        device_code: &str,
+        client_id: &str,
+    ) -> Result<TokenResponse, &'static str> {
+        if self.realms.get(realm).await.is_none() {
+            return Err("realm_not_found");
+        }
+        let _ = self.clients.get_by_client_id(realm, client_id).await.ok_or("invalid_client")?;
+        match self.device_codes.poll(device_code).await {
+            super::device_endpoint::DevicePollOutcome::Pending => Err("authorization_pending"),
+            super::device_endpoint::DevicePollOutcome::SlowDown => Err("slow_down"),
+            super::device_endpoint::DevicePollOutcome::Denied => Err("access_denied"),
+            super::device_endpoint::DevicePollOutcome::Expired => Err("expired_token"),
+            super::device_endpoint::DevicePollOutcome::Unknown => Err("invalid_grant"),
+            super::device_endpoint::DevicePollOutcome::Approved(entry) => {
+                let super::device_endpoint::DeviceCodeStatus::Approved { user_id, username, email } = &entry.status else {
+                    return Err("invalid_grant");
+                };
+                let session_state = Uuid::new_v4().to_string();
+                let (access, refresh) = Self::make_token_pair(
+                    realm, user_id, username, email.as_deref(),
+                    Some(client_id), &entry.scope, &session_state,
+                )?;
+                self.sessions.insert(session_state.clone(), SessionEntry {
+                    realm: realm.to_string(),
+                    sub: user_id.clone(),
+                    username: username.clone(),
+                    email: email.clone(),
+                    client_id: Some(client_id.to_string()),
+                    scope: entry.scope.clone(),
+                    exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
+                }).await;
+                Ok(TokenResponse {
+                    access_token: access,
+                    token_type: "Bearer".to_string(),
+                    expires_in: ACCESS_TOKEN_TTL,
+                    refresh_token: Some(refresh),
+                    refresh_expires_in: Some(REFRESH_TOKEN_TTL),
+                    scope: entry.scope.clone(),
+                    session_state: Some(session_state),
+                })
+            }
+        }
+    }
+
+    /// OIDC CIBA `urn:openid:params:grant-type:ciba` — poll the `auth_req_id`.
+    pub async fn ciba_grant(
+        &self,
+        realm: &str,
+        auth_req_id: &str,
+        client_id: &str,
+    ) -> Result<TokenResponse, &'static str> {
+        if self.realms.get(realm).await.is_none() {
+            return Err("realm_not_found");
+        }
+        let _ = self.clients.get_by_client_id(realm, client_id).await.ok_or("invalid_client")?;
+        let outcome = self.ciba_requests.poll(auth_req_id).await;
+        use super::ciba_endpoint::CibaPollOutcome;
+        match outcome {
+            CibaPollOutcome::Pending => Err("authorization_pending"),
+            CibaPollOutcome::SlowDown => Err("slow_down"),
+            CibaPollOutcome::Denied => Err("access_denied"),
+            CibaPollOutcome::Expired => Err("expired_token"),
+            CibaPollOutcome::Unknown => Err("invalid_grant"),
+            CibaPollOutcome::Approved(req) => {
+                let session_state = Uuid::new_v4().to_string();
+                let (access, refresh) = Self::make_token_pair(
+                    realm, &req.user_id, &req.username, req.email.as_deref(),
+                    Some(client_id), &req.scope, &session_state,
+                )?;
+                self.sessions.insert(session_state.clone(), SessionEntry {
+                    realm: realm.to_string(),
+                    sub: req.user_id.clone(),
+                    username: req.username.clone(),
+                    email: req.email.clone(),
+                    client_id: Some(client_id.to_string()),
+                    scope: req.scope.clone(),
+                    exp: Utc::now().timestamp() + REFRESH_TOKEN_TTL,
+                }).await;
+                Ok(TokenResponse {
+                    access_token: access,
+                    token_type: "Bearer".to_string(),
+                    expires_in: ACCESS_TOKEN_TTL,
+                    refresh_token: Some(refresh),
+                    refresh_expires_in: Some(REFRESH_TOKEN_TTL),
+                    scope: req.scope.clone(),
+                    session_state: Some(session_state),
+                })
+            }
+        }
+    }
+
     pub async fn introspect(&self, realm: &str, token: &str) -> IntrospectionResponse {
         match Self::decode_access_token(token) {
             Some(claims) if claims.iss == Self::issuer(realm) => IntrospectionResponse {
@@ -412,6 +605,14 @@ pub struct TokenForm {
     pub client_secret: Option<String>,
     pub refresh_token: Option<String>,
     pub scope: Option<String>,
+    // authorization_code grant
+    pub code: Option<String>,
+    pub redirect_uri: Option<String>,
+    pub code_verifier: Option<String>,
+    // device_code grant
+    pub device_code: Option<String>,
+    // CIBA
+    pub auth_req_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -448,18 +649,50 @@ pub async fn token_endpoint(
             let rt = form.refresh_token.unwrap_or_default();
             svc.refresh_grant(&realm, &rt).await
         }
+        "authorization_code" => {
+            svc.authorization_code_grant(
+                &realm,
+                form.code.as_deref().unwrap_or(""),
+                form.redirect_uri.as_deref().unwrap_or(""),
+                form.client_id.as_deref().unwrap_or(""),
+                form.client_secret.as_deref(),
+                form.code_verifier.as_deref(),
+            ).await
+        }
+        "urn:ietf:params:oauth:grant-type:device_code" => {
+            svc.device_code_grant(
+                &realm,
+                form.device_code.as_deref().unwrap_or(""),
+                form.client_id.as_deref().unwrap_or(""),
+            ).await
+        }
+        "urn:openid:params:grant-type:ciba" => {
+            svc.ciba_grant(
+                &realm,
+                form.auth_req_id.as_deref().unwrap_or(""),
+                form.client_id.as_deref().unwrap_or(""),
+            ).await
+        }
         _ => Err("unsupported_grant_type"),
     };
 
     match result {
         Ok(tokens) => (StatusCode::OK, Json(serde_json::to_value(tokens).unwrap())).into_response(),
+        // RFC 8628 §3.5 — terminal grant errors return 400 with specific OAuth error codes.
+        Err(e @ "authorization_pending")
+        | Err(e @ "slow_down")
+        | Err(e @ "expired_token")
+        | Err(e @ "access_denied")
+        | Err(e @ "invalid_grant") => {
+            (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response()
+        }
         Err("realm_not_found") | Err("invalid_credentials") | Err("invalid_client") | Err("invalid_client_secret") | Err("public_client_not_allowed") => {
             (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"unauthorized"}))).into_response()
         }
         Err("invalid_refresh_token") | Err("session_not_found") | Err("realm_mismatch") => {
             (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_grant"}))).into_response()
         }
-        Err(_) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"bad_request"}))).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e}))).into_response(),
     }
 }
 
@@ -939,5 +1172,210 @@ mod tests {
         let (_, b2) = introspect_with(svc, &format!("token={}", t2.access_token)).await;
         assert_eq!(b1["active"], true);
         assert_eq!(b2["active"], true);
+    }
+
+    // ── authorization_code grant — RFC 6749 §4.1.3 ─────────────────────────────
+    #[tokio::test]
+    async fn authorization_code_grant_with_pkce() {
+        let (app, svc) = setup().await;
+        // Pre-mint an auth code for "testuser" in the shared store.
+        let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+        let challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+        svc.auth_codes.insert(super::super::auth_endpoint::AuthCode {
+            code: "code-1".into(),
+            realm: "myrealm".into(),
+            client_id: "public-client".into(),
+            redirect_uri: "https://spa.example/cb".into(),
+            user_id: "user-1".into(),
+            username: "testuser".into(),
+            email: None,
+            scope: "openid".into(),
+            nonce: None,
+            code_challenge: Some(challenge.into()),
+            code_challenge_method: Some("S256".into()),
+            auth_time: Utc::now().timestamp(),
+            exp: Utc::now().timestamp() + 60,
+            used: false,
+        }).await;
+
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "authorization_code"),
+                    ("code", "code-1"),
+                    ("redirect_uri", "https://spa.example/cb"),
+                    ("client_id", "public-client"),
+                    ("code_verifier", verifier),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert!(body["access_token"].is_string());
+    }
+
+    #[tokio::test]
+    async fn authorization_code_pkce_mismatch_rejected() {
+        let (app, svc) = setup().await;
+        svc.auth_codes.insert(super::super::auth_endpoint::AuthCode {
+            code: "code-2".into(),
+            realm: "myrealm".into(),
+            client_id: "public-client".into(),
+            redirect_uri: "https://spa.example/cb".into(),
+            user_id: "user-1".into(),
+            username: "testuser".into(),
+            email: None,
+            scope: "openid".into(),
+            nonce: None,
+            code_challenge: Some("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM".into()),
+            code_challenge_method: Some("S256".into()),
+            auth_time: Utc::now().timestamp(),
+            exp: Utc::now().timestamp() + 60,
+            used: false,
+        }).await;
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "authorization_code"),
+                    ("code", "code-2"),
+                    ("redirect_uri", "https://spa.example/cb"),
+                    ("client_id", "public-client"),
+                    ("code_verifier", "wrong-verifier"),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_json(resp).await;
+        assert_eq!(body["error"], "invalid_grant");
+    }
+
+    // ── device_code grant — RFC 8628 §3.4 ──────────────────────────────────────
+    #[tokio::test]
+    async fn device_code_grant_pending() {
+        let (app, svc) = setup().await;
+        svc.device_codes.insert(super::super::device_endpoint::DeviceCode {
+            device_code: "dev-x".into(),
+            user_code: "AA-BB".into(),
+            realm: "myrealm".into(),
+            client_id: "test-client".into(),
+            scope: "openid".into(),
+            exp: Utc::now().timestamp() + 600,
+            interval: 5,
+            last_polled: 0,
+            status: super::super::device_endpoint::DeviceCodeStatus::Pending,
+        }).await;
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                    ("device_code", "dev-x"),
+                    ("client_id", "test-client"),
+                    ("client_secret", "client-secret"),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_json(resp).await;
+        assert_eq!(body["error"], "authorization_pending");
+    }
+
+    #[tokio::test]
+    async fn device_code_grant_approved_issues_tokens() {
+        let (app, svc) = setup().await;
+        svc.device_codes.insert(super::super::device_endpoint::DeviceCode {
+            device_code: "dev-y".into(),
+            user_code: "CC-DD".into(),
+            realm: "myrealm".into(),
+            client_id: "test-client".into(),
+            scope: "openid".into(),
+            exp: Utc::now().timestamp() + 600,
+            interval: 5,
+            last_polled: 0,
+            status: super::super::device_endpoint::DeviceCodeStatus::Approved {
+                user_id: "u".into(),
+                username: "testuser".into(),
+                email: Some("testuser@example.com".into()),
+            },
+        }).await;
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                    ("device_code", "dev-y"),
+                    ("client_id", "test-client"),
+                    ("client_secret", "client-secret"),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert!(body["access_token"].is_string());
+    }
+
+    // ── CIBA grant ─────────────────────────────────────────────────────────────
+    #[tokio::test]
+    async fn ciba_grant_pending() {
+        let (app, svc) = setup().await;
+        svc.ciba_requests.insert(super::super::ciba_endpoint::CibaRequest {
+            auth_req_id: "ciba-1".into(),
+            realm: "myrealm".into(),
+            client_id: "test-client".into(),
+            user_id: "u".into(),
+            username: "testuser".into(),
+            email: None,
+            scope: "openid".into(),
+            binding_message: None,
+            acr_values: None,
+            exp: Utc::now().timestamp() + 600,
+            interval: 5,
+            last_polled: 0,
+            status: super::super::ciba_endpoint::CibaStatus::Pending,
+        }).await;
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "urn:openid:params:grant-type:ciba"),
+                    ("auth_req_id", "ciba-1"),
+                    ("client_id", "test-client"),
+                    ("client_secret", "client-secret"),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_json(resp).await;
+        assert_eq!(body["error"], "authorization_pending");
+    }
+
+    #[tokio::test]
+    async fn ciba_grant_approved_issues_tokens() {
+        let (app, svc) = setup().await;
+        svc.ciba_requests.insert(super::super::ciba_endpoint::CibaRequest {
+            auth_req_id: "ciba-2".into(),
+            realm: "myrealm".into(),
+            client_id: "test-client".into(),
+            user_id: "u".into(),
+            username: "testuser".into(),
+            email: Some("testuser@example.com".into()),
+            scope: "openid".into(),
+            binding_message: None,
+            acr_values: None,
+            exp: Utc::now().timestamp() + 600,
+            interval: 5,
+            last_polled: 0,
+            status: super::super::ciba_endpoint::CibaStatus::Approved,
+        }).await;
+        let resp = app.oneshot(
+            Request::builder().method("POST").uri("/realms/myrealm/protocol/openid-connect/token")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(token_form(&[
+                    ("grant_type", "urn:openid:params:grant-type:ciba"),
+                    ("auth_req_id", "ciba-2"),
+                    ("client_id", "test-client"),
+                    ("client_secret", "client-secret"),
+                ]))).unwrap()
+        ).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert!(body["access_token"].is_string());
     }
 }
