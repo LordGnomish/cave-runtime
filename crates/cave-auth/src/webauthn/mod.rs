@@ -7,5 +7,7 @@
 // Implements the W3C WebAuthn Level 3 server-side ceremonies (RP-side),
 // not the authenticator side.
 
+pub mod attestation;
 pub mod cose;
 pub mod model;
+pub mod registration;

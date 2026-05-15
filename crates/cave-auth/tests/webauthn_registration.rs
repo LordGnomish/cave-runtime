@@ -256,7 +256,11 @@ fn cose_es256_stub() -> Vec<u8> {
     out
 }
 
-impl RegistrationOptions {
+trait TestDefault {
+    fn test_default() -> Self;
+}
+
+impl TestDefault for RegistrationOptions {
     fn test_default() -> Self {
         Self {
             rp_id: "cave.example".into(),
