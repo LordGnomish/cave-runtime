@@ -1260,6 +1260,17 @@
       "upstream": "SonarSource/sonarqube",
       "upstream_version": "v10.3.0"
     },
+    "cave-scan-db": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "parity_ratio_source": "none",
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-scheduler": {
       "behavioral_audit_at": "2026-05-13",
       "behavioral_audit_scope": "imagelocality + tainttoleration + nodeaffinity + nodename + nodeunschedulable + noderesources/least_allocated (v1.36.0)",
@@ -1574,7 +1585,7 @@
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
     "flipped": 84,
-    "injected": 6,
+    "injected": 7,
     "new_filled": 84,
     "phantoms": 7,
     "ratio_overrides": 26

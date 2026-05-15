@@ -185,3 +185,369 @@ loc          = 75
 priority     = "P2"
 notes        = "Code-quality UI"
 last_audit   = "2026-05-11"
+
+# === S3 ===
+# Trivy / trivy-db / gitleaks port — vuln DB + IaC + secrets + license scanners.
+# Upstream SHAs: aquasecurity/trivy@8a3177a, aquasecurity/trivy-db@2034dd8,
+# gitleaks/gitleaks@9febafb.
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/types/types.go"
+local    = "../cave-scan-db/src/lib.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/db/db.go"
+local    = "../cave-scan-db/src/storage.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/detector/library/driver.go"
+local    = "../cave-scan-db/src/matcher.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/nvd/nvd.go"
+local    = "../cave-scan-db/src/sources/nvd.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/ghsa/ghsa.go"
+local    = "../cave-scan-db/src/sources/ghsa.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/debian/debian.go"
+local    = "../cave-scan-db/src/sources/debian.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/redhat/redhat.go"
+local    = "../cave-scan-db/src/sources/redhat.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/alpine/alpine.go"
+local    = "../cave-scan-db/src/sources/alpine.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy-db@2034dd8 pkg/vulnsrc/alma/alma.go"
+local    = "../cave-scan-db/src/sources/almalinux.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/scanner.go"
+local    = "src/iac/mod.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/terraform/scanner.go"
+local    = "src/iac/terraform.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/kubernetes/scanner.go"
+local    = "src/iac/kubernetes.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/dockerfile/scanner.go"
+local    = "src/iac/dockerfile.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/helm/scanner.go"
+local    = "src/iac/helm.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/iac/scanners/cloudformation/scanner.go"
+local    = "src/iac/cloudformation.rs"
+
+[[files]]
+upstream = "gitleaks/gitleaks@9febafb config/gitleaks.toml"
+local    = "src/secrets/patterns.rs"
+
+[[files]]
+upstream = "gitleaks/gitleaks@9febafb detect/detect.go"
+local    = "src/secrets/entropy.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/licensing/scanner.go"
+local    = "src/license/mod.rs"
+
+[[files]]
+upstream = "aquasecurity/trivy@8a3177a pkg/licensing/classifier.go"
+local    = "src/license/spdx.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "trivy-db.Vulnerability"
+local_name    = "Vulnerability"
+file          = "../cave-scan-db/src/lib.rs"
+
+[[functions]]
+upstream_name = "trivy-db.Advisory"
+local_name    = "Advisory"
+file          = "../cave-scan-db/src/lib.rs"
+
+[[functions]]
+upstream_name = "trivy-db.Severity"
+local_name    = "Severity"
+file          = "../cave-scan-db/src/lib.rs"
+
+[[functions]]
+upstream_name = "db.PutVulnerability"
+local_name    = "SledStore::put_vuln"
+file          = "../cave-scan-db/src/storage.rs"
+
+[[functions]]
+upstream_name = "db.GetVulnerability"
+local_name    = "SledStore::get_vuln"
+file          = "../cave-scan-db/src/storage.rs"
+
+[[functions]]
+upstream_name = "db.PutAdvisory"
+local_name    = "SledStore::put_advisory"
+file          = "../cave-scan-db/src/storage.rs"
+
+[[functions]]
+upstream_name = "db.GetAdvisories"
+local_name    = "SledStore::advisories_for_pkg"
+file          = "../cave-scan-db/src/storage.rs"
+
+[[functions]]
+upstream_name = "library.Driver.Detect"
+local_name    = "matcher::match_purl"
+file          = "../cave-scan-db/src/matcher.rs"
+
+[[functions]]
+upstream_name = "version.Compare"
+local_name    = "matcher::version_cmp"
+file          = "../cave-scan-db/src/matcher.rs"
+
+[[functions]]
+upstream_name = "version.Satisfies"
+local_name    = "matcher::version_satisfies"
+file          = "../cave-scan-db/src/matcher.rs"
+
+[[functions]]
+upstream_name = "iac.scanner.Scan"
+local_name    = "IacScanner::scan_str"
+file          = "src/iac/mod.rs"
+
+[[functions]]
+upstream_name = "terraform.scan_resource"
+local_name    = "iac::terraform::scan_resource"
+file          = "src/iac/terraform.rs"
+
+[[functions]]
+upstream_name = "kubernetes.checkContainer"
+local_name    = "iac::kubernetes::check_container"
+file          = "src/iac/kubernetes.rs"
+
+[[functions]]
+upstream_name = "dockerfile.lintLine"
+local_name    = "iac::dockerfile::check_from"
+file          = "src/iac/dockerfile.rs"
+
+[[functions]]
+upstream_name = "gitleaks.Detector.Detect"
+local_name    = "SecretScanner::scan"
+file          = "src/secrets/patterns.rs"
+
+[[functions]]
+upstream_name = "gitleaks.shannonEntropy"
+local_name    = "secrets::entropy::shannon_entropy"
+file          = "src/secrets/entropy.rs"
+
+[[functions]]
+upstream_name = "licensing.Classify"
+local_name    = "LicenseScanner::detect_from_text"
+file          = "src/license/spdx.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+
+[[tests]]
+upstream_test = "trivy-db/pkg/db/db_test.go::TestPutGetVulnerability"
+local_test    = "test_store_put_get_vuln"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/db/db_test.go::TestPutGetAdvisory"
+local_test    = "test_store_advisory_index"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/db/db_test.go::TestAdvisoryDedup"
+local_test    = "test_store_advisory_dedup_on_repeat_put"
+
+[[tests]]
+upstream_test = "trivy/pkg/version/version_test.go::TestCompare"
+local_test    = "test_version_cmp_basic"
+
+[[tests]]
+upstream_test = "trivy/pkg/version/version_test.go::TestSatisfies"
+local_test    = "test_version_satisfies_operators"
+
+[[tests]]
+upstream_test = "trivy/pkg/detector/library/driver_test.go::TestDetect"
+local_test    = "test_match_purl_e2e"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/alpine/alpine_test.go::TestParse"
+local_test    = "test_source_alpine_parse"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/debian/debian_test.go::TestParse"
+local_test    = "test_source_debian_parse"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/redhat/redhat_test.go::TestParse"
+local_test    = "test_source_redhat_parse"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/alma/alma_test.go::TestParse"
+local_test    = "test_source_almalinux_parse"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/ghsa/ghsa_test.go::TestParse"
+local_test    = "test_source_ghsa_parse"
+
+[[tests]]
+upstream_test = "trivy-db/pkg/vulnsrc/nvd/nvd_test.go::TestParse"
+local_test    = "test_source_nvd_parse_with_cvss"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/terraform/scanner_test.go::TestS3PublicACL"
+local_test    = "test_terraform_s3_public_acl"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/terraform/scanner_test.go::TestS3Unencrypted"
+local_test    = "test_terraform_unencrypted_s3"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/terraform/scanner_test.go::TestSGOpen"
+local_test    = "test_terraform_security_group_open_world"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/terraform/scanner_test.go::TestIAMWildcard"
+local_test    = "test_terraform_iam_wildcard_action"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/kubernetes/scanner_test.go::TestPrivileged"
+local_test    = "test_k8s_privileged_container"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/kubernetes/scanner_test.go::TestRunAsRoot"
+local_test    = "test_k8s_run_as_root"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/kubernetes/scanner_test.go::TestImageLatest"
+local_test    = "test_k8s_latest_tag_warns"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/dockerfile/scanner_test.go::TestUserRoot"
+local_test    = "test_dockerfile_user_root"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/dockerfile/scanner_test.go::TestFromLatest"
+local_test    = "test_dockerfile_latest_tag"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/dockerfile/scanner_test.go::TestAddURL"
+local_test    = "test_dockerfile_add_remote_url"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/helm/scanner_test.go::TestChartNoAppVersion"
+local_test    = "test_helm_chart_no_app_version"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/cloudformation/scanner_test.go::TestS3Public"
+local_test    = "test_cfn_s3_public_acl"
+
+[[tests]]
+upstream_test = "trivy/pkg/iac/scanners/cloudformation/scanner_test.go::TestSGOpen"
+local_test    = "test_cfn_security_group_open"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestAWSKey"
+local_test    = "test_secret_aws_access_key"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestGitHubPAT"
+local_test    = "test_secret_github_pat"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestSlackToken"
+local_test    = "test_secret_slack_token"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestJWT"
+local_test    = "test_secret_jwt"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestPrivateKey"
+local_test    = "test_secret_pem_private_key"
+
+[[tests]]
+upstream_test = "gitleaks/detect/detect_test.go::TestEntropy"
+local_test    = "test_entropy_high_for_random_base64"
+
+[[tests]]
+upstream_test = "trivy/pkg/licensing/classifier_test.go::TestMIT"
+local_test    = "test_license_mit_detection"
+
+[[tests]]
+upstream_test = "trivy/pkg/licensing/classifier_test.go::TestApache"
+local_test    = "test_license_apache_detection"
+
+[[tests]]
+upstream_test = "trivy/pkg/licensing/classifier_test.go::TestGPL"
+local_test    = "test_license_gpl_flagged_copyleft"
+
+[[tests]]
+upstream_test = "trivy/pkg/licensing/classifier_test.go::TestSPDXHeader"
+local_test    = "test_license_spdx_id_in_source_header"
+
+# ── Honest missing/skipped surface ───────────────────────────────────────────
+
+[[missings]]
+upstream = "trivy/pkg/iac/rego/*"
+note     = "Rego policy engine — we use pure-Rust pattern matching instead of OPA"
+
+[[missings]]
+upstream = "trivy/pkg/iac/scanners/helm/helmtemplate.go"
+note     = "Live helm template render — would require helm Go binary; static Chart.yaml + values.yaml only"
+
+[[missings]]
+upstream = "trivy-db/pkg/db/bolt.go (compaction)"
+note     = "Sled handles its own compaction; trivy-db bbolt manual compaction omitted"
+
+[[missings]]
+upstream = "trivy/pkg/version/<ecosystem>/*"
+note     = "Per-ecosystem version comparators (Debian dpkg vercmp, RPM rpmvercmp, Ruby Gem::Version) — single generic numeric+lexical fallback used; close enough for >90% of feeds, prerelease edge cases will misorder"
+
+[[missings]]
+upstream = "trivy/pkg/iac/terraform/parser/interpolation.go"
+note     = "var.foo / local.bar interpolation — current scanner only sees literal expressions"
+
+[[missings]]
+upstream = "gitleaks/config/baseline.toml allowlists"
+note     = "No allow/deny path filtering yet — all paths scanned uniformly"
+
+[[missings]]
+upstream = "trivy/pkg/licensing/google_licensecheck"
+note     = "Full rabin-fingerprint corpus match (3000+ license texts) — replaced with 14 fingerprint phrases + SPDX header parse"
+
+[[missings]]
+upstream = "trivy-db/pkg/vulnsrc/aqua (proprietary feed)"
+note     = "Aqua-proprietary CVE feed — out of scope for AGPL port"
+
+[[missings]]
+upstream = "trivy/pkg/iac/scanners/azure/*"
+note     = "Azure ARM templates — not in S3 scope (5 providers only)"
+
+[[missings]]
+upstream = "trivy/pkg/iac/scanners/json/*"
+note     = "Generic JSON CFN — YAML supported, JSON dialect deferred"
+
+# Honest fill_ratio:
+#   mapped files = 19
+#   mapped functions = 17
+#   mapped tests = 34
+#   missing  = 10
+# fill_ratio = (19 + 17 + 34) / (19 + 17 + 34 + 10) = 70/80 = 0.875
+[parity_s3]
+fill_ratio = 0.875
+last_audit = "2026-05-15"
+notes      = "S3-port-only parity ratio; merge with global parity table after S1+S2+S4 land."
+# === S3 end ===
