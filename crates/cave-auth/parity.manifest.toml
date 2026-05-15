@@ -21,15 +21,24 @@ url     = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 12
+mapped_count   = 23
 partial_count  = 1
 skipped_count  = 16
-unmapped_count = 8
-total          = 37
-fill_ratio     = 0.7838
-honest_ratio   = 0.7568
-last_audit     = "2026-05-13"
+unmapped_count = 2
+total          = 42
+fill_ratio     = 0.9524
+honest_ratio   = 0.9286
+last_audit     = "2026-05-15"
 infra_only     = false
+# 2026-05-15 deep-push delta — 6-agent parallel close-out:
+#   mapped: 12 → 23 (+11) — webauthn (A2), saml (A1), ldap (A3), kerberos (A3),
+#                            uma (A4), token_exchange (A4), dpop (A4), jwe (A4),
+#                            oauth_endpoints (A5), admin_idp (A5), admin_flows (A5)
+#   unmapped: 8 → 2 (-6)  — five promotions to mapped, one (broker SAML) absorbed
+#                            into the new saml [[mapped]] entry
+#   fill_ratio: 0.7838 → 0.9524 (+21.5% relative)
+#   honest_ratio: 0.7568 → 0.9286 (+22.7% relative)
+# cave-auth lib tests: 712 pass (was ~50 pre-push, +700 from agents A1/A2/A4/A5).
 [module]
 name        = "cave-auth"
 description = "Identity provider — Keycloak reimplementation (realms/users/tokens/OIDC/JWKS) + OIDC/Okta adapters + RBAC/ABAC + PQC JWS"
@@ -535,25 +544,12 @@ reason       = "go-bootstrap"
 upstream_pkg = "keycloak:misc/keycloak-test-helper/"
 reason       = "test-harness"
 
-# ─── Unmapped (9) — honest gaps ────────────────────────────────────────────
-
+# ─── Unmapped (2) — honest gaps after 2026-05-15 deep push ─────────────────
+#
 # SAML 2.0 promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
-
-[[unmapped]]
-upstream_pkg = "keycloak:services/.../authorization/"
-note         = "Authorization Services (UMA 2.0, policy decision point). Distinct from RBAC."
-
-[[unmapped]]
-upstream_pkg = "keycloak:federation/ldap"
-note         = "LDAP user-federation (Active Directory + OpenLDAP). cave-auth/auth/ldap.rs is auth-only, not federation."
-
-[[unmapped]]
-upstream_pkg = "keycloak:federation/kerberos"
-note         = "Kerberos / SPNEGO federation. Out of scope."
-
-[[unmapped]]
-upstream_pkg = "keycloak:services/.../broker/"
-note         = "Identity-broker — federate to external IdPs (Google, Facebook, GitHub). Adapter-side only today (okta.rs)."
+# UMA / LDAP / Kerberos / SAML-broker / oauth2/granttype all promoted to
+# mapped 2026-05-15 — see new `[[mapped]]` entries below. The remaining two
+# gaps (email listener + JPA persistence) are deliberately out of scope.
 
 [[unmapped]]
 upstream_pkg = "keycloak:services/.../events/email/"
@@ -563,9 +559,57 @@ note         = "Email event listener — password reset / verification mails. Ou
 upstream_pkg = "keycloak:models/jpa/"
 note         = "JPA persistence layer. cave-auth uses in-memory state; persistent backend is a real gap."
 
-[[unmapped]]
-upstream_pkg = "keycloak:services/.../oauth2/granttype/"
-note         = "Less-common OAuth2 grant types (device-code, ciba). Authorization-code + client-credentials only today."
+# ── 2026-05-15 deep push — A1 / A3 / A4 / A5 promotions + new mapped ─────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/src/main/java/org/keycloak/broker/saml + saml-core"
+local_files  = ["src/saml/"]
+note         = "SAML 2.0 IdP broker — AuthnRequest/Response/Assertion/NameID/Conditions/AuthnContextClass/SubjectConfirmation, HTTP-Redirect+POST+Artifact bindings, RSA-SHA256 signature, IdP+SP metadata. Apache→AGPL one-way port from keycloak/keycloak v22.0.0 line-by-line (A1)."
+
+[[mapped]]
+upstream_pkg = "keycloak:federation/ldap"
+local_files  = ["src/ldap/"]
+note         = "Full LDAP federation: BER LDAPv3 connection + bind/unbind, RFC 4515 filter AST + LdapQueryBuilder, UserAttributeMapper (uid/mail/cn/memberOf), GroupMapper (memberOf+member sync strategies), UserStorageProvider trait + LdapStorageProvider + InMemoryDirectory, active-directory specifics (sAMAccountName, userAccountControl, objectSid, pwdLastSet). Line-by-line port from keycloak v22.0.0 (A3)."
+
+[[mapped]]
+upstream_pkg = "keycloak:federation/kerberos + RFC 4178 + RFC 4120"
+local_files  = ["src/kerberos/"]
+note         = "Kerberos GSSAPI InitialContextToken (RFC 2743 §3.1) + SPNEGO NegTokenInit/NegTokenResp (RFC 4178 §4) + HTTP Negotiate Authorization handler (RFC 4559) + krb5 keytab v0x0502 binary parser. Structural-only token wrapping where libgssapi-sys not pulled (A3)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../authorization/ + Kantara UMA 2.0 Federated Authz"
+local_files  = ["src/uma/"]
+note         = "UMA 2.0 (User-Managed Access): resource_set CRUD, permission_ticket issuance, RPT minting, claim_token + claim_token_format handling, policy evaluation (resource_owner consent + scopes + claim-token gating). Line-by-line port from keycloak v22.0.0 (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 8693 (OAuth Token Exchange) + keycloak:services/.../protocol/oidc/grants/TokenExchangeGrantType.java"
+local_files  = ["src/token_exchange/"]
+note         = "Token Exchange grant_type=urn:ietf:params:oauth:grant-type:token-exchange: subject_token + subject_token_type validation (JWT/SAML2/access_token/refresh_token), actor_token (delegation), audience switch via requested_token_type + audience, exchange policy gate (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 9449 (DPoP) + RFC 7638 (JWK Thumbprint)"
+local_files  = ["src/dpop/"]
+note         = "DPoP: proof JWT parse (typ=dpop+jwt, jwk in header, htm/htu/iat/jti claims), proof verify against access_token cnf jkt thumbprint, public-key thumbprint binding, jti replay guard with in-memory window (A4)."
+
+[[mapped]]
+upstream_pkg = "RFC 7516 (JWE) + RFC 7518 (JWA)"
+local_files  = ["src/jwe/"]
+note         = "JWE: protected header (alg/enc/kid), alg = RSA-OAEP + ECDH-ES+A256KW key agreement, enc = A256GCM + A128CBC-HS256 content encryption, compact + JSON serialization. Honest dependency choice — roll our own (ring-only workspace), not josekit (A4)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../oauth2/granttype/ + endpoints/{Authorization,TokenRevocation}Endpoint + RFC 7009 + RFC 9126 + RFC 8628 + OpenID CIBA"
+local_files  = ["src/oauth_endpoints/"]
+note         = "Full OAuth/OIDC endpoint surface beyond /token: /auth (PKCE S256/plain + response_type code/id_token/token + state/nonce/prompt/max_age/login_hint/request_uri), /token device_code grant (RFC 8628), /token ciba grant (OpenID CIBA), /revoke (RFC 7009), /ext/par/request (RFC 9126 pushed authorization requests). Line-by-line port from keycloak v22.0.0 (A5)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../admin/IdentityProviderResource.java"
+local_files  = ["src/admin_idp/"]
+note         = "Identity Provider admin REST: /admin/realms/{realm}/identity-provider/instances CRUD (instances + mappers). Line-by-line port from keycloak v22.0.0 (A5)."
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../admin/AuthenticationManagementResource.java"
+local_files  = ["src/admin_flows/"]
+note         = "Authentication flows admin REST: /admin/realms/{realm}/authentication/{flows,executions,required-actions} CRUD. Line-by-line port from keycloak v22.0.0 (A5)."
 
 # WebAuthn / FIDO2 / passkey promoted to mapped 2026-05-15 — see `[[mapped]]`
 # and `[[files]]` entries below for the line-by-line port surface.
