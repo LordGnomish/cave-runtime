@@ -34,3 +34,5 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# Keytab (big-endian binary) parsing — keycloak federation/kerberos port (src/kerberos/)
+byteorder = "1.5"
