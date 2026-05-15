@@ -194,6 +194,12 @@ ring = "0.17"
 ed25519-dalek = "2"
 # ECDSA over NIST P-256 — real signer/verifier for Cosign classical mode.
 p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+# ECDSA over NIST P-384 — WebAuthn ES384.
+p384 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+# RSA — WebAuthn RS256 + RSA-PSS attestation signatures.
+rsa  = { version = "0.9", features = ["sha2"] }
+# CBOR — WebAuthn / FIDO2 attestation object + COSE_Key (RFC 7049 / RFC 8949).
+ciborium = "0.2"
 # HTTP client (for upstream tracking, uptime probes)
 reqwest-middleware = "0.4"
 # Persistence

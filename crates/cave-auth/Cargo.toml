@@ -34,3 +34,17 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# WebAuthn / FIDO2 — clean-room port of webauthn4j (Apache-2.0)
+# Source: webauthn4j/webauthn4j@82345b8
+ciborium       = { workspace = true }
+sha2           = { workspace = true }
+p256           = { workspace = true }
+p384           = { workspace = true }
+rsa            = { workspace = true }
+ed25519-dalek  = { workspace = true }
+hex            = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tower = { workspace = true }
+hex   = { workspace = true }
