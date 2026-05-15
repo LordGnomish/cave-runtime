@@ -34,3 +34,12 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# WebAuthn / FIDO2 — webauthn4j + Keycloak `webauthn` port (src/webauthn/)
+ciborium      = "0.2"
+coset         = "0.3"
+bitflags      = "2"
+p256          = { workspace = true }
+rsa           = "0.9"
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+sha2          = { workspace = true, features = ["oid"] }
+hex           = { workspace = true }

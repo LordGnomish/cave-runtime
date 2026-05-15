@@ -63,6 +63,10 @@ pub mod tui;
 /// streaming output in various formats.
 pub mod watch;
 
+/// `cavectl auth …` subcommand surface — WebAuthn / FIDO2 today (other auth
+/// sub-surfaces will live alongside as they land). New file 2026-05-15.
+pub mod auth;
+
 /// Re-exports the approval backend traits and in-memory implementation.
 pub use approval::{ApprovalBackend, ApprovalRecord, ApprovalState, InMemoryApprovals};
 
