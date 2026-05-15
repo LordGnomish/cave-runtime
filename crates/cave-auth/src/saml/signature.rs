@@ -1,9 +1,12 @@
-//! XML DSig — RSA-SHA256 sign and verify over the bytes of a
-//! SAML message. This module owns the *crypto step* of XML DSig;
-//! the *canonicalization step* (`exc-c14n`) is the caller's
-//! responsibility — see [`SignedDocument`].
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! XML DSig — RSA-SHA256 + ECDSA-{SHA256,SHA384} sign and verify
+//! over the bytes of a SAML message. This module owns the *crypto
+//! step* of XML DSig; the *canonicalization step* (`exc-c14n`) is
+//! the caller's responsibility — see [`SignedDocument`].
 //!
-//! Mirrors the crypto half of `org.keycloak.saml.processing.api.saml.v2.sig.SAML2Signature`.
+//! Source: keycloak/keycloak@b825ba97
+//!         saml-core/src/main/java/org/keycloak/saml/processing/api/saml/v2/sig/SAML2Signature.java
+//!         saml-core-api/src/main/java/org/keycloak/saml/SignatureAlgorithm.java
 //!
 //! ## What this implements
 //!
@@ -47,6 +50,14 @@ pub const ALG_SHA256: &str = "http://www.w3.org/2001/04/xmlenc#sha256";
 /// `<ds:CanonicalizationMethod Algorithm=…>` URN for exclusive
 /// canonicalization.
 pub const ALG_EXC_C14N: &str = "http://www.w3.org/2001/10/xml-exc-c14n#";
+
+/// `<ds:SignatureMethod Algorithm=…>` URN for ECDSA over NIST P-256
+/// with SHA-256.
+pub const ALG_ECDSA_SHA256: &str = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256";
+
+/// `<ds:SignatureMethod Algorithm=…>` URN for ECDSA over NIST P-384
+/// with SHA-384.
+pub const ALG_ECDSA_SHA384: &str = "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha384";
 
 /// A SAML document the broker is preparing to sign, paired with
 /// a canonicalization function. Default canonicalization is the
@@ -105,6 +116,111 @@ pub fn verify_signature(
     let key = UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, rsa_pub_der);
     key.verify(&canon, &sig)
         .map_err(|_| SamlError::InvalidSignature("rsa verify failed".into()))?;
+    Ok(())
+}
+
+// ─── ECDSA-SHA256 (NIST P-256) ──────────────────────────────────────────────
+
+/// Generate a fresh P-256 keypair, returning `(pkcs8_der, spki_der)`.
+/// `pkcs8_der` is the PKCS#8-encoded private key suitable for
+/// [`sign_ecdsa_sha256`]; `spki_der` is the SubjectPublicKeyInfo DER
+/// encoding suitable for [`verify_signature_ecdsa_sha256`].
+pub fn ecdsa_p256_generate_pkcs8() -> (Vec<u8>, Vec<u8>) {
+    use p256::ecdsa::SigningKey;
+    use p256::pkcs8::{EncodePrivateKey, EncodePublicKey};
+    let sk = SigningKey::random(&mut rand::thread_rng());
+    let pkcs8 = sk.to_pkcs8_der().expect("pkcs8 encode").as_bytes().to_vec();
+    let vk = *sk.verifying_key();
+    let spki = vk.to_public_key_der().expect("spki encode").as_bytes().to_vec();
+    (pkcs8, spki)
+}
+
+/// Sign `doc` with a PKCS#8-encoded P-256 private key. Signature is
+/// the 64-byte fixed-size IEEE P1363 concatenation `r||s` exactly as
+/// `<ds:SignatureValue>` is required to carry it (xmldsig-more §3.2),
+/// then base64.
+pub fn sign_ecdsa_sha256(
+    doc: &SignedDocument<'_>,
+    pkcs8_der: &[u8],
+) -> Result<String, SamlError> {
+    use p256::ecdsa::{signature::Signer, Signature, SigningKey};
+    use p256::pkcs8::DecodePrivateKey;
+    let sk = SigningKey::from_pkcs8_der(pkcs8_der)
+        .map_err(|e| SamlError::InvalidSignature(format!("p256 load: {e}")))?;
+    let canon = doc.canonical_bytes()?;
+    let sig: Signature = sk.sign(&canon);
+    Ok(B64.encode(sig.to_bytes()))
+}
+
+/// Verify an ECDSA-P256-SHA256 `<ds:SignatureValue>` against `doc`,
+/// given the verifying key as SPKI DER. Returns `Ok(())` on a valid
+/// signature.
+pub fn verify_signature_ecdsa_sha256(
+    doc: &SignedDocument<'_>,
+    signature_b64: &str,
+    spki_der: &[u8],
+) -> Result<(), SamlError> {
+    use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+    use p256::pkcs8::DecodePublicKey;
+    let sig_bytes = B64
+        .decode(signature_b64)
+        .map_err(|e| SamlError::InvalidSignature(format!("base64: {e}")))?;
+    let sig = Signature::try_from(sig_bytes.as_slice())
+        .map_err(|e| SamlError::InvalidSignature(format!("p256 sig: {e}")))?;
+    let vk = VerifyingKey::from_public_key_der(spki_der)
+        .map_err(|e| SamlError::InvalidSignature(format!("p256 spki: {e}")))?;
+    let canon = doc.canonical_bytes()?;
+    vk.verify(&canon, &sig)
+        .map_err(|_| SamlError::InvalidSignature("ecdsa-p256 verify failed".into()))?;
+    Ok(())
+}
+
+// ─── ECDSA-SHA384 (NIST P-384) ──────────────────────────────────────────────
+
+/// Generate a fresh P-384 keypair, returning `(pkcs8_der, spki_der)`.
+pub fn ecdsa_p384_generate_pkcs8() -> (Vec<u8>, Vec<u8>) {
+    use p384::ecdsa::SigningKey;
+    use p384::pkcs8::{EncodePrivateKey, EncodePublicKey};
+    let sk = SigningKey::random(&mut rand::thread_rng());
+    let pkcs8 = sk.to_pkcs8_der().expect("pkcs8 encode").as_bytes().to_vec();
+    let vk = *sk.verifying_key();
+    let spki = vk.to_public_key_der().expect("spki encode").as_bytes().to_vec();
+    (pkcs8, spki)
+}
+
+/// Sign `doc` with a PKCS#8-encoded P-384 private key. Signature is
+/// the 96-byte fixed-size IEEE P1363 concatenation `r||s`, base64.
+pub fn sign_ecdsa_sha384(
+    doc: &SignedDocument<'_>,
+    pkcs8_der: &[u8],
+) -> Result<String, SamlError> {
+    use p384::ecdsa::{signature::Signer, Signature, SigningKey};
+    use p384::pkcs8::DecodePrivateKey;
+    let sk = SigningKey::from_pkcs8_der(pkcs8_der)
+        .map_err(|e| SamlError::InvalidSignature(format!("p384 load: {e}")))?;
+    let canon = doc.canonical_bytes()?;
+    let sig: Signature = sk.sign(&canon);
+    Ok(B64.encode(sig.to_bytes()))
+}
+
+/// Verify an ECDSA-P384-SHA384 `<ds:SignatureValue>` against `doc`.
+pub fn verify_signature_ecdsa_sha384(
+    doc: &SignedDocument<'_>,
+    signature_b64: &str,
+    spki_der: &[u8],
+) -> Result<(), SamlError> {
+    use p384::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+    use p384::pkcs8::DecodePublicKey;
+    let sig_bytes = B64
+        .decode(signature_b64)
+        .map_err(|e| SamlError::InvalidSignature(format!("base64: {e}")))?;
+    let sig = Signature::try_from(sig_bytes.as_slice())
+        .map_err(|e| SamlError::InvalidSignature(format!("p384 sig: {e}")))?;
+    let vk = VerifyingKey::from_public_key_der(spki_der)
+        .map_err(|e| SamlError::InvalidSignature(format!("p384 spki: {e}")))?;
+    let canon = doc.canonical_bytes()?;
+    vk.verify(&canon, &sig)
+        .map_err(|_| SamlError::InvalidSignature("ecdsa-p384 verify failed".into()))?;
     Ok(())
 }
 
