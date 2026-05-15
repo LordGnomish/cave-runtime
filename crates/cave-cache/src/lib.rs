@@ -60,6 +60,12 @@ pub mod keyspace;
 /// Handles RDB and AOF persistence mechanisms.
 pub mod persistence;
 
+/// RDB binary snapshot encoder/decoder (port of `src/rdb.c`).
+pub mod persistence_rdb;
+
+/// AOF append-only log writer + replay (port of `src/aof.c`).
+pub mod persistence_aof;
+
 /// The RESP protocol module.
 ///
 /// Implements RESP2 and RESP3 wire protocol parsing and serialization.
