@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Parity calculator: resolves a `ParityManifest` against the local filesystem.
 
 use super::manifest::ParityManifest;

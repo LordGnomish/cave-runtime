@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shamir's Secret Sharing over GF(256).
 //!
 //! Uses the primitive polynomial x^8 + x^4 + x^3 + x + 1.

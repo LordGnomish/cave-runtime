@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE Store — Unified storage engine.
 //!
 //! Compatible with: etcd (KV store) + MinIO (S3 object storage).

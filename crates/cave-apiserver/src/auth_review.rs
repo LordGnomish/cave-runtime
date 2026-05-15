@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Authentication & Authorization review APIs:
 //!
 //!   * `authentication.k8s.io/v1.TokenReview`

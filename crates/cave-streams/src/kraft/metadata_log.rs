@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Append-only, compacted log of `MetadataRecord`s — the single
 //! source of truth for cluster metadata in KRaft mode.
 //!

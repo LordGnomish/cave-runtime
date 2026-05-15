@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Walks a branch's commit history and computes [`TddCompliance`].
 //!
 //! The four signals:

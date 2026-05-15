@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HPA metric source typing — `pkg/api/autoscaling/v2/types.go`.
 //!
 //! The autoscaling/v2 API has five metric source kinds. Each carries a

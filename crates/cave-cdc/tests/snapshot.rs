@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cdc — snapshot + incremental snapshot tests.
 //! Pinned to debezium-connector-common
 //! `pipeline/source/spi/SnapshotChangeEventSource.java` +

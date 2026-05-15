@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Data plane — pod IP allocation, service routing, network policy enforcement.
 //!
 //! On Linux: uses eBPF programs for kernel-level packet processing.

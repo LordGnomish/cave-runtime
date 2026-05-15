@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Manifest and registry types: OCI, Docker V2 Schema 2, Manifest List.
 
 use serde::{Deserialize, Serialize};

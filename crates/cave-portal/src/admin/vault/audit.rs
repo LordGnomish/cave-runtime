@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Audit-log tab — append-only Vault audit entries. Mirrors the
 //! Vault UI's audit tail surface: newest first, with the operation
 //! kind and the principal that issued it.

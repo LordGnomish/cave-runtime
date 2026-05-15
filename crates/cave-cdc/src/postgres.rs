@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Postgres logical replication connector.
 //!
 //! Cite: debezium-connector-postgres v3.5.0.Final —

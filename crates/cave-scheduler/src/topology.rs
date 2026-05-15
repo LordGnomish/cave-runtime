@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pod topology spread constraints — spread pods evenly across topology domains
 //! (zones, hostnames). Implements maxSkew with DoNotSchedule and ScheduleAnyway, plus
 //! minDomains (KEP-3094, GA in v1.30).

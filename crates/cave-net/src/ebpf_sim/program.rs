@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `Program` trait + `Context` + `Verdict` shared shape.
 //!
 //! A BPF program in Cilium is a function `int prog(struct __sk_buff *)`

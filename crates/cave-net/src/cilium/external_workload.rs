@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CiliumExternalWorkload — non-K8s pod onboarding (VMs, bare-metal).
 //!
 //! Mirrors `pkg/clustermesh/externalworkloads/manager.go` plus the

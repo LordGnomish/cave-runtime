@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Local ACME client — drives an in-process [`cave_acme::AcmeServer`]
 //! through the new-account / new-order / challenge / finalize / cert
 //! workflow.

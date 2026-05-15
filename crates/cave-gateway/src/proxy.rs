@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Core reverse proxy engine.
 //!
 //! Handles HTTP/1.1, HTTP/2, WebSocket, gRPC, and TCP stream proxying.

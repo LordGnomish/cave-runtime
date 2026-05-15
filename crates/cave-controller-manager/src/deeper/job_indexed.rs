@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Indexed Job — per-completion-index scheduler + completion table.
 //!
 //! Mirrors `pkg/controller/job/indexed_job_utils.go::firstPendingIndexes`

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ScaledObject CRD — autoscale Deployment/StatefulSet/Custom workloads.
 //! upstream: kedacore/keda v2.x — apis/keda/v1alpha1/scaledobject_types.go
 

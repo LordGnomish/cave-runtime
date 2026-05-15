@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Vault wrap — policies, leases, AppRole auth.
 //!
 //! Layered atop [`super::vault`]. The basic wrap models the secret engine

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/erp/projects` — ERPNext "Projects" tab. Synthesises
 //! one project row per customer aggregating their invoice
 //! activity — the view operators use to see "what's the

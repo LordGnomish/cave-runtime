@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Batch 3 (2026-05-14) — additional upstream test ports beyond
 //! `upstream_port.rs` (batch1, 2026-05-13).
 //!

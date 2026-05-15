@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Length-prefix framing helper, parameterized over the small set of
 //! choices that vary between PostgreSQL v3 and MongoDB OP_MSG.
 //!

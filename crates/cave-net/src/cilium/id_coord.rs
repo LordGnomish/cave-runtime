@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Identity allocation coordinator — etcd-lock-based race protection.
 //!
 //! Mirrors `pkg/identity/cache/allocator.go::Allocator.AllocateIdentity`.

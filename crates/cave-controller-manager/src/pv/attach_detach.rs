@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! AttachDetach controller — `pkg/controller/volume/attachdetach`.
 //!
 //! Reconciles the desired-state (pods that need volumes mounted on

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Integration tests for cave-scan public surface (engine + coverage).
 
 use cave_scan::coverage::{parse_cobertura, parse_lcov};

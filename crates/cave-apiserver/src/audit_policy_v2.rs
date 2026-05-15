@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! audit.k8s.io/v1 Policy + PolicyRule — line-by-line port of upstream
 //! `staging/src/k8s.io/apiserver/pkg/apis/audit/v1/types.go` and
 //! `staging/src/k8s.io/apiserver/pkg/audit/policy/checker.go`.

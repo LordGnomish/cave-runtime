@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Light-weight GC controllers — separate from the central GarbageCollector
 //! because they operate on narrower object kinds with simpler triggers.
 //!

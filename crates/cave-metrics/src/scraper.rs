@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Scrape targets: Prometheus exposition format parsing, service discovery.
 
 use crate::models::{Sample, ScrapeTarget};

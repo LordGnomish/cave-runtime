@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Iceberg Schema — typed column list with stable field ids.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/schema.rs and

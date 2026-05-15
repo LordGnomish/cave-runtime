@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant / namespace registry shared by the Kafka and Pulsar wire layers.
 //!
 //! Per ADR-RUNTIME-STREAMING-CONSOLIDATION-001, addressing is Pulsar-native

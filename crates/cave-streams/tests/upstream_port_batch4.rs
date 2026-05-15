@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Batch 4 (2026-05-14) — Kafka Connect REST admin API port.
 //!
 //! Batch3 covered the Connect runtime state machine (connector/task

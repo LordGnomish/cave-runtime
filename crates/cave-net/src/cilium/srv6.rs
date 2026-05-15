@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SRv6 (Segment Routing v6) — IPv6-based service chaining.
 //!
 //! Mirrors `pkg/srv6/manager.go` and the BPF helpers in

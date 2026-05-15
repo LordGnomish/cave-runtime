@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Portal → real cave-runtime data source.
 //!
 //! The admin dashboard was originally backed by `AdminState::seeded()`

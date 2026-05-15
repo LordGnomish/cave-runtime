@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use crate::models::{Finding, ScanKind, ScanRequest, ScanResult, ScanStatus, ScanVerdict, Severity, VerdictDecision};
 use chrono::Utc;
 use std::collections::HashMap;

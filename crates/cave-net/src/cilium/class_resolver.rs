@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! IngressClass / GatewayClass parameter resolver.
 //!
 //! Mirrors `pkg/ingress/class_resolver.go` and the gateway-API

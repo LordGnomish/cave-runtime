@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Cache plugin — positive and negative DNS caching with TTL countdown.
 use std::sync::Arc;
 use std::time::{Duration, Instant};

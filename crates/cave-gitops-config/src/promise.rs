@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Promise engine — register, validate, and fulfil platform capability requests.
 //!
 //! The engine mirrors a Kubernetes controller loop: `reconcile()` continuously

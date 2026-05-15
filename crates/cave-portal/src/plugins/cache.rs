@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cache wrap — native Redis/Valkey-compatible admin UI.
 //!
 //! Replaces RedisInsight / Valkey UI for the cave runtime. Tenants browse

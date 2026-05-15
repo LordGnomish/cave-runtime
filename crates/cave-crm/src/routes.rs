@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP router skeleton. Endpoint surface to be filled out against Twenty's
 //! REST + GraphQL APIs in v0.2 — see parity.manifest.toml for tracked surfaces.
 

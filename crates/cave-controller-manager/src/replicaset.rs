@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ReplicaSet controller — keeps a fixed number of pods alive.
 //!
 //! Upstream: [`pkg/controller/replicaset`]. The full controller handles

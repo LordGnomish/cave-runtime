@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Presigned URL generation and verification.
 //!
 //! Uses HMAC-SHA256 to sign URL parameters. Compatible with AWS SigV4 presigned

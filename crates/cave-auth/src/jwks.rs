@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! JWKS (JSON Web Key Set) fetching and caching.
 //! Supports automatic key rotation from Okta and Keycloak.
 

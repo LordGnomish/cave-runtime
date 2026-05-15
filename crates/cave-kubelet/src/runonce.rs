@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Standalone `runonce` mode — boot static-pod manifests
 //! without an apiserver. Used by boot-time control-plane
 //! components (e.g. starting the apiserver itself from a static

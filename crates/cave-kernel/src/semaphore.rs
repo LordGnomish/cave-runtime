@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Async semaphore — bounded concurrency primitive.
 //!
 //! Mirrors `tokio::sync::Semaphore` reduced to the surface every

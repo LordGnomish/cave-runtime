@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/auth` view — user list + role assignment + RBAC matrix.
 //!
 //! Mirrors the user-management surface Backstage exposes through

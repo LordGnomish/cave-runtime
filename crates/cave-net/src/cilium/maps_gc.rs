@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Maps GC controller — periodic sweep across BPF map families.
 //!
 //! Mirrors `pkg/maps/gc/gc.go`. The agent runs a periodic sweep of

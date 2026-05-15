@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Envoy XDS shapes — what cilium-agent pushes to the proxy.
 //!
 //! Mirrors `pkg/proxy/envoy/listener.go`, `pkg/proxy/envoy/cluster.go`,

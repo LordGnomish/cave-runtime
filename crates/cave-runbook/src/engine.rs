@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Runbook execution engine — sequential, parallel, conditional steps.
 use crate::models::*;
 use chrono::Utc;

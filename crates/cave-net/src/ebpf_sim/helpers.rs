@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Userspace mocks for `bpf_helpers.h`.
 //!
 //! Cilium programs call:

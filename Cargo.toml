@@ -35,6 +35,7 @@ members = [
     # === Phase 4: Heavy Hitters ===
     "crates/cave-workflows",
     "crates/cave-scan",
+    "crates/cave-scan-db",
     "crates/cave-portal",
     "crates/cave-portal-api",
     "crates/cave-portal-web",
@@ -142,7 +143,7 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 authors = ["Cave Runtime Contributors"]
 homepage = "https://github.com/cave-runtime/cave-runtime"
 repository = "https://github.com/cave-runtime/cave-runtime"
@@ -219,6 +220,11 @@ petgraph = "0.6"
 snap = "1"
 tokio-util = { version = "0.7", features = ["full"] }
 zstd = "0.13"
+# === S3 ===
+# Trivy port: vuln DB persistence + IaC HCL parsing + secret patterns
+sled = { version = "0.34", default-features = false }
+hcl-rs = "0.18"
+# === S3 end ===
 
 [profile.release]
 opt-level = 3

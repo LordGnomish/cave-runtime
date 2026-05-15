@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-network mesh federation. Sits on top of
 //! [`crate::multicluster`] (which manages cross-cluster service
 //! discovery) and adds the *network* dimension — east-west

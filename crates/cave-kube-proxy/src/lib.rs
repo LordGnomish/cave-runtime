@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-kube-proxy — kube-proxy parity for Cave Runtime.
 //!
 //! Tracks Service / EndpointSlice events from cave-apiserver and renders them

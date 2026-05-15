@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Inline help — tooltips + empty-state CTAs.
 //!
 //! Tooltips wrap a label with a native `<span title="...">` so they

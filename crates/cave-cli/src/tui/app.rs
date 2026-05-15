@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pure state reducer for the TUI.
 //!
 //! `AppState` is the entire UI state. `Action` is the union of every

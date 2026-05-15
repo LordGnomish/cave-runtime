@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Upstream-test port — Kafka Connect runtime + Tiered Storage.
 //!
 //! Each test below mirrors a `@Test` method in the upstream

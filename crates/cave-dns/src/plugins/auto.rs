@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Auto plugin — automatically load all zone files from a directory.
 use std::path::PathBuf;
 use std::sync::Arc;

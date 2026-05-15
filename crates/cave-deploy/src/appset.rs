@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ApplicationSet generators — list, cluster, git, matrix, merge, pull request.
 
 use crate::models::*;

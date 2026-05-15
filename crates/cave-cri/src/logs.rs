@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Container log management — JSON line format + rotation.
 //!
 //! Each log line is a JSON object matching Docker/containerd's format:

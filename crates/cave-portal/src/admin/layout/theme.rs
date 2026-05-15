@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Dark/light theme preference. Persisted via the `cave_theme`
 //! cookie so it survives page reloads and travels with the
 //! persona's session.

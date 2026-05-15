@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Retry policy with exponential backoff + jitter, async retry executor.
 //!
 //! Upstream cite: AWS SDK `@aws-sdk/util-retry` for jitter strategies (full,

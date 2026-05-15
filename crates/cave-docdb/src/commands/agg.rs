@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Aggregation pipeline: $match, $project, $limit, $skip, $sort, $group.
 
 use crate::bson::Document;

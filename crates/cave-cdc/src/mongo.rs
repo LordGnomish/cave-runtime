@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MongoDB oplog connector (change streams).
 //!
 //! Cite: debezium-connector-mongodb v3.5.0.Final

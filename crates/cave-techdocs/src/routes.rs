@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP routes — port of router.ts from @backstage/plugin-techdocs-backend.
 //!
 //! Upstream: backstage/plugins/techdocs-backend/src/service/router.ts

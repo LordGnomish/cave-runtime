@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Alerting rules: evaluate a condition and transition through pending→firing→resolved.
 
 use std::collections::HashMap;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cdc — SourceConnector trait + ChangeEvent shape tests.
 //! Pinned to debezium v3.5.0.Final.
 

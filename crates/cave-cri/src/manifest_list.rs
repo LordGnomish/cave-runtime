@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-architecture image support — OCI image index / Docker manifest list.
 //!
 //! When a registry stores a single tag for multiple platforms it serves a

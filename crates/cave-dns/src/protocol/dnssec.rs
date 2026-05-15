@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// DNSSEC validation and signing support.
 ///
 /// Wraps hickory_proto's DNSSEC primitives behind a stable interface.

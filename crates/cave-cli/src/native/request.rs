@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shared `PreparedRequest` shape for native verb tests.
 //!
 //! Each verb's `prepare` function returns a `PreparedRequest` so tests

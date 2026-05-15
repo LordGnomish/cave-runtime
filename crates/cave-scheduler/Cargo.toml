@@ -11,7 +11,7 @@ readme = "README.md"
 rust-version.workspace = true
 keywords = ["scheduler", "kubernetes", "pods", "nodes", "resources"]
 categories = ["api-bindings", "command-line-utilities"]
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 [dependencies]
 axum = "0.8"

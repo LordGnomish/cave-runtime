@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PodDisruptionBudget controller — gates voluntary disruption.
 //!
 //! Upstream: [`pkg/controller/disruption`]. The full controller computes

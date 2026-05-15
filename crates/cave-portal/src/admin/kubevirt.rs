@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/kubevirt` — KubeVirt VM lifecycle parity. Mirrors the
 //! upstream UI's VirtualMachine list with phase-coloured cards and a
 //! per-phase summary. The cave-side `VirtualMachine` struct doubles

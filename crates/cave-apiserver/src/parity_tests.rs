@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Parity-named tests mirroring upstream Kubernetes Go test_io.
 //!
 //! Each `fn test_*` here corresponds 1:1 to a `[[tests]]` entry in

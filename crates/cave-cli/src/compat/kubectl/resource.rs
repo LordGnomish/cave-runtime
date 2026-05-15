@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! kubectl resource short-name normalisation.
 //!
 //! kubectl accepts `po`, `svc`, `deploy`, `ns`, `cm`, etc. The shim

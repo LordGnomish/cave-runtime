@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SAML flow state machines — SP-initiated and IdP-initiated.
 //!
 //! Mirrors `org.keycloak.broker.saml.SAMLEndpoint` (SP role) +

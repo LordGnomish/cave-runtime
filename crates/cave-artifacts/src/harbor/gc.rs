@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Garbage collection for unreferenced blobs.
 //!
 //! GC is run manually via POST /api/v2.0/system/gc or on a schedule.

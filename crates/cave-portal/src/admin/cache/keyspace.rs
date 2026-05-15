@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Keyspace tab — Redis/Valkey-style per-namespace key browser with
 //! TTL editor and delete mutator.
 

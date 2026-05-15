@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Plugins tab — active scheduling-framework plugins per phase.
 //! Wraps the legacy `list_policies` / CRUD path (treats each policy
 //! as a Score-phase plugin) plus a phase taxonomy.

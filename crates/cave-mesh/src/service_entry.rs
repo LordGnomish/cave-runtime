@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ServiceEntry manager.
 //!
 //! Mirrors Istio's `networking.istio.io/v1alpha3` ServiceEntry — the

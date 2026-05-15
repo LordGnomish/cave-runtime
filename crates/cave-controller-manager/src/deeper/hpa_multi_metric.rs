@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HPA multi-metric reconciliation — `pkg/controller/podautoscaler/horizontal.go::computeReplicasForMetrics`.
 //!
 //! When an HPA carries multiple `metrics[]` sources, the controller computes

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kubernetes resource types — full core API surface parity.
 
 use chrono::{DateTime, Utc};

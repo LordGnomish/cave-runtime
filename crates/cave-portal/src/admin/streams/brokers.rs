@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/streams/brokers` — Kafka admin "Brokers" tab. cave-streams
 //! runs a single-node broker today (per ADR-RUNTIME-STREAMING-
 //! CONSOLIDATION-001 — Kafka + Pulsar wire on one process), so

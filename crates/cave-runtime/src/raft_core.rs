@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Raft consensus state machine.
 //!
 //! This module implements the **safety-critical** core of Raft from

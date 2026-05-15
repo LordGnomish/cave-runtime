@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! XML canonicalization — exclusive c14n (`exc-c14n`, rfc3741)
 //! subset for SAML 2.0 messages.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/cache` — Valkey/Redis Web UI parity surface.
 //!
 //! Tabs mirror RedisInsight + Valkey native console:

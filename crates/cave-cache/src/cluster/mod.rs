@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Redis Cluster — slot routing, gossip, migration, epoch tracking.
 //!
 //! Ports `src/cluster.c` and `src/cluster_slot_stats.c` from upstream

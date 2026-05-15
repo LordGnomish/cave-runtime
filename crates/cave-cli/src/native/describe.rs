@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl describe <resource> <name>`
 //!
 //! Native describe — returns the rich, human-readable view of a Cave

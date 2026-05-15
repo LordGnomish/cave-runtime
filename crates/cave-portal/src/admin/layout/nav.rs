@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Persona-filtered navigation menu.
 //!
 //! Returns a tree of [`NavItem`]s the sidebar renders. The tree is

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kafka wire protocol — API keys, framing, encode/decode primitives.
 //!
 //! Implements the Kafka binary protocol as defined in the Apache Kafka

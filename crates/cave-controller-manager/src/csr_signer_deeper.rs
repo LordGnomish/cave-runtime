@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CSR signer deeper — `pkg/controller/certificates/signer/signer.go`.
 //!
 //! Extends [`crate::csr_signer`] with:

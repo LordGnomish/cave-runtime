@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rule engine: evaluates Falco-style conditions against security events.
 
 use crate::models::{Condition, Priority, SecurityAlert, SecurityEvent, SecurityRule};

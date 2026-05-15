@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shared metadata + spec primitives used across Knative resources.
 //! upstream: knative/serving v1.18.x
 

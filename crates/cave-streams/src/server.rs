@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TCP Kafka wire protocol server.
 //!
 //! Listens on KAFKA_PORT (9092) and handles the binary Kafka protocol.

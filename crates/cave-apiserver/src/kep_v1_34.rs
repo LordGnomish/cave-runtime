@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! KEPs landing in Kubernetes 1.31–1.34 — bundled module so we don't
 //! sprout a top-level mod for each individual KEP.
 //!

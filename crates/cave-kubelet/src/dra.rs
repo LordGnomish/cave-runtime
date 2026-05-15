@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Dynamic Resource Allocation (DRA) — KEP-3063.
 //!
 //! Mirrors Kubernetes v1.36.0 upstream:

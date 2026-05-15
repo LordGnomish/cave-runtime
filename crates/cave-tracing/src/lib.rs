@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-tracing — Sovereign OpenTelemetry-compatible tracing SDK.
 //!
 //! Companion to cave-trace (the storage/query backend). Where cave-trace

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! AlertManager-compatible HTTP API routes.
 //! Implements: /api/v2/alerts, /api/v2/silences, /api/v2/status, /api/v2/receivers
 

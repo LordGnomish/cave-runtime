@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Chunk-based log storage with pluggable compression.
 //!
 //! A chunk holds a contiguous, sorted slice of log entries for a single stream.

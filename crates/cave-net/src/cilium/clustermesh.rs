@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ClusterMesh — multi-cluster identity exchange and service announce.
 //!
 //! Mirrors `pkg/clustermesh/clustermesh.go` (the in-process registry that

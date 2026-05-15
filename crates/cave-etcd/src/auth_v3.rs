@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Auth subsystem refinements — auth revision, range-permission cache,
 //! TLS client-cert (CN-based) auth, and root-role bootstrap.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 #[test]
 fn parity_snapshot() {
     let report = cave_cri::calculate_parity().unwrap();

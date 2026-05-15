@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Loader for the YAML alerting-rule catalog under `crates/cave-alerts/rules/`.
 //!
 //! Each YAML file describes one crate's eight standard SLO alerts. The

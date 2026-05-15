@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Runbook execution engine — steps in order, retries, timeouts, approvals.
 
 use crate::{

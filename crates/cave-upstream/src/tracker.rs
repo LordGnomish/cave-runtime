@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! GitHub release tracker — fetches latest releases and generates triage items.
 
 use crate::projects::TrackedProject;

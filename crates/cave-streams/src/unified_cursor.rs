@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Unified cursor — Pulsar `ManagedCursor` ↔ Kafka consumer-group offset.
 //!
 //! Both protocols track *the highest message a subscriber has acked* on a

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Compliance assessment engine.
 //!
 //! All functions are pure (take immutable or mutable store references) so they

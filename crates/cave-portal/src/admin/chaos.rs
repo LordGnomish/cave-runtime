@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/chaos` — Chaos Dashboard parity. Experiment timeline +
 //! per-kind counters + last-run staleness flag.
 //!

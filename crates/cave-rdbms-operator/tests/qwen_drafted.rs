@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 // === cycle 1777648137 (qwen success at retry 1; ollama_calls=1; ollama_secs=506) ===
 // === cycle 1777648652 (qwen success at retry 1; ollama_calls=1; ollama_secs=502) ===
 // === cycle 1777717913 (qwen success at retry 1; ollama_calls=1; ollama_secs=516) ===

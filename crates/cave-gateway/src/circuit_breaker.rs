@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Per-upstream-target circuit breaker.
 //!
 //! **Sweep-005 adoption (2026-05-12)** — this module is now a thin wrapper

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Scaffolder plugin — software template runner.
 //!
 //! Templates are fixed-shape recipes that the portal runs to produce a new

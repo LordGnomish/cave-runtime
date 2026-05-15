@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! BatchSpanProcessor — bounded queue + ticker that flushes spans to the
 //! configured `SpanExporter`. Drop-on-overflow is the default backpressure
 //! strategy (matching OTel SDK behaviour). Force-flush + shutdown are

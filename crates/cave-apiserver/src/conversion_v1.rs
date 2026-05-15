@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CustomResourceConversion (apiextensions.k8s.io/v1) — types and strategy
 //! dispatch for CRD version conversion. Layered atop `conversion.rs`
 //! which already has the converter trait + tenant-invariant enforcement.

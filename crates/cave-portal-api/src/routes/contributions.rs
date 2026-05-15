@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `GET /api/v1/contributions?since=<ISO>` — worker batch contributions JSON API.
 //!
 //! Source of truth: `tools/night-pump/contributions.jsonl`. Each line is one

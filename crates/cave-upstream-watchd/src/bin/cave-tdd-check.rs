@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cave-tdd-check` — Charter v2 TDD-strict gate CLI.
 //!
 //! Standalone driver around the [`cave_upstream_watchd::tdd`] analyzer.

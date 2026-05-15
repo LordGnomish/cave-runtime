@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Schema evolution + compatibility checks (Avro / Protobuf / JSON).
 //!
 //! Cite: debezium `EventDispatcher` schema-emission flow + Confluent

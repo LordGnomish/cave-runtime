@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ClusterMesh deepening — KVStore (etcd-style), RemoteCluster lifecycle,
 //! global service shadowing, service affinity.
 //!

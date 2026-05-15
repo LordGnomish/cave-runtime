@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Lint dispatcher: content-type detection and per-type rule filtering.
 
 use crate::models::{BatchLintRequest, BatchLintResult, ContentType, LintRequest, LintResult};

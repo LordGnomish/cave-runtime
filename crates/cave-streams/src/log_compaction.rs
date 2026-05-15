@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Storage layer — Kafka-style log compaction (tombstone-driven) and
 //! time/size-based retention.
 //!

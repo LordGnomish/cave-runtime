@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pod status manager — `pkg/kubelet/status/status_manager.go`.
 //!
 //! The kubelet's sync loop observes pod state on this node (running

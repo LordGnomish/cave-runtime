@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OCSP responder.
 //!
 //! Cite: RFC 6960 §2.2 (Response Syntax) — the OCSPResponse value

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/erp/inventory` — ERPNext "Stock" tab. cave-portal
 //! doesn't track items independently; we synthesise an inventory
 //! row per distinct customer-line on the invoice list (each

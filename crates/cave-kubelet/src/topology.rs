@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Topology manager — NUMA alignment for CPU, memory, and device hints.
 //!
 //! Mirrors `pkg/kubelet/cm/topologymanager`: each hint provider supplies

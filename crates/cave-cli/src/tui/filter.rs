@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Fuzzy filter for the TUI item list.
 //!
 //! Subsequence match (each byte of `query` must appear in `target` in

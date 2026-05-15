@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! File-path classifier: is this a test file, an impl file, or neither?
 //!
 //! The classifier is pure (path → kind) so it can be unit-tested without

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Producer API — send messages with key, value, headers, timestamp.
 //!
 //! Supports three partitioning strategies and exactly-once semantics via:

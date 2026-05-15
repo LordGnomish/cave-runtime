@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! State machine surface — adopted onto `cave_kernel::consensus` (sweep-002 F2-A).
 //!
 //! The local `StateMachine` trait that previously lived here was a structural

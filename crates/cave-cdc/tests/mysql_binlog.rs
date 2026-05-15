@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cdc — MySQL binlog tests.
 //! Pinned to debezium-connector-mysql v3.5.0.Final.
 

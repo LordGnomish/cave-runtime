@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Workspace-wide parity manifest discovery.
 //!
 //! Walks `{workspace_root}/crates/*/parity.manifest.toml`, parses each manifest,

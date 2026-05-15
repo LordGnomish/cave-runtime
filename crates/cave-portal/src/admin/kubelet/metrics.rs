@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Metrics tab — per-node CPU / memory / disk IO derived numbers.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's per-node metrics chart

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Line-by-line ports of upstream kube-controller-manager tests — batch 4.
 //!
 //! Upstream: kubernetes/kubernetes @ v1.36.0

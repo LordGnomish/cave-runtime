@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Audit entry types + in-memory ring buffer store.
 
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Dashboard aggregation engine for cave-portal.
 //!
 //! Collects health and summary data from all 30 CAVE modules and

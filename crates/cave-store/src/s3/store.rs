@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Core S3/MinIO object store implementation.
 //!
 //! Objects are stored as files on disk (data_dir/bucket/object-path).

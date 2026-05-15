@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Gravitee API Lifecycle Management — draft → published → deprecated → retired
 //! state machine, review/approval workflow, changelog, and audit trail.
 

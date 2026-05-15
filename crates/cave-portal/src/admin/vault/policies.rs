@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Policies tab — mirrors Vault's `Policies` page
 //! (`GET /v1/sys/policies/acl/<name>`). Lists every named policy for
 //! the tenant; each row shows the bound-token count so the operator

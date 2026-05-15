@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Generic registry — line-by-line port of upstream
 //! `staging/src/k8s.io/apiserver/pkg/registry/generic/registry/store.go`
 //! plus KEP-956 (streaming list / consistent reads) and KEP-1904 (watch

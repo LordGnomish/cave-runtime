@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tunneling — VXLAN / Geneve / native-routing encap modes.
 //!
 //! Mirrors `pkg/datapath/tunnel/tunnel.go` (the per-mode tunnel manager)

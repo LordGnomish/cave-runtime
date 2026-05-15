@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Chunked upload API — Pulp v3 upload workflow.
 //!
 //! Upload → finalize → create artifact → create content → add to repo.

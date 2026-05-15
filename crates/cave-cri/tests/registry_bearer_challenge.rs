@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-002: registry Bearer-challenge parser + tenant-scoped token cache.
 //!
 //! Upstream: containerd v2.2.3 `core/remotes/docker/auth/parse.go`

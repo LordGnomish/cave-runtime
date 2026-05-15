@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Upstream-named test cases declared in `parity.manifest.toml`.
 //!
 //! Each function here mirrors a containerd CRI integration test by name and

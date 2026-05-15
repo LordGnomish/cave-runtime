@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Lock-manager — deeper-cut distributed-lock primitives layered on
 //! [`crate::concurrency::DistMutex`] / [`crate::concurrency::DistElection`].
 //!

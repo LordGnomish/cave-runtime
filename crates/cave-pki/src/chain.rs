@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Chain validation. Cite: RFC 5280 §6.1 (Certification Path Validation),
 //! §6.1.3 (basic certificate processing), §4.2.1.9 (Basic Constraints).
 

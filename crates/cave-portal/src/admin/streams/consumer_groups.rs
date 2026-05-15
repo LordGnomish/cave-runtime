@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/streams/consumer_groups` — Kafka admin "Consumer
 //! Groups" tab. Per-group state, lag, and topic binding —
 //! the page operators visit first when a downstream consumer

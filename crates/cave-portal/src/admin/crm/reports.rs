@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/crm/reports` — Twenty CRM "Reports" tab. Computes a
 //! per-plan MRR roll-up + total ARR for the operator.
 //!

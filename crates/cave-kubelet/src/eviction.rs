@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Eviction manager — node-pressure pod eviction.
 //!
 //! Mirrors `pkg/kubelet/eviction` semantics: soft and hard thresholds against

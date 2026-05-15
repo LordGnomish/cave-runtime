@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanOrchestrator, aggregate_verdict};
 use crate::models::*;
 use crate::scanners::{image::ImageScanner, iac::IacScanner, fs::FsScanner, secret::SecretScanner, yara::YaraScanner, namespace::NamespaceScanner};

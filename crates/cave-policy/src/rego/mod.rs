@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rego policy engine — public interface.
 //!
 //! Implements the full OPA Rego language: rules, functions, comprehensions,

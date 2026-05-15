@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pod Security admission (PSA) — KEP-2579.
 //!
 //! Upstream sources (kubernetes/kubernetes v1.31):

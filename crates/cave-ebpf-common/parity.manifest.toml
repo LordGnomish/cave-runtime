@@ -51,3 +51,65 @@ infra_only = true
 fill_ratio  = 0.0
 last_audit  = "2026-05-13"
 
+
+# Qwen-pump B-prime cycle 1778774770 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=1)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_default_invariant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_type_safety"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_struct_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_invariant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_empty_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_long_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_special_chars_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_unicode_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_numeric_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_whitespace_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_net_event_mixed_case_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_resource_event_hyphen_tenant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_syscall_event_underscore_tenant"

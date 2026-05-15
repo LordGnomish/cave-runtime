@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Core DNS management: sync, drift detection, validation, change application, health probes.
 
 use crate::models::{ChangeAction, DnsChange, DnsDrift, DnsRecord, DriftType, RecordData, RecordType};

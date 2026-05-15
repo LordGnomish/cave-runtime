@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! KMS envelope-encryption layer — etcd v3.6 KMS provider trait, used to
 //! integrate cave-etcd with cave-vault transit (per ADR-105).
 //!

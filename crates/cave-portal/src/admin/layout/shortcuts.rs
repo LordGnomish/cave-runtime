@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Keyboard shortcuts + the `?` help modal.
 //!
 //! `cave-runtime` doesn't yet ship a SPA, so the shortcuts live on

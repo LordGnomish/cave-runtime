@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cavectl library — testable surface for chat REPL, tenant/env lifecycle,
 //! approval workflow, audit query, watch/stream output, and the native +
 //! compatibility command surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001).

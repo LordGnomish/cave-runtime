@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Admin contributions view — "kim ne kadar iş yapıyor" panel.
 //!
 //! Source of truth: `tools/night-pump/contributions.jsonl`. Each line is one

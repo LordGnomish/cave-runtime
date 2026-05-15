@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cloud service controller — drives `Service.spec.type == LoadBalancer`
 //! through a per-cloud `LoadBalancer` provider.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Minimal RecordBatch — column-major rows for the execution operators.
 //!
 //! Mirrors apache/arrow-rs `RecordBatch` and apache/datafusion's use of it

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl deploy <module> [--revision <r>] [--strategy <s>]`
 //!
 //! Native deploy verb — upstream-agnostic. Targets a *Cave module*

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Byte-level snapshot wire protocol.
 //!
 //! [`crate::store::KvStore::snapshot_stream`] already produces JSON

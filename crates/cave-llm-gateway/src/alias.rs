@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Model aliasing — map friendly names to canonical provider+model pairs.
 
 use dashmap::DashMap;

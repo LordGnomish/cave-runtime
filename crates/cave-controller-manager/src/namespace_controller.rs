@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Namespace controller — `pkg/controller/namespace/namespace_controller.go`.
 //!
 //! Drives a Namespace through the deletion finalizer dance:

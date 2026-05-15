@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Content-addressable in-memory registry storage.
 //!
 //! Production deployments would back this with S3/GCS/Azure Blob, but the

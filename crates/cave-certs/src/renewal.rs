@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Renewal controller — fires when the renewal window opens.
 //!
 //! Cite: cert-manager v1.20.2

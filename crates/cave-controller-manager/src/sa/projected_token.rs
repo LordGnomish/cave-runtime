@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Projected service-account-token volumes — `pkg/serviceaccount/jwt.go`
 //! plus `pkg/api/v1/types.go::ServiceAccountTokenProjection`.
 //!

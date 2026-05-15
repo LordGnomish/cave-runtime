@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Service topology + endpoint slice integration.
 //!
 //! Mirrors the upstream pieces in

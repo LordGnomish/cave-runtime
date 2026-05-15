@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Registered models sub-page — per-model version registry.
 
 use super::types::{MlflowViewError, ModelVersion};

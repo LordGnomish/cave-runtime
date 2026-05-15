@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Storage versioning — encode at the storage version, decode at the
 //! requested version. Supports per-kind multi-version registration with
 //! a single elected storage version (KEP-3247).

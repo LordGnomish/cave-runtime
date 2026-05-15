@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cave-upstream-watchd` — daemon binary for the upstream watch loop.
 //!
 //! ```text

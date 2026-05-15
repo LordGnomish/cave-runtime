@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Backup storage location validation and lifecycle.
 
 use crate::models::{BackupStorageLocation, BslPhase};

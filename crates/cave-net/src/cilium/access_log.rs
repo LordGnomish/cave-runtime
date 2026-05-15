@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ProxyAccessLog — Envoy L7 access log shape consumed by the agent.
 //!
 //! Mirrors `pkg/proxy/accesslog/record.go`. Envoy ships every L7

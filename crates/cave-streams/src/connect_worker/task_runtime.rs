@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Task lifecycle types — the records a SourceTask emits and a
 //! SinkTask consumes, plus the trait every connector
 //! implementation hooks into.

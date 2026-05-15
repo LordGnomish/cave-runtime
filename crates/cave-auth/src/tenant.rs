@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenancy — tenant isolation, tenant-scoped roles and configuration.
 //!
 //! Each tenant in CAVE is completely isolated: separate namespaces, resource quotas,

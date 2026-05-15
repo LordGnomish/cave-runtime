@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Hosts plugin — /etc/hosts style static records.
 use std::collections::HashMap;
 use std::net::IpAddr;

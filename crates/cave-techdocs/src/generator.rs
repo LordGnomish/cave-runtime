@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TechDocsGenerator trait and NoopGenerator — port of TechDocsGenerator from Backstage.
 //!
 //! Upstream: TechDocsGenerator in @backstage/plugin-techdocs-node/src/techdocs/TechDocsGenerator.ts

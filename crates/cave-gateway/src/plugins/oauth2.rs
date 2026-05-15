@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! oauth2 plugin — authorization code, client credentials, implicit, password flows.
 //!
 //! This is a full OAuth2 Authorization Server embedded in Kong.

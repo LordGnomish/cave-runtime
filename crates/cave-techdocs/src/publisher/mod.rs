@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Publisher trait — port of PublisherBase from backstage-plugin-techdocs-node.
 //!
 //! Upstream: PublisherBase in @backstage/plugin-techdocs-node/src/publishing/PublisherBase.ts

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/gitops-config` — Flux HelmRelease / Kustomization parity.
 //! Flux's main artefacts (HelmRelease, Kustomization, GitRepository)
 //! all share the `(name, repo, path, synced_at)` shape; the page

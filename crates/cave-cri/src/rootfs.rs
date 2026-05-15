@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Root filesystem assembly from OCI image layers using overlayfs.
 
 use crate::error::{CriError, CriResult};

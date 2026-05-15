@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! KEDA scaler catalog.
 //!
 //! The set of scalers below is the upstream list as of KEDA 2.14

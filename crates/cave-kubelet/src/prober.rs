@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prober worker pool + restart-coordination ledger.
 //!
 //! Mirrors `pkg/kubelet/prober/worker.go` + `pkg/kubelet/prober/results/`.

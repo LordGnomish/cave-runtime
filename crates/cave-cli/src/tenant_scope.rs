@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant scope resolution for `cavectl`.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 every native verb carries a

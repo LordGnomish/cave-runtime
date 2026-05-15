@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Log plugin — query access logging.
 use async_trait::async_trait;
 use tracing::info;

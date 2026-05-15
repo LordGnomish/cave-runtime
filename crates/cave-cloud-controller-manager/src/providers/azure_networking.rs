@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Azure provider — networking, autoscaler, BYO-VNet, CNI / NetworkPolicy.
 //!
 //! Upstream: `kubernetes-sigs/cloud-provider-azure` @

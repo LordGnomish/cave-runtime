@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl logs <crate-or-pod> [-c <component>] [--follow] [--tail <n>]`
 //!
 //! Native logs verb. Targets a *Cave module* (a crate name) or a pod.

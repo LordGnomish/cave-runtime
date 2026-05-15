@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Synchronous RESP3 codec on `BytesMut`, conforming to
 //! `cave_kernel::codec::FrameCodec`.
 //!

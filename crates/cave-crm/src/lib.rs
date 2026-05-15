@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE CRM — Sovereign customer relationship management.
 //!
 //! Upstream: Twenty (twentyhq/twenty). Standalone, independent from

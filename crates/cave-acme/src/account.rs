@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ACMEv2 Account model.
 //!
 //! Cite: RFC 8555 §7.1.2 (Account object), §7.3 (newAccount workflow),

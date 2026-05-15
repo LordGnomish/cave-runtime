@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Chat module — REPL state machine + conversation resolution + tool mode + pipe output.
 //!
 //! ratatui is used by the binary for rendering; the state machine here is

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Write-Ahead Log — durable append-only record stream.
 //!
 //! Mirrors etcd v3.6's `server/storage/wal/` package: every mutating

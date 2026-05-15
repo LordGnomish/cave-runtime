@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shared types for the `/admin/iceberg` page set.
 //!
 //! Mirrors Apache Iceberg's REST-catalog payload shape (table → snapshots

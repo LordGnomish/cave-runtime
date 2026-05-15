@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Container, IaC, filesystem, secret, and malware scanner — compatible with Trivy.
 //!
 //! Compatible with: Aqua Trivy (Apache-2.0). Sovereign-safe.

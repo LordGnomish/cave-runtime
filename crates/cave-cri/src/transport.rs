@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SPDY/WebSocket byte transport for `exec` and `attach`.
 //!
 //! Cite: containerd v2.2.3 `pkg/cri/streaming/portforward/portforward.go`,
