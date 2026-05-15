@@ -474,6 +474,37 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    /// WebAuthn / FIDO2 / passkey credential management.
+    Webauthn {
+        #[command(subcommand)]
+        cmd: WebauthnCmd,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum WebauthnCmd {
+    /// List all credentials in the caller's tenant.
+    List,
+    /// Begin a registration ceremony for a user.
+    Register {
+        #[arg(long)]
+        user: String,
+    },
+    /// Delete a credential by its hex-encoded `credentialId`.
+    Delete {
+        #[arg(long)]
+        credential_id: String,
+    },
+    /// Upload a fresh FIDO Alliance MDS3 JWT blob.
+    MdsUpdate {
+        #[arg(long)]
+        path: String,
+    },
+    /// Look up an AAGUID inside the cached MDS3 blob.
+    MdsShow {
+        #[arg(long)]
+        aaguid: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3961,6 +3992,21 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            AuthCmd::Webauthn { cmd } => match cmd {
+                WebauthnCmd::List => c.get("/api/auth/webauthn/credentials").await,
+                WebauthnCmd::Register { user } => {
+                    c.get(&format!("/api/auth/webauthn/register?user={}", urlencode(&user))).await
+                }
+                WebauthnCmd::Delete { credential_id } => {
+                    c.get(&format!("/api/auth/webauthn/delete?cid={}", urlencode(&credential_id))).await
+                }
+                WebauthnCmd::MdsUpdate { path } => {
+                    c.get(&format!("/api/auth/webauthn/mds/update?path={}", urlencode(&path))).await
+                }
+                WebauthnCmd::MdsShow { aaguid } => {
+                    c.get(&format!("/api/auth/webauthn/mds/show?aaguid={}", urlencode(&aaguid))).await
+                }
+            },
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
