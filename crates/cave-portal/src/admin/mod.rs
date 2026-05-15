@@ -905,6 +905,121 @@ async fn store_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query
 async fn metrics_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); metrics::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn trace_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); trace::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn auth_sessions_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); auth::render(&s, &ctx).map(Html).map_err(err_to_response) }
+
+// ── 2026-05-15 Keycloak admin-ui port — new auth admin pages ──────────
+//
+// Each handler resolves the realm from the URL path (`/admin/auth/{kind}/{realm}[/...]`).
+// Persona is enforced loosely: list/detail pages require Permission::AuthSessionsRead
+// which the dev extract grants. Tenant_admin callers see only their own tenant via
+// the standard scope() helper — the page-level helpers already gate on the ctx.
+
+async fn auth_realm_settings_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::realm_settings::render(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_client_scopes_list_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::client_scopes::render_list(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_client_scopes_detail_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path((realm, name)): axum::extract::Path<(String, String)>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::client_scopes::render_detail(&s, &ctx, &realm, &name).map(Html).map_err(err_to_response)
+}
+
+async fn auth_realm_roles_list_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::realm_roles::render_list(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_realm_roles_detail_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path((realm, name)): axum::extract::Path<(String, String)>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::realm_roles::render_detail(&s, &ctx, &realm, &name).map(Html).map_err(err_to_response)
+}
+
+async fn auth_groups_list_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::groups::render_list(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_groups_detail_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path((realm, id)): axum::extract::Path<(String, String)>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::groups::render_detail(&s, &ctx, &realm, &id).map(Html).map_err(err_to_response)
+}
+
+async fn auth_idp_list_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::idp::render_list(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_idp_detail_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path((realm, alias)): axum::extract::Path<(String, String)>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::idp::render_detail(&s, &ctx, &realm, &alias).map(Html).map_err(err_to_response)
+}
+
+async fn auth_flows_list_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::flows::render_list(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
+
+async fn auth_flows_detail_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path((realm, alias)): axum::extract::Path<(String, String)>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::flows::render_detail(&s, &ctx, &realm, &alias).map(Html).map_err(err_to_response)
+}
+
+async fn auth_authn_config_handler(
+    AxumState(s): AxumState<Arc<AdminState>>,
+    Query(q): Query<AdminQuery>,
+    axum::extract::Path(realm): axum::extract::Path<String>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let ctx = extract_ctx_from_query(q);
+    auth::authn_config::render(&s, &ctx, &realm).map(Html).map_err(err_to_response)
+}
 async fn dashboard_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dashboard::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn dns_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); dns::render(&s, &ctx).map(Html).map_err(err_to_response) }
 async fn logs_handler(AxumState(s): AxumState<Arc<AdminState>>, Query(q): Query<AdminQuery>) -> Result<Html<String>, (StatusCode, Html<String>)> { let ctx = extract_ctx_from_query(q); logs::render(&s, &ctx).map(Html).map_err(err_to_response) }
@@ -1497,6 +1612,19 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/metrics", get(metrics_handler))
         .route("/admin/trace", get(trace_handler))
         .route("/admin/auth-sessions", get(auth_sessions_handler))
+        // ── 2026-05-15 Keycloak admin-ui port ─────────────────────
+        .route("/admin/auth/realm-settings/{realm}", get(auth_realm_settings_handler))
+        .route("/admin/auth/client-scopes/{realm}", get(auth_client_scopes_list_handler))
+        .route("/admin/auth/client-scopes/{realm}/{name}", get(auth_client_scopes_detail_handler))
+        .route("/admin/auth/realm-roles/{realm}", get(auth_realm_roles_list_handler))
+        .route("/admin/auth/realm-roles/{realm}/{name}", get(auth_realm_roles_detail_handler))
+        .route("/admin/auth/groups/{realm}", get(auth_groups_list_handler))
+        .route("/admin/auth/groups/{realm}/{id}", get(auth_groups_detail_handler))
+        .route("/admin/auth/idp/{realm}", get(auth_idp_list_handler))
+        .route("/admin/auth/idp/{realm}/{alias}", get(auth_idp_detail_handler))
+        .route("/admin/auth/flows/{realm}", get(auth_flows_list_handler))
+        .route("/admin/auth/flows/{realm}/{alias}", get(auth_flows_detail_handler))
+        .route("/admin/auth/authn-config/{realm}", get(auth_authn_config_handler))
         .route("/admin/dashboard-catalog", get(dashboard_handler))
         .route("/admin/dns", get(dns_handler))
         .route("/admin/logs", get(logs_handler))
@@ -1798,5 +1926,137 @@ mod router_tests {
         assert!(body.contains("alice"));
         assert!(body.contains("bob"));
         assert!(!body.contains("mallory"));
+    }
+
+    // ── 2026-05-15 Keycloak admin-ui port — route mount smoke tests ────
+
+    async fn fetch_ok(app: axum::Router, uri: &str) -> String {
+        let resp = app
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "expected 200 for {uri}");
+        body_text(resp).await
+    }
+
+    #[tokio::test]
+    async fn auth_realm_settings_route_returns_200_with_form() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/realm-settings/acme-realm?tenant_id=acme").await;
+        assert!(body.contains("Realm name"));
+        assert!(body.contains(r#"action="/admin/auth/realm-settings/acme-realm""#));
+    }
+
+    #[tokio::test]
+    async fn auth_client_scopes_list_route_renders_seeded_scopes() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/client-scopes/acme-realm?tenant_id=acme").await;
+        assert!(body.contains("openid"));
+        assert!(body.contains("offline_access"));
+    }
+
+    #[tokio::test]
+    async fn auth_client_scopes_detail_route_returns_settings_and_mappers() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/client-scopes/acme-realm/profile?tenant_id=acme").await;
+        assert!(body.contains("Mappers ("));
+        assert!(body.contains("given_name"));
+    }
+
+    #[tokio::test]
+    async fn auth_realm_roles_list_route_renders_platform_admin_row() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/realm-roles/acme-realm?tenant_id=acme").await;
+        assert!(body.contains("platform_admin"));
+        assert!(body.contains(">composite<"));
+    }
+
+    #[tokio::test]
+    async fn auth_realm_roles_detail_route_renders_associated_list() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(
+            app,
+            "/admin/auth/realm-roles/acme-realm/default-roles?tenant_id=acme",
+        )
+        .await;
+        assert!(body.contains("offline_access"));
+        assert!(body.contains("+ Add associated role"));
+    }
+
+    #[tokio::test]
+    async fn auth_groups_list_route_indents_subgroups() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/groups/acme-realm?tenant_id=acme").await;
+        assert!(body.contains("/acme-realm/engineering/backend"));
+        assert!(body.contains("&nbsp;&nbsp;&nbsp;&nbsp;"));
+    }
+
+    #[tokio::test]
+    async fn auth_groups_detail_route_renders_member_count_and_subgroup_list() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(
+            app,
+            "/admin/auth/groups/acme-realm/grp-root-eng?tenant_id=acme",
+        )
+        .await;
+        assert!(body.contains("/acme-realm/engineering/backend"));
+        assert!(body.contains("Members"));
+    }
+
+    #[tokio::test]
+    async fn auth_idp_list_route_renders_discover_and_create_buttons() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/idp/acme-realm?tenant_id=acme").await;
+        assert!(body.contains("Discover"));
+        assert!(body.contains("+ Add OIDC provider"));
+        assert!(body.contains("+ Add SAML provider"));
+        assert!(body.contains("github"));
+    }
+
+    #[tokio::test]
+    async fn auth_idp_detail_route_renders_all_toggles() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/idp/acme-realm/github?tenant_id=acme").await;
+        for n in ["alias", "display_name", "provider_id", "enabled", "trust_email", "link_only"] {
+            assert!(body.contains(&format!(r#"name="{n}""#)), "missing {n}");
+        }
+    }
+
+    #[tokio::test]
+    async fn auth_flows_list_route_lists_five_flows() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/flows/acme-realm?tenant_id=acme").await;
+        for f in ["browser", "direct grant", "registration", "reset credentials", "first broker login"] {
+            assert!(body.contains(f), "missing flow {f}");
+        }
+    }
+
+    #[tokio::test]
+    async fn auth_flows_detail_route_renders_execution_requirement_selects() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(app, "/admin/auth/flows/acme-realm/browser?tenant_id=acme").await;
+        assert!(body.contains("Cookie"));
+        for opt in ["REQUIRED", "ALTERNATIVE", "OPTIONAL", "DISABLED", "CONDITIONAL"] {
+            assert!(body.contains(opt));
+        }
+    }
+
+    #[tokio::test]
+    async fn auth_authn_config_route_renders_all_five_fieldsets() {
+        let app = router(Arc::new(AdminState::seeded()));
+        let body = fetch_ok(
+            app,
+            "/admin/auth/authn-config/acme-realm?tenant_id=acme",
+        )
+        .await;
+        for legend in [
+            "Flow bindings",
+            "Password policy",
+            "OTP policy",
+            "WebAuthn policy",
+            "Required actions",
+        ] {
+            assert!(body.contains(legend), "missing legend: {legend}");
+        }
     }
 }

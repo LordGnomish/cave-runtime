@@ -13,8 +13,16 @@
 //!
 //! Upstream UI: <https://www.keycloak.org/documentation>
 
+pub mod authn_config;
+pub mod client_scopes;
 pub mod clients;
 pub mod events;
+pub mod fixtures;
+pub mod flows;
+pub mod groups;
+pub mod idp;
+pub mod realm_settings;
+pub mod realm_roles;
 pub mod realms;
 pub mod sessions;
 pub mod users;
