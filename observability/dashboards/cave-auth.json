@@ -277,6 +277,67 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "LDAP federation: bind rate by result",
+      "description": "Rate of LDAP bind attempts per second, split by result (success / invalid_credentials / protocol_error / io_error). Source: cave_auth_ldap_bind_total{provider,result} — Keycloak federation/ldap port.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_ldap_bind_total[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "LDAP federation: search rate by provider",
+      "description": "RFC 4511 SearchRequest dispatch rate, including paged-result continuations. Source: cave_auth_ldap_search_total{provider,result}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (provider) (rate(cave_auth_ldap_search_total[1m]))", "legendFormat": "{{provider}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "LDAP federation: sync duration p50 / p95",
+      "description": "Wall-clock time per UserStorageSyncTask run. p95 should stay well under the configured sync period (default 1h). Source: cave_auth_ldap_sync_duration_seconds histogram.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (provider, le) (rate(cave_auth_ldap_sync_duration_seconds_bucket[1h])))", "legendFormat": "p50 {{provider}}", "refId": "A" },
+        { "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(cave_auth_ldap_sync_duration_seconds_bucket[1h])))", "legendFormat": "p95 {{provider}}", "refId": "B" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Kerberos SPNEGO negotiations",
+      "description": "Rate of WWW-Authenticate Negotiate challenge/response rounds, split by outcome. Source: cave_auth_kerberos_spnego_negotiations_total{result}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (result) (rate(cave_auth_kerberos_spnego_negotiations_total[1m]))", "legendFormat": "{{result}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 19,
+      "title": "LDAP federation: users imported (cumulative)",
+      "description": "Monotonic count of user records imported through cave_auth::federation::ldap::sync::SyncDriver. Includes new entries plus updates.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 63 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (provider) (cave_auth_ldap_users_imported_total)", "legendFormat": "{{provider}}", "refId": "A" }
+      ]
     }
   ]
 }

@@ -229,3 +229,69 @@ groups:
             with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
             the hybrid path live before the OSS launch (target 21 May).
           runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+  - name: cave-auth.federation
+    interval: 30s
+    rules:
+      # ── LDAP bind error rate (Keycloak federation port) ───────────────
+      - alert: LdapBindErrorRateHigh
+        expr: |
+          (
+            sum(rate(cave_auth_ldap_bind_total{result!="success"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_ldap_bind_total[5m])), 1)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: identity
+          tier: "1"
+        annotations:
+          summary: "LDAP bind error rate >10% across all providers"
+          description: |
+            More than 10% of LDAP binds in the last 5 minutes failed.
+            Common causes: directory unavailable, bind credentials
+            rotated without cave-vault update, or TLS handshake error.
+            Inspect /admin/auth/federation for the most recent
+            `last_bind_result` per provider.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/ldap-bind-errors"
+
+      # ── LDAP sync overrun ─────────────────────────────────────────────
+      - alert: LdapSyncSlowerThanCadence
+        expr: |
+          (
+            histogram_quantile(0.95, sum by (provider, le)
+              (rate(cave_auth_ldap_sync_duration_seconds_bucket[1h])))
+          ) > 1800
+        for: 15m
+        labels:
+          severity: warning
+          team: identity
+          tier: "2"
+        annotations:
+          summary: "LDAP full-sync p95 wall-clock >30m for provider {{ $labels.provider }}"
+          description: |
+            cave-auth's UserStorageSyncTask is taking longer than its
+            scheduled cadence. Tail will overlap the next tick and
+            queue depth will grow unboundedly. Consider switching the
+            provider's sync policy from FullSync to ChangedOnly.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/ldap-sync-overrun"
+
+      # ── SPNEGO failures (Kerberos federation) ────────────────────────
+      - alert: KerberosSpnegoFailuresHigh
+        expr: |
+          sum(rate(cave_auth_kerberos_spnego_negotiations_total{result!="success"}[5m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: identity
+          tier: "1"
+        annotations:
+          summary: "Kerberos SPNEGO negotiations failing"
+          description: |
+            More than 0.5 SPNEGO failures per second over 10 minutes.
+            Likely keytab/SPN mismatch, clock skew >5 min between KDC
+            and portal host, or libgssapi not linked (cave-auth surfaces
+            FederationError::GssapiNotLinked when the verification shim
+            is missing in this build).
+          runbook_url: "https://portal.cave.dev/runbooks/auth/spnego-failures"
