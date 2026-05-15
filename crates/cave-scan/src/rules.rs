@@ -4,8 +4,56 @@
 //!
 //! Rules are organized by language and categorized as Security (SEC),
 //! Bug (BUG), Code Smell (SMELL), or Duplication (DUP).
+//!
+//! Note: this module defines its own `ScanRule`/`IssueType`/`IssueSeverity`
+//! types (the SonarQube-style catalog shape) which are deliberately distinct
+//! from the keyword-engine `models::ScanRule` shape used by `engine.rs`.
+//! Bridging the two is a downstream concern; this file keeps the rich
+//! SAST taxonomy intact.
 
-use crate::models::{IssueType, IssueSeverity, ScanRule};
+use serde::{Deserialize, Serialize};
+
+/// Kind of issue raised by a rule, SonarQube-style.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueType {
+    Vulnerability,
+    Bug,
+    CodeSmell,
+    SecurityHotspot,
+    Duplication,
+}
+
+/// Severity of an issue raised by a rule, SonarQube-style.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueSeverity {
+    Blocker,
+    Critical,
+    Major,
+    Minor,
+    Info,
+}
+
+/// A SAST rule in the rich catalog shape (separate from `models::ScanRule`,
+/// which is the simpler keyword-engine shape used at scan time).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ScanRule {
+    pub id: String,
+    pub name: String,
+    pub issue_type: IssueType,
+    pub severity: IssueSeverity,
+    /// Languages the rule applies to (empty = applies to all).
+    pub languages: Vec<String>,
+    /// Optional regex pattern. `None` means the rule is evaluated by a
+    /// dedicated analyzer (e.g. complexity, nesting depth) rather than regex.
+    pub pattern: Option<String>,
+    pub message_template: String,
+    pub effort_mins: u32,
+    pub tags: Vec<String>,
+    /// Common Weakness Enumeration ID, when applicable.
+    pub cwe: Option<u32>,
+}
 
 /// Construct the extended set of analysis rules (50+ rules).
 pub fn extended_scan_rules() -> Vec<ScanRule> {
@@ -183,7 +231,7 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::Vulnerability,
             severity: IssueSeverity::Major,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
-            pattern: Some(r"setTimeout\s*\(\s*['\"]".to_string()),
+            pattern: Some(r#"setTimeout\s*\(\s*['"]"#.to_string()),
             message_template: "setTimeout with string evaluates code -- use function: {match}".to_string(),
             effort_mins: 10,
             tags: vec!["javascript".to_string(), "security".to_string(), "code-execution".to_string()],
@@ -256,7 +304,7 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::Vulnerability,
             severity: IssueSeverity::Critical,
             languages: vec!["JavaScript".to_string(), "TypeScript".to_string()],
-            pattern: Some(r"(?i)jwt.*secret\s*[:=]\s*['\"][^'\"]{8,}['\"]".to_string()),
+            pattern: Some(r#"(?i)jwt.*secret\s*[:=]\s*['"][^'"]{8,}['"]"#.to_string()),
             message_template: "Hardcoded JWT secret -- use environment variables: {match}".to_string(),
             effort_mins: 20,
             tags: vec!["javascript".to_string(), "security".to_string(), "secrets".to_string()],
@@ -308,7 +356,7 @@ pub fn extended_scan_rules() -> Vec<ScanRule> {
             issue_type: IssueType::Bug,
             severity: IssueSeverity::Major,
             languages: vec!["Rust".to_string()],
-            pattern: Some(r"todo!\s*\(").to_string()),
+            pattern: Some(r"todo!\s*\(".to_string()),
             message_template: "todo!() macro not implemented -- remove before release: {match}".to_string(),
             effort_mins: 30,
             tags: vec!["rust".to_string(), "incomplete".to_string()],
