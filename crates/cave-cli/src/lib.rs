@@ -88,3 +88,8 @@ pub use tenant::{
 /// Re-exports watch and stream related types including exit codes, JSON
 /// streaming, formats, events, and tickers.
 pub use watch::{ExitCode, JsonStream, StreamFormat, WatchEvent, WatchTicker};
+
+// ── A1 mission addition (Keycloak v22.0.0 SAML broker port) ────────────────
+// Appended-only — the existing surface above is untouched.
+/// SAML 2.0 parse helpers for `cavectl auth saml` sub-verbs.
+pub mod auth;
