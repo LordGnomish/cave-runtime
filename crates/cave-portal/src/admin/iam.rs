@@ -5,7 +5,7 @@
 //! with the editor (assign / revoke) gated on `IamWrite`.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, IamRoleAssignment, IamUser};
 use crate::admin::types::Cite;
 use std::collections::BTreeMap;
@@ -119,7 +119,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, IamViewErr
         u_tbl = table(&["username", "email"], &user_rows),
         m_tbl = table(&["user", "roles"], &matrix_rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/auth",
         &format!("auth · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

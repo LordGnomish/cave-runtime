@@ -82,6 +82,35 @@ impl TokenBucket {
         }
     }
 
+    /// Like [`try_consume`] but on rejection returns the duration the caller
+    /// must wait until `n` tokens will be available given the current refill
+    /// rate. Useful for HTTP rate-limit responses that include a
+    /// `Retry-After` header — the call site no longer has to redo the deficit
+    /// arithmetic locally. Cost-weighted consumption is supported via `n`
+    /// (e.g. cave-llm-gateway passes `prompt_tokens + completion_tokens`).
+    pub fn try_consume_or_retry(&self, n: f64) -> Result<(), Duration> {
+        self.try_consume_or_retry_at(n, Instant::now())
+    }
+
+    pub fn try_consume_or_retry_at(&self, n: f64, now: Instant) -> Result<(), Duration> {
+        if n <= 0.0 {
+            return Ok(());
+        }
+        let mut st = self.state.lock();
+        self.refill_locked(&mut st, now);
+        if st.tokens >= n {
+            st.tokens -= n;
+            Ok(())
+        } else {
+            let deficit = n - st.tokens;
+            let wait_secs = deficit / self.cfg.refill_per_sec;
+            // Round up to at least 1ms so callers don't busy-loop on
+            // sub-millisecond deficits.
+            let wait = Duration::from_secs_f64(wait_secs).max(Duration::from_millis(1));
+            Err(wait)
+        }
+    }
+
     /// Available tokens at the given instant (after virtual refill).
     pub fn available_at(&self, now: Instant) -> f64 {
         let mut st = self.state.lock();
@@ -449,5 +478,54 @@ mod tests {
         assert_eq!(m.kind, "leaky_bucket");
         assert_eq!(m.capacity_or_queue, 4.0);
         assert!(m.available_or_level >= 1.99 && m.available_or_level <= 2.01);
+    }
+
+    // ── try_consume_or_retry (Sweep-006 unblock) ──────────────────────────────
+
+    /// cite: Retry-After header — success path returns Ok and consumes
+    #[test]
+    fn ratelimiter_token_or_retry_ok_when_available() {
+        let b = TokenBucket::new(TokenBucketConfig::new(10.0, 1.0));
+        assert!(b.try_consume_or_retry(3.0).is_ok());
+        let avail = b.available();
+        assert!(avail >= 6.99 && avail <= 7.01);
+    }
+
+    /// cite: Retry-After header — exhaustion returns the wait Duration
+    #[test]
+    fn ratelimiter_token_or_retry_returns_wait_on_exhaustion() {
+        // capacity=2, refill=1 token/sec → consuming 5 tokens needs 3 tokens
+        // of deficit → 3 seconds of wait
+        let b = TokenBucket::new(TokenBucketConfig::new(2.0, 1.0));
+        let wait = b
+            .try_consume_or_retry(5.0)
+            .expect_err("should reject — only 2 tokens available");
+        assert!(wait >= Duration::from_secs(2));
+        assert!(wait <= Duration::from_secs(4));
+    }
+
+    /// cite: Retry-After header — cost-weighted (the case that motivates
+    /// the API extension for cave-llm-gateway)
+    #[test]
+    fn ratelimiter_token_or_retry_supports_cost_weighted_consume() {
+        // 100 tokens/min = 100/60 ≈ 1.667 tokens/sec
+        let b = TokenBucket::new(TokenBucketConfig::new(100.0, 100.0 / 60.0));
+        // Small request — fits easily.
+        assert!(b.try_consume_or_retry(5.0).is_ok());
+        // Large LLM request — fits the remaining capacity exactly.
+        assert!(b.try_consume_or_retry(95.0).is_ok());
+        // Empty bucket; even a 1-token request must wait.
+        let wait = b.try_consume_or_retry(1.0).expect_err("empty bucket");
+        assert!(wait >= Duration::from_millis(1));
+    }
+
+    /// cite: edge — non-positive cost is always allowed (caller can probe
+    /// without consuming, e.g. for headroom checks)
+    #[test]
+    fn ratelimiter_token_or_retry_zero_cost_is_free() {
+        let b = TokenBucket::new(TokenBucketConfig::new(1.0, 1.0));
+        assert!(b.try_consume(1.0));
+        assert!(b.try_consume_or_retry(0.0).is_ok(), "zero cost is free");
+        assert!(b.try_consume_or_retry(-1.0).is_ok(), "negative cost is free");
     }
 }

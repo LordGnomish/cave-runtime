@@ -162,22 +162,141 @@ impl FilterPlugin for TaintToleration {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ImageLocality — score nodes higher when they already cache the pod's images.
+//
 // Cite: pkg/scheduler/framework/plugins/imagelocality/image_locality.go
+//       (v1.36.0 — `Score` + `sumImageScores` + `calculatePriority`).
+//
+// Upstream's formula:
+//   per_image_scaled = image_size_bytes * (num_nodes_with_image / total_nodes)
+//   sum_scores       = Σ per_image_scaled for images on this node from the pod
+//   node_score       = clamp_linear(sum_scores, min_threshold, max_threshold,
+//                                   0, MAX_NODE_SCORE)
+//   * min_threshold  = 23 MiB (tiny images are noise, treat as 0).
+//   * max_threshold  = 1000 MiB × num_containers (cap so a single huge
+//     image can't saturate the score with one container).
+//
+// Wider-spread images get *more* score: an image cached on every node
+// already replicates the cost across the cluster, so picking the node
+// that has it is high-value. A rare image (on 1 of N nodes) gets a
+// fractional bonus because the system will still need to pull it
+// elsewhere later.
+
+/// Image-state summary the scheduler keeps per `(image_ref → state)`.
+/// Mirrors `framework.ImageStateSummary`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ImageStateSummary {
+    /// Compressed size on disk in bytes.
+    pub size_bytes: u64,
+    /// How many nodes in the cluster currently have this image cached.
+    pub num_nodes: u32,
+}
+
+/// Per-node view of cached images. Each entry maps the canonical
+/// image reference (`<registry>/<repo>:<tag>` or `@sha256:...`) to its
+/// state summary.
+pub type NodeImageStates = std::collections::HashMap<String, ImageStateSummary>;
+
+/// 23 MiB — below this sum_scores the scaling treats the locality
+/// benefit as nil. Matches upstream `mb23Threshold`.
+pub const IMAGE_LOCALITY_MIN_THRESHOLD: u64 = 23 * 1024 * 1024;
+/// 1000 MiB per container — saturates the cap. Matches upstream
+/// `mb1000Threshold`.
+pub const IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER: u64 = 1000 * 1024 * 1024;
 
 pub struct ImageLocality {
-    /// node_name → set of image refs cached on that node.
-    pub cache: std::collections::HashMap<String, HashSet<String>>,
+    /// `node_name` → cached-image state map. Populate from the
+    /// kubelet's image GC report or via the CRI image API
+    /// (`cave_cri::routes::list_images`); the scheduler does not
+    /// fetch this itself.
+    pub node_states: std::collections::HashMap<String, NodeImageStates>,
+    /// Total number of schedulable nodes in the cluster — used to
+    /// weight the "spread" component. Updated by the same routine
+    /// that calls `update_node_images`.
+    pub total_nodes: u32,
+}
+
+impl Default for ImageLocality {
+    fn default() -> Self {
+        Self {
+            node_states: std::collections::HashMap::new(),
+            total_nodes: 0,
+        }
+    }
+}
+
+impl ImageLocality {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Replace the recorded image state for one node. Idempotent;
+    /// the caller is responsible for keeping `total_nodes` honest.
+    pub fn update_node_images(&mut self, node: &str, states: NodeImageStates) {
+        self.node_states.insert(node.to_string(), states);
+    }
+
+    /// Bulk replace + recompute `total_nodes`. Use when feeding the
+    /// scheduler from a fresh CRI dump on every scheduling cycle.
+    pub fn set_cluster_state(&mut self, per_node: std::collections::HashMap<String, NodeImageStates>) {
+        self.total_nodes = per_node.len() as u32;
+        self.node_states = per_node;
+    }
+
+    /// Per-image scaled score. Public so the dispatcher can audit a
+    /// single image's contribution + so tests can verify the
+    /// upstream formula directly. `num_nodes_with_image` should
+    /// match the entry's `state.num_nodes`; we accept it separately
+    /// to support tests that override the cluster-wide spread.
+    pub fn scaled_image_score(state: &ImageStateSummary, total_nodes: u32) -> i64 {
+        if total_nodes == 0 {
+            return 0;
+        }
+        // num_nodes / total — keep it integer-faithful so a one-of-one
+        // cluster scores at full size, not 0 from rounding.
+        let num = state.num_nodes.min(total_nodes) as i128;
+        let total = total_nodes as i128;
+        let size = state.size_bytes as i128;
+        ((size * num) / total) as i64
+    }
+
+    /// Sum image scores for a pod on a given node.
+    pub fn sum_image_scores(&self, pod: &Pod, node: &str) -> i64 {
+        let Some(states) = self.node_states.get(node) else {
+            return 0;
+        };
+        let mut sum: i128 = 0;
+        for img in &pod.spec.container_images {
+            if let Some(state) = states.get(img) {
+                sum += Self::scaled_image_score(state, self.total_nodes) as i128;
+            }
+        }
+        sum.min(i64::MAX as i128) as i64
+    }
+
+    /// Map a sum-of-image-sizes onto `[0, MAX_NODE_SCORE]` using
+    /// upstream's linear-with-thresholds curve.
+    pub fn calculate_priority(sum_scores: i64, num_containers: u32) -> i64 {
+        let containers = num_containers.max(1) as u64;
+        let min = IMAGE_LOCALITY_MIN_THRESHOLD as i128;
+        let max = (IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER as i128) * (containers as i128);
+        let sum = (sum_scores as i128).max(0);
+        let clamped = sum.clamp(min, max);
+        let scaled = (MAX_NODE_SCORE as i128) * (clamped - min) / (max - min);
+        scaled.clamp(0, MAX_NODE_SCORE as i128) as i64
+    }
 }
 
 impl ScorePlugin for ImageLocality {
     fn name(&self) -> &str { "ImageLocality" }
     fn score(&self, pod: &Pod, node: &Node, _: &ClusterSnapshot) -> i64 {
-        if pod.spec.container_images.is_empty() { return 0; }
-        let cached = self.cache.get(&node.name);
-        let hits: usize = pod.spec.container_images.iter().filter(|img| {
-            cached.map_or(false, |c| c.contains(*img))
-        }).count();
-        (hits as i64 * MAX_NODE_SCORE) / pod.spec.container_images.len() as i64
+        if pod.spec.container_images.is_empty() {
+            return 0;
+        }
+        if self.total_nodes == 0 {
+            return 0;
+        }
+        let sum = self.sum_image_scores(pod, &node.name);
+        Self::calculate_priority(sum, pod.spec.container_images.len() as u32)
     }
 }
 
@@ -619,21 +738,203 @@ mod tests {
     }
 
     // ImageLocality -------------------------------------------------------
+
+    fn states(entries: &[(&str, u64, u32)]) -> NodeImageStates {
+        entries
+            .iter()
+            .map(|(name, size, nodes)| {
+                (
+                    (*name).to_string(),
+                    ImageStateSummary {
+                        size_bytes: *size,
+                        num_nodes: *nodes,
+                    },
+                )
+            })
+            .collect()
+    }
+
     #[test]
-    fn image_locality_zero_when_no_images() {
+    fn image_locality_zero_when_pod_has_no_images() {
         let p = Pod::new("t", "ns", "p");
-        let il = ImageLocality { cache: HashMap::new() };
+        let mut il = ImageLocality::new();
+        il.total_nodes = 1;
         assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), 0);
     }
+
     #[test]
-    fn image_locality_scales_with_hits() {
+    fn image_locality_zero_when_no_total_nodes_recorded() {
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["nginx:1".into()];
+        let il = ImageLocality::new(); // total_nodes = 0
+        assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), 0);
+    }
+
+    #[test]
+    fn image_locality_zero_when_node_has_no_matching_image() {
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["nginx:1".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 3;
+        il.update_node_images("a", states(&[("redis:7", 100 * 1024 * 1024, 1)]));
+        assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), 0);
+    }
+
+    #[test]
+    fn image_locality_below_min_threshold_scores_zero() {
+        // A tiny image (10 MiB) on the node with sum_scores below
+        // the 23 MiB min threshold → score 0.
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["alpine:3".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 1;
+        il.update_node_images("a", states(&[("alpine:3", 10 * 1024 * 1024, 1)]));
+        assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), 0);
+    }
+
+    #[test]
+    fn image_locality_at_or_above_max_threshold_saturates_max_score() {
+        // 1 GiB image (≥ max threshold for 1 container) on a 1-node
+        // cluster → MAX_NODE_SCORE.
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["postgres:16".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 1;
+        il.update_node_images("a", states(&[("postgres:16", 1000 * 1024 * 1024, 1)]));
+        assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), MAX_NODE_SCORE);
+    }
+
+    #[test]
+    fn image_locality_spread_factor_reduces_score_when_image_is_rare() {
+        // 1 GiB image present on only 1 of 4 nodes. Scaled score =
+        // size * (1/4) = 256 MiB. The priority curve maps that
+        // somewhere between min (23 MiB → 0) and max (1000 MiB →
+        // 100). Verify the linear interpolation is honoured.
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["postgres:16".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 4;
+        il.update_node_images("a", states(&[("postgres:16", 1000 * 1024 * 1024, 1)]));
+        let got = il.score(&p, &n("a"), &empty_snap(vec![]));
+        // Sanity bounds: strictly less than MAX_NODE_SCORE (because
+        // spread < 1) and strictly greater than 0 (because sum
+        // exceeds min threshold).
+        assert!(got > 0 && got < MAX_NODE_SCORE, "got {got}");
+    }
+
+    #[test]
+    fn image_locality_widely_replicated_image_outscores_rare_image() {
+        // Same image size, but node 'a' has it on 4/4 nodes vs node
+        // 'b' has it on 1/4 — 'a' must score higher.
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["postgres:16".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 4;
+        il.update_node_images(
+            "a",
+            states(&[("postgres:16", 500 * 1024 * 1024, 4)]),
+        );
+        il.update_node_images(
+            "b",
+            states(&[("postgres:16", 500 * 1024 * 1024, 1)]),
+        );
+        let a = il.score(&p, &n("a"), &empty_snap(vec![]));
+        let b = il.score(&p, &n("b"), &empty_snap(vec![]));
+        assert!(a > b, "a={a} b={b}");
+    }
+
+    #[test]
+    fn image_locality_multi_container_sums_scores_per_image() {
+        // Two containers, two distinct images. Both on the node.
+        // sum_scores ≈ 2 × image_size × spread.
         let mut p = Pod::new("t", "ns", "p");
         p.spec.container_images = vec!["nginx:1".into(), "redis:7".into()];
-        let mut cache = HashMap::new();
-        let mut s = HashSet::new(); s.insert("nginx:1".into());
-        cache.insert("a".into(), s);
-        let il = ImageLocality { cache };
-        assert_eq!(il.score(&p, &n("a"), &empty_snap(vec![])), 50);
+        let mut il = ImageLocality::new();
+        il.total_nodes = 1;
+        il.update_node_images(
+            "a",
+            states(&[
+                ("nginx:1", 200 * 1024 * 1024, 1),
+                ("redis:7", 400 * 1024 * 1024, 1),
+            ]),
+        );
+        // sum = 200 + 400 = 600 MiB; max_threshold = 1000 × 2 = 2000 MiB.
+        // priority = (600 - 23) / (2000 - 23) × 100 ≈ 29.
+        let got = il.score(&p, &n("a"), &empty_snap(vec![]));
+        assert!(got > 0 && got < MAX_NODE_SCORE);
+        assert!((25..=35).contains(&got), "got {got}");
+    }
+
+    #[test]
+    fn image_locality_partial_match_only_counts_present_images() {
+        // Pod uses two images; node only has one.
+        let mut p = Pod::new("t", "ns", "p");
+        p.spec.container_images = vec!["nginx:1".into(), "redis:7".into()];
+        let mut il = ImageLocality::new();
+        il.total_nodes = 1;
+        il.update_node_images("a", states(&[("nginx:1", 200 * 1024 * 1024, 1)]));
+        let one = il.score(&p, &n("a"), &empty_snap(vec![]));
+        // Adding the second image on the same node must monotonically
+        // increase the score (or keep it pinned at MAX).
+        il.update_node_images(
+            "a",
+            states(&[
+                ("nginx:1", 200 * 1024 * 1024, 1),
+                ("redis:7", 400 * 1024 * 1024, 1),
+            ]),
+        );
+        let both = il.score(&p, &n("a"), &empty_snap(vec![]));
+        assert!(both >= one, "both={both} one={one}");
+    }
+
+    #[test]
+    fn scaled_image_score_clamps_num_nodes_to_total() {
+        // Defensive: if state.num_nodes exceeds total_nodes (stale
+        // metadata) we shouldn't return more than image size.
+        let s = ImageStateSummary { size_bytes: 100, num_nodes: 50 };
+        assert_eq!(ImageLocality::scaled_image_score(&s, 4), 100);
+    }
+
+    #[test]
+    fn calculate_priority_clamps_below_min_to_zero() {
+        let p = ImageLocality::calculate_priority(0, 1);
+        assert_eq!(p, 0);
+        let p = ImageLocality::calculate_priority(
+            (IMAGE_LOCALITY_MIN_THRESHOLD as i64) - 1,
+            1,
+        );
+        assert_eq!(p, 0);
+    }
+
+    #[test]
+    fn calculate_priority_clamps_above_max_to_node_score() {
+        let p = ImageLocality::calculate_priority(
+            (IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER as i64) * 10,
+            1,
+        );
+        assert_eq!(p, MAX_NODE_SCORE);
+    }
+
+    #[test]
+    fn calculate_priority_max_threshold_scales_with_container_count() {
+        // Same sum, but 2 containers raises the max threshold and
+        // therefore lowers the relative score (more headroom).
+        let sum = (IMAGE_LOCALITY_MAX_THRESHOLD_PER_CONTAINER as i64) / 2;
+        let one = ImageLocality::calculate_priority(sum, 1);
+        let two = ImageLocality::calculate_priority(sum, 2);
+        assert!(one > two, "one={one} two={two}");
+    }
+
+    #[test]
+    fn set_cluster_state_replaces_total_nodes_count() {
+        let mut il = ImageLocality::new();
+        let mut per_node = std::collections::HashMap::new();
+        per_node.insert("a".to_string(), states(&[("x", 1, 1)]));
+        per_node.insert("b".to_string(), states(&[("x", 1, 1)]));
+        per_node.insert("c".to_string(), states(&[("x", 1, 1)]));
+        il.set_cluster_state(per_node);
+        assert_eq!(il.total_nodes, 3);
+        assert_eq!(il.node_states.len(), 3);
     }
 
     // InterPodAffinity ----------------------------------------------------

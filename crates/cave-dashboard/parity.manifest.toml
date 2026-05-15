@@ -8,7 +8,15 @@
 org     = "grafana"
 repo    = "grafana"
 version = "v10.2.0"
+name    = "Grafana"
+license = "AGPL-3.0"
+language= "Go"
+url     = "https://github.com/grafana/grafana"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-dashboard"
 description = "Grafana reimplementation — dashboards / panels / datasources / alerting / variables / orgs / API keys"
@@ -294,3 +302,12 @@ local_path    = "/api/orgs"
 kind          = "http"
 upstream_path = "/api/users"
 local_path    = "/api/users"
+
+[portal_ui]
+upstream_ui  = "Grafana"
+upstream_url = "https://grafana.com/grafana/dashboards/"
+status       = "complete"
+loc          = 900
+priority     = "P0"
+notes        = "admin/grafana/: dashboards/panels/datasources/explore/alerts (25 tests). See PORTAL_UI_OVERRIDE in audit script."
+last_audit   = "2026-05-11"

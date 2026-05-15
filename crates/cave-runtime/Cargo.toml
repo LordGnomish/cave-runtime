@@ -1,6 +1,14 @@
 [package]
 name = "cave-runtime"
 description = "CAVE Unified Runtime — single binary hosting all platform modules"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-runtime"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["runtime", "kubernetes", "platform", "unified", "binary"]
+categories = ["api-bindings", "command-line-utilities", "network-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -56,7 +64,7 @@ cave-flags = { path = "../cave-flags" }
 cave-docs-site = { path = "../cave-docs-site" }
 cave-dns = { path = "../cave-dns" }
 # Observability stack (Prometheus / Loki / OTLP compat)
-cave-logs    = { path = "../cave-logs" }
+cave-logs     = { path = "../cave-logs" }
 cave-registry = { path = "../cave-registry" }
 # Phase 3 modules
 cave-llm-gateway = { path = "../cave-llm-gateway" }
@@ -97,7 +105,7 @@ cave-pam = { path = "../cave-pam" }
 # Infrastructure & Networking
 cave-gateway = { path = "../cave-gateway" }
 # Data & Storage
-cave-pg = { path = "../cave-pg" }
+cave-rdbms-operator = { path = "../cave-rdbms-operator" }
 cave-streams = { path = "../cave-streams" }
 # Observability
 # Security & Admission
@@ -115,6 +123,7 @@ cave-runbook = { path = "../cave-runbook" }
 cave-oncall = { path = "../cave-oncall" }
 cave-container-scan = { path = "../cave-container-scan" }
 cave-erp = { path = "../cave-erp" }
+cave-crm = { path = "../cave-crm" }
 cave-docdb = { path = "../cave-docdb" }
 cave-rdbms = { path = "../cave-rdbms" }
 cave-kamaji = { path = "../cave-kamaji" }
@@ -129,3 +138,23 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 anyhow = { workspace = true }
+chrono = { workspace = true }
+jsonwebtoken = { workspace = true }
+pulldown-cmark = { workspace = true }
+uuid = { workspace = true }
+# Cluster init plumbing
+rcgen = { version = "0.13", features = ["x509-parser"] }
+time = "0.3"
+reqwest = { workspace = true }
+base64 = { workspace = true }
+axum-server = { version = "0.7", features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+dashmap = "6"
+thiserror = "1"
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true }
+http-body-util = "0.1"
+tempfile = "3"

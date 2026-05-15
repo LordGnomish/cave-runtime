@@ -6,11 +6,21 @@
 org     = "clastix"
 repo    = "kamaji"
 version = "v1.0.0"
+name    = "Kamaji"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/clastix/kamaji"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-kamaji"
 description = "Hosted control planes — Kamaji replacement"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── File mappings ────────────────────────────────────────────────────────────
 # [[files]]
@@ -33,3 +43,74 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/kamaji/endpoint"
+
+# Qwen-pump B-prime cycle 1778425052 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_provision_initialization_20231027_100000"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_deprovision_cleanup_20231027_100100"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_generate_kubeconfig_output_20231027_100200"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_health_check_success_20231027_100300"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_health_check_failure_20231027_100400"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_mark_running_state_transition_20231027_100500"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_router_dispatch_20231027_100600"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_lifecycle_phase_change_20231027_100700"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_models_serialization_20231027_100800"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_routes_validation_20231027_100900"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_kamaji_state_persistence_20231027_101000"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_tenant_spec_defaults_20231027_101100"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_tenant_status_update_20231027_101200"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_create_tenant_request_validation_20231027_101300"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_tenant_control_plane_lifecycle_20231027_101400"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://kamaji.clastix.io/"
+status       = "partial"
+loc          = 164
+priority     = "P2"
+notes        = "kamaji is CRD/CLI"
+last_audit   = "2026-05-11"

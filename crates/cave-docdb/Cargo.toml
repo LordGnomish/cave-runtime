@@ -4,9 +4,18 @@ description = "MongoDB-compatible document database — compatible with MongoDB 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-docdb"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["mongodb", "database", "bson", "document", "wire-protocol"]
+categories = ["database-implementations", "api-bindings", "asynchronous"]
 
 [dependencies]
 cave-core = { path = "../cave-core" }
+cave-kernel = { path = "../cave-kernel" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

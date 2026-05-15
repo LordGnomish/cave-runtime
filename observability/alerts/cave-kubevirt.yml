@@ -1,0 +1,55 @@
+# cave-kubevirt alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-kubevirt-slo
+    interval: 30s
+    rules:
+      - alert: KubevirtSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_kubevirt_total{job="cave-kubevirt",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_kubevirt_total{job="cave-kubevirt"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-kubevirt fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-kubevirt/slo-burn-fast.md"
+      - alert: KubevirtLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_kubevirt_request_duration_seconds_bucket{job="cave-kubevirt"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-kubevirt p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-kubevirt/latency.md"
+      - alert: KubevirtSaturationHigh
+        expr: 'sum(rate(cave_kubevirt_inflight_requests{job="cave-kubevirt"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-kubevirt inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-kubevirt/saturation.md"
+      - alert: KubevirtMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-kubevirt"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-kubevirt RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-kubevirt/memory.md"
+      - alert: KubevirtHealthProbeFailing
+        expr: 'min(up{job="cave-kubevirt"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-kubevirt health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-kubevirt/health.md"

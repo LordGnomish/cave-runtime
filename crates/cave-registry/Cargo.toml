@@ -1,6 +1,14 @@
 [package]
 name = "cave-registry"
 description = "Container registry — Harbor-compatible (alias for cave_artifacts::harbor)"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-registry"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["registry", "harbor", "container", "docker", "alias"]
+categories = ["api-bindings", "network-programming", "authentication"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

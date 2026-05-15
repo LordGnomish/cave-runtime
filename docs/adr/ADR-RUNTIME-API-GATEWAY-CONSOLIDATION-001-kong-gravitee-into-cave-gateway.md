@@ -164,6 +164,10 @@ Tüm plugin'ler ortak trait implement eder; runtime chain'de sıralı çalışı
 - **v0.2** — `cave-gateway` implementation **bu sürümde başlar** (bu ADR sonrası ilk implementation milestone). Multi-tenant namespace, ResourceQuota, OAuth2 plugin, circuit-breaker, OpenAPI validation. cave-gateway-portal-ui v1 (API katalog + key management).
 - **v0.3** — Developer Portal full feature parity (Gravitee'nin docs/onboarding/analytics dashboard set'i). cave-llm-bridge, cave-secrets, cave-audit-pqc plugin'leri. IAM federation (cave-auth ile Keycloak/Okta/Entra köprüsü). Backstage entegrasyonu.
 
+## Implementation notes
+
+- **2026-05-02** — Envoy admin / xDS code (`crates/cave-gateway/src/xds.rs` plus its mappings in `parity.manifest.toml`) **removed**. Envoy is a "rejected alternative" in seven ADRs and the xDS surface was charter-misaligned. cave-gateway's canonical surface is now Kong (proxy data path + Kong-style admin API at `/admin/v1/*`) + Gravitee (API/plan/application/subscription registry + developer portal at `/api/gateway/gravitee/*`). The Gravitee port includes 32 unit tests against the Java upstream's `ApiService` / `PlanService` / `ApplicationService` / `SubscriptionService` / `ApiKeyService` / `PolicyChain` / `PortalService` test suites; cavectl exposes `cave gateway gravitee {apis, plans, applications, subscriptions, portal}`; cave-portal carries a `gateway` MODS card with the Kong + Gravitee feature list; companion `parity-gravitee.manifest.toml` records the Gravitee half (same multi-upstream + companion-manifest pattern as cave-artifacts: Pulp primary + Harbor + Nexus companions).
+
 ## Mirror inheritance
 
 - Platform `ADR-027 Kong API Gateway` — Platform'da Kong OSS deployment kararı **değişmedi**, deployment ADR olarak yerinde duruyor.

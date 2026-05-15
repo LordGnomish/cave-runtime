@@ -10,13 +10,20 @@
 //! - `reconcile` — generic Kubernetes-style reconcile loop runner
 //! - `identity` — SPIFFE ID + SVID metadata
 //! - `ns` — TenantId / TenantScope newtypes
+//! - `codec` — `FrameCodec` trait + length-prefix framing helper used by
+//!   `cave-rdbms`, `cave-docdb`, and `cave-cache` wire servers
 
+pub mod backoff;
 pub mod circuitbreaker;
+pub mod codec;
 pub mod consensus;
 pub mod eventbus;
 pub mod identity;
+pub mod lease;
 pub mod ns;
+pub mod observability;
 pub mod parity;
 pub mod ratelimiter;
 pub mod reconcile;
 pub mod retrypolicy;
+pub mod semaphore;

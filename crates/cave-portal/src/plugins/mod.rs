@@ -9,12 +9,16 @@
 pub mod argocd;
 pub mod argocd_advanced;
 pub mod badges;
+pub mod cache;
 pub mod cost_insight;
 pub mod defectdojo;
+pub mod docdb;
 pub mod grafana;
 pub mod grafana_renderer;
 pub mod hubble;
 pub mod kubernetes;
+pub mod lakehouse;
+pub mod rdbms_operator;
 pub mod reflex;
 pub mod reflex_advanced;
 pub mod scaffolder;

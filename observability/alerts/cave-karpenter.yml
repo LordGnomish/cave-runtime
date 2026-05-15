@@ -1,0 +1,55 @@
+# cave-karpenter alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-karpenter-slo
+    interval: 30s
+    rules:
+      - alert: KarpenterSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_karpenter_total{job="cave-karpenter",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_karpenter_total{job="cave-karpenter"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-karpenter fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-karpenter/slo-burn-fast.md"
+      - alert: KarpenterLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_karpenter_request_duration_seconds_bucket{job="cave-karpenter"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-karpenter p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-karpenter/latency.md"
+      - alert: KarpenterSaturationHigh
+        expr: 'sum(rate(cave_karpenter_inflight_requests{job="cave-karpenter"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-karpenter inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-karpenter/saturation.md"
+      - alert: KarpenterMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-karpenter"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-karpenter RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-karpenter/memory.md"
+      - alert: KarpenterHealthProbeFailing
+        expr: 'min(up{job="cave-karpenter"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-karpenter health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-karpenter/health.md"

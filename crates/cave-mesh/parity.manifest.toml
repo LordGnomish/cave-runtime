@@ -7,11 +7,33 @@
 org     = "istio"
 repo    = "istio"
 version = "1.29.2"
+name    = "Istio"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/istio/istio"
+[parity]
+# Package-level inventory against istio/istio v1.29 + ambient-mode
+# add-ons (ztunnel, waypoint). Inventory hand-curated 2026-05-12
+# against the Istio repo layout (pilot/, security/, telemetry/,
+# istioctl/, operator/, cni/, pkg/) plus the ztunnel repo.
+# The ambient-mode layer in `src/ambient/` is the cave-side entry
+# point; legacy control-plane bits live alongside.
+mapped_count   = 17
+partial_count  = 2
+skipped_count  = 13
+unmapped_count = 4
+total          = 36
+fill_ratio     = 0.8889
+honest_ratio   = 0.8333
+last_audit     = "2026-05-14"
+infra_only     = false
 
 [module]
 name        = "cave-mesh"
 description = "Service mesh — Istio-parity control plane (sidecar + ambient mode: ztunnel L4 mTLS, waypoint L7 routing, AuthZ, VS/DR, SPIFFE, telemetry)"
 source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
 
 # ── Ambient-mode file mappings (this batch) ──────────────────────────────────
 [[files]]
@@ -46,3 +68,565 @@ local    = "src/ambient/svid.rs"
 [[files]]
 upstream = "pilot/pkg/networking/telemetry/telemetry.go"
 local    = "src/ambient/telemetry.rs"
+
+[[files]]
+upstream = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+local    = "src/traffic_policy.rs"
+
+[portal_ui]
+upstream_ui  = "Kiali (Istio)"
+upstream_url = "https://kiali.io/"
+status       = "complete"
+loc          = 484
+priority     = "P0"
+notes        = "Service-mesh topology; covered by admin/kiali.rs"
+last_audit   = "2026-05-11"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Package-level inventory (added 2026-05-12)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ─── Mapped (14) ───────────────────────────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/core/v1alpha3/route"
+local_files  = ["src/routes.rs", "src/traffic.rs"]
+note         = "Routing rules — VirtualService → cluster + retry + fault + match"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/xds"
+local_files  = ["src/lib.rs"]
+note         = "xDS discovery service (ADS, CDS, EDS, LDS, RDS shapes)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/pki"
+local_files  = ["src/spiffe.rs", "src/mtls.rs"]
+note         = "SPIFFE ID + workload PKI + mTLS handshake"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/server"
+local_files  = ["src/auth.rs"]
+note         = "AuthorizationPolicy enforcement, JWT validation"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/sidecar"
+local_files  = ["src/sidecar.rs"]
+note         = "Sidecar resource — workload-scoped reachability + policy filter"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/proxy"
+local_files  = ["src/proxy.rs"]
+note         = "Envoy proxy state machine + circuit breaker integration"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/circuitbreaker"
+local_files  = ["src/circuit.rs"]
+note         = "Per-host outlier ejection + half-open probes (sweep-011 backoff adopted)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/ratelimit"
+local_files  = ["src/rate_limit.rs"]
+note         = "Token-bucket per-destination rate limit"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/serviceregistry"
+local_files  = ["src/registry.rs", "src/store.rs"]
+note         = "Service + workload registry; xDS subscribers"
+
+[[mapped]]
+upstream_pkg = "istio/istio:telemetry/pkg"
+local_files  = ["src/telemetry.rs", "src/metrics.rs", "src/observability.rs"]
+note         = "RED metrics, span emission, log records per request"
+
+[[mapped]]
+upstream_pkg = "ztunnel:src/proxy/{inbound,outbound,hbone}"
+local_files  = ["src/ambient/hbone.rs", "src/ambient/ztunnel.rs"]
+note         = "HBONE tunnel encapsulation (HTTP CONNECT) for ambient mode L4 mTLS"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/ambient/{authz,virtualservice,destinationrule,waypoint}"
+local_files  = ["src/ambient/authz.rs", "src/ambient/virtualservice.rs", "src/ambient/destinationrule.rs", "src/ambient/waypoint.rs"]
+note         = "Ambient-mode CRD handling — AuthZ, VS, DR, waypoint deployment"
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/server/ca"
+local_files  = ["src/ambient/svid.rs"]
+note         = "SVID issuance for ambient identities (ztunnel + waypoint pods)"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/multicluster"
+local_files  = ["src/multicluster.rs"]
+note         = "Multi-cluster service-export + east-west gateway config"
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/core/cluster_traffic_policy.go"
+local_files  = ["src/traffic_policy.rs"]
+note         = "TrafficPolicy → Envoy translation (batch4 2026-05-14). Pure-function port of applyOutlierDetection, applyConnectionPool, and the selectTrafficPolicyComponents per-port overlay. Mirrors istio 1.29.2 cluster_traffic_policy.go branch-for-branch: Consecutive_5xx / ConsecutiveGatewayFailure with their >0 ? 100 : 0 enforcing peers, SplitExternalLocalOriginErrors gating local-origin failure counter, MaxEjectionPercent / Interval / BaseEjectionTime passthrough, TCP/HTTP threshold mapping, TcpKeepalive lift, idle-timeout HTTP→TCP fallback, CommonHttpProtocolOptions materialised only when at least one field set."
+
+# ─── Skipped (13) ──────────────────────────────────────────────────────────
+
+[[skipped]]
+upstream_pkg = "istio/istio:istioctl/"
+reason       = "CLI"
+note         = "istioctl CLI; cavectl mesh exposes the equivalent"
+
+[[skipped]]
+upstream_pkg = "istio/istio:operator/"
+reason       = "go-bootstrap"
+note         = "Helm operator; cave-runtime owns its own lifecycle"
+
+[[skipped]]
+upstream_pkg = "istio/istio:cni/"
+reason       = "go-bootstrap"
+note         = "CNI plugin (init container); k8s networking is cave-cni's job"
+
+[[skipped]]
+upstream_pkg = "istio/istio:tests/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "istio/istio:e2e/"
+reason       = "test-harness"
+
+[[skipped]]
+upstream_pkg = "istio/istio:bin/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:tools/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:samples/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:helm/"
+reason       = "go-bootstrap"
+note         = "Helm chart"
+
+[[skipped]]
+upstream_pkg = "istio/istio:pkg/log/ + pkg/util/"
+reason       = "stdlib-analog"
+note         = "Logging + utility helpers; Rust uses tracing + std"
+
+[[skipped]]
+upstream_pkg = "istio/istio:manifests/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:release/"
+reason       = "go-bootstrap"
+
+[[skipped]]
+upstream_pkg = "istio/istio:operator/cmd/mesh/"
+reason       = "CLI"
+note         = "mesh CLI subcommand"
+
+# ─── Unmapped (8) — honest gaps ────────────────────────────────────────────
+
+[[partial]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
+local_files  = ["src/wasm_plugin.rs", "src/wasm_runtime.rs"]
+note         = "WasmPlugin CRD lifecycle + filter-chain projection (wasm_plugin.rs) plus an embedded wasmtime-backed runtime (wasm_runtime.rs): wat/wasm compile + validate, ResourceLimits with fuel cap + memory ceiling, proxy-wasm ABI shim (proxy_log + proxy_set_header_map_value + 10 stub responders returning WasmResultUnimplemented = 12), per-invocation RequestContext capturing log records / set_header calls / response body, fuel exhaustion → typed FuelExhausted error. Filter modules built against proxy-wasm-rust-sdk run end-to-end in process; the full ~50-function proxy-wasm host surface is documented as a follow-up."
+
+# pilot/pkg/networking/federation/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
+
+[[partial]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/federation/"
+local_files  = ["src/federation.rs"]
+note         = "Multi-network federation control plane — MeshNetwork enrolment, EastWestGateway lifecycle + health flip, NetworkEndpoint publish/retract keyed on (service, network) with SPIFFE-id-stable slot replacement, TrustBundle rotate + bundle projection to consumers, cross_network_endpoints() pairs remote endpoints with their network's healthy east-west gateway addresses for xDS programming. Scope cut: actual data-plane forwarding stays in bound Envoy / ambient proxy; cross-mesh federation tracked separately."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/serviceentry/external/"
+note         = "VM-mesh expansion — non-k8s workloads (VirtualMachine + WorkloadEntry CRD). Not implemented."
+
+[[mapped]]
+upstream_pkg = "istio/istio:security/pkg/jwt/"
+local_files  = ["src/jwks.rs", "src/auth.rs"]
+note         = "JWT validation pipeline: JwkSet parser (RFC 7517) covering RSA / EC / oct kty, pluggable JwksTransport (production reqwest + tests StubTransport), per-issuer JwksCache with TTL refresh + force_refresh, RFC 7515 §4.1.4 single-key kid-less lookup, IssuerValidation builder that drives jsonwebtoken::Validation with audience / issuer / leeway. auth.rs already enforces RequestAuthentication/AuthorizationPolicy semantics; this module covers key resolution."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:telemetry/api/v1/AnalyticsClient"
+note         = "Backend analytics protocol — sends mesh usage to Istio team. Out of scope."
+
+[[unmapped]]
+upstream_pkg = "istio/istio:istioctl/pkg/{analyze,debug}/"
+note         = "Static analysis + diagnose. Distinct from runtime mesh."
+
+[[mapped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/serviceregistry/serviceentry/"
+local_files  = ["src/service_entry.rs", "src/models.rs"]
+note         = "ServiceEntry CRD manager: create / get / list / update / delete with validation (hosts/ports non-empty, Static/DNS modes require endpoints), resolve(host, port_name) under all four ServiceResolution modes (None passthrough / Static / Dns first-record / DnsRoundRobin cycle), pluggable DnsResolver trait so tests stay offline. registry.rs continues to handle auto-discovery; this module owns the operator-curated entries."
+
+[[unmapped]]
+upstream_pkg = "ztunnel:src/state/policy/L7"
+note         = "Ambient L7 policy (waypoint proxy filter chain). waypoint.rs has the routing stub; L7 filter ordering is unmapped."
+
+
+# ── Upstream test cross-reference (behavioral parity) ────────────────────────
+# Methodology — see crates/cave-scheduler/parity.manifest.toml head
+# (2026-05-13 upstream-test-port batch).
+
+[behavioral_parity]
+audit_scope = "hbone + authz + destinationrule + loadbalancer (istio v1.29.2)"
+audit_at    = "2026-05-14"
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/connects_with_valid_request"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_parses_valid_connect_request"
+status         = "ported"
+notes          = "CONNECT + :authority + Baggage tenant parsing."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_non_connect_method"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_non_connect_method"
+status         = "ported"
+notes          = "Only HTTP/2 CONNECT is valid for HBONE."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_non_root_path"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_non_root_path"
+status         = "ported"
+notes          = "HBONE CONNECT requires :path = \"/\"."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/rejects_authority_without_port"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_rejects_authority_without_port"
+status         = "ported"
+notes          = "Authority must be host:port form."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/baggage_test.go"
+upstream_name  = "TestParseBaggage/whitespace_and_properties"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_baggage_tolerates_whitespace_and_properties"
+status         = "ported"
+notes          = "W3C Baggage parser tolerates whitespace + drops `;property` suffix."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestAuthorise/refuses_mismatched_baggage_tenant"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_authorise_refuses_when_baggage_tenant_mismatches"
+status         = "ported"
+notes          = "cave invariant — tenant baggage must equal invoking ztunnel's tenant."
+
+[[upstream_test]]
+upstream_path  = "pkg/hbone/server_test.go"
+upstream_name  = "TestServeHTTP/accept_response_status_200"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_hbone_accept_response_carries_status_200"
+status         = "ported"
+notes          = "Successful CONNECT → :status 200."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/deny_first_short_circuits"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_deny_short_circuits_to_deny"
+status         = "ported"
+notes          = "DENY rules evaluated before ALLOW rules; DENY match terminates."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/no_policies_allows_by_default"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_no_policies_means_allow_by_default"
+status         = "ported"
+notes          = "Empty policy set → ALLOW (Istio's default-allow)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/allow_in_scope_no_match_denies"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_allow_in_scope_with_no_match_denies"
+status         = "ported"
+notes          = "ALLOW exists + no match → deny-by-default."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/allow_matches_principal_allows"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_allow_matches_principal_returns_allow"
+status         = "ported"
+notes          = "SPIFFE principal exact match → ALLOW."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/tenant_scoped_invisible_to_other_tenant"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_tenant_scoping_ignores_other_tenant_policies"
+status         = "ported"
+notes          = "cave Charter — cross-tenant policies are invisible."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/security/authz/builder/builder_test.go"
+upstream_name  = "TestPolicies/JWT_when_clause_enforced"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_authz_jwt_when_clause_enforces_claim_match"
+status         = "ported"
+notes          = "when.jwt claim must match; missing claim → no rule match."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildDefaultCluster/no_subsets_one_cluster"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_compile_default_yields_one_cluster"
+status         = "ported"
+notes          = "DR with no subsets compiles to a single default cluster."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildDefaultCluster/extra_cluster_per_subset"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_compile_yields_extra_cluster_per_subset"
+status         = "ported"
+notes          = "Naming convention `<host>|<subset>` via model.BuildSubsetKey."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestCompile/empty_subset_labels_rejected"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_destinationrule_empty_subset_labels_rejected"
+status         = "ported"
+notes          = "Validation — subset must declare a non-empty label selector."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestApplyLocalityLBSetting/least_request"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_least_request_picks_lowest_active_count"
+status         = "ported"
+notes          = "LeastRequest LB picks min(active_requests)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestApplyLocalityLBSetting/round_robin_cycles"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_round_robin_cycles_through_pool"
+status         = "ported"
+notes          = "RoundRobin uses seed % pool.len() — deterministic cycle."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/util/loadbalancer_test.go"
+upstream_name  = "TestSubsetEndpointSelection/label_filter"
+cave_path      = "tests/upstream_port.rs"
+cave_test_name = "upstream_loadbalancer_subset_filter_excludes_non_matching_endpoints"
+status         = "ported"
+notes          = "Subset label_selector filters the LB pool BEFORE LB policy applies."
+
+# Honest "still missing" entries — Istio is huge; this is a curated subset.
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/cluster_test.go"
+upstream_name  = "TestBuildCluster/RingHash_consistent_under_header_value"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "RingHash deterministic-hash LB path not yet expressed as upstream-port test."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/v1alpha3/listener_test.go"
+upstream_name  = "TestBuildListener/HTTPListenerWithFilters"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "Envoy listener/filter chain construction — distinct surface, not yet behaviourally cross-referenced."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/xds/ads_test.go"
+upstream_name  = "TestADSConnection"
+cave_path      = "—"
+cave_test_name = "—"
+status         = "missing"
+notes          = "xDS aggregated discovery streaming — long-form integration, not yet covered."
+
+# ── Batch 4 (2026-05-14) — cluster_traffic_policy.go ports ───────────────────
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestApplyOutlierDetection/nil_detection"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_nil_yields_no_cluster_field"
+status         = "ported"
+notes          = "Default TrafficPolicy has no outlier_detection — Option::None equivalence to Go nil."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestApplyOutlierDetection/empty_detection"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_empty_only_sets_enforcing_success_rate_zero"
+status         = "ported"
+notes          = "Empty OutlierDetection{} → EnforcingSuccessRate=0, every other field unset."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestApplyOutlierDetection/5xx_and_gateway"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_consecutive_5xx_and_gateway_set"
+status         = "ported"
+notes          = "Consecutive_5xx=4 + ConsecutiveGatewayErrors=3 → enforcing peers both promoted to 100."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyOutlierDetection/v_eq_0_keeps_enforcing_zero"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_explicit_zero_consecutive_5xx_keeps_enforcing_zero"
+status         = "ported"
+notes          = "Explicit consecutive_5xx=0 stays 0 (Go `if v > 0 { v = 100 }` guard)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyOutlierDetection/interval_and_base_ejection_passthrough"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_interval_and_base_ejection_time_passthrough"
+status         = "ported"
+notes          = "Interval + BaseEjectionTime durationpb propagate verbatim."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyOutlierDetection/max_ejection_percent_gt_0"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_max_ejection_percent_only_when_positive"
+status         = "ported"
+notes          = "MaxEjectionPercent>0 propagates; 0 stays unset (None)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestApplyOutlierDetection/local_origin_errors"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_split_external_local_origin_errors"
+status         = "ported"
+notes          = "SplitExternalLocalOriginErrors=true + ConsecutiveLocalOriginFailures=10 → enforcing=100, EnforcingLocalOriginSuccessRate=0."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyOutlierDetection/split_false_ignores_local_origin"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_local_origin_failures_ignored_without_split_flag"
+status         = "ported"
+notes          = "Split flag gates the local-origin counter assignment in upstream Go."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyOutlierDetection/split_true_zero_failures"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_outlier_split_true_zero_local_origin_only_sets_flags"
+status         = "ported"
+notes          = "Split=true unconditionally writes EnforcingLocalOriginSuccessRate=0 but Counter only when failures>0."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestConnectionPoolSettings/basic_settings"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_basic_settings"
+status         = "ported"
+notes          = "Full HTTP+TCP pool struct (Http1MaxPendingRequests/Http2MaxRequests/MaxRetries/MaxConnections/ConnectTimeout/TcpKeepalive triplet/MaxRequestsPerConnection)."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestConnectionPoolSettings/no_settings"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_no_settings_yields_defaults"
+status         = "ported"
+notes          = "Default ConnectionPoolSettings → all threshold/options fields None."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_test.go"
+upstream_name  = "TestCommonHttpProtocolOptions/idle_timeout_http_path"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_http_idle_timeout_lifts_into_common_opts"
+status         = "ported"
+notes          = "Http.IdleTimeout=15s → CommonHttpProtocolOptions.IdleTimeout=15s."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyConnectionPool/tcp_idle_timeout_fallback"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_tcp_idle_timeout_fallback"
+status         = "ported"
+notes          = "When Http.IdleTimeout is unset, Tcp.IdleTimeout bubbles into CommonHttpProtocolOptions."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyConnectionPool/connect_timeout_passthrough"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_connect_timeout_passthrough"
+status         = "ported"
+notes          = "Tcp.ConnectTimeout=750ms → cluster.ConnectTimeout=750ms verbatim."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyConnectionPool/zero_means_unset"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_zero_means_unset_for_positive_fields"
+status         = "ported"
+notes          = "Every `> 0` guard in Go: explicit zero leaves the threshold field at None."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyConnectionPool/tcp_keepalive_packed"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_tcp_keepalive_packed"
+status         = "ported"
+notes          = "TcpKeepalive {probes, time, interval} packed verbatim into UpstreamConnectionOptions.TcpKeepalive."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "selectTrafficPolicyComponents/port_level_overrides_outlier"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_merge_port_level_overrides_global_outlier"
+status         = "ported"
+notes          = "Per-port outlier_detection wins on the matching port; global inherits on other ports."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "selectTrafficPolicyComponents/port_level_overrides_connection_pool"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_merge_port_level_overrides_global_connection_pool"
+status         = "ported"
+notes          = "Per-port connection_pool overlay precedence on matching/non-matching ports."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "selectTrafficPolicyComponents/partial_inherits"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_merge_port_level_partial_inherits_missing_fields"
+status         = "ported"
+notes          = "Missing port-level component inherits from global TrafficPolicy."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "selectTrafficPolicyComponents/no_port_level"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_merge_no_port_level_returns_global_clone"
+status         = "ported"
+notes          = "Empty port_level_settings list → effective policy clones the global."
+
+[[upstream_test]]
+upstream_path  = "pilot/pkg/networking/core/cluster_traffic_policy.go"
+upstream_name  = "applyH2Upgrade/explicit_upgrade_or_no_upgrade"
+cave_path      = "tests/upstream_port_batch4.rs"
+cave_test_name = "upstream_connection_pool_h2_upgrade_policy_propagates"
+status         = "ported"
+notes          = "Http.H2UpgradePolicy enum (Upgrade/DoNotUpgrade) propagates verbatim into the converter view."
+
+# Honest deferrals (batch4):
+#   * Envoy proto-level codegen tests (wrapperspb.UInt32Value wiring,
+#     durationpb round-tripping) are Go-only — we mirror semantics, not
+#     proto encoding.
+#   * `applyUpstreamProxyProtocol` + `applyDefaultConnectionPool` cover
+#     mesh-default thresholds vs DR overrides; both depend on a
+#     `MeshConfig` shape not yet ported.
+#   * `retryBudget` (TrafficPolicy.RetryBudget) — separate Istio feature,
+#     not part of the OutlierDetection / ConnectionPool surface.

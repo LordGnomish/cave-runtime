@@ -1,0 +1,427 @@
+# parity.manifest.toml — cave-lakehouse
+# Consolidated per ADR-147. Multi-upstream form per ADR-RUNTIME-UPSTREAM-MIRROR-001.
+#
+# cave-lakehouse fuses two primary upstreams:
+#
+#   * **Apache Iceberg (table format)** — schema, partition spec, manifest,
+#     snapshot, table_metadata. Code lives under `src/table_format/iceberg/`.
+#   * **Apache DataFusion (query engine)** — logical plan, expressions,
+#     execution plan, RecordBatch. Code lives under `src/engine/datafusion/`.
+#
+# Optional / future upstreams (Delta, Hudi, Arrow IO, MinIO substrate) are
+# declared so the audit trail is honest about scope, but are not yet mapped.
+#
+# Function and test names below are bare identifiers that the parity
+# calculator can grep against the source tree (it searches for
+# `fn <name>`). Identifiers that exist as method paths in upstream are
+# mapped to the bare local function name for that reason.
+
+[module]
+name        = "cave-lakehouse"
+description = "Consolidated lakehouse — Iceberg table format + DataFusion engine"
+source_root = "src"
+pump_priority = "HIGH"  # qwen-pump B-prime priority gate
+target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+[[upstreams]]
+org     = "apache"
+repo    = "iceberg-rust"
+version = "0.4.0"
+role    = "primary-table-format"
+notes   = "Table format — partition layout, snapshot isolation, time-travel."
+
+[[upstreams]]
+org     = "apache"
+repo    = "datafusion"
+version = "44.0.0"
+role    = "primary-engine"
+notes   = "Query engine — SQL planner, DataFrame, vectorized executor."
+
+[[upstreams]]
+org     = "delta-io"
+repo    = "delta-rs"
+version = "0.18.0"
+role    = "optional-table-format"
+notes   = "Optional second table format. Iceberg is the primary; Delta is opt-in for Databricks-aligned workflows."
+
+[[upstreams]]
+org     = "apache"
+repo    = "hudi-rs"
+version = "0.2.0"
+role    = "optional-table-format"
+notes   = "Optional third table format. Defer concrete impl until Iceberg + Delta are 100% parity."
+
+[[upstreams]]
+org     = "apache"
+repo    = "arrow-rs"
+version = "53.0.0"
+role    = "io-substrate"
+notes   = "Parquet columnar IO + Arrow in-memory representation."
+
+[[upstreams]]
+org     = "minio"
+repo    = "minio"
+version = "RELEASE.2026-04-22"
+role    = "storage-substrate"
+notes   = "Object store substrate. Lakehouse calls go through cave-store which mirrors MinIO."
+
+# ── File mappings ────────────────────────────────────────────────────────────
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/spec/schema.rs"
+local    = "src/table_format/iceberg/schema.rs"
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/spec/partition.rs"
+local    = "src/table_format/iceberg/partition.rs"
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/spec/manifest.rs"
+local    = "src/table_format/iceberg/manifest.rs"
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/spec/snapshot.rs"
+local    = "src/table_format/iceberg/snapshot.rs"
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/spec/table_metadata.rs"
+local    = "src/table_format/iceberg/table_metadata.rs"
+
+[[files]]
+upstream = "apache/iceberg-rust:crates/iceberg/src/error.rs"
+local    = "src/table_format/iceberg/error.rs"
+
+[[files]]
+upstream = "apache/datafusion:datafusion/expr/src/expr.rs"
+local    = "src/engine/datafusion/expr.rs"
+
+[[files]]
+upstream = "apache/datafusion:datafusion/expr/src/logical_plan/plan.rs"
+local    = "src/engine/datafusion/logical_plan.rs"
+
+[[files]]
+upstream = "apache/datafusion:datafusion/physical-plan/src/lib.rs"
+local    = "src/engine/datafusion/execution_plan.rs"
+
+[[files]]
+upstream = "apache/datafusion:datafusion/common/src/scalar/mod.rs"
+local    = "src/engine/datafusion/batch.rs"
+
+[[files]]
+upstream = "apache/datafusion:datafusion/common/src/error.rs"
+local    = "src/engine/datafusion/error.rs"
+
+[[files]]
+upstream = "(cave-runtime invariant)"
+local    = "src/table_format/iceberg/tenant.rs"
+
+[[files]]
+upstream = "(cave-runtime invariant)"
+local    = "src/engine/datafusion/tenant.rs"
+
+# ── Function mappings ────────────────────────────────────────────────────────
+# Local name = bare Rust fn name (parity calc greps `fn <name>`).
+
+[[functions]]
+upstream_name = "Schema::Builder::build"
+local_name    = "build"
+file          = "src/table_format/iceberg/schema.rs"
+
+[[functions]]
+upstream_name = "Transform::apply"
+local_name    = "apply"
+file          = "src/table_format/iceberg/partition.rs"
+
+[[functions]]
+upstream_name = "Transform::parse"
+local_name    = "parse_spec"
+file          = "src/table_format/iceberg/partition.rs"
+
+[[functions]]
+upstream_name = "PartitionSpec::is_unpartitioned"
+local_name    = "is_unpartitioned"
+file          = "src/table_format/iceberg/partition.rs"
+
+[[functions]]
+upstream_name = "PartitionSpec::validate"
+local_name    = "validate"
+file          = "src/table_format/iceberg/partition.rs"
+
+[[functions]]
+upstream_name = "ManifestEntry::added"
+local_name    = "added"
+file          = "src/table_format/iceberg/manifest.rs"
+
+[[functions]]
+upstream_name = "Manifest::push"
+local_name    = "push"
+file          = "src/table_format/iceberg/manifest.rs"
+
+[[functions]]
+upstream_name = "Manifest::total_record_count"
+local_name    = "total_record_count"
+file          = "src/table_format/iceberg/manifest.rs"
+
+[[functions]]
+upstream_name = "TableMetadata::current_schema"
+local_name    = "current_schema"
+file          = "src/table_format/iceberg/table_metadata.rs"
+
+[[functions]]
+upstream_name = "TableMetadata::default_spec"
+local_name    = "default_spec"
+file          = "src/table_format/iceberg/table_metadata.rs"
+
+[[functions]]
+upstream_name = "TableMetadata::current_snapshot"
+local_name    = "current_snapshot"
+file          = "src/table_format/iceberg/table_metadata.rs"
+
+[[functions]]
+upstream_name = "TableMetadata::add_snapshot"
+local_name    = "add_snapshot"
+file          = "src/table_format/iceberg/table_metadata.rs"
+
+[[functions]]
+upstream_name = "Snapshot::added_records"
+local_name    = "added_records"
+file          = "src/table_format/iceberg/snapshot.rs"
+
+[[functions]]
+upstream_name = "Snapshot::total_records"
+local_name    = "total_records"
+file          = "src/table_format/iceberg/snapshot.rs"
+
+[[functions]]
+upstream_name = "Expr::evaluate"
+local_name    = "eval"
+file          = "src/engine/datafusion/expr.rs"
+
+[[functions]]
+upstream_name = "LogicalPlanBuilder::scan"
+local_name    = "scan"
+file          = "src/engine/datafusion/logical_plan.rs"
+
+[[functions]]
+upstream_name = "LogicalPlanBuilder::scan_for_tenant"
+local_name    = "scan_for_tenant"
+file          = "src/engine/datafusion/logical_plan.rs"
+
+[[functions]]
+upstream_name = "LogicalPlanBuilder::project"
+local_name    = "project"
+file          = "src/engine/datafusion/logical_plan.rs"
+
+[[functions]]
+upstream_name = "LogicalPlanBuilder::filter"
+local_name    = "filter"
+file          = "src/engine/datafusion/logical_plan.rs"
+
+[[functions]]
+upstream_name = "PhysicalPlanner::create_initial_plan"
+local_name    = "compile"
+file          = "src/engine/datafusion/execution_plan.rs"
+
+[[functions]]
+upstream_name = "RecordBatch::try_new"
+local_name    = "new"
+file          = "src/engine/datafusion/batch.rs"
+
+[[functions]]
+upstream_name = "RecordBatch::column_by_name"
+local_name    = "column_index"
+file          = "src/engine/datafusion/batch.rs"
+
+[[functions]]
+upstream_name = "RecordBatch::num_rows"
+local_name    = "num_rows"
+file          = "src/engine/datafusion/batch.rs"
+
+[[functions]]
+upstream_name = "(cave-runtime invariant)"
+local_name    = "validate_tenant_id"
+file          = "src/table_format/iceberg/tenant.rs"
+
+[[functions]]
+upstream_name = "(cave-runtime invariant)"
+local_name    = "default_tenant_id"
+file          = "src/table_format/iceberg/tenant.rs"
+
+# ── Test mappings ────────────────────────────────────────────────────────────
+# Local test = bare test fn name (parity calc greps `fn <name>`).
+
+# Iceberg.
+[[tests]]
+upstream_test = "test_format_version_v2_default"
+local_test    = "format_version_v2_default"
+
+[[tests]]
+upstream_test = "test_new_seeds_current_schema_id_from_passed_schema"
+local_test    = "new_seeds_current_schema_id_from_passed_schema"
+
+[[tests]]
+upstream_test = "test_current_schema_returns_match"
+local_test    = "current_schema_returns_match"
+
+[[tests]]
+upstream_test = "test_default_spec_returns_match"
+local_test    = "default_spec_returns_match"
+
+[[tests]]
+upstream_test = "test_current_snapshot_none_when_no_snapshots"
+local_test    = "current_snapshot_none_when_no_snapshots"
+
+[[tests]]
+upstream_test = "test_add_snapshot_updates_current"
+local_test    = "add_snapshot_updates_current_and_last_seq"
+
+[[tests]]
+upstream_test = "test_add_snapshot_must_have_increasing_seq"
+local_test    = "add_snapshot_must_have_increasing_seq"
+
+[[tests]]
+upstream_test = "test_add_snapshot_tenant_mismatch"
+local_test    = "add_snapshot_tenant_mismatch_err"
+
+[[tests]]
+upstream_test = "test_validate_default_ok"
+local_test    = "validate_default_ok"
+
+[[tests]]
+upstream_test = "test_data_content_codes_match_spec_v2"
+local_test    = "data_content_codes_match_spec_v2"
+
+[[tests]]
+upstream_test = "test_data_file_format_round_trip"
+local_test    = "data_file_format_round_trip_all"
+
+[[tests]]
+upstream_test = "test_entry_status_codes_match_spec"
+local_test    = "entry_status_codes_match_spec"
+
+# DataFusion engine.
+[[tests]]
+upstream_test = "test_record_batch_empty"
+local_test    = "batch_empty"
+
+[[tests]]
+upstream_test = "test_record_batch_arity_mismatch"
+local_test    = "batch_new_arity_mismatch_err"
+
+[[tests]]
+upstream_test = "test_record_batch_column_lookup"
+local_test    = "batch_column_index_found"
+
+[[tests]]
+upstream_test = "test_record_batch_column_missing"
+local_test    = "batch_column_index_missing_err"
+
+[[tests]]
+upstream_test = "test_record_batch_validate"
+local_test    = "batch_validate_default_ok"
+
+[[tests]]
+upstream_test = "test_record_batch_with_tenant"
+local_test    = "batch_with_tenant"
+
+[[tests]]
+upstream_test = "test_compile_filter_projection_limit"
+local_test    = "compile_round_trip_filter_projection_limit"
+
+[[tests]]
+upstream_test = "test_aggregate_count_star"
+local_test    = "aggregate_count_star_no_group"
+
+[[tests]]
+upstream_test = "test_aggregate_group_by"
+local_test    = "aggregate_group_by_dept_count"
+
+[[tests]]
+upstream_test = "test_aggregate_sum"
+local_test    = "aggregate_sum_no_group"
+
+[[tests]]
+upstream_test = "test_aggregate_min_max"
+local_test    = "aggregate_min_max"
+
+[[tests]]
+upstream_test = "test_aggregate_avg"
+local_test    = "aggregate_avg_returns_float"
+
+[[tests]]
+upstream_test = "test_compile_invalid_plan_err"
+local_test    = "compile_invalid_plan_err"
+
+[[tests]]
+upstream_test = "test_eval_and_true_true"
+local_test    = "eval_and_true_true"
+
+[[tests]]
+upstream_test = "test_eval_and_type_mismatch_err"
+local_test    = "eval_and_type_mismatch_err"
+
+[[tests]]
+upstream_test = "test_eval_eq_int_true"
+local_test    = "eval_eq_int_true"
+
+[[tests]]
+upstream_test = "test_eval_gt_int"
+local_test    = "eval_gt_int"
+
+[[tests]]
+upstream_test = "test_eval_lt_int"
+local_test    = "eval_lt_int"
+
+[[tests]]
+upstream_test = "test_expr_serde_roundtrip"
+local_test    = "expr_serde_roundtrip"
+
+# Multi-tenant invariant.
+[[tests]]
+upstream_test = "(cave-runtime invariant)"
+local_test    = "default_is_default"
+
+# ── Surface mappings ─────────────────────────────────────────────────────────
+# cave-lakehouse is currently a library — no HTTP surface yet. The Iceberg REST
+# catalog and DataFusion query endpoint will live behind `/api/lakehouse/*`
+# once cave-runtime wires them. The entries below are aspirational and will
+# score 0% surface parity until the routes land — that is the honest signal.
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/iceberg/v1/catalogs"
+local_path    = "/api/lakehouse/catalogs"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/iceberg/v1/{prefix}/namespaces"
+local_path    = "/api/lakehouse/namespaces"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/iceberg/v1/{prefix}/namespaces/{namespace}/tables"
+local_path    = "/api/lakehouse/tables"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/iceberg/v1/{prefix}/namespaces/{namespace}/tables/{table}/snapshots"
+local_path    = "/api/lakehouse/tables/{table}/snapshots"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/datafusion/v1/sql"
+local_path    = "/api/lakehouse/query"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/health"
+local_path    = "/api/lakehouse/health"
+
+[portal_ui]
+upstream_ui  = "Spark UI (per-app)"
+upstream_url = "https://spark.apache.org/docs/latest/web-ui.html"
+status       = "partial"
+loc          = 294
+priority     = "P1"
+notes        = "Iceberg snapshot + Spark job views"
+last_audit   = "2026-05-11"

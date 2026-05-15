@@ -6,7 +6,10 @@
 org     = "SonarSource"
 repo    = "sonarqube"
 version = "v10.3.0"
-
+name    = "SonarQube"
+license = "LGPL-3.0"
+language= "Java"
+url     = "https://github.com/SonarSource/sonarqube"
 [module]
 name        = "cave-lint"
 description = "Code quality — SonarQube replacement"
@@ -33,3 +36,9 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/lint/endpoint"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

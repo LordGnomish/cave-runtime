@@ -16,3 +16,9 @@ name        = "cave-portal-api"
 description = "Backstage backend API surface — sub-crate of cave-portal"
 source_root = "src"
 parent_module = "cave-portal"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

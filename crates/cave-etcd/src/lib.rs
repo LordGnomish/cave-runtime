@@ -78,12 +78,14 @@ pub mod maintenance_v2;
 pub mod membership_audit;
 pub mod membership_v2;
 pub mod models;
+pub mod raft_bridge;
 pub mod rbac_deeper;
 pub mod routes;
 pub mod snap_db;
 pub mod snapshot_stream;
 pub mod snapshot_wire;
 pub mod store;
+pub mod wal;
 pub mod watch_filters;
 
 #[cfg(test)]
@@ -106,9 +108,22 @@ pub fn new_state() -> Arc<KvStore> {
     store
 }
 
-/// Create the axum router.
+/// Create the axum router (single-node mode — writes apply directly
+/// to the local `KvStore`). Multi-node deployments call
+/// [`router_with_bridge`] instead so writes propose through Raft.
 pub fn router(state: Arc<KvStore>) -> axum::Router {
     routes::create_router(state)
+}
+
+/// Create the axum router with an optional `RaftBridge`. When
+/// `Some(bridge)` is passed the write handlers consult it before
+/// mutating the local store; when `None` the behaviour is identical
+/// to [`router`].
+pub fn router_with_bridge(
+    state: Arc<KvStore>,
+    bridge: Option<raft_bridge::SharedRaftBridge>,
+) -> axum::Router {
+    routes::create_router_with_bridge(state, bridge)
 }
 
 /// Calculate parity against the local source tree at compile-time crate root.

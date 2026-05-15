@@ -365,6 +365,118 @@ mod tests {
     }
 
     #[test]
+    fn test_split_combine_roundtrip() {
+        let secret = b"hello shamir secret bytes XX";
+        let shares = split_secret(secret, 4, 3).unwrap();
+        assert_eq!(shares.len(), 4);
+        let combined = combine_shares(&shares[..3]).unwrap();
+        assert_eq!(combined, secret);
+    }
+
+    #[test]
+    fn test_split_combine_threshold_2() {
+        let secret = b"k=2 minimum threshold";
+        let shares = split_secret(secret, 5, 2).unwrap();
+        let combined = combine_shares(&shares[..2]).unwrap();
+        assert_eq!(combined, secret);
+    }
+
+    #[test]
+    fn test_gf_mul_identity() {
+        // 1 is multiplicative identity in GF(256).
+        for x in 0u8..=255u8 {
+            assert_eq!(gf_mul(x, 1), x);
+            assert_eq!(gf_mul(1, x), x);
+        }
+    }
+
+    #[test]
+    fn test_gf_inv() {
+        // gf_inv is involutive: gf_inv(gf_inv(x)) == x for x != 0
+        // and gf_mul(x, gf_inv(x)) == 1 for x != 0.
+        for x in 1u8..=255u8 {
+            assert_eq!(gf_inv(gf_inv(x)), x);
+            assert_eq!(gf_mul(x, gf_inv(x)), 1);
+        }
+    }
+
+    #[test]
+    fn test_validate_threshold_rejects_invalid() {
+        assert!(SealState::validate_threshold(0, 2).is_err());
+        assert!(SealState::validate_threshold(3, 1).is_err());
+        assert!(SealState::validate_threshold(2, 5).is_err());
+        assert!(SealState::validate_threshold(5, 3).is_ok());
+    }
+
+    #[test]
+    fn test_seal_after_unseal_clears_master_key() {
+        let mut state = SealState::default();
+        let (_root, shares) = state.initialize(3, 2).unwrap();
+        state.unseal(&shares[0]).unwrap();
+        state.unseal(&shares[1]).unwrap();
+        assert!(!state.is_sealed());
+        state.seal();
+        assert!(state.is_sealed());
+        assert!(state.master_key.is_none());
+    }
+
+    #[test]
+    fn test_autoseal_type_barrier_strings() {
+        assert_eq!(AutoSealType::Transit.barrier_type(), "transit");
+        assert_eq!(AutoSealType::AwsKms.barrier_type(), "awskms");
+        assert_eq!(AutoSealType::AzureKeyVault.barrier_type(), "azurekeyvault");
+        assert_eq!(AutoSealType::Shamir.barrier_type(), "shamir");
+    }
+
+    #[test]
+    fn test_autoseal_shamir_does_not_store_remotely() {
+        assert!(!AutoSealType::Shamir.stores_keys_remotely());
+        assert!(!AutoSealType::Shamir.supports_recovery_key());
+        assert!(AutoSealType::Transit.stores_keys_remotely());
+        assert!(AutoSealType::AwsKms.supports_recovery_key());
+    }
+
+    #[test]
+    fn test_autoseal_config_validate_shamir_rejects_recovery() {
+        let bad = AutoSealConfig {
+            seal_type: AutoSealType::Shamir,
+            recovery_shares: 3,
+            recovery_threshold: 2,
+            endpoint: String::new(),
+            key_id: String::new(),
+        };
+        assert!(bad.validate().is_err());
+        let ok = AutoSealConfig {
+            seal_type: AutoSealType::Shamir,
+            recovery_shares: 0,
+            recovery_threshold: 0,
+            endpoint: String::new(),
+            key_id: String::new(),
+        };
+        assert!(ok.validate().is_ok());
+    }
+
+    #[test]
+    fn test_autoseal_config_validate_remote_requires_endpoint() {
+        let bad = AutoSealConfig {
+            seal_type: AutoSealType::AwsKms,
+            recovery_shares: 5,
+            recovery_threshold: 3,
+            endpoint: String::new(),
+            key_id: "k".into(),
+        };
+        assert!(bad.validate().is_err());
+        let ok = AutoSealConfig {
+            seal_type: AutoSealType::AwsKms,
+            recovery_shares: 5,
+            recovery_threshold: 3,
+            endpoint: "https://kms.example.com".into(),
+            key_id: "k".into(),
+        };
+        assert!(ok.validate().is_ok());
+    }
+
+    #[test]
     fn test_seal_initialize_unseal() {
         let mut state = SealState::default();
         assert!(!state.is_initialized());

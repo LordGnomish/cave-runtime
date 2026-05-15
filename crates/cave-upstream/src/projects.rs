@@ -1,15 +1,8 @@
-//! Registry of all upstream OSS projects tracked by cave-runtime.
+//! Registry of all 73 upstream OSS projects tracked by cave-runtime.
 //!
 //! Each component in the CAVE platform documentation has a corresponding
 //! upstream project that we track for API/protocol compatibility.
 //! The cave-runtime reimplements each project's functionality in Rust+eBPF.
-//!
-//! **Sovereign OSS only.** Every entry MUST be open-source under an
-//! OSI-approved license. Proprietary cloud SaaS (Azure AI Search,
-//! AWS DynamoDB, Google Bigtable, Databricks, etc.) is NOT tracked here —
-//! managed services are consumed via Crossplane XR composition on the
-//! Azure profile, not reimplemented. See ADR-002 (Azure profile) and
-//! ADR-049 / ADR-114 for dual-profile mappings.
 
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +19,7 @@ pub struct TrackedProject {
     pub phase: u8,
 }
 
-/// All upstream projects tracked by cave-runtime (sovereign OSS only).
+/// All 66 upstream projects tracked by cave-runtime.
 pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     // ============================================================
     // KUBERNETES CORE (reimplemented as cave-* crates)
@@ -105,7 +98,7 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "CloudNativePG",
         github_repo: "cloudnative-pg/cloudnative-pg",
-        cave_module: "cave-pg",
+        cave_module: "cave-rdbms-operator",
         track_features: "Cluster CRD spec, Barman backup integration, connection pooling, PVCResize, tablespace mgmt",
         check_frequency: "biweekly",
         category: "database",
@@ -172,42 +165,10 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "search",
         phase: 2,
     },
-    TrackedProject {
-        name: "Qdrant",
-        github_repo: "qdrant/qdrant",
-        cave_module: "cave-search",
-        track_features: "HNSW/IVFFlat indexing, gRPC API, quantization, multi-vector, hybrid search",
-        check_frequency: "biweekly",
-        category: "search",
-        phase: 2,
-    },
-    TrackedProject {
-        name: "Faiss",
-        github_repo: "facebookresearch/faiss",
-        cave_module: "cave-search",
-        track_features: "IVF/HNSW/PQ index types, GPU acceleration, ANN algorithms, batch search semantics",
-        check_frequency: "monthly",
-        category: "search",
-        phase: 2,
-    },
-    TrackedProject {
-        name: "Milvus",
-        github_repo: "milvus-io/milvus",
-        cave_module: "cave-search",
-        track_features: "Distributed vector DB, segment-based storage, multi-tenancy, scalar+vector hybrid filtering, gRPC API",
-        check_frequency: "monthly",
-        category: "search",
-        phase: 2,
-    },
-    TrackedProject {
-        name: "Weaviate",
-        github_repo: "weaviate/weaviate",
-        cave_module: "cave-search",
-        track_features: "GraphQL+REST API, modular vectorizer plugins, multi-tenancy, hybrid BM25+vector. Optional upstream — included for API parity reference.",
-        check_frequency: "monthly",
-        category: "search",
-        phase: 2,
-    },
+    // Phantom: target name `cave-vector-search` has no workspace member.
+    // The OpenSearch/Qdrant/Faiss/Milvus split-out exists in tracker but
+    // workspace has only `cave-search/` (handles all four together).
+    // Re-enable when crates/cave-vector-search/ exists. See naming-audit-2026-05-03.md §1.
 
     // ============================================================
     // IDENTITY & SECRETS
@@ -264,8 +225,16 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
     TrackedProject {
         name: "Cilium",
         github_repo: "cilium/cilium",
-        cave_module: "cave-ebpf-common",
-        track_features: "eBPF programs, CiliumNetworkPolicy CRD, egress gateway, kube-proxy replacement, bandwidth mgr",
+        // 2026-05-13: was `cave-ebpf-common` — a 188-LOC shared eBPF
+        // types crate with a skeleton parity manifest (every [[files]]
+        // / [[functions]] / [[tests]] / [[surfaces]] block commented
+        // out). The kernel parity calculator therefore returned
+        // overall=0.0 for it, and the /upstream tracker page rendered
+        // "Cilium 0%" — Burak's report. The actual Cilium port lives
+        // in cave-net (36k LOC, full mapping inventory, fill_ratio =
+        // 0.9179 per its parity.manifest.toml). Remap to the real one.
+        cave_module: "cave-net",
+        track_features: "eBPF programs, CiliumNetworkPolicy CRD, egress gateway, kube-proxy replacement, bandwidth mgr, Hubble flow visibility, agent state machines",
         check_frequency: "biweekly",
         category: "networking",
         phase: 1,
@@ -658,15 +627,10 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         category: "operations",
         phase: 3,
     },
-    TrackedProject {
-        name: "vcluster",
-        github_repo: "loft-sh/vcluster",
-        cave_module: "cave-cluster",
-        track_features: "Syncer protocol, resource sync config, persistent vs ephemeral modes, pro features going OSS",
-        check_frequency: "biweekly",
-        category: "operations",
-        phase: 1,
-    },
+    // loft-sh/vcluster intentionally NOT tracked: Charter decision — `cave-cluster`
+    // multi-tenant control-plane uses clastix/kamaji, not vcluster. `cave-kamaji`
+    // is tracked separately (LATEST status). See version-audit-2026-05-02.md DROPPED
+    // section (lands with feat/cave-upstream-watchd-001 branch).
     TrackedProject {
         name: "k6",
         github_repo: "grafana/k6",
@@ -728,6 +692,62 @@ pub const TRACKED_PROJECTS: &[TrackedProject] = &[
         check_frequency: "monthly",
         category: "serverless",
         phase: 3,
+    },
+    TrackedProject {
+        name: "Karpenter",
+        github_repo: "kubernetes-sigs/karpenter",
+        cave_module: "cave-karpenter",
+        track_features: "NodePool/NodeClaim/NodeClass v1 CRDs, scheduler, consolidation, drift detection, disruption budgets",
+        check_frequency: "monthly",
+        category: "node-autoscaling",
+        phase: 3,
+    },
+    TrackedProject {
+        name: "KubeVirt",
+        github_repo: "kubevirt/kubevirt",
+        cave_module: "cave-kubevirt",
+        track_features: "VirtualMachine/VirtualMachineInstance/DataVolume CRDs, virt-launcher Pod, live migration, instancetype/preference, CDI",
+        check_frequency: "monthly",
+        category: "virtualization",
+        phase: 4,
+    },
+    // ============================================================
+    // LAKEHOUSE (consolidated per ADR-147 — N upstreams → 1 cave-module)
+    // ============================================================
+    TrackedProject {
+        name: "Apache Iceberg",
+        github_repo: "apache/iceberg-rust",
+        cave_module: "cave-lakehouse",
+        track_features: "Table format — Schema, PartitionSpec, Manifest, Snapshot, TableMetadata, time-travel",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
+    },
+    TrackedProject {
+        name: "Apache DataFusion",
+        github_repo: "apache/datafusion",
+        cave_module: "cave-lakehouse",
+        track_features: "Query engine — SQL planner, DataFrame, vectorized executor, LogicalPlan/PhysicalPlan",
+        check_frequency: "biweekly",
+        category: "lakehouse",
+        phase: 2,
+    },
+
+    // ============================================================
+    // BUSINESS APPLICATIONS (CRM, ERP — standalone modules)
+    // ============================================================
+    // Twenty is the standalone CRM upstream (ADR-145). cave-crm is a
+    // function-based crate (ADR-147 naming pattern), independent from
+    // cave-erp's CRM submodule which is being deprecated.
+    // Latest stable at scaffold time: v2.2.0 (2026-05-04).
+    TrackedProject {
+        name: "Twenty",
+        github_repo: "twentyhq/twenty",
+        cave_module: "cave-crm",
+        track_features: "Person/Company/Opportunity/Activity data model, GraphQL + REST API, custom objects, workflow automation, AGPL-3.0 license",
+        check_frequency: "biweekly",
+        category: "crm",
+        phase: 4,
     },
 ];
 
@@ -819,6 +839,23 @@ mod tests {
                 project.name
             );
         }
+    }
+
+    #[test]
+    fn cilium_project_maps_to_cave_net_not_cave_ebpf_common() {
+        // Regression for the 2026-05-13 "Cilium 0%" bug: previously
+        // mapped to cave-ebpf-common (a 188-LOC shared types crate
+        // with a skeleton manifest, kernel parity = 0.0). The actual
+        // Cilium port lives in cave-net (36k LOC, fill_ratio = 0.9179).
+        let cilium = TRACKED_PROJECTS
+            .iter()
+            .find(|p| p.name == "Cilium" && p.github_repo == "cilium/cilium")
+            .expect("Cilium tracked project must exist");
+        assert_eq!(
+            cilium.cave_module, "cave-net",
+            "Cilium must map to cave-net (where the parity manifest declares cilium/cilium); \
+             cave-ebpf-common is a shared types crate, not a port"
+        );
     }
 
     #[test]

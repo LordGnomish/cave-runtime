@@ -30,29 +30,83 @@ pub fn escape(input: &str) -> String {
 /// `title` is shown in the `<title>` and as the H1.
 /// `body` is interpolated as-is — callers MUST escape user data before
 /// passing it in.
+///
+/// **2026-05-13 UX foundation update.** This shell delegates to
+/// [`crate::admin::layout::shell::shell_v2`] with the full chrome
+/// (top bar, sidebar, breadcrumb, command palette, shortcuts, toasts,
+/// dark-mode toggle, footer).
+///
+/// **2026-05-14 sidebar mass adoption.** The default no longer hides
+/// the sidebar — every handler that calls `page_shell(title, body)`
+/// now ships with the navigation visible. The fallback persona is
+/// [`Persona::PlatformAdmin`] because the legacy callers (~136 of
+/// them) all sit behind the platform-admin JWT gate; rendering the
+/// full nav for them is the right default. Callers that want
+/// persona-aware filtering + active-route highlight should migrate
+/// to [`page_shell_full`].
+///
+/// Existing tests that assert the presence of `/static/htmx.min.js`,
+/// `/static/tailwind-light.css`, and the escaped
+/// `<h1>{title}</h1>` / `<title>{title} — cave admin</title>` continue
+/// to pass because shell_v2 emits exactly those tags.
 pub fn page_shell(title: &str, body: &str) -> String {
-    let title_e = escape(title);
-    format!(
-        r#"<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>{title} — cave admin</title>
-  <script src="/static/htmx.min.js" defer></script>
-  <link rel="stylesheet" href="/static/tailwind-light.css">
-</head>
-<body class="bg-gray-50 text-gray-900 font-sans">
-  <header class="border-b bg-white px-4 py-3">
-    <h1 class="text-xl font-semibold">{title}</h1>
-  </header>
-  <main class="px-4 py-6 max-w-6xl mx-auto">
-{body}
-  </main>
-</body>
-</html>"#,
-        title = title_e,
-        body = body,
-    )
+    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    use crate::admin::permission::Persona;
+    shell_v2(ShellOptions {
+        title,
+        persona: Persona::PlatformAdmin,
+        tenant_id: "dev",
+        current_path: "/",
+        theme_cookie: None,
+        breadcrumb: None,
+        extra_commands: Vec::new(),
+        cluster_info: "cave-runtime",
+        hide_sidebar: false,
+        body,
+    })
+}
+
+/// Render the admin-page shell with full request context.
+///
+/// This is the preferred form for any handler that has a
+/// [`crate::admin::permission::RequestCtx`] in scope (and they all
+/// should — the JWT middleware constructs one on every request).
+///
+/// Compared to [`page_shell`], this routes the *real* persona +
+/// tenant id + current URL path into the chrome, so:
+///
+///   * the sidebar's persona filter actually filters
+///     (TenantAdmin only sees the tenant-relevant items),
+///   * the active item in the sidebar gets the `aria-current="page"`
+///     marker + the highlighted styling, and
+///   * the breadcrumb resolves the right trail from the current URL.
+///
+/// `current_path` should be the path the user is viewing — e.g.
+/// `/admin/keda` for the keda list page. Pass an empty string and
+/// the breadcrumb will degrade to "Home" only.
+///
+/// 2026-05-14 — added during the sidebar mass-adoption sweep. New
+/// handlers should call this directly; legacy handlers continue to
+/// work via [`page_shell`].
+pub fn page_shell_full(
+    ctx: &crate::admin::permission::RequestCtx,
+    current_path: &str,
+    title: &str,
+    body: &str,
+) -> String {
+    use crate::admin::layout::shell::{shell_v2, ShellOptions};
+    shell_v2(ShellOptions {
+        title,
+        persona: ctx.persona,
+        tenant_id: ctx.tenant.as_str(),
+        current_path,
+        theme_cookie: None,
+        breadcrumb: None,
+        extra_commands: Vec::new(),
+        cluster_info: "cave-runtime",
+        hide_sidebar: false,
+        body,
+    })
 }
 
 /// Render an HTML table. `headers` and `rows` are escaped; the caller does
@@ -69,6 +123,38 @@ pub fn table(headers: &[&str], rows: &[Vec<String>]) -> String {
         out.push_str(r#"<tr class="border-t">"#);
         for cell in row {
             let _ = write!(out, r#"<td class="px-3 py-2">{}</td>"#, escape(cell));
+        }
+        out.push_str("</tr>");
+    }
+    out.push_str("</tbody></table>");
+    out
+}
+
+/// Render an HTML table whose cells are **already-escaped raw HTML**
+/// (badges, links, icons). Headers are still escaped — those are
+/// always plain-text labels in this codebase. The caller is
+/// responsible for escaping any user-controlled substrings inside
+/// each cell.
+///
+/// Added 2026-05-13 to fix the compliance-matrix double-escape bug:
+/// `compliance.rs` builds per-cell HTML like
+/// `<span class="...">92%</span>`, which `table()` would render as
+/// literal `&lt;span class=...&gt;92%&lt;/span&gt;` text. The
+/// dashboard's matrix now goes through `table_html` so badges /
+/// links / status icons render as intended.
+pub fn table_html(headers: &[&str], rows: &[Vec<String>]) -> String {
+    let mut out = String::new();
+    out.push_str(r#"<table class="min-w-full text-sm border-collapse">"#);
+    out.push_str(r#"<thead class="bg-gray-100"><tr>"#);
+    for h in headers {
+        let _ = write!(out, r#"<th class="px-3 py-2 text-left">{}</th>"#, escape(h));
+    }
+    out.push_str("</tr></thead><tbody>");
+    for row in rows {
+        out.push_str(r#"<tr class="border-t">"#);
+        for cell in row {
+            // Emit cell verbatim — the caller has already produced HTML.
+            let _ = write!(out, r#"<td class="px-3 py-2">{}</td>"#, cell);
         }
         out.push_str("</tr>");
     }
@@ -128,6 +214,37 @@ mod tests {
         assert!(html.contains("/static/htmx.min.js"));
         assert!(html.contains("/static/tailwind-light.css"));
         assert!(html.contains("<p>body</p>"));
+    }
+
+    #[test]
+    fn table_html_emits_cells_verbatim() {
+        // The 2026-05-13 sibling to `table()`: when the caller has
+        // already produced safe HTML for each cell (badges, links,
+        // icons), `table_html` must NOT escape it. Headers are still
+        // escaped because they are always plain-text labels in this
+        // codebase.
+        let (_cite, _t) = crate::portal_test_ctx!(
+            "packages/core-components/src/components/Table/Table.tsx",
+            "TableHtml",
+            "tenant-render-table-html"
+        );
+        let html = table_html(
+            &["score"],
+            &[vec![r#"<span class="px-2 rounded bg-green-100">92%</span>"#.into()]],
+        );
+        // The span survives intact (not double-escaped).
+        assert!(html.contains(r#"<span class="px-2 rounded bg-green-100">92%</span>"#));
+        // And it does NOT appear as escaped text.
+        assert!(!html.contains("&lt;span"));
+        assert!(!html.contains("&quot;"));
+    }
+
+    #[test]
+    fn table_html_still_escapes_headers() {
+        // Headers are always plain-text labels — escape them just like
+        // `table()` does, even though cell content is verbatim.
+        let html = table_html(&["a<b"], &[vec!["x".into()]]);
+        assert!(html.contains("a&lt;b"));
     }
 
     #[test]

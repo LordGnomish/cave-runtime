@@ -6,7 +6,10 @@
 org     = "louislam"
 repo    = "uptime-kuma"
 version = "v1.23.0"
-
+name    = "Uptime Kuma"
+license = "MIT"
+language= "JavaScript"
+url     = "https://github.com/louislam/uptime-kuma"
 [module]
 name        = "cave-status"
 description = "Status page — Uptime Kuma replacement"
@@ -33,3 +36,9 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/status/endpoint"
+
+[parity]
+infra_only = true
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+

@@ -40,6 +40,7 @@ impl ObjectMeta {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OwnerReference {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub name: String,
     pub uid: Uuid,
@@ -86,6 +87,7 @@ pub struct LabelSelectorRequirement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pod {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: PodSpec,
@@ -266,6 +268,7 @@ impl Default for PodTemplateSpec {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deployment {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: DeploymentSpec,
@@ -326,6 +329,7 @@ pub struct DeploymentCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scale {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: ScaleSpec,
@@ -344,6 +348,7 @@ pub struct ScaleStatus { pub replicas: u32, pub selector: Option<String> }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatefulSet {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: StatefulSetSpec,
@@ -387,6 +392,7 @@ pub struct StatefulSetStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonSet {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: DaemonSetSpec,
@@ -428,6 +434,7 @@ pub struct DaemonSetStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplicaSet {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: ReplicaSetSpec,
@@ -460,6 +467,7 @@ pub struct ReplicaSetStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: JobSpec,
@@ -500,6 +508,7 @@ pub struct JobStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronJob {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: CronJobSpec,
@@ -554,6 +563,7 @@ pub struct CronJobStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ingress {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: IngressSpec,
@@ -618,6 +628,7 @@ pub struct IngressLoadBalancerIngress { pub ip: Option<String>, pub hostname: Op
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkPolicy {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: NetworkPolicySpec,
@@ -662,6 +673,7 @@ pub struct NetworkPolicyPort { pub port: Option<u16>, pub protocol: Option<Strin
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentVolume {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: PersistentVolumeSpec,
@@ -708,6 +720,7 @@ impl Default for PersistentVolumeStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentVolumeClaim {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: PersistentVolumeClaimSpec,
@@ -752,6 +765,7 @@ impl Default for PersistentVolumeClaimStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageClass {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub provisioner: String,
@@ -790,6 +804,7 @@ pub struct Subject {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub rules: Vec<PolicyRule>,
@@ -799,6 +814,7 @@ pub struct Role {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterRole {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub rules: Vec<PolicyRule>,
@@ -812,6 +828,7 @@ pub struct AggregationRule { pub cluster_role_selectors: Vec<LabelSelector> }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleBinding {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub subjects: Vec<Subject>,
@@ -822,6 +839,7 @@ pub struct RoleBinding {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClusterRoleBinding {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub subjects: Vec<Subject>,
@@ -834,6 +852,7 @@ pub struct ClusterRoleBinding {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Service {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: ServiceSpec,
@@ -859,6 +878,7 @@ pub struct ServicePort {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigMap {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub data: HashMap<String, String>,
@@ -868,6 +888,7 @@ pub struct ConfigMap {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Secret {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub data: HashMap<String, String>,
@@ -878,6 +899,7 @@ pub struct Secret {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Namespace {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub status: NamespaceStatus,
@@ -890,6 +912,7 @@ pub struct NamespaceStatus { pub phase: String }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceAccount {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub secrets: Vec<ObjectReference>,
@@ -901,6 +924,7 @@ pub struct ServiceAccount {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: NodeSpec,
@@ -970,6 +994,7 @@ pub struct NodeSystemInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KubeEvent {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub involved_object: ObjectReference,
@@ -989,6 +1014,7 @@ pub struct EventSource { pub component: String, pub host: Option<String> }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Endpoints {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub subsets: Vec<EndpointSubset>,
@@ -1015,6 +1041,7 @@ pub struct EndpointPort { pub name: Option<String>, pub port: u16, pub protocol:
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceQuota {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: ResourceQuotaSpec,
@@ -1047,6 +1074,7 @@ pub struct ResourceQuotaStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LimitRange {
     pub api_version: String,
+    #[serde(default, skip_serializing)]
     pub kind: String,
     pub metadata: ObjectMeta,
     pub spec: LimitRangeSpec,

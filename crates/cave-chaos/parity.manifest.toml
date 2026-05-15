@@ -6,7 +6,15 @@
 org     = "chaos-mesh"
 repo    = "chaos-mesh"
 version = "v2.6.0"
+name    = "Chaos Mesh"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/chaos-mesh/chaos-mesh"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-chaos"
 description = "Chaos engineering — Chaos Mesh replacement"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/chaos/endpoint"
+
+[portal_ui]
+upstream_ui  = "Chaos Dashboard"
+upstream_url = "https://chaos-mesh.org/docs/"
+status       = "partial"
+loc          = 143
+priority     = "P1"
+notes        = "Experiment timeline"
+last_audit   = "2026-05-11"

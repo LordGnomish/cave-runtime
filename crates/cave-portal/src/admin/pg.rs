@@ -5,7 +5,7 @@
 //! plugin (read-only by default).
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, PgTable};
 use crate::admin::types::Cite;
 
@@ -118,7 +118,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, PgViewErro
         n = tables.len(),
         tbl = table(&["schema", "name", "rows"], &rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/pg",
         &format!("pg · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

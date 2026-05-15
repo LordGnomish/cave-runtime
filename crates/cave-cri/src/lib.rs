@@ -81,10 +81,20 @@ pub mod manifest_list;
 pub mod pull_progress;
 pub mod runtime_handler;
 pub mod sandbox;
+/// k8s-cri push batch2 2026-05-13: Windows + FreeBSD sandbox
+/// runners. Mirrors `pkg/cri/server/podsandbox/sandbox_run_other.go`.
+/// State machine + path layout + spec validation are platform-
+/// independent (tests run on every host); the real syscall layer
+/// (`jail_create` / `CreateJobObjectW` / HCS) belongs to the
+/// runtime backend.
+pub mod sandbox_other;
 pub mod stats;
 pub mod streaming;
 pub mod transport;
 pub mod userns;
+pub mod content;
+pub mod diff;
+pub mod leases;
 
 #[cfg(test)]
 mod upstream_tests;

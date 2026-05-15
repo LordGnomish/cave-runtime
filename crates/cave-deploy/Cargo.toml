@@ -1,6 +1,14 @@
 [package]
 name = "cave-deploy"
 description = "GitOps deployment engine — compatible with ArgoCD + Flux"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-deploy"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["gitops", "deployment", "argocd", "flux", "automation"]
+categories = ["command-line-utilities", "development-tools", "network-programming"]
 version.workspace = true
 edition.workspace = true
 license.workspace = true

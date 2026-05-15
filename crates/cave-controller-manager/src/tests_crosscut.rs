@@ -34,6 +34,7 @@ fn deployment_paused_short_circuits_to_noop() {
         replicas: 5,
         strategy: deployment::Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
         paused: true,
+        progress_deadline_seconds: None,
     };
     let status = deployment::DeploymentStatus { observed_replicas: 0, ..Default::default() };
     assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::NoOp);
@@ -52,6 +53,7 @@ fn deployment_scale_up_emits_create_decision() {
         replicas: 5,
         strategy: deployment::Strategy::RollingUpdate { max_surge: 1, max_unavailable: 0 },
         paused: false,
+        progress_deadline_seconds: None,
     };
     let status = deployment::DeploymentStatus { observed_replicas: 2, ..Default::default() };
     assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(3));
@@ -70,6 +72,7 @@ fn deployment_scale_down_emits_delete_decision() {
         replicas: 2,
         strategy: deployment::Strategy::Recreate,
         paused: false,
+        progress_deadline_seconds: None,
     };
     let status = deployment::DeploymentStatus { observed_replicas: 5, ..Default::default() };
     assert_eq!(deployment::reconcile(&spec, &status, &t).unwrap(), Reconcile::Delete(3));
@@ -88,6 +91,7 @@ fn deployment_max_pods_during_surge_caps_at_replicas_for_recreate() {
         replicas: 7,
         strategy: deployment::Strategy::Recreate,
         paused: false,
+        progress_deadline_seconds: None,
     };
     assert_eq!(deployment::max_pods_during_surge(&spec), 7);
 }
@@ -340,8 +344,9 @@ fn job_is_complete_when_succeeded_meets_completions() {
         parallelism: 2,
         backoff_limit: 3,
         suspended: false,
+        active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 0, succeeded: 5, failed: 0 };
+    let status = job::JobStatus { active: 0, succeeded: 5, failed: 0, start_time: None };
     assert!(job::is_complete(&spec, &status));
 }
 
@@ -359,8 +364,9 @@ fn job_past_backoff_when_failed_exceeds_limit() {
         parallelism: 2,
         backoff_limit: 3,
         suspended: false,
+        active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 0, succeeded: 0, failed: 4 };
+    let status = job::JobStatus { active: 0, succeeded: 0, failed: 4, start_time: None };
     assert!(job::past_backoff(&spec, &status));
 }
 
@@ -378,8 +384,9 @@ fn job_suspended_with_active_pods_emits_delete() {
         parallelism: 2,
         backoff_limit: 3,
         suspended: true,
+        active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 2, succeeded: 0, failed: 0 };
+    let status = job::JobStatus { active: 2, succeeded: 0, failed: 0, start_time: None };
     assert_eq!(job::reconcile(&spec, &status, &t).unwrap(), Reconcile::Delete(2));
 }
 
@@ -397,8 +404,9 @@ fn job_clamps_creates_to_parallelism_remaining() {
         parallelism: 3,
         backoff_limit: 6,
         suspended: false,
+        active_deadline_seconds: None,
     };
-    let status = job::JobStatus { active: 1, succeeded: 0, failed: 0 };
+    let status = job::JobStatus { active: 1, succeeded: 0, failed: 0, start_time: None };
     assert_eq!(job::reconcile(&spec, &status, &t).unwrap(), Reconcile::Create(2));
 }
 

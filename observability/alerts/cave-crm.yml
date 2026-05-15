@@ -1,0 +1,55 @@
+# cave-crm alerts — auto-generated tier1 obs scaffold
+groups:
+  - name: cave-crm-slo
+    interval: 30s
+    rules:
+      - alert: CrmSloBurnRateFast
+        expr: |
+          (
+            sum(rate(cave_crm_total{job="cave-crm",code=~"5.."}[1h]))
+            /
+            sum(rate(cave_crm_total{job="cave-crm"}[1h]))
+          ) > (14.4 * 0.001)
+        for: 2m
+        labels:
+          severity: critical
+          tenant_scoped: "true"
+        annotations:
+          summary: "cave-crm fast burn-rate (1h)"
+          description: "5xx fraction is {{ $value | humanizePercentage }}."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-crm/slo-burn-fast.md"
+      - alert: CrmLatencyP99High
+        expr: |
+          histogram_quantile(0.99, sum(rate(cave_crm_request_duration_seconds_bucket{job="cave-crm"}[5m])) by (le)) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-crm p99 latency > 500ms"
+          description: "p99 latency = {{ $value }}s over 5m."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-crm/latency.md"
+      - alert: CrmSaturationHigh
+        expr: 'sum(rate(cave_crm_inflight_requests{job="cave-crm"}[5m])) > 100'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-crm inflight requests > 100"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-crm/saturation.md"
+      - alert: CrmMemoryPressure
+        expr: 'process_resident_memory_bytes{job="cave-crm"} > (4 * 1024 * 1024 * 1024)'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cave-crm RSS > 4 GiB"
+          runbook_url: "https://docs.cave.dev/runbooks/cave-crm/memory.md"
+      - alert: CrmHealthProbeFailing
+        expr: 'min(up{job="cave-crm"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-crm health probe failing"
+          description: "At least one instance reports up == 0."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-crm/health.md"

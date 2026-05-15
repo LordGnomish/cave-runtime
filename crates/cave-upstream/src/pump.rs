@@ -234,9 +234,10 @@ mod tests {
     #[test]
     fn env_var_overrides_default_queue() {
         let tmp = TempDir::new().unwrap();
-        std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path());
+        // SAFETY: serialised access — no other test in this binary touches this var.
+        unsafe { std::env::set_var("CAVE_QWEN_PUMP_QUEUE", tmp.path()); }
         let resolved = default_queue_dir();
-        std::env::remove_var("CAVE_QWEN_PUMP_QUEUE");
+        unsafe { std::env::remove_var("CAVE_QWEN_PUMP_QUEUE"); }
         assert_eq!(resolved, tmp.path());
     }
 

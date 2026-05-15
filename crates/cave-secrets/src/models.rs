@@ -271,4 +271,87 @@ mod tests {
         };
         assert_eq!(s.total_findings, 0);
     }
+
+    #[test]
+    fn secret_type_as_str_matches_display() {
+        for t in [
+            SecretType::ApiKey,
+            SecretType::AwsCredential,
+            SecretType::PrivateKey,
+            SecretType::SlackToken,
+            SecretType::JwtSecret,
+        ] {
+            assert_eq!(t.as_str(), t.to_string());
+        }
+    }
+
+    #[test]
+    fn secret_type_serde_roundtrip_all_variants() {
+        let variants = [
+            SecretType::ApiKey,
+            SecretType::AwsCredential,
+            SecretType::GithubToken,
+            SecretType::GitlabToken,
+            SecretType::SlackToken,
+            SecretType::PrivateKey,
+            SecretType::Certificate,
+            SecretType::Password,
+            SecretType::DatabaseUrl,
+            SecretType::GenericSecret,
+            SecretType::GoogleApiKey,
+            SecretType::StripeKey,
+            SecretType::SendgridKey,
+            SecretType::JwtSecret,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let back: SecretType = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, &back);
+        }
+    }
+
+    #[test]
+    fn confidence_serde_snake_case() {
+        let json = serde_json::to_string(&Confidence::High).unwrap();
+        assert_eq!(json, "\"high\"");
+    }
+
+    #[test]
+    fn severity_serde_snake_case() {
+        let json = serde_json::to_string(&Severity::Critical).unwrap();
+        assert_eq!(json, "\"critical\"");
+    }
+
+    #[test]
+    fn scan_request_explicit_redact_false() {
+        let req: ScanRequest =
+            serde_json::from_str(r#"{"content":"x","file_path":"a","redact":false}"#).unwrap();
+        assert!(!req.redact);
+    }
+
+    #[test]
+    fn scan_result_serializes() {
+        let r = ScanResult {
+            file_path: "f.txt".to_string(),
+            findings: vec![],
+            scanned_lines: 10,
+            scanned_bytes: 100,
+            duration_ms: 5,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("scanned_lines"));
+        assert!(json.contains("duration_ms"));
+    }
+
+    #[test]
+    fn allowlist_entry_serializes() {
+        let e = AllowlistEntry {
+            id: "a1".to_string(),
+            pattern: "test/fixtures/*".to_string(),
+            reason: "test data".to_string(),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        assert!(json.contains("test/fixtures"));
+        assert!(json.contains("test data"));
+    }
 }

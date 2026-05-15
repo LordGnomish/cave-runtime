@@ -10,7 +10,15 @@
 org     = "minio"
 repo    = "minio"
 version = "RELEASE.2024-01-01"
+name    = "MinIO"
+license = "AGPL-3.0"
+language= "Go"
+url     = "https://github.com/minio/minio"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-store"
 description = "Object store — MinIO-equivalent S3 surface (multipart, versioning, encryption, lifecycle, policy, presigned) + etcd-v3 KV/lease/watch shim"
@@ -361,3 +369,12 @@ local_path    = "/v3/kv/deleterange"
 kind          = "http"
 upstream_path = "etcd /v3/kv/txn"
 local_path    = "/v3/kv/txn"
+
+[portal_ui]
+upstream_ui  = "MinIO Console"
+upstream_url = "https://min.io/docs/minio/linux/operations/minio-console.html"
+status       = "partial"
+loc          = 137
+priority     = "P1"
+notes        = "Bucket browser"
+last_audit   = "2026-05-11"

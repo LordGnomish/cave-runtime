@@ -1,0 +1,112 @@
+Cave Runtime
+Copyright 2026 Cave Runtime Contributors
+
+This product is licensed under the Apache License, Version 2.0
+(see LICENSE).
+
+This product includes software developed by the following upstream
+projects whose APIs, behaviors, or wire protocols Cave re-implements
+in Rust (line-by-line TDD parity, per ADR-GOLDEN-001). Cave does NOT
+vendor or redistribute their source. Each upstream is independently
+licensed as listed below. License strings are extracted from each
+crate's `parity.manifest.toml` — verify against upstream LICENSE files
+before redistribution of any derived artifact.
+
+Total upstreams: 78
+
+AGPL-3.0:
+  - minio/minio
+  - twentyhq/twenty
+
+Apache-2.0:
+  - BerriAI/litellm
+  - DefectDojo/django-DefectDojo
+  - DependencyTrack/dependency-track
+  - Kong/kong
+  - SonarSource/sonarqube
+  - Unleash/unleash
+  - apache/arrow-rs
+  - apache/datafusion
+  - apache/hudi-rs
+  - apache/iceberg-rust
+  - apache/incubator-devlake
+  - apache/kafka
+  - apache/pulsar
+  - aquasecurity/trivy
+  - argoproj/argo-cd
+  - argoproj/argo-rollouts
+  - backstage/backstage
+  - casbin/casbin
+  - cert-manager/cert-manager
+  - chaos-mesh/chaos-mesh
+  - cilium/cilium
+  - cilium/tetragon
+  - clastix/kamaji
+  - cloudnative-pg/cloudnative-pg
+  - containerd/containerd
+  - coredns/coredns
+  - crossplane/crossplane
+  - danny-avila/LibreChat
+  - debezium/debezium-server
+  - delta-io/delta-rs
+  - distribution/distribution
+  - etcd-io/etcd
+  - falcosecurity/falco
+  - grafana/grafana
+  - grafana/loki
+  - grafana/oncall
+  - grafana/pyroscope
+  - gravitational/teleport
+  - hashicorp/terraform
+  - istio/istio
+  - jaegertracing/jaeger
+  - kedacore/keda
+  - keycloak/keycloak
+  - knative/serving
+  - kubernetes-sigs/cluster-api
+  - kubernetes-sigs/karpenter
+  - kubernetes/kubernetes
+  - kubevirt/kubevirt
+  - langfuse/langfuse
+  - louislam/uptime-kuma
+  - makeplane/plane
+  - manticoresoftware/manticoresearch
+  - microsoft/presidio
+  - n8n-io/n8n
+  - nobl9/nobl9-go
+  - ollama/ollama
+  - open-policy-agent/gatekeeper
+  - open-policy-agent/opa
+  - openbao/openbao
+  - opencost/opencost
+  - pgbouncer/pgbouncer
+  - prometheus/alertmanager
+  - prometheus/prometheus
+  - pulp/pulpcore
+  - sigstore/sigstore
+  - smallstep/certificates
+  - tektoncd/pipeline
+  - trufflesecurity/trufflehog
+  - twisted/towncrier
+  - vmware-tanzu/velero
+  - zaproxy/zaproxy
+  - zed-industries/zed
+
+GPL-3.0:
+  - frappe/erpnext
+
+PostgreSQL (BSD-2-style):
+  - postgres/postgres
+
+RSAL/SSPL-1.0 (v7.4+); BSD-3-Clause (earlier):
+  - redis/redis
+
+SSPL-1.0 (server); Apache-2.0 (drivers):
+  - mongodb/mongo
+
+---
+
+This product also depends on the following Rust ecosystem crates
+(see Cargo.toml for the canonical list and Cargo.lock for resolved
+versions). All are independently licensed; see each crate's
+LICENSE file via `cargo about generate licenses.html` or similar.

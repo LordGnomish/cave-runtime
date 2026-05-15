@@ -6,7 +6,15 @@
 org     = "gravitational"
 repo    = "teleport"
 version = "v14.0.0"
+name    = "Teleport"
+license = "AGPL-3.0"
+language= "Go"
+url     = "https://github.com/gravitational/teleport"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-pam"
 description = "Privileged access management — Teleport replacement"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/pam/endpoint"
+
+[portal_ui]
+upstream_ui  = "Teleport Web UI"
+upstream_url = "https://goteleport.com/docs/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Access proxy UI"
+last_audit   = "2026-05-11"

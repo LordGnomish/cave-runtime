@@ -6,7 +6,15 @@
 org     = "kubernetes"
 repo    = "kubernetes"
 version = "v1.28.0"
+name    = "Kubernetes"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/kubernetes/kubernetes"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-admission"
 description = "Kubernetes admission controller"
@@ -33,3 +41,12 @@ source_root = "src"
 # kind          = "http"
 # upstream_path = "/api/upstream"
 # local_path    = "/api/admission/endpoint"
+
+[portal_ui]
+upstream_ui  = "(CRD-only)"
+upstream_url = "https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/"
+status       = "scaffold"
+loc          = 75
+priority     = "P2"
+notes        = "Validating/mutating webhook lifecycle"
+last_audit   = "2026-05-11"

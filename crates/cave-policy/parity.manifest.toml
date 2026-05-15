@@ -9,7 +9,15 @@
 org     = "open-policy-agent"
 repo    = "opa"
 version = "v0.58.0"
+name    = "Open Policy Agent"
+license = "Apache-2.0"
+language= "Go"
+url     = "https://github.com/open-policy-agent/opa"
 
+[parity]
+ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
+last_audit  = "2026-05-12"
+infra_only  = false
 [module]
 name        = "cave-policy"
 description = "Policy engine — OPA reimplementation (Rego parser/eval, bundle service, decision log) + Kyverno-style admission webhook"
@@ -275,3 +283,12 @@ local_path    = "/webhook/mutate"
 kind          = "http"
 upstream_path = "/kyverno/policies"
 local_path    = "/api/kyverno/policies"
+
+[portal_ui]
+upstream_ui  = "OPA Rego Playground"
+upstream_url = "https://play.openpolicyagent.org/"
+status       = "partial"
+loc          = 151
+priority     = "P1"
+notes        = "Policy editor"
+last_audit   = "2026-05-11"

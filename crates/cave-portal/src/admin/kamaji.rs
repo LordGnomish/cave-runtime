@@ -6,7 +6,7 @@
 //! exposes both.
 
 use crate::admin::permission::{Permission, RequestCtx};
-use crate::admin::render::{escape, page_shell, table};
+use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, KamajiTcp};
 use crate::admin::types::Cite;
 
@@ -64,7 +64,9 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, KamajiView
         n = tcps.len(),
         tbl = table(&["name", "version", "ready/desired"], &rows),
     );
-    Ok(page_shell(
+    Ok(page_shell_full(
+        ctx,
+        "/admin/kamaji",
         &format!("kamaji · {}", escape(ctx.tenant.as_str())),
         &body,
     ))

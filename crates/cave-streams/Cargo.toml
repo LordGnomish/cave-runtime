@@ -1,9 +1,17 @@
 [package]
 name = "cave-streams"
 description = "Kafka-compatible streaming — full wire protocol, Schema Registry, Kafka Connect"
-version.workspace = true
+authors.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/cave-streams"
+readme = "README.md"
+rust-version.workspace = true
+keywords = ["kafka", "pulsar", "streaming", "messaging", "broker"]
+categories = ["network-programming", "asynchronous", "database-implementations"]
+version.workspace = true
 
 [dependencies]
 cave-core = { path = "../cave-core" }

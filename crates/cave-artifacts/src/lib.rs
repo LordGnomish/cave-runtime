@@ -7,11 +7,15 @@
 //! - `nexus`  — universal binary repository (Sonatype Nexus 3) — initial
 //!              port: repository/component/asset/cleanup/routing + raw
 //!              format end-to-end; remaining format adapters land later
+//! - `cosign` — supply-chain signature module: ECDSA-P256 (real) +
+//!              ML-DSA-65 hybrid composite (Ed25519 real + ML-DSA fixture
+//!              today; backend swap is contained inside cave-certs)
 //!
 //! Surfaces:
 //! - [`ArtifactsState`] — combined module state graph
 //! - [`router`]         — combined axum Router merging all sub-modules
 
+pub mod cosign;
 pub mod harbor;
 pub mod nexus;
 pub mod pulp;
@@ -28,6 +32,7 @@ pub struct ArtifactsState {
     pub harbor: Arc<harbor::RegistryState>,
     pub pulp: Arc<pulp::ArtifactsState>,
     pub nexus: Arc<nexus::NexusState>,
+    pub cosign: Arc<cosign::CosignState>,
 }
 
 impl Default for ArtifactsState {
@@ -36,15 +41,17 @@ impl Default for ArtifactsState {
             harbor: Arc::new(harbor::RegistryState::default()),
             pulp: Arc::new(pulp::ArtifactsState::default()),
             nexus: Arc::new(nexus::NexusState::default()),
+            cosign: Arc::new(cosign::CosignState::default()),
         }
     }
 }
 
-/// Build the combined axum router (harbor ∪ pulp ∪ nexus ∪ /api/artifacts/health).
+/// Build the combined axum router (harbor ∪ pulp ∪ nexus ∪ cosign ∪ /api/artifacts/health).
 pub fn router(state: Arc<ArtifactsState>) -> Router {
     harbor::router(Arc::clone(&state.harbor))
         .merge(pulp::router(Arc::clone(&state.pulp)))
         .merge(nexus::router(Arc::clone(&state.nexus)))
+        .merge(cosign::router(Arc::clone(&state.cosign)))
         .merge(health_router())
 }
 
@@ -61,6 +68,7 @@ fn health_router() -> Router {
                     "harbor": harbor::MODULE_NAME,
                     "pulp":   pulp::MODULE_NAME,
                     "nexus":  nexus::MODULE_NAME,
+                    "cosign": cosign::MODULE_NAME,
                 }
             }))
         }),

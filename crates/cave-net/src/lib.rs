@@ -18,6 +18,13 @@ pub mod routes;
 /// Pinned to cilium/cilium v1.19.3.
 pub mod cilium;
 
+/// 2026-05-14 eBPF userspace simulation. Closes the `behavioral_parity`
+/// audit's deliberately-skipped BPF datapath test by providing a
+/// deterministic userspace state-machine sim of Cilium's
+/// `bpf_lxc.c` / `bpf_host.c` / `bpf/lib/conntrack.h` control
+/// surfaces. Not a packet emulator — see `ebpf_sim/mod.rs`.
+pub mod ebpf_sim;
+
 use dataplane::NetState;
 use std::sync::Arc;
 

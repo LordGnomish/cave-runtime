@@ -86,3 +86,51 @@ impl WrapStore {
         self.wrap(entry.data, new_ttl, &entry.creation_path)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_wrap_returns_token_with_hvs_prefix() {
+        let mut s = WrapStore::default();
+        let info = s.wrap(json!({"k": "v"}), 60, "/v1/secret/data/x").unwrap();
+        assert!(info.token.starts_with("hvs."));
+        assert_eq!(info.ttl, 60);
+        assert_eq!(info.creation_path, "/v1/secret/data/x");
+    }
+
+    #[test]
+    fn test_wrap_unwrap_roundtrip() {
+        let mut s = WrapStore::default();
+        let payload = json!({"username": "alice", "secret": "hunter2"});
+        let info = s.wrap(payload.clone(), 60, "/p").unwrap();
+        let unwrapped = s.unwrap(&info.token).unwrap();
+        assert_eq!(unwrapped, payload);
+    }
+
+    #[test]
+    fn test_unwrap_consumes_token_single_use() {
+        let mut s = WrapStore::default();
+        let info = s.wrap(json!(1), 60, "/p").unwrap();
+        assert!(s.unwrap(&info.token).is_ok());
+        // Second unwrap must fail — wrap tokens are single-use.
+        assert!(s.unwrap(&info.token).is_err());
+    }
+
+    #[test]
+    fn test_lookup_does_not_consume() {
+        let mut s = WrapStore::default();
+        let info = s.wrap(json!("data"), 60, "/p").unwrap();
+        assert!(s.lookup(&info.token).is_ok());
+        // Token still unwrappable after lookup.
+        assert!(s.unwrap(&info.token).is_ok());
+    }
+
+    #[test]
+    fn test_unwrap_unknown_token_fails() {
+        let mut s = WrapStore::default();
+        assert!(s.unwrap("hvs.bogus").is_err());
+    }
+}

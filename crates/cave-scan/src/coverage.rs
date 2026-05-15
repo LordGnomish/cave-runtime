@@ -149,4 +149,96 @@ mod tests {
         let report = parse_cobertura(cobertura);
         assert!((report.coverage_percent - 80.0).abs() < 0.1);
     }
+
+    #[test]
+    fn test_parse_lcov_empty() {
+        let report = parse_lcov("");
+        assert_eq!(report.total_lines, 0);
+        assert_eq!(report.covered_lines, 0);
+        assert_eq!(report.coverage_percent, 0.0);
+        assert!(report.files.is_empty());
+    }
+
+    #[test]
+    fn test_parse_lcov_multiple_files() {
+        let lcov = "TN:src/a.rs\nLF:50\nLH:40\nend_of_record\nTN:src/b.rs\nLF:100\nLH:80\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.files.len(), 2);
+        assert_eq!(report.total_lines, 150);
+        assert_eq!(report.covered_lines, 120);
+        assert!((report.coverage_percent - 80.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_parse_lcov_zero_lines() {
+        let lcov = "TN:src/empty.rs\nLF:0\nLH:0\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.total_lines, 0);
+        assert_eq!(report.coverage_percent, 0.0);
+    }
+
+    #[test]
+    fn test_parse_lcov_no_end_of_record_finalizes() {
+        // No trailing end_of_record; parser must still emit the file.
+        let lcov = "TN:src/dangling.rs\nLF:30\nLH:15\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.files.len(), 1);
+        assert_eq!(report.files[0].path, "src/dangling.rs");
+        assert_eq!(report.files[0].total_lines, 30);
+        assert_eq!(report.files[0].covered_lines, 15);
+    }
+
+    #[test]
+    fn test_parse_lcov_full_coverage() {
+        let lcov = "TN:src/full.rs\nLF:42\nLH:42\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert!((report.coverage_percent - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_lcov_zero_coverage() {
+        let lcov = "TN:src/none.rs\nLF:50\nLH:0\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.coverage_percent, 0.0);
+    }
+
+    #[test]
+    fn test_parse_lcov_garbage_lines_ignored() {
+        let lcov = "DA:1,1\nBRDA:2,3,4,5\nFNDA:1,foo\nTN:src/clean.rs\nLF:10\nLH:7\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.files.len(), 1);
+        assert_eq!(report.total_lines, 10);
+        assert_eq!(report.covered_lines, 7);
+    }
+
+    #[test]
+    fn test_parse_lcov_malformed_numbers_default_zero() {
+        let lcov = "TN:src/bad.rs\nLF:not_a_number\nLH:also_bad\nend_of_record\n";
+        let report = parse_lcov(lcov);
+        assert_eq!(report.total_lines, 0);
+        assert_eq!(report.covered_lines, 0);
+    }
+
+    #[test]
+    fn test_parse_cobertura_full_rate() {
+        let xml = r#"<coverage line-rate="1.0"><package name="full" /></coverage>"#;
+        let report = parse_cobertura(xml);
+        assert!((report.coverage_percent - 100.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_cobertura_no_packages_no_rate() {
+        let report = parse_cobertura("<coverage></coverage>");
+        assert_eq!(report.total_lines, 0);
+        assert_eq!(report.coverage_percent, 0.0);
+        assert!(report.files.is_empty());
+    }
+
+    #[test]
+    fn test_parse_cobertura_multiple_packages() {
+        let xml = r#"<coverage line-rate="0.50"><package name="a"/><package name="b"/><package name="c"/></coverage>"#;
+        let report = parse_cobertura(xml);
+        assert_eq!(report.files.len(), 3);
+        assert!((report.coverage_percent - 50.0).abs() < 0.1);
+    }
 }

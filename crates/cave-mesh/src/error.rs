@@ -54,6 +54,24 @@ pub enum MeshError {
 
     #[error("timeout: {0}")]
     Timeout(String),
+
+    #[error("conflict: {0}")]
+    Conflict(String),
+
+    #[error("invalid input: {0}")]
+    InvalidInput(String),
+}
+
+impl MeshError {
+    pub fn not_found(s: impl Into<String>) -> Self {
+        Self::NotFound(s.into())
+    }
+    pub fn conflict(s: impl Into<String>) -> Self {
+        Self::Conflict(s.into())
+    }
+    pub fn invalid_input(s: impl Into<String>) -> Self {
+        Self::InvalidInput(s.into())
+    }
 }
 
 pub type MeshResult<T> = Result<T, MeshError>;
