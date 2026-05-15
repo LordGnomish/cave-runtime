@@ -212,6 +212,15 @@ pub enum Permission {
     IcebergRead,
     MlflowRead,
     LiteLlmRead,
+
+    // ── 2026-05-15 batch: WebAuthn / FIDO2 / passkey ──────────────────
+    /// Read per-user credential records (credentialId, public key, counter,
+    /// AAGUID, attestation format).
+    WebauthnRead,
+    /// Delete a credential record from a user.
+    WebauthnWrite,
+    /// Upload + browse the FIDO Alliance Metadata Service v3 blob.
+    WebauthnMdsManage,
 }
 
 impl Permission {
@@ -342,6 +351,9 @@ impl Permission {
             Permission::IcebergRead => "iceberg.catalog.read",
             Permission::MlflowRead => "mlflow.experiment.read",
             Permission::LiteLlmRead => "litellm.proxy.read",
+            Permission::WebauthnRead => "auth.webauthn.read",
+            Permission::WebauthnWrite => "auth.webauthn.write",
+            Permission::WebauthnMdsManage => "auth.webauthn.mds.manage",
         }
     }
 }

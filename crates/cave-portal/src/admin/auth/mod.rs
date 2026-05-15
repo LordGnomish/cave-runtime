@@ -18,6 +18,7 @@ pub mod events;
 pub mod realms;
 pub mod sessions;
 pub mod users;
+pub mod webauthn;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
