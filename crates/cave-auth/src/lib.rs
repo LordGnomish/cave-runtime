@@ -27,6 +27,7 @@ pub mod okta;
 pub mod rbac;
 pub mod saml;
 pub mod tokens;
+pub mod webauthn;
 
 use cave_core::config::AuthProvider;
 
