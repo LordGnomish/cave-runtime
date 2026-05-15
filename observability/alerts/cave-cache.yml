@@ -158,3 +158,55 @@ groups:
         annotations:
           summary: "Pub/sub backlog > 100k messages"
           runbook_url: "https://docs.cave.dev/runbooks/cave-cache/pubsub-backlog.md"
+
+  - name: cave-cache-cluster
+    interval: 30s
+    rules:
+      - alert: CacheClusterPartitioned
+        expr: 'min(cache_cluster_state_ok{job="cave-cache"}) < 1'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cave-cache cluster partitioned (cluster_state != ok)"
+          description: "At least one node reports cluster_state != ok — slots may be uncovered."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/cluster-partitioned.md"
+      - alert: CacheReshardingStalled
+        expr: |
+          max(cache_cluster_migration_active_seconds{job="cave-cache"}) > 1800
+          and
+          rate(cache_cluster_migration_keys_done_total{job="cave-cache"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Resharding stalled — migration alive > 30m with zero key progress"
+          description: "Active migration has not advanced any keys in the last 5 minutes."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/resharding-stalled.md"
+      - alert: CacheAofRewriteOverdue
+        expr: 'cache_aof_seconds_since_last_rewrite{job="cave-cache"} > 86400'
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AOF has not been rewritten in 24h"
+          description: "auto-aof-rewrite did not fire — file may have grown unbounded."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/aof-rewrite-overdue.md"
+      - alert: CacheSnapshotFailed
+        expr: 'increase(cache_rdb_save_failures_total{job="cave-cache"}[10m]) > 0'
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RDB snapshot failed at least once in the last 10m"
+          description: "Persistence is degraded — investigate disk/permissions/space."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/snapshot-failed.md"
+      - alert: CacheNodeFlapping
+        expr: 'increase(cache_cluster_node_state_changes_total{job="cave-cache"}[10m]) > 5'
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cluster node flapping (>5 state changes in 10m)"
+          description: "A node is bouncing between PFAIL/FAIL/OK — gossip latency, partial netsplit, or GC pause."
+          runbook_url: "https://docs.cave.dev/runbooks/cave-cache/node-flapping.md"

@@ -1290,6 +1290,51 @@ enum CacheCmd {
         /// Message body
         message: String,
     },
+    /// Cluster management (CLUSTER NODES / SLOTS / SETSLOT)
+    Cluster {
+        #[command(subcommand)]
+        cmd: CacheClusterCmd,
+    },
+    /// Persistence management (RDB / AOF)
+    Persistence {
+        #[command(subcommand)]
+        cmd: CachePersistenceCmd,
+    },
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum CacheClusterCmd {
+    /// List known cluster nodes (CLUSTER NODES)
+    Nodes,
+    /// Show slot ownership ranges (CLUSTER SLOTS)
+    Slots,
+    /// Reshard slots between two nodes (CLUSTER SETSLOT)
+    Reshard {
+        /// Source node id
+        #[arg(long)]
+        from: String,
+        /// Destination node id
+        #[arg(long)]
+        to: String,
+        /// Number of slots to move
+        #[arg(long)]
+        slots: u16,
+    },
+    /// Force a node to fail over (CLUSTER FAILOVER)
+    Failover {
+        /// Node id to fail over
+        node: String,
+    },
+}
+
+#[derive(Subcommand, Debug, PartialEq, Eq)]
+enum CachePersistenceCmd {
+    /// Trigger an RDB snapshot now (SAVE)
+    Snapshot,
+    /// Trigger an AOF rewrite (BGREWRITEAOF)
+    RewriteAof,
+    /// Show RDB + AOF persistence status (INFO persistence)
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -2963,6 +3008,33 @@ async fn run(cli: Cli) -> Result<()> {
                 )
                 .await
             }
+            CacheCmd::Cluster { cmd } => match cmd {
+                CacheClusterCmd::Nodes => c.get("/api/cache/cluster/nodes").await,
+                CacheClusterCmd::Slots => c.get("/api/cache/cluster/slots").await,
+                CacheClusterCmd::Reshard { from, to, slots } => {
+                    c.post(
+                        "/api/cache/cluster/reshard",
+                        json!({ "from": from, "to": to, "slots": slots }),
+                    )
+                    .await
+                }
+                CacheClusterCmd::Failover { node } => {
+                    c.post(
+                        &format!("/api/cache/cluster/failover/{}", urlencode(&node)),
+                        json!({}),
+                    )
+                    .await
+                }
+            },
+            CacheCmd::Persistence { cmd } => match cmd {
+                CachePersistenceCmd::Snapshot => {
+                    c.post("/api/cache/persistence/snapshot", json!({})).await
+                }
+                CachePersistenceCmd::RewriteAof => {
+                    c.post("/api/cache/persistence/rewrite-aof", json!({})).await
+                }
+                CachePersistenceCmd::Status => c.get("/api/cache/persistence/status").await,
+            },
         },
 
         // ── Lakehouse (Iceberg + DataFusion) ──────────────────────────────────
@@ -5146,5 +5218,127 @@ mod batch4_parse_tests {
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+    }
+}
+
+#[cfg(test)]
+mod cache_cluster_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn cache_cluster_nodes_parses() {
+        let cli = parse(&["cavectl", "cache", "cluster", "nodes"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Cache {
+                cmd: CacheCmd::Cluster { cmd: CacheClusterCmd::Nodes }
+            }
+        ));
+    }
+
+    #[test]
+    fn cache_cluster_slots_parses() {
+        let cli = parse(&["cavectl", "cache", "cluster", "slots"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Cache {
+                cmd: CacheCmd::Cluster { cmd: CacheClusterCmd::Slots }
+            }
+        ));
+    }
+
+    #[test]
+    fn cache_cluster_reshard_parses_full_args() {
+        let cli = parse(&[
+            "cavectl",
+            "cache",
+            "cluster",
+            "reshard",
+            "--from",
+            "a",
+            "--to",
+            "b",
+            "--slots",
+            "100",
+        ]);
+        match cli.command {
+            Commands::Cache {
+                cmd:
+                    CacheCmd::Cluster {
+                        cmd:
+                            CacheClusterCmd::Reshard {
+                                from,
+                                to,
+                                slots,
+                            },
+                    },
+            } => {
+                assert_eq!(from, "a");
+                assert_eq!(to, "b");
+                assert_eq!(slots, 100);
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn cache_cluster_reshard_rejects_missing_args() {
+        let r = Cli::try_parse_from(&["cavectl", "cache", "cluster", "reshard", "--from", "a"]);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn cache_cluster_failover_takes_node_arg() {
+        let cli = parse(&["cavectl", "cache", "cluster", "failover", "n123"]);
+        match cli.command {
+            Commands::Cache {
+                cmd: CacheCmd::Cluster { cmd: CacheClusterCmd::Failover { node } },
+            } => assert_eq!(node, "n123"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn cache_persistence_snapshot_parses() {
+        let cli = parse(&["cavectl", "cache", "persistence", "snapshot"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Cache {
+                cmd: CacheCmd::Persistence { cmd: CachePersistenceCmd::Snapshot }
+            }
+        ));
+    }
+
+    #[test]
+    fn cache_persistence_rewrite_aof_parses() {
+        let cli = parse(&["cavectl", "cache", "persistence", "rewrite-aof"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Cache {
+                cmd: CacheCmd::Persistence { cmd: CachePersistenceCmd::RewriteAof }
+            }
+        ));
+    }
+
+    #[test]
+    fn cache_persistence_status_parses() {
+        let cli = parse(&["cavectl", "cache", "persistence", "status"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Cache {
+                cmd: CacheCmd::Persistence { cmd: CachePersistenceCmd::Status }
+            }
+        ));
+    }
+
+    #[test]
+    fn cache_health_still_parses_after_cluster_was_added() {
+        let cli = parse(&["cavectl", "cache", "health"]);
+        assert!(matches!(cli.command, Commands::Cache { cmd: CacheCmd::Health }));
     }
 }

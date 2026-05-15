@@ -20,6 +20,7 @@ use crate::admin::state::AdminState;
 use crate::admin::types::Cite;
 
 pub mod clients;
+pub mod cluster;
 pub mod commands;
 pub mod keyspace;
 pub mod pubsub;

@@ -16,19 +16,26 @@ language= "C"
 url     = "https://github.com/redis/redis"
 
 [parity]
-# Package-level inventory against redis/redis 7.2.0. Inventory
-# hand-curated 2026-05-12 against the Redis source tree
-# (`src/{server,networking,db,t_*,replication,cluster,scripting,
-# expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
-# cache `src/commands/` directory mirrors Redis's `t_*.c` 1:1.
-mapped_count   = 19
+# Package-level inventory against redis/redis 7.2.0 (and valkey-io
+# 7.2 for the new on-wire + persistence ports). Inventory hand-
+# curated 2026-05-12 and refreshed 2026-05-15 after the B4 sweep
+# that ported the cluster bus codec, RDB encoder/decoder, AOF
+# writer/replayer/rewriter, and the per-key MIGRATE state machine.
+# The cave-cache `src/commands/` directory mirrors Redis's `t_*.c`
+# 1:1.
+mapped_count   = 20
 partial_count  = 4
 skipped_count  = 13
 unmapped_count = 2
-total          = 38
-fill_ratio     = 0.9474
-honest_ratio   = 0.8421
-last_audit     = "2026-05-13"
+total          = 39
+# fill_ratio = (mapped + partial + skipped) / total = 37/39.
+# Honest re-audit (2026-05-13) found 4 self-flagged partials.
+# B4 sweep (2026-05-15) split aof.c+rdb.c into two mapped entries
+# (real per-module ports) and added cluster on-wire + shard files,
+# pushing total 38 → 39 and mapped 19 → 20.
+fill_ratio     = 0.9487
+honest_ratio   = 0.8462
+last_audit     = "2026-05-15"
 infra_only     = false
 [module]
 name        = "cave-cache"
@@ -62,6 +69,22 @@ local    = "src/eviction.rs"
 [[files]]
 upstream = "src/cluster.c"
 local    = "src/cluster.rs"
+
+[[files]]
+upstream = "src/cluster.c"
+local    = "src/cluster_gossip.rs"
+
+[[files]]
+upstream = "src/cluster.c"
+local    = "src/cluster_shard.rs"
+
+[[files]]
+upstream = "src/rdb.c"
+local    = "src/persistence_rdb.rs"
+
+[[files]]
+upstream = "src/aof.c"
+local    = "src/persistence_aof.rs"
 
 [[files]]
 upstream = "src/acl.c"
@@ -452,9 +475,14 @@ local_files  = ["src/pubsub.rs", "src/commands/pubsub.rs"]
 note         = "PUBLISH / SUBSCRIBE / PSUBSCRIBE / channel routing"
 
 [[mapped]]
-upstream_pkg = "redis:src/aof.c + src/rdb.c"
-local_files  = ["src/persistence.rs"]
-note         = "AOF append-only log + RDB snapshot writer"
+upstream_pkg = "redis:src/aof.c"
+local_files  = ["src/persistence.rs", "src/persistence_aof.rs"]
+note         = "AOF: RESP2-array writer with always/everysec/no fsync policies, replay loader, BGREWRITEAOF emitting minimal SET/RPUSH/SADD/HSET/ZADD/XADD per key + auto-rewrite trigger. Real on-disk file + atomic rename."
+
+[[mapped]]
+upstream_pkg = "redis:src/rdb.c"
+local_files  = ["src/persistence.rs", "src/persistence_rdb.rs"]
+note         = "RDB v11 binary snapshot: REDIS magic + ASCII version + AUX/SELECTDB/RESIZEDB/EXPIRETIME_MS opcodes + per-type values (string/list/set/hash/zset/stream). atomic_save = tmp + fsync + rename. Length encoding (6-bit/14-bit/32-bit) matches rdbSaveLen."
 
 [[mapped]]
 upstream_pkg = "redis:src/eviction.c"
@@ -532,8 +560,17 @@ note         = "Build + config templates"
 
 [[partial]]
 upstream_pkg = "redis:src/cluster.c"
-local_files  = ["src/cluster/mod.rs", "src/cluster/state.rs", "src/cluster/slots.rs", "src/cluster/gossip.rs", "src/cluster/migration.rs", "src/cluster/epoch.rs"]
-note         = "Cluster mode: 16,384-slot SlotMap with hash-tag-aware routing, MOVED / ASK redirect computation, IMPORTING/MIGRATING ledger, configEpoch/currentEpoch atomic counters, and a GossipBus state machine (PING/PONG/MEET/FAIL/UPDATE message effects). Honest scope cut: the on-wire bus serializer for upstream's port-16380 listener is not implemented — gossip flows through the same control plane as the rest of the runtime."
+local_files  = [
+    "src/cluster/mod.rs",
+    "src/cluster/state.rs",
+    "src/cluster/slots.rs",
+    "src/cluster/gossip.rs",
+    "src/cluster/migration.rs",
+    "src/cluster/epoch.rs",
+    "src/cluster_gossip.rs",
+    "src/cluster_shard.rs",
+]
+note         = "Cluster mode (B4 close-out 2026-05-15): 16,384-slot SlotMap + hash-tag-aware routing, MOVED/ASK redirect, IMPORTING/MIGRATING ledger, configEpoch/currentEpoch atomic counters, GossipBus state machine. B4 added: binary on-wire codec (clusterMsg header + 12 message types + NodeFlags bitset + GossipEntry/Publish/Fail/Update bodies) + LivenessTracker (PFAIL→FAIL with 2× timeout) + HeartbeatScheduler (100ms cadence) + per-key MIGRATE state machine with ASK on locked keys. Honest scope cut: no live TCP listener wired onto data-port + 10000 yet, and no failover-vote majority quorum collector — those are next-batch follow-ons. Cluster-bus codec is shape-faithful; the TCP socket lifecycle is not."
 
 [[partial]]
 upstream_pkg = "redis:src/sentinel.c"
