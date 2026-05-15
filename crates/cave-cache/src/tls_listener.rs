@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Native TLS listener configuration.
 //!
 //! Ports the configuration + parse half of `src/tls.c`. Upstream's

@@ -1,16 +1,46 @@
 Cave Runtime
 Copyright 2026 Cave Runtime Contributors
 
-This product is licensed under the Apache License, Version 2.0
-(see LICENSE).
+This product is licensed under the GNU Affero General Public License,
+Version 3 or (at your option) any later version (AGPL-3.0-or-later).
+The full license text is in the LICENSE file at the repository root.
 
-This product includes software developed by the following upstream
-projects whose APIs, behaviors, or wire protocols Cave re-implements
-in Rust (line-by-line TDD parity, per ADR-GOLDEN-001). Cave does NOT
-vendor or redistribute their source. Each upstream is independently
-licensed as listed below. License strings are extracted from each
-crate's `parity.manifest.toml` — verify against upstream LICENSE files
-before redistribution of any derived artifact.
+Mission
+-------
+
+Cave Runtime is AGPL-3.0-or-later by deliberate choice. The intent is
+to keep the platform open and serving humanity:
+
+  * Hyperscalers (Amazon Web Services, Google Cloud, Microsoft Azure)
+    and other large SaaS vendors cannot take Cave Runtime, modify it
+    behind closed doors, and re-sell the result as a closed managed
+    service. AGPL §13 ("Remote Network Interaction") requires that
+    anyone who runs a modified Cave Runtime as a network service make
+    the corresponding source available to every user of that service.
+  * Operators who self-host Cave Runtime — including commercial
+    operators serving paying customers — keep all the freedoms the
+    license grants, with the single obligation that modifications
+    surface to their users on the same terms.
+  * Sovereign-by-default: the platform must remain operable without
+    any external SaaS in the critical path, by anyone, anywhere.
+
+This is "insanlığa hizmet" — service to humanity, in Turkish.
+
+Upstream attribution
+--------------------
+
+Cave Runtime re-implements the wire protocols, behaviors, and APIs of
+the upstream projects listed below in pure Rust (line-by-line TDD
+parity, per ADR-GOLDEN-001 / docs/adr/internal/ADR-GOLDEN-*). Cave
+Runtime does NOT vendor or redistribute upstream source code; each
+upstream is independently licensed by its own authors.
+
+License strings below are extracted from each crate's
+`parity.manifest.toml`. Verify against the upstream's authoritative
+LICENSE file before redistribution of any derived artifact. The
+canonical machine-readable list lives in
+`crates/cave-upstream/src/projects.rs` and is exposed at runtime via
+`/api/portal/upstream`.
 
 Total upstreams: 78
 
@@ -104,9 +134,24 @@ RSAL/SSPL-1.0 (v7.4+); BSD-3-Clause (earlier):
 SSPL-1.0 (server); Apache-2.0 (drivers):
   - mongodb/mongo
 
----
+The full upstream-by-crate mapping (with version, port method, and
+fill-ratio) is generated from `crates/*/parity.manifest.toml` by
+`scripts/gen-upstream-attribution.sh` into
+`docs/upstream-attribution.md`.
 
-This product also depends on the following Rust ecosystem crates
-(see Cargo.toml for the canonical list and Cargo.lock for resolved
-versions). All are independently licensed; see each crate's
-LICENSE file via `cargo about generate licenses.html` or similar.
+Rust ecosystem dependencies
+---------------------------
+
+Cave Runtime also depends on the Rust ecosystem crates listed in
+Cargo.toml (and resolved transitively in Cargo.lock). All such crates
+are independently licensed; the canonical inventory is produced by
+`cargo about generate licenses.html` (see CI gate
+`.github/workflows/license.yml`).
+
+Pre-1.0 disclaimer
+------------------
+
+Cave Runtime is pre-1.0 (target launch: 2026-05-21). License terms,
+upstream attribution, and the parity manifest are reviewed every release
+cycle; if you redistribute a derived artifact, regenerate this file from
+the live `parity.manifest.toml` files at your release point.

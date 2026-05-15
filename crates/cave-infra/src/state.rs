@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! State management — persistent tracking, locking, drift detection, import, history.
 
 use crate::models::{DriftReport, InfraResource, InfraState, ResourceDrift, ResourceState};

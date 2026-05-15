@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Grafana Tempo HTTP API — full parity with Tempo 2.x.
 //!
 //! Endpoints

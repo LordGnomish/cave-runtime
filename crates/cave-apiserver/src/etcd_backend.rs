@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! etcd-backed storage driver for the apiserver registry.
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

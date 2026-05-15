@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-pg integration tests.
 //!
 //! Upstream parity reference: PostgreSQL `src/test/regress` (pg_regress smoke

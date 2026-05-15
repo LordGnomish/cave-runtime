@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Step executor: runs steps as child processes with stdout/stderr capture,
 //! exit code handling, and timeout enforcement.
 

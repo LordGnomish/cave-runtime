@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TriggerAuthentication CRD — credentials for trigger sources.
 //! upstream: kedacore/keda v2.x — apis/keda/v1alpha1/triggerauthentication_types.go
 

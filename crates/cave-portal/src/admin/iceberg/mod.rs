@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/iceberg` — Apache Iceberg catalog views.
 //!
 //! Mirrors the apache/iceberg v1.5.x REST-catalog and Java-API surface:

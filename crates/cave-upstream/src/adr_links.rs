@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ADR ↔ upstream-project mapping.
 //!
 //! For every tracked upstream project we record the ADR(s) that justify the

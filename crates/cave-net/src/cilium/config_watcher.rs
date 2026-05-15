@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ConfigMap watcher — reacts to changes in `cilium-config` and the
 //! `CiliumNodeConfig` CRD.
 //!

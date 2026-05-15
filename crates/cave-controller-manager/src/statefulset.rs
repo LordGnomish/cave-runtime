@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! StatefulSet controller — ordered, identity-stable pod management.
 //!
 //! Upstream: [`pkg/controller/statefulset`]. Identity is `<name>-<ordinal>`;

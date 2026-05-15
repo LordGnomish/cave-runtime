@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Vector embeddings + cosine similarity for semantic search.
 //! upstream: opensearch v3.0/server/src/main/java/org/opensearch/knn/
 

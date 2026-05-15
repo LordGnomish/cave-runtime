@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-001: Seal/unseal — Shamir threshold validation, double-init
 //! rejection, auto-unseal interface (Transit / KMIP / Azure Key Vault /
 //! AWS KMS / GCP KMS / OCI KMS). Pinned to openbao v2.5.3.

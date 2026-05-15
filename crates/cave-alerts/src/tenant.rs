@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant scoping helpers (Cortex/Mimir/Loki-compatible `X-Scope-OrgID`).
 
 use crate::models::{Alert, DEFAULT_TENANT, TENANT_LABEL};

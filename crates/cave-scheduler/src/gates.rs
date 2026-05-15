@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SchedulingGates PreEnqueue plugin (KEP-3521 GA in v1.30).
 //!
 //! Cite: kubernetes/kubernetes v1.31.0

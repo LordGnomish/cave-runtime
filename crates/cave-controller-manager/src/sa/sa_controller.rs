@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ServiceAccount controller — `pkg/controller/serviceaccount/serviceaccounts_controller.go`.
 //!
 //! Ensures every active namespace has a `default` ServiceAccount. Mirrors

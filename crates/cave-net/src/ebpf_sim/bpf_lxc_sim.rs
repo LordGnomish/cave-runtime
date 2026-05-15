@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Userspace simulation of Cilium's `bpf_lxc.c` LXC endpoint map.
 //!
 //! Cite: cilium/bpf/lxc/bpf_lxc.c + cilium/bpf/lib/lxc.h (v1.19.3).

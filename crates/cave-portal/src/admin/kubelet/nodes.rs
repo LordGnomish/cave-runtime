@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Nodes tab — per-node summary aggregating pods + capacity + taints.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's Node list (Name,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenant support.
 //!
 //! Tenancy follows the Grafana/Tempo convention: the `X-Scope-OrgID` HTTP header

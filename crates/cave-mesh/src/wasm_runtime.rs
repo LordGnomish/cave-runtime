@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! WASM runtime — sandboxed execution of WasmPlugin bytecode.
 //!
 //! Mirrors the proxy-wasm ABI surface that Envoy ships with: a wasm

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant model — tiers, isolation levels, and lifecycle states.
 //!
 //! Implements Principle 8 (Multi-Tenant Isolation), ADR-012, ADR-084.

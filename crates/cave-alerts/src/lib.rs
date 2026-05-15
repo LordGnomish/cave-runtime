@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Alert routing & management — Alertmanager parity.
 //!
 //! Compatible with: Alertmanager v0.26+ (route tree, group_by, inhibits,

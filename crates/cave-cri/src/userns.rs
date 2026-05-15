@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! User namespace support — KEP-127 / Pod-level user namespaces.
 //!
 //! When `pod.spec.hostUsers: false`, the kubelet asks the runtime to put

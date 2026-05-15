@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/streams/acls` — Kafka admin "ACLs" tab. cave-streams
 //! ACLs live inside the broker (`AclStore`); this view exposes
 //! a synthesized per-tenant policy summary from the topic

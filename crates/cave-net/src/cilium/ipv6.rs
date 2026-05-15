@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! IPv6 datapath + Neighbor Discovery (ND) proxy.
 //!
 //! Mirrors `bpf/bpf_lxc.c::handle_ipv6` plus

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! API Priority and Fairness (KEP-1040).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

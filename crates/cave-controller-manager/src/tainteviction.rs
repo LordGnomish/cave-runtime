@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Taint-based per-pod eviction with toleration timers.
 //!
 //! Cite: pkg/controller/nodelifecycle/scheduler/taint_manager.go (v1.36.0).

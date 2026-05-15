@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Auto-breadcrumb from URL path.
 //!
 //! Given a request path like `/admin/keda/scaledobjects/foo`, produce

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE LLM Gateway — Multi-provider LLM router and proxy.
 //!
 //! Compatible with: LiteLLM, custom AI gateway, OpenAI proxy

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SLO tracking engine — error budgets, burn rates
 //!
 //! Compatible with: Custom (Prometheus rules)

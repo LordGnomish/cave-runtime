@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/metrics` — Prometheus expr browser parity for the
 //! cave-metrics catalog view. Sister of `admin/prometheus.rs`
 //! (upstream-UI parity); this page focuses on the cave-side catalog.

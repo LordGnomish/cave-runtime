@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Probe handler — liveness, readiness, startup probes.
 //!
 //! Mirrors `pkg/kubelet/prober` semantics: HTTP-Get, TCP-Socket, Exec, gRPC.

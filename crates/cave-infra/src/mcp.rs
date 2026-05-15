@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MCP (Model Context Protocol) tool server for infrastructure actions.
 //!
 //! Implements the JSON-RPC 2.0 protocol used by MCP:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Volumes tab — pod ↔ PVC bindings derived from the seeded pod set.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's Volumes column on the

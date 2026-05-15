@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Streaming ingest writer.
 //!
 //! Mirrors `core/content/local/writer.go`. The caller opens a writer

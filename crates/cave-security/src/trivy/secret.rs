@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Secret scanning — regex + entropy patterns matching Trivy's ruleset.
 
 use regex::Regex;

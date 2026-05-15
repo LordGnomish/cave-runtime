@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/mlflow` — MLflow tracking + model registry views.
 //!
 //! Mirrors mlflow/mlflow v2.x REST API:

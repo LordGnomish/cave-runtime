@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Event-driven automation — compatible with n8n
 //!
 //! Compatible with: n8n

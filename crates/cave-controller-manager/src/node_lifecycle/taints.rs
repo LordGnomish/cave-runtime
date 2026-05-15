@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node taints — `pkg/controller/nodelifecycle/scheduler/taint_manager.go`
 //! and `pkg/util/taints/taints.go`.
 //!

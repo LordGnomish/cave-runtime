@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Core data models — Kong-compatible entities.
 //!
 //! Services, Routes, Upstreams, Targets, Consumers, Plugins,

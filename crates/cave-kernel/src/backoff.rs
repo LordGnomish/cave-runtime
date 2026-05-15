@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Backoff strategies — pure-function delay schedules.
 //!
 //! Distinct from `retrypolicy::BackoffStrategy` (which is owned by

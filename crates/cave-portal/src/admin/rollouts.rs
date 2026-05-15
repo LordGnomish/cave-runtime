@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/rollouts` — Argo Rollouts UI parity. Canary progression
 //! with per-state summary + traffic-percentage badge.
 //!

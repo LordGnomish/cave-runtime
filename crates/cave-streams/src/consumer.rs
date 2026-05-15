@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Consumer API — subscribe to topics, poll messages, commit offsets.
 //!
 //! Supports two consumer group rebalancing strategies:

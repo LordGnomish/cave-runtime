@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use tokio::sync::broadcast;
 use crate::store::StoreEvent;
 use crate::types::NotificationConfig;

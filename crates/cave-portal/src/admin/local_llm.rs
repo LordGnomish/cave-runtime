@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/local-llm` view — local-llm resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};

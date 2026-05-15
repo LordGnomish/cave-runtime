@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HBONE — HTTP-Based Overlay Network Environment.
 //!
 //! Mirrors `pkg/hbone/server.go` in upstream Istio v1.29.2 (and the

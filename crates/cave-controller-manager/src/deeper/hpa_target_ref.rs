@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HPA target ref + scale subresource — `pkg/controller/podautoscaler/horizontal.go::reconcileAutoscaler`.
 //!
 //! `spec.scaleTargetRef` points at the controller (Deployment / ReplicaSet /

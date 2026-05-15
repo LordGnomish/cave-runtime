@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Raft membership v2 — ConfChangeV2 wire format, joint-consensus state
 //! machine, cluster-id validation, and member-set diff helpers.
 //!

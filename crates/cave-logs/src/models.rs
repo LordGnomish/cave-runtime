@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Core domain types for cave-logs — mirrors Loki's data model.
 
 use std::collections::HashMap;

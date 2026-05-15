@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Watch daemon — tiered-cadence release poller with pump trigger.
 //!
 //! ## Lifecycle of a single tick

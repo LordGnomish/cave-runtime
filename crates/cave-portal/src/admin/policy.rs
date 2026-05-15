@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/policy` — OPA Rego Playground parity. Rule browser with
 //! action grouping + enable-toggle mutator (preserved).
 //!

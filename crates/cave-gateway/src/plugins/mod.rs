@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Plugin system — Kong-compatible plugin pipeline.
 //!
 //! Each plugin implements the `GatewayPlugin` trait and is executed in

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Job controller — runs N pods to completion (with optional parallelism).
 //!
 //! Upstream: [`pkg/controller/job`]. The full controller implements indexed

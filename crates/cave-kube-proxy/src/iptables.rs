@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! iptables proxier — KUBE-SERVICES + KUBE-NODEPORTS chain emission.
 //!
 //! Cite: `pkg/proxy/iptables/proxier.go:55` (kubeServicesChain),

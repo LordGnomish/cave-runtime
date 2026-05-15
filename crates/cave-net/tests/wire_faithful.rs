@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Wire-faithful parity tests.
 //!
 //! These tests pin the *exact bytes* (or close-to-exact field shape)

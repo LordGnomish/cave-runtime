@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl topology` — module/dependency graph.
 //!
 //! Returns a snapshot of how Cave modules depend on each other,

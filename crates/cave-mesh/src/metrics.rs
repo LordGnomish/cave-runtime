@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Automatic request metrics: request count, error count, latency, and active
 //! connections per service pair.  Exports Prometheus text format.
 //!

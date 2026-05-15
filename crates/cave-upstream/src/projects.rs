@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Registry of all 73 upstream OSS projects tracked by cave-runtime.
 //!
 //! Each component in the CAVE platform documentation has a corresponding

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-local-llm-daemon — 24/7 scheduler daemon for tier-1 draft generation.
 //!
 //! Usage:

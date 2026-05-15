@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prompt caching — exact-match cache keyed on request fingerprint.
 
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};

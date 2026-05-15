@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Badges plugin — small SVG-style status badges per service.
 
 use serde::{Deserialize, Serialize};

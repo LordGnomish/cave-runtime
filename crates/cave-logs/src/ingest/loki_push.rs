@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Loki push API handler — supports both JSON and protobuf+snappy wire formats.
 //!
 //! Implements the Loki v1 push endpoint:

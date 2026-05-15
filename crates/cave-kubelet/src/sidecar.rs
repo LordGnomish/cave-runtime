@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Native sidecar containers — KEP-753 (`SidecarContainers` GA in 1.29).
 //!
 //! Mirrors `pkg/kubelet/kuberuntime` and `pkg/api/v1/pod` semantics for

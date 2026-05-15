@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-lakehouse — consolidated lakehouse stack per ADR-147.
 //!
 //! Same multi-upstream pattern as cave-streams (Kafka + Pulsar) and

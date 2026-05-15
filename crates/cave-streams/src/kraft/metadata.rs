@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `MetadataRecord` — one entry in the compacted metadata log.
 //!
 //! Mirrors `org.apache.kafka.common.metadata.*Record` from

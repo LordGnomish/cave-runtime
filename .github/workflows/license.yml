@@ -1,0 +1,37 @@
+name: license
+
+# Cave Runtime is AGPL-3.0-or-later. This workflow gates two things on
+# every PR and on every push to main:
+#   1. The SPDX header check (every committed .rs file starts with the
+#      AGPL SPDX line).
+#   2. cargo-deny check licenses (every transitive Rust dep is on the
+#      allow-list in deny.toml; SSPL is forbidden).
+#
+# Failing either gate blocks merge.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  spdx-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: SPDX header check
+        run: bash scripts/check-spdx.sh
+
+  cargo-deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check licenses sources
+          # We don't gate on advisories here; the security workflow
+          # owns that.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Post-quantum hybrid signer — ML-DSA-65 (FIPS 204) + Ed25519 dual-sign.
 //!
 //! Cite: ADR-015 v2 (Cave PQC migration plan); IETF

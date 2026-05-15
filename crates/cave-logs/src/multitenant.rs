@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenant primitives + retention/compaction policy types for cave-logs.
 //!
 //! The existing `LogStore` already keys chunks by tenant, but Loki-parity

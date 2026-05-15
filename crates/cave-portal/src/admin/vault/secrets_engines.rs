@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Secrets-engines tab — mirrors Vault's `Secrets` page
 //! (`GET /v1/sys/mounts`). Lists every mounted engine for the
 //! caller's tenant.

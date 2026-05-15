@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use serde::{Deserialize, Serialize};
 use crate::error::{HaError, HaResult};
 use crate::raft::types::{EntryType, LogIndex, MembershipConfig, Term};

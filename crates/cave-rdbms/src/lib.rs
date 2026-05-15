@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE RDBMS — PostgreSQL-wire-protocol-compatible SQL database.
 //!
 //! Compatible with: PostgreSQL (management + query surface). Standard Postgres

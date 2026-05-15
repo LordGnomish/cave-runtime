@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OpenID Connect Discovery endpoint — GET /realms/{realm}/.well-known/openid-configuration
 //!
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/RealmsResource.java

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! REST API routes for the container runtime.
 //!
 //! 42 endpoints — 100% parity with containerd CRI.

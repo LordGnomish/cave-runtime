@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# .git/hooks/pre-commit — fail the commit if any staged .rs file is
+# missing the AGPL-3.0-or-later SPDX header.
+#
+# Cave Runtime ships under AGPL-3.0-or-later (see LICENSE / NOTICE).
+# Every Rust file under crates/ and tools/ must start with:
+#   // SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Source-controlled at scripts/git-hooks/pre-commit. Install with:
+#   ./scripts/install-git-hooks.sh
+#
+# We only inspect *staged* .rs files so the hook stays fast even on a
+# 2000-file workspace. The CI gate
+# (.github/workflows/license.yml + scripts/check-spdx.sh) re-validates
+# the entire tree on every PR.
+#
+# macOS bash 3.2 compatible — no mapfile, no nameref.
+
+set -uo pipefail
+
+EXPECTED="// SPDX-License-Identifier: AGPL-3.0-or-later"
+
+# Staged adds + modifies (skip deletes), filtered to .rs files under
+# crates/ or tools/. NUL-delimited to survive paths with whitespace.
+bad_count=0
+bad_list=""
+while IFS= read -r -d '' f; do
+    [ -f "$f" ] || continue
+    case "$f" in
+        crates/*.rs|tools/*.rs|crates/*/*.rs|tools/*/*.rs|crates/*/*/*.rs|tools/*/*/*.rs|crates/*/*/*/*.rs|tools/*/*/*/*.rs|crates/*/*/*/*/*.rs|tools/*/*/*/*/*.rs|crates/*/*/*/*/*/*.rs|tools/*/*/*/*/*/*.rs)
+            ;;
+        *)
+            continue
+            ;;
+    esac
+    first=$(head -n 1 "$f" 2>/dev/null)
+    if [ "$first" != "$EXPECTED" ]; then
+        bad_count=$((bad_count + 1))
+        bad_list="$bad_list  - $f"$'\n'
+    fi
+done < <(git diff --cached --name-only --diff-filter=AM -z)
+
+if [ "$bad_count" -gt 0 ]; then
+    echo "❌ pre-commit: $bad_count staged .rs file(s) missing AGPL SPDX header:" >&2
+    printf '%s' "$bad_list" >&2
+    echo >&2
+    echo "Add this as the very first line of each file:" >&2
+    echo "  $EXPECTED" >&2
+    echo "  // Copyright 2026 Cave Runtime contributors" >&2
+    echo >&2
+    echo "If this is a deliberate exception, run \`git commit --no-verify\` (please don't)." >&2
+    exit 1
+fi
+
+exit 0

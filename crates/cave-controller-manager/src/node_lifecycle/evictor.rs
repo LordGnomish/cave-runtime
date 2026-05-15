@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Per-zone eviction queue — `pkg/controller/nodelifecycle/scheduler/rate_limited_queue.go`.
 //!
 //! Two queues per zone: a primary (full QPS) and a secondary that kicks in

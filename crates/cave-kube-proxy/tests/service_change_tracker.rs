@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ServiceChangeTracker — parity tests against k8s v1.36.0.
 //!
 //! Upstream: `pkg/proxy/config/config.go` (ServiceConfig event handlers)

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/crm/contacts` — Twenty CRM "Contacts" tab. cave-portal
 //! treats one row per `CrmAccount` as a primary contact (the
 //! account-owner-of-record), surfacing plan tier and MRR.

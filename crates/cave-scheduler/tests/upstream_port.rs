@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Line-by-line ports of upstream kube-scheduler tests, cited in the
 //! `[[upstream_test]]` block of `parity.manifest.toml`.
 //!

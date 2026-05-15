@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use crate::engine::{ScanError, Scanner};
 use crate::models::{Finding, FindingCategory, Confidence, ScanKind, ScanRequest, ScanTarget, Severity};
 use async_trait::async_trait;

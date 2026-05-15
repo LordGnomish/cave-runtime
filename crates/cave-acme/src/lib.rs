@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-acme — RFC 8555 ACMEv2 server reimplementation.
 //!
 //! Multi-tenant: every Account, Order and Authorization carries the

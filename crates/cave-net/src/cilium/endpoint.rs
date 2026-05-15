@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Endpoint program model — per-pod datapath state.
 //!
 //! Mirrors `pkg/endpoint/endpoint.go` (the in-memory `Endpoint` struct

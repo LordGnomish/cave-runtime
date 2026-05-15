@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Syslog receiver — RFC 5424 and RFC 3164 (BSD syslog) parsers.
 //!
 //! Both formats are accepted on the same UDP/TCP listener. The parser

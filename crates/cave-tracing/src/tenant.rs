@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenant scoping helpers.
 //!
 //! The SDK injects a `tenant_id` resource attribute on every span when a

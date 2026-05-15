@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-registry — Harbor / Docker / OCI container registry.
 //!
 //! As of the multi-upstream consolidation, the implementation lives in

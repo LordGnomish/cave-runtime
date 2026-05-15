@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rules tab — alerting + recording rule groups.
 //!
 //! Mirrors Prometheus `/rules` (rule groups + per-rule state + last

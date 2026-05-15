@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CaveStoreServer — starts both the etcd gRPC server and S3 HTTP server.
 
 use std::{net::SocketAddr, sync::Arc};

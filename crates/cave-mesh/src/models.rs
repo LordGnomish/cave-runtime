@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Istio-equivalent resource types for the CAVE service mesh.
 //!
 //! Full parity with Istio v1.20+:

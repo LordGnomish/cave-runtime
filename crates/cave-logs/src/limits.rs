@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Per-tenant rate limiting and query limits.
 //!
 //! Uses a token-bucket algorithm for ingestion rate limiting:

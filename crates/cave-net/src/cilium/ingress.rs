@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Ingress controller — Cilium's Envoy-backed L7 gateway.
 //!
 //! Mirrors `pkg/ingress/ingress.go` (cilium-ingress-controller) plus the

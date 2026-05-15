@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Snapshots sub-page — per-table snapshot timeline.
 //!
 //! Iceberg snapshots form a parent-pointer chain so the operator can

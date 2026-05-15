@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/erp` — ERPNext parity. Mirrors the upstream's Invoices
 //! landing page with status-group pills + totals.
 //!

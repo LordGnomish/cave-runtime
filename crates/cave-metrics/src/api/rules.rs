@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! /api/v1/rules and /api/v1/alerts
 
 use axum::{extract::State, Json};

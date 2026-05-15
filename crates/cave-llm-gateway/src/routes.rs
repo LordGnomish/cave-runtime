@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP routes for cave-llm-gateway — OpenAI-compatible API + admin endpoints.
 
 use crate::api_keys::{ApiKeyStore, Scope};

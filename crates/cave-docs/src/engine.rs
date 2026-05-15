@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use crate::models::ApiSpec;
 
 /// Check if a version string looks like a valid semver

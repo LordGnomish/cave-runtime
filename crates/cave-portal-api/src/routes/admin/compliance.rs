@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `GET /api/compliance/snapshot` — JSON view of the Charter compliance dashboard.
 //!
 //! The HTML dashboard at `/admin/compliance` is rendered by

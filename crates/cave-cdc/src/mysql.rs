@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MySQL binlog connector.
 //!
 //! Cite: debezium-connector-mysql v3.5.0.Final

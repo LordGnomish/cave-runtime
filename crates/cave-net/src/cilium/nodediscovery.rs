@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node discovery loop.
 //!
 //! Mirrors `pkg/nodediscovery/nodediscovery.go`. The agent keeps a

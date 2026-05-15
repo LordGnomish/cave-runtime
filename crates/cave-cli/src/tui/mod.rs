@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TUI mode for `cavectl` — k9s-style terminal-first console.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 M5: a pure-state TUI that

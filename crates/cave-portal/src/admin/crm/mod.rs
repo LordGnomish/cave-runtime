@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/crm` — Twenty CRM parity. Mirrors the upstream's
 //! Accounts landing page with per-plan grouping and MRR summary card.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/kubelet` — Kubernetes-Dashboard parity surface for the
 //! workload view (Pods, Nodes, Volumes, Events, per-node metrics).
 //!

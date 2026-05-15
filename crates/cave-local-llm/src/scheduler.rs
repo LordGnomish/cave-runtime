@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Picks the next queue item to process, subject to guardrails.
 //!
 //! Guardrails checked before each pick:

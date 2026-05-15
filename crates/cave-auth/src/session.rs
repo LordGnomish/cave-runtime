@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Session management — create, validate, refresh, invalidate.
 //!
 //! Sessions layer on top of OIDC tokens, providing server-side session state

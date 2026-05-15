@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cgroup v2 unified-hierarchy extensions.
 //!
 //! cgroup v1 had per-controller filesystem hierarchies with `devices.allow`

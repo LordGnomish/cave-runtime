@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pulsar binary protocol — minimal in-process implementation of the
 //! command set Cave Streams' Pulsar adapter exchanges with clients.
 //!

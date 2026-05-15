@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CronJob controller — schedules `Job` objects on a cron expression.
 //!
 //! Upstream: [`pkg/controller/cronjob`] (the v2 controller). The full

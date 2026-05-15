@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Azure provider resource catalog + tenant-scoped inventory.
 //!
 //! Extends [`super::azure::AzureProvider`] with the resource shapes the

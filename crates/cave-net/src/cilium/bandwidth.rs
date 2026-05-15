@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Bandwidth manager — per-pod rate limiting via EDT (Earliest Departure
 //! Time) and BBR congestion-control hand-off.
 //!

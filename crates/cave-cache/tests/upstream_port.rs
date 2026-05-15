@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Line-by-line ports of upstream Redis command tests, cross-
 //! referenced from `parity.manifest.toml`'s `[[upstream_test]]` block.
 //!

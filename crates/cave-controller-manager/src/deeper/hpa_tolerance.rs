@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HPA tolerance check — `pkg/controller/podautoscaler/replica_calculator.go`.
 //!
 //! Upstream picks `currentReplicas` (no-op) when the usage ratio is within a

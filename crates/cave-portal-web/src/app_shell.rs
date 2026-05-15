@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! App shell — wires together [`Router`], [`PluginRegistry`], and the
 //! per-request auth + tenant contexts to serve a full HTML page.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `<samlp:AuthnRequest>` — the SP → IdP message that initiates a
 //! SAML login. cave-auth issues this when wearing the SP hat (eg.
 //! federating *out* to a customer's IdP) and parses it when wearing

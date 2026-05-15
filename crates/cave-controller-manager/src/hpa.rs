@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HorizontalPodAutoscaler controller — scales a target based on metrics.
 //!
 //! Upstream: [`pkg/controller/podautoscaler`]. The full controller resolves

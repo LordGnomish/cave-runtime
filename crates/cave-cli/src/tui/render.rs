@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pure formatters for the TUI.
 //!
 //! These functions take state and produce strings. Ratatui owns the

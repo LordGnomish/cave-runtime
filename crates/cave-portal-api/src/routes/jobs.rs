@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Background jobs — submit, list, cancel. Tenant-scoped.
 
 use std::collections::HashMap;

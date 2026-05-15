@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Async task queue — Pulp v3 task system.
 //!
 //! All long-running operations (sync, publish, repair) return a task href

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! KMS provider chain — the multi-provider transformation pipeline that
 //! Kubernetes' EncryptionConfiguration v1/v2 and etcd v3.6's
 //! `--experimental-encryption-provider-config` accept.

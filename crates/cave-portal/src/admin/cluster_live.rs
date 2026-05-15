@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/cluster` — live Raft state + node liveness.
 //!
 //! Reads (no mutate) the cluster state machine and renders the four

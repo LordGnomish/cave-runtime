@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Query engine — mixed datasource queries, caching, query inspector,
 //! and all Grafana transformations.
 

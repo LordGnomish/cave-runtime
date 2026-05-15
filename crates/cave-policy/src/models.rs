@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OPA REST API data models (v1 API).
 
 use chrono::{DateTime, Utc};

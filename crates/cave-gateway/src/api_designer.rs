@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Gravitee API Designer — API-first studio with spec management, mock servers,
 //! and automated quality scoring.
 

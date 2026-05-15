@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE Runbook — Runbook automation engine.
 //! Compatible with: manual runbooks, PagerDuty runbooks.
 //! Features: YAML-defined runbooks, multi-step execution, approvals, scheduling.

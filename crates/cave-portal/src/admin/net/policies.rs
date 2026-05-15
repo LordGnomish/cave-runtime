@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Policies tab — NetworkPolicy editor (Ingress / Egress / Both).
 //! Endpoint browser lives in `nodes.rs`; this module is focused on
 //! the policy CRUD path.

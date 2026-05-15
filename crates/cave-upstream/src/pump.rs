@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Qwen pump payload writer.
 //!
 //! When [`crate::delta::detect_release_delta`] returns a

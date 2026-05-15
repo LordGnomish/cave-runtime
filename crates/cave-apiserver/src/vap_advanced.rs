@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ValidatingAdmissionPolicy (KEP-3488) — line-by-line port of upstream
 //! `staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/`.
 //!

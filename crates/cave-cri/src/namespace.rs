@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Linux namespace management for container isolation.
 //!
 //! Creates pid, net, mnt, uts, ipc namespaces using clone(2) flags.

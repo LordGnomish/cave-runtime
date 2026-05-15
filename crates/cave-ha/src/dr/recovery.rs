@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Point-in-time recovery (PITR) and failback for DR sites.
 //!
 //! Recovery workflow:

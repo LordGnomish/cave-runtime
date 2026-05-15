@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Environment lifecycle — `cavectl env suspend|resume`.
 //!
 //! ADR-012 v7 destekleyici (vcluster PR environments). Env tenant'a bağlı,

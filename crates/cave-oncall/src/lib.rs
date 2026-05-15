@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! On-call scheduling, paging, and escalation — compatible with Grafana OnCall.
 //!
 //! Compatible with: Grafana OnCall

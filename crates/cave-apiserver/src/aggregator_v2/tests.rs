@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! aggregator_v2 tests — availability, proxy reasons, openapi merging,
 //! priority ordering.
 

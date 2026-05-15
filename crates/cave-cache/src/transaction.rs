@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use std::time::Duration;
 use crate::engine::CacheEngine;
 use crate::types::{CacheError, CacheResult};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/karpenter` — Karpenter NodePool + NodeClaim parity. The
 //! upstream surface is CRD-only; the page mirrors what `karpenter`'s
 //! Grafana dashboard would show — pool utilisation, capacity, and a

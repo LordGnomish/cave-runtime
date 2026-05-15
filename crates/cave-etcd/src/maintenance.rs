@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Maintenance-API extensions.  The base store already exposes
 //! `defragment`, `alarm`, `status`, `hash`, and `snapshot`.  This module
 //! adds the two endpoints etcd v3.6 ships that were missing: `HashKV`

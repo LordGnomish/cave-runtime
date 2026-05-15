@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/slo` view — SLO catalog + error-budget burn snapshot.
 
 use crate::admin::permission::{Permission, RequestCtx};

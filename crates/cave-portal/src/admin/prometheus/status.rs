@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Status tab — service discovery + config + alertmanagers.
 //!
 //! Mirrors Prometheus `/status` page (build info, runtime info,

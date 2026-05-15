@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cross-controller crosscut tests.
 //!
 //! Verifies behaviours that span multiple controller reconcile loops in the

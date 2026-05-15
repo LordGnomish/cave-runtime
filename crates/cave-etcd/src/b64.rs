@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Base64 encoding/decoding helpers for etcd v3 API compatibility.
 //!
 //! etcd v3 JSON API requires keys and values to be base64-encoded

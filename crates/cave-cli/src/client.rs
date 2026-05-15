@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use anyhow::{Context, Result};
 use colored::Colorize;
 use reqwest::{Client, Method, StatusCode};

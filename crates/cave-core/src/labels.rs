@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Canonical label set for the Cave observability stack.
 //!
 //! Both cave-logs (Loki-style streams) and cave-metrics (Prometheus-style

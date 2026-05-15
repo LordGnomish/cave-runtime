@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CPU + Memory scalers — wrap the K8s HPA's resource metrics.
 //! upstream: kedacore/keda v2.x — pkg/scalers/cpu_memory_scaler.go
 

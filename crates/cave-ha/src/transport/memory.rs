@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-process transport for tests and single-binary deployments.
 //!
 //! A `MemNetwork` owns a shared router; each node gets a `MemTransport` handle.

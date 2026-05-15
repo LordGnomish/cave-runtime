@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! kubeconfig generation for cluster access.
 
 use crate::cluster::Cluster;

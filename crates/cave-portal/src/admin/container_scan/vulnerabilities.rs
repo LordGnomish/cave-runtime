@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/container_scan/vulnerabilities` — Trivy "Vulnerabilities"
 //! tab. Surfaces the per-image CVE count. Operators sort by
 //! critical descending to find images that need re-baked first.

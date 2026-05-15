@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Vulnerability scanning integration hooks.
 //! Provides an async hook interface; concrete scanners (Trivy, Grype, etc.)
 //! implement ScanHook and are registered with the ScanManager.

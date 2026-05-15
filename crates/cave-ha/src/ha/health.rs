@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Health checking and leader election priority.
 //!
 //! Each node tracks the health of its peers and can advertise a priority

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Deployment profile system — 7 profiles (3 envs × 2 providers + local).
 //!
 //! Implements Principle 3 (Profile-Driven Deployment) and ADR-094.

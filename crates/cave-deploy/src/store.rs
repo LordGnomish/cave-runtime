@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PostgreSQL storage for cave-deploy.
 //!
 //! Uses the `cave_deploy` schema.  Migrations are idempotent.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prometheus-compatible data models.
 //!
 //! Mirrors the Prometheus HTTP API response envelope and data types

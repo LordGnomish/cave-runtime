@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Inhibit rules — Alertmanager `inhibit_rules` semantics.
 //!
 //! Source alerts whose labels match the rule's `source_matchers` cause target

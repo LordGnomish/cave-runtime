@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Trace-to-logs and trace-to-metrics correlation.
 //!
 //! Provides the metadata needed to link a trace/span to:

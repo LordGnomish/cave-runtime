@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Schema-evolution rules — `BACKWARD`, `FORWARD`, `FULL` (and their
 //! transitive variants) for Avro / JSON Schema / Protobuf.
 //!

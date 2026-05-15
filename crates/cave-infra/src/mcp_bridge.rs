@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MCP Provider Bridge — register, discover, execute, health-check MCP servers.
 //!
 //! MCP (Model Context Protocol) servers provide the actual cloud-provider

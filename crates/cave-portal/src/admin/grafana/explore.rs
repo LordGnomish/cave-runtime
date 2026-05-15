@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Explore tab — ad-hoc PromQL/LogQL editor surface.
 //!
 //! Mirrors Grafana's Explore view header (datasource picker + query

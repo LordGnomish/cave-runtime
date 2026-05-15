@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! LocalPublisher — port of LocalPublisher from backstage-plugin-techdocs-node.
 //!
 //! Upstream: techdocs-node/src/publishing/local.ts — LocalPublisher class
