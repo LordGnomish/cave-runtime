@@ -34,3 +34,21 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# UMA 2.0 + Token Exchange (RFC 8693) + DPoP (RFC 9449) + JWE (RFC 7516)
+# Honest dependency choice: roll our own JWE on top of aes-gcm + rsa + p256
+# + hkdf + sha2 rather than josekit, because (a) we already depend on
+# jsonwebtoken for JWT parse, (b) josekit pulls in openssl which the
+# workspace deliberately avoids (ring-only), (c) we only need the four
+# RFC 7518 algorithms listed in `[parity]` below.
+sha2    = { workspace = true }
+sha1    = "0.10"
+# p256 with `ecdh` feature for ECDH-ES key agreement in JWE.
+p256    = { version = "0.13", features = ["ecdsa", "pem", "pkcs8", "ecdh"] }
+aes-gcm = "0.10"
+aes     = "0.8"
+cbc     = { version = "0.1", features = ["alloc"] }
+cipher  = { version = "0.4", features = ["block-padding", "alloc"] }
+hmac    = "0.12"
+rsa     = "0.9"
+hkdf    = "0.12"
+hex     = { workspace = true }
