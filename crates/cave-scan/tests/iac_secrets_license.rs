@@ -70,18 +70,23 @@ fn test_terraform_iam_wildcard_action() {
 
 #[test]
 fn test_terraform_clean_file_no_findings() {
+    // HCL block-form with both attributes (acl) and a nested
+    // server_side_encryption_configuration block — this should clear
+    // AVD-AWS-0001 (acl is private) and AVD-AWS-0088 (SSE present).
     let hcl = r#"
         resource "aws_s3_bucket" "ok" {
           bucket = "good-bucket"
           acl    = "private"
+
           server_side_encryption_configuration {
-            rule { apply_server_side_encryption_by_default { sse_algorithm = "AES256" } }
+            algorithm = "AES256"
           }
         }
     "#;
     let s = TerraformScanner::new();
     let findings = s.scan_str(hcl, "main.tf").unwrap();
     assert!(findings.iter().all(|f| f.rule_id != "AVD-AWS-0001"));
+    assert!(findings.iter().all(|f| f.rule_id != "AVD-AWS-0088"));
 }
 
 // ── IaC: Kubernetes ─────────────────────────────────────────────────────────
