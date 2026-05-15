@@ -54,6 +54,9 @@ pub mod name_id;
 pub mod assertion;
 pub mod bindings;
 
+#[cfg(test)]
+mod tests_a1;
+
 use thiserror::Error;
 
 /// Errors the SAML surface can surface. Modelled on Keycloak's
