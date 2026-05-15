@@ -19,6 +19,7 @@ pub mod audit;
 pub mod auth_middleware;
 pub mod auth_routes;
 pub mod claims;
+pub mod federation;
 pub mod jwks;
 pub mod jwt_middleware;
 pub mod keycloak;
