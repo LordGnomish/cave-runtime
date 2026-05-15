@@ -567,9 +567,146 @@ note         = "JPA persistence layer. cave-auth uses in-memory state; persisten
 upstream_pkg = "keycloak:services/.../oauth2/granttype/"
 note         = "Less-common OAuth2 grant types (device-code, ciba). Authorization-code + client-credentials only today."
 
-[[unmapped]]
-upstream_pkg = "keycloak:services/.../webauthn/"
-note         = "WebAuthn / passkey support. The portal layer has Persona-based MFA; full WebAuthn is unmapped."
+# WebAuthn / FIDO2 / passkey promoted to mapped 2026-05-15 — see `[[mapped]]`
+# and `[[files]]` entries below for the line-by-line port surface.
+
+# ── Newly mapped: WebAuthn / FIDO2 (Keycloak `services/.../webauthn/` +
+# ──    webauthn4j v0.24.0 line-by-line port) ─────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "keycloak:services/.../webauthn/ + webauthn4j@v0.24.0"
+local        = "src/webauthn/"
+note         = "Full WebAuthn L2 ceremony engine: cbor + cose + clientDataJSON + authenticatorData + attestation(none/packed/tpm/android-key) + registration + authentication + credential_store + resident_key (passkey)."
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/AttestationObjectConverter.java"
+local    = "src/webauthn/cbor.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/client/CollectedClientData.java"
+local    = "src/webauthn/client_data.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/authenticator/AuthenticatorData.java"
+local    = "src/webauthn/authenticator_data.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/data/attestation/authenticator/CredentialPublicKey.java"
+local    = "src/webauthn/cose.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/none/NoneAttestationStatementVerifier.java"
+local    = "src/webauthn/attestation/none.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/packed/PackedAttestationStatementVerifier.java"
+local    = "src/webauthn/attestation/packed.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/tpm/TPMAttestationStatementValidator.java"
+local    = "src/webauthn/attestation/tpm.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/verifier/attestation/statement/androidkey/AndroidKeyAttestationStatementValidator.java"
+local    = "src/webauthn/attestation/android_key.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnRegistrationManager.java + keycloak:services/.../authentication/authenticators/browser/WebAuthnAuthenticator.java"
+local    = "src/webauthn/registration.rs"
+
+[[files]]
+upstream = "webauthn4j:webauthn4j-core/src/main/java/com/webauthn4j/WebAuthnAuthenticationManager.java"
+local    = "src/webauthn/authentication.rs"
+
+[[files]]
+upstream = "keycloak:services/src/main/java/org/keycloak/credential/WebAuthnCredentialProvider.java"
+local    = "src/webauthn/credential_store.rs"
+
+[[files]]
+upstream = "keycloak:services/.../authenticators/browser/WebAuthnPasswordlessAuthenticator.java + webauthn4j passkey extensions"
+local    = "src/webauthn/resident_key.rs"
+
+# ── Portal surfaces — page itself is A6's job; we declare the path here ─────
+
+[[surfaces]]
+kind        = "portal-page"
+path        = "/admin/auth/webauthn"
+crate       = "cave-portal"
+note        = "Per-user passkey/security-key console: registered credentials list (aaguid, transports, last-used, sign_count), enroll-new-credential ceremony, revoke. Page implementation handled by sibling agent A6; cave-auth provides the backing trait."
+
+[[surfaces]]
+kind        = "cli"
+path        = "cavectl auth webauthn {register-options,verify-attestation,assert-options,verify-assertion}"
+crate       = "cavectl"
+note        = "Parse-only surface today (crates/cave-cli/src/auth/webauthn.rs); HTTP wiring lands when the portal page goes live."
+
+[[surfaces]]
+kind        = "alert"
+path        = "WebAuthnRegistrationFailureRate"
+crate       = "observability/alerts/cave-auth.yml"
+note        = ">10% registration failures over 10m — warn."
+
+[[surfaces]]
+kind        = "alert"
+path        = "WebAuthnAssertionSignatureVerifyFailureRate"
+crate       = "observability/alerts/cave-auth.yml"
+note        = ">2% signature-verify failures over 5m — critical."
+
+# ── Upstream test ports (webauthn4j test suite + W3C L2 vectors) ────────────
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/converter/CollectedClientDataConverterTest.java"
+local    = "src/webauthn/tests/upstream_port.rs::w3c_appendix_c3_client_data_parses"
+status   = "ported"
+note     = "W3C Appendix C.3 — clientDataJSON canonical form parses."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-test/src/test/java/com/webauthn4j/test/E2EIntegrationTest.java::testEd25519Registration"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_1_eddsa_register_then_authenticate"
+status   = "ported"
+note     = "EdDSA register-then-authenticate end-to-end roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-test/src/test/java/com/webauthn4j/test/E2EIntegrationTest.java::testES256Registration"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_2_es256_register_then_authenticate"
+status   = "ported"
+note     = "ES256 register-then-authenticate end-to-end roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/AuthenticatorDataVerifierTest.java::testSignCountRegression"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_3_replay_rejected_by_sign_count"
+status   = "ported"
+note     = "Sign-count monotonicity replay rejection."
+
+[[upstream_test]]
+upstream = "keycloak:services/src/test/java/org/keycloak/test/auth/WebAuthnPasswordlessTest.java"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_4_passkey_discoverable"
+status   = "ported"
+note     = "Passkey discoverable-credential flow with user_handle."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/packed/PackedAttestationStatementVerifierTest.java::testSelfAttestation"
+local    = "src/webauthn/tests/upstream_port.rs::ceremony_5_packed_self_attestation_register"
+status   = "ported"
+note     = "Packed self-attestation (no x5c) register ceremony."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/converter/AttestationObjectConverterTest.java::testNoneAttestationRoundTrip"
+local    = "src/webauthn/tests/upstream_port.rs::spec_vector_none_attestation_roundtrip"
+status   = "ported"
+note     = "None-attestation CBOR roundtrip."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/tpm/TPMAttestationStatementVerifierTest.java::testCertInfoMagic"
+local    = "src/webauthn/attestation/tpm.rs::tests::cert_info_magic_accepts_valid_header"
+status   = "ported"
+note     = "TPMS_ATTEST magic + type byte check."
+
+[[upstream_test]]
+upstream = "webauthn4j:webauthn4j-core/src/test/java/com/webauthn4j/verifier/attestation/statement/AppleAnonymousAttestationStatementVerifierTest.java"
+local    = ""
+status   = "missing"
+note     = "Apple anonymous attestation — deferred (MVP). Add when iOS Safari hardware-attested passkeys become common in cave-portal traffic."
 
 # ─── A1 mission additions (Keycloak v22.0.0 SAML broker port, 2026-05-15) ──
 # Appended-only — every existing entry above is untouched.

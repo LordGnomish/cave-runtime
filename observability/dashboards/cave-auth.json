@@ -303,6 +303,32 @@
       "targets": [
         { "expr": "sum by (reason) (rate(cave_auth_saml_assertion_signature_verify_failures_total[5m]))", "legendFormat": "fail {{reason}}", "refId": "A" }
       ]
+    },
+    {
+      "id": 17,
+      "title": "WebAuthn registration ceremony rate (success / failure)",
+      "description": "Outcomes of WebAuthn registration ceremonies from cave-auth/webauthn/registration.rs. Counter: cave_auth_webauthn_registration_total{outcome=success|failure}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome) (rate(cave_auth_webauthn_registration_total[1m]))", "legendFormat": "{{outcome}}", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_registration_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(cave_auth_webauthn_registration_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "WebAuthn assertion: total vs signature-verify failures",
+      "description": "Healthy ratio between assertion ceremonies and signature-verify rejections from cave-auth/webauthn/authentication.rs. Two distinct counters: cave_auth_webauthn_assertion_total and cave_auth_webauthn_assertion_signature_verify_failure_total.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_total[1m]))", "legendFormat": "assertions/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_signature_verify_failure_total[1m]))", "legendFormat": "sig-verify failures/s", "refId": "B" }
+      ]
     }
   ]
 }

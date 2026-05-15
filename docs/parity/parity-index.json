@@ -92,6 +92,11 @@
       "upstream_version": "v3.0.0"
     },
     "cave-auth": {
+      "behavioral_missing": 1,
+      "behavioral_parity": 0.8888888888888888,
+      "behavioral_partial": 0,
+      "behavioral_ported": 8,
+      "behavioral_total": 9,
       "cave_src_loc": 8236,
       "honest_ratio": 0.7568,
       "last_audit_disk": "2026-05-13",

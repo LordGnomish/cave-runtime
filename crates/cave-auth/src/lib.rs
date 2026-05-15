@@ -47,6 +47,7 @@ pub mod scim;
 pub mod session;
 pub mod tenant;
 pub mod token;
+pub mod webauthn;
 
 /// RBAC engine + models.
 pub use rbac::{BindingScope, RbacEngine, ResourcePolicy, Role, RoleBinding};
