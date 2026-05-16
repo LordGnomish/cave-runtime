@@ -7,4 +7,5 @@
 //! kafka_protocol.rs, consumer_group.rs, …) stay where they are
 //! per ADR — directory reorg is deferred to Phase-2 backlog.
 
+pub mod kip415;
 pub mod kip848;
