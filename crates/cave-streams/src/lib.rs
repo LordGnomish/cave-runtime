@@ -36,6 +36,7 @@ pub mod consumer_group;
 pub mod error;
 pub mod idempotent_producer;
 pub mod incremental_rebalance;
+pub mod kafka;
 pub mod kafka_wire;
 pub mod kraft;
 pub mod log_compaction;
