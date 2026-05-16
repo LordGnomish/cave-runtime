@@ -8,22 +8,44 @@
 //! single mutator is `reset_consumer_offset`, which exposes the
 //! `kafka-consumer-groups.sh --reset-offsets` semantics.
 //!
-//! Tab layout — mirrors Kafka admin tooling:
+//! Tab layout — mirrors Kafka admin tooling. The original 6-tab
+//! split (topics / brokers / consumer_groups / partitions / acls
+//! / connect) is preserved; the 2026-05-16 S4 sweep adds the full
+//! 9-tab Kafka Connect + KIP-405 console:
 //!
-//! * [`topics`]          — topic registry + per-topic configs
+//! * [`workers`]            — Connect worker roster (PlatformAdmin)
+//! * [`connectors`]         — Connect connector list (PlatformAdmin)
+//! * [`tasks`]              — Connect tasks per connector (PlatformAdmin)
+//! * [`configs`]            — broker + Connect config explorer (PlatformAdmin)
+//! * [`topics`]             — topic registry + per-topic configs
+//! * [`partitions`]         — per-partition leader + replica view
+//! * [`groups`]             — Kafka consumer groups
+//! * [`rebalance_history`]  — last N rebalances (PlatformAdmin)
+//! * [`tiered_storage`]     — KIP-405 status per topic-partition
+//!
+//! Legacy modules kept for routing compatibility:
+//!
 //! * [`brokers`]         — live broker roster
-//! * [`consumer_groups`] — group state + lag
-//! * [`partitions`]      — per-partition leader + replica view
+//! * [`consumer_groups`] — group state + lag (legacy alias of [`groups`])
 //! * [`acls`]            — tenant-scoped allow rules
+//! * [`connect`]         — 4-anchor Connect console
 
 pub mod acls;
 pub mod brokers;
+pub mod configs;
 pub mod connect;
+pub mod connectors;
 pub mod consumer_groups;
+pub mod groups;
 pub mod partitions;
+pub mod rebalance_history;
+pub mod tasks;
+pub mod tiered_storage;
 pub mod topics;
+pub mod workers;
 
-use crate::admin::permission::{Permission, RequestCtx};
+use crate::admin::layout::command_palette::CommandItem;
+use crate::admin::permission::{Permission, Persona, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
 use crate::admin::state::{scope, AdminState, StreamsConsumerGroup, StreamsTopic};
 use crate::admin::types::Cite;
@@ -185,6 +207,32 @@ pub fn render(state: &AdminState, ctx: &RequestCtx) -> Result<String, StreamsVie
     ))
 }
 
+/// Per-persona command-palette entries for the 9-tab streams console.
+/// PlatformAdmin gets every tab; TenantAdmin gets only the four
+/// tenant-scoped read-only tabs (topics, partitions, groups,
+/// tiered_storage). Mounted via [`crate::admin::layout::shell::ShellOptions::extra_commands`].
+pub fn palette_entries(tenant_id: &str, persona: Persona) -> Vec<CommandItem> {
+    let t = tenant_id;
+    let plat = persona == Persona::PlatformAdmin;
+    let mut out = vec![
+        // Tenant-visible.
+        CommandItem::nav("Streams · Topics", &format!("/admin/streams/topics?tenant_id={t}")),
+        CommandItem::nav("Streams · Partitions", &format!("/admin/streams/partitions?tenant_id={t}")),
+        CommandItem::nav("Streams · Groups", &format!("/admin/streams/groups?tenant_id={t}")),
+        CommandItem::nav("Streams · Tiered Storage", &format!("/admin/streams/tiered_storage?tenant_id={t}")),
+    ];
+    if plat {
+        out.extend([
+            CommandItem::nav_platform("Streams · Workers", &format!("/admin/streams/workers?tenant_id={t}")),
+            CommandItem::nav_platform("Streams · Connectors", &format!("/admin/streams/connectors?tenant_id={t}")),
+            CommandItem::nav_platform("Streams · Tasks", &format!("/admin/streams/tasks?tenant_id={t}")),
+            CommandItem::nav_platform("Streams · Configs", &format!("/admin/streams/configs?tenant_id={t}")),
+            CommandItem::nav_platform("Streams · Rebalance History", &format!("/admin/streams/rebalance_history?tenant_id={t}")),
+        ]);
+    }
+    out
+}
+
 #[allow(dead_code)]
 const FILE_CITE: Cite = Cite::backstage(
     "plugins/streams/src/components/Topics/TopicsPage.tsx",
@@ -292,6 +340,56 @@ mod tests {
         );
         let s = AdminState::seeded();
         assert!(list_topics(&s, &ctx(&[])).is_err());
+    }
+
+    #[test]
+    fn palette_entries_platform_admin_carries_all_nine_tabs() {
+        let entries = palette_entries("acme", Persona::PlatformAdmin);
+        let labels: Vec<&str> = entries.iter().map(|c| c.label.as_str()).collect();
+        for must in &[
+            "Streams · Topics",
+            "Streams · Partitions",
+            "Streams · Groups",
+            "Streams · Tiered Storage",
+            "Streams · Workers",
+            "Streams · Connectors",
+            "Streams · Tasks",
+            "Streams · Configs",
+            "Streams · Rebalance History",
+        ] {
+            assert!(labels.contains(must), "missing {must}");
+        }
+    }
+
+    #[test]
+    fn palette_entries_tenant_admin_only_carries_four_read_only_tabs() {
+        let entries = palette_entries("acme", Persona::TenantAdmin);
+        let labels: Vec<&str> = entries.iter().map(|c| c.label.as_str()).collect();
+        for must in &[
+            "Streams · Topics",
+            "Streams · Partitions",
+            "Streams · Groups",
+            "Streams · Tiered Storage",
+        ] {
+            assert!(labels.contains(must), "missing {must}");
+        }
+        for must_not in &[
+            "Streams · Workers",
+            "Streams · Connectors",
+            "Streams · Tasks",
+            "Streams · Configs",
+            "Streams · Rebalance History",
+        ] {
+            assert!(!labels.contains(must_not), "leaked admin entry {must_not}");
+        }
+    }
+
+    #[test]
+    fn palette_entries_carry_tenant_id_query_param() {
+        let entries = palette_entries("acme", Persona::PlatformAdmin);
+        for c in &entries {
+            assert!(c.href.contains("tenant_id=acme"), "missing tenant_id in {}", c.href);
+        }
     }
 
     #[test]
