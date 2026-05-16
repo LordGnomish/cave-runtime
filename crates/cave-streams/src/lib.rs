@@ -31,6 +31,7 @@ pub mod connect;
 pub mod connect_rest;
 pub mod connect_worker;
 pub mod consumer_group;
+pub mod cooperative_assignor;
 pub mod error;
 pub mod idempotent_producer;
 pub mod incremental_rebalance;

@@ -1,13 +1,61 @@
 //! Consumer group coordinator — join/sync/heartbeat/leave + rebalance protocols.
 //!
 //! Supports: range, roundrobin, sticky, cooperative-sticky
+//!
+//! Source: apache/kafka@9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2 core/src/main/scala/kafka/coordinator/group/GroupCoordinator.scala
 
 use crate::error::{StreamsError, StreamsResult};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use uuid::Uuid;
+
+/// Encode a (topic, partition) set into the simple wire form used
+/// for cooperative-plan input — `"topic:partition,topic:partition"`
+/// UTF-8 bytes. cave-streams' assignment bytes don't need to match
+/// the Kafka MemberAssignment v0 wire shape exactly because the
+/// cooperative coordinator interprets them locally; this codec is
+/// the canonical local format used by [`decode_assignment`].
+pub fn encode_assignment(
+    parts: &std::collections::BTreeSet<crate::incremental_rebalance::Tp>,
+) -> Vec<u8> {
+    let mut out = String::new();
+    for (i, (topic, partition)) in parts.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(topic);
+        out.push(':');
+        out.push_str(&partition.to_string());
+    }
+    out.into_bytes()
+}
+
+/// Inverse of [`encode_assignment`]. Empty bytes → empty set.
+pub fn decode_assignment(
+    bytes: &[u8],
+) -> std::collections::BTreeSet<crate::incremental_rebalance::Tp> {
+    let mut out = BTreeSet::new();
+    let s = match std::str::from_utf8(bytes) {
+        Ok(s) => s,
+        Err(_) => return out,
+    };
+    for chunk in s.split(',') {
+        let chunk = chunk.trim();
+        if chunk.is_empty() {
+            continue;
+        }
+        let Some((topic, partition)) = chunk.rsplit_once(':') else {
+            continue;
+        };
+        let Ok(p) = partition.parse::<i32>() else {
+            continue;
+        };
+        out.insert((topic.to_string(), p));
+    }
+    out
+}
 
 // ── Rebalance protocol ────────────────────────────────────────────────────────
 
@@ -413,6 +461,35 @@ impl GroupCoordinator {
         Ok(())
     }
 
+    /// Build a cooperative incremental rebalance plan for `group_id`
+    /// (KIP-415). The caller supplies the desired partition set; the
+    /// coordinator computes a balanced + sticky target from each
+    /// member's `assignment` bytes (interpreted via
+    /// [`decode_assignment`]) and returns the two-phase plan that
+    /// follows the revoke-then-assign discipline.
+    pub fn cooperative_plan(
+        &self,
+        group_id: &str,
+        partitions: &std::collections::BTreeSet<crate::incremental_rebalance::Tp>,
+    ) -> StreamsResult<crate::incremental_rebalance::IncrementalRebalancePlan> {
+        let group = self
+            .groups
+            .get(group_id)
+            .ok_or_else(|| StreamsError::GroupNotFound(group_id.into()))?;
+        let members: Vec<String> = group.members.keys().cloned().collect();
+        let mut previous: HashMap<String, std::collections::BTreeSet<crate::incremental_rebalance::Tp>> =
+            HashMap::new();
+        for (mid, m) in &group.members {
+            previous.insert(mid.clone(), decode_assignment(&m.assignment));
+        }
+        drop(group);
+        Ok(crate::cooperative_assignor::cooperative_sticky_plan(
+            &previous,
+            &members,
+            partitions,
+        ))
+    }
+
     /// Expire members that haven't heartbeated within their session timeout.
     pub fn expire_stale_members(&self) {
         for mut group in self.groups.iter_mut() {
@@ -561,5 +638,87 @@ mod tests {
         let assignments = proto.assign(&members, &tp);
         let total: usize = assignments.values().map(|v| v.len()).sum();
         assert_eq!(total, 6);
+    }
+
+    #[test]
+    fn assignment_codec_round_trips() {
+        let mut s: BTreeSet<(String, i32)> = BTreeSet::new();
+        s.insert(("orders".into(), 0));
+        s.insert(("orders".into(), 1));
+        s.insert(("alerts".into(), 7));
+        let enc = encode_assignment(&s);
+        let dec = decode_assignment(&enc);
+        assert_eq!(dec, s);
+    }
+
+    #[test]
+    fn assignment_codec_handles_empty() {
+        let s = BTreeSet::new();
+        assert_eq!(encode_assignment(&s), Vec::<u8>::new());
+        assert_eq!(decode_assignment(&[]), BTreeSet::new());
+    }
+
+    #[test]
+    fn assignment_codec_tolerates_garbage() {
+        // Garbage segments are silently skipped.
+        let dec = decode_assignment(b"orders:0,not-a-pair,alerts:7");
+        let mut want = BTreeSet::new();
+        want.insert(("orders".to_string(), 0));
+        want.insert(("alerts".to_string(), 7));
+        assert_eq!(dec, want);
+    }
+
+    #[test]
+    fn cooperative_plan_for_group_uses_member_assignments() {
+        let c = coordinator();
+        // Two members with prior assignment.
+        c.join_group(
+            "co-grp".into(),
+            Some("m1".into()),
+            "c1".into(),
+            "1".into(),
+            30000,
+            60000,
+            "consumer".into(),
+            HashMap::new(),
+        )
+        .unwrap();
+        c.join_group(
+            "co-grp".into(),
+            Some("m2".into()),
+            "c2".into(),
+            "2".into(),
+            30000,
+            60000,
+            "consumer".into(),
+            HashMap::new(),
+        )
+        .unwrap();
+        // Seed m1 with [t,0] and m2 with [t,1].
+        let mut prev_m1 = BTreeSet::new();
+        prev_m1.insert(("t".to_string(), 0));
+        let mut prev_m2 = BTreeSet::new();
+        prev_m2.insert(("t".to_string(), 1));
+        let gen_now = c.groups.get("co-grp").unwrap().generation_id;
+        let mut assigns = HashMap::new();
+        assigns.insert("m1".into(), encode_assignment(&prev_m1));
+        assigns.insert("m2".into(), encode_assignment(&prev_m2));
+        c.sync_group("co-grp", gen_now, "m1", assigns).unwrap();
+        // Compute cooperative plan over the same partition set —
+        // already balanced.
+        let parts: BTreeSet<(String, i32)> = [("t".to_string(), 0), ("t".to_string(), 1)]
+            .into_iter()
+            .collect();
+        let plan = c.cooperative_plan("co-grp", &parts).unwrap();
+        assert_eq!(plan.released_count, 0);
+        assert_eq!(plan.stable_count, 2);
+    }
+
+    #[test]
+    fn cooperative_plan_for_unknown_group_errors() {
+        let c = coordinator();
+        let parts = BTreeSet::new();
+        let r = c.cooperative_plan("nope", &parts);
+        assert!(r.is_err());
     }
 }
