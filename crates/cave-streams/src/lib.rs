@@ -40,6 +40,7 @@ pub mod log_compaction;
 pub mod mirror;
 pub mod partitioned_topic;
 pub mod protocol;
+pub mod pulsar;
 pub mod pulsar_admin;
 pub mod pulsar_dispatch;
 pub mod pulsar_topic;
