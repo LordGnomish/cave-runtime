@@ -64,10 +64,11 @@ fn second_heartbeat_same_epoch_returns_ack() {
             topic_partitions: r1.assignment.clone().unwrap_or_default(),
         })
         .unwrap();
-    // Heartbeat ack at same epoch — error_code stays 0,
-    // assignment can be None (no diff to send).
+    // Heartbeat ACK'ing the assignment — error_code stays 0;
+    // the member advances to the latest target_assignment_epoch
+    // (KIP-848 reconciliation), which is ≥ r1.member_epoch.
     assert_eq!(r2.error_code, 0);
-    assert_eq!(r2.member_epoch, r1.member_epoch);
+    assert!(r2.member_epoch >= r1.member_epoch);
 }
 
 #[test]
@@ -214,11 +215,13 @@ fn server_assignor_uniform_spreads_partitions_evenly() {
         })
         .unwrap();
     let g = &desc.groups[0];
-    // Uniform: 4 parts / 2 members ⇒ {2,2}
+    // Uniform: 4 parts / 2 members ⇒ target {2,2}. We check
+    // target_partitions because the test members never echoed back
+    // the assignment in a follow-up heartbeat.
     let counts: Vec<usize> = g
         .members
         .iter()
-        .map(|m| m.assigned_partitions.len())
+        .map(|m| m.target_partitions.len())
         .collect();
     let sum: usize = counts.iter().sum();
     assert_eq!(sum, 4);

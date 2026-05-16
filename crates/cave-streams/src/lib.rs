@@ -39,6 +39,7 @@ pub mod kafka_wire;
 pub mod kraft;
 pub mod log_compaction;
 pub mod mirror;
+pub mod next_gen_group_protocol;
 pub mod partitioned_topic;
 pub mod protocol;
 pub mod pulsar_admin;
