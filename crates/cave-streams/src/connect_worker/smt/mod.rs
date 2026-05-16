@@ -36,9 +36,13 @@
 pub mod cast;
 pub mod extract_field;
 pub mod filter;
+pub mod flatten;
 pub mod header_from;
 pub mod insert_field;
 pub mod mask_field;
+pub mod regex_router;
+pub mod replace_field;
+pub mod timestamp_router;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock, RwLock};
@@ -267,15 +271,19 @@ impl SmtRegistry {
         Ok(chain)
     }
 
-    /// Pre-loaded registry with the six built-in SMTs.
+    /// Pre-loaded registry with the ten built-in SMTs.
     pub fn with_defaults() -> Self {
         let me = Self::new();
         cast::Cast::register(&me);
         extract_field::ExtractField::register(&me);
         filter::Filter::register(&me);
+        flatten::Flatten::register(&me);
         header_from::HeaderFrom::register(&me);
         insert_field::InsertField::register(&me);
         mask_field::MaskField::register(&me);
+        regex_router::RegexRouter::register(&me);
+        replace_field::ReplaceField::register(&me);
+        timestamp_router::TimestampRouter::register(&me);
         me
     }
 }

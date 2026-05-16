@@ -71,8 +71,13 @@ fn timestamp_router_appends_yyyymmdd_to_topic() {
     cfg.insert("topic.format".into(), "${topic}-${timestamp}".into());
     cfg.insert("timestamp.format".into(), "yyyyMMdd".into());
     let s = TimestampRouter::from_config(&cfg).unwrap();
-    // 2026-05-16T00:00:00 UTC.
-    let ts_ms: i64 = 1_779_004_800_000;
+    // 2026-05-16T00:00:00 UTC = (2026-05-16 - 1970-01-01) * 86400 * 1000.
+    // 56 years inclusive of 14 leap years (1972 .. 2024) → 20,585 days
+    // from 1970-01-01 to 2026-05-16. Reuse chrono to compute it rather
+    // than hand-arithmeticking the seconds.
+    use chrono::TimeZone;
+    let dt = chrono::Utc.with_ymd_and_hms(2026, 5, 16, 0, 0, 0).unwrap();
+    let ts_ms: i64 = dt.timestamp_millis();
     let mut r = RecordEnvelope::new("events", Value::Null);
     r.timestamp_ms = Some(ts_ms);
     let out = s.apply(r).unwrap().unwrap();
@@ -273,18 +278,19 @@ fn chain_predicate_gated_drop_short_circuits_downstream() {
     // do not observe the dropped record. (Smoke pattern from
     // `FilterChainTest` in upstream.)
     let mut chain = SmtChain::new();
-    // Use a Filter that drops EVERY record.
+    // Configure Filter to drop every record on topic "drop-me".
     let mut filter_cfg = BTreeMap::new();
-    filter_cfg.insert("type".into(), "exclude".into());
+    filter_cfg.insert("predicate".into(), "TopicNameMatches".into());
+    filter_cfg.insert("pattern".into(), "drop-me".into());
     let filter = cave_streams::connect_worker::smt::filter::Filter::from_config(&filter_cfg)
         .unwrap();
     chain.push(Arc::new(filter));
-    // ReplaceField after — should never run.
+    // ReplaceField after — should never run on the dropped record.
     let mut rep_cfg = BTreeMap::new();
     rep_cfg.insert("renames".into(), "x:y".into());
     let rep = ReplaceField::from_config(&rep_cfg).unwrap();
     chain.push(Arc::new(rep));
-    let r = RecordEnvelope::new("t", obj(&[("x", Value::Int(1))]));
+    let r = RecordEnvelope::new("drop-me", obj(&[("x", Value::Int(1))]));
     let out = chain.apply(r).unwrap();
-    assert!(out.is_none());
+    assert!(out.is_none(), "Filter must drop the record before ReplaceField runs");
 }
