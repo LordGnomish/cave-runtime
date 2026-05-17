@@ -1219,12 +1219,17 @@
       "upstream_version": null
     },
     "cave-sbom": {
+      "behavioral_missing": 0,
+      "behavioral_parity": 1.0,
+      "behavioral_partial": 0,
+      "behavioral_ported": 28,
+      "behavioral_total": 28,
       "cave_src_loc": 434,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.8545,
+      "last_audit_disk": "2026-05-17",
       "manifest_filled": true,
       "note": "skeleton \u2014 needs real impl",
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8545,
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D1",
@@ -1575,7 +1580,7 @@
     "injected": 6,
     "new_filled": 84,
     "phantoms": 5,
-    "ratio_overrides": 26
+    "ratio_overrides": 27
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
