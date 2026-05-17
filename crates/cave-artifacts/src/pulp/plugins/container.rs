@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulp_container@37ef4770b830439b0e86a364b9109a916446e229 pulp_container/app/models.py
 //! pulp_container — Container image content plugin (OCI / Docker).
 //!
 //! For full container functionality, this delegates to cave-registry.

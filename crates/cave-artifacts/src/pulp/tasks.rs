@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulpcore@0f991c2fa2bf6c8635e8a2de064ef04dacbbcf4f pulpcore/app/tasks/repository.py + pulpcore/app/models/task.py
 //! Async task queue — Pulp v3 task system.
 //!
 //! All long-running operations (sync, publish, repair) return a task href

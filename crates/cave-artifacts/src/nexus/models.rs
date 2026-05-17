@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: sonatype/nexus-public@HEAD components/nexus-repository/.../Repository.java + Component.java + Asset.java
 //! Sonatype Nexus 3 domain model.
 //!
 //! Mirrors Nexus' public REST shapes for repositories, components, assets,

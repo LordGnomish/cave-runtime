@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulpcore@0f991c2fa2bf6c8635e8a2de064ef04dacbbcf4f pulpcore/app/tasks/repair.py
 //! Repair — reclaim space, verify checksums, re-download missing content.
 
 use crate::pulp::models::Artifact;

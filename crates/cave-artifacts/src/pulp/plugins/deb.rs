@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulp_deb@HEAD pulp_deb/app/models/
 //! pulp_deb — Debian package content plugin.
 
 use crate::pulp::error::ArtifactsError;

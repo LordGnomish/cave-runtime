@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/server/v2.0/handler/project.go + registry.go + replication.go
 //! Harbor Admin API routes (/api/v2.0/…).
 //!
 //! Implements: projects, repositories, robot accounts, vulnerability scanning,

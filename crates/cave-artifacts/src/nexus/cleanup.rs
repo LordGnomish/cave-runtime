@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: sonatype/nexus-public@HEAD components/nexus-cleanup/.../cleanup
 //! Cleanup policy evaluation: scans a repository's assets and returns the
 //! set of asset IDs that match every configured criterion. The caller is
 //! responsible for actually deleting them so dry-run / preview flows can

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/server/registry/handler.go (Docker Registry V2 dispatch)
 //! Docker Registry HTTP API V2 compatibility layer.
 //!
 //! Implements the Docker Distribution Spec v2 so that `docker pull`,

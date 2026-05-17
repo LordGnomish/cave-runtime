@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: META — cave-artifacts crate root (consolidation, no single upstream)
 //! cave-artifacts — consolidated artifact repository platform.
 //!
 //! Bundles best-of-breed upstream parities under one crate, mirroring the

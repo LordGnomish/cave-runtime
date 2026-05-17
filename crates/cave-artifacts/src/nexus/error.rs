@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: sonatype/nexus-public@HEAD components/nexus-repository/.../RepositoryException.java
 //! Error type for the Nexus module.
 
 use thiserror::Error;
