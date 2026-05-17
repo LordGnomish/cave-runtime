@@ -15,6 +15,8 @@
 //! | [`okta`] | Okta Authorization Server client, group sync, SCIM 2.0 handlers |
 
 pub mod abac;
+pub mod admin_flows;
+pub mod admin_idp;
 pub mod audit;
 pub mod auth_middleware;
 pub mod auth_routes;

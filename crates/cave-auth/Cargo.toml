@@ -34,3 +34,5 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# Admin REST stores (Keycloak `IdentityProvidersResource`, `AuthenticationManagementResource`)
+dashmap   = { workspace = true }
