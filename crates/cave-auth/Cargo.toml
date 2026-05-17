@@ -79,6 +79,8 @@ rusqlite    = { workspace = true }
 # on the structural pure-Rust modules. On Linux, install `libgssapi-krb5-2-dev` /
 # `krb5-devel` first. See `kerberos::gssapi_real::PLATFORM_NOTES` for full detail.
 libgssapi = { workspace = true, optional = true }
+# Admin REST stores (Keycloak `IdentityProvidersResource`, `AuthenticationManagementResource`)
+dashmap   = { workspace = true }
 
 [features]
 # `kerberos-gssapi` is opt-in (not default). Even on Linux it requires the system
