@@ -646,3 +646,65 @@ cave_path      = "tests/upstream_port_batch4.rs"
 cave_test_name = "upstream_cronjob_unparseable_field_returns_error"
 status         = "ported"
 notes          = "Non-numeric token returns ScheduleError::InvalidField."
+
+# Qwen-pump B-prime cycle 1779014729 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=2)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_controllers_list_is_non_empty_20240520120001"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_node_client_group_constant_20240520120002"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_max_endpoints_per_slice_constant_20240520120003"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_min_endpoints_per_zone_constant_20240520120004"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_default_scale_down_window_sec_constant_20240520120005"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_default_pod_eviction_timeout_sec_constant_20240520120006"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_renewal_fraction_constant_20240520120007"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_default_cleanup_grace_sec_constant_20240520120008"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_max_expiration_sec_constant_20240520120009"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_default_sa_name_constant_20240520120010"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_sa_token_type_constant_20240520120011"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_pv_protection_finalizer_constant_20240520120012"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_taint_not_ready_constant_20240520120013"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_annotation_revision_constant_20240520120014"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_signer_kube_apiserver_client_kubelet_constant_20240520120015"
