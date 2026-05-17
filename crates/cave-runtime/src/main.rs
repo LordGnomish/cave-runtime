@@ -330,6 +330,17 @@ async fn main() -> anyhow::Result<()> {
         .merge(cave_kamaji::router(kamaji_state))
         // Auth endpoints
         .merge(cave_auth::auth_routes::router())
+        // Keycloak Admin REST — identity-provider/instances + authentication/flows.
+        // Both routers carry their own state internally; the JWT layer below
+        // gates `/admin/realms/...` to platform_admin via the bypass list,
+        // and the per-handler persona-gate (added in `admin_realms_gate`)
+        // rejects tenant_admin callers with 403.
+        .merge(cave_auth::admin_idp::router(cave_auth::admin_idp::AdminIdpState::new()))
+        .merge(cave_auth::admin_flows::router(cave_auth::admin_flows::AdminFlowsState::new()))
+        // Persona gate for `/admin/realms/*` — runs AFTER the JWT
+        // middleware has injected `JwtClaims`; rejects everything that
+        // is not `platform_admin`.
+        .layer(axum::middleware::from_fn(admin_realms_persona_gate))
         // Portal-facing handlers: persona auth, upstream tracker, ADR browser, attribution
         .merge(portal::router())
         // JWT auth middleware
@@ -430,6 +441,44 @@ async fn health() -> axum::Json<serde_json::Value> {
 
 async fn ready() -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({ "ready": true }))
+}
+
+/// Persona gate for the Keycloak Admin REST surface mounted by
+/// `cave_auth::admin_idp` and `cave_auth::admin_flows`. The outer JWT
+/// middleware bypasses `/admin/` so the portal dev-token flow stays
+/// unbroken, which means `/admin/realms/...` would otherwise be wide
+/// open. This gate compensates: it runs *after* the JWT middleware has
+/// best-effort-decoded claims, and on `/admin/realms/...` it requires a
+/// caller carrying the `platform_admin` role. Tenant admins get 403;
+/// callers without a JWT get 401. Everything else (the portal `/admin/*`
+/// pages, /admin/_audit, …) flows through untouched.
+async fn admin_realms_persona_gate(
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let path = req.uri().path();
+    if !path.starts_with("/admin/realms/") {
+        return next.run(req).await;
+    }
+    match req.extensions().get::<cave_auth::jwt_middleware::JwtClaims>() {
+        Some(claims) if claims.roles.iter().any(|r| r == "platform_admin") => {
+            next.run(req).await
+        }
+        Some(_) => (
+            axum::http::StatusCode::FORBIDDEN,
+            axum::Json(serde_json::json!({
+                "error": "platform_admin persona required for /admin/realms/*"
+            })),
+        )
+            .into_response(),
+        None => (
+            axum::http::StatusCode::UNAUTHORIZED,
+            axum::Json(serde_json::json!({
+                "error": "JWT required for /admin/realms/*"
+            })),
+        )
+            .into_response(),
+    }
 }
 
 async fn api_modules() -> axum::Json<serde_json::Value> {
