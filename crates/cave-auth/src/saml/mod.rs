@@ -49,6 +49,7 @@ pub mod canonicalization;
 pub mod metadata;
 pub mod response;
 pub mod signature;
+pub mod signing_ecdsa;
 
 // ── A1 mission additions (Keycloak v22.0.0 SAML broker port) ────────────────
 // Appended-only — never edit the originals above.

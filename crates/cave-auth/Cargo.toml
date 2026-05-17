@@ -41,6 +41,10 @@ ciborium      = "0.2"
 coset         = "0.3"
 bitflags      = "2"
 p256          = { workspace = true }
+# ECDSA XML signing — XMLDSig ECDSA-SHA{256,384,512} per RFC 4051 §2.2.3
+# (r||s raw concatenation, NOT DER). Real signers/verifiers for P-384/P-521.
+p384          = { workspace = true }
+p521          = { workspace = true }
 rsa           = "0.9"
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
 sha2          = { workspace = true, features = ["oid"] }
