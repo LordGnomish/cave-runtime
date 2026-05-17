@@ -47,3 +47,89 @@ loc          = 75
 priority     = "P2"
 notes        = "Internal audit ledger"
 last_audit   = "2026-05-11"
+
+# Qwen-pump B-prime cycle 1779052669 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=3)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "create_test_entry"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_state_creation_fails_without_new"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_merkle_chain_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_verify_result_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_in_memory_store_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_file_store_type_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_store_trait_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_entry_kind_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_store_config_enum_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_router_function_exists"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_verify_result_no_valid_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_verify_result_no_invalid_constant"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_state_no_new_method"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_in_memory_store_implements_ledger_store"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "assert_implements_store"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_file_store_implements_ledger_store"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "assert_implements_store"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_merkle_chain_is_send_sync"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "assert_send_sync"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_ledger_state_is_send_sync"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "assert_send_sync"
