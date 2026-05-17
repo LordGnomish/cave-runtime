@@ -19,6 +19,7 @@ pub mod gc;
 pub mod harbor;
 pub mod models;
 pub mod pipeline;
+pub mod project_store;
 pub mod proxy;
 pub mod routes;
 pub mod storage;
@@ -33,6 +34,7 @@ use storage::RegistryStorage;
 pub struct RegistryState {
     pub pool: Arc<CavePool>,
     pub storage: Arc<RegistryStorage>,
+    pub projects: Arc<project_store::ProjectStore>,
     pub proxy: proxy::ProxyClient,
     pub pipeline: pipeline::ScanPipeline,
 }
@@ -42,6 +44,7 @@ impl Default for RegistryState {
         Self {
             pool: Arc::new(cave_db::CavePool::mock()),
             storage: Arc::new(RegistryStorage::default()),
+            projects: Arc::new(project_store::ProjectStore::new()),
             proxy: proxy::ProxyClient::new(proxy::ProxyConfig::default()),
             pipeline: pipeline::ScanPipeline::new(pipeline::ScanPipelineConfig::default()),
         }
