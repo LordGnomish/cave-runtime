@@ -14,6 +14,11 @@ pub mod ui;
 /// + per-tenant dashboard. Pinned to backstage/backstage v1.50.3.
 pub mod admin;
 
+/// Live-runtime data sources for Portal admin pages that read from
+/// non-apiserver backends (currently: `cave-auth` admin REST).
+/// Companion to `admin::runtime_client`.
+pub mod runtime_client;
+
 use axum::Router;
 use cave_kernel::parity::ParityReport;
 use std::collections::HashMap;
