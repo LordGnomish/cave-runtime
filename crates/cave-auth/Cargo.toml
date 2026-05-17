@@ -34,3 +34,12 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# SHA-256 digests for SAML 1.1 DSig (src/wsfed/) and OID4VC DataIntegrityProof
+sha2 = { workspace = true }
+# Ed25519 for OID4VC eddsa-rdfc-2022 Data Integrity Proof
+ed25519-dalek = { workspace = true }
+# SMTP outbox for email_listener — `builder` for messages, `smtp-transport` for real send,
+# `tokio1-rustls-tls` for async TLS, `stub` exposed via cfg(test) for in-memory tests.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls", "tokio1-rustls-tls", "tokio1", "tracing"] }
+# Templating for email_listener
+handlebars = "6"
