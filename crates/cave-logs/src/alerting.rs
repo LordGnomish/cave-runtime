@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Log-based alerting: rule evaluation, pattern detection, anomaly detection.
 
 use crate::models::{AlertCondition, AlertSeverity, LogAlert, LogLevel};

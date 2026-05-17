@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Metrics tab — Raft log size, snapshot, commit duration.
 //! Mirrors etcd's `/metrics` Prometheus endpoint key series.
 

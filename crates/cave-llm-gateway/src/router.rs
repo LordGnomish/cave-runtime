@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! GatewayRouter — multi-provider routing with load balancing and fallback chains.
 
 use crate::alias::AliasRegistry;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Quick-action suggester for the compliance dashboard.
 //!
 //! Walks every crate in a [`ComplianceSnapshot`] and emits a typed

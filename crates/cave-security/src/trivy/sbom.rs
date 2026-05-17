@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SBOM generation — CycloneDX 1.4 and SPDX 2.3 (JSON format).
 
 use crate::trivy::{

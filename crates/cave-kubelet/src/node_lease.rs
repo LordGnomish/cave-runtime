@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node lease + status reporter — heartbeat (`coordination.k8s.io/v1`
 //! Lease) and node-condition transition tracking.
 //!

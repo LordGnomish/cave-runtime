@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Leader election tab — `kube-system/Lease` browser. Mirrors the
 //! upstream kube-controller-manager leader-election surface.
 

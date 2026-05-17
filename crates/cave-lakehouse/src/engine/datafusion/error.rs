@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Error types for cave-datafusion.
 //!
 //! Mirrors the categories of apache/datafusion datafusion-common DataFusionError.

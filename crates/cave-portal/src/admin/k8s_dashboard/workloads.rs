@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Workloads tab — joined scheduler nodes ⨝ kubelet pods view.
 
 use super::K8sDashboardViewError;

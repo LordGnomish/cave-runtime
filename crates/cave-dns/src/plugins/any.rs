@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Any plugin — handle or block ANY queries (RFC 8482).
 use async_trait::async_trait;
 use hickory_proto::{

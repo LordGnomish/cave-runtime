@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/workflows` — n8n editor parity (Argo Workflows / Temporal
 //! sibling). Workflow run browser with status cards + duration aggregate.
 //!

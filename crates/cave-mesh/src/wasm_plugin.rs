@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! WasmPlugin CRD — filter-chain extension surface.
 //!
 //! Mirrors Istio's `extensions.istio.io/v1alpha1` WasmPlugin: an

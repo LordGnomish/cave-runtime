@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Alert grouping + dedup, plus Notification log throttling.
 //!
 //! Implements Alertmanager's group_wait / group_interval / repeat_interval:

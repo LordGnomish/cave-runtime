@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-pki — CRL responder tests pinned to RFC 5280 §5.
 
 use cave_pki::{CrlResponder, RevocationReason};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cilium agent default-value constants.
 //!
 //! Mirrors `pkg/defaults/defaults.go`. Every const here has the same name

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-memory Kafka broker — topic/partition log, offset tracking.
 
 use crate::acl::AclStore;

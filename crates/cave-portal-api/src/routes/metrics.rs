@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Metrics — point-in-time series query API.
 //!
 //! Backstage's monitoring tab is one of the most valuable upstream views; the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Multi-tenant in-memory ACME server. Cite: RFC 8555 §6.1
 //! (Directory) + §7 (Account/Order/Authorization workflow). Designed
 //! for the cave-runtime gateway: routes parse JWS, deserialise the

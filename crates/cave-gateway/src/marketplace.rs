@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Gravitee Developer Portal & API Marketplace — self-service API catalog,
 //! consumer management, subscription plans, and API key self-provisioning.
 

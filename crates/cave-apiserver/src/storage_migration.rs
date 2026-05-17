@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Storage migration controller — orchestrates alpha → beta → GA promotions
 //! against `storage_version::StorageVersionRegistry`.
 //!

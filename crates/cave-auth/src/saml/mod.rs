@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SAML 2.0 broker — port of Keycloak's `saml-core` + the
 //! `services/.../protocol/saml/` endpoint set. cave-auth is
 //! primarily OIDC; this module adds the second federation
@@ -47,6 +49,15 @@ pub mod canonicalization;
 pub mod metadata;
 pub mod response;
 pub mod signature;
+
+// ── A1 mission additions (Keycloak v22.0.0 SAML broker port) ────────────────
+// Appended-only — never edit the originals above.
+pub mod name_id;
+pub mod assertion;
+pub mod bindings;
+
+#[cfg(test)]
+mod tests_a1;
 
 use thiserror::Error;
 

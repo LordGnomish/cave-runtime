@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Built-in admission plugins — line-by-line port of upstream
 //! `plugin/pkg/admission/{namespace,resourcequota,limitranger}/`.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! WebSocket log tail — /loki/api/v1/tail
 //!
 //! Subscribers connect via WebSocket and receive a stream of `TailResponse`

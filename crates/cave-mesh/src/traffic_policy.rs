@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Istio `DestinationRule.TrafficPolicy` → Envoy XDS cluster translation.
 //!
 //! Upstream: `pilot/pkg/networking/core/cluster_traffic_policy.go`

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Whoami plugin — respond with the client's IP address.
 use std::net::IpAddr;
 

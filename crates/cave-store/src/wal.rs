@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Write-Ahead Log (WAL) for crash recovery — delegates to cave-core::wal.
 //!
 //! `WalEntry` owns the S3 + etcd domain op shapes.

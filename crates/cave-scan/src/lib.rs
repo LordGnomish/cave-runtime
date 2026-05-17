@@ -1,17 +1,16 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Code quality & SAST — compatible with SonarQube
 //!
 //! Compatible with: SonarQube
 //! Upstream tracking: see cave-upstream for monitored features.
 
 use std::sync::Arc;
-// NOTE: coverage module is safe, but rules.rs has pre-existing Unicode/raw-string
-// syntax errors preventing compilation (em-dashes, raw strings with quote issues).
-// Coverage is usable; rules require syntax repair in a separate effort.
 pub mod coverage;
 pub mod engine;
 pub mod models;
 pub mod routes;
-// pub mod rules;  // TODO: Fix raw string escaping in rules.rs
+pub mod rules;
 
 use axum::Router;
 
@@ -25,3 +24,17 @@ pub fn router(state: Arc<State>) -> Router {
 }
 
 pub const MODULE_NAME: &str = "scan";
+
+pub mod iac;
+pub mod secrets;
+pub mod license;
+// === S2: Trivy scan engine ===
+pub mod analyzer;
+pub mod oci;
+pub mod report_agg;
+pub mod scanners;
+pub mod target;
+// === S2 end ===
+// === S4: Report formats ===
+pub mod report;
+// === S4 end ===

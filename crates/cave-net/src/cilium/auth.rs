@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Cilium Auth API — per-identity-pair mTLS authentication state.
 //!
 //! Mirrors `pkg/auth/auth.go` (the AuthManager that drives mutual auth

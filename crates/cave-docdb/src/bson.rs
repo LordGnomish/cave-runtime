@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Minimal BSON encode/decode for MongoDB wire protocol.
 //! Supports: double, string, embedded doc, array, binary, ObjectId, bool,
 //! UTC datetime, null, regex, int32, timestamp, int64.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! NAT table — SNAT (masquerade) and DNAT (service backend rewrite).
 //!
 //! Mirrors `pkg/datapath/linux/nat/nat.go` and the BPF NAT helpers in

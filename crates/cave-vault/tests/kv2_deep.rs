@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-001: KV v2 — version pruning, delete protection, metadata TTL,
 //! cas+version conflict edge cases. Pinned to openbao v2.5.3.
 

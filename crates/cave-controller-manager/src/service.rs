@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Service controller — provisions external load balancers for
 //! `Service.spec.type == "LoadBalancer"` and finalises cleanup on delete.
 //!

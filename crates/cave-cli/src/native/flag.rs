@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl flag toggle/set/unset/list/group`
 //!
 //! Native flag verb. Per ADR-RUNTIME-CLI-CONSOLIDATION-001, `flag`

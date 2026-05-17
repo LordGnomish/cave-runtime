@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Docker Registry V2 + OCI Distribution Spec 1.1 routes.
 //!
 //! All repository-scoped endpoints are dispatched through a single

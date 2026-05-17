@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE Auth — full enterprise authentication & authorization layer.
 //!
 //! ## What's included
@@ -15,18 +17,27 @@
 //! | [`okta`] | Okta Authorization Server client, group sync, SCIM 2.0 handlers |
 
 pub mod abac;
+pub mod admin_flows;
+pub mod admin_idp;
 pub mod audit;
 pub mod auth_middleware;
 pub mod auth_routes;
 pub mod claims;
+pub mod dpop;
+pub mod jwe;
 pub mod jwks;
 pub mod jwt_middleware;
+pub mod kerberos;
 pub mod keycloak;
+pub mod ldap;
 pub mod middleware;
+pub mod oauth_endpoints;
 pub mod okta;
 pub mod rbac;
 pub mod saml;
+pub mod token_exchange;
 pub mod tokens;
+pub mod uma;
 
 use cave_core::config::AuthProvider;
 
@@ -45,6 +56,7 @@ pub mod scim;
 pub mod session;
 pub mod tenant;
 pub mod token;
+pub mod webauthn;
 
 /// RBAC engine + models.
 pub use rbac::{BindingScope, RbacEngine, ResourcePolicy, Role, RoleBinding};

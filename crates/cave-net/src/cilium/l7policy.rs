@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CiliumNetworkPolicy L7 evaluator.
 //!
 //! Mirrors `pkg/policy/api/l7.go` plus the per-protocol matcher modules:

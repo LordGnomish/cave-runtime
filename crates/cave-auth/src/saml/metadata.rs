@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `<md:EntityDescriptor>` — the metadata XML two SAML parties
 //! exchange before any flow can run. cave-auth emits both SP and
 //! IdP descriptors; the SP variant is what a downstream IdP

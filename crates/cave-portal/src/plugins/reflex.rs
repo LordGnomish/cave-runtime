@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Reflex Engine console — action approval workflow.
 //!
 //! Reflex actions are platform-side automations that require human approval

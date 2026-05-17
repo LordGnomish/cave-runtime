@@ -277,6 +277,58 @@
         { "expr": "sum by (alg) (rate(cave_auth_pqc_sign_total[1m]))", "legendFormat": "sign {{alg}}", "refId": "A" },
         { "expr": "sum by (alg) (rate(cave_auth_pqc_keygen_total[5m]))", "legendFormat": "keygen {{alg}}", "refId": "B" }
       ]
+    },
+    {
+      "id": 15,
+      "title": "SAML AuthnRequest/Response",
+      "description": "SAML 2.0 broker traffic — rate of AuthnRequest received from SPs and Response emitted from the IdP. Source: cave_auth/saml/broker.rs. Failure ratio is the AuthnRequest rejection rate (malformed XML, bad signature, replay).",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_saml_authn_requests_total[1m]))", "legendFormat": "AuthnRequest/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_saml_responses_total[1m]))", "legendFormat": "Response/s", "refId": "B" },
+        { "expr": "sum(rate(cave_auth_saml_authn_failures_total[5m])) / clamp_min(sum(rate(cave_auth_saml_authn_requests_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "C" }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "SAML Assertion signature verify failures",
+      "description": "Rate of SAML 2.0 Assertion signatures rejected at the broker. Non-zero is always notable — either the IdP rotated keys without metadata refresh, an attacker is replaying, or our canonicalisation has drifted. Linked to alert SamlAssertionSignatureVerifyFailures.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 47 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (reason) (rate(cave_auth_saml_assertion_signature_verify_failures_total[5m]))", "legendFormat": "fail {{reason}}", "refId": "A" }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "WebAuthn registration ceremony rate (success / failure)",
+      "description": "Outcomes of WebAuthn registration ceremonies from cave-auth/webauthn/registration.rs. Counter: cave_auth_webauthn_registration_total{outcome=success|failure}.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum by (outcome) (rate(cave_auth_webauthn_registration_total[1m]))", "legendFormat": "{{outcome}}", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_registration_total{outcome=\"failure\"}[5m])) / clamp_min(sum(rate(cave_auth_webauthn_registration_total[5m])), 1e-9)", "legendFormat": "failure ratio", "refId": "B" }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "WebAuthn assertion: total vs signature-verify failures",
+      "description": "Healthy ratio between assertion ceremonies and signature-verify rejections from cave-auth/webauthn/authentication.rs. Two distinct counters: cave_auth_webauthn_assertion_total and cave_auth_webauthn_assertion_signature_verify_failure_total.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROM}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 55 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_total[1m]))", "legendFormat": "assertions/s", "refId": "A" },
+        { "expr": "sum(rate(cave_auth_webauthn_assertion_signature_verify_failure_total[1m]))", "legendFormat": "sig-verify failures/s", "refId": "B" }
+      ]
     }
   ]
 }

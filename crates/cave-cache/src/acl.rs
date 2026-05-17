@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ACL (Access Control List) system — Redis 6+ compatible.
 
 use std::collections::{HashMap, HashSet};

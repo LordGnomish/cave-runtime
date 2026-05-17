@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Low-level network address types — IPv4/IPv6/MAC/PortMap/XFRM.
 //!
 //! Mirrors `pkg/types/`. Upstream defines small thin wrappers around

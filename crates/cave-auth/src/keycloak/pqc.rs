@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PQC-hybrid ML-DSA-65 + Ed25519 JWT signing (ADR-PORTAL-AUTH-001).
 //!
 //! Implementation uses Ed25519 via `ring` for the real digital signature,

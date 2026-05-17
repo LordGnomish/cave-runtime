@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Service registry — Cilium's view of K8s `Service` + `Endpoints`.
 //!
 //! Mirrors `pkg/service/service.go::svcInfo` and `pkg/loadbalancer/types.go`.

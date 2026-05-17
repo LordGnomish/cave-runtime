@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! RESP3 TCP server — connection handling, command dispatch, pub/sub, transactions.
 
 use std::sync::Arc;

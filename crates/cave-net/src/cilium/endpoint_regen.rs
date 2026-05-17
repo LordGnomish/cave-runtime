@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Endpoint regeneration controller — per-endpoint BPF program rebuild.
 //!
 //! Mirrors `pkg/endpoint/policy.go::Endpoint.Regenerate` and the work

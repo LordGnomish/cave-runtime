@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! WebAuthn-gated, RBAC-checked request context.
 //!
 //! Mirrors the `permission-react`/`permission-backend` plugin pair in

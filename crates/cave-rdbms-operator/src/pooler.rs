@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pooler CRD reconciler.
 //!
 //! Mirrors CloudNativePG's Pooler — a higher-level CRD that owns a

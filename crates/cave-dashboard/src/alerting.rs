@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Unified Alerting engine — rule evaluation, contact points, notification routing,
 //! silences, mute timings, and alert group aggregation.
 

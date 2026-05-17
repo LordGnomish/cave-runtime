@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! S3 XML response serialization.
 //!
 //! S3 uses XML for most responses. This module builds XML strings directly

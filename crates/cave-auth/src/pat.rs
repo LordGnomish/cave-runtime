@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Personal Access Tokens (PAT) — create, list, validate, revoke.
 //!
 //! PATs are long-lived tokens scoped to specific capabilities.

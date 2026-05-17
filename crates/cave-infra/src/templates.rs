@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Infrastructure modules/templates — reusable resource blueprints.
 
 use crate::resource::{ResourceKind, ResourceSpec};

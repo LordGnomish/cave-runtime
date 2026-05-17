@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/auth/clients` — Keycloak "Clients" tab. OIDC client
 //! registrations per realm. cave-portal synthesises a per-realm
 //! roster from the live session principals (one client row per

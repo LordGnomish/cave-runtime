@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! AuthLayer — full enterprise auth middleware for axum.
 //!
 //! ## Tower Layer architecture

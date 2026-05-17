@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! BPF map introspection — `cilium bpf <map> list` shape.
 //!
 //! Mirrors `pkg/maps/cmd/dump.go` and the per-map pretty-printers in

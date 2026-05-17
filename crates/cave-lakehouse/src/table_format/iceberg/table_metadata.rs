@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Iceberg TableMetadata — top-level table descriptor (`metadata.json`).
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/table_metadata.rs and

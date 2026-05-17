@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MirrorMaker pattern — cross-cluster topic replication.
 
 use crate::error::{StreamsError, StreamsResult};

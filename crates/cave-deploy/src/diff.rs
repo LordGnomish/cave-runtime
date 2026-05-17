@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Diff engine — live vs desired state, structured merge diff.
 
 use serde_json::Value;

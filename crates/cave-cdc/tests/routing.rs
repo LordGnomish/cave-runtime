@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cdc — tenant-scoped topic routing tests.
 //! Pinned to debezium `TopicNamingStrategy`.
 

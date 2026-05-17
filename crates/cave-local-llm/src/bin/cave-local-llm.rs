@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-local-llm CLI — offline draft generator for Cave Runtime.
 //!
 //! Usage:

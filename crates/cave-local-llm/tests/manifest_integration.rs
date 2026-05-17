@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Integration tests for the manifest reader using real fixture files.
 
 use cave_local_llm::manifest::{find_missing_functions, parse_manifest_file};

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/auth/realms` — Keycloak Admin Console "Realm Settings"
 //! tab. Lists the realms the operator's tenant touches, derived
 //! from the live session list (one realm row per distinct

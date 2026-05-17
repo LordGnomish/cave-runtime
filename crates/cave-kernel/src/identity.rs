@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Workload identity primitives — SPIFFE ID & SVID metadata.
 //!
 //! Implements the SPIFFE 1.0 ID grammar:

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! BGP control plane — `cilium-operator` BGP integration.
 //!
 //! Mirrors `pkg/bgpv1/manager/manager.go` (the per-instance BGP daemon

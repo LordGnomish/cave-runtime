@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Catalog permission constants — port from @backstage/catalog-backend
 //!
 //! Upstream: backstage/plugins/catalog-backend/src/permissions.ts

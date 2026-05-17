@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-net Cilium-parity end-to-end integration tests.
 //!
 //! Cross-module scenarios that exercise the public surface against

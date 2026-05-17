@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/audit` — append-only activity log.
 //!
 //! Every persona action that mutates Portal state (a KEDA pause, a

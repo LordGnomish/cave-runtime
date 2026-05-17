@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CRIU integration — Checkpoint/Restore in Userspace, KEP-2008.
 //!
 //! KEP-2008 wires the existing CRIU tooling into the CRI as

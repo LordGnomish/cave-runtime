@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! TechDocsPreparer trait and NoopPreparer — port of TechDocsPreparer from Backstage.
 //!
 //! Upstream: TechDocsPreparer in @backstage/plugin-techdocs-node/src/techdocs/TechDocsPreparer.ts

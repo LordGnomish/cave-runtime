@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Kubernetes plugin — service discovery from the Kubernetes API.
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};

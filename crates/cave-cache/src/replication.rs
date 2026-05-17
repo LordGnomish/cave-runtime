@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Master / replica replication.
 //!
 //! Ports the master-side and replica-side state machines from

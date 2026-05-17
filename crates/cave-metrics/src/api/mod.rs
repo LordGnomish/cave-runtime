@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prometheus HTTP API v1 — full parity implementation.
 
 pub mod query;

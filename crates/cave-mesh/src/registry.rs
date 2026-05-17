@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Service discovery registry.
 //!
 //! Maintains a live map of namespace/service → endpoints.

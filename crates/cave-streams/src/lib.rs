@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE Streams — Kafka + Pulsar streaming platform.
 //!
 //! Per ADR-RUNTIME-STREAMING-CONSOLIDATION-001 we run a single Rust broker

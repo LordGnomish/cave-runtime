@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! gRPC API surface complete — `RangeRequest` variations, `PutRequest`
 //! `prev_kv` semantics, `DeleteRangeRequest` `prev_kv`, and a typed
 //! `TxnRequest` builder over the existing flat shape in

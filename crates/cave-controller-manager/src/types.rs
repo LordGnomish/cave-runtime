@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shared types for all controllers in cave-controller-manager.
 //!
 //! Every controller carries a [`TenantId`] for multi-tenant isolation, and

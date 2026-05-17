@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OCI registry client — pulls manifests and blobs from container registries.
 //!
 //! Implements the Docker Registry HTTP API v2 for image pulling.

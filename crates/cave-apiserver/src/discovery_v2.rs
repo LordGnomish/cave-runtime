@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Aggregated discovery v2 (KEP-3352) + OpenAPI v3 transport — gzip, ETag,
 //! pagination. Layered on top of `discovery.rs`.
 //!

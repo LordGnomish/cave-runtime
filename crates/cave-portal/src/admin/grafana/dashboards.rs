@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Dashboards tab — Grafana `/dashboards` parity. Folder-tree
 //! grouping + flat list, mirroring `GET /api/search?type=dash-db`.
 

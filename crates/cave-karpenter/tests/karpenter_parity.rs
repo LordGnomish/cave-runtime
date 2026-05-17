@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Parity tests vs. upstream kubernetes-sigs/karpenter v1.12.0.
 //!
 //! All tests are `#[cfg(feature = "live-integration")]` until the corresponding upstream behaviour is

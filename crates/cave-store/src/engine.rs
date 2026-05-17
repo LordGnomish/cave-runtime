@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MVCC storage engine — the core KV store backing the etcd API.
 //!
 //! Uses a BTreeMap for ordered key storage with full revision history.

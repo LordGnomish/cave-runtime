@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cilium-health — cluster-wide connectivity probes.
 //!
 //! Mirrors `pkg/health/probe/probe.go` (the prober that pings every

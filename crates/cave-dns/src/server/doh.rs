@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// DNS-over-HTTPS server (RFC 8484).
 use std::sync::Arc;
 

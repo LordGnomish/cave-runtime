@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Hubble — observability surface for cave-net.
 //!
 //! Mirrors `pkg/hubble/parser/parser.go` plus the drop-reason taxonomy from

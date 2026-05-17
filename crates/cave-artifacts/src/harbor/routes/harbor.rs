@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Harbor Admin API routes (/api/v2.0/…).
 //!
 //! Implements: projects, repositories, robot accounts, vulnerability scanning,

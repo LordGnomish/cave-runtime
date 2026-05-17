@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-cache parity tests — supplements `integration.rs`.
 //!
 //! Upstream parity reference: redis/src/t_zset.c (sorted-set internals),

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HPA status conditions — `pkg/controller/podautoscaler/horizontal.go`.
 //!
 //! The HPA controller writes three conditions onto each HPA's status:

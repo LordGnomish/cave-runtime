@@ -1,5 +1,7 @@
 # Cave Runtime
 
+[![License: AGPL v3+](https://img.shields.io/badge/License-AGPL_v3+-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 **Sovereign, self-healing, self-improving Cloud OS. Multi-tenant by construction. Line-by-line TDD reimplementation of best-of-breed upstream projects in Rust.**
 
 > Status: pre-v1. OSS launch target: 21 May 2026. See [docs/adr/ADR-CHARTER-001.md](docs/adr/ADR-CHARTER-001.md) for the mission, [docs/adr/](docs/adr/) for the full decision record.
@@ -18,6 +20,18 @@ Because every upstream is reimplemented under one roof:
 **This is not a thin wrapper over existing projects.** It is a from-scratch Rust implementation that passes the upstream's own tests. See [ADR-GOLDEN-001](docs/adr/ADR-GOLDEN-001-upstream-parity.md) for the rule.
 
 ## Charter
+
+**Mission.** Cave Runtime is licensed under **AGPL-3.0-or-later** as a deliberate
+choice. The mission is to keep this platform open and serving humanity:
+hyperscalers (Amazon, Google, Azure) and other large SaaS providers may not
+take Cave Runtime, modify it behind closed doors, and re-sell the result as a
+closed managed service. AGPL §13 ("Remote Network Interaction") closes the
+SaaS loophole — anyone who runs a modified Cave Runtime as a network service
+must make the corresponding source available to every user of that service,
+on the same terms. Anyone who modifies or derives from this code is required
+to make their source available to their users. Sovereign-by-default,
+insanlığa hizmet ("service to humanity"). See [LICENSE](LICENSE),
+[NOTICE](NOTICE), and the License section below.
 
 1. **World's most performant** — Rust + io_uring + eBPF + cgroup v2 + Linux 7.1+; tail-latency and p99 beat upstream.
 2. **Fully featured** — not a "core path" MVP; every upstream flag, edge case, and error mode is ported.
@@ -99,7 +113,27 @@ See [SECURITY.md](SECURITY.md) for disclosure policy. Cave Runtime is on a post-
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+**GNU Affero General Public License v3 or later** (AGPL-3.0-or-later) — see
+[LICENSE](LICENSE), [NOTICE](NOTICE), and [CREDITS.md](CREDITS.md) for the
+upstream attribution and the per-crate license inventory.
+
+We chose AGPL-3.0-or-later deliberately to **prevent hyperscalers
+(AWS, Google Cloud, Azure) and other large SaaS vendors from re-selling
+Cave Runtime as a closed managed service without contributing back**.
+AGPL §13 ("Remote Network Interaction") closes the SaaS loophole that
+Apache-2.0 leaves open: anyone who runs a modified Cave Runtime as a
+network-accessible service must make the corresponding source code
+available to every user of that service, on the same terms.
+
+Operators self-hosting Cave Runtime — including commercial operators
+serving paying customers — keep all the freedoms the license grants;
+the only obligation is that modifications surface to their users on
+the same terms. Sovereign-by-default, insanlığa hizmet ("service to
+humanity").
+
+By submitting a pull request you agree to license your contribution
+under AGPL-3.0-or-later. We do not require Contributor License
+Agreements.
 
 ## Status
 

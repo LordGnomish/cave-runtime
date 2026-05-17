@@ -1,0 +1,74 @@
+# cargo-deny configuration for Cave Runtime
+# https://embarkstudios.github.io/cargo-deny/
+#
+# Cave Runtime ships under AGPL-3.0-or-later. Transitive crates
+# must be on the SPDX allow-list below. SSPL is forbidden because
+# it is not OSI-approved; if a Rust dependency ever pulls SSPL in,
+# we want CI to fail loudly so we can vendor a replacement.
+
+[graph]
+# We only ship for Linux; gate licenses on that target.
+all-features = true
+
+[licenses]
+version = 2
+# unlisted = denied (safe-by-default).
+allow = [
+    # Cave Runtime's own license — and copyleft cousins.
+    "AGPL-3.0",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later",
+    "GPL-3.0",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "LGPL-3.0",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "MPL-2.0",
+
+    # Permissive licenses common across the Rust ecosystem.
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "OpenSSL",
+    "BSL-1.0",
+    "0BSD",
+    # Community Data License Agreement, Permissive 2.0 — Linux Foundation
+    # data license used by webpki-roots (Mozilla's CA trust list). OSS-friendly.
+    "CDLA-Permissive-2.0",
+]
+# Explicitly forbid SSPL — not OSI approved, license-laundered "fauxpen-source".
+# (cargo-deny denies unlisted by default; this exception list is purely
+# documentation for reviewers.)
+exceptions = []
+
+# Per-crate licenses where the SPDX expression is incomplete or wrong upstream.
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[bans]
+# We don't enforce duplicate-version bans yet; flip to "warn" once the
+# workspace stabilises.
+multiple-versions = "allow"
+wildcards = "allow"
+
+[advisories]
+version = 2
+# vulnerability + unmaintained advisories surface in CI as warnings;
+# OSS-launch hygiene focuses on the license gate first.
+yanked = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

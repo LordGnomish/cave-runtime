@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Full Grafana v10 data model — panels, variables, annotations, alerting,
 //! datasources, folders, permissions, users, orgs, teams.
 

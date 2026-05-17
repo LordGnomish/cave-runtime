@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! API spec registry — compatible with Apicurio + openapi-diff
 //!
 //! Upstream tracking: apicurio + openapi-diff

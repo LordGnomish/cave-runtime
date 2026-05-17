@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Circuit breaker (Closed → Open → HalfOpen → Closed).
 //!
 //! Configured per (host, optional subset).  Transitions:

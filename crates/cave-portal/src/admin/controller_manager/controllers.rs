@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Controllers tab — full registered controller catalog (k-c-m has
 //! ~30 built-in controllers in modern upstream releases). Each row
 //! tells the operator whether the controller is enabled and how

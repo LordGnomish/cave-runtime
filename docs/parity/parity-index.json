@@ -92,20 +92,25 @@
       "upstream_version": "v3.0.0"
     },
     "cave-auth": {
+      "behavioral_missing": 1,
+      "behavioral_parity": 0.8888888888888888,
+      "behavioral_partial": 0,
+      "behavioral_ported": 8,
+      "behavioral_total": 9,
       "cave_src_loc": 8236,
-      "honest_ratio": 0.7568,
-      "last_audit_disk": "2026-05-13",
+      "honest_ratio": 0.9286,
+      "last_audit_disk": "2026-05-15",
       "manifest_filled": true,
-      "mapped_count": 12,
+      "mapped_count": 23,
       "note": null,
-      "parity_ratio": 0.7838,
+      "parity_ratio": 0.9524,
       "parity_ratio_source": "manifest",
       "partial_count": 1,
       "skipped_count": 16,
       "stubs": null,
       "tier": "C",
-      "total_count": 37,
-      "unmapped_count": 8,
+      "total_count": 42,
+      "unmapped_count": 2,
       "upstream": "keycloak/keycloak",
       "upstream_version": "v22.0.0"
     },
@@ -1246,17 +1251,33 @@
       "upstream_version": "v1.20.0"
     },
     "cave-scan": {
+      "behavioral_missing": 0,
+      "behavioral_parity": 0.9523809523809523,
+      "behavioral_partial": 1,
+      "behavioral_ported": 20,
+      "behavioral_total": 21,
       "cave_src_loc": 1189,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.9012,
+      "last_audit_disk": "2026-05-15",
       "manifest_filled": true,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.9012,
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
       "upstream": "SonarSource/sonarqube",
       "upstream_version": "v10.3.0"
+    },
+    "cave-scan-db": {
+      "cave_src_loc": null,
+      "manifest_filled": null,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": null,
+      "parity_ratio_source": "none",
+      "stubs": null,
+      "tier": "C",
+      "upstream": null,
+      "upstream_version": null
     },
     "cave-scheduler": {
       "behavioral_audit_at": "2026-05-13",
@@ -1572,10 +1593,10 @@
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
     "flipped": 84,
-    "injected": 6,
+    "injected": 7,
     "new_filled": 84,
     "phantoms": 5,
-    "ratio_overrides": 26
+    "ratio_overrides": 27
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

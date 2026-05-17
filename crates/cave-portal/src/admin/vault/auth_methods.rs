@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Auth-methods tab — mirrors Vault's `Access` page
 //! (`GET /v1/sys/auth`). Lists every mounted auth method
 //! (`token`, `userpass`, `kubernetes`, `approle`, `oidc`, …).

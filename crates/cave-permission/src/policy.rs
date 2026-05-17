@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Permission policy trait and built-in implementations.
 //!
 //! Upstream: @backstage/permission-node — PermissionPolicy interface,

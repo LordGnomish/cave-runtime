@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/crm/activities` — Twenty CRM "Activities" tab.
 //! Synthesises an activity-log row per account from MRR
 //! magnitude — high-MRR accounts get a `BUSINESS_REVIEW`

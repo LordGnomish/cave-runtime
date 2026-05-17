@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/upstream` view — upstream resource browser. **Canonical**
 //! upstream-tracker page as of 2026-05-14; the legacy `/upstream`
 //! handler in cave-runtime now 301-redirects here.

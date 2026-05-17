@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Workloads tab — service-mesh-attached workload list.
 //!
 //! Kiali shows: workload name, namespace, type (Deployment, StatefulSet),

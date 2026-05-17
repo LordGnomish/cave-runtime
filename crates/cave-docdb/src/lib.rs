@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE DocDB — MongoDB 6.0-compatible document database.
 //!
 //! Compatible with: MongoDB Community Edition (SSPL-1.1).

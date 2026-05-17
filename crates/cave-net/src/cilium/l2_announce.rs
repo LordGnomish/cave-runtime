@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! L2 announcer — ARP/ND-based service VIP advertisement.
 //!
 //! Mirrors `pkg/l2announcer/l2announcer.go` plus the

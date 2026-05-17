@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Prometheus remote_write protocol: protobuf + Snappy compression.
 //! Compatible with Prometheus remote_write 1.0 and 2.0.
 

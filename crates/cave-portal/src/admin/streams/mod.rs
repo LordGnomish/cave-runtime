@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/streams` view — Kafka/Pulsar topic + consumer-group browser.
 //!
 //! Mirrors the Kafka admin dashboard pattern: per-tenant topics with

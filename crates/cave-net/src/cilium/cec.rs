@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CiliumEnvoyConfig (CEC) reconciler.
 //!
 //! Mirrors `pkg/ciliumenvoyconfig/cec_resource_parser.go` and

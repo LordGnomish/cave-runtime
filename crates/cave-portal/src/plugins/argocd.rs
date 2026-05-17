@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Argo CD wrap — native re-implementation of the deployment timeline,
 //! sync status, and rollback action.
 //!

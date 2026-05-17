@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! ClusterEvent + QueueingHint (KEP-4247) — event-driven re-queueing.
 //!
 //! Cite: kubernetes/kubernetes v1.31.0

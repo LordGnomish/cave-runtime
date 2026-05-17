@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kafka L7 policy — `PortRuleKafka` evaluator.
 //!
 //! Mirrors `pkg/policy/api/kafka.go` and the Kafka request/response

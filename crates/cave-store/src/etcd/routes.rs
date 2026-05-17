@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! HTTP routes for the etcd v3 API (etcd grpc-gateway JSON format).
 //!
 //! Endpoints mirror etcd's grpc-gateway at /v3/{service}/{method}.

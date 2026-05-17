@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
@@ -474,6 +476,18 @@ enum AuthCmd {
     SamlVerifyRequest,
     /// Show the c14n-canonicalized form of an in-flight document.
     SamlC14n,
+    // ── LDAP federation (Keycloak federation/ldap parity) ────────────────────
+    /// Bind against the LDAP federation provider and report resultCode.
+    LdapTestConnection,
+    /// Run a full user-federation sync (LDAP → cave user model).
+    LdapSyncUsers,
+    /// Run a group + memberOf sync.
+    LdapSyncGroups,
+    // ── Kerberos / SPNEGO (Keycloak federation/kerberos parity) ──────────────
+    /// Parse the configured keytab file; dump principal + enctype + vno.
+    KerberosValidateKeytab,
+    /// Drive the SPNEGO 401-challenge / Negotiate handshake.
+    KerberosTestSpnego,
 }
 
 #[derive(Subcommand)]
@@ -697,7 +711,7 @@ enum SecretsCmd {
 
 #[derive(Subcommand)]
 enum ScanCmd {
-    /// Start a new code scan
+    /// Start a new code scan (SonarQube-style SAST)
     Start {
         /// Repository URL or local path
         #[arg(long)]
@@ -712,6 +726,53 @@ enum ScanCmd {
     Results {
         /// Scan job ID
         id: String,
+    },
+    /// Scan a container image (Trivy-style)
+    Image {
+        /// Image reference (e.g. alpine:3.20) or local tarball path
+        target: String,
+        /// Report format: table | json | sarif | cyclonedx | spdx
+        #[arg(long = "report-format", default_value = "table")]
+        report_format: String,
+        /// Minimum severity to surface: CRITICAL/HIGH/MEDIUM/LOW/INFO
+        #[arg(long, default_value = "MEDIUM")]
+        severity: String,
+    },
+    /// Scan a local filesystem path for installed packages
+    Fs {
+        /// Path to scan
+        path: std::path::PathBuf,
+        #[arg(long = "report-format", default_value = "table")]
+        report_format: String,
+    },
+    /// Scan IaC config (Terraform / Kubernetes / Dockerfile / Helm / CloudFormation)
+    Config {
+        /// Path to a config file or directory
+        path: std::path::PathBuf,
+        #[arg(long = "report-format", default_value = "table")]
+        report_format: String,
+    },
+    /// Scan for committed secrets / credentials
+    Secret {
+        /// Path to scan
+        path: std::path::PathBuf,
+        #[arg(long = "report-format", default_value = "table")]
+        report_format: String,
+    },
+    /// License scan and copyleft summary
+    License {
+        /// Path to scan
+        path: std::path::PathBuf,
+        #[arg(long = "report-format", default_value = "table")]
+        report_format: String,
+    },
+    /// Generate an SBOM (CycloneDX or SPDX)
+    Sbom {
+        /// Target (image ref, fs path, or tarball)
+        target: String,
+        /// SBOM format: cyclonedx | spdx
+        #[arg(long = "report-format", default_value = "cyclonedx")]
+        report_format: String,
     },
 }
 
@@ -2701,6 +2762,48 @@ async fn run(cli: Cli) -> Result<()> {
             }
             ScanCmd::List => c.get("/api/scan").await,
             ScanCmd::Results { id } => c.get(&format!("/api/scan/{id}/results")).await,
+            ScanCmd::Image { target, report_format, severity } => {
+                c.post(
+                    "/api/scan/image",
+                    json!({ "target": target, "format": report_format, "severity": severity }),
+                )
+                .await
+            }
+            ScanCmd::Fs { path, report_format } => {
+                c.post(
+                    "/api/scan/fs",
+                    json!({ "path": path.to_string_lossy(), "format": report_format }),
+                )
+                .await
+            }
+            ScanCmd::Config { path, report_format } => {
+                c.post(
+                    "/api/scan/config",
+                    json!({ "path": path.to_string_lossy(), "format": report_format }),
+                )
+                .await
+            }
+            ScanCmd::Secret { path, report_format } => {
+                c.post(
+                    "/api/scan/secret",
+                    json!({ "path": path.to_string_lossy(), "format": report_format }),
+                )
+                .await
+            }
+            ScanCmd::License { path, report_format } => {
+                c.post(
+                    "/api/scan/license",
+                    json!({ "path": path.to_string_lossy(), "format": report_format }),
+                )
+                .await
+            }
+            ScanCmd::Sbom { target, report_format } => {
+                c.post(
+                    "/api/scan/sbom",
+                    json!({ "target": target, "format": report_format }),
+                )
+                .await
+            }
         },
 
         // ── Vulns ─────────────────────────────────────────────────────────────
@@ -3961,6 +4064,13 @@ source_root = "src"
             AuthCmd::SamlMetadata      => c.get("/api/auth/saml/metadata").await,
             AuthCmd::SamlVerifyRequest => c.get("/api/auth/saml/verify").await,
             AuthCmd::SamlC14n          => c.get("/api/auth/saml/c14n").await,
+            // LDAP federation
+            AuthCmd::LdapTestConnection => c.get(cavectl::auth::ldap::PATH_TEST_CONNECTION).await,
+            AuthCmd::LdapSyncUsers      => c.get(cavectl::auth::ldap::PATH_SYNC_USERS).await,
+            AuthCmd::LdapSyncGroups     => c.get(cavectl::auth::ldap::PATH_SYNC_GROUPS).await,
+            // Kerberos / SPNEGO
+            AuthCmd::KerberosValidateKeytab => c.get(cavectl::auth::kerberos::PATH_VALIDATE_KEYTAB).await,
+            AuthCmd::KerberosTestSpnego     => c.get(cavectl::auth::kerberos::PATH_TEST_SPNEGO).await,
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
@@ -4666,6 +4776,37 @@ mod batch4_parse_tests {
         assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::SamlC14n }));
     }
 
+    // ── LDAP federation + Kerberos/SPNEGO sub-commands ───────────────────────
+    #[test]
+    fn auth_ldap_test_connection_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-test-connection"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapTestConnection }));
+    }
+
+    #[test]
+    fn auth_ldap_sync_users_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-sync-users"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncUsers }));
+    }
+
+    #[test]
+    fn auth_ldap_sync_groups_parses() {
+        let cli = parse(&["cavectl", "auth", "ldap-sync-groups"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::LdapSyncGroups }));
+    }
+
+    #[test]
+    fn auth_kerberos_validate_keytab_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos-validate-keytab"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosValidateKeytab }));
+    }
+
+    #[test]
+    fn auth_kerberos_test_spnego_parses() {
+        let cli = parse(&["cavectl", "auth", "kerberos-test-spnego"]);
+        assert!(matches!(cli.command, Commands::Auth { cmd: AuthCmd::KerberosTestSpnego }));
+    }
+
     // ── Expanded container-scan subcommands ───────────────────────────────────
     #[test]
     fn container_scan_vulnerabilities_parses() {
@@ -5146,5 +5287,138 @@ mod batch4_parse_tests {
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+    }
+
+    // ── 2026-05-15 Trivy scan subcommands ────────────────────────
+
+    #[test]
+    fn scan_image_parses_with_defaults() {
+        let cli = parse(&["cavectl", "scan", "image", "alpine:3.20"]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Image { target, report_format, severity } } => {
+                assert_eq!(target, "alpine:3.20");
+                assert_eq!(report_format, "table");
+                assert_eq!(severity, "MEDIUM");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_image_accepts_sarif_format() {
+        let cli = parse(&[
+            "cavectl", "scan", "image", "alpine:3.20", "--report-format", "sarif",
+        ]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Image { report_format, .. } } => {
+                assert_eq!(report_format, "sarif")
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_image_accepts_severity_override() {
+        let cli = parse(&[
+            "cavectl", "scan", "image", "img", "--severity", "CRITICAL",
+        ]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Image { severity, .. } } => {
+                assert_eq!(severity, "CRITICAL")
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_fs_parses_path() {
+        let cli = parse(&["cavectl", "scan", "fs", "/tmp/proj"]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Fs { path, report_format } } => {
+                assert_eq!(path.to_string_lossy(), "/tmp/proj");
+                assert_eq!(report_format, "table");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_config_parses() {
+        let cli = parse(&["cavectl", "scan", "config", "infra/"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::Config { .. } }
+        ));
+    }
+
+    #[test]
+    fn scan_secret_parses() {
+        let cli = parse(&["cavectl", "scan", "secret", "."]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::Secret { .. } }
+        ));
+    }
+
+    #[test]
+    fn scan_license_parses() {
+        let cli = parse(&["cavectl", "scan", "license", "."]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::License { .. } }
+        ));
+    }
+
+    #[test]
+    fn scan_sbom_cyclonedx_default() {
+        let cli = parse(&["cavectl", "scan", "sbom", "alpine:3.20"]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Sbom { report_format, .. } } => {
+                assert_eq!(report_format, "cyclonedx")
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_sbom_spdx_override() {
+        let cli = parse(&[
+            "cavectl", "scan", "sbom", "alpine:3.20", "--report-format", "spdx",
+        ]);
+        match cli.command {
+            Commands::Scan { cmd: ScanCmd::Sbom { report_format, .. } } => {
+                assert_eq!(report_format, "spdx")
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn scan_start_still_parses_after_trivy_added() {
+        let cli = parse(&[
+            "cavectl", "scan", "start", "--repo", "github.com/x/y",
+        ]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::Start { .. } }
+        ));
+    }
+
+    #[test]
+    fn scan_list_still_parses_after_trivy_added() {
+        let cli = parse(&["cavectl", "scan", "list"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::List }
+        ));
+    }
+
+    #[test]
+    fn scan_results_still_parses_after_trivy_added() {
+        let cli = parse(&["cavectl", "scan", "results", "abc-1"]);
+        assert!(matches!(
+            cli.command,
+            Commands::Scan { cmd: ScanCmd::Results { .. } }
+        ));
     }
 }

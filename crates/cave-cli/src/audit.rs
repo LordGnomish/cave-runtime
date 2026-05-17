@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Audit log query — `cavectl audit log --filter`.
 //!
 //! cave-audit query layer subset. Filter mini-DSL: `key=value` ya da `key~regex`

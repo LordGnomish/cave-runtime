@@ -3,7 +3,7 @@ name = "night-pump"
 version = "0.1.0"
 edition = "2021"
 description = "Cave Runtime night-pump — coordinates worker batches against a YAML queue"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 
 # Standalone workspace — not part of the cave-runtime crate workspace.
 [workspace]

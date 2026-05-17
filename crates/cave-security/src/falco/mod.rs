@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Falco runtime security subsystem.
 //!
 //! Full parity with Falco 0.38:

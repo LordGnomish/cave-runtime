@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-002 batch — real implementations for controller surface area
 //! that the scaffold + deeper-001 left as thin reconcile shells.
 //!

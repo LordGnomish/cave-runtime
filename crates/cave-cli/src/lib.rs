@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cavectl library — testable surface for chat REPL, tenant/env lifecycle,
 //! approval workflow, audit query, watch/stream output, and the native +
 //! compatibility command surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001).
@@ -15,6 +17,12 @@
 /// `cannot find client in crate root` E0433 that blocked any
 /// `cargo test -p cavectl` run.
 pub mod client;
+
+/// `cavectl auth ldap` + `cavectl auth kerberos` HTTP path constants.
+/// Lives alongside the rest of the per-feature command modules so
+/// the dispatch table in `main.rs` is a single-line match per
+/// variant.
+pub mod auth;
 
 /// The approval workflow module, providing backend traits and in-memory
 /// implementations for managing approval records and states.
@@ -88,3 +96,6 @@ pub use tenant::{
 /// Re-exports watch and stream related types including exit codes, JSON
 /// streaming, formats, events, and tickers.
 pub use watch::{ExitCode, JsonStream, StreamFormat, WatchEvent, WatchTicker};
+
+// ── 2026-05-15 cave-auth deep push: auth submodules consolidated at line 23 above
+// (saml / ldap / kerberos / webauthn parse-stubs all live in `crate::auth::*`).

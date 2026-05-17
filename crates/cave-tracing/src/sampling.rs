@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Sampler implementations matching the OpenTelemetry SDK spec:
 //! AlwaysOn, AlwaysOff, TraceIdRatioBased, ParentBased, and a TailSampler
 //! used by the post-export pipeline.

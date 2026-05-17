@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! deeper-001: Mount table — enable+disable, namespace scoping, listing,
 //! defaults, longest-prefix dispatch. Pinned to openbao v2.5.3.
 

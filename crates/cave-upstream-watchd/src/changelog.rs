@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Release-body parser → structured `Changelog`.
 //!
 //! GitHub release bodies are free-form markdown. The convention this

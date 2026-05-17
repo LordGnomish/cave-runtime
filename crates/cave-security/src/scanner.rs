@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Container image vulnerability scanner (Trivy replacement).
 //!
 //! In production this module would fetch OCI image layers, parse package

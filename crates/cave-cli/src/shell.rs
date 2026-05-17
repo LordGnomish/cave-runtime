@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shell completion script generation.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 M6: ship completions for

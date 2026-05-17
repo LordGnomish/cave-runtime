@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! /api/v1/query and /api/v1/query_range handlers.
 
 use axum::{

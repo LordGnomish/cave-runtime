@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! DaemonSet — rolling update partition + taint/toleration evaluator.
 //!
 //! Mirrors `pkg/controller/daemon/update.go::rollingUpdate` plus the shared

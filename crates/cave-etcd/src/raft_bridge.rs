@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Optional Raft seam for the etcd write-path handlers.
 //!
 //! Single-node deployments mutate [`crate::store::KvStore`] directly

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! LabelSelector matchExpressions — `pkg/apis/meta/v1/helpers.go::LabelSelectorAsSelector`.
 //!
 //! Extends [`crate::rbac::cluster_role_aggregation::LabelSelector`] (which

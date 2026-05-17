@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! OS package extraction — Alpine APK, Debian dpkg, RHEL/CentOS RPM.
 
 use serde::{Deserialize, Serialize};

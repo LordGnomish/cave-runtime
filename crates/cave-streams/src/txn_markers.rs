@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Kafka EOS transaction markers — `WriteTxnMarkersRequest` / Response
 //! shape, plus a per-broker marker store that records committed/aborted
 //! transaction outcomes per-partition.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 // UI primitives for the cave-desktop native shell.
 //
 // These are data-shape skeletons. Real rendering lands when the

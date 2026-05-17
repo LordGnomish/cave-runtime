@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! License detection — SPDX license matching and risk classification.
 
 use serde::{Deserialize, Serialize};

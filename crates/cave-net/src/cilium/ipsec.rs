@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! IPsec transparent encryption — Security Associations + Policies.
 //!
 //! Mirrors `pkg/ipsec/ipsec_linux.go`. Each node has a set of

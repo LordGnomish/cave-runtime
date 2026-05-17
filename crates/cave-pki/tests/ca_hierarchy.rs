@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! cave-pki — Root → Platform → Tenant CA hierarchy tests.
 
 use cave_pki::{Ca, CaKind, KeyAlgorithm, PkiError};

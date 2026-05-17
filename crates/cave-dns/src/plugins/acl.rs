@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// ACL plugin — allow or deny queries by source IP/CIDR.
 use std::str::FromStr;
 

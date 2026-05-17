@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/pg` view — table browser + read-only query console.
 //!
 //! The query console parses one statement and refuses anything that is not

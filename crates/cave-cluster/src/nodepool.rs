@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Node pool management — add, remove, scale, labels, taints.
 
 use crate::error::{ClusterError, ClusterResult};

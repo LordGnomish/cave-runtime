@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 /// Zone transfer — AXFR (full) and IXFR (incremental), RFC 5936 / RFC 1995.
 use std::net::SocketAddr;
 

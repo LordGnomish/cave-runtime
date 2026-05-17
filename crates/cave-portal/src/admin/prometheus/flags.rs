@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Flags tab — runtime flags Prometheus was launched with.
 //!
 //! Mirrors `/flags`. Today we expose a static set keyed to cave-metrics

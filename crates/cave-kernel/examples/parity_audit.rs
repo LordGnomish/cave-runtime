@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Workspace parity audit: prints one CSV row per crate.
 //!
 //! Columns: name,has_manifest,upstream_ref,file_m,file_t,fn_m,fn_t,test_m,test_t,

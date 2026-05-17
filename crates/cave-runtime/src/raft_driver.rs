@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Glue between [`RaftCore`] and the HTTP transport.
 //!
 //! The core ([`crate::raft_core::RaftCore`]) is a pure state machine: it

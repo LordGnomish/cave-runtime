@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Flows tab — Hubble-style L3/L4/L7 flow viewer.
 //!
 //! Sourced from the seeded `mesh_flows` collection; verdict pills

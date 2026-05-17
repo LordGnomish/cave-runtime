@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Events tab — recent reconcile-loop events. Derived from lease
 //! renewals so the page has a meaningful timeline without a separate
 //! Event store.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Generic key commands: SCAN, SSCAN, ZSCAN, KEYS, EXISTS, DEL, UNLINK, TYPE,
 //! RENAME, RENAMENX, RANDOMKEY, DBSIZE, FLUSHDB, OBJECT, DUMP, RESTORE, WAIT, OBJECT ENCODING.
 

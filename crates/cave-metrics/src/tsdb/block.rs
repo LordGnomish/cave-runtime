@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Gorilla-style XOR float compression for block chunks.
 //! Implements the Facebook Gorilla paper delta-of-delta timestamps + XOR values.
 

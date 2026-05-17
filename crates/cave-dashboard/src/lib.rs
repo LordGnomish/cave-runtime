@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! CAVE Dashboard — Grafana-compatible dashboard engine.
 //!
 //! Compatible with: Grafana v10

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! RBAC deeper-cut — root-user auto-creation, full permission set
 //! resolution, and prefix-vs-exact-vs-range permission semantics.
 //!

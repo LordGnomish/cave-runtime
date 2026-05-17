@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Leader election for the controller-manager itself.
 //!
 //! Mirrors upstream `kube-controller-manager`'s `--leader-elect=true`

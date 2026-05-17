@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! 24/7 daemon loop: pick → draft → patch → test → commit or escalate.
 
 use std::path::{Path, PathBuf};

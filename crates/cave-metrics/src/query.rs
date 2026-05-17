@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! PromQL-like query execution: instant and range queries.
 
 use crate::models::{QueryData, QueryResult, SeriesResult};

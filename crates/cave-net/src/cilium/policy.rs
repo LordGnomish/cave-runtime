@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! L3/L4 NetworkPolicy + CiliumNetworkPolicy evaluator.
 //!
 //! Mirrors `pkg/policy/api/rule.go` (Rule, Ingress, Egress), the entity

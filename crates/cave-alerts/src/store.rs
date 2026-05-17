@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-memory store for the Alertmanager-style HTTP surface.
 
 use crate::models::{Alert, InhibitRule, Receiver, Route, Silence};

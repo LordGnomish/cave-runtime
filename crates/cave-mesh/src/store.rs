@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Mesh resource store — in-memory with optional cave-db persistence.
 //!
 //! Persists: VS, DR, Gateway, ServiceEntry, PeerAuthentication,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! SQL schema for the catalog module.
 //!
 //! Upstream: backstage/plugins/catalog-backend/src/database/migrations/

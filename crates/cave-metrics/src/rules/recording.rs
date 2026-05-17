@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Recording rules: evaluate a PromQL expression and write back to TSDB.
 
 use crate::error::Result;

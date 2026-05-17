@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Rollout state-machine engine.
 //!
 //! Determines what action to take next for a given rollout given its current

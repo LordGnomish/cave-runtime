@@ -211,6 +211,51 @@ groups:
             sink (Loki / S3) is down or AuditLogger is silently failing.
           runbook_url: "https://portal.cave.dev/runbooks/auth/audit-stalled"
 
+      - alert: WebAuthnRegistrationFailureRate
+        expr: |
+          (
+            sum(rate(cave_auth_webauthn_registration_total{outcome="failure"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_webauthn_registration_total[5m])), 1e-9)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: ">10% of WebAuthn registration ceremonies are failing"
+          description: |
+            cave-auth/webauthn/registration.rs is rejecting more than 10% of
+            attestation responses. Common causes: wrong RP origin in the
+            cave-portal `/admin/auth/webauthn` page config, a mismatched
+            challenge cache TTL, or an unsupported attestation fmt the RP
+            policy is rejecting.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-registration-failure"
+
+      - alert: WebAuthnAssertionSignatureVerifyFailureRate
+        expr: |
+          (
+            sum(rate(cave_auth_webauthn_assertion_signature_verify_failure_total[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_webauthn_assertion_total[5m])), 1e-9)
+          ) > 0.02
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+          tier: "1"
+        annotations:
+          summary: ">2% of WebAuthn assertions fail signature verification"
+          description: |
+            cave-auth/webauthn/authentication.rs is rejecting assertion
+            signatures above the 2% noise floor. Either an authenticator
+            is roaming with a stale public-key cache, a man-in-the-middle
+            is replaying authenticatorData, or the RP origin / rpId is
+            misconfigured. Investigate immediately — passkey login is
+            user-visible and high-trust.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/webauthn-signature-fail"
+
       - alert: PqcSignBackendMissing
         expr: |
           (
@@ -229,3 +274,51 @@ groups:
             with Ed25519-only — acceptable for MVP but ADR-GOLDEN-003 wants
             the hybrid path live before the OSS launch (target 21 May).
           runbook_url: "https://portal.cave.dev/runbooks/auth/wire-mldsa-backend"
+
+# ── A1: SAML 2.0 broker (Keycloak v22.0.0 port) ─────────────────────────────
+# Appended-only; the rules above are untouched.
+  - name: cave-auth.saml
+    interval: 30s
+    rules:
+      - alert: SamlAuthnFailuresRate
+        expr: |
+          (
+            sum(rate(cave_auth_saml_authn_failures_total[5m])) > 0.1
+          )
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "SAML 2.0 AuthnRequest failures over threshold"
+          description: |
+            cave-auth's SAML 2.0 broker is rejecting >0.1 AuthnRequest/s for
+            10m. Common causes: SP metadata drift (signing cert rotated
+            without push), clock skew on the IdP host, mis-bound
+            destination URL. Check the audit log
+            (`/admin/auth/audit?protocol=saml`) for the rejection reason
+            label and runbook for fixup steps.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-authn-failures"
+
+      - alert: SamlAssertionSignatureVerifyFailures
+        expr: |
+          (
+            sum(rate(cave_auth_saml_assertion_signature_verify_failures_total[5m])) > 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "SAML 2.0 Assertion signature verification failing"
+          description: |
+            cave-auth is rejecting >0 SAML 2.0 Assertion signatures over
+            the last 5m. A non-zero rate here is always notable — either
+            the IdP rotated keys without publishing new metadata, an
+            attacker is replaying or forging an assertion, or our
+            canonicalisation path has drifted from the IdP's. Open the
+            audit log filtered to `event=saml.signature.verify.fail` and
+            inspect the issuer / cert thumbprint.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/saml-signature-verify-failures"

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Tenant invariant — every Iceberg metadata object is scoped per tenant.
 //!
 //! Mirrors the rules in cave-cri's `tenant.rs` (RFC 1123 DNS label).

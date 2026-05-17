@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 #[derive(Debug, thiserror::Error)]
 pub enum DocsError {
     #[error("space not found: {0}")]

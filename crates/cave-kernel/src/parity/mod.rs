@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Upstream parity tracking for CAVE modules.
 //!
 //! Each CAVE module is a line-for-line reimplementation of an upstream OSS tool.

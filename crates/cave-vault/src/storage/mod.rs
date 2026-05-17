@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Persistent storage backends — the "physical.Backend" surface
 //! every Vault deployment chooses one of.
 //!

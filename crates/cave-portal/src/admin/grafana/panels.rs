@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Panels tab — per-panel preview rows. Each Grafana dashboard has N
 //! panels; we synthesise a typed panel grid from the dashboard
 //! catalog so the surface is meaningful without a real Grafana data

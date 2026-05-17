@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Controller epoch + voter set — the two opaque values the
 //! Raft layer feeds the controller on each leadership change.
 //!

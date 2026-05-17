@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Docker Registry HTTP API V2 compatibility layer.
 //!
 //! Implements the Docker Distribution Spec v2 so that `docker pull`,

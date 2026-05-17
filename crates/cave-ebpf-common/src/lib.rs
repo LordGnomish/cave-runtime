@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Shared eBPF types and BPF map definitions.
 //! Used by both kernel-space eBPF programs (via Aya) and user-space consumers.
 

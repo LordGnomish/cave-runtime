@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Twenty CRM data model placeholders.
 //!
 //! Mirrors Twenty's core objects: Person, Company, Opportunity, Activity.

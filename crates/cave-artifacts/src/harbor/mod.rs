@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Harbor / Docker / OCI container registry module.
 //!
 //! Compatible with: Harbor v2.10

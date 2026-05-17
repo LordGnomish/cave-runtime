@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Stream commands: XADD, XREAD, XRANGE, XREVRANGE, XLEN, XTRIM, XDEL, XINFO,
 //! XGROUP CREATE/DESTROY/CREATECONSUMER/DELCONSUMER, XREADGROUP, XACK, XPENDING,
 //! XCLAIM, XAUTOCLAIM.

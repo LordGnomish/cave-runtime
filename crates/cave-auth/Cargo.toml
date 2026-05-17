@@ -34,3 +34,25 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# Keytab (big-endian binary) parsing — keycloak federation/kerberos port (src/kerberos/)
+byteorder = "1.5"
+# WebAuthn / FIDO2 — webauthn4j + Keycloak `webauthn` port (src/webauthn/)
+ciborium      = "0.2"
+coset         = "0.3"
+bitflags      = "2"
+p256          = { workspace = true }
+rsa           = "0.9"
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+sha2          = { workspace = true, features = ["oid"] }
+hex           = { workspace = true }
+# UMA 2.0 + Token Exchange (RFC 8693) + DPoP (RFC 9449) + JWE (RFC 7516) — src/{uma,token_exchange,dpop,jwe}/
+sha1    = "0.10"
+aes-gcm = "0.10"
+aes     = "0.8"
+cbc     = { version = "0.1", features = ["alloc"] }
+cipher  = { version = "0.4", features = ["block-padding", "alloc"] }
+hmac    = "0.12"
+hkdf    = "0.12"
+# OAuth/OIDC endpoints (oauth_endpoints/): URL-encoding + form deser for /auth + /par + /token
+urlencoding      = "2.1"
+serde_urlencoded = "0.7"

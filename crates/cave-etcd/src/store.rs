@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! MVCC key-value store with revision tracking.
 //!
 //! Implements etcd's multi-version concurrency control model:

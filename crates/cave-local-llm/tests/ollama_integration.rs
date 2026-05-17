@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Integration tests for `OllamaClient` against a real-in-process axum mock server.
 //!
 //! Each test spins up an ephemeral HTTP server on a random port and asserts that

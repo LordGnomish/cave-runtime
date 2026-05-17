@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/artifacts` — Pulp Web UI parity. Image / file registry
 //! browser grouped by upstream registry with size totals.
 //!

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `cavectl vault …` — Vault / OpenBao compat shim.
 //!
 //! Targets `/api/compat/vault/v1/...`. Cave's cave-vault crate owns

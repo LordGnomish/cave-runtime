@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/streams/connect` view — Kafka Connect runtime
 //! console. Mirrors `connect/runtime/rest/resources/` from
 //! upstream `apache/kafka`. Four tab anchors:

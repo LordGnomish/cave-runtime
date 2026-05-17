@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Sync engine — manual, auto, self-heal, prune, dry-run, waves, hooks.
 
 use crate::models::*;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Azure cloud provider scaffold.
 //!
 //! Upstream: `kubernetes-sigs/cloud-provider-azure` @ [`PROVIDER_VERSION`].

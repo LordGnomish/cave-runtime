@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Pod garbage collector — sweeps terminated pods on this kubelet instance.
 //!
 //! Mirrors upstream kubelet's `pkg/kubelet/pod/pod_gc.go` (and the related

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! In-memory store placeholder. PostgreSQL-backed implementation lands in v0.2
 //! (cave-rdbms-operator), driven by Twenty's Postgres schema.
 

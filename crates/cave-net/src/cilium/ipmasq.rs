@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! IP masquerade agent (config + map shape).
 //!
 //! Mirrors `pkg/ipmasq/ipmasq.go`. Cilium ships an ip-masq-agent-compatible
