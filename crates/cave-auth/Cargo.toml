@@ -34,3 +34,6 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# JPA persistence layer port (src/persistence/) — Keycloak `model/jpa`
+async-trait = { workspace = true }
+rusqlite    = { workspace = true }

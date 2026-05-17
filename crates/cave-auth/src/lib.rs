@@ -24,6 +24,7 @@ pub mod jwt_middleware;
 pub mod keycloak;
 pub mod middleware;
 pub mod okta;
+pub mod persistence;
 pub mod rbac;
 pub mod saml;
 pub mod tokens;
