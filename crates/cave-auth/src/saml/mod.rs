@@ -22,7 +22,14 @@
 //! * [`signature`]     — RSA-SHA256 sign + verify over the
 //!   pre-canonicalized bytes of a SAML message. XML
 //!   canonicalization (`exc-c14n`) is a separate concern — see
-//!   the limitation note on [`signature::SignedDocument`].
+//!   the limitation note on [`signature::SignedDocument`]. The
+//!   unified [`signature::sign`] / [`signature::verify`] entry
+//!   points dispatch by [`signature::Algorithm`] across RSA-SHA256
+//!   plus the three ECDSA variants from [`signing_ecdsa`].
+//! * [`signing_ecdsa`] — ECDSA-SHA256/384/512 over NIST P-256 /
+//!   P-384 / P-521 (XMLDSig 2.0, RFC 4051 §2.2.3). Signatures are
+//!   raw R||S concatenation, padded to curve scalar size; PKCS#8
+//!   PEM round-trips supported on every curve.
 //! * [`broker`]        — SP-initiated and IdP-initiated flow
 //!   state machines. Holds in-flight request state keyed by
 //!   `RequestID`.
