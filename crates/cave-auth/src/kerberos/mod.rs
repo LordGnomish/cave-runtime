@@ -36,12 +36,14 @@
 //!   built but not signed.
 
 pub mod gssapi;
+pub mod gssapi_real;
 pub mod keytab;
 pub mod negotiate;
 pub mod spnego;
 
 #[cfg(test)]
 mod tests {
+    pub mod libgssapi_real;
     pub mod upstream_port;
 }
 

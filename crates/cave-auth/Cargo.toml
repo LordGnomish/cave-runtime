@@ -35,7 +35,7 @@ anyhow = { workspace = true }
 quick-xml = "0.37"
 flate2    = "1.0"
 # Keytab (big-endian binary) parsing — keycloak federation/kerberos port (src/kerberos/)
-byteorder = "1.5"
+byteorder = { workspace = true }
 # WebAuthn / FIDO2 — webauthn4j + Keycloak `webauthn` port (src/webauthn/)
 ciborium      = "0.2"
 coset         = "0.3"
@@ -70,6 +70,25 @@ parking_lot = { workspace = true }
 # JPA persistence layer port (src/persistence/) — Keycloak `model/jpa`
 async-trait = { workspace = true }
 rusqlite    = { workspace = true }
+# Kerberos: real libgssapi wiring (MIT krb5 on Linux). Optional — pure-Rust ASN.1
+# paths in `kerberos/gssapi.rs` / `spnego.rs` / `keytab.rs` compile without it.
+#
+# Platform note: libgssapi-sys bindgen targets MIT krb5; macOS ships Heimdal which
+# lacks `gss_localname` / `gss_store_cred` / `gss_wrap_iov` / `gss_unwrap_iov`. The
+# crate does not currently link on macOS — leave the feature off on Darwin and rely
+# on the structural pure-Rust modules. On Linux, install `libgssapi-krb5-2-dev` /
+# `krb5-devel` first. See `kerberos::gssapi_real::PLATFORM_NOTES` for full detail.
+libgssapi = { workspace = true, optional = true }
+
+[features]
+# `kerberos-gssapi` is opt-in (not default). Even on Linux it requires the system
+# `libgssapi-krb5-2` package; we keep CI honest by not assuming it.
+default = []
+# Wire `kerberos::gssapi_real` to the system GSSAPI implementation.
+kerberos-gssapi = ["dep:libgssapi"]
+# Live-KDC integration tests — require KRB5_CONFIG + a reachable KDC.
+# OFF by default; turn on locally with `--features kerberos-integration-tests`.
+kerberos-integration-tests = ["kerberos-gssapi"]
 
 [dev-dependencies]
 urlencoding = "2"

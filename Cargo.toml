@@ -228,6 +228,11 @@ zstd = "0.13"
 sled = { version = "0.34", default-features = false }
 hcl-rs = "0.18"
 # === S3 end ===
+# Kerberos keytab parsing — big-endian binary frames per MIT krb5 kt_file.c
+byteorder = "1"
+# Kerberos GSSAPI safe wrapper. Pinned 0.7 — see crates/cave-auth/Cargo.toml comment for
+# platform caveats (Heimdal vs MIT krb5 symbol gaps on macOS).
+libgssapi = "0.7"
 
 [profile.release]
 opt-level = 3
