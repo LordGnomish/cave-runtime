@@ -81,7 +81,7 @@
           "showLegend": true
         }
       },
-      "description": "SBOM generation \u2014 request throughput."
+      "description": "SBOM generation — request throughput."
     },
     {
       "id": 2,
@@ -175,7 +175,7 @@
           "showLegend": true
         }
       },
-      "description": "RED triad \u2014 duration percentiles."
+      "description": "RED triad — duration percentiles."
     },
     {
       "id": 4,
@@ -402,7 +402,7 @@
         "overrides": []
       },
       "options": {},
-      "description": "Hot-tenant table \u2014 feeds throttle / inhibit decisions."
+      "description": "Hot-tenant table — feeds throttle / inhibit decisions."
     },
     {
       "id": 10,
@@ -443,6 +443,208 @@
         }
       },
       "description": "0 = at least one instance failing the scrape."
+    },
+    {
+      "id": 11,
+      "title": "Components — total tracked",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sbom_components_total{job=\"cave-sbom\"})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "description": "Total components stored across all projects."
+    },
+    {
+      "id": 12,
+      "title": "Components — vulnerable",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 48,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sbom_components_vulnerable{job=\"cave-sbom\"})",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "description": "Components matched against at least one open advisory."
+    },
+    {
+      "id": 13,
+      "title": "Policy violations — fail-state",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sbom_policy_violations{job=\"cave-sbom\",state=\"FAIL\"})",
+          "refId": "A"
+        }
+      ],
+      "description": "Active policy violations at the FAIL severity."
+    },
+    {
+      "id": 14,
+      "title": "BOM ingest rate (per format)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 48,
+        "w": 6,
+        "h": 6
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(sbom_bom_ingest_total{job=\"cave-sbom\"}[5m])) by (format)",
+          "legendFormat": "{{format}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "description": "BOM uploads per format (CycloneDX JSON/XML, SPDX JSON/tag-value)."
+    },
+    {
+      "id": 15,
+      "title": "EPSS score distribution (histogram)",
+      "type": "heatmap",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(rate(sbom_epss_score_bucket{job=\"cave-sbom\"}[10m])) by (le)",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "description": "EPSS score buckets — how exploitable are the open advisories?"
+    },
+    {
+      "id": 16,
+      "title": "Project risk heat-map (Inherited Risk Score)",
+      "type": "bargauge",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "sum(sbom_project_risk_score{job=\"cave-sbom\"}) by (project)",
+          "legendFormat": "{{project}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-GrYlRd"
+          }
+        },
+        "overrides": []
+      },
+      "description": "Per-project IRS — weighted sum critical=10, high=5, medium=3, low=1."
     }
   ],
   "annotations": {
