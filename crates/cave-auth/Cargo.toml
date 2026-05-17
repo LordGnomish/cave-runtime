@@ -67,6 +67,9 @@ lettre = { version = "0.11", default-features = false, features = ["builder", "s
 handlebars = "6"
 # Lock primitives for OID4VC issuer state
 parking_lot = { workspace = true }
+# JPA persistence layer port (src/persistence/) — Keycloak `model/jpa`
+async-trait = { workspace = true }
+rusqlite    = { workspace = true }
 
 [dev-dependencies]
 urlencoding = "2"
