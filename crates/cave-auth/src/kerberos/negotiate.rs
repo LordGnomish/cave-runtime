@@ -39,16 +39,30 @@ impl NegotiateHandler {
     ///
     /// Accepts either `"Negotiate <b64>"` or just the base64
     /// payload — RFC 4559 specifies the prefix but real clients
-    /// (curl-spnego, browser SSO) both send variants.
+    /// (curl-spnego, browser SSO) both send variants. The
+    /// scheme name is case-insensitive per RFC 7235 §2.1.
     pub fn decode_request(&self, header: &str) -> Result<DecodedNegotiate, KerberosError> {
-        let payload = header
-            .strip_prefix("Negotiate ")
-            .or_else(|| header.strip_prefix("negotiate "))
-            .unwrap_or(header)
-            .trim();
+        // Case-insensitive `Negotiate ` prefix strip — RFC 7235 §2.1.
+        let payload = match strip_negotiate_prefix(header) {
+            Some(rest) => rest.trim(),
+            None => header.trim(),
+        };
+        if payload.is_empty() {
+            return Err(KerberosError::Spnego(
+                "Negotiate header carries empty token".into(),
+            ));
+        }
         let bytes = B64
             .decode(payload)
             .map_err(|e| KerberosError::Spnego(format!("base64 decode: {e}")))?;
+        // Upstream Keycloak `KerberosUtil.MAX_TOKEN_SIZE`.
+        const MAX_NEGOTIATE_TOKEN_SIZE: usize = 64 * 1024;
+        if bytes.len() > MAX_NEGOTIATE_TOKEN_SIZE {
+            return Err(KerberosError::Spnego(format!(
+                "Negotiate token exceeds {MAX_NEGOTIATE_TOKEN_SIZE} byte limit (got {} bytes)",
+                bytes.len()
+            )));
+        }
         // Path A: bytes start with GSSAPI wrapper (0x60). Then
         // inner is a NegTokenInit.
         if bytes.first() == Some(&0x60) {
@@ -90,6 +104,29 @@ impl NegotiateHandler {
             )],
         )
     }
+}
+
+/// Strip an `"Negotiate "` prefix in any letter-case. Returns the
+/// remainder when matched, `None` otherwise. The whitespace after
+/// `Negotiate` is mandatory per RFC 4559 — a header that's just
+/// `"Negotiate"` with no payload is structurally invalid.
+fn strip_negotiate_prefix(header: &str) -> Option<&str> {
+    const SCHEME: &str = "negotiate";
+    let bytes = header.as_bytes();
+    if bytes.len() < SCHEME.len() + 1 {
+        return None;
+    }
+    for (i, sb) in SCHEME.as_bytes().iter().enumerate() {
+        if bytes[i].to_ascii_lowercase() != *sb {
+            return None;
+        }
+    }
+    // Mandatory single space (or tab) between scheme and token.
+    let sep = bytes[SCHEME.len()];
+    if sep != b' ' && sep != b'\t' {
+        return None;
+    }
+    Some(&header[SCHEME.len() + 1..])
 }
 
 /// What a successful header parse hands to the caller.
