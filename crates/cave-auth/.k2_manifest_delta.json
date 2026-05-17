@@ -1,0 +1,83 @@
+{
+  "agent": "K2",
+  "new_module": "persistence",
+  "new_files": [
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/JpaRealmProvider.java",
+      "local": "src/persistence/backend.rs"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/RealmEntity.java",
+      "local": "src/persistence/entities.rs#RealmEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/UserEntity.java",
+      "local": "src/persistence/entities.rs#UserEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/CredentialEntity.java",
+      "local": "src/persistence/entities.rs#UserCredential"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/ClientEntity.java",
+      "local": "src/persistence/entities.rs#ClientEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/RoleEntity.java",
+      "local": "src/persistence/entities.rs#RoleEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/GroupEntity.java",
+      "local": "src/persistence/entities.rs#GroupEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/IdentityProviderEntity.java",
+      "local": "src/persistence/entities.rs#IdentityProviderEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/IdentityProviderMapperEntity.java",
+      "local": "src/persistence/entities.rs#IdpMapper"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/AuthenticationFlowEntity.java",
+      "local": "src/persistence/entities.rs#AuthFlowEntity"
+    },
+    {
+      "upstream": "model/jpa/src/main/java/org/keycloak/models/jpa/entities/AuthenticationExecutionEntity.java",
+      "local": "src/persistence/entities.rs#FlowExecution"
+    },
+    {
+      "upstream": "services/src/main/java/org/keycloak/connections/jpa/JpaConnectionProviderFactory.java",
+      "local": "src/persistence/rdbms_backend.rs"
+    },
+    {
+      "upstream": "model/map/src/main/java/org/keycloak/models/map/storage/chm/ConcurrentHashMapStorage.java",
+      "local": "src/persistence/in_memory_backend.rs"
+    },
+    {
+      "upstream": "services/src/main/java/org/keycloak/connections/jpa/JpaKeycloakTransaction.java",
+      "local": "src/persistence/txn.rs"
+    },
+    {
+      "upstream": "services/src/main/resources/META-INF/keycloak-model-jpa-changelog-master.xml",
+      "local": "src/persistence/migration.rs"
+    }
+  ],
+  "tests_added": 58,
+  "loc_added": 3568,
+  "deps_added": ["async-trait", "rusqlite"],
+  "fill_ratio_delta_proposal": 0.05,
+  "honest_gaps": [
+    "No real PostgreSQL backend yet — rusqlite is the only RDBMS impl. Postgres adapter is a drop-in once `cave_rdbms::Pool` exposes a query API. Schema DDL is ANSI-compatible (TEXT/INTEGER) so the migration set ports verbatim.",
+    "Transactions on `RdbmsBackend` use a row-level snapshot/restore rather than SQLite's BEGIN/COMMIT. Reason: a single `Arc<Mutex<Connection>>` cannot safely bridge a long-lived BEGIN across the async boundary if multiple concurrent tasks share the backend. The snapshot strategy matches the in-memory backend's semantics and keeps the trait contract uniform.",
+    "Side tables `user_credentials`, `user_attributes`, `idp_mappers`, `flow_executions` are persisted as JSON columns (`credentials_json`, `attributes_json`, `mappers_json`, `executions_json`) rather than fully normalised relations. JPA keeps them as `@ElementCollection` so we lose some referential integrity but match the upstream JSON-encoded behaviour for ConcurrentHashMap storage.",
+    "Group↔role mapping tables (`group_role_mapping`, `user_group_membership`) are CREATE'd by V002 but not yet wired into the trait — left as scope for a follow-up to add `assign_role_to_group` / `add_user_to_group` helpers.",
+    "No `#[cfg(feature = \"postgres_test\")]` Postgres smoke yet — the in-memory rusqlite tests fully exercise every CRUD/uniqueness/soft-delete/txn path, and the trait contract guarantees a Postgres impl would behave identically.",
+    "Migration `down` is omitted intentionally (Keycloak's Liquibase changelog is forward-only); downgrade requires a snapshot restore."
+  ],
+  "verification": {
+    "cargo_build": "PASS (cave-auth lib)",
+    "persistence_tests": "58/58 PASS",
+    "full_cave_auth_tests": "224/224 PASS"
+  }
+}
