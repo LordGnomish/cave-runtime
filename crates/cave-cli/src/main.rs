@@ -743,13 +743,95 @@ enum SbomCmd {
         #[arg(long)]
         version: Option<String>,
     },
-    /// List SBOMs
+    /// List SBOMs (legacy)
     List,
-    /// Get SBOM detail
+    /// Get SBOM detail (legacy)
     Detail {
         /// SBOM ID
         id: String,
     },
+    /// Upload (ingest) a BOM file (auto-detect CycloneDX/SPDX)
+    Ingest {
+        /// Path to BOM file (JSON or XML)
+        #[arg(long)]
+        file: String,
+        /// Existing project UUID; omitted = create new
+        #[arg(long)]
+        project_uuid: Option<String>,
+    },
+    /// Component sub-commands (Dependency-Track parity)
+    #[command(subcommand)]
+    Component(SbomComponentCmd),
+    /// Project sub-commands
+    #[command(subcommand)]
+    Project(SbomProjectCmd),
+    /// Vulnerability sub-commands
+    #[command(subcommand)]
+    Vuln(SbomVulnCmd),
+    /// Policy sub-commands
+    #[command(subcommand)]
+    Policy(SbomPolicyCmd),
+    /// Portfolio metrics
+    Portfolio,
+}
+
+#[derive(Subcommand)]
+enum SbomComponentCmd {
+    /// List components (paginated)
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get component detail by UUID
+    Get { uuid: String },
+}
+
+#[derive(Subcommand)]
+enum SbomProjectCmd {
+    /// List projects
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get project detail by UUID
+    Get { uuid: String },
+    /// Create a project
+    Create {
+        #[arg(long)]
+        name: String,
+        #[arg(long = "ver", id = "proj_ver")]
+        version: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum SbomVulnCmd {
+    /// List vulnerabilities
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get vulnerability by ID (CVE / GHSA / OSV)
+    Get { id: String },
+    /// Transition the analysis state
+    Analyze {
+        id: String,
+        /// One of NOT_SET / EXPLOITABLE / IN_TRIAGE / RESOLVED / FALSE_POSITIVE / NOT_AFFECTED
+        #[arg(long)]
+        state: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum SbomPolicyCmd {
+    /// List policies
+    List,
 }
 
 #[derive(Subcommand)]
@@ -2719,6 +2801,49 @@ async fn run(cli: Cli) -> Result<()> {
             }
             SbomCmd::List => c.get("/api/sbom").await,
             SbomCmd::Detail { id } => c.get(&format!("/api/sbom/{id}")).await,
+            SbomCmd::Ingest { file, project_uuid } => {
+                use base64::Engine;
+                let bytes = std::fs::read(&file)
+                    .map_err(|e| anyhow::anyhow!("read {}: {}", file, e))?;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                c.post(
+                    "/api/v1/bom",
+                    json!({ "project_uuid": project_uuid, "bom_b64": b64 }),
+                )
+                .await
+            }
+            SbomCmd::Component(sub) => match sub {
+                SbomComponentCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/component?page={page}&page_size={page_size}")).await
+                }
+                SbomComponentCmd::Get { uuid } => c.get(&format!("/api/v1/component/{uuid}")).await,
+            },
+            SbomCmd::Project(sub) => match sub {
+                SbomProjectCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/project?page={page}&page_size={page_size}")).await
+                }
+                SbomProjectCmd::Get { uuid } => c.get(&format!("/api/v1/project/{uuid}")).await,
+                SbomProjectCmd::Create { name, version } => {
+                    c.post("/api/v1/project", json!({ "name": name, "version": version })).await
+                }
+            },
+            SbomCmd::Vuln(sub) => match sub {
+                SbomVulnCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/vulnerability?page={page}&page_size={page_size}")).await
+                }
+                SbomVulnCmd::Get { id } => c.get(&format!("/api/v1/vulnerability/{id}")).await,
+                SbomVulnCmd::Analyze { id, state } => {
+                    c.post(
+                        &format!("/api/v1/vulnerability/{id}/analysis"),
+                        json!({ "state": state }),
+                    )
+                    .await
+                }
+            },
+            SbomCmd::Policy(sub) => match sub {
+                SbomPolicyCmd::List => c.get("/api/v1/policy").await,
+            },
+            SbomCmd::Portfolio => c.get("/api/v1/metrics/portfolio").await,
         },
 
         // ── Registry (legacy alias of `artifacts pulp`) ──────────────────────
@@ -5146,5 +5271,129 @@ mod batch4_parse_tests {
     fn portal_status_still_parses_after_audit_was_added() {
         let cli = parse(&["cavectl", "portal", "status"]);
         assert!(matches!(cli.command, Commands::Portal { cmd: PortalCmd::Status }));
+    }
+}
+
+#[cfg(test)]
+mod sbom_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn sbom_ingest_parses_with_file_arg() {
+        let cli = parse(&["cavectl", "sbom", "ingest", "--file", "bom.json"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Ingest { file, project_uuid } } => {
+                assert_eq!(file, "bom.json");
+                assert!(project_uuid.is_none());
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_ingest_accepts_project_uuid_override() {
+        let cli = parse(&[
+            "cavectl", "sbom", "ingest",
+            "--file", "bom.json", "--project-uuid", "uu-123"
+        ]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Ingest { project_uuid, .. } } => {
+                assert_eq!(project_uuid.as_deref(), Some("uu-123"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_component_list_default_pagination() {
+        let cli = parse(&["cavectl", "sbom", "component", "list"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::List { page, page_size }) } => {
+                assert_eq!(page, 1);
+                assert_eq!(page_size, 50);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_component_get_takes_uuid() {
+        let cli = parse(&["cavectl", "sbom", "component", "get", "uu-abc"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::Get { uuid }) } => {
+                assert_eq!(uuid, "uu-abc");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_project_create_requires_name() {
+        let cli = parse(&["cavectl", "sbom", "project", "create", "--name", "p", "--ver", "1.0"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::Create { name, version }) } => {
+                assert_eq!(name, "p");
+                assert_eq!(version.as_deref(), Some("1.0"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_project_list_paginates() {
+        let cli = parse(&["cavectl", "sbom", "project", "list", "--page", "3", "--page-size", "25"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::List { page, page_size }) } => {
+                assert_eq!(page, 3);
+                assert_eq!(page_size, 25);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_vuln_get_takes_cve_id() {
+        let cli = parse(&["cavectl", "sbom", "vuln", "get", "CVE-2024-12345"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Get { id }) } => {
+                assert_eq!(id, "CVE-2024-12345");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_vuln_analyze_requires_state() {
+        let cli = parse(&["cavectl", "sbom", "vuln", "analyze", "CVE-1", "--state", "RESOLVED"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Analyze { id, state }) } => {
+                assert_eq!(id, "CVE-1");
+                assert_eq!(state, "RESOLVED");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_policy_list_parses() {
+        let cli = parse(&["cavectl", "sbom", "policy", "list"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Policy(SbomPolicyCmd::List) }));
+    }
+
+    #[test]
+    fn sbom_portfolio_parses() {
+        let cli = parse(&["cavectl", "sbom", "portfolio"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Portfolio }));
+    }
+
+    #[test]
+    fn sbom_legacy_list_still_parses() {
+        let cli = parse(&["cavectl", "sbom", "list"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::List }));
     }
 }
