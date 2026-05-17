@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: DependencyTrack/dependency-track@128fd0fa01bed9fcb57abffa3b30047c45941415
+//   src/main/java/org/dependencytrack/util/ComponentVersion.java + DependencyGraphBuilder
+
 use crate::models::{Component, DependencyTree};
 use std::collections::{HashMap, HashSet, VecDeque};
 
