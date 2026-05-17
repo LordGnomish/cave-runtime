@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/server/middleware/repoproxy/proxy.go + src/pkg/proxy/proxy.go
 //! Pull-through proxy — upstream registry adapters for multiple ecosystems.
 //!
 //! When `cave-registry` receives a request for an artefact it does not yet

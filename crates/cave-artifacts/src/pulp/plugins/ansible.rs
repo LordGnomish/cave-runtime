@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulp_ansible@HEAD pulp_ansible/app/models/
 //! pulp_ansible — Ansible collection and role content plugin.
 
 use crate::pulp::error::ArtifactsError;

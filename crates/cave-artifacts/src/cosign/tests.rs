@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: META — cave-artifacts cosign tests
 //! Cosign module unit + integration tests.
 //!
 //! Real ECDSA round-trip, real Ed25519 half of the hybrid composite

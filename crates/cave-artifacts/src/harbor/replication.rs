@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/replication/policy/manager.go + src/replication/controller/
 //! Registry-to-registry replication.
 //! Pushes manifests and blobs to configured upstream registries.
 

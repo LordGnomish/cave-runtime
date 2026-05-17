@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulp_python@HEAD pulp_python/app/models.py
 //! pulp_python — Python Package Index (PyPI) content plugin.
 
 use crate::pulp::error::ArtifactsError;

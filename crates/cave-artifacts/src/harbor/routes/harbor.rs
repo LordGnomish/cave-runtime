@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/server/v2.0/handler/project.go + registry.go + replication.go
 //! Harbor Admin API routes (/api/v2.0/…).
 //!
 //! Implements: projects, repositories, robot accounts, vulnerability scanning,
@@ -7,7 +9,7 @@
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    response::{IntoResponse, Json, Response},
     routing::{get, post, put},
     Router,
 };
@@ -163,53 +165,73 @@ async fn trigger_gc(State(state): State<Arc<RegistryState>>) -> impl IntoRespons
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 async fn list_projects(
-    State(_state): State<Arc<RegistryState>>,
-    Query(_q): Query<PageQuery>,
+    State(state): State<Arc<RegistryState>>,
+    Query(q): Query<PageQuery>,
 ) -> Json<Vec<Project>> {
-    // TODO: query cave_registry.projects
-    Json(vec![])
+    let name_like = q.query.as_deref();
+    Json(state.projects.list(name_like, None))
 }
 
 async fn create_project(
-    State(_state): State<Arc<RegistryState>>,
+    State(state): State<Arc<RegistryState>>,
     Json(req): Json<CreateProjectRequest>,
-) -> impl IntoResponse {
-    let project = Project {
-        id: Uuid::new_v4(),
-        name: req.project_name,
-        public: req.public.unwrap_or(false),
-        owner_name: "admin".to_string(),
-        description: String::new(),
-        repo_count: 0,
-        creation_time: Utc::now(),
-        update_time: Utc::now(),
-        metadata: req.metadata.unwrap_or_default(),
-    };
-    (StatusCode::CREATED, Json(project))
+) -> Response {
+    match state.projects.create(
+        req.project_name.clone(),
+        req.public.unwrap_or(false),
+        "admin".to_string(),
+        req.metadata.unwrap_or_default(),
+    ) {
+        Ok(p) => (StatusCode::CREATED, Json(p)).into_response(),
+        Err(crate::harbor::project_store::ProjectError::Conflict(_)) => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "errors": [{"code": "CONFLICT", "message": format!("project '{}' already exists", req.project_name)}]
+            })),
+        )
+            .into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
 async fn get_project(
-    State(_state): State<Arc<RegistryState>>,
+    State(state): State<Arc<RegistryState>>,
     Path(project_name): Path<String>,
-) -> impl IntoResponse {
-    // TODO: query DB
-    let _ = project_name;
-    StatusCode::NOT_FOUND
+) -> Response {
+    match state.projects.get(&project_name) {
+        Some(p) => (StatusCode::OK, Json(p)).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 async fn update_project(
-    State(_state): State<Arc<RegistryState>>,
-    Path(_project_name): Path<String>,
-    Json(_req): Json<UpdateProjectRequest>,
-) -> StatusCode {
-    StatusCode::OK
+    State(state): State<Arc<RegistryState>>,
+    Path(project_name): Path<String>,
+    Json(req): Json<UpdateProjectRequest>,
+) -> Response {
+    match state.projects.update(&project_name, req.public, req.description, req.metadata) {
+        Ok(_) => StatusCode::OK.into_response(),
+        Err(crate::harbor::project_store::ProjectError::NotFound(_)) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
 async fn delete_project(
-    State(_state): State<Arc<RegistryState>>,
-    Path(_project_name): Path<String>,
-) -> StatusCode {
-    StatusCode::OK
+    State(state): State<Arc<RegistryState>>,
+    Path(project_name): Path<String>,
+) -> Response {
+    match state.projects.delete(&project_name) {
+        Ok(()) => StatusCode::OK.into_response(),
+        Err(crate::harbor::project_store::ProjectError::NotFound(_)) => StatusCode::NOT_FOUND.into_response(),
+        Err(crate::harbor::project_store::ProjectError::HasRepos(name, count)) => (
+            StatusCode::PRECONDITION_FAILED,
+            Json(serde_json::json!({
+                "errors": [{"code": "PRECONDITION_FAILED", "message": format!("project '{name}' still has {count} repositories")}]
+            })),
+        )
+            .into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error": e.to_string()}))).into_response(),
+    }
 }
 
 // ── Repositories ─────────────────────────────────────────────────────────────

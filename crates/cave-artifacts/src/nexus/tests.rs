@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: META — cave-artifacts nexus integration tests
 //! Nexus module unit + integration tests.
 //!
 //! Covers the new code introduced by Faz 2: format adapter behaviour,

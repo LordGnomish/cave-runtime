@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: META — cave-artifacts pulp sub-module root
 //! Pulp v3-compatible artifact repository module.
 //!
 //! Compatible with: Pulp v3

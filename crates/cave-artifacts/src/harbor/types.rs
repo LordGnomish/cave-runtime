@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/distribution/manifest.go + types/
 //! Manifest and registry types: OCI, Docker V2 Schema 2, Manifest List.
 
 use serde::{Deserialize, Serialize};

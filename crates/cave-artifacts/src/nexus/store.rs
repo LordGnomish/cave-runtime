@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: sonatype/nexus-public@HEAD components/nexus-repository/.../storage/
 //! In-memory storage backend for the Nexus module.
 //!
 //! All state is held behind RwLocks so handlers can safely fan out across

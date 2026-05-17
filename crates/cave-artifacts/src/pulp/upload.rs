@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulpcore@0f991c2fa2bf6c8635e8a2de064ef04dacbbcf4f pulpcore/app/tasks/upload.py + pulpcore/app/models/upload.py
 //! Chunked upload API — Pulp v3 upload workflow.
 //!
 //! Upload → finalize → create artifact → create content → add to repo.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/notification/policy/manager.go + src/pkg/notifier/notifier.go
 //! Webhook notifications on push / pull / delete / scan events.
 
 use crate::harbor::types::{WebhookConfig, WebhookEvent, WebhookPayload};

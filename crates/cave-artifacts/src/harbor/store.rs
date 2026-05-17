@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/scan/dao/manager.go + src/pkg/artifact/manager.go
 //! PostgreSQL migrations for Harbor-compatible metadata
 //! (projects, robots, audit, webhooks, quotas, labels, scan results).
 //! The actual blob/manifest bytes live in RegistryStorage (in-memory / object store).

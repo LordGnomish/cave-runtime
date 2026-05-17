@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: META — cave-artifacts crate root (consolidation, no single upstream)
 //! cave-artifacts — consolidated artifact repository platform.
 //!
 //! Bundles best-of-breed upstream parities under one crate, mirroring the
@@ -15,8 +17,10 @@
 //! - [`ArtifactsState`] — combined module state graph
 //! - [`router`]         — combined axum Router merging all sub-modules
 
+pub mod core;
 pub mod cosign;
 pub mod harbor;
+pub mod integrations;
 pub mod nexus;
 pub mod pulp;
 

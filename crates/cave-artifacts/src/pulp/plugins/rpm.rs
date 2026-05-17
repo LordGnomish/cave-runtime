@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: pulp/pulp_rpm@79bcad7807c617b6512fbedd4d43db623d0a417f pulp_rpm/app/models.py
 //! pulp_rpm — RPM package content plugin.
 
 use crate::pulp::error::ArtifactsError;

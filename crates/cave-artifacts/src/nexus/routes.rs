@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Source: sonatype/nexus-public@HEAD plugins/nexus-restore-*/REST API
 //! HTTP surface for the Nexus module.
 //!
 //! Endpoint base mirrors Nexus' `/service/rest/v1` surface but rooted under
