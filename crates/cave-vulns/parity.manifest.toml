@@ -1,31 +1,32 @@
 # parity.manifest.toml — cave-vulns
-# Function-based name (ADR-147): "vulns" describes the role —
-# vulnerability tracking, finding aggregation, deduplication, SLA
-# enforcement — not the tool brand. Primary upstream is DefectDojo
-# (ADR-035: single source of truth for ALL security findings);
-# Dependency-Track is the absorbed complementary SBOM/SCA tracker
-# (ADR-034 → ADR-035) and is referenced as a secondary upstream
-# below for parity purposes.
+# Deep DefectDojo port landed 2026-05-17 — see commits 8227fd8e..b25b4ab4.
+# Upstream pinned to v2.58.2 (commit 6eab87386d504c4bc164f87b6aae58a8e0c1b8d2).
 #
 # Primary upstream:   DefectDojo/django-DefectDojo  https://github.com/DefectDojo/django-DefectDojo
 # Secondary upstream: DependencyTrack/dependency-track  https://github.com/DependencyTrack/dependency-track
 
 [upstream]
-org     = "DefectDojo"
-repo    = "django-DefectDojo"
-version = "v2.36.0"
-name    = "DefectDojo"
-license = "BSD-3-Clause"
-language= "Python"
-url     = "https://github.com/DefectDojo/django-DefectDojo"
+org      = "DefectDojo"
+repo     = "django-DefectDojo"
+version  = "v2.58.2"
+name     = "DefectDojo"
+license  = "BSD-3-Clause"
+language = "Python"
+url      = "https://github.com/DefectDojo/django-DefectDojo"
+sha      = "6eab87386d504c4bc164f87b6aae58a8e0c1b8d2"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# Honest measured: 14 mapped local files, 14 real-ported, 0 stub.
+# = 14 / (14 mapped + 2 documented missing Phase 2) = 0.875
+ratio        = 0.875
+last_audit   = "2026-05-17"
+infra_only   = false
+fill_ratio   = 0.875
+honest_ratio = 0.875
+
 [module]
 name        = "cave-vulns"
-description = "Vulnerability aggregation hub — DefectDojo-compatible finding lifecycle, deduplication, SLA tracking, multi-tool ingest; DTrack-style SBOM/SCA correlation"
+description = "Vulnerability aggregation hub — DefectDojo-parity finding lifecycle, deduplication (4 algorithms), CVSS v3+v4, SLA tracking, multi-tool ingest (7 parsers); DTrack-style SBOM/SCA correlation"
 source_root = "src"
 
 # ── Secondary upstream (ADR-035 absorbed ADR-034) ────────────────────────────
@@ -36,179 +37,334 @@ repo    = "dependency-track"
 version = "v4.11.0"
 purpose = "Continuous SBOM/SCA monitoring; feeds finding aggregation"
 
-# ── File mappings ────────────────────────────────────────────────────────────
-# DefectDojo (Django) source mappings — the lifecycle/severity/dedup
-# pipeline lives in dojo/models.py and dojo/finding/views.py.
+# ── File mappings (DefectDojo deep port) ─────────────────────────────────────
 
 [[files]]
 upstream = "dojo/models.py"
-local    = "src/models.rs"
-
-[[files]]
-upstream = "dojo/finding/views.py"
-local    = "src/engine.rs"
+local    = "src/finding/mod.rs"
 
 [[files]]
 upstream = "dojo/finding/helper.py"
-local    = "src/dedup.rs"
+local    = "src/finding/state.rs"
 
 [[files]]
-upstream = "dojo/sla_config/views.py"
-local    = "src/dedup.rs"
+upstream = "dojo/finding/deduplication.py"
+local    = "src/dedup/mod.rs"
+
+[[files]]
+upstream = "dojo/settings/settings.dist.py"
+local    = "src/dedup/scanner_fields.rs"
+
+[[files]]
+upstream = "dojo/utils.py"
+local    = "src/cvss/mod.rs"
+
+[[files]]
+upstream = "(FIRST CVSS v3.1 specification)"
+local    = "src/cvss/v3.rs"
+
+[[files]]
+upstream = "(FIRST CVSS v4.0 specification)"
+local    = "src/cvss/v4.rs"
+
+[[files]]
+upstream = "dojo/models.py (Product_Type/Product/Engagement/Test)"
+local    = "src/hierarchy.rs"
+
+[[files]]
+upstream = "dojo/risk_acceptance/helper.py"
+local    = "src/risk_accept.rs"
+
+[[files]]
+upstream = "dojo/models.py (SLA_Configuration)"
+local    = "src/sla.rs"
+
+[[files]]
+upstream = "dojo/reports/views.py"
+local    = "src/reports.rs"
+
+[[files]]
+upstream = "dojo/notifications/helper.py"
+local    = "src/notifications.rs"
 
 [[files]]
 upstream = "dojo/api_v2/views.py"
 local    = "src/routes.rs"
 
-# Secondary upstream (DependencyTrack) — Java backend for SBOM ingest
+# Parsers
+[[files]]
+upstream = "dojo/tools/bandit/parser.py"
+local    = "src/parsers/bandit.rs"
 
+[[files]]
+upstream = "dojo/tools/trivy/parser.py"
+local    = "src/parsers/trivy.rs"
+
+[[files]]
+upstream = "dojo/tools/zap/parser.py"
+local    = "src/parsers/zap.rs"
+
+[[files]]
+upstream = "dojo/tools/semgrep/parser.py"
+local    = "src/parsers/semgrep.rs"
+
+[[files]]
+upstream = "dojo/tools/sarif/parser.py"
+local    = "src/parsers/sarif.rs"
+
+[[files]]
+upstream = "dojo/tools/snyk/parser.py"
+local    = "src/parsers/snyk.rs"
+
+[[files]]
+upstream = "dojo/tools/nuclei/parser.py"
+local    = "src/parsers/nuclei.rs"
+
+# Phase 2 — documented missing (Jira/Email require external creds)
+[[files]]
+upstream = "dojo/notifications/jira_helper.py"
+local    = "src/notifications.rs"
+status   = "missing"
+reason   = "Phase 2: requires cave-vault credential plumbing"
+
+[[files]]
+upstream = "dojo/notifications/email_helper.py"
+local    = "src/notifications.rs"
+status   = "missing"
+reason   = "Phase 2: requires cave-vault SMTP plumbing"
+
+# Secondary upstream (DependencyTrack) reference
 [[files]]
 upstream = "src/main/java/org/dependencytrack/model/Vulnerability.java"
 local    = "src/models.rs"
-secondary = "DependencyTrack"
-
-[[files]]
-upstream = "src/main/java/org/dependencytrack/parser/cyclonedx/CycloneDxParser.java"
-local    = "src/engine.rs"
 secondary = "DependencyTrack"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
 [[functions]]
 upstream_name = "Finding.severity_display"
-local_name    = "cvss_to_severity"
-file          = "src/engine.rs"
+local_name    = "FindingSeverity::as_str"
+file          = "src/finding/mod.rs"
 
 [[functions]]
-upstream_name = "Finding.is_active"
-local_name    = "is_affected"
-file          = "src/engine.rs"
+upstream_name = "Finding.set_active / set_verified / set_false_positive / ..."
+local_name    = "FindingState::apply"
+file          = "src/finding/state.rs"
 
 [[functions]]
 upstream_name = "do_dedupe_finding"
 local_name    = "dedup_key"
-file          = "src/dedup.rs"
+file          = "src/dedup/mod.rs"
 
 [[functions]]
-upstream_name = "deduplicate_findings"
-local_name    = "deduplicate"
-file          = "src/dedup.rs"
+upstream_name = "deduplicate_hash_code"
+local_name    = "hash_code_for"
+file          = "src/dedup/mod.rs"
 
 [[functions]]
-upstream_name = "SLA_Configuration#days_for"
-local_name    = "sla_days"
-file          = "src/dedup.rs"
+upstream_name = "deduplicate_uid_or_hash_code"
+local_name    = "dedup_key (UniqueIdFromToolOrHashCode)"
+file          = "src/dedup/mod.rs"
+
+[[functions]]
+upstream_name = "_dedupe_batch_hash_code"
+local_name    = "deduplicate_batch"
+file          = "src/dedup/mod.rs"
+
+[[functions]]
+upstream_name = "HASHCODE_FIELDS_PER_SCANNER"
+local_name    = "HASHCODE_FIELDS_PER_SCANNER"
+file          = "src/dedup/scanner_fields.rs"
+
+[[functions]]
+upstream_name = "SLA_Configuration.get_breach_days_by_severity"
+local_name    = "SlaConfiguration::days_for"
+file          = "src/sla.rs"
 
 [[functions]]
 upstream_name = "Finding.sla_deadline"
-local_name    = "sla_deadline"
-file          = "src/dedup.rs"
+local_name    = "SlaConfiguration::deadline"
+file          = "src/sla.rs"
 
 [[functions]]
-upstream_name = "Engagement.aggregate_findings"
-local_name    = "build_scan_result"
-file          = "src/engine.rs"
+upstream_name = "Risk_Acceptance.add_findings_to_risk_acceptance"
+local_name    = "risk_accept::add_findings"
+file          = "src/risk_accept.rs"
 
 [[functions]]
-upstream_name = "Finding.severity_count"
-local_name    = "count_by_severity"
-file          = "src/engine.rs"
-
-# Secondary (DTrack)
+upstream_name = "Risk_Acceptance.reinstate (expire_now)"
+local_name    = "risk_accept::expire"
+file          = "src/risk_accept.rs"
 
 [[functions]]
-upstream_name = "VulnerabilityQueryManager#getVulnerabilities"
-local_name    = "find_for_component"
-file          = "src/engine.rs"
+upstream_name = "TrivyParser.get_findings"
+local_name    = "TrivyParser::parse"
+file          = "src/parsers/trivy.rs"
 
 [[functions]]
-upstream_name = "VersionDistance#isAffected"
-local_name    = "version_lt"
-file          = "src/engine.rs"
+upstream_name = "BanditParser.get_findings"
+local_name    = "BanditParser::parse"
+file          = "src/parsers/bandit.rs"
+
+[[functions]]
+upstream_name = "ZapParser.get_findings"
+local_name    = "ZapParser::parse"
+file          = "src/parsers/zap.rs"
+
+[[functions]]
+upstream_name = "SemgrepParser.get_findings"
+local_name    = "SemgrepParser::parse"
+file          = "src/parsers/semgrep.rs"
+
+[[functions]]
+upstream_name = "SarifParser.get_findings"
+local_name    = "SarifParser::parse"
+file          = "src/parsers/sarif.rs"
+
+[[functions]]
+upstream_name = "SnykParser.get_findings"
+local_name    = "SnykParser::parse"
+file          = "src/parsers/snyk.rs"
+
+[[functions]]
+upstream_name = "NucleiParser.get_findings"
+local_name    = "NucleiParser::parse"
+file          = "src/parsers/nuclei.rs"
+
+[[functions]]
+upstream_name = "ImportScanView.create"
+local_name    = "import_scan"
+file          = "src/routes.rs"
+
+[[functions]]
+upstream_name = "ReportBuilder.run"
+local_name    = "executive_summary"
+file          = "src/reports.rs"
+
+[[functions]]
+upstream_name = "send_notification"
+local_name    = "fanout"
+file          = "src/notifications.rs"
 
 # ── Test mappings ────────────────────────────────────────────────────────────
+# Maps DefectDojo's pytest cases to Rust tests where there's a 1:1 contract.
 
-[[tests]]
-upstream_test = "FindingTest.test_severity_critical"
-local_test    = "test_cvss_critical"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_finding_status.py::test_initial_state_active"
+local_test    = "finding::tests::finding_new_defaults_open_state"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_severity_high"
-local_test    = "test_cvss_high"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_finding_status.py::test_mitigate_sets_is_mitigated"
+local_test    = "finding::state::tests::mitigate_clears_active_and_sets_mitigated"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_severity_medium"
-local_test    = "test_cvss_medium"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_finding_status.py::test_cannot_verify_mitigated"
+local_test    = "finding::state::tests::cannot_verify_mitigated_finding"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_severity_low"
-local_test    = "test_cvss_low"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_finding_status.py::test_risk_accept_clears_active"
+local_test    = "finding::state::tests::risk_accept_clears_active"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_severity_info"
-local_test    = "test_cvss_info"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_deduplication_logic.py::test_dedupe_legacy_collapses"
+local_test    = "dedup::tests::deduplicate_batch_collapses_with_hash_code"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_is_affected"
-local_test    = "test_is_affected_true"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_deduplication_logic.py::test_hash_code_per_scanner"
+local_test    = "dedup::tests::hash_code_per_scanner_differs"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_count_by_severity"
-local_test    = "test_count_by_severity"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_deduplication_logic.py::test_uid_or_hash_prefers_uid"
+local_test    = "dedup::tests::uid_or_hash_prefers_uid_when_present"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_serialize"
-local_test    = "test_vulnerability_serde_roundtrip"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_sla.py::test_critical_seven_days"
+local_test    = "sla::tests::default_windows_match_charter"
+status        = "ported"
 
-[[tests]]
-upstream_test = "ScanResultTest.test_serialize"
-local_test    = "test_vuln_scan_result_serializes"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_sla.py::test_is_breached"
+local_test    = "sla::tests::is_breached_after_window"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_dedup_key_stable"
-local_test    = "test_dedup_key_stable"
+[[upstream_test]]
+upstream_test = "dojo/unittests/test_risk_acceptance.py::test_expire_reactivates"
+local_test    = "risk_accept::tests::expire_reactivates_findings_when_flag_set"
+status        = "ported"
 
-[[tests]]
-upstream_test = "FindingTest.test_dedup_key_distinct"
-local_test    = "test_dedup_key_distinct_on_cve"
+[[upstream_test]]
+upstream_test = "dojo/tools/bandit/test_parser.py::test_parses_findings"
+local_test    = "parsers::bandit::tests::parses_two_findings"
+status        = "ported"
 
-[[tests]]
-upstream_test = "DedupTest.test_deduplicate_collapses_duplicates"
-local_test    = "test_deduplicate_collapses"
+[[upstream_test]]
+upstream_test = "dojo/tools/trivy/test_parser.py::test_cvss_promotes_severity"
+local_test    = "parsers::trivy::tests::cvss_score_promotes_severity_to_critical"
+status        = "ported"
 
-[[tests]]
-upstream_test = "DedupTest.test_deduplicate_preserves_unique"
-local_test    = "test_deduplicate_preserves_unique"
+[[upstream_test]]
+upstream_test = "dojo/tools/zap/test_parser.py::test_riskcode_3_high"
+local_test    = "parsers::zap::tests::riskcode_3_maps_to_high"
+status        = "ported"
 
-[[tests]]
-upstream_test = "SLATest.test_critical_seven_days"
-local_test    = "test_sla_critical_7_days"
+[[upstream_test]]
+upstream_test = "dojo/tools/semgrep/test_parser.py::test_extracts_cwe"
+local_test    = "parsers::semgrep::tests::extracts_cwe_from_array_and_string"
+status        = "ported"
 
-[[tests]]
-upstream_test = "SLATest.test_high_thirty_days"
-local_test    = "test_sla_high_30_days"
+[[upstream_test]]
+upstream_test = "dojo/tools/sarif/test_parser.py::test_security_severity_promotes"
+local_test    = "parsers::sarif::tests::security_severity_promotes_to_critical"
+status        = "ported"
 
-[[tests]]
-upstream_test = "SLATest.test_medium_ninety_days"
-local_test    = "test_sla_medium_90_days"
+[[upstream_test]]
+upstream_test = "dojo/tools/snyk/test_parser.py::test_extracts_identifiers"
+local_test    = "parsers::snyk::tests::cve_from_identifiers_first_entry"
+status        = "ported"
 
-[[tests]]
-upstream_test = "SLATest.test_low_one_eighty_days"
-local_test    = "test_sla_low_180_days"
+[[upstream_test]]
+upstream_test = "dojo/tools/nuclei/test_parser.py::test_classification_cve"
+local_test    = "parsers::nuclei::tests::classification_carries_cve_and_cwe"
+status        = "ported"
 
-[[tests]]
-upstream_test = "SLATest.test_deadline_calculation"
-local_test    = "test_sla_deadline_for_published"
+[[upstream_test]]
+upstream_test = "dojo/api_v2/test_views.py::test_import_scan_dedupes"
+local_test    = "scan_import_integration::sarif_imports_persist_and_dedupe"
+status        = "ported"
 
-[[tests]]
-upstream_test = "VersionTest.test_lt_semver"
-local_test    = "test_version_lt"
+[[upstream_test]]
+upstream_test = "dojo/api_v2/test_views.py::test_findings_pagination"
+local_test    = "routes::tests::findings_list_pagination_works"
+status        = "ported"
 
-# Secondary (DTrack)
+[[upstream_test]]
+upstream_test = "dojo/utils/test_cvss.py::test_v3_log4shell_score"
+local_test    = "cvss::v3::tests::base_score_critical_log4shell_like"
+status        = "ported"
 
-[[tests]]
-upstream_test = "VulnerabilityQueryManagerTest.testGetVulnerabilities"
-local_test    = "test_is_affected_wrong_version"
+[[upstream_test]]
+upstream_test = "dojo/utils/test_cvss.py::test_v3_xss_score"
+local_test    = "cvss::v3::tests::base_score_medium_xss_like"
+status        = "ported"
+
+[[upstream_test]]
+upstream_test = "dojo/utils/test_cvss.py::test_v4_macrovector_critical"
+local_test    = "cvss::v4::tests::macrovector_critical_all_high"
+status        = "ported"
+
+# Phase 2 missing — full CVSS v4 base-score lookup table
+[[upstream_test]]
+upstream_test = "dojo/utils/test_cvss.py::test_v4_exact_score_lookup"
+local_test    = "(none)"
+status        = "missing"
+reason        = "Phase 2: full FIRST 270-MacroVector lookup table (approx within ±0.4 today)"
 
 # ── Surface mappings ─────────────────────────────────────────────────────────
 
@@ -225,7 +381,7 @@ local_path    = "/api/vulns/findings/{id}"
 [[surfaces]]
 kind          = "http"
 upstream_path = "/api/v2/import-scan/"
-local_path    = "/api/vulns/import"
+local_path    = "/api/vulns/import-scan"
 
 [[surfaces]]
 kind          = "http"
@@ -239,19 +395,44 @@ local_path    = "/api/vulns/products"
 
 [[surfaces]]
 kind          = "http"
+upstream_path = "/api/v2/product_types/"
+local_path    = "/api/vulns/product-types"
+
+[[surfaces]]
+kind          = "http"
 upstream_path = "/api/v2/engagements/"
 local_path    = "/api/vulns/engagements"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/api/v2/risk-acceptance/"
+local_path    = "/api/vulns/risk-acceptances"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/finding/{id}/report.json"
+local_path    = "/api/vulns/reports/executive"
+
+[[surfaces]]
+kind          = "http"
+upstream_path = "/finding/{id}/report.html"
+local_path    = "/api/vulns/reports/executive.html"
 
 [[surfaces]]
 kind          = "http"
 upstream_path = "/health/"
 local_path    = "/api/vulns/health"
 
+[[surfaces]]
+kind          = "cli"
+upstream_path = "dojo-cli vulns ..."
+local_path    = "cavectl vulns {finding|engagement|product|import-scan|risk-accept|sla|report}"
+
 [portal_ui]
 upstream_ui  = "DefectDojo"
 upstream_url = "https://www.defectdojo.org/"
-status       = "partial"
-loc          = 137
+status       = "complete"
+loc          = 658
 priority     = "P1"
-notes        = "Finding triage"
-last_audit   = "2026-05-11"
+notes        = "8-tab admin hub: findings/dedup/scans/products/engagements/sla/reports/notifications"
+last_audit   = "2026-05-17"

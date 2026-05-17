@@ -1,7 +1,25 @@
-//! `/admin/vulns` — DefectDojo parity. CVE browser with severity
-//! pills + unfixed counter (preserves existing helpers).
+//! `/admin/vulns` — DefectDojo-parity vulnerability triage hub.
 //!
 //! Upstream UI: <https://www.defectdojo.org/>
+//!
+//! Sub-pages:
+//!   * [`findings`]     — full Finding triage list (severity / SLA / state)
+//!   * [`dedup`]        — dedup algorithm + scanner mapping reference
+//!   * [`scans`]        — registered scan parsers + import surface
+//!   * [`products`]     — Product/ProductType hierarchy browser
+//!   * [`engagements`]  — Engagement + Test runs
+//!   * [`sla`]          — SLA window config + per-severity breach rollup
+//!   * [`reports`]      — executive summary (JSON / HTML download)
+//!   * [`notifications`] — sink registry + recent events
+
+pub mod dedup;
+pub mod engagements;
+pub mod findings;
+pub mod notifications;
+pub mod products;
+pub mod reports;
+pub mod scans;
+pub mod sla;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};
