@@ -1,0 +1,48 @@
+{
+  "agent": "K6",
+  "new_modules": ["wsfed", "oid4vc", "email_listener"],
+  "new_files": [
+    {"upstream": "services/src/main/java/org/keycloak/protocol/wsfed/", "local": "crates/cave-auth/src/wsfed/mod.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/wsfed/builders/", "local": "crates/cave-auth/src/wsfed/protocol.rs"},
+    {"upstream": "saml-core/src/main/java/org/keycloak/dom/saml/v1/assertion/", "local": "crates/cave-auth/src/wsfed/saml11_assertion.rs"},
+    {"upstream": "saml-core/src/main/java/org/keycloak/saml/processing/api/saml/v1/sig/", "local": "crates/cave-auth/src/wsfed/signing.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/wsfed/WSFedLoginProtocolService.java", "local": "crates/cave-auth/src/wsfed/endpoints.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/", "local": "crates/cave-auth/src/oid4vc/mod.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/model/", "local": "crates/cave-auth/src/oid4vc/vc/model.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/signing/", "local": "crates/cave-auth/src/oid4vc/vc/proof.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/CredentialOfferEndpoint.java", "local": "crates/cave-auth/src/oid4vc/issuance/credential_offer.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/OID4VCIssuerEndpoint.java", "local": "crates/cave-auth/src/oid4vc/issuance/credential_endpoint.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/OID4VPVerifierEndpoint.java#authzRequest", "local": "crates/cave-auth/src/oid4vc/presentation/authz_request.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/OID4VPVerifierEndpoint.java#authzResponse", "local": "crates/cave-auth/src/oid4vc/presentation/authz_response.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/events/EventType.java", "local": "crates/cave-auth/src/email_listener/events.rs"},
+    {"upstream": "themes/base/email/", "local": "crates/cave-auth/src/email_listener/templates.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/email/DefaultEmailSenderProvider.java", "local": "crates/cave-auth/src/email_listener/smtp_outbox.rs"},
+    {"upstream": "services/src/main/java/org/keycloak/events/email/EmailEventListenerProvider.java", "local": "crates/cave-auth/src/email_listener/dispatcher.rs"}
+  ],
+  "tests_added": 120,
+  "tests_by_module": {
+    "wsfed": 41,
+    "oid4vc": 51,
+    "email_listener": 28
+  },
+  "loc_added": 4435,
+  "commits": {
+    "wsfed_red": "34e87e60",
+    "wsfed_green": "31bc58de",
+    "oid4vc_red": "6b776352",
+    "oid4vc_green": "38726450",
+    "email_listener_red": "271e8f71",
+    "email_listener_green": "fb2e55ed"
+  },
+  "honest_gaps": [
+    "wsfed: exc-c14n canonicalisation not applied — same posture as the existing SAML 2.0 broker; bytes are authoritative.",
+    "wsfed: wattr1.0 attribute query is not implemented (rare; never seen in cave customer deployments).",
+    "wsfed: Active Profile token encryption is out of scope — passive-profile only.",
+    "oid4vc: full URDNA2015 (RDF Dataset Canonicalisation 2.0) NOT used — JCS (RFC 8785) is used as a substitute. Sufficient when both sides use the same code path, but strict wallets enforcing URDNA2015 will reject these proofs. Documented in module-level docs.",
+    "oid4vc: multibase prefix 'u' (base64url-no-pad) used instead of Keycloak's 'z' (base58btc) — both are valid per multibase spec; rationale: no base58 crate in workspace.",
+    "oid4vc: DID resolution not implemented — verifier uses the co-located issuer key directly. Real deployments must resolve verificationMethod URLs.",
+    "oid4vc: presentation_submission descriptor is echoed but not validated against the presentation_definition.",
+    "email_listener: lettre async transport not used — outbox uses std::thread::sleep for backoff so it stays Send + Sync without a tokio handle for tests. Production should swap in AsyncSmtpTransport with a tokio runtime.",
+    "email_listener: GdprDataExportPayload accepts an EmailAttachment but the attachment is NOT yet embedded into the MIME body. Typed-send still delivers a valid message; attachment embedding is a documented future enhancement."
+  ]
+}
