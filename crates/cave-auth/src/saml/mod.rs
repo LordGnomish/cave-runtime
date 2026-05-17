@@ -47,6 +47,7 @@ pub mod canonicalization;
 pub mod metadata;
 pub mod response;
 pub mod signature;
+pub mod signing_ecdsa;
 
 use thiserror::Error;
 

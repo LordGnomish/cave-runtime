@@ -34,3 +34,9 @@ anyhow = { workspace = true }
 # SAML 2.0 protocol parsing — Keycloak `saml-core` port (src/saml/)
 quick-xml = "0.37"
 flate2    = "1.0"
+# ECDSA XML signing — XMLDSig ECDSA-SHA{256,384,512} per RFC 4051 §2.2.3
+# (r||s raw concatenation, NOT DER). Real signers/verifiers for P-256/P-384/P-521.
+p256  = { workspace = true }
+p384  = { workspace = true }
+p521  = { workspace = true }
+sha2  = { workspace = true }
