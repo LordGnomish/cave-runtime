@@ -60,3 +60,8 @@ hkdf    = "0.12"
 # OAuth/OIDC endpoints (oauth_endpoints/): URL-encoding + form deser for /auth + /par + /token
 urlencoding      = "2.1"
 serde_urlencoded = "0.7"
+# SMTP outbox for email_listener — `builder` for messages, `smtp-transport` for real send,
+# `tokio1-rustls-tls` for async TLS, `stub` exposed via cfg(test) for in-memory tests.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls", "tokio1-rustls-tls", "tokio1", "tracing"] }
+# Templating for email_listener
+handlebars = "6"
