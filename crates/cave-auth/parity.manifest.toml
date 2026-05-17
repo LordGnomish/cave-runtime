@@ -21,15 +21,37 @@ url     = "https://github.com/keycloak/keycloak"
 # admin-rest/) rather than the JVM stack underneath. Java-stdlib
 # analog packages are aggressively skipped — they're not the cave
 # port target.
-mapped_count   = 23
+mapped_count   = 27
 partial_count  = 1
 skipped_count  = 16
-unmapped_count = 2
-total          = 42
-fill_ratio     = 0.9524
-honest_ratio   = 0.9286
-last_audit     = "2026-05-15"
+unmapped_count = 0
+total          = 44
+fill_ratio     = 1.0000
+honest_ratio   = 0.9773
+last_audit     = "2026-05-17"
 infra_only     = false
+# 2026-05-17 Phase 3 close-out — 6-parallel-agent 100% run.
+# K1 admin handler mount  : admin_idp + admin_flows routers wired into
+#                            cave-runtime binary + persona gate on /admin/realms/*
+#                            (16 integration tests via axum::oneshot).
+# K2 JPA persistence      : PersistenceBackend trait + rusqlite RdbmsBackend +
+#                            InMemoryBackend + 4 Flyway-style migrations. Closes the
+#                            "JPA persistence" unmapped entry. Honest gap: no live
+#                            Postgres adapter (cave_rdbms::Pool drop-in pending).
+# K3 SAML ECDSA           : XMLDSig ECDSA-SHA256/384/512 over P-256/P-384/P-521
+#                            (RFC 4051 §2.2.3 r||s raw encoding). Extends saml/.
+# K4 Kerberos libgssapi   : Real server-side AcceptSecContext behind
+#                            `kerberos-gssapi` cargo feature (Linux/MIT krb5 only —
+#                            macOS Heimdal lacks gss_localname / gss_store_cred).
+#                            Pure-Rust ASN.1 path remains the default.
+# K5 portal live data     : AuthClient + AuthApiClient + AuthMockClient + SSE
+#                            event subscription — portal-only change.
+# K6 WS-Fed + OID4VC + email listener: 3 new mapped modules. wsfed (SAML 1.1
+#                            assertions + RST/RSTR + signin/signout); oid4vc (W3C
+#                            VC 2.0 + Ed25519 DataIntegrityProof + OID4VCI/OID4VP);
+#                            email_listener (lettre SMTP + handlebars templates +
+#                            audit-event dispatcher). honest_ratio penalty: OID4VC
+#                            uses JCS (RFC 8785) as a URDNA2015 substitute.
 # 2026-05-15 deep-push delta — 6-agent parallel close-out:
 #   mapped: 12 → 23 (+11) — webauthn (A2), saml (A1), ldap (A3), kerberos (A3),
 #                            uma (A4), token_exchange (A4), dpop (A4), jwe (A4),
@@ -911,4 +933,65 @@ local_test    = "scenario_name_id_policy_wire_shape"
 [[tests]]
 upstream_test = "NameIDTest::testMatchesByQualifier"
 local_test    = "scenario_name_id_matching_honors_qualifiers"
+
+
+
+# ── Phase 3 close-out (2026-05-17) — new module mappings ───────────────────────
+
+[[files]]
+upstream = "model/jpa/src/main/java/org/keycloak/connections/jpa/JpaConnectionProviderFactory.java"
+local    = "src/persistence/rdbms_backend.rs"
+
+[[files]]
+upstream = "model/jpa/src/main/java/org/keycloak/models/jpa/entities/UserEntity.java"
+local    = "src/persistence/entities.rs"
+
+[[files]]
+upstream = "server-spi/src/main/java/org/keycloak/storage/KeycloakSchema.java"
+local    = "src/persistence/migration.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/wsfed/WSFedLoginProtocol.java"
+local    = "src/wsfed/protocol.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/wsfed/WSFedLoginProtocolService.java"
+local    = "src/wsfed/endpoints.rs"
+
+[[files]]
+upstream = "saml-core/src/main/java/org/keycloak/saml/SAML11AssertionWriter.java"
+local    = "src/wsfed/saml11_assertion.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/OID4VCLoginProtocolFactory.java"
+local    = "src/oid4vc/mod.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/credentialbuilder/CredentialBuilder.java"
+local    = "src/oid4vc/issuance/credential_endpoint.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/model/VerifiableCredential.java"
+local    = "src/oid4vc/vc/model.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/protocol/oid4vc/issuance/signing/JwtProofSignatureHandler.java"
+local    = "src/oid4vc/vc/proof.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/events/email/EmailEventListenerProvider.java"
+local    = "src/email_listener/dispatcher.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/email/DefaultEmailSenderProvider.java"
+local    = "src/email_listener/smtp_outbox.rs"
+
+[[files]]
+upstream = "services/src/main/java/org/keycloak/email/freemarker/FreeMarkerEmailTemplateProvider.java"
+local    = "src/email_listener/templates.rs"
+
+# Phase 3 enrichments to existing mapped entries (no new entries):
+# - saml/ — K3 added signing_ecdsa.rs (XMLDSig ECDSA-SHA256/384/512)
+# - kerberos/ — K4 added gssapi_real.rs (libgssapi-backed AcceptSecContext)
+# - admin_idp/, admin_flows/ — K1 added router() + cave-runtime mount
 

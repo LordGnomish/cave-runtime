@@ -1,168 +1,216 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Source: keycloak/keycloak@v22.0.0 services/.../admin/IdentityProviderResource.java#mappers
+// Copyright (C) 2026 CAVE Runtime contributors
+// Source: keycloak/keycloak@v22.0.0 services/src/main/java/org/keycloak/services/resources/admin/IdentityProviderResource.java
+//         (`@Path("mappers")` sub-resource — `getMappers`, `addMapper`,
+//         `getMapperById`, `update`, `delete`).
 //
-//! Identity-provider mappers — per-instance attribute / role mappers.
-//!
-//! - `GET    /admin/realms/{realm}/identity-provider/instances/{alias}/mappers`
-//! - `POST   /admin/realms/{realm}/identity-provider/instances/{alias}/mappers`
-//! - `GET    /admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}`
-//! - `DELETE /admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}`
+// Identity-provider mappers tie attributes/roles/claims from an upstream
+// IdP onto Keycloak user attributes. Each mapper has its own
+// `identityProviderMapper` plugin id (e.g. `oidc-user-attribute-idp-mapper`,
+// `hardcoded-role-idp-mapper`, `saml-role-idp-mapper`).
 
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
-    Json, Router,
+    Json,
 };
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_json::{json, Map, Value};
+use std::sync::Arc;
 use uuid::Uuid;
 
-use super::AdminIdpState;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Keycloak `IdentityProviderMapperRepresentation`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IdentityProviderMapper {
-    pub id: String,
+    /// Server-assigned id (UUID). Optional on POST (server generates) but
+    /// always present on GET/PUT.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub name: String,
+    /// Mapper plugin id, e.g. `oidc-user-attribute-idp-mapper`.
+    #[serde(rename = "identityProviderMapper")]
     pub identity_provider_mapper: String,
+    /// Owning alias — Keycloak surfaces this so reverse lookup works.
+    #[serde(default, rename = "identityProviderAlias", skip_serializing_if = "Option::is_none")]
+    pub identity_provider_alias: Option<String>,
     #[serde(default)]
-    pub config: HashMap<String, String>,
+    pub config: Map<String, Value>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CreateMapperRequest {
-    pub name: String,
-    pub identity_provider_mapper: String,
-    #[serde(default)]
-    pub config: HashMap<String, String>,
+#[derive(Debug, Default)]
+pub struct IdentityProviderMapperStore {
+    // (realm, idp_alias, mapper_id) -> mapper
+    inner: DashMap<(String, String, String), IdentityProviderMapper>,
 }
 
+impl IdentityProviderMapperStore {
+    pub fn new() -> Self {
+        Self { inner: DashMap::new() }
+    }
+
+    pub fn list(&self, realm: &str, alias: &str) -> Vec<IdentityProviderMapper> {
+        let mut out: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|kv| kv.key().0 == realm && kv.key().1 == alias)
+            .map(|kv| kv.value().clone())
+            .collect();
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+        out
+    }
+
+    pub fn get(&self, realm: &str, alias: &str, id: &str) -> Option<IdentityProviderMapper> {
+        self.inner
+            .get(&(realm.into(), alias.into(), id.into()))
+            .map(|v| v.clone())
+    }
+
+    /// Assigns a fresh UUID if the mapper lacks an id and stores it.
+    /// Returns the persisted id.
+    pub fn create(&self, realm: &str, alias: &str, mut m: IdentityProviderMapper) -> String {
+        let id = m.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+        m.id = Some(id.clone());
+        m.identity_provider_alias.get_or_insert_with(|| alias.to_string());
+        self.inner.insert((realm.into(), alias.into(), id.clone()), m);
+        id
+    }
+
+    pub fn update(&self, realm: &str, alias: &str, id: &str, m: IdentityProviderMapper) -> bool {
+        let key = (realm.to_string(), alias.to_string(), id.to_string());
+        if !self.inner.contains_key(&key) {
+            return false;
+        }
+        let mut m = m;
+        m.id = Some(id.to_string());
+        m.identity_provider_alias.get_or_insert_with(|| alias.to_string());
+        self.inner.insert(key, m);
+        true
+    }
+
+    pub fn delete(&self, realm: &str, alias: &str, id: &str) -> bool {
+        self.inner
+            .remove(&(realm.into(), alias.into(), id.into()))
+            .is_some()
+    }
+}
+
+#[derive(Clone)]
+pub struct MapperState(pub Arc<IdentityProviderMapperStore>);
+
+/// `GET /admin/realms/{realm}/identity-provider/instances/{alias}/mappers`
 pub async fn list_mappers(
-    State(state): State<AdminIdpState>,
+    State(store): State<Arc<IdentityProviderMapperStore>>,
     Path((realm, alias)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    if state.providers.get(&realm, &alias).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"idp_not_found"}))).into_response();
-    }
-    let list = state.mappers.list(&realm, &alias).await;
-    (StatusCode::OK, Json(serde_json::to_value(list).unwrap())).into_response()
+    (StatusCode::OK, Json(store.list(&realm, &alias)))
 }
 
+/// `POST /admin/realms/{realm}/identity-provider/instances/{alias}/mappers`
 pub async fn create_mapper(
-    State(state): State<AdminIdpState>,
+    State(store): State<Arc<IdentityProviderMapperStore>>,
     Path((realm, alias)): Path<(String, String)>,
-    Json(req): Json<CreateMapperRequest>,
+    Json(m): Json<IdentityProviderMapper>,
 ) -> impl IntoResponse {
-    if state.providers.get(&realm, &alias).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"idp_not_found"}))).into_response();
+    if m.name.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "mapper name is required" })),
+        )
+            .into_response();
     }
-    let mapper = IdentityProviderMapper {
-        id: Uuid::new_v4().to_string(),
-        name: req.name,
-        identity_provider_mapper: req.identity_provider_mapper,
-        config: req.config,
-    };
-    match state.mappers.create(&realm, &alias, mapper).await {
-        Ok(m) => (StatusCode::CREATED, Json(serde_json::to_value(m).unwrap())).into_response(),
-        Err(_) => (StatusCode::CONFLICT, Json(serde_json::json!({"error":"conflict"}))).into_response(),
-    }
+    let id = store.create(&realm, &alias, m);
+    let location =
+        format!("/admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}");
+    (
+        StatusCode::CREATED,
+        [(axum::http::header::LOCATION, location)],
+        Json(json!({ "id": id })),
+    )
+        .into_response()
 }
 
+/// `GET /admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}`
 pub async fn get_mapper(
-    State(state): State<AdminIdpState>,
+    State(store): State<Arc<IdentityProviderMapperStore>>,
     Path((realm, alias, id)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
-    match state.mappers.get(&realm, &alias, &id).await {
-        Some(m) => (StatusCode::OK, Json(serde_json::to_value(m).unwrap())).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
+    match store.get(&realm, &alias, &id) {
+        Some(m) => (StatusCode::OK, Json(m)).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "mapper not found", "id": id })),
+        )
+            .into_response(),
     }
 }
 
+/// `PUT /admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}`
+pub async fn update_mapper(
+    State(store): State<Arc<IdentityProviderMapperStore>>,
+    Path((realm, alias, id)): Path<(String, String, String)>,
+    Json(m): Json<IdentityProviderMapper>,
+) -> impl IntoResponse {
+    if store.update(&realm, &alias, &id, m) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "mapper not found", "id": id })),
+        )
+            .into_response()
+    }
+}
+
+/// `DELETE /admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}`
 pub async fn delete_mapper(
-    State(state): State<AdminIdpState>,
+    State(store): State<Arc<IdentityProviderMapperStore>>,
     Path((realm, alias, id)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
-    match state.mappers.delete(&realm, &alias, &id).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
+    if store.delete(&realm, &alias, &id) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "mapper not found", "id": id })),
+        )
+            .into_response()
     }
-}
-
-pub fn router(state: AdminIdpState) -> Router {
-    Router::new()
-        .route(
-            "/admin/realms/{realm}/identity-provider/instances/{alias}/mappers",
-            get(list_mappers).post(create_mapper),
-        )
-        .route(
-            "/admin/realms/{realm}/identity-provider/instances/{alias}/mappers/{id}",
-            get(get_mapper).delete(delete_mapper),
-        )
-        .with_state(state)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admin_idp::instances::IdentityProvider;
-    use crate::keycloak::realm::{RealmRequest, RealmStore};
-    use axum::{body::Body, http::Request};
-    use chrono::Utc;
-    use tower::ServiceExt;
 
-    async fn setup() -> (Router, AdminIdpState) {
-        let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "r".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
-        let state = AdminIdpState::new(realms);
-        state.providers.create("r", IdentityProvider {
-            alias: "github".into(), display_name: None, provider_id: "github".into(),
-            enabled: true, config: Default::default(), created_at: Utc::now(),
-        }).await.unwrap();
-        let app = router(state.clone());
-        (app, state)
+    fn mapper(name: &str) -> IdentityProviderMapper {
+        IdentityProviderMapper {
+            id: None,
+            name: name.into(),
+            identity_provider_mapper: "oidc-user-attribute-idp-mapper".into(),
+            identity_provider_alias: None,
+            config: Map::new(),
+        }
     }
 
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:listMappersOnFreshInstance
-    #[tokio::test]
-    async fn list_mappers_empty() {
-        let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/identity-provider/instances/github/mappers").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
+    #[test]
+    fn create_assigns_uuid_and_alias() {
+        let s = IdentityProviderMapperStore::new();
+        let id = s.create("master", "google", mapper("email-mapper"));
+        let got = s.get("master", "google", &id).unwrap();
+        assert_eq!(got.identity_provider_alias.as_deref(), Some("google"));
+        assert_eq!(got.id.as_deref(), Some(id.as_str()));
     }
 
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:createMapperReturnsCreated
-    #[tokio::test]
-    async fn create_mapper_returns_created() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"name":"email-attr","identity_provider_mapper":"oidc-user-attribute-idp-mapper","config":{}});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances/github/mappers")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:createMapperUnknownIdp404
-    #[tokio::test]
-    async fn create_mapper_unknown_idp_404() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"name":"x","identity_provider_mapper":"oidc-user-attribute-idp-mapper"});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances/ghost/mappers")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:deleteMapperFlow
-    #[tokio::test]
-    async fn create_then_delete_mapper() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"name":"role-map","identity_provider_mapper":"oidc-role-idp-mapper"});
-        let create = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances/github/mappers")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        let bytes = axum::body::to_bytes(create.into_body(), usize::MAX).await.unwrap();
-        let m: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        let id = m["id"].as_str().unwrap();
-        let uri = format!("/admin/realms/r/identity-provider/instances/github/mappers/{}", id);
-        let resp = app.oneshot(Request::builder().method("DELETE").uri(&uri).body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    #[test]
+    fn isolation_by_realm_and_alias() {
+        let s = IdentityProviderMapperStore::new();
+        s.create("r1", "google", mapper("m1"));
+        s.create("r1", "github", mapper("m1"));
+        s.create("r2", "google", mapper("m1"));
+        assert_eq!(s.list("r1", "google").len(), 1);
+        assert_eq!(s.list("r1", "github").len(), 1);
+        assert_eq!(s.list("r2", "google").len(), 1);
+        assert_eq!(s.list("r2", "github").len(), 0);
     }
 }

@@ -110,6 +110,133 @@ pub fn verify_signature(
     Ok(())
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Unified algorithm dispatch — RSA-SHA256 + ECDSA-SHA{256,384,512}.
+// XMLDSig `<ds:SignatureMethod Algorithm="…">` URN selects which
+// crypto routine fires; the key type is encoded out-of-band on
+// [`SigningMaterial`] / [`VerifyingMaterial`].
+// ─────────────────────────────────────────────────────────────────
+
+use super::signing_ecdsa::{
+    self, EcdsaSigningKey, EcdsaVerifyingKey, HashAlg as EcdsaHashAlg, ALG_ECDSA_SHA256,
+    ALG_ECDSA_SHA384, ALG_ECDSA_SHA512,
+};
+
+/// One of the four XMLDSig signature methods cave-auth's SAML
+/// stack supports for both signing and verification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Algorithm {
+    /// `xmldsig-more#rsa-sha256`. Baseline; Phase A1.
+    RsaSha256,
+    /// `xmldsig-more#ecdsa-sha256`. ECDSA over any curve.
+    EcdsaSha256,
+    /// `xmldsig-more#ecdsa-sha384`.
+    EcdsaSha384,
+    /// `xmldsig-more#ecdsa-sha512`.
+    EcdsaSha512,
+}
+
+impl Algorithm {
+    /// XMLDSig URN this algorithm advertises as
+    /// `<ds:SignatureMethod Algorithm="…">`.
+    pub fn xmldsig_alg(self) -> &'static str {
+        match self {
+            Algorithm::RsaSha256 => ALG_RSA_SHA256,
+            Algorithm::EcdsaSha256 => ALG_ECDSA_SHA256,
+            Algorithm::EcdsaSha384 => ALG_ECDSA_SHA384,
+            Algorithm::EcdsaSha512 => ALG_ECDSA_SHA512,
+        }
+    }
+
+    /// Inverse of [`xmldsig_alg`] — returns `None` for unknown URNs
+    /// so callers can surface "unsupported algorithm" cleanly.
+    pub fn from_xmldsig_alg(urn: &str) -> Option<Self> {
+        match urn {
+            ALG_RSA_SHA256 => Some(Algorithm::RsaSha256),
+            ALG_ECDSA_SHA256 => Some(Algorithm::EcdsaSha256),
+            ALG_ECDSA_SHA384 => Some(Algorithm::EcdsaSha384),
+            ALG_ECDSA_SHA512 => Some(Algorithm::EcdsaSha512),
+            _ => None,
+        }
+    }
+}
+
+/// Signing-side key material. RSA carries PKCS#8 DER bytes (existing
+/// contract). ECDSA carries a typed [`EcdsaSigningKey`].
+pub enum SigningMaterial<'a> {
+    Rsa { pkcs8_der: &'a [u8] },
+    Ecdsa { key: &'a EcdsaSigningKey },
+}
+
+/// Verification-side key material — symmetric to [`SigningMaterial`].
+pub enum VerifyingMaterial<'a> {
+    Rsa { rsa_pub_der: &'a [u8] },
+    Ecdsa { key: &'a EcdsaVerifyingKey },
+}
+
+/// Top-level XMLDSig sign. Selects the underlying routine by `alg`
+/// and (for ECDSA) the curve carried on `key`.
+///
+/// The RED placeholder rejects every ECDSA variant; GREEN dispatches
+/// to [`signing_ecdsa::sign_xml_canonical`].
+pub fn sign(
+    doc: &SignedDocument<'_>,
+    alg: Algorithm,
+    key: &SigningMaterial<'_>,
+) -> Result<String, SamlError> {
+    match (alg, key) {
+        (Algorithm::RsaSha256, SigningMaterial::Rsa { pkcs8_der }) => {
+            sign_rsa_sha256(doc, pkcs8_der)
+        }
+        (Algorithm::EcdsaSha256, SigningMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::sign_xml_canonical(&canon, key, EcdsaHashAlg::Sha256)
+        }
+        (Algorithm::EcdsaSha384, SigningMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::sign_xml_canonical(&canon, key, EcdsaHashAlg::Sha384)
+        }
+        (Algorithm::EcdsaSha512, SigningMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::sign_xml_canonical(&canon, key, EcdsaHashAlg::Sha512)
+        }
+        _ => Err(SamlError::InvalidSignature(format!(
+            "algorithm/key mismatch: {:?}",
+            alg
+        ))),
+    }
+}
+
+/// Top-level XMLDSig verify.
+pub fn verify(
+    doc: &SignedDocument<'_>,
+    alg: Algorithm,
+    signature_b64: &str,
+    key: &VerifyingMaterial<'_>,
+) -> Result<(), SamlError> {
+    match (alg, key) {
+        (Algorithm::RsaSha256, VerifyingMaterial::Rsa { rsa_pub_der }) => {
+            verify_signature(doc, signature_b64, rsa_pub_der)
+        }
+        (Algorithm::EcdsaSha256, VerifyingMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::verify_xml_canonical(&canon, signature_b64, key, EcdsaHashAlg::Sha256)
+        }
+        (Algorithm::EcdsaSha384, VerifyingMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::verify_xml_canonical(&canon, signature_b64, key, EcdsaHashAlg::Sha384)
+        }
+        (Algorithm::EcdsaSha512, VerifyingMaterial::Ecdsa { key }) => {
+            let canon = doc.canonical_bytes()?;
+            signing_ecdsa::verify_xml_canonical(&canon, signature_b64, key, EcdsaHashAlg::Sha512)
+        }
+        _ => Err(SamlError::InvalidSignature(format!(
+            "algorithm/key mismatch: {:?}",
+            alg
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,5 +313,126 @@ mod tests {
             canonicalize_fn: Some(upper),
         };
         verify_signature(&doc_canon, &sig, &pubk).unwrap();
+    }
+
+    // ─── Algorithm dispatch tests (unified RSA + ECDSA top-level) ───
+
+    use super::super::signing_ecdsa::{generate_keypair, EcdsaCurve};
+
+    #[test]
+    fn algorithm_xmldsig_alg_urns_round_trip() {
+        for a in [
+            Algorithm::RsaSha256,
+            Algorithm::EcdsaSha256,
+            Algorithm::EcdsaSha384,
+            Algorithm::EcdsaSha512,
+        ] {
+            assert_eq!(Algorithm::from_xmldsig_alg(a.xmldsig_alg()), Some(a));
+        }
+        assert_eq!(Algorithm::from_xmldsig_alg("urn:other"), None);
+    }
+
+    #[test]
+    fn dispatch_signs_and_verifies_rsa_sha256() {
+        let key_der = test_keypair_pkcs8_der();
+        let pub_der = test_public_key_der();
+        let doc = SignedDocument::new(b"<saml:Assertion>dispatch rsa</saml:Assertion>");
+        let sig = sign(
+            &doc,
+            Algorithm::RsaSha256,
+            &SigningMaterial::Rsa { pkcs8_der: &key_der },
+        )
+        .unwrap();
+        verify(
+            &doc,
+            Algorithm::RsaSha256,
+            &sig,
+            &VerifyingMaterial::Rsa { rsa_pub_der: &pub_der },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn dispatch_signs_and_verifies_ecdsa_p256_sha256() {
+        let kp = generate_keypair(EcdsaCurve::P256);
+        let doc = SignedDocument::new(b"<saml:Assertion>dispatch p256</saml:Assertion>");
+        let sig = sign(
+            &doc,
+            Algorithm::EcdsaSha256,
+            &SigningMaterial::Ecdsa { key: &kp.signing },
+        )
+        .unwrap();
+        verify(
+            &doc,
+            Algorithm::EcdsaSha256,
+            &sig,
+            &VerifyingMaterial::Ecdsa { key: &kp.verifying },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn dispatch_signs_and_verifies_ecdsa_p384_sha384() {
+        let kp = generate_keypair(EcdsaCurve::P384);
+        let doc = SignedDocument::new(b"<saml:Assertion>dispatch p384</saml:Assertion>");
+        let sig = sign(
+            &doc,
+            Algorithm::EcdsaSha384,
+            &SigningMaterial::Ecdsa { key: &kp.signing },
+        )
+        .unwrap();
+        verify(
+            &doc,
+            Algorithm::EcdsaSha384,
+            &sig,
+            &VerifyingMaterial::Ecdsa { key: &kp.verifying },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn dispatch_signs_and_verifies_ecdsa_p521_sha512() {
+        let kp = generate_keypair(EcdsaCurve::P521);
+        let doc = SignedDocument::new(b"<saml:Assertion>dispatch p521</saml:Assertion>");
+        let sig = sign(
+            &doc,
+            Algorithm::EcdsaSha512,
+            &SigningMaterial::Ecdsa { key: &kp.signing },
+        )
+        .unwrap();
+        verify(
+            &doc,
+            Algorithm::EcdsaSha512,
+            &sig,
+            &VerifyingMaterial::Ecdsa { key: &kp.verifying },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn dispatch_rejects_alg_key_mismatch_rsa_with_ecdsa_key() {
+        let kp = generate_keypair(EcdsaCurve::P256);
+        let doc = SignedDocument::new(b"x");
+        // RsaSha256 + Ecdsa key → must surface a typed error.
+        let err = sign(
+            &doc,
+            Algorithm::RsaSha256,
+            &SigningMaterial::Ecdsa { key: &kp.signing },
+        )
+        .unwrap_err();
+        assert!(matches!(err, SamlError::InvalidSignature(_)));
+    }
+
+    #[test]
+    fn dispatch_rejects_alg_key_mismatch_ecdsa_with_rsa_key() {
+        let key_der = test_keypair_pkcs8_der();
+        let doc = SignedDocument::new(b"x");
+        let err = sign(
+            &doc,
+            Algorithm::EcdsaSha256,
+            &SigningMaterial::Rsa { pkcs8_der: &key_der },
+        )
+        .unwrap_err();
+        assert!(matches!(err, SamlError::InvalidSignature(_)));
     }
 }

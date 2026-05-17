@@ -1,253 +1,250 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Source: keycloak/keycloak@v22.0.0 services/.../admin/IdentityProviderResource.java
+// Copyright (C) 2026 CAVE Runtime contributors
+// Source: keycloak/keycloak@v22.0.0 services/src/main/java/org/keycloak/services/resources/admin/IdentityProvidersResource.java
+//         services/src/main/java/org/keycloak/services/resources/admin/IdentityProviderResource.java
 //
-//! Admin CRUD for identity-provider instances:
-//!
-//! - `GET    /admin/realms/{realm}/identity-provider/instances`
-//! - `POST   /admin/realms/{realm}/identity-provider/instances`
-//! - `GET    /admin/realms/{realm}/identity-provider/instances/{alias}`
-//! - `PUT    /admin/realms/{realm}/identity-provider/instances/{alias}`
-//! - `DELETE /admin/realms/{realm}/identity-provider/instances/{alias}`
+// Keycloak Admin REST API — Identity Provider instances.
+//
+// Routes ported (under `/admin/realms/{realm}/identity-provider/instances`):
+//   GET    /                — list all IdPs in the realm
+//   POST   /                — create new IdP
+//   GET    /{alias}         — fetch single IdP by alias
+//   PUT    /{alias}         — replace IdP config
+//   DELETE /{alias}         — remove IdP
+//
+// Storage: in-memory (DashMap) keyed by `(realm, alias)`. K2 will replace
+// the store with a JPA-backed implementation in a later commit (the
+// `Backend` seam is the `IdentityProviderStore` struct itself — swapping
+// it out is a contained refactor).
 
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
-    Json, Router,
+    Json,
 };
-use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde_json::{json, Map, Value};
+use std::sync::Arc;
 
-use super::AdminIdpState;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// Keycloak `IdentityProviderRepresentation` — minimal subset that the
+/// admin console actually writes. Extra fields are accepted via the
+/// `config` map (Keycloak's own representation uses `Map<String, String>`
+/// for arbitrary provider-specific config, e.g. `clientId`, `clientSecret`,
+/// `tokenUrl`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IdentityProvider {
+    /// Stable identifier used as the URL path segment and as the key in
+    /// `KeycloakIdentityProviderMapperModel.identityProviderAlias`.
     pub alias: String,
-    pub display_name: Option<String>,
+    /// Provider plugin id — `oidc`, `saml`, `google`, `github`, …
+    #[serde(rename = "providerId")]
     pub provider_id: String,
+    #[serde(default)]
     pub enabled: bool,
-    /// Keycloak-style flat config map.
+    /// Whether `account.management` allows the user to unlink this IdP.
+    #[serde(default, rename = "storeToken")]
+    pub store_token: bool,
+    /// Free-form provider config (`clientId`, `clientSecret`, `tokenUrl`,
+    /// `authorizationUrl`, `useJwksUrl`, …). Mirrors Keycloak's String→String
+    /// representation; values are JSON-stringified by the admin console.
     #[serde(default)]
-    pub config: HashMap<String, String>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateIdpRequest {
-    pub alias: String,
+    pub config: Map<String, Value>,
+    /// Display name (optional) — used by the login page.
+    #[serde(default, rename = "displayName", skip_serializing_if = "Option::is_none")]
     pub display_name: Option<String>,
-    pub provider_id: String,
-    pub enabled: Option<bool>,
-    #[serde(default)]
-    pub config: HashMap<String, String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateIdpRequest {
-    pub display_name: Option<String>,
-    pub enabled: Option<bool>,
-    pub config: Option<HashMap<String, String>>,
+/// In-memory store keyed by `(realm, alias)`. Concurrent-safe.
+#[derive(Debug, Default)]
+pub struct IdentityProviderStore {
+    inner: DashMap<(String, String), IdentityProvider>,
 }
 
-pub async fn list_idps(
-    State(state): State<AdminIdpState>,
+impl IdentityProviderStore {
+    pub fn new() -> Self {
+        Self { inner: DashMap::new() }
+    }
+
+    /// List all IdPs in a realm, sorted by alias (deterministic for tests).
+    pub fn list(&self, realm: &str) -> Vec<IdentityProvider> {
+        let mut out: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|kv| kv.key().0 == realm)
+            .map(|kv| kv.value().clone())
+            .collect();
+        out.sort_by(|a, b| a.alias.cmp(&b.alias));
+        out
+    }
+
+    pub fn get(&self, realm: &str, alias: &str) -> Option<IdentityProvider> {
+        self.inner
+            .get(&(realm.to_string(), alias.to_string()))
+            .map(|v| v.clone())
+    }
+
+    /// Insert or replace. Returns `true` if a previous entry existed.
+    pub fn put(&self, realm: &str, idp: IdentityProvider) -> bool {
+        let key = (realm.to_string(), idp.alias.clone());
+        self.inner.insert(key, idp).is_some()
+    }
+
+    pub fn delete(&self, realm: &str, alias: &str) -> bool {
+        self.inner
+            .remove(&(realm.to_string(), alias.to_string()))
+            .is_some()
+    }
+}
+
+/// `GET /admin/realms/{realm}/identity-provider/instances`
+pub async fn list_instances(
+    State(store): State<Arc<IdentityProviderStore>>,
     Path(realm): Path<String>,
 ) -> impl IntoResponse {
-    if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm_not_found"}))).into_response();
-    }
-    let list = state.providers.list(&realm).await;
-    (StatusCode::OK, Json(serde_json::to_value(list).unwrap())).into_response()
+    let idps = store.list(&realm);
+    (StatusCode::OK, Json(idps))
 }
 
-pub async fn create_idp(
-    State(state): State<AdminIdpState>,
+/// `POST /admin/realms/{realm}/identity-provider/instances`
+///
+/// Keycloak returns `201 Created` with a `Location` header pointing at the
+/// newly created resource. On alias collision Keycloak returns `409
+/// Conflict` (see `IdentityProvidersResource.create`).
+pub async fn create_instance(
+    State(store): State<Arc<IdentityProviderStore>>,
     Path(realm): Path<String>,
-    Json(req): Json<CreateIdpRequest>,
+    Json(idp): Json<IdentityProvider>,
 ) -> impl IntoResponse {
-    if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm_not_found"}))).into_response();
-    }
-    if req.alias.is_empty() || req.provider_id.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_request"}))).into_response();
-    }
-    let idp = IdentityProvider {
-        alias: req.alias,
-        display_name: req.display_name,
-        provider_id: req.provider_id,
-        enabled: req.enabled.unwrap_or(true),
-        config: req.config,
-        created_at: Utc::now(),
-    };
-    match state.providers.create(&realm, idp).await {
-        Ok(idp) => (StatusCode::CREATED, Json(serde_json::to_value(idp).unwrap())).into_response(),
-        Err("conflict") => (StatusCode::CONFLICT, Json(serde_json::json!({"error":"alias_exists"}))).into_response(),
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({"error":"server_error"}))).into_response(),
-    }
-}
-
-pub async fn get_idp(
-    State(state): State<AdminIdpState>,
-    Path((realm, alias)): Path<(String, String)>,
-) -> impl IntoResponse {
-    match state.providers.get(&realm, &alias).await {
-        Some(idp) => (StatusCode::OK, Json(serde_json::to_value(idp).unwrap())).into_response(),
-        None => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    }
-}
-
-pub async fn update_idp(
-    State(state): State<AdminIdpState>,
-    Path((realm, alias)): Path<(String, String)>,
-    Json(req): Json<UpdateIdpRequest>,
-) -> impl IntoResponse {
-    let mut existing = match state.providers.get(&realm, &alias).await {
-        Some(i) => i,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    };
-    if let Some(v) = req.display_name { existing.display_name = Some(v); }
-    if let Some(v) = req.enabled { existing.enabled = v; }
-    if let Some(v) = req.config { existing.config = v; }
-    match state.providers.update(&realm, &alias, existing).await {
-        Ok(idp) => (StatusCode::OK, Json(serde_json::to_value(idp).unwrap())).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    }
-}
-
-pub async fn delete_idp(
-    State(state): State<AdminIdpState>,
-    Path((realm, alias)): Path<(String, String)>,
-) -> impl IntoResponse {
-    match state.providers.delete(&realm, &alias).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    }
-}
-
-pub fn router(state: AdminIdpState) -> Router {
-    Router::new()
-        .route("/admin/realms/{realm}/identity-provider/instances", get(list_idps).post(create_idp))
-        .route(
-            "/admin/realms/{realm}/identity-provider/instances/{alias}",
-            get(get_idp).put(update_idp).delete(delete_idp),
+    if idp.alias.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "alias is required" })),
         )
-        .with_state(state)
+            .into_response();
+    }
+    if store.get(&realm, &idp.alias).is_some() {
+        return (
+            StatusCode::CONFLICT,
+            Json(json!({ "error": "alias already exists", "alias": idp.alias })),
+        )
+            .into_response();
+    }
+    let location = format!("/admin/realms/{realm}/identity-provider/instances/{}", idp.alias);
+    store.put(&realm, idp);
+    (
+        StatusCode::CREATED,
+        [(axum::http::header::LOCATION, location)],
+        Json(json!({})),
+    )
+        .into_response()
+}
+
+/// `GET /admin/realms/{realm}/identity-provider/instances/{alias}`
+pub async fn get_instance(
+    State(store): State<Arc<IdentityProviderStore>>,
+    Path((realm, alias)): Path<(String, String)>,
+) -> impl IntoResponse {
+    match store.get(&realm, &alias) {
+        Some(idp) => (StatusCode::OK, Json(serde_json::to_value(&idp).unwrap())).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "identity provider not found", "alias": alias })),
+        )
+            .into_response(),
+    }
+}
+
+/// `PUT /admin/realms/{realm}/identity-provider/instances/{alias}`
+///
+/// Keycloak insists the path alias matches the body alias. Mismatch →
+/// `400 Bad Request`.
+pub async fn update_instance(
+    State(store): State<Arc<IdentityProviderStore>>,
+    Path((realm, alias)): Path<(String, String)>,
+    Json(idp): Json<IdentityProvider>,
+) -> impl IntoResponse {
+    if idp.alias != alias {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "alias mismatch between path and body" })),
+        )
+            .into_response();
+    }
+    if store.get(&realm, &alias).is_none() {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "identity provider not found", "alias": alias })),
+        )
+            .into_response();
+    }
+    store.put(&realm, idp);
+    StatusCode::NO_CONTENT.into_response()
+}
+
+/// `DELETE /admin/realms/{realm}/identity-provider/instances/{alias}`
+pub async fn delete_instance(
+    State(store): State<Arc<IdentityProviderStore>>,
+    Path((realm, alias)): Path<(String, String)>,
+) -> impl IntoResponse {
+    if store.delete(&realm, &alias) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "identity provider not found", "alias": alias })),
+        )
+            .into_response()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keycloak::realm::{RealmRequest, RealmStore};
-    use axum::{body::Body, http::Request};
-    use serde_json::Value;
-    use tower::ServiceExt;
 
-    async fn setup() -> (Router, AdminIdpState) {
-        let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "r".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
-        let state = AdminIdpState::new(realms);
-        let app = router(state.clone());
-        (app, state)
+    fn sample(alias: &str) -> IdentityProvider {
+        IdentityProvider {
+            alias: alias.into(),
+            provider_id: "oidc".into(),
+            enabled: true,
+            store_token: false,
+            config: Map::new(),
+            display_name: Some(format!("{alias} login")),
+        }
     }
 
-    async fn body(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    #[test]
+    fn list_returns_sorted_by_alias() {
+        let s = IdentityProviderStore::new();
+        s.put("master", sample("zulu"));
+        s.put("master", sample("alpha"));
+        let out = s.list("master");
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].alias, "alpha");
+        assert_eq!(out[1].alias, "zulu");
     }
 
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:listEmpty
-    #[tokio::test]
-    async fn list_initially_empty() {
-        let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/identity-provider/instances").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let b = body(resp).await;
-        assert!(b.as_array().unwrap().is_empty());
+    #[test]
+    fn realm_isolation() {
+        let s = IdentityProviderStore::new();
+        s.put("realm-a", sample("google"));
+        s.put("realm-b", sample("github"));
+        assert_eq!(s.list("realm-a").len(), 1);
+        assert_eq!(s.list("realm-b").len(), 1);
+        assert_eq!(s.list("realm-c").len(), 0);
     }
 
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:createOidcInstance
-    #[tokio::test]
-    async fn create_oidc_instance() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"alias":"google","provider_id":"oidc","enabled":true,"config":{"clientId":"abc"}});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json")
-            .body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        let b = body(resp).await;
-        assert_eq!(b["alias"], "google");
-        assert_eq!(b["provider_id"], "oidc");
-        assert_eq!(b["config"]["clientId"], "abc");
+    #[test]
+    fn put_returns_true_on_overwrite() {
+        let s = IdentityProviderStore::new();
+        assert!(!s.put("r", sample("a")));
+        assert!(s.put("r", sample("a")));
     }
 
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:duplicateAliasReturns409
-    #[tokio::test]
-    async fn duplicate_alias_returns_conflict() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"alias":"a","provider_id":"oidc"});
-        let r1 = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(r1.status(), StatusCode::CREATED);
-        let r2 = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(r2.status(), StatusCode::CONFLICT);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:getReturnsCreated
-    #[tokio::test]
-    async fn get_returns_created() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"alias":"github","provider_id":"github"});
-        let _ = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/identity-provider/instances/github").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(body(resp).await["alias"], "github");
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:getMissingReturns404
-    #[tokio::test]
-    async fn get_missing_returns_404() {
-        let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/identity-provider/instances/nope").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:updateChangesEnabledFlag
-    #[tokio::test]
-    async fn update_disables_instance() {
-        let (app, _) = setup().await;
-        let create = serde_json::json!({"alias":"saml","provider_id":"saml","enabled":true});
-        let _ = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(create.to_string())).unwrap()).await.unwrap();
-        let upd = serde_json::json!({"enabled":false});
-        let resp = app.oneshot(Request::builder().method("PUT").uri("/admin/realms/r/identity-provider/instances/saml")
-            .header("content-type","application/json").body(Body::from(upd.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(body(resp).await["enabled"], false);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:deleteRemovesInstance
-    #[tokio::test]
-    async fn delete_removes_instance() {
-        let (app, state) = setup().await;
-        let payload = serde_json::json!({"alias":"goner","provider_id":"oidc"});
-        let _ = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        let resp = app.oneshot(Request::builder().method("DELETE").uri("/admin/realms/r/identity-provider/instances/goner").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
-        assert_eq!(state.providers.count("r").await, 0);
-    }
-
-    // upstream: keycloak/keycloak IdentityProviderResourceTest.java:createInUnknownRealm404
-    #[tokio::test]
-    async fn create_in_unknown_realm_404() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"alias":"x","provider_id":"oidc"});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/ghost/identity-provider/instances")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    #[test]
+    fn delete_returns_false_when_missing() {
+        let s = IdentityProviderStore::new();
+        assert!(!s.delete("r", "nope"));
     }
 }

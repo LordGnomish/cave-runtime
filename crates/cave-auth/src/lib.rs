@@ -24,6 +24,7 @@ pub mod auth_middleware;
 pub mod auth_routes;
 pub mod claims;
 pub mod dpop;
+pub mod email_listener;
 pub mod jwe;
 pub mod jwks;
 pub mod jwt_middleware;
@@ -32,12 +33,15 @@ pub mod keycloak;
 pub mod ldap;
 pub mod middleware;
 pub mod oauth_endpoints;
+pub mod oid4vc;
 pub mod okta;
+pub mod persistence;
 pub mod rbac;
 pub mod saml;
 pub mod token_exchange;
 pub mod tokens;
 pub mod uma;
+pub mod wsfed;
 
 use cave_core::config::AuthProvider;
 

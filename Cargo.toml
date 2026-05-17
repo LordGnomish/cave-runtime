@@ -195,6 +195,9 @@ ring = "0.17"
 ed25519-dalek = "2"
 # ECDSA over NIST P-256 — real signer/verifier for Cosign classical mode.
 p256 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8", "ecdh"] }
+# ECDSA over NIST P-384 / P-521 — XMLDSig ECDSA-SHA384 / ECDSA-SHA512 for SAML 2.0 signing.
+p384 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
+p521 = { version = "0.13", features = ["ecdsa", "pem", "pkcs8"] }
 # HTTP client (for upstream tracking, uptime probes)
 reqwest-middleware = "0.4"
 # Persistence
@@ -225,6 +228,11 @@ zstd = "0.13"
 sled = { version = "0.34", default-features = false }
 hcl-rs = "0.18"
 # === S3 end ===
+# Kerberos keytab parsing — big-endian binary frames per MIT krb5 kt_file.c
+byteorder = "1"
+# Kerberos GSSAPI safe wrapper. Pinned 0.7 — see crates/cave-auth/Cargo.toml comment for
+# platform caveats (Heimdal vs MIT krb5 symbol gaps on macOS).
+libgssapi = "0.7"
 
 [profile.release]
 opt-level = 3

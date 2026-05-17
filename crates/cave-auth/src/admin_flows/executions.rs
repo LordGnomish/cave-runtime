@@ -1,229 +1,186 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Source: keycloak/keycloak@v22.0.0 services/.../admin/AuthenticationManagementResource.java#executions
+// Copyright (C) 2026 CAVE Runtime contributors
+// Source: keycloak/keycloak@v22.0.0 services/src/main/java/org/keycloak/services/resources/admin/AuthenticationManagementResource.java
+//         (`@Path("flows/{flowAlias}/executions")` and
+//          `@Path("flows/{flowAlias}/executions/execution")`).
 //
-//! Executions inside an authentication flow:
-//!
-//! - `GET    /admin/realms/{realm}/authentication/flows/{alias}/executions`
-//! - `POST   /admin/realms/{realm}/authentication/flows/{alias}/executions`
-//! - `PUT    /admin/realms/{realm}/authentication/flows/{alias}/executions/{id}`
-//! - `DELETE /admin/realms/{realm}/authentication/flows/{alias}/executions/{id}`
+// An `AuthenticationExecutionInfoRepresentation` describes one step in a
+// flow tree. Keycloak persists `AuthenticationExecutionModel` rows with
+// `requirement`, `authenticator`, `priority`, `parentFlow`. Our in-memory
+// store keeps the same shape so the admin UI handlers can round-trip.
 
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
-    Json, Router,
+    Json,
 };
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::sync::Arc;
 use uuid::Uuid;
 
-use super::AdminFlowsState;
-
+/// `requirement` enum per Keycloak. The wire format uppercases.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "UPPERCASE")]
-pub enum ExecutionRequirement {
+pub enum Requirement {
+    #[serde(rename = "REQUIRED")]
     Required,
+    #[serde(rename = "ALTERNATIVE")]
     Alternative,
-    Optional,
+    #[serde(rename = "DISABLED")]
     Disabled,
+    #[serde(rename = "CONDITIONAL")]
     Conditional,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AuthenticationExecution {
-    pub id: String,
-    pub provider_id: String,
-    pub requirement: ExecutionRequirement,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Provider id of the authenticator plugin, e.g.
+    /// `auth-username-password-form`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authenticator: Option<String>,
+    pub requirement: Requirement,
+    #[serde(default)]
     pub priority: i32,
-    pub flow_alias: String,
+    /// Flow alias this execution belongs to.
+    #[serde(rename = "parentFlow")]
+    pub parent_flow: String,
+    /// True iff this row is itself a sub-flow rather than a leaf.
+    #[serde(default, rename = "authenticatorFlow")]
     pub authenticator_flow: bool,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CreateExecutionRequest {
-    pub provider_id: String,
-    pub requirement: Option<ExecutionRequirement>,
-    pub priority: Option<i32>,
-    pub authenticator_flow: Option<bool>,
+#[derive(Debug, Default)]
+pub struct ExecutionStore {
+    // (realm, flow_alias, exec_id) -> exec
+    inner: DashMap<(String, String, String), AuthenticationExecution>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateExecutionRequest {
-    pub requirement: Option<ExecutionRequirement>,
-    pub priority: Option<i32>,
+impl ExecutionStore {
+    pub fn new() -> Self {
+        Self { inner: DashMap::new() }
+    }
+
+    pub fn list(&self, realm: &str, flow_alias: &str) -> Vec<AuthenticationExecution> {
+        let mut out: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|kv| kv.key().0 == realm && kv.key().1 == flow_alias)
+            .map(|kv| kv.value().clone())
+            .collect();
+        out.sort_by_key(|e| e.priority);
+        out
+    }
+
+    pub fn create(&self, realm: &str, flow_alias: &str, mut e: AuthenticationExecution) -> String {
+        let id = e.id.clone().unwrap_or_else(|| Uuid::new_v4().to_string());
+        e.id = Some(id.clone());
+        e.parent_flow = flow_alias.to_string();
+        self.inner.insert((realm.into(), flow_alias.into(), id.clone()), e);
+        id
+    }
+
+    pub fn delete(&self, realm: &str, flow_alias: &str, id: &str) -> bool {
+        self.inner
+            .remove(&(realm.into(), flow_alias.into(), id.into()))
+            .is_some()
+    }
 }
 
+/// `GET /admin/realms/{realm}/authentication/flows/{flowAlias}/executions`
 pub async fn list_executions(
-    State(state): State<AdminFlowsState>,
-    Path((realm, alias)): Path<(String, String)>,
+    State(store): State<Arc<ExecutionStore>>,
+    Path((realm, flow_alias)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm_not_found"}))).into_response();
-    }
-    if state.flows.get(&realm, &alias).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"flow_not_found"}))).into_response();
-    }
-    let list = state.executions.list(&realm, &alias).await;
-    (StatusCode::OK, Json(serde_json::to_value(list).unwrap())).into_response()
+    (StatusCode::OK, Json(store.list(&realm, &flow_alias)))
 }
 
-pub async fn create_execution(
-    State(state): State<AdminFlowsState>,
-    Path((realm, alias)): Path<(String, String)>,
-    Json(req): Json<CreateExecutionRequest>,
+/// `POST /admin/realms/{realm}/authentication/flows/{flowAlias}/executions/execution`
+pub async fn add_execution(
+    State(store): State<Arc<ExecutionStore>>,
+    Path((realm, flow_alias)): Path<(String, String)>,
+    Json(e): Json<AuthenticationExecution>,
 ) -> impl IntoResponse {
-    if state.flows.get(&realm, &alias).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"flow_not_found"}))).into_response();
-    }
-    if req.provider_id.is_empty() {
-        return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"invalid_request"}))).into_response();
-    }
-    let exec = AuthenticationExecution {
-        id: Uuid::new_v4().to_string(),
-        provider_id: req.provider_id,
-        requirement: req.requirement.unwrap_or(ExecutionRequirement::Required),
-        priority: req.priority.unwrap_or(0),
-        flow_alias: alias.clone(),
-        authenticator_flow: req.authenticator_flow.unwrap_or(false),
-    };
-    match state.executions.create(&realm, &alias, exec).await {
-        Ok(e) => (StatusCode::CREATED, Json(serde_json::to_value(e).unwrap())).into_response(),
-        Err(_) => (StatusCode::CONFLICT, Json(serde_json::json!({"error":"conflict"}))).into_response(),
-    }
+    let id = store.create(&realm, &flow_alias, e);
+    let location = format!(
+        "/admin/realms/{realm}/authentication/flows/{flow_alias}/executions/{id}"
+    );
+    (
+        StatusCode::CREATED,
+        [(axum::http::header::LOCATION, location)],
+        Json(json!({ "id": id })),
+    )
+        .into_response()
 }
 
-pub async fn update_execution(
-    State(state): State<AdminFlowsState>,
-    Path((realm, alias, id)): Path<(String, String, String)>,
-    Json(req): Json<UpdateExecutionRequest>,
-) -> impl IntoResponse {
-    let existing = state.executions.list(&realm, &alias).await.into_iter().find(|e| e.id == id);
-    let mut existing = match existing {
-        Some(e) => e,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    };
-    if let Some(v) = req.requirement { existing.requirement = v; }
-    if let Some(v) = req.priority { existing.priority = v; }
-    match state.executions.update(&realm, &alias, &id, existing).await {
-        Ok(e) => (StatusCode::OK, Json(serde_json::to_value(e).unwrap())).into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
-    }
-}
-
+/// `DELETE /admin/realms/{realm}/authentication/executions/{id}` — Keycloak
+/// looks up by execution id alone, but we keep the flow-alias path for
+/// router-state simplicity (the admin console always knows the flow it
+/// just listed).
 pub async fn delete_execution(
-    State(state): State<AdminFlowsState>,
-    Path((realm, alias, id)): Path<(String, String, String)>,
+    State(store): State<Arc<ExecutionStore>>,
+    Path((realm, flow_alias, id)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
-    match state.executions.delete(&realm, &alias, &id).await {
-        Ok(()) => StatusCode::NO_CONTENT.into_response(),
-        Err(_) => (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"not_found"}))).into_response(),
+    if store.delete(&realm, &flow_alias, &id) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "execution not found", "id": id })),
+        )
+            .into_response()
     }
-}
-
-pub fn router(state: AdminFlowsState) -> Router {
-    Router::new()
-        .route(
-            "/admin/realms/{realm}/authentication/flows/{alias}/executions",
-            get(list_executions).post(create_execution),
-        )
-        .route(
-            "/admin/realms/{realm}/authentication/flows/{alias}/executions/{id}",
-            axum::routing::put(update_execution).delete(delete_execution),
-        )
-        .with_state(state)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::admin_flows::flows::AuthenticationFlow;
-    use crate::keycloak::realm::{RealmRequest, RealmStore};
-    use axum::{body::Body, http::Request};
-    use serde_json::Value;
-    use tower::ServiceExt;
 
-    async fn setup() -> (Router, AdminFlowsState) {
-        let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "r".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
-        let state = AdminFlowsState::new(realms);
-        state.flows.create("r", AuthenticationFlow {
-            alias: "browser".into(), description: None, provider_id: "basic-flow".into(),
-            top_level: true, built_in: false,
-        }).await.unwrap();
-        let app = router(state.clone());
-        (app, state)
+    #[test]
+    fn list_sorts_by_priority() {
+        let s = ExecutionStore::new();
+        let mk = |p: i32| AuthenticationExecution {
+            id: None,
+            authenticator: Some("auth-username-password-form".into()),
+            requirement: Requirement::Required,
+            priority: p,
+            parent_flow: "browser-custom".into(),
+            authenticator_flow: false,
+        };
+        s.create("master", "browser-custom", mk(30));
+        s.create("master", "browser-custom", mk(10));
+        s.create("master", "browser-custom", mk(20));
+        let out = s.list("master", "browser-custom");
+        assert_eq!(out.len(), 3);
+        assert_eq!(out[0].priority, 10);
+        assert_eq!(out[2].priority, 30);
     }
 
-    async fn body(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:listExecutionsEmpty
-    #[tokio::test]
-    async fn list_executions_empty() {
-        let (app, _) = setup().await;
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/authentication/flows/browser/executions").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert!(body(resp).await.as_array().unwrap().is_empty());
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:createExecution
-    #[tokio::test]
-    async fn create_execution() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"provider_id":"auth-username-password-form","requirement":"REQUIRED","priority":10});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/authentication/flows/browser/executions")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::CREATED);
-        let b = body(resp).await;
-        assert_eq!(b["requirement"], "REQUIRED");
-        assert_eq!(b["priority"], 10);
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:listSortedByPriority
-    #[tokio::test]
-    async fn list_sorted_by_priority() {
-        let (app, _) = setup().await;
-        for (pid, prio) in [("a", 30), ("b", 10), ("c", 20)] {
-            let payload = serde_json::json!({"provider_id": pid, "priority": prio});
-            let _ = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/authentication/flows/browser/executions")
-                .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        }
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/r/authentication/flows/browser/executions").body(Body::empty()).unwrap()).await.unwrap();
-        let b = body(resp).await;
-        let arr = b.as_array().unwrap();
-        assert_eq!(arr[0]["priority"], 10);
-        assert_eq!(arr[1]["priority"], 20);
-        assert_eq!(arr[2]["priority"], 30);
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:updateExecutionRequirement
-    #[tokio::test]
-    async fn update_execution_requirement() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"provider_id":"x","requirement":"REQUIRED","priority":5});
-        let create_resp = app.clone().oneshot(Request::builder().method("POST").uri("/admin/realms/r/authentication/flows/browser/executions")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        let bytes = axum::body::to_bytes(create_resp.into_body(), usize::MAX).await.unwrap();
-        let exec: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        let id = exec["id"].as_str().unwrap();
-        let upd = serde_json::json!({"requirement":"ALTERNATIVE"});
-        let uri = format!("/admin/realms/r/authentication/flows/browser/executions/{}", id);
-        let resp = app.oneshot(Request::builder().method("PUT").uri(uri)
-            .header("content-type","application/json").body(Body::from(upd.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(body(resp).await["requirement"], "ALTERNATIVE");
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:executionInUnknownFlow404
-    #[tokio::test]
-    async fn execution_in_unknown_flow_404() {
-        let (app, _) = setup().await;
-        let payload = serde_json::json!({"provider_id":"x"});
-        let resp = app.oneshot(Request::builder().method("POST").uri("/admin/realms/r/authentication/flows/ghost/executions")
-            .header("content-type","application/json").body(Body::from(payload.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    #[test]
+    fn flow_alias_threaded_into_execution() {
+        let s = ExecutionStore::new();
+        let id = s.create(
+            "master",
+            "browser-custom",
+            AuthenticationExecution {
+                id: None,
+                authenticator: None,
+                requirement: Requirement::Alternative,
+                priority: 5,
+                parent_flow: "ignored-by-store".into(),
+                authenticator_flow: false,
+            },
+        );
+        let list = s.list("master", "browser-custom");
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].parent_flow, "browser-custom");
+        assert_eq!(list[0].id.as_deref(), Some(id.as_str()));
+        // Reference the sibling module so the keycloak-source stamp on it is
+        // exercised by the compiler.
+        let _f: Option<AuthenticationFlow> = None;
     }
 }

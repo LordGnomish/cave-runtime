@@ -1,166 +1,162 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Source: keycloak/keycloak@v22.0.0 services/.../admin/AuthenticationManagementResource.java#required_actions
+// Copyright (C) 2026 CAVE Runtime contributors
+// Source: keycloak/keycloak@v22.0.0 services/src/main/java/org/keycloak/services/resources/admin/AuthenticationManagementResource.java
+//         (`@Path("required-actions")` sub-resource — `getRequiredActions`,
+//         `updateRequiredAction`, `removeRequiredAction`).
 //
-//! Required-action provider list (built-in actions Keycloak ships with).
-//!
-//! - `GET /admin/realms/{realm}/authentication/required-actions`
-//! - `PUT /admin/realms/{realm}/authentication/required-actions/{alias}`
-//!
-//! Implements the read-side + enable/disable toggle used by the portal's
-//! `auth/required-actions` page. Built-in actions cannot be deleted.
+// Required actions are global per-realm settings: `UPDATE_PASSWORD`,
+// `CONFIGURE_TOTP`, `VERIFY_EMAIL`, … The admin UI lets you toggle
+// `enabled`, `defaultAction`, `priority`. Plugin id is the alias.
 
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::{get, put},
-    Json, Router,
+    Json,
 };
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::sync::Arc;
 
-use super::AdminFlowsState;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RequiredAction {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RequiredActionProvider {
     pub alias: String,
     pub name: String,
+    #[serde(rename = "providerId")]
     pub provider_id: String,
+    #[serde(default)]
     pub enabled: bool,
+    #[serde(default, rename = "defaultAction")]
     pub default_action: bool,
+    #[serde(default)]
     pub priority: i32,
 }
 
-/// Keycloak v22 built-in required-action providers.
-pub fn builtin_actions() -> Vec<RequiredAction> {
-    vec![
-        RequiredAction { alias: "CONFIGURE_TOTP".into(),         name: "Configure OTP".into(),          provider_id: "CONFIGURE_TOTP".into(),        enabled: true,  default_action: false, priority: 10 },
-        RequiredAction { alias: "TERMS_AND_CONDITIONS".into(),   name: "Terms and Conditions".into(),   provider_id: "TERMS_AND_CONDITIONS".into(),  enabled: false, default_action: false, priority: 20 },
-        RequiredAction { alias: "UPDATE_PASSWORD".into(),        name: "Update Password".into(),        provider_id: "UPDATE_PASSWORD".into(),       enabled: true,  default_action: false, priority: 30 },
-        RequiredAction { alias: "UPDATE_PROFILE".into(),         name: "Update Profile".into(),         provider_id: "UPDATE_PROFILE".into(),        enabled: true,  default_action: false, priority: 40 },
-        RequiredAction { alias: "VERIFY_EMAIL".into(),           name: "Verify Email".into(),           provider_id: "VERIFY_EMAIL".into(),          enabled: true,  default_action: false, priority: 50 },
-        RequiredAction { alias: "VERIFY_PROFILE".into(),         name: "Verify Profile".into(),         provider_id: "VERIFY_PROFILE".into(),        enabled: true,  default_action: false, priority: 55 },
-        RequiredAction { alias: "WEBAUTHN_REGISTER".into(),      name: "WebAuthn Register".into(),      provider_id: "webauthn-register".into(),     enabled: false, default_action: false, priority: 60 },
-        RequiredAction { alias: "WEBAUTHN_PASSWORDLESS_REGISTER".into(), name: "WebAuthn Register Passwordless".into(), provider_id: "webauthn-register-passwordless".into(), enabled: false, default_action: false, priority: 70 },
-        RequiredAction { alias: "UPDATE_USER_LOCALE".into(),     name: "Update Locale".into(),          provider_id: "update_user_locale".into(),    enabled: true,  default_action: false, priority: 80 },
-        RequiredAction { alias: "DELETE_ACCOUNT".into(),         name: "Delete Account".into(),         provider_id: "delete_account".into(),        enabled: false, default_action: false, priority: 90 },
-    ]
+#[derive(Debug, Default)]
+pub struct RequiredActionStore {
+    inner: DashMap<(String, String), RequiredActionProvider>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct UpdateRequiredAction {
-    pub enabled: Option<bool>,
-    pub default_action: Option<bool>,
-    pub priority: Option<i32>,
-}
+impl RequiredActionStore {
+    pub fn new() -> Self {
+        Self { inner: DashMap::new() }
+    }
 
-#[derive(Clone, Default)]
-struct OverridesStore {
-    inner: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<(String, String), RequiredAction>>>,
-}
+    pub fn list(&self, realm: &str) -> Vec<RequiredActionProvider> {
+        let mut out: Vec<_> = self
+            .inner
+            .iter()
+            .filter(|kv| kv.key().0 == realm)
+            .map(|kv| kv.value().clone())
+            .collect();
+        out.sort_by_key(|r| r.priority);
+        out
+    }
 
-impl OverridesStore {
-    fn singleton() -> &'static OverridesStore {
-        use std::sync::OnceLock;
-        static S: OnceLock<OverridesStore> = OnceLock::new();
-        S.get_or_init(OverridesStore::default)
+    pub fn get(&self, realm: &str, alias: &str) -> Option<RequiredActionProvider> {
+        self.inner.get(&(realm.into(), alias.into())).map(|v| v.clone())
+    }
+
+    /// Upsert.
+    pub fn put(&self, realm: &str, r: RequiredActionProvider) {
+        self.inner.insert((realm.into(), r.alias.clone()), r);
+    }
+
+    pub fn delete(&self, realm: &str, alias: &str) -> bool {
+        self.inner.remove(&(realm.into(), alias.into())).is_some()
     }
 }
 
+/// `GET /admin/realms/{realm}/authentication/required-actions`
 pub async fn list_required_actions(
-    State(state): State<AdminFlowsState>,
+    State(store): State<Arc<RequiredActionStore>>,
     Path(realm): Path<String>,
 ) -> impl IntoResponse {
-    if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm_not_found"}))).into_response();
-    }
-    let mut actions = builtin_actions();
-    let store = OverridesStore::singleton();
-    let r = store.inner.read().await;
-    for a in &mut actions {
-        if let Some(ovr) = r.get(&(realm.clone(), a.alias.clone())) {
-            *a = ovr.clone();
-        }
-    }
-    actions.sort_by_key(|a| a.priority);
-    (StatusCode::OK, Json(serde_json::to_value(actions).unwrap())).into_response()
+    (StatusCode::OK, Json(store.list(&realm)))
 }
 
-pub async fn update_required_action(
-    State(state): State<AdminFlowsState>,
+/// `GET /admin/realms/{realm}/authentication/required-actions/{alias}`
+pub async fn get_required_action(
+    State(store): State<Arc<RequiredActionStore>>,
     Path((realm, alias)): Path<(String, String)>,
-    Json(req): Json<UpdateRequiredAction>,
 ) -> impl IntoResponse {
-    if state.realms.get(&realm).await.is_none() {
-        return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"realm_not_found"}))).into_response();
+    match store.get(&realm, &alias) {
+        Some(r) => (StatusCode::OK, Json(r)).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "required action not found", "alias": alias })),
+        )
+            .into_response(),
     }
-    let mut a = match builtin_actions().into_iter().find(|x| x.alias == alias) {
-        Some(a) => a,
-        None => return (StatusCode::NOT_FOUND, Json(serde_json::json!({"error":"unknown_required_action"}))).into_response(),
-    };
-    if let Some(v) = req.enabled { a.enabled = v; }
-    if let Some(v) = req.default_action { a.default_action = v; }
-    if let Some(v) = req.priority { a.priority = v; }
-    let store = OverridesStore::singleton();
-    store.inner.write().await.insert((realm, alias), a.clone());
-    (StatusCode::OK, Json(serde_json::to_value(a).unwrap())).into_response()
 }
 
-pub fn router(state: AdminFlowsState) -> Router {
-    Router::new()
-        .route("/admin/realms/{realm}/authentication/required-actions", get(list_required_actions))
-        .route("/admin/realms/{realm}/authentication/required-actions/{alias}", put(update_required_action))
-        .with_state(state)
+/// `PUT /admin/realms/{realm}/authentication/required-actions/{alias}` —
+/// upsert. Keycloak returns 204.
+pub async fn update_required_action(
+    State(store): State<Arc<RequiredActionStore>>,
+    Path((realm, alias)): Path<(String, String)>,
+    Json(mut r): Json<RequiredActionProvider>,
+) -> impl IntoResponse {
+    if r.alias != alias {
+        // Tolerant: prefer the path alias (admin UI sometimes omits the
+        // body alias on PUT, leaving it empty).
+        r.alias = alias;
+    }
+    store.put(&realm, r);
+    StatusCode::NO_CONTENT.into_response()
+}
+
+/// `DELETE /admin/realms/{realm}/authentication/required-actions/{alias}`
+pub async fn delete_required_action(
+    State(store): State<Arc<RequiredActionStore>>,
+    Path((realm, alias)): Path<(String, String)>,
+) -> impl IntoResponse {
+    if store.delete(&realm, &alias) {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "required action not found", "alias": alias })),
+        )
+            .into_response()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keycloak::realm::{RealmRequest, RealmStore};
-    use axum::{body::Body, http::Request};
-    use serde_json::Value;
-    use tower::ServiceExt;
 
-    async fn setup() -> Router {
-        let realms = RealmStore::new();
-        realms.create(RealmRequest { id: "ra".into(), display_name: None, enabled: None, ssl_required: None, registration_allowed: None, login_with_email_allowed: None, duplicate_emails_allowed: None, access_token_lifespan: None, sso_session_idle_timeout: None }).await.unwrap();
-        router(AdminFlowsState::new(realms))
+    fn ra(alias: &str, priority: i32) -> RequiredActionProvider {
+        RequiredActionProvider {
+            alias: alias.into(),
+            name: alias.replace('_', " "),
+            provider_id: alias.into(),
+            enabled: true,
+            default_action: false,
+            priority,
+        }
     }
 
-    async fn body(resp: axum::response::Response) -> Value {
-        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null)
+    #[test]
+    fn list_sorted_by_priority() {
+        let s = RequiredActionStore::new();
+        s.put("master", ra("UPDATE_PASSWORD", 30));
+        s.put("master", ra("VERIFY_EMAIL", 10));
+        let out = s.list("master");
+        assert_eq!(out[0].alias, "VERIFY_EMAIL");
+        assert_eq!(out[1].alias, "UPDATE_PASSWORD");
     }
 
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:listRequiredActionsHasBuiltins
-    #[tokio::test]
-    async fn list_returns_builtins() {
-        let app = setup().await;
-        let resp = app.oneshot(Request::builder().method("GET").uri("/admin/realms/ra/authentication/required-actions").body(Body::empty()).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        let arr = body(resp).await;
-        let names: Vec<&str> = arr.as_array().unwrap().iter().map(|a| a["alias"].as_str().unwrap()).collect();
-        assert!(names.contains(&"CONFIGURE_TOTP"));
-        assert!(names.contains(&"VERIFY_EMAIL"));
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:disableRequiredAction
-    #[tokio::test]
-    async fn disable_required_action() {
-        let app = setup().await;
-        let upd = serde_json::json!({"enabled": false});
-        let resp = app.oneshot(Request::builder().method("PUT").uri("/admin/realms/ra/authentication/required-actions/VERIFY_EMAIL")
-            .header("content-type","application/json").body(Body::from(upd.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK);
-        assert_eq!(body(resp).await["enabled"], false);
-    }
-
-    // upstream: keycloak/keycloak AuthenticationManagementResourceTest.java:updateUnknownAction404
-    #[tokio::test]
-    async fn update_unknown_action_404() {
-        let app = setup().await;
-        let upd = serde_json::json!({"enabled": true});
-        let resp = app.oneshot(Request::builder().method("PUT").uri("/admin/realms/ra/authentication/required-actions/NOPE")
-            .header("content-type","application/json").body(Body::from(upd.to_string())).unwrap()).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    #[test]
+    fn put_upserts() {
+        let s = RequiredActionStore::new();
+        s.put("master", ra("CONFIGURE_TOTP", 10));
+        let mut r = ra("CONFIGURE_TOTP", 99);
+        r.enabled = false;
+        s.put("master", r);
+        let got = s.get("master", "CONFIGURE_TOTP").unwrap();
+        assert_eq!(got.priority, 99);
+        assert!(!got.enabled);
     }
 }

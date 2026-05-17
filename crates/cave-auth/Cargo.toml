@@ -35,12 +35,16 @@ anyhow = { workspace = true }
 quick-xml = "0.37"
 flate2    = "1.0"
 # Keytab (big-endian binary) parsing — keycloak federation/kerberos port (src/kerberos/)
-byteorder = "1.5"
+byteorder = { workspace = true }
 # WebAuthn / FIDO2 — webauthn4j + Keycloak `webauthn` port (src/webauthn/)
 ciborium      = "0.2"
 coset         = "0.3"
 bitflags      = "2"
 p256          = { workspace = true }
+# ECDSA XML signing — XMLDSig ECDSA-SHA{256,384,512} per RFC 4051 §2.2.3
+# (r||s raw concatenation, NOT DER). Real signers/verifiers for P-384/P-521.
+p384          = { workspace = true }
+p521          = { workspace = true }
 rsa           = "0.9"
 ed25519-dalek = { workspace = true, features = ["rand_core"] }
 sha2          = { workspace = true, features = ["oid"] }
@@ -56,3 +60,37 @@ hkdf    = "0.12"
 # OAuth/OIDC endpoints (oauth_endpoints/): URL-encoding + form deser for /auth + /par + /token
 urlencoding      = "2.1"
 serde_urlencoded = "0.7"
+# SMTP outbox for email_listener — `builder` for messages, `smtp-transport` for real send,
+# `tokio1-rustls-tls` for async TLS, `stub` exposed via cfg(test) for in-memory tests.
+lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "rustls-tls", "tokio1-rustls-tls", "tokio1", "tracing"] }
+# Templating for email_listener
+handlebars = "6"
+# Lock primitives for OID4VC issuer state
+parking_lot = { workspace = true }
+# JPA persistence layer port (src/persistence/) — Keycloak `model/jpa`
+async-trait = { workspace = true }
+rusqlite    = { workspace = true }
+# Kerberos: real libgssapi wiring (MIT krb5 on Linux). Optional — pure-Rust ASN.1
+# paths in `kerberos/gssapi.rs` / `spnego.rs` / `keytab.rs` compile without it.
+#
+# Platform note: libgssapi-sys bindgen targets MIT krb5; macOS ships Heimdal which
+# lacks `gss_localname` / `gss_store_cred` / `gss_wrap_iov` / `gss_unwrap_iov`. The
+# crate does not currently link on macOS — leave the feature off on Darwin and rely
+# on the structural pure-Rust modules. On Linux, install `libgssapi-krb5-2-dev` /
+# `krb5-devel` first. See `kerberos::gssapi_real::PLATFORM_NOTES` for full detail.
+libgssapi = { workspace = true, optional = true }
+# Admin REST stores (Keycloak `IdentityProvidersResource`, `AuthenticationManagementResource`)
+dashmap   = { workspace = true }
+
+[features]
+# `kerberos-gssapi` is opt-in (not default). Even on Linux it requires the system
+# `libgssapi-krb5-2` package; we keep CI honest by not assuming it.
+default = []
+# Wire `kerberos::gssapi_real` to the system GSSAPI implementation.
+kerberos-gssapi = ["dep:libgssapi"]
+# Live-KDC integration tests — require KRB5_CONFIG + a reachable KDC.
+# OFF by default; turn on locally with `--features kerberos-integration-tests`.
+kerberos-integration-tests = ["kerberos-gssapi"]
+
+[dev-dependencies]
+urlencoding = "2"
