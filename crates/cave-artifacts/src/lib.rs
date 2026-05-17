@@ -17,8 +17,10 @@
 //! - [`ArtifactsState`] — combined module state graph
 //! - [`router`]         — combined axum Router merging all sub-modules
 
+pub mod core;
 pub mod cosign;
 pub mod harbor;
+pub mod integrations;
 pub mod nexus;
 pub mod pulp;
 
