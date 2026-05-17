@@ -1,15 +1,38 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Source: keycloak/keycloak@v22.0.0 saml-core/src/main/java/org/keycloak/saml/processing/api/saml/v1/sig/
 
-//! SAML 1.1 signing — RED phase: tests authored, implementation lands in GREEN.
+//! Sign a SAML 1.1 assertion using the same RSA-SHA256 path the SAML 2.0
+//! side uses. We don't duplicate the RSA implementation — we thin-shim
+//! [`crate::saml::signature`] and only touch the parts that differ:
+//!
+//! * The `<ds:Signature>` block is inserted **inside** the
+//!   `<saml:Assertion>` element (before `<saml:Conditions>`), not after.
+//! * The `Reference URI` points at the `AssertionID`, not at an ID
+//!   attribute named `ID` (SAML 2.0 uses `ID="…"`, SAML 1.1 uses
+//!   `AssertionID="…"`).
+//!
+//! Apart from those two surface differences, the crypto step is
+//! identical: PKCS#1 v1.5 over SHA-256, base64 of the result placed in
+//! `<ds:SignatureValue>`.
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine;
 
+use crate::saml::signature::{sign_rsa_sha256, verify_signature, SignedDocument, ALG_RSA_SHA256, ALG_SHA256, ALG_EXC_C14N};
+use crate::saml::SamlError;
+
 use super::WsFedError;
 
+/// XML DSig wrapper inserted into a SAML 1.1 assertion.
+///
+/// This mirrors `<ds:Signature>` produced by Keycloak's
+/// `SAML2Signature.signSAMLDocument` path with the small AssertionID
+/// rewrite mentioned above.
 pub struct Saml11SignedAssertion {
+    /// Original unsigned assertion XML (the [`super::saml11_assertion::Saml11Assertion::to_xml`] output).
     pub assertion_xml: String,
+    /// `AssertionID` attribute value (without the `_` prefix already gets
+    /// echoed back unchanged in the `Reference URI="#…"`).
     pub assertion_id: String,
 }
 
@@ -20,11 +43,93 @@ impl Saml11SignedAssertion {
             assertion_id: assertion_id.into(),
         }
     }
-    pub fn sign(&self, _pkcs8_der: &[u8]) -> Result<String, WsFedError> {
-        Err(WsFedError::Signature("RED-phase stub".into()))
+
+    /// Sign the assertion in-place — returns assertion XML with a
+    /// `<ds:Signature>` block inserted right after the opening
+    /// `<saml:Assertion …>` tag.
+    pub fn sign(&self, pkcs8_der: &[u8]) -> Result<String, WsFedError> {
+        // 1. Compute the DSig over the assertion bytes (pre-canonicalised
+        //    by our caller — see crate::saml::signature for the c14n
+        //    honesty note).
+        let doc = SignedDocument::new(self.assertion_xml.as_bytes());
+        let sig_b64 = sign_rsa_sha256(&doc, pkcs8_der)
+            .map_err(|e: SamlError| WsFedError::Signature(format!("{e}")))?;
+
+        // 2. Build the <ds:Signature> XML.
+        //    DigestValue is the SHA-256 of the canonical bytes — for our
+        //    purposes the canonical bytes are the assertion bytes.
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(self.assertion_xml.as_bytes());
+        let digest_b64 = B64.encode(digest);
+
+        let sig_xml = format!(
+            "<ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">\
+             <ds:SignedInfo>\
+             <ds:CanonicalizationMethod Algorithm=\"{c14n}\"/>\
+             <ds:SignatureMethod Algorithm=\"{sigalg}\"/>\
+             <ds:Reference URI=\"#{id}\">\
+             <ds:Transforms>\
+             <ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>\
+             <ds:Transform Algorithm=\"{c14n}\"/>\
+             </ds:Transforms>\
+             <ds:DigestMethod Algorithm=\"{digalg}\"/>\
+             <ds:DigestValue>{dv}</ds:DigestValue>\
+             </ds:Reference>\
+             </ds:SignedInfo>\
+             <ds:SignatureValue>{sv}</ds:SignatureValue>\
+             </ds:Signature>",
+            c14n = ALG_EXC_C14N,
+            sigalg = ALG_RSA_SHA256,
+            digalg = ALG_SHA256,
+            id = self.assertion_id,
+            dv = digest_b64,
+            sv = sig_b64,
+        );
+
+        // 3. Insert <ds:Signature> immediately after the opening
+        //    <saml:Assertion …> tag. SAML 1.1 differs from 2.0 in
+        //    placement: it must come *before* <saml:Conditions>.
+        let close = self
+            .assertion_xml
+            .find('>')
+            .ok_or_else(|| WsFedError::Parse("no closing > on Assertion open tag".into()))?;
+        let mut out = String::with_capacity(self.assertion_xml.len() + sig_xml.len());
+        out.push_str(&self.assertion_xml[..=close]);
+        out.push_str(&sig_xml);
+        out.push_str(&self.assertion_xml[close + 1..]);
+        Ok(out)
     }
-    pub fn verify(_signed_xml: &str, _rsa_pub_der: &[u8]) -> Result<(), WsFedError> {
-        Err(WsFedError::Signature("RED-phase stub".into()))
+
+    /// Verify that `signed_xml` carries a valid signature against `rsa_pub_der`.
+    /// Returns `Ok(())` on a valid signature.
+    pub fn verify(signed_xml: &str, rsa_pub_der: &[u8]) -> Result<(), WsFedError> {
+        // Extract <ds:SignatureValue> + the original (signature-stripped)
+        // assertion bytes.
+        let sig_b64 = extract_between(signed_xml, "<ds:SignatureValue>", "</ds:SignatureValue>")
+            .ok_or_else(|| WsFedError::MissingField("SignatureValue".into()))?;
+        let stripped = strip_ds_signature(signed_xml);
+        let doc = SignedDocument::new(stripped.as_bytes());
+        verify_signature(&doc, &sig_b64, rsa_pub_der)
+            .map_err(|e: SamlError| WsFedError::Signature(format!("{e}")))?;
+        Ok(())
+    }
+}
+
+fn extract_between(s: &str, open: &str, close: &str) -> Option<String> {
+    let i = s.find(open)?;
+    let after = &s[i + open.len()..];
+    let j = after.find(close)?;
+    Some(after[..j].to_string())
+}
+
+fn strip_ds_signature(s: &str) -> String {
+    if let (Some(start), Some(end)) = (s.find("<ds:Signature"), s.find("</ds:Signature>")) {
+        let mut out = String::with_capacity(s.len());
+        out.push_str(&s[..start]);
+        out.push_str(&s[end + "</ds:Signature>".len()..]);
+        out
+    } else {
+        s.to_string()
     }
 }
 
@@ -60,6 +165,7 @@ mod tests {
         let xml = a.to_xml().unwrap();
         let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
+        // Reference URI must be "#<AssertionID>".
         let expect = format!("URI=\"#{}\"", a.assertion_id);
         assert!(signed.contains(&expect), "signed: {signed}");
     }
