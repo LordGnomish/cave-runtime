@@ -4,7 +4,7 @@ The official command-line interface for the cave-runtime sovereign Cloud OS, pro
 
 ## Status
 
-This crate is currently in a pre-open-source-launch phase. Feature parity with the broader cave-runtime ecosystem is actively tracked and verified against the ADR-RUNTIME-CLI-CONSOLIDATION-001 specification to ensure consistency across all interaction surfaces.
+This crate is currently in a pre-open-source-launch phase. Feature parity with the broader cave-runtime ecosystem is actively tracked and verified against the ADR-009 (`docs/adr/ADR-009-cavectl-cli-consolidation.md`) specification to ensure consistency across all interaction surfaces.
 
 ## Upstream
 

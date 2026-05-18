@@ -4,11 +4,13 @@ Thank you for considering a contribution. Cave Runtime is a platform-grade, line
 
 ## The non-negotiables
 
-Read these three ADRs before opening a PR:
+Read these foundational ADRs before opening a PR:
 
-1. [ADR-CHARTER-001](docs/adr/ADR-CHARTER-001.md) — the mission.
-2. [ADR-GOLDEN-001](docs/adr/ADR-GOLDEN-001-upstream-parity.md) — upstream line-by-line parity + TDD.
-3. [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md) — no backward-compat port; PQC-ready crypto.
+1. [ADR-002](docs/adr/ADR-002-cave-runtime-stack-architecture.md) — the Cave Runtime stack and what each layer owns.
+2. [ADR-003](docs/adr/ADR-003-multi-tenant-by-construction.md) — multi-tenancy invariant.
+3. [ADR-004](docs/adr/ADR-004-zero-trust-runtime-principle.md) — zero-trust posture (no insecure fast path).
+4. [ADR-005](docs/adr/ADR-005-platform-runtime-upstream-mirror.md) — Platform ↔ Runtime upstream mirror; the line-by-line-parity contract lives here.
+5. [ADR-027](docs/adr/ADR-027-contribution-attribution.md) — commit author + trailer attribution.
 
 Golden rule summary:
 
@@ -18,7 +20,7 @@ Golden rule summary:
 - **No behavioral approximation.** "80% of the hot path" is not done. Done is "every upstream test passes".
 - **No backward-compat port.** If upstream has an `if kernel < 5.8 { old_path }`, skip the `if`; Cave is Linux 7.1+ only.
 - **Shared primitives.** If a concept (Raft, WAL, EventBus, rate-limit, retry, labels, SPIFFE, watch) exists in `cave-kernel`, use it. Do not reimplement per-module.
-- **Multi-tenant awareness.** Every new public API takes `tenant_id`. Every persisted resource owns exactly one tenant. Default-deny across tenants. See [ADR-MULTI-TENANT-001](docs/adr/ADR-MULTI-TENANT-001.md).
+- **Multi-tenant awareness.** Every new public API takes `tenant_id`. Every persisted resource owns exactly one tenant. Default-deny across tenants. See [ADR-003](docs/adr/ADR-003-multi-tenant-by-construction.md).
 - **Post-quantum first.** New crypto calls use `cave-crypto` PQC primitives; classical-only crypto is a bug.
 
 ## Development workflow
@@ -29,9 +31,9 @@ Golden rule summary:
 4. Run the full workspace suite: `cargo test --workspace`. Zero failures, zero `#[ignore]`d tests added in your PR.
 5. Lint: `cargo fmt --all && cargo clippy --all-targets --all-features -- -D warnings`.
 6. Update the module's `parity.manifest.toml` (file_parity, function_parity, test_parity, surface_parity metrics).
-7. If your change touches a 4-track module (backend + portal + cavectl + observability per [ADR-GOLDEN-004](docs/adr/)), all four tracks ship in the same PR.
+7. If your change touches a 4-track module (backend + portal + cavectl + observability), all four tracks ship in the same PR (this is the standing Charter rule; see the "Golden Rules" section of the project memory).
 8. Commit message uses [Conventional Commits](https://www.conventionalcommits.org/): `feat(scope): …`, `fix(scope): …`, `test(scope): …`, `docs(scope): …`.
-9. Include a `Co-Authored-By: <model/name>` trailer if the PR was LLM-assisted (required for attribution; see [ADR-CONTRIB-ATTRIBUTION-001](docs/adr/)).
+9. Include a `Co-Authored-By: <model/name>` trailer if the PR was LLM-assisted (required for attribution; see [ADR-027](docs/adr/ADR-027-contribution-attribution.md)).
 
 ## Architectural changes
 

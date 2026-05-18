@@ -14,9 +14,9 @@
 ### Post-quantum crypto
 PQC migration is on the roadmap, not complete. ML-KEM / ML-DSA / SLH-DSA
 adoption is staged across `cave-crypto`, `cave-vault`, and `cave-auth`. See
-[ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md). Classical-
-crypto paths remain for compatibility during the migration; please flag any
-production-only-classical paths.
+[ADR-010](docs/adr/ADR-010-sovereign-cert-lifecycle.md) for the PQC-ready
+certificate hierarchy. Classical-crypto paths remain for compatibility
+during the migration; please flag any production-only-classical paths.
 
 ### Tier 0 — Core (Complete)
 - [x] Single binary boot on port 8080
@@ -47,7 +47,7 @@ production-only-classical paths.
 - [ ] cave-ledger — Sovereign audit ledger
 
 ### Documentation
-- [x] 123 Architecture Decision Records (scope-classified)
+- [x] 28 Architecture Decision Records (OSS-scope only; Platform-side ADRs archived in `docs/adr/internal/`)
 - [x] README, LICENSE, CONTRIBUTING, CI
 - [ ] Per-module API documentation
 - [ ] Operations runbook

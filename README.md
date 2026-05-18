@@ -2,7 +2,7 @@
 
 **Sovereign, self-healing, self-improving Cloud OS. Multi-tenant by construction. Line-by-line TDD reimplementation of best-of-breed upstream projects in Rust.**
 
-> Status: pre-v1. OSS launch target: 21 May 2026. See [docs/adr/ADR-CHARTER-001.md](docs/adr/ADR-CHARTER-001.md) for the mission, [docs/adr/](docs/adr/) for the full decision record.
+> Status: pre-v1. OSS launch target: 21 May 2026. See the Charter section below for the mission, [docs/adr/](docs/adr/) for the full decision record.
 
 ---
 
@@ -15,7 +15,7 @@ Because every upstream is reimplemented under one roof:
 - Cross-module capabilities that no single upstream CLI can express (federated watch, consistent cross-module snapshot, tenant-scoped policy) ship as first-class verbs.
 - A single upgrade path rolls the whole platform forward with zero user-visible downtime.
 
-**This is not a thin wrapper over existing projects.** It is a from-scratch Rust implementation that passes the upstream's own tests. See [ADR-GOLDEN-001](docs/adr/ADR-GOLDEN-001-upstream-parity.md) for the rule.
+**This is not a thin wrapper over existing projects.** It is a from-scratch Rust implementation that passes the upstream's own tests. The Platform–Runtime mirror contract is described in [ADR-005](docs/adr/ADR-005-platform-runtime-upstream-mirror.md); line-by-line upstream TDD parity is the contribution rule, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Charter
 
@@ -23,14 +23,14 @@ Because every upstream is reimplemented under one roof:
 2. **Fully featured** — not a "core path" MVP; every upstream flag, edge case, and error mode is ported.
 3. **Sovereign** — Linux 7.1 kernel and nothing else; no external SaaS dependency at the core.
 4. **Self-healing** — reconcile loops with automatic drift correction at every layer.
-5. **Self-improving** — in-cluster `cave-agent` reads observability, proposes tuned changes, canary-deploys, rolls back on regression. See [ADR-SELF-IMPROVE-001](docs/adr/ADR-SELF-IMPROVE-001.md).
+5. **Self-improving** — in-cluster `cave-agent` reads observability, proposes tuned changes, canary-deploys, rolls back on regression. See [ADR-022](docs/adr/ADR-022-self-improving-cave-agent.md).
 6. **Multi-region** — federated control plane + regional data planes.
 7. **HA** — 3-replica minimum for every critical component, Raft quorum consensus (one implementation, shared via `cave-kernel`).
 8. **DR** — cross-region async replication + point-in-time recovery.
 9. **Zero-downtime upgrade** — rolling, blue-green, version-skew tolerant.
 10. **HA/DR latency hiding** — replication delays never leak to the client SLA.
-11. **Multi-tenant by construction** — every module carries `tenant_id` as first-class attribute; default-deny between tenants; per-tenant quota, SLO, billing. See [ADR-MULTI-TENANT-001](docs/adr/ADR-MULTI-TENANT-001.md).
-12. **Post-quantum crypto migration in progress** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. See [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md).
+11. **Multi-tenant by construction** — every module carries `tenant_id` as first-class attribute; default-deny between tenants; per-tenant quota, SLO, billing. See [ADR-003](docs/adr/ADR-003-multi-tenant-by-construction.md).
+12. **Post-quantum crypto migration in progress** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. See [ADR-010](docs/adr/ADR-010-sovereign-cert-lifecycle.md) for the PQC-ready certificate hierarchy.
 
 ## Project layout
 
@@ -53,10 +53,10 @@ cave-runtime/
 │   ├── cave-metrics/       Prometheus parity
 │   ├── cave-trace/         Tempo / OTel parity
 │   ├── cave-scan/          Trivy + Semgrep parity
-│   ├── cave-portal/        unified admin portal (two personas per ADR-PORTAL-PERSONAS-001)
+│   ├── cave-portal/        unified admin portal (two personas per ADR-017)
 │   ├── cave-portal-api/    portal backend
 │   ├── cave-local-llm/     build-time dev agent (Qwen3-assisted drafts)
-│   ├── cave-agent/         runtime self-improvement agent (per ADR-SELF-IMPROVE-001)
+│   ├── cave-agent/         runtime self-improvement agent (per ADR-022)
 │   ├── cave-cli/           cavectl — unified CLI with upstream parity + cave-native verbs
 │   └── ...                  (~60 crates total, see Cargo.toml workspace members)
 ├── docs/adr/               every architectural decision with context + rationale
@@ -86,12 +86,12 @@ CAVE_JWT_SECRET=dev ./target/release/cave-runtime
 # Use the CLI
 ./target/release/cave --help
 ./target/release/cave etcd get /foo   # cave-native shortcut
-./target/release/cave etcdctl get /foo  # upstream etcdctl parity (see ADR-CLI-HYBRID-001)
+./target/release/cave etcdctl get /foo  # upstream etcdctl parity (see ADR-009)
 ```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: read [ADR-GOLDEN-001](docs/adr/) first — all contributions follow line-by-line upstream TDD parity. No stubs, no `todo!()`, no behavioral approximation.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: all contributions follow line-by-line upstream TDD parity. No stubs, no `todo!()`, no behavioral approximation.
 
 ## Security
 

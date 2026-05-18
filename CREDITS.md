@@ -4,7 +4,7 @@ Cave Runtime is built by humans and AI agents working together. This file
 records who and what produced the v0.1.0 artifact.
 
 The numbers below are pulled from the prototype repo at the moment of the
-public-launch orphan commit (see [ADR-148](docs/adr/ADR-148_OSS_Launch_History_Strategy.md)).
+public-launch orphan commit (see [ADR-028](docs/adr/ADR-028-oss-launch-history-strategy.md)).
 Future contributors are appended in chronological order at the bottom.
 
 ## Lead
@@ -82,9 +82,9 @@ Runtime's own code is Apache-2.0 (see [LICENSE](LICENSE)).
 - [sonatype/nexus-public](https://github.com/sonatype/nexus-public) — artifact repository
 
 ### Foundation
-- The **Linux kernel** (≥ 7.0 baseline per ADR-014) — eBPF, cgroup v2, namespaces, io_uring
+- The **Linux kernel** (≥ 7.0 baseline; see [ADR-002](docs/adr/ADR-002-cave-runtime-stack-architecture.md) Layer 1) — eBPF, cgroup v2, namespaces, io_uring
 - The **Rust** language and **Tokio** ecosystem — workspace, async runtime, ecosystem deps
-- **Hetzner Cloud** — sovereign infrastructure provider that motivated the architecture (ADR-001)
+- **Hetzner Cloud** — sovereign infrastructure provider that motivated the architecture (see [ADR-001](docs/adr/ADR-001-sovereign-bare-metal-hosting.md))
 
 The full list of tracked upstreams is in
 `crates/cave-upstream/src/projects.rs`; the running runtime exposes it at

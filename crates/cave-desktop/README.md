@@ -4,7 +4,7 @@ Native admin shell for CAVE Runtime, built with [GPUI](https://github.com/zed-in
 
 The web portal at `crates/cave-runtime/src/portal_index.html` remains the primary, canonical UI. This crate is a power-admin companion that runs as a native binary, talking to the same `cave-runtime` HTTP backend.
 
-See `docs/adr/ADR-PORTAL-DESKTOP-001-gpui-native-admin-shell.md` for the design rationale.
+See `docs/adr/ADR-018-portal-desktop-shell.md` for the design rationale.
 
 ## Status
 

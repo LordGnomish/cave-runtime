@@ -27,7 +27,7 @@ We will:
 
 ## Post-quantum cryptography
 
-Cave Runtime is on a post-quantum-crypto migration path (see [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md)). Reports that identify:
+Cave Runtime is on a post-quantum-crypto migration path (see [ADR-010](docs/adr/ADR-010-sovereign-cert-lifecycle.md) for the PQC-ready certificate hierarchy). Reports that identify:
 
 - Classical-only paths in new code (RSA/ECDSA/Ed25519 without a PQC pair),
 - TLS handshakes that do not offer a hybrid PQC + classical key exchange,
@@ -37,7 +37,7 @@ are in-scope security bugs. Treat with the same urgency as traditional vulnerabi
 
 ## Multi-tenancy boundary bugs
 
-Cave Runtime is multi-tenant by construction (see [ADR-MULTI-TENANT-001](docs/adr/ADR-MULTI-TENANT-001.md)). Any cross-tenant leak (tenant A can read/write/observe/affect tenant B's resources without explicit policy) is a critical vulnerability regardless of CVSS scoring heuristics.
+Cave Runtime is multi-tenant by construction (see [ADR-003](docs/adr/ADR-003-multi-tenant-by-construction.md)). Any cross-tenant leak (tenant A can read/write/observe/affect tenant B's resources without explicit policy) is a critical vulnerability regardless of CVSS scoring heuristics.
 
 ## Responsible disclosure
 
