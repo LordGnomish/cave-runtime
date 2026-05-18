@@ -322,3 +322,161 @@ groups:
             audit log filtered to `event=saml.signature.verify.fail` and
             inspect the issuer / cert thumbprint.
           runbook_url: "https://portal.cave.dev/runbooks/auth/saml-signature-verify-failures"
+
+  # ── 2026-05-18 FINALIZE — Phase 3 protocol coverage ────────────────────────
+  # One alert per Phase 3 protocol surface so the operator gets a paged-on
+  # signal for every federation / authz / issuance / persistence backend
+  # cave-auth actually owns. Every metric below is instrumented by the named
+  # cave-auth submodule (`cave-auth/src/<proto>/`).
+  - name: cave-auth.phase3
+    interval: 30s
+    rules:
+      - alert: LdapFederationSyncFailures
+        expr: |
+          sum(rate(cave_auth_ldap_sync_total{outcome="failure"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "LDAP federation sync failing"
+          description: |
+            cave-auth LDAP federation has emitted >0 sync failures over the
+            last 10m. Run `cavectl auth ldap test-connection` to bind against
+            the configured provider and inspect the BER resultCode in the
+            audit log (`/admin/auth/events?protocol=ldap`).
+          runbook_url: "https://portal.cave.dev/runbooks/auth/ldap-sync-failures"
+
+      - alert: KerberosGssapiAcceptFailures
+        expr: |
+          sum(rate(cave_auth_kerberos_gssapi_accept_total{outcome="failure"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "Kerberos GSSAPI AcceptSecContext failing (>0.1/s)"
+          description: |
+            cave-auth is rejecting Kerberos / SPNEGO context tokens. Likely
+            causes: keytab rotation without service reload, time-skew >5m vs
+            KDC, or libgssapi feature flag mismatch. Validate the keytab
+            with `cavectl auth kerberos validate-keytab`.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/kerberos-gssapi-accept-failures"
+
+      - alert: OAuthDeviceGrantAnomaly
+        expr: |
+          (
+            sum(rate(cave_auth_oauth_device_authz_total{outcome="approved"}[10m]))
+            /
+            clamp_min(sum(rate(cave_auth_oauth_device_authz_total[10m])), 1e-9)
+          ) < 0.10
+        for: 15m
+        labels:
+          severity: warning
+          team: security
+          tier: "1"
+        annotations:
+          summary: "OAuth Device Authorization Grant approval rate <10%"
+          description: |
+            RFC 8628 device-flow is dominated by denial / expiry events over
+            the last 15m. Common causes: phishing-bait device-code spray,
+            user-code typo storms, or the device-flow polling logic on a
+            client has gone wrong. Inspect
+            `/admin/auth/events?grant=device_code`.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/oauth-device-anomaly"
+
+      - alert: UmaRptIssuanceFailures
+        expr: |
+          sum(rate(cave_auth_uma_rpt_issuance_total{outcome="failure"}[5m])) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "UMA 2.0 RPT issuance failing (>0.05/s)"
+          description: |
+            UMA Requesting Party Token minting has been failing. Most often
+            policy-evaluation rejections (resource owner withdrew consent,
+            scope mismatch, missing claim_token). Check
+            `cavectl auth uma resource-set` and
+            `cavectl auth uma permission-ticket`.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/uma-rpt-failures"
+
+      - alert: Oid4vcIssuanceFailures
+        expr: |
+          sum(rate(cave_auth_oid4vc_issue_total{outcome="failure"}[10m])) > 0
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "OID4VCI credential issuance failing"
+          description: |
+            OpenID4VCI issuance has emitted >0 failures over the last 10m.
+            Usually caused by signing-key access (Ed25519/JWS) or
+            DataIntegrityProof canonicalisation drift. Inspect
+            `cavectl auth oid4vc metadata` and the issuer's signing key
+            health.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/oid4vc-issuance-failures"
+
+      - alert: WsFedSigninFailures
+        expr: |
+          (
+            sum(rate(cave_auth_wsfed_signin_total{outcome="failure"}[5m]))
+            /
+            clamp_min(sum(rate(cave_auth_wsfed_signin_total[5m])), 1e-9)
+          ) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "WS-Federation signin failure rate >10%"
+          description: |
+            cave-auth WS-Fed `wa=wsignin1.0` rejections are above 10% over
+            the last 10m. Likely realm-trust misconfiguration or SAML 1.1
+            assertion signing drift.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/wsfed-signin-failures"
+
+      - alert: EmailOutboxStalled
+        expr: |
+          (
+            cave_auth_email_outbox_depth > 0
+            and on()
+            rate(cave_auth_email_dispatch_total[15m]) == 0
+          )
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+          tier: "2"
+        annotations:
+          summary: "Email outbox has queued mail but dispatcher is idle"
+          description: |
+            The email_listener outbox depth is non-zero but no mail has been
+            dispatched over the last 15m. Most often SMTP creds expired or
+            the upstream relay is unreachable. Check
+            `cavectl auth email queue`.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/email-outbox-stalled"
+
+      - alert: PersistenceMigrationFailure
+        expr: |
+          sum(increase(cave_auth_persistence_migration_failure_total[1h])) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+          tier: "1"
+        annotations:
+          summary: "cave-auth persistence migration failed (>0 in last 1h)"
+          description: |
+            A `cave-auth/src/persistence/migration.rs` Flyway-style
+            migration failed. The realm/user/session schema may be in a
+            partially-applied state — refuse to roll forward until repair.
+            Inspect `cavectl auth persistence status`.
+          runbook_url: "https://portal.cave.dev/runbooks/auth/persistence-migration-failure"
