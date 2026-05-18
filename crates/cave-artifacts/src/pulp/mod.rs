@@ -7,7 +7,10 @@
 
 pub mod content;
 pub mod distribution;
+pub mod error;
 pub mod models;
+pub mod plugin;
+pub mod plugins;
 pub mod rbac;
 pub mod repair;
 pub mod repository;
@@ -15,6 +18,9 @@ pub mod routes;
 pub mod signing;
 pub mod tasks;
 pub mod upload;
+
+#[cfg(test)]
+mod plugin_layer_tests;
 
 use axum::Router;
 use cave_db::CavePool;
