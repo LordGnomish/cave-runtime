@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: premise is Hetzner/Azure two-provider split. OSS Cave Runtime is provider-agnostic; reassess whether the onboarding-time choice still applies. -->
 # ADR-066: Tenant Provider Choice at Onboarding
 
 **Status:** Accepted

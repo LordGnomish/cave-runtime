@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: ADR-RUNTIME-STACK-001 / ADR-001 (sovereign bare-metal) ships its own Linux 7.1+ baseline. Does Talos remain an officially supported Cave Runtime profile or is it Hetzner-only history? -->
 # ADR-098: Talos Linux Immutable Infrastructure
 
 **Status:** Accepted

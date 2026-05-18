@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: cave-portal is the OSS direction; does Backstage remain in the runtime story or is this ADR superseded? -->
 # ADR-011: Backstage as Developer Portal
 
 **Status:** Accepted

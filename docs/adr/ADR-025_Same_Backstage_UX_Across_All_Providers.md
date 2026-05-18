@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: tied to Backstage choice in ADR-011 and to the two-provider model; reassess once Backstage status is fixed. -->
 # ADR-025: Same Backstage UX Across All Providers
 
 **Status:** Accepted

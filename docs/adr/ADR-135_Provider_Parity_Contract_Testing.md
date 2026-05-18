@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: premise is Hetzner-vs-Azure behavioural parity contracts. In OSS Cave Runtime the upstream-parity contract tests run against single canonical reimpls (cave-net, cave-streams, ...). Does this ADR remain valid or is it superseded by the upstream-test-port batches? -->
 # ADR-135: Provider Parity Contract Testing
 
 **Status:** Accepted

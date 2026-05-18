@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!-- needs Burak verify: superseded by ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 (Kong + Gravitee -> cave-gateway). Keep as historical, mark superseded, or delete? -->
 # ADR-027: Kong API Gateway
 
 **Status:** Accepted
