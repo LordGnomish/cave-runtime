@@ -222,11 +222,30 @@ fn source_ranges_equal(a: &[String], b: &[String]) -> bool {
 ///   (upstream `validateHealthCheckNodePort` rejects this at admission, but
 ///   defence-in-depth is cheap).
 pub fn sync_lb_attributes(
-    _spec: &ServiceSpec,
-    _current: &LbAttributes,
-    _desired: &LbAttributes,
+    spec: &ServiceSpec,
+    current: &LbAttributes,
+    desired: &LbAttributes,
 ) -> Result<Reconcile, ControllerError> {
-    unimplemented!("cloud LB attribute sync — see cloudprovider.LoadBalancer.UpdateLoadBalancer")
+    if spec.service_type != ServiceType::LoadBalancer {
+        return Err(ControllerError::InvalidSpec {
+            kind: "Service",
+            reason: "sync_lb_attributes called on a non-LoadBalancer service".into(),
+        });
+    }
+    if desired.health_check_node_port.is_some()
+        && desired.external_traffic_policy != ExternalTrafficPolicy::Local
+    {
+        return Err(ControllerError::InvalidSpec {
+            kind: "Service",
+            reason: "healthCheckNodePort requires externalTrafficPolicy=Local".into(),
+        });
+    }
+    let diff = diff_lb_attributes(current, desired);
+    if diff.is_empty() {
+        Ok(Reconcile::NoOp)
+    } else {
+        Ok(Reconcile::Update(diff.change_count()))
+    }
 }
 
 #[allow(dead_code)]

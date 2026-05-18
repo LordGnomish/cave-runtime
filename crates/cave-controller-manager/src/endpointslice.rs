@@ -93,12 +93,25 @@ pub fn reconcile(
 /// [`reconcile`] enforces — because hint placement without a selector means
 /// the controller has no pods to project.
 pub fn place_topology_hints(
-    _spec: &EndpointSliceSpec,
-    _endpoints: &[ReadyEndpoint],
-    _zones: &[ZoneInfo],
-    _distribution: TrafficDistribution,
+    spec: &EndpointSliceSpec,
+    endpoints: &[ReadyEndpoint],
+    zones: &[ZoneInfo],
+    distribution: TrafficDistribution,
 ) -> Result<TopologyDecision, ControllerError> {
-    unimplemented!("Topology-aware hints — see pkg/controller/endpointslice/topologycache")
+    if spec.selector.is_empty() {
+        return Err(ControllerError::InvalidSpec {
+            kind: "EndpointSlice",
+            reason: "selector must not be empty".into(),
+        });
+    }
+    Ok(match distribution {
+        TrafficDistribution::Default => {
+            TopologyDecision::Disabled("trafficDistribution=Default".into())
+        }
+        TrafficDistribution::PreferClose => {
+            compute_hints(endpoints, zones, MIN_ENDPOINTS_PER_ZONE)
+        }
+    })
 }
 
 #[allow(dead_code)]
