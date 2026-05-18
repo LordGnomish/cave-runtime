@@ -1,10 +1,19 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Cave Runtime contributors
+//
 //! EndpointSlice controller — projects ready pods into one or more
 //! `discovery.k8s.io/v1.EndpointSlice` objects.
 //!
 //! Upstream: [`pkg/controller/endpointslice`]. The full controller chunks
 //! endpoints across slices, manages slice ownership labels, and reconciles
-//! topology hints. This scaffold implements the chunking arithmetic.
+//! topology hints. This module owns the chunking arithmetic and the
+//! topology-hint *entry point*; the actual hint algorithm lives in
+//! [`crate::endpointslice_topology`] and is delegated to from
+//! [`place_topology_hints`].
 
+use crate::endpointslice_topology::{
+    compute_hints, ReadyEndpoint, TopologyDecision, ZoneInfo, MIN_ENDPOINTS_PER_ZONE,
+};
 use crate::types::{Cite, ControllerError, Reconcile, TenantId};
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +33,18 @@ pub struct EndpointSliceSpec {
 pub struct EndpointObservation {
     pub ready_pod_count: u32,
     pub current_slice_count: u32,
+}
+
+/// `Service.spec.trafficDistribution` (Kubernetes v1.31+). Mirrors the
+/// upstream enum exactly: any value the controller doesn't understand
+/// disengages the topology algorithm.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrafficDistribution {
+    /// Default — no topology preference; route to any zone.
+    #[default]
+    Default,
+    /// Prefer endpoints in the same zone as the caller.
+    PreferClose,
 }
 
 /// Returns the number of slices required to cover `pods` endpoints. Mirrors
@@ -57,8 +78,26 @@ pub fn reconcile(
     })
 }
 
-/// Stub: topology-aware hint placement. Not implemented.
-pub fn place_topology_hints(_spec: &EndpointSliceSpec) -> Result<Reconcile, ControllerError> {
+/// Top-level entry point: drive topology-aware hint placement for a given
+/// EndpointSlice + its observed ready endpoints + the cluster's zone-CPU
+/// profile.
+///
+/// Behaviour matches upstream `pkg/controller/endpointslice/topologycache`:
+///
+/// * `TrafficDistribution::Default` ⇒ algorithm disabled, hints stripped
+///   (`Disabled("trafficDistribution=Default")`).
+/// * `TrafficDistribution::PreferClose` ⇒ delegate to [`compute_hints`] with
+///   the upstream `MinEndpointsPerZone = 7` threshold.
+///
+/// The selector must not be empty — same invariant the chunking
+/// [`reconcile`] enforces — because hint placement without a selector means
+/// the controller has no pods to project.
+pub fn place_topology_hints(
+    _spec: &EndpointSliceSpec,
+    _endpoints: &[ReadyEndpoint],
+    _zones: &[ZoneInfo],
+    _distribution: TrafficDistribution,
+) -> Result<TopologyDecision, ControllerError> {
     unimplemented!("Topology-aware hints — see pkg/controller/endpointslice/topologycache")
 }
 
@@ -82,6 +121,14 @@ mod tests {
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
         }
+    }
+
+    fn ep(addr: &str, zone: &str) -> ReadyEndpoint {
+        ReadyEndpoint { address: addr.into(), zone: zone.into(), ready: true }
+    }
+
+    fn zinfo(name: &str, cpu: u64) -> ZoneInfo {
+        ZoneInfo { name: name.into(), cpu_milli: cpu }
     }
 
     #[test]
@@ -134,5 +181,93 @@ mod tests {
         let s = slice(vec![("app", "web")]);
         let obs = EndpointObservation { ready_pod_count: 0, current_slice_count: 3 };
         assert_eq!(reconcile(&s, &obs, &tenant).unwrap(), Reconcile::Delete(3));
+    }
+
+    // ── place_topology_hints ────────────────────────────────────────────────
+
+    #[test]
+    fn topology_hints_disabled_when_distribution_is_default() {
+        let (_cite, _tenant) = test_ctx!(
+            "pkg/controller/endpointslice/topologycache/topologycache.go",
+            "AddHints",
+            "tenant-eps-topo-default"
+        );
+        let s = slice(vec![("app", "web")]);
+        let dec = place_topology_hints(&s, &[], &[], TrafficDistribution::Default).unwrap();
+        match dec {
+            TopologyDecision::Disabled(reason) => {
+                assert!(reason.contains("Default"));
+            }
+            other => panic!("expected Disabled, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn topology_hints_engaged_with_prefer_close_and_quorum() {
+        let (_cite, _tenant) = test_ctx!(
+            "pkg/controller/endpointslice/topologycache/topologycache.go",
+            "redistributeHintsByZone",
+            "tenant-eps-topo-prefer-close"
+        );
+        let s = slice(vec![("app", "web")]);
+        let mut eps = Vec::new();
+        for i in 0..MIN_ENDPOINTS_PER_ZONE {
+            eps.push(ep(&format!("a{i}"), "z1"));
+            eps.push(ep(&format!("b{i}"), "z2"));
+        }
+        let zones = vec![zinfo("z1", 1000), zinfo("z2", 1000)];
+        let dec =
+            place_topology_hints(&s, &eps, &zones, TrafficDistribution::PreferClose).unwrap();
+        match dec {
+            TopologyDecision::Engaged(hints) => {
+                assert_eq!(hints.len(), (MIN_ENDPOINTS_PER_ZONE * 2) as usize);
+            }
+            other => panic!("expected Engaged, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn topology_hints_disabled_when_endpoints_below_threshold() {
+        let (_cite, _tenant) = test_ctx!(
+            "pkg/controller/endpointslice/topologycache/topologycache.go",
+            "AddHints",
+            "tenant-eps-topo-too-few"
+        );
+        let s = slice(vec![("app", "web")]);
+        let eps = vec![ep("a", "z1"), ep("b", "z2")];
+        let zones = vec![zinfo("z1", 1000), zinfo("z2", 1000)];
+        let dec =
+            place_topology_hints(&s, &eps, &zones, TrafficDistribution::PreferClose).unwrap();
+        assert!(matches!(dec, TopologyDecision::Disabled(_)));
+    }
+
+    #[test]
+    fn topology_hints_rejects_empty_selector() {
+        let (_cite, _tenant) = test_ctx!(
+            "pkg/controller/endpointslice/endpointslice_controller.go",
+            "syncService",
+            "tenant-eps-topo-bad-selector"
+        );
+        let s = slice(vec![]);
+        let err = place_topology_hints(&s, &[], &[], TrafficDistribution::PreferClose)
+            .expect_err("empty selector must be rejected");
+        match err {
+            ControllerError::InvalidSpec { kind, .. } => assert_eq!(kind, "EndpointSlice"),
+            other => panic!("expected InvalidSpec, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn traffic_distribution_serde_round_trip() {
+        let (_cite, _tenant) = test_ctx!(
+            "pkg/controller/endpointslice/topologycache/topologycache.go",
+            "TrafficDistribution",
+            "tenant-eps-topo-serde"
+        );
+        for d in [TrafficDistribution::Default, TrafficDistribution::PreferClose] {
+            let s = serde_json::to_string(&d).unwrap();
+            let back: TrafficDistribution = serde_json::from_str(&s).unwrap();
+            assert_eq!(d, back);
+        }
     }
 }
