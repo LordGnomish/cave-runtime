@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ScheduledBackup CRD.
 //!
 //! Mirrors `pkg/specs/scheduledbackup_types.go` from CloudNativePG.

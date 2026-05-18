@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TTLAfterFinished jitter — `pkg/controller/ttlafterfinished/ttlafterfinished_controller.go::enqueueTTL`.
 //!
 //! Adding jitter to the TTL requeue prevents thundering-herd deletes when

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Chat message types + pipe-mode (script-friendly) output formatting.
 //!
 //! `cavectl chat --pipe` writes assistant tokens to stdout as they arrive,

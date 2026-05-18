@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Provisioning — load dashboards, datasources, and alert rules from YAML/JSON files.
 
 use crate::models::*;

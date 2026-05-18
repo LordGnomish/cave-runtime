@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Jenkins Jenkinsfile compatibility layer.
 //!
 //! Parses Jenkinsfile (Declarative Pipeline syntax) into a

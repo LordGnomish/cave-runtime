@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node controller tab — node registration + InitializeProvider state.
 //! Derived from scheduler_nodes; one row per node with provider + zone.
 

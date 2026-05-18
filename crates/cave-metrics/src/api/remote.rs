@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Remote write/read, OTLP, StatsD, Graphite, InfluxDB ingestion handlers.
 
 use axum::{

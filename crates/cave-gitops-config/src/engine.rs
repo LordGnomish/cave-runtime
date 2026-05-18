@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pipeline execution engine for cave-gitops-config.
 
 use crate::models::{

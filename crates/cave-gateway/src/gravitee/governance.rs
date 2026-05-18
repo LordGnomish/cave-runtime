@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! API design-time governance (Spectral-like linting + quality gates).
 //!
 //! Rules for OpenAPI validation, consistency checks, and quality scoring.

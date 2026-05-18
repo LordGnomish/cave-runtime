@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MirrorMaker pattern — cross-cluster topic replication.
 
 use crate::error::{StreamsError, StreamsResult};

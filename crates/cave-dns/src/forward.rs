@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::message::{decode, encode};
 use crate::types::DnsMessage;
 use std::time::Duration;

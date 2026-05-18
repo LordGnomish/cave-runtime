@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for cave-security.
 //!
 //! POST /api/scan/image          — scan container image

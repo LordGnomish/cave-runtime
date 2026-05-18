@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kyverno engine integration tests.
 
 use cave_policy::kyverno::{

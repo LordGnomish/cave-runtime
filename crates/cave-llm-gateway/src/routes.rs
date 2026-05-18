@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for cave-llm-gateway — OpenAI-compatible API + admin endpoints.
 
 use crate::api_keys::{ApiKeyStore, Scope};

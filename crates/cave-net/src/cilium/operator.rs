@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cilium-operator workflows — identity garbage collection, CES batching,
 //! stale CRD cleanup.
 //!

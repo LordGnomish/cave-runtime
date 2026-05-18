@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tables sub-page — catalog listing grouped by namespace.
 
 use super::types::{IcebergTable, IcebergViewError};

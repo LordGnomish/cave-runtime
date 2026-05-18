@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Manifest and registry types: OCI, Docker V2 Schema 2, Manifest List.
 
 use serde::{Deserialize, Serialize};

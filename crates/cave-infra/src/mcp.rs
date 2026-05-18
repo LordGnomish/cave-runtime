@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MCP (Model Context Protocol) tool server for infrastructure actions.
 //!
 //! Implements the JSON-RPC 2.0 protocol used by MCP:

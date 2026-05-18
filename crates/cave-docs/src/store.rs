@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{DocBook, DocPage, DocSpace, DocStats, PageVersion};
 use chrono::Utc;
 use std::collections::HashMap;

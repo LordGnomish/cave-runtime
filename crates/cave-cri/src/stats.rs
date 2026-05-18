@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container and image statistics.
 //!
 //! Models the CRI v1 stats messages (`ContainerStats`,

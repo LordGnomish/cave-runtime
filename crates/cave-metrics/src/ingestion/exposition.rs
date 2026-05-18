@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus text exposition format parser (0.0.4) and OpenMetrics is handled
 //! by openmetrics.rs.  This parser handles the standard `/metrics` text format.
 

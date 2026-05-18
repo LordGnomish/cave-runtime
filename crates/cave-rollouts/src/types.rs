@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Domain types for cave-rollouts.
 
 use chrono::{DateTime, Utc};

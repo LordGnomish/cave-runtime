@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Built-in runbook templates.
 use crate::models::*;
 use chrono::Utc;

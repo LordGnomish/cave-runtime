@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runtime handler registry — KEP-585 / RuntimeClass support.
 //!
 //! Models the CRI v1 `RuntimeHandler` message, which advertises which

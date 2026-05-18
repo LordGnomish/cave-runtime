@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! etcd Auth API — user/role management and authentication.
 
 use crate::error::{StoreError, StoreResult};

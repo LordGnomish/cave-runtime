@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Registry error types with Docker V2 error body serialisation.
 
 use axum::{

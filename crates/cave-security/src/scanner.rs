@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container image vulnerability scanner (Trivy replacement).
 //!
 //! In production this module would fetch OCI image layers, parse package

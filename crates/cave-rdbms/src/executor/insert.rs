@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! INSERT statement execution.
 
 use crate::sql::ast::{InsertStmt, Literal};

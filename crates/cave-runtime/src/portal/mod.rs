@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Portal-facing handlers for cave-runtime.
 //!
 //! Provides the user-facing surface: persona login (Keycloak / dev mode),

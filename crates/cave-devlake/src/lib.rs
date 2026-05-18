@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DevOps analytics — compatible with DevLake
 //!
 //! Compatible with: DevLake

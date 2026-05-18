@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-lakehouse — consolidated lakehouse stack per ADR-147.
 //!
 //! Same multi-upstream pattern as cave-streams (Kafka + Pulsar) and

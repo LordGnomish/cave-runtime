@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cursor management for MongoDB find operations.
 
 use crate::bson::Document;

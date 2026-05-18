@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Argo CD wrap — native re-implementation of the deployment timeline,
 //! sync status, and rollback action.
 //!

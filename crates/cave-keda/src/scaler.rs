@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scaler trait + ScalingModifiers.
 //! upstream: kedacore/keda v2.x — pkg/scalers/
 

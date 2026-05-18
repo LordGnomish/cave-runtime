@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cloud node controller.
 //!
 //! Mirrors `cloud-provider/controllers/node/node_controller.go` and the

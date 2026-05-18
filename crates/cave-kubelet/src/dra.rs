@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Dynamic Resource Allocation (DRA) — KEP-3063.
 //!
 //! Mirrors Kubernetes v1.36.0 upstream:

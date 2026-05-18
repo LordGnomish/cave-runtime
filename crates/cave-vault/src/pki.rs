@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PKI secrets engine — certificate authority and issuance.
 //!
 //! Generates a root CA with rcgen, issues leaf TLS certs signed by that CA,

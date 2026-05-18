@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Startup message and SSL request handling.
 
 use std::collections::HashMap;

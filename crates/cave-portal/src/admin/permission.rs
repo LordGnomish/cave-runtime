@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! WebAuthn-gated, RBAC-checked request context.
 //!
 //! Mirrors the `permission-react`/`permission-backend` plugin pair in

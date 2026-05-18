@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prompt caching — exact-match cache keyed on request fingerprint.
 
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-kubelet — Node agent.
 //!
 //! Watches the API server for pod assignments, manages container lifecycle

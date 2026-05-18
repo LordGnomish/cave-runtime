@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Local ACME client — drives an in-process [`cave_acme::AcmeServer`]
 //! through the new-account / new-order / challenge / finalize / cert
 //! workflow.

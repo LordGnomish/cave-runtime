@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant scope resolution for `cavectl`.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 every native verb carries a

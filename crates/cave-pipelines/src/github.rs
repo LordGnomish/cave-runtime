@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitHub integration: commit status updates and PR check runs.
 
 use crate::models::RunStatus;

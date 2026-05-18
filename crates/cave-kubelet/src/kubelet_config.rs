@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KubeletConfiguration — the full kubelet config object that the kubelet
 //! reads on startup.
 //!

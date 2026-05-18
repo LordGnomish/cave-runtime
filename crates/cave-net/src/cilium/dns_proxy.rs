@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DNS proxy — intercepts pod DNS queries for visibility + policy
 //! enforcement.
 //!

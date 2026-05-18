@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Parity manifest reader — wraps `cave_kernel::parity::ParityManifest` with filesystem I/O
 //! and missing-function detection.
 

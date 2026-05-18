@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Redis Cluster support — hash slot computation, CRC16, CLUSTER commands.
 
 use std::collections::HashMap;

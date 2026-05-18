@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Userspace simulation of Cilium's connection tracker.
 //!
 //! Cite: cilium/bpf/lib/conntrack.h + cilium/bpf/lib/conntrack_map.h

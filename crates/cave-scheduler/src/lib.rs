@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-scheduler — Pod scheduler.
 //!
 //! Architecture: kube-scheduler v1.31 framework parity. Pods flow through 13

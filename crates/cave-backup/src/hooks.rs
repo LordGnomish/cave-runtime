@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Backup and restore hook validation utilities.
 
 use crate::models::{BackupHook, ExecHook, HookErrorMode};

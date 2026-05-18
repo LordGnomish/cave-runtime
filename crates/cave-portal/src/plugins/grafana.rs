@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Grafana wrap — native dashboard renderer + panel embed.
 //!
 //! The portal hosts dashboard *definitions* and renders them with

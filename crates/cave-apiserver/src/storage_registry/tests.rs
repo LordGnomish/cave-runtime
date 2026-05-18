@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! storage_registry tests — strategy, consistent reads, watch progress,
 //! streaming list, tenant index.
 

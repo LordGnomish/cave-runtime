@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! JWT authentication middleware with RBAC support for CAVE runtime.
 
 use axum::{

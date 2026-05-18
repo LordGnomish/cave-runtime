@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TCP transport for production inter-node communication.
 //!
 //! Wire format (per frame):

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Backoff strategies — pure-function delay schedules.
 //!
 //! Distinct from `retrypolicy::BackoffStrategy` (which is owned by

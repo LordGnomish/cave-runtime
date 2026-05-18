@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/prometheus` — Prometheus Web UI parity surface.
 //!
 //! Tabs mirror upstream Prometheus's top navigation:

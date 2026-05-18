@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{CostRecommendation, RecommendationKind, ResourceCost};
 use uuid::Uuid;
 

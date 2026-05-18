@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CRI image GC manager — LRU eviction with disk-pressure trigger.
 //!
 //! Mirrors Kubernetes v1.36.0 upstream:

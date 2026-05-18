@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Raft-replicated storage backend.
 //!
 //! Mirrors `openbao/physical/raft` (Go) plus the upstream hashicorp

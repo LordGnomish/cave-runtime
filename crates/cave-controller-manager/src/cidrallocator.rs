@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod CIDR allocator — on-the-fly node-CIDR slicing.
 //!
 //! Cite: pkg/controller/nodeipam/ipam/range_allocator.go (v1.36.0).

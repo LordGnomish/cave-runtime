@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for the etcd v3 API (etcd grpc-gateway JSON format).
 //!
 //! Endpoints mirror etcd's grpc-gateway at /v3/{service}/{method}.

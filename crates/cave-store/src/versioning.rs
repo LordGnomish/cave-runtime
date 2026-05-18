@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use ring::digest::{digest, SHA256};
 
 fn to_hex(bytes: &[u8]) -> String {

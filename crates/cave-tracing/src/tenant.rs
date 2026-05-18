@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-tenant scoping helpers.
 //!
 //! The SDK injects a `tenant_id` resource attribute on every span when a

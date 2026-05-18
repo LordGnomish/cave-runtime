@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-kubevirt: KubeVirt VM-as-K8s-pod reimplementation (scaffold).
 //!
 //! Upstream: kubevirt/kubevirt v1.8.2

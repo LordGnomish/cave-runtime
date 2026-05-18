@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Composition engine — resolve, execute, and roll back Composition pipelines.
 //!
 //! A Composition maps a `PromiseRequest` to an ordered set of CAVE module

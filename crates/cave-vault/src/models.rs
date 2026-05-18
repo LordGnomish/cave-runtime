@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Data models for cave-vault.
 //!
 //! Mirrors HashiCorp Vault's API response shapes for drop-in compatibility.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ADR Browser page + API.
 //!
 //! Walks `docs/adr/*.md`, extracts (id, title, category, file path) and

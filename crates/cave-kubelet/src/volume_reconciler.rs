@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Volume reconciler — DSW (Desired State of World) vs ASW (Actual State
 //! of World) reconcile loop.
 //!

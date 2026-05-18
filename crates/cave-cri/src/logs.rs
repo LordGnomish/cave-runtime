@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container log management — JSON line format + rotation.
 //!
 //! Each log line is a JSON object matching Docker/containerd's format:

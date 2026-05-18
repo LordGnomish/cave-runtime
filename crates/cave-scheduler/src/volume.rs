@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Volume scheduling deeper — VolumeBinding (Immediate / WaitForFirstConsumer
 //! / late-binding handshake) and VolumeZone.
 //!

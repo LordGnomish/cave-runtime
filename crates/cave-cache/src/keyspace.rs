@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keyspace notifications — Redis-compatible event broadcasting.
 
 use tokio::sync::broadcast;

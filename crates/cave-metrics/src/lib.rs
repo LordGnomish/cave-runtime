@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-metrics — Prometheus + VictoriaMetrics parity
 //!
 //! Compatible with: Prometheus, VictoriaMetrics

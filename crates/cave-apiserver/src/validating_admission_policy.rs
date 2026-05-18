@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ValidatingAdmissionPolicy — in-process CEL-style validation (KEP-3488).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

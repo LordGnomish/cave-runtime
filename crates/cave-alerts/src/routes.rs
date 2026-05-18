@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP API — Alertmanager v2 surface.
 //!
 //! - `GET    /api/alerts/health`              health

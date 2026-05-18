@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Webhook admission — line-by-line parity port of upstream
 //! `staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/`.
 //!

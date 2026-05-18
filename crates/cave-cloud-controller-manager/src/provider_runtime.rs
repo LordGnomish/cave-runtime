@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Provider runtime — error classification, rate limits, controller
 //! options, pre-init hooks.
 //!

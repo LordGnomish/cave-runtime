@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Storage layer — Kafka-style log compaction (tombstone-driven) and
 //! time/size-based retention.
 //!

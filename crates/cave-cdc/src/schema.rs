@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Schema evolution + compatibility checks (Avro / Protobuf / JSON).
 //!
 //! Cite: debezium `EventDispatcher` schema-emission flow + Confluent

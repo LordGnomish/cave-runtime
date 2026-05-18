@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Volume snapshot helpers and CSI integration types.
 
 use crate::types::{FileBackupTool, VolumeSnapshot, VolumeSnapshotConfig};

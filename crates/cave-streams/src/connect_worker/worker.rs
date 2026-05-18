@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! The Worker — top-level Connect runtime process. Holds task
 //! handles, drives the tick loop, owns the [`OffsetStore`].
 //! Mirrors `org.apache.kafka.connect.runtime.Worker` from

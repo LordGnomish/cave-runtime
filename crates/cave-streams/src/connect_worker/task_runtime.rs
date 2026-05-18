@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Task lifecycle types — the records a SourceTask emits and a
 //! SinkTask consumes, plus the trait every connector
 //! implementation hooks into.

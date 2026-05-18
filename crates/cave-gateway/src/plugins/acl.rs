@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ACL plugin — allow/deny lists based on consumer groups.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

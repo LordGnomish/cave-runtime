@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Event field definitions and EventContext for Falco condition evaluation.
 //!
 //! Covers all syscall, process, file descriptor, container, and k8s fields

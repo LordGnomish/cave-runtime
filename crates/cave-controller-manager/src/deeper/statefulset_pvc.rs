@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! StatefulSet — ordered creation + PVC binding state machine + scale-down
 //! + set-deletion cascade.
 //!

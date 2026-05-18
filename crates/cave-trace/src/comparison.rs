@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Module for comparing two distributed traces.
 //!
 //! This module provides functionality to diff two `Trace` objects,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LogQL recursive-descent parser.
 //! Converts a token stream (from `lexer`) into a `Query` AST node.
 

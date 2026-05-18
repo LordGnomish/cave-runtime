@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Alerting rules: evaluate a condition and transition through pending→firing→resolved.
 
 use std::collections::HashMap;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node pool management — add, remove, scale, labels, taints.
 
 use crate::error::{ClusterError, ClusterResult};

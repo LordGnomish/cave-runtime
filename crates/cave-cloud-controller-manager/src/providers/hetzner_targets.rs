@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hetzner Cloud — deeper provider surface.
 //!
 //! Upstream: `hetznercloud/hcloud-cloud-controller-manager` @

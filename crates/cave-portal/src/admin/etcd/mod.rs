@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/etcd` — etcdctl/etcd web-UI parity surface.
 //!
 //! etcd has no canonical web UI; this page mirrors the operator-

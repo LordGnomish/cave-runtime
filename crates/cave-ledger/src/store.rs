@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ledger persistence backends — WORM object storage, local file, and in-memory.
 //!
 //! Production: MinIO/ADLS via cave-store (WORM bucket with object lock)

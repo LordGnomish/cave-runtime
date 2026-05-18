@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! EndpointSlice topology-aware hints — `staging/src/k8s.io/endpointslice/topologycache/topologycache.go`.
 //!
 //! When `Service.spec.trafficDistribution = "PreferClose"` (or the legacy

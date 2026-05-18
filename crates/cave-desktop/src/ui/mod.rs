@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // UI primitives for the cave-desktop native shell.
 //
 // These are data-shape skeletons. Real rendering lands when the

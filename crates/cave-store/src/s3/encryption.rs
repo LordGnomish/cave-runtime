@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Server-side encryption support (SSE-S3, SSE-C, SSE-KMS).
 //!
 //! SSE-S3: AES-256 with a server-managed key (derived from a root key).

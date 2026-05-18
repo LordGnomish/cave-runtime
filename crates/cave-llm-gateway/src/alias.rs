@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Model aliasing — map friendly names to canonical provider+model pairs.
 
 use dashmap::DashMap;

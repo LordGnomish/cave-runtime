@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! JWT claims extraction — maps Okta and Keycloak tokens to CaveIdentity.
 
 use cave_core::types::{CaveIdentity, CaveRole, TokenType};

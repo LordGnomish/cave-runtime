@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! v1.31–1.34 KEP tests.
 
 use super::*;

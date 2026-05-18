@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LLM-powered planner — generate, optimize, cost-estimate, risk-score plans.
 //!
 //! In production `generate_plan` sends the intent + state diff to a local LLM

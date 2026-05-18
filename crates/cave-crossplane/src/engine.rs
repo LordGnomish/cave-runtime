@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Composition engine — renders composed resources from a Composition + claim spec.
 
 use std::collections::HashMap;

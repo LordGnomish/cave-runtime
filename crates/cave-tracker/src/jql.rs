@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Simple JQL-like query language for cave-tracker.
 //!
 //! Supported:

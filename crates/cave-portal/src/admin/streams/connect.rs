@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/streams/connect` view — Kafka Connect runtime
 //! console. Mirrors `connect/runtime/rest/resources/` from
 //! upstream `apache/kafka`. Four tab anchors:

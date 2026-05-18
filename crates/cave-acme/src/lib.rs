@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-acme — RFC 8555 ACMEv2 server reimplementation.
 //!
 //! Multi-tenant: every Account, Order and Authorization carries the

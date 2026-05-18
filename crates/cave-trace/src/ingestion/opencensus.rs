@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OpenCensus ingestion — grpc-json format.
 //!
 //! OpenCensus is mostly superseded by OpenTelemetry but some legacy clients

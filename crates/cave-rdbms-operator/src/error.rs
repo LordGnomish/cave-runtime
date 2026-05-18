@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #[derive(Debug, thiserror::Error)]
 pub enum PgError {
     #[error("instance not found: {0}")]

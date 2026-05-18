@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! v3 client compatibility layer — gRPC-over-HTTP/2 surface plus
 //! configurable retry / keepalive policies.
 //!

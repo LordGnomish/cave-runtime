@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Real CEL evaluator for ValidatingAdmissionPolicy.
 //!
 //! Closes the largest behavioural gap recorded in

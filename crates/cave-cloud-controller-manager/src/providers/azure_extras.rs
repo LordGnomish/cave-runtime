@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Azure provider extras — Application Gateway, AvailabilityZones,
 //! Disk CSI shape, AAD Workload Identity.
 //!

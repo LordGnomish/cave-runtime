@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL management — compatible with pgAdmin / CloudNativePG.
 //!
 //! Compatible with: pgAdmin, CloudNativePG

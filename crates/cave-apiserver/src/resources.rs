@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kubernetes resource types — full core API surface parity.
 
 use chrono::{DateTime, Utc};

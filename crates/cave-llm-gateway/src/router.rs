@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GatewayRouter — multi-provider routing with load balancing and fallback chains.
 
 use crate::alias::AliasRegistry;

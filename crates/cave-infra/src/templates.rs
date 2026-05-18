@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Infrastructure modules/templates — reusable resource blueprints.
 
 use crate::resource::{ResourceKind, ResourceSpec};

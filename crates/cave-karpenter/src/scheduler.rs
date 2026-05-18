@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Karpenter scheduler stub.
 //!
 //! Upstream reference: pkg/controllers/provisioning/scheduling/scheduler.go

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/container-scan` — Trivy vulnerability report parity. The
 //! upstream UI is minimal (Trivy is CLI-first); this page mirrors
 //! the `trivy image` JSON output as a per-image table with severity

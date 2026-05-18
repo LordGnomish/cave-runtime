@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Session affinity (ClientIP timeout) — parity tests against k8s v1.36.0.
 //!
 //! Upstream: `pkg/proxy/serviceport.go:43` (SessionAffinityType),

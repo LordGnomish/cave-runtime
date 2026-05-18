@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Raft consensus state machine.
 //!
 //! This module implements the **safety-critical** core of Raft from

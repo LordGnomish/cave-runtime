@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Real behavior tests for cave-trace propagation (Mode B-prime spike).
 //! Exercises W3C Trace Context parse/inject round-trip + error cases.
 //! Generated 2026-05-04 via local Ollama (qwen3.6:35b-a3b-coding-mxfp8).

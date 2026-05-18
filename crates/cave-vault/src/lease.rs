@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Lease management and automatic revocation.
 
 use chrono::{DateTime, Utc};

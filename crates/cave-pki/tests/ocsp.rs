@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-pki — OCSP responder tests pinned to RFC 6960.
 
 use cave_pki::{CrlResponder, OcspResponder, OcspStatus, RevocationReason};

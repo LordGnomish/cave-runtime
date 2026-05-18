@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TLS subsystem — SNI-based routing, TLS termination, mTLS upstream, ACME.
 //!
 //! Uses rustls for TLS handling. Certificates are stored in the GatewayStore

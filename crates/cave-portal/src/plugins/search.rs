@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Search plugin — global cross-domain search.
 //!
 //! Indexes catalog entries, dashboards, ADRs, secrets metadata, deployments,

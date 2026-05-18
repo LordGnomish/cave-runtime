@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus-compatible data models.
 //!
 //! Mirrors the Prometheus HTTP API response envelope and data types

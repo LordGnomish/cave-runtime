@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Loading skeletons + error boundary panel.
 //!
 //! Skeleton rows are content-shaped placeholders that show the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Resource providers — abstractions over cloud/infra APIs.
 
 use serde::{Deserialize, Serialize};

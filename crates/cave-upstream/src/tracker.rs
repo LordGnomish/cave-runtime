@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitHub release tracker — fetches latest releases and generates triage items.
 
 use crate::projects::TrackedProject;

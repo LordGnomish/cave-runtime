@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! bot-detection plugin — block/allow known bot User-Agents.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

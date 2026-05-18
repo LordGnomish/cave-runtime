@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl deploy <module> [--revision <r>] [--strategy <s>]`
 //!
 //! Native deploy verb — upstream-agnostic. Targets a *Cave module*

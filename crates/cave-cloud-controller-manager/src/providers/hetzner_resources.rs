@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hetzner Cloud resource catalog + tenant-scoped inventory.
 //!
 //! Extends [`super::hetzner::HetznerProvider`] with the resource shapes the

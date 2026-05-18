@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Graceful node-shutdown handler — KEP-2000.
 //!
 //! Mirrors `pkg/kubelet/nodeshutdown/` from upstream. The

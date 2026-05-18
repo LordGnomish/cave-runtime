@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use tokio::sync::broadcast;
 use crate::store::StoreEvent;
 use crate::types::NotificationConfig;

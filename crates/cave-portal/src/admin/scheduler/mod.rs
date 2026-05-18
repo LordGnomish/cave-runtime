@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/scheduler` — kube-scheduler Web UI parity surface.
 //!
 //! Tabs mirror kube-scheduler's operator-facing observability:

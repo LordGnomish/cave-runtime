@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Route controller tab — per-node pod CIDR routes (k8s.io node-routes).
 
 use super::CloudControllerViewError;

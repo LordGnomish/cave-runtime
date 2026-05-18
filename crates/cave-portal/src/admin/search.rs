@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/search` — OpenSearch Dashboards parity. Index list with
 //! doc-count + size summary, status-grouped chips.
 //!

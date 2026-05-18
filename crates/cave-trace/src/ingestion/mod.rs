@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ingestion protocol handlers.
 //!
 //! Each submodule converts a wire format into `Vec<crate::types::Span>` for

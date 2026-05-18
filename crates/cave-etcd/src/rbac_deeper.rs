@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! RBAC deeper-cut — root-user auto-creation, full permission set
 //! resolution, and prefix-vs-exact-vs-range permission semantics.
 //!

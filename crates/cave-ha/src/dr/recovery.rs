@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Point-in-time recovery (PITR) and failback for DR sites.
 //!
 //! Recovery workflow:

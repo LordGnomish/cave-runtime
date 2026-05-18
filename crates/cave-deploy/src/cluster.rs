@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster gateway — wraps a kube::Client and provides the primitives
 //! that the sync engine needs: apply (SSA), get, delete, list.
 //!

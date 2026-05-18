@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA target ref + scale subresource — `pkg/controller/podautoscaler/horizontal.go::reconcileAutoscaler`.
 //!
 //! `spec.scaleTargetRef` points at the controller (Deployment / ReplicaSet /

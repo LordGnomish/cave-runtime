@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Streams API — stateless and stateful stream transformations.
 //!
 //! Provides a fluent DSL for defining stream processing pipelines:

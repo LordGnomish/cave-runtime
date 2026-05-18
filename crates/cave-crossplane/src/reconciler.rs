@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Reconcile queue for resource reconciliation.
 
 use std::collections::VecDeque;

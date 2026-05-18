@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Distributed concurrency primitives — `Mutex`, `RWMutex`, and `Election`.
 //!
 //! Mirrors etcd's `clientv3/concurrency` package which builds these on top

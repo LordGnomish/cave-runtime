@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runtime build/migration progress endpoints.
 //!
 //! Surfaces a JSON snapshot of platform port progress so the dev portal can

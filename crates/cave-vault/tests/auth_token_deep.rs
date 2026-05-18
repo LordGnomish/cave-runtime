@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-001: Token store — explicit_max_ttl clamping, periodic tokens,
 //! num_uses, child token TTL clamp, default-policy injection toggle,
 //! orphan parenting. Pinned to openbao v2.5.3.

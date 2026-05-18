@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SPDY/WebSocket byte transport for `exec` and `attach`.
 //!
 //! Cite: containerd v2.2.3 `pkg/cri/streaming/portforward/portforward.go`,

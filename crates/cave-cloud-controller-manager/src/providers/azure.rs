@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Azure cloud provider scaffold.
 //!
 //! Upstream: `kubernetes-sigs/cloud-provider-azure` @ [`PROVIDER_VERSION`].

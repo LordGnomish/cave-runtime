@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus scaler — scales on a PromQL query result.
 //! upstream: kedacore/keda v2.x — pkg/scalers/prometheus_scaler.go
 

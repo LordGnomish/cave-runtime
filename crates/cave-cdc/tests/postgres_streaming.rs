@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-cdc — Postgres logical replication tests.
 //! Pinned to debezium-connector-postgres v3.5.0.Final.
 

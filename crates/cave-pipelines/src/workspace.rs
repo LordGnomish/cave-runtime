@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Workspace management: shared volumes between tasks.
 //! Supports EmptyDir, PVC, ConfigMap, Secret, and HostPath bindings.
 

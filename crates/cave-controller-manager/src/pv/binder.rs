@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PV/PVC binder — `pkg/controller/volume/persistentvolume/pv_controller.go`.
 //!
 //! Reconciles PersistentVolumeClaims with PersistentVolumes:

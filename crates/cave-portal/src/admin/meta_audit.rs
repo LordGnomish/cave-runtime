@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/_audit` — consolidated portal-wide audit roll-up.
 //!
 //! The single page Burak should land on to answer "how is everything

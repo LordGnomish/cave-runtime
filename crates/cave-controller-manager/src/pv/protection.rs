@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PV / PVC protection finalizers — `pkg/controller/volume/pvprotection`
 //! and `pkg/controller/volume/pvcprotection`.
 //!

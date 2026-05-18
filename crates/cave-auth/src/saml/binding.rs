@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SAML transport bindings — how messages travel between SP and
 //! IdP over HTTP. cave-auth implements the two front-channel
 //! bindings every real-world IdP supports:

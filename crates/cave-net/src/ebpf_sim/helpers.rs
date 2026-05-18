@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Userspace mocks for `bpf_helpers.h`.
 //!
 //! Cilium programs call:

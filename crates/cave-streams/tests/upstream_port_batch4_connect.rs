@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Upstream-test port — Kafka Connect runtime + Tiered Storage.
 //!
 //! Each test below mirrors a `@Test` method in the upstream

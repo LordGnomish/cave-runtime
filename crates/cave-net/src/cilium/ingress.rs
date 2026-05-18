@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ingress controller — Cilium's Envoy-backed L7 gateway.
 //!
 //! Mirrors `pkg/ingress/ingress.go` (cilium-ingress-controller) plus the

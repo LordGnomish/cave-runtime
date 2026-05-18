@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Async semaphore — bounded concurrency primitive.
 //!
 //! Mirrors `tokio::sync::Semaphore` reduced to the surface every

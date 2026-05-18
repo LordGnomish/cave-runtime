@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Top-level pipeline that ties matchers + routing + inhibit + silences +
 //! grouping + receivers together. Also keeps the legacy convenience
 //! functions used by older callers (`route_alert`, `is_silenced`,

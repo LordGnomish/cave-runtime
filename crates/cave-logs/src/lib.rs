@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-logs — Full Loki-parity log aggregation for the CAVE Unified Runtime.
 //!
 //! # Features

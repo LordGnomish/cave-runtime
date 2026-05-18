@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-pki — sovereign internal CA hierarchy + chain validation +
 //! CRL/OCSP responder.
 //!

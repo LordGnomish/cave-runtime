@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Monitoring sub-page — traffic stats per model.
 
 use super::types::{LiteLlmTraffic, LiteLlmViewError};

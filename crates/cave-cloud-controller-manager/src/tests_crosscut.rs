@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cross-controller crosscut tests for cave-cloud-controller-manager.
 //!
 //! Verifies behaviours that span multiple controller loops in upstream

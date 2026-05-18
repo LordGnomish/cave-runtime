@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Core — shared types, configuration, and utilities for the Unified Runtime.
 //!
 //! This crate defines the foundational types used across all CAVE modules:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Admission webhook integration tests.
 //!
 //! Tests AdmissionReview v1 API, OPA + Kyverno integration,

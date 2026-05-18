@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core value types for cave-cache.
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};

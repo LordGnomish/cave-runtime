@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Memory eviction policies for cave-cache.
 
 use std::time::Instant;

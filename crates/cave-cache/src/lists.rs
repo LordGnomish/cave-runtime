@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use std::collections::VecDeque;
 use crate::engine::CacheEngine;
 use crate::types::{CacheEntry, CacheError, CacheResult, CacheValue};

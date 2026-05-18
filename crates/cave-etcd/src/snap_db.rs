@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `snap.db` file format — the on-disk snapshot artefact etcd v3.6 emits
 //! and reads on `--initial-cluster-state existing` boot.
 //!

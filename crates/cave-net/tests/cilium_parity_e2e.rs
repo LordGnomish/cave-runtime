@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-net Cilium-parity end-to-end integration tests.
 //!
 //! Cross-module scenarios that exercise the public surface against

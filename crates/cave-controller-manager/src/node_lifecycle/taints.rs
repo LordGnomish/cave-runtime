@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node taints — `pkg/controller/nodelifecycle/scheduler/taint_manager.go`
 //! and `pkg/util/taints/taints.go`.
 //!

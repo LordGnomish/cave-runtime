@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! kubeconfig generation for cluster access.
 
 use crate::cluster::Cluster;

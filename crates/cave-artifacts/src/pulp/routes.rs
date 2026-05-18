@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP API routes for cave-artifacts — Pulp v3 REST API.
 
 use crate::pulp::{

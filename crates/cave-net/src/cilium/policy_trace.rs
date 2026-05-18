@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PolicyTrace — explain why a (src, dst, port, proto) decision was
 //! made. Backs `cilium policy trace`.
 //!

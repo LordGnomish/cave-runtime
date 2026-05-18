@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! App shell — wires together [`Router`], [`PluginRegistry`], and the
 //! per-request auth + tenant contexts to serve a full HTML page.
 //!

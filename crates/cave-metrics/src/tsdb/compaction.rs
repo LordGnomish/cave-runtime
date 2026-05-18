@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Block compaction, downsampling, and retention helpers.
 
 use crate::model::Sample;

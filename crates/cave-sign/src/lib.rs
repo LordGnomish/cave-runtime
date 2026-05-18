@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Image signing & verification — compatible with Sigstore Policy Controller
 //!
 //! Compatible with: Sigstore Policy Controller

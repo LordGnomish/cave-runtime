@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Server configuration for cave-cache.
 
 use std::time::Duration;

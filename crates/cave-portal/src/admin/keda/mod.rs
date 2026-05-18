@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/keda` views — KEDA ScaledObject, ScaledJob, TriggerAuthentication,
 //! scaler-catalog browser, and per-scaler metrics.
 //!

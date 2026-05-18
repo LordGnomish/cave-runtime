@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-knative: Knative Serverless reimplementation.
 //!
 //! upstream: knative/serving v1.18.x, knative/eventing v1.18.x

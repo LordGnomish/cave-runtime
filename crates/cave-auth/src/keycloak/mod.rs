@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keycloak-compatible admin and OIDC endpoints.
 //!
 //! Modules:

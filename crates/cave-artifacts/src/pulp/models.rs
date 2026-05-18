@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pulp v3 data models.
 //!
 //! Repository, RepositoryVersion, Remote, Distribution, Publication,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Maglev consistent-hash load balancer (Cilium kube-proxy replacement).
 //!
 //! Mirrors `pkg/maglev/maglev.go` and the Maglev reference algorithm

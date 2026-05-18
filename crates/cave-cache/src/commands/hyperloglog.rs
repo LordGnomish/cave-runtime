@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HyperLogLog commands: PFADD, PFCOUNT, PFMERGE.
 //!
 //! Implements the HyperLogLog++ algorithm compatible with Redis.

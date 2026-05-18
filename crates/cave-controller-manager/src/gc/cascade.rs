@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cascade plan computation — `pkg/controller/garbagecollector/garbagecollector.go`.
 //!
 //! Given the dependency graph and a [`DeletionPropagation`] policy, compute

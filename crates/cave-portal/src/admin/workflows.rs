@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/workflows` — n8n editor parity (Argo Workflows / Temporal
 //! sibling). Workflow run browser with status cards + duration aggregate.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rate limiting plugin — fixed window, sliding window, and Redis-backed counters.
 //!
 //! Config keys:

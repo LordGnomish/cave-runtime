@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ClusterRoleAggregation deeper — `pkg/controller/clusterroleaggregation`.
 //!
 //! Adds:

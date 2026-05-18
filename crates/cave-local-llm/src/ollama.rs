@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ollama HTTP client — GET /api/tags, POST /api/generate, POST /api/chat (streaming + non-streaming).
 
 /// Default model for all Qwen amele operations.

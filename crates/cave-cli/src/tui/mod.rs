@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TUI mode for `cavectl` — k9s-style terminal-first console.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 M5: a pure-state TUI that

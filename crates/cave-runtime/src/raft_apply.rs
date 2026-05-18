@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Apply daemon — drains committed Raft entries into the local
 //! state machine (cave-etcd `KvStore` + cave-apiserver
 //! `ResourceStore`).

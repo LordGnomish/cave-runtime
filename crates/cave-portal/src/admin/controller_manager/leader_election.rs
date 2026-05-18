@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Leader election tab — `kube-system/Lease` browser. Mirrors the
 //! upstream kube-controller-manager leader-election surface.
 

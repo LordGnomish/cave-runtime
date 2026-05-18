@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTML rendering helpers.
 //!
 //! The web shell deliberately avoids template-engine dependencies — the

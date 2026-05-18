@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node lease + status reporter — heartbeat (`coordination.k8s.io/v1`
 //! Lease) and node-condition transition tracking.
 //!

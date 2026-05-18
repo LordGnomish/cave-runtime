@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Remote write API handler.
 
 use std::sync::Arc;

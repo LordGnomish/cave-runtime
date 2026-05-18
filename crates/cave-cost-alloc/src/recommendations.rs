@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Recommendation engine for Kubernetes cost optimization.
 
 use crate::cost_model::CostCalculator;

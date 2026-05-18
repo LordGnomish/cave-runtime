@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deduplication and SLA tracking — DefectDojo finding lifecycle parity.
 //!
 //! Cite: `dojo/finding/helper.py::do_dedupe_finding` for the dedup-key

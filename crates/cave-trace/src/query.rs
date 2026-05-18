@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Query engine — wraps the store with higher-level search and analysis APIs.
 //!
 //! This layer sits between routes and storage; it owns no state itself.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP admin API routes for cave-docdb.
 
 use crate::bson::Document;

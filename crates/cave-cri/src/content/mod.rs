@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Content-addressable storage (CAS).
 //!
 //! Ports `core/content/` from upstream containerd

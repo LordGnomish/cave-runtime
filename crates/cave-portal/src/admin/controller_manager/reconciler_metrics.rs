@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Reconciler metrics tab — reconcile duration p50/p99 + error rate
 //! per controller. Mirrors `controller_runtime_reconcile_*` series.
 

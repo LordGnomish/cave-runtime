@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Streaming endpoints: exec, attach, port-forward.
 //!
 //! Mirrors `pkg/kubelet/cri/streaming` and the upstream streaming protocol

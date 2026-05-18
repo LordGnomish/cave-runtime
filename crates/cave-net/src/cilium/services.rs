@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service registry — Cilium's view of K8s `Service` + `Endpoints`.
 //!
 //! Mirrors `pkg/service/service.go::svcInfo` and `pkg/loadbalancer/types.go`.
