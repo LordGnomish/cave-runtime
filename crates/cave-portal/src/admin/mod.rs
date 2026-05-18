@@ -33,6 +33,7 @@ pub mod chaos;
 pub mod chat;
 pub mod cloud_controller_manager;
 pub mod cluster;
+pub mod charter_matrix;
 pub mod compliance;
 pub mod meta_audit;
 
