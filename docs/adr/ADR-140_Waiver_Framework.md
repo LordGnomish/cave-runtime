@@ -1,66 +1,77 @@
-# ADR-140: Waiver Framework
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
-**Status:** Accepted
+# ADR-140: Waiver Framework for Temporary Policy Exceptions
 
-**Scope:** Runtime, Universal
-
-**Category:** Platform Governance
-
-**Related ADRs:** 030 (OPA), 089 (Policy Provenance), 093 (Ledger), 137 (Constitutional Tiering)
+## Status
+Accepted
 
 ## Context
+Cave Runtime enforces policy through `cave-policy` and the
+constitutional tiers of ADR-137. Real operations occasionally need
+*temporary* relief from a rule — for example: an unfixed upstream CVE,
+a tenant migration that briefly needs a relaxed egress rule, a workload
+needing host networking until a feature lands.
 
-Zero-exception policy enforcement is theoretically ideal but operationally brittle. Real-world scenarios require temporary exceptions: CVE risk acceptance while fix is in progress, deprecated API usage during migration, relaxed egress policy for vendor integration testing, security policy exception for legacy tenant migration.
-
-Without a formal waiver process, exceptions happen informally (Slack message to guardian, undocumented OPA rule override) — creating audit gaps and compliance risk.
-
----
-
-## Candidates
-
-| Approach | TTL-bounded waiver framework (chosen) | No waivers (absolute policies) | Permanent waivers | Informal exceptions |
-|---|---|---|---|---|
-| Edge case handling | ✅ Documented exception path | ❌ Shadow workarounds | ✅ | ⚠️ Tribal knowledge |
-| Policy integrity | ✅ Waivers expire, force re-evaluation | ✅ Maximum | ❌ Permanent erosion | ❌ Undocumented drift |
-| Compliance trail | ✅ Waiver attestation in Ledger | N/A | ⚠️ Permanent | ❌ |
-| Tier-appropriate approval | ✅ A: multi-sig, B: guardian, C: team lead | N/A | ⚠️ Single approver | ❌ |
-| Renewal discipline | ✅ Max 90d, renewable once | N/A | ❌ No renewal trigger | ❌ |
+If there is no formal way to grant an exception, operators reach for
+informal workarounds (chat-approved policy edits, hand-rolled bypasses
+in admission). Those workarounds are invisible to audit and tend to
+become permanent. This ADR defines the only sanctioned way to grant a
+temporary exception.
 
 ## Decision
+The Runtime exposes a waiver primitive with the following non-negotiable
+properties.
 
-| Element | Requirement |
-|---|---|
-| **Scope** | Specific: tenant + namespace + resource (never platform-wide, never wildcard) |
-| **Justification** | Written risk assessment: what policy is waived, why, what compensating controls exist, what is the blast radius |
-| **Approval** | Tier A policies: no waiver possible. Tier B: guardian approval. Tier C: team lead. |
-| **TTL** | Maximum 90 days. Renewable once with fresh justification (max total: 180 days). |
-| **Compensating controls** | Mandatory for security-related waivers. Optional for operational waivers. |
-| **Ledger** | `Waiver Granted` attestation: hash of justification, scope, TTL, approver cave_uid |
-| **Enforcement** | OPA waiver exception injected via OPAL data source. Scoped to specific tenant+namespace+resource. |
-| **Expiry** | Auto-revoked at TTL. `cave-ctl compliance status` shows active waivers. |
-| **Review** | Active waivers reviewed quarterly during guardian review. |
-| **Escalation** | If waiver renewed 2x (>180 days), mandatory ADR for permanent resolution. |
+| Property | Rule |
+|----------|------|
+| Scope | A waiver names a specific tenant, namespace and resource selector. Cluster-wide or wildcard waivers are forbidden. |
+| Justification | A written risk assessment in the PR that creates the waiver: what is being waived, why, what compensating controls are in place, what is the blast radius. |
+| Approval | Tier A artefacts (ADR-137) cannot be waived. Tier B requires the named owner. Tier C requires team-lead approval. |
+| TTL | Maximum 90 days. Renewable once with fresh justification. Hard cap 180 days. |
+| Compensating control | Mandatory for security-relevant waivers; optional for operational ones. |
+| Audit | A `waiver_granted` event is written to the signed-event log: hash of justification, scope, TTL, approver identity. |
+| Enforcement | The waiver is materialised as a scoped policy exception in `cave-policy`; nothing outside that path may grant a bypass. |
+| Expiry | Automatic at TTL. `cavectl compliance waivers` lists active waivers and how long they have left. |
+| Escalation | A waiver renewed twice (total reach >180 days) triggers a mandatory ADR proposing a permanent resolution. |
 
----
-
-## Rejected
-
-- **No waiver process (all policies absolute):** Some edge cases legitimately need temporary exceptions (e.g., upstream CVE without fix, performance-critical workload needing host networking). Absolute policies with no exception path create shadow workarounds.
-- **Permanent waivers:** Waivers without TTL become permanent policy erosion. Max 90d (renewable once) forces re-evaluation.
-- **Team-level waiver for all tiers:** Tier A (immutable) should never be waived. Tier B requires guardian judgment. Only Tier C is team-lead-adjustable.
+## Rejected Alternatives
+- **No waiver path (absolute policies).** Operators will route around
+  the rule via undocumented bypasses; this is the worst outcome for
+  audit.
+- **Permanent waivers.** Without TTL, a "temporary" exception becomes a
+  silent policy change. The 90-day cap forces re-evaluation.
+- **Single approver for all tiers.** Treats a Tier-A exception (which
+  the Runtime forbids) the same as a Tier-C operational tweak; loses
+  the safety property of ADR-137.
 
 ## Consequences
 
-## ### Positive
-- Formal, auditable exception process replaces informal workarounds
-- TTL ensures waivers don't become permanent drift
-- Ledger attestation satisfies SOC2/ISO 27001 exception documentation requirements
-- OPAL distribution ensures waiver is scoped precisely (no broad OPA override)
+Positive
+- Exceptions are visible to audit by construction — they live in the
+  same signed-event log as constitutional changes.
+- The Runtime keeps a single source of truth for "what is currently
+  not being enforced", instead of distributing that knowledge across
+  ad-hoc admission edits.
+- A waiver that needs to be renewed twice is a signal that the
+  underlying policy needs to change — the framework surfaces that
+  signal instead of hiding it.
 
-### Negative
-- Waiver process adds governance overhead for legitimate exceptions
-- Risk of "waiver fatigue" if too many exceptions requested (mitigated: quarterly review + ADR escalation)
+Negative
+- A waiver carries real paperwork weight; operators may try to avoid
+  the process for genuinely urgent cases. The Runtime mitigates by
+  making the happy path (Tier C, named compensating control)
+  lightweight.
+- "Waiver fatigue" is possible if many exceptions accumulate; the
+  quarterly review is the relief valve.
 
-## Compliance Mapping
+## Compliance Anchors
+External mappings (SOC2 CC6.1, ISO 27001 A.5.1 / A.5.36, NIS2 Art.21)
+reference this ADR as the documented exception process. Mapping detail
+lives in `docs/compliance/`.
 
-SOC2 CC6.1 (policy exception management). ISO A.5.1 (policy governance — exception process). ISO A.5.36 (compliance — documented exceptions with TTL). NIS2 Art.21 (risk management — formal exception process).
+## Related ADRs
+- ADR-137 (Constitutional Tiering — which tiers may be waived at all)
+- ADR-138 (Evidence Tiering — a waiver does not reduce the evidence
+  required for the change it accompanies)

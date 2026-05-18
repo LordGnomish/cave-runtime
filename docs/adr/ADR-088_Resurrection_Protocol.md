@@ -1,72 +1,88 @@
-# ADR-088: Resurrection Protocol
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
-**Status:** Accepted
+# ADR-088: Resurrection Protocol — Restore-from-Cold
 
-**Scope:** Universal
-
-**Category:** DR
-
-**Related ADRs:** 079 | Absorbs: ADR-097
+## Status
+Accepted
 
 ## Context
+Cave Runtime stores tenant state in `cave-etcd` (Raft-replicated) and
+configuration as code (operator's git). A working cluster can be
+destroyed by hardware loss, ransomware, mis-operation, or hostile
+takeover. The Runtime must be recoverable **from cold** — that is,
+starting from nothing except (a) an offline secret-zero kit and
+(b) snapshots that the operator placed in independent escrow.
 
-CAVE must be recoverable from complete cluster destruction (data center fire, catastrophic cloud failure, hostile takeover). Recovery must be independently achievable without depending on the destroyed infrastructure.
-
-
-## Candidates
-
-| Phase | Action | Dependency | Target Duration |
-|---|---|---|---|
-| 1. Key recovery | Shamir 3-of-5 reassembly (HSM fast-path) | Break-glass Kit (offline) | <90 min |
-| 2. WORM access | Retrieve etcd snapshot, Talos configs, Git mirror | WORM escrow (cross-region) | <15 min |
-| 3. etcd restore | Decrypt + restore etcd snapshot | KMS key from Kit | <15 min |
-| 4. Node provision | Apply Talos machine configs to new nodes | Talos image in WORM | <30 min |
-| 5. K8s API | Kubernetes API server comes up | etcd + nodes | <5 min |
-| 6. ArgoCD bootstrap | Deploy ArgoCD, point to Git mirror | K8s API | <15 min |
-| 7. Platform reconcile | ArgoCD reconciles all platform components | ArgoCD + Git | <30 min |
-| 8. Crossplane reconcile | Crossplane reconciles infrastructure | Crossplane + providers | <30 min |
-| 9. Tenant restore | Workloads restored from last known state | Platform services | <30 min |
-| 10. Validation | SLO baseline comparison, smoke tests | All services | <15 min |
-
+This ADR specifies the Runtime-side contract that makes that recovery
+possible. Where to store snapshots, which cloud region to escrow into,
+which legal jurisdiction holds the keys — those are operator deployment
+choices and live outside the Runtime.
 
 ## Decision
+Cave Runtime's resurrection contract has five Runtime-owned phases. The
+target is <4 hours from cold start to "apiserver healthy, tenants
+admissible". Phases 6–10 (workload re-bind) are operator-driven and
+not part of the Runtime contract.
 
-10-phase resurrection from Break-glass Kit + WORM escrow. Total target: <4 hours from incident declaration to ArgoCD healthy. WORM escrow contents: Git mirror (hourly), etcd snapshots (5min prod), Talos machine configs, Sovereign Ledger replica. WORM escrow is cross-region, cross-account, independent of primary cluster. Quarterly simulation drill (phases 3-10). Annual full drill (all 10 phases including Shamir).
+| Phase | Runtime obligation | Target |
+|-------|--------------------|--------|
+| 1. Secret-zero | `cave-vault` accepts an externally reassembled root key (Shamir 3-of-5 or HSM unseal) — see ADR-079. | < 90 min |
+| 2. Snapshot ingress | `cave-runtime serve` accepts a previously-exported etcd snapshot and CA bundle on first boot via `--restore-from`. | < 15 min |
+| 3. etcd restore | `cave-etcd` rehydrates from the snapshot deterministically; WAL is rebuilt; cluster membership is rewritten to the new node list. | < 15 min |
+| 4. Apiserver up | `cave-apiserver` comes up read-only until quorum, then writeable. Admission for tenant workloads is gated until phase 5. | < 5 min |
+| 5. Tenant readiness | `cave-auth` re-issues tenant tokens against the restored identity store; admission opens. | < 30 min |
 
+Phases 6 onward (GitOps reconcile, application-layer restore) are the
+operator's responsibility and depend on the deployment profile.
 
-## Rejected Options
+## Requirements on the Runtime
 
-- **No DR plan:** Unacceptable for a platform hosting multi-tenant production workloads.
-- **Backup-only (no tested restore):** Untested backups are not backups. Resurrection drill validates restorability.
-- **Cloud-provider DR only:** Circular dependency during total cloud loss. Azure Backup/Hetzner snapshots are useful for node-level recovery but insufficient for total platform resurrection.
-- **Active-active multi-region:** Phase 4 future capability. Too complex for initial delivery. Resurrection protocol covers the gap.
+1. **Idempotent restore.** `--restore-from <snapshot>` must succeed
+   against an empty data dir, or refuse cleanly if the data dir is
+   already populated. No silent overwrite.
+2. **Deterministic rehydration.** A given snapshot must produce a
+   byte-identical etcd state across two independent restores. This is
+   the property exercised by the quarterly drill.
+3. **Drill-friendly mode.** `cave-runtime cluster restore --dry-run`
+   validates a snapshot + key bundle without committing — used by the
+   operator's quarterly resurrection drill to keep restorability honest.
+4. **No external dependency in the critical path.** The restore path
+   only needs the local snapshot, the local key bundle and the binary
+   itself. No SaaS, no cloud API, no DNS round-trip is required.
 
+## Out of Scope
+- Where the snapshot is stored (S3, MinIO, tape, etc.) — Platform.
+- Cross-region escrow strategy — Platform.
+- Multi-cloud failover topology — Platform.
+- Application-layer restore (databases inside tenants) — tenant operator.
+
+## Rejected Alternatives
+- **No restore path.** Unacceptable for a multi-tenant Runtime.
+- **Backup tooling only, no documented restore.** "Untested backups are
+  not backups." The drill exists because restore is the contract, not
+  backup.
+- **Restore via re-bootstrap of a fresh cluster.** Would lose tenant
+  identity continuity (token issuer changes, certs invalidated).
+  Restore must preserve the identity root.
 
 ## Consequences
 
-**Positive:**
-- Platform fully recoverable from total destruction within 4 hours.
-- WORM escrow is independent of primary cloud infrastructure.
-- HSM fast-path enables remote key recovery without physical co-location.
-- Quarterly/annual drills produce `GOT-Benchmark` attestations proving recoverability.
+Positive
+- The operator can answer "what does recovery look like?" without
+  reference to any specific cloud or SaaS.
+- The drill is small enough to exercise quarterly (it does not require
+  rebuilding the whole platform — only the Runtime contract).
 
-**Negative:**
-- Key holder coordination required (3-of-5 for full recovery).
-- WORM escrow storage cost.
-- Git mirror and etcd snapshot frequency determine RPO (5min for etcd, hourly for Git — worst case 1h RPO for platform config).
-- Resurrection drill is time-consuming (4h for full drill — planned quarterly/annually).
+Negative
+- The 4-hour budget pre-supposes the operator has the secret-zero kit
+  reachable in <90 min. That is a deployment property, not a Runtime
+  guarantee.
+- Idempotent restore costs extra disk space during transition
+  (snapshot + rehydrated state held briefly together).
 
-Compliance Mapping
-
-SOC2 CC7.5 (disaster recovery). SOC2 CC9.1 (risk mitigation). ISO A.5.29 (information security during disruption). ISO A.5.30 (ICT readiness for business continuity). NIS2 Art.21 (business continuity, disaster recovery).
-
-Absorbed Decisions:
-
-The following tool-level decisions are absorbed into this ADR for traceability
-
-Multi-Region Failover
-
-Decision:
-
-Multi-region failover via Cloudflare DNS health-check. Active-passive default (cost-efficient). Active-active for premium dedicated tenants. Cross-cloud out of scope (ADR-066).
-
+## Related ADRs
+- ADR-079 (Secret-Zero Bootstrap + Break-Glass Kit)
+- ADR-RUNTIME-CERT-LIFECYCLE-001 (CA hierarchy survives restore)
+- ADR-MULTI-TENANT-001 (why identity continuity matters)

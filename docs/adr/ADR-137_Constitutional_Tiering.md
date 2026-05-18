@@ -1,88 +1,93 @@
-# ADR-137: Constitutional Tiering
+<!--
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
-**Status:** Accepted
+# ADR-137: Constitutional Tiering of Governed Configuration
 
-**Scope:** Runtime, Universal
-
-**Category:** Platform Governance
-
-**Related ADRs:** 093 (Sovereign Ledger), 112 (APOL), 133 (Compatibility Matrix), 136 (Bounded Autonomy)
+## Status
+Accepted
 
 ## Context
+Cave Runtime ships a number of artefacts that are *normative* — changing
+them changes the meaning of the cluster. Examples: the identity-root
+configuration that `cave-auth` boots from, the policy bundles that
+`cave-policy` evaluates, the operational thresholds that the
+self-improving daemon may touch.
 
-CAVE designates certain artifacts as "constitutional" — protected from automation and requiring multi-sig governance. However, grouping all governed artifacts at the same protection level creates:
+If all of these are gated behind the same heavy approval flow, change
+velocity collapses for routine tuning. If none of them are gated, an
+operator (or the autonomous agent in ADR-SELF-IMPROVE-001) can quietly
+re-write the constitution.
 
-- **Guardian bottleneck:** Every soak window change, FinOps threshold adjustment, or alert routing update requires 2-of-3 guardian multi-sig + hardware key. Guardians become approval bottlenecks for routine operational tuning.
-- **Change velocity reduction:** Platform evolution slows because trivial config changes get the same governance overhead as identity root modifications.
-- **APOL ineffectiveness:** APOL downgrades to recommendation-only mode whenever it needs to adjust governed artifacts, even if those artifacts are operational parameters (not security-critical).
-
-The solution is tiered protection: highest protection for identity/trust roots, moderate for evolvable policies, lightest for operational parameters.
-
----
-
-## Candidates
-
-| Approach | Three-tier constitutional (chosen) | No tiering (guardian for all) | Binary (critical/non-critical) | Tagging without enforcement |
-|---|---|---|---|---|
-| Guardian bottleneck | ✅ Tier C is team-lead approval | ❌ All changes need guardian | ⚠️ Only 2 tiers | ✅ |
-| Change velocity | ✅ Proportional to impact | ❌ Slow for all changes | ⚠️ | ✅ Fastest |
-| Immutability guarantee | ✅ Tier A is multi-sig | ❌ Single approver bypass | ⚠️ | ❌ Advisory only |
-| Granularity | ✅ Three meaningful levels | ❌ Single class | ❌ Too coarse | ⚠️ |
-| Enforcement | ✅ Constitutional Registry + Ledger | ✅ | ✅ | ❌ Cosmetic |
+This ADR establishes a tiered governance taxonomy so that each governed
+artefact carries a clear "how do you change me" contract.
 
 ## Decision
+Three tiers, each with a specific change process and an audit obligation
+in the operator's signed-event log.
 
-## Three constitutional tiers with proportional governance:
+| Tier | Name | Change process | Approval | Audit |
+|------|------|----------------|----------|-------|
+| A | Immutable Constitutional | PR + multi-party signed approval + hardware-backed signing | Multi-party (2-of-N) | `constitutional_change` event |
+| B | Protected Evolvable | PR + single named approver | Named owner | `protected_change` event |
+| C | Governed Operational | Normal review | Team lead | Standard audit event |
 
-| Tier | Name | Change Process | Approval | Ledger |
-|---|---|---|---|---|
-| **A** | Immutable Constitutional | PR + 2-of-3 guardian multi-sig + hardware-backed signing key | Multi-sig | `Constitutional Change` attestation |
-| **B** | Protected Evolvable | PR + single guardian approval + standard signing | Guardian | `Protected Change` attestation |
-| **C** | Governed Operational | PR + team lead approval | Team lead | Standard CI audit |
+The Runtime obligation is to make tier the **source-of-truth field** on
+the governed artefact itself — not a wiki note. The classification
+machinery and the approval flow live in `cave-runtime/registry/` and are
+enforced by `cave-policy` admission, not by social contract.
 
-### Tier Assignment
+### Tier assignment (Runtime defaults)
+The Runtime ships with the following default classification. Operators
+may move artefacts to a higher tier but may never lower one.
 
-| Tier A (Immutable) | Tier B (Protected) | Tier C (Operational) |
-|---|---|---|
-| Identity root config (Keycloak master realm, Okta org) | Core OPA policy bundles | Soak window durations |
-| Sovereign Ledger trust root + WORM config | Crossplane Composition interfaces | Rollout thresholds |
-| Policy bundle signing keys + trust chain | Backup/recovery contracts (RPO/RTO) | FinOps budget thresholds |
-| Compatibility matrix **schema** (not values) | Tenant SLA definitions | APOL concurrency limits |
-| XRD schema contracts | RBAC mapping templates | Alert routing rules |
-| Break-glass Kit access list | Egress quarantine policy | Dashboard configurations |
-| | Parity test contracts (ADR-135) | Chaos experiment parameters |
+| Tier A | Tier B | Tier C |
+|--------|--------|--------|
+| Identity root (`cave-auth` realm config, root CAs) | Core policy bundles | Soak-window durations |
+| Signed-ledger trust root | Backup / restore RPO/RTO contracts | Rollout thresholds |
+| Policy-bundle signing keys + trust chain | Tenant SLA definitions | Resource-budget limits |
+| Compatibility-matrix schema | RBAC mapping templates | Alert routing rules |
+| Break-glass access list | Egress allow-list policy | Dashboard layouts |
 
-### APOL Interaction
+### Interaction with the self-improving agent
+ADR-SELF-IMPROVE-001 grants the resident agent a bounded write surface.
+Constitutional tiering is the gate on that surface:
 
-- APOL may never modify Tier A artifacts (Class D action, ADR-136)
-- APOL may propose Tier B changes (Class B: prepare PR) but not execute
-- APOL may execute Tier C changes autonomously (Class C) within signed playbook bounds
+- The agent **must not** modify Tier A.
+- The agent **may propose** Tier B changes (prepare a PR; never merge).
+- The agent **may apply** Tier C changes inside its signed-playbook
+  scope, with attestation.
 
----
-
-## Rejected
-
-- **No tiering (all changes require guardian approval):** Guardian bottleneck for routine operational changes. Slows platform iteration. Guardians fatigue from reviewing low-impact changes.
-- **Two tiers only (critical/non-critical):** Too coarse. "Protected but evolvable" (Tier B) is a distinct category — more impactful than operational tuning (Tier C) but not immutable like identity root (Tier A).
-- **Tiering without enforcement (advisory only):** Tier labels without corresponding approval workflow are cosmetic. Constitutional registry + Ledger attestation makes tiering enforceable.
+## Rejected Alternatives
+- **No tiering (one global approval flow).** Approver fatigue;
+  routine changes pile up behind security-critical changes.
+- **Two tiers (critical / non-critical).** "Protected but evolvable" is
+  a distinct category; collapsing it into either neighbour produces
+  bad incentives.
+- **Advisory tiering (labels without enforcement).** Cosmetic. A tier
+  with no enforcement path will be ignored at the first deadline.
 
 ## Consequences
 
-## ### Positive
-- Guardian load reduced by ~60% (Tier C no longer requires guardian approval)
-- APOL can autonomously tune operational parameters (Tier C) without freeze
-- Security-critical artifacts (Tier A) retain maximum protection
-- Platform evolution accelerates for non-security changes
+Positive
+- Routine operational tuning does not block on multi-party approval.
+- The autonomous agent has a small, machine-readable contract for what
+  it may touch.
+- Security-critical artefacts retain their highest-friction approval.
 
-### Negative
-- Tier misclassification risk (operational artifact incorrectly placed in Tier C that should be Tier B)
-- More complex governance documentation (3 tiers vs 1)
+Negative
+- Mis-classification risk. The Runtime mitigates by treating any
+  artefact involved in a security incident as escalated to the next
+  tier, pending re-review.
+- Slightly more governance surface to document and explain to a new
+  operator.
 
-### Mitigations
-- Tier assignment reviewed quarterly during guardian review
-- Any artifact involved in a security incident automatically escalated to next tier pending review
-- `docs/constitutional-registry.yaml` tracks tier assignment with justification
+## Compliance Anchors
+This ADR is the hook used by external mappings for tiered change-control
+(SOC2 CC6.1 / CC8.1, ISO 27001 A.5.1 / A.5.4, NIS2 Art.21). Mapping
+detail lives in `docs/compliance/`.
 
-## Compliance Mapping
-
-SOC2 CC6.1 (governance — tiered change control). SOC2 CC8.1 (change management — approval levels by impact). ISO A.5.1 (policy governance — tiered policy management). ISO A.5.4 (management responsibilities — guardian multi-sig for Tier A). NIS2 Art.21 (governance — structured change control).
+## Related ADRs
+- ADR-SELF-IMPROVE-001 (agent's write surface honours these tiers)
+- ADR-138 (Evidence Tiering — how attestations from each tier are kept)
+- ADR-140 (Waiver Framework — temporary exceptions, never to Tier A)
