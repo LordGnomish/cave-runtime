@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gateway engine — load balancing, circuit breakers, and request routing.
 //!
 //! Load-balancing algorithms:

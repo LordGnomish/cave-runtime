@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Metrics plugin — Prometheus /metrics endpoint.
 use std::sync::Arc;
 

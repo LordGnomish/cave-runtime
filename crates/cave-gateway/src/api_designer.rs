@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee API Designer — API-first studio with spec management, mock servers,
 //! and automated quality scoring.
 

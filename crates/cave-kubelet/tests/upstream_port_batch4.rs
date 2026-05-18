@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Batch 4 (2026-05-14) — upstream test port for PLEG
 //! (PodLifecycleEventGenerator).
 //!

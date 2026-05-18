@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::store::ErpStore;
 use axum::{response::IntoResponse, routing::get, Json, Router};
 use serde_json::json;

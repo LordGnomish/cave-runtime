@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unleash-compatible HTTP API for cave-flags.
 //!
 //! Adds the exact API surface that Unleash server exposes so that any

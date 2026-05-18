@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Azure provider resource catalog + tenant-scoped inventory.
 //!
 //! Extends [`super::azure::AzureProvider`] with the resource shapes the

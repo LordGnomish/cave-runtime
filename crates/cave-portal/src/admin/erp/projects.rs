@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/erp/projects` — ERPNext "Projects" tab. Synthesises
 //! one project row per customer aggregating their invoice
 //! activity — the view operators use to see "what's the

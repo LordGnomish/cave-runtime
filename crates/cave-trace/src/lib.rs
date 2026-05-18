@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-trace — Distributed tracing engine with full Jaeger/Tempo parity.
 //!
 //! Ingestion protocols

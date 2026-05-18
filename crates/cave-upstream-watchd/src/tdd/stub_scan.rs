@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Stub scanner — counts `todo!()` / `unimplemented!()` / `unreachable!()`
 //! macro invocations in the implementation files of a branch.
 //!

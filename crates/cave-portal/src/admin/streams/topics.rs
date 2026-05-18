@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/streams/topics` — Kafka admin "Topics" tab. Per-topic
 //! configuration view with partition count, replication factor,
 //! retention, and compaction policy. Read-only here; mutations

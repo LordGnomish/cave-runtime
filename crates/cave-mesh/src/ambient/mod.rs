@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Istio Ambient-mode parity batch.
 //!
 //! This module is a *deeper* (no-stub) parity port of the Ambient-mode

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bootstrap-token signer — `pkg/controller/bootstrap/bootstrapsigner.go`.
 //!
 //! Maintains a JWT-style signature on the `cluster-info` ConfigMap in

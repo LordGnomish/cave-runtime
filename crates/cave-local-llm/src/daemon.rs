@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! 24/7 daemon loop: pick → draft → patch → test → commit or escalate.
 
 use std::path::{Path, PathBuf};

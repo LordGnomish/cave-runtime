@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cookiecutter-style template definitions bundled with cave-scaffold.
 //!
 //! This module defines inline, self-contained project templates in the classic

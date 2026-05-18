@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! EndpointSlice controller — projects ready pods into one or more
 //! `discovery.k8s.io/v1.EndpointSlice` objects.
 //!

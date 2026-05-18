@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Log compaction — keep only the latest record per key in a partition.
 //!
 //! Runs on-demand or can be triggered in a background tokio task.

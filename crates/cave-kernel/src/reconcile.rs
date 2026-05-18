@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Generic reconcile loop primitive.
 //!
 //! Used by cave-controller-manager, cave-cri, cave-net (CNI plugin), and

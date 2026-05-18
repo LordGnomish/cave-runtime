@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-001: HCL Policy — comments, denied/required/allowed parameters,
 //! sudo on root-protected paths, min_wrapping_ttl, multi-statement bodies.
 //! Pinned to openbao v2.5.3.

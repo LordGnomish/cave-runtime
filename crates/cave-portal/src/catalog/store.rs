@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CatalogStore trait + MemoryCatalogStore + PostgresCatalogStore.
 //!
 //! Upstream: backstage/plugins/catalog-backend/src/database/DefaultCatalogDatabase.ts

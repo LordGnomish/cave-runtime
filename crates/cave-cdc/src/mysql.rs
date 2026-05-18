@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MySQL binlog connector.
 //!
 //! Cite: debezium-connector-mysql v3.5.0.Final

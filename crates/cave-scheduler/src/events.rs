@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ClusterEvent + QueueingHint (KEP-4247) — event-driven re-queueing.
 //!
 //! Cite: kubernetes/kubernetes v1.31.0

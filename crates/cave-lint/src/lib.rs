@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Lint — Config & image linting engine.
 //!
 //! Compatible with: Hadolint + Checkov + Pluto + kubent

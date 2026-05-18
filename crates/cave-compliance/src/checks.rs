@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Automated control check implementations.
 use crate::models::{Control, Evidence, EvidenceType, Finding, FindingStatus};
 use chrono::Utc;

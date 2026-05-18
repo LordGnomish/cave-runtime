@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Columnar trace storage with Bloom filter, tag index, and retention policies.
 //!
 //! Architecture

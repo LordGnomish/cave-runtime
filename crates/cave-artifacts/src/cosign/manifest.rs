@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OCI signature manifest attachment.
 //!
 //! Cosign attaches signatures to a subject manifest by:

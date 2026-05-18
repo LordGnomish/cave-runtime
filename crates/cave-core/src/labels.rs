@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical label set for the Cave observability stack.
 //!
 //! Both cave-logs (Loki-style streams) and cave-metrics (Prometheus-style

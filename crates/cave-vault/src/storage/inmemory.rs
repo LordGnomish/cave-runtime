@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Process-local backend — `HashMap` behind a single `RwLock`.
 //! The default for tests / dev / single-process demo, equivalent
 //! to OpenBao's `physical/inmem`. No persistence, no validation

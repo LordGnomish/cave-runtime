@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! RDBMS-operator wrap — native CloudNativePG-style cluster admin UI.
 //!
 //! Replaces the CloudNativePG web console. Platform admins manage Postgres

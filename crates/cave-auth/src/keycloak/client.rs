@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keycloak Client Admin CRUD — POST/GET/PUT/DELETE /admin/realms/{realm}/clients
 //!
 //! upstream: https://github.com/keycloak/keycloak/blob/v22.0.0/services/src/main/java/org/keycloak/services/resources/admin/ClientsResource.java

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scaffolder plugin — software template runner.
 //!
 //! Templates are fixed-shape recipes that the portal runs to produce a new

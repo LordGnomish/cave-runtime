@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/erp/hr` — ERPNext "HR" tab. cave-portal doesn't
 //! manage employees as first-class records, so this tab
 //! synthesises a per-customer relationship-manager directory

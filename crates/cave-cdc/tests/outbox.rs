@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-cdc — transactional outbox event router tests.
 //! Pinned to debezium `OutboxEventRouter`.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-tenant primitives for cave-metrics.
 //!
 //! - `tenant_from_headers` parses `X-Scope-OrgID` (Cortex/Mimir convention).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for cave-secrets public surface.
 
 use cave_secrets::detector::{builtin_detectors, scan, shannon_entropy, Severity};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Recursive-descent parser for the Rego-compatible policy language.
 
 use super::ast::*;

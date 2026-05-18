@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod label resolver — compute identity-defining labels from a K8s
 //! Pod + Namespace.
 //!

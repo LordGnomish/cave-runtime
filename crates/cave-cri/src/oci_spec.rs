@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OCI runtime spec (config.json) generation.
 //!
 //! Produces the JSON spec passed to runc/crun.  Follows the OCI Runtime

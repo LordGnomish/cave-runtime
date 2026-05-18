@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service topology + endpoint slice integration.
 //!
 //! Mirrors the upstream pieces in

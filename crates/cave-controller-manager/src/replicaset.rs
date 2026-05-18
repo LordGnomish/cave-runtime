@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ReplicaSet controller — keeps a fixed number of pods alive.
 //!
 //! Upstream: [`pkg/controller/replicaset`]. The full controller handles

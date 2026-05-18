@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/crm/deals` — Twenty CRM "Opportunities" tab. Each
 //! account synthesises a "deal" sized at 12 × MRR (annualised
 //! contract value) with a stage derived from plan tier

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/store` — MinIO Console parity. Bucket browser with
 //! backend grouping + size totals.
 //!

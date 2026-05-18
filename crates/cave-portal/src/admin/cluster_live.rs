@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/cluster` — live Raft state + node liveness.
 //!
 //! Reads (no mutate) the cluster state machine and renders the four

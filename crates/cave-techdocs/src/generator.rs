@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TechDocsGenerator trait and NoopGenerator — port of TechDocsGenerator from Backstage.
 //!
 //! Upstream: TechDocsGenerator in @backstage/plugin-techdocs-node/src/techdocs/TechDocsGenerator.ts

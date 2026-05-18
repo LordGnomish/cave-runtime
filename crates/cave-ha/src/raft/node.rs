@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core Raft state machine — drives election, replication, snapshotting, and read-only queries.
 
 use std::collections::{BTreeSet, HashMap};

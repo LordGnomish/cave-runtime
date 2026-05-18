@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared types for the Cilium-parity batch.
 //!
 //! Same conventions as the other deeper batches in the workspace:

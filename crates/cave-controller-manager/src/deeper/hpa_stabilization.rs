@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA stabilization window — `pkg/controller/podautoscaler/horizontal.go`.
 //!
 //! Mirrors `stabilizeRecommendationWithBehaviors`. Each HPA stores recent

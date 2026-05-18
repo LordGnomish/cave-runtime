@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! eBPF userspace simulation.
 //!
 //! Cilium's hot path lives in BPF programs compiled by clang and

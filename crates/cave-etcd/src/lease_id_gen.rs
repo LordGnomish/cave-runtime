@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Random lease-ID generator with collision retry, matching etcd v3.6.10
 //! `lease.lessor.assignNewLeaseID` semantics.
 //!

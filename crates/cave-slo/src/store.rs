@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{Slo, SloStats, SloStatus};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

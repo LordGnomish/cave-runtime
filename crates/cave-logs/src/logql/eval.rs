@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LogQL evaluator — takes a parsed `Query` and executes it against the store.
 
 use std::collections::HashMap;

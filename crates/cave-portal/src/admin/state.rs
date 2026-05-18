@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory data sources backing the admin views.
 //!
 //! Real cave-runtime instances hand the views *connected* clients (an

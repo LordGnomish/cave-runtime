@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core scanner — orchestrates OS packages, language packages, secrets,
 //! misconfigurations, and SBOM generation for image and filesystem targets.
 

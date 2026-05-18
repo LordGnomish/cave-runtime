@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-architecture image support — OCI image index / Docker manifest list.
 //!
 //! When a registry stores a single tag for multiple platforms it serves a

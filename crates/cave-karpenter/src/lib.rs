@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-karpenter: Karpenter node-autoscaler reimplementation (scaffold).
 //!
 //! Upstream: kubernetes-sigs/karpenter v1.12.0

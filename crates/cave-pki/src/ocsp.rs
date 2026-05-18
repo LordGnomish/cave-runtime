@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OCSP responder.
 //!
 //! Cite: RFC 6960 §2.2 (Response Syntax) — the OCSPResponse value

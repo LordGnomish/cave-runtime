@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node scores tab — per-node aggregate Score-phase output, last cycle.
 
 use super::SchedulerViewError;

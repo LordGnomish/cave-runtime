@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Topology Manager + CPU Manager (static) + Memory Manager.
 //!
 //! Mirrors Kubernetes v1.36.0 upstream:

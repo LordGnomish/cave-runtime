@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Trigger evaluation — matches incidents/alerts to runbooks and schedules runs.
 
 use crate::{

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GC graph resync — `pkg/controller/garbagecollector/garbagecollector.go::Sync`.
 //!
 //! Periodically rebuilds the dependency graph by listing every monitored

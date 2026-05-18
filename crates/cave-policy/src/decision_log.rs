@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Decision logging for OPA policy evaluation.
 //!
 //! Logs every policy decision with input, result, metrics, and provenance.

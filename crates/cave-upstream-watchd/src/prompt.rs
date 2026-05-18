@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Port-prompt builder.
 //!
 //! Given a `GapEvent` + a per-crate context (parity ratio, unmapped

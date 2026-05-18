@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/vault` — Vault Web UI parity surface.
 //!
 //! Mirrors the **upstream Vault UI**'s top-level tabs:

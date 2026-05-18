@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka Connect API — connectors, tasks, transforms, and status.
 
 use crate::error::{StreamsError, StreamsResult};

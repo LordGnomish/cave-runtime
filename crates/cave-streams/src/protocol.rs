@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka wire protocol — API keys, framing, encode/decode primitives.
 //!
 //! Implements the Kafka binary protocol as defined in the Apache Kafka

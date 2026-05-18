@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Route assembly for cave-registry.
 
 pub mod harbor;

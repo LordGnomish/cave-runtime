@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plugin extension-point traits beyond `Filter` and `Score`.
 //!
 //! Cite: kubernetes/kubernetes v1.31.0

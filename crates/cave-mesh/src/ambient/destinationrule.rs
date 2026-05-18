@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DestinationRule — cluster definition + load-balancing policy.
 //!
 //! Mirrors `pilot/pkg/networking/core/v1alpha3/cluster.go::buildDefaultCluster`

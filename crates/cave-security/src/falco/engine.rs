@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Falco rule engine — evaluates events against the loaded rule set.
 
 use crate::falco::{

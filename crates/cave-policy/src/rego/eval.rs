@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego evaluator — tree-walking interpreter with backtracking.
 //!
 //! Implements OPA's evaluation model:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rollback support — revert resource changes using stored history.
 
 use crate::error::{InfraError, InfraResult};

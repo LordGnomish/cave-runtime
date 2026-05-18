@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Token lifecycle — parity tests against openbao v2.5.3.
 //!
 //! Upstream package: `vault/token_store.go` (and helpers in `vault/policy_store.go`).

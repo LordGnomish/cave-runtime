@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Replication tab — Redis-style master/replica state. Mirrors
 //! `INFO replication` output (role, connected_slaves, offsets,
 //! backlog).

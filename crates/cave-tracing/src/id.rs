@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Trace/span ID generation. Uses a thread-local PRNG seeded from
 //! system time + thread id; non-cryptographic but well-distributed
 //! enough for SDK ID assignment per OpenTelemetry guidance.

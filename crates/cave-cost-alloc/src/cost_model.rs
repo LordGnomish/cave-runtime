@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cost calculation model for Kubernetes workloads.
 
 use crate::models::{BudgetAlert, CostAllocation, CostRate, ResourceCost, ResourceUsage};

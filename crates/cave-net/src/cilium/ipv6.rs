@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IPv6 datapath + Neighbor Discovery (ND) proxy.
 //!
 //! Mirrors `bpf/bpf_lxc.c::handle_ipv6` plus

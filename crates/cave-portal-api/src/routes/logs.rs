@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Logs — tail/search.
 //!
 //! The portal renders log streams natively (no Grafana Loki UI handoff). The

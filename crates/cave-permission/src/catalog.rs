@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Catalog permission constants — port from @backstage/catalog-backend
 //!
 //! Upstream: backstage/plugins/catalog-backend/src/permissions.ts

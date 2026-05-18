@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Route controller orchestration — concurrent reconcile, batch
 //! scheduling, allocator/apiserver coordination.
 //!

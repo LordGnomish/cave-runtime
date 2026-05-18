@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Raft membership v2 — ConfChangeV2 wire format, joint-consensus state
 //! machine, cluster-id validation, and member-set diff helpers.
 //!

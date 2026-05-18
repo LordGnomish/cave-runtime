@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster health monitoring and auto-healing.
 //!
 //! Aggregates health across all instances, detects quorum loss, identifies

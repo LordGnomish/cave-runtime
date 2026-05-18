@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runtime configuration — loaded from YAML, env vars, and Kubernetes ConfigMaps.
 //!
 //! Configuration resolves in this order:

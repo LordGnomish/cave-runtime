@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PodDisruptionBudget controller — gates voluntary disruption.
 //!
 //! Upstream: [`pkg/controller/disruption`]. The full controller computes

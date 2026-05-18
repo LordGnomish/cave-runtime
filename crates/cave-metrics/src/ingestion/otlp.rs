@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OTLP metrics ingestion (JSON over HTTP; gRPC support uses the same encoding).
 //! We parse the OTLP JSON representation and convert to our internal model.
 

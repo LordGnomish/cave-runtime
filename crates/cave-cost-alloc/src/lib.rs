@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! FinOps showback/chargeback — compatible with Kubecost/CloudHealth
 //!
 //! Compatible with: Kubecost, CloudHealth

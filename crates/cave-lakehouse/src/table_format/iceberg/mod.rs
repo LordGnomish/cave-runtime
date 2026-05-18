@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-iceberg — Apache Iceberg table format primitives.
 //!
 //! Models the on-disk JSON metadata documented in the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Metric analysis — evaluate PromQL/webhook results against thresholds.
 
 use crate::types::{AnalysisPhase, AnalysisRun, MetricCondition, MetricResult};

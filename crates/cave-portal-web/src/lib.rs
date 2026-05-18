@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cave Portal web shell — Backstage-style plugin host.
 //!
 //! The web shell provides:

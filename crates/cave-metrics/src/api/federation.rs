@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus federation endpoint: GET /federate?match[]=...
 //! Returns Prometheus text exposition format with matching series.
 

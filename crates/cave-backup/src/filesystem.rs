@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Filesystem backup (restic/kopia) job management.
 
 use crate::models::{FsBackupJob, FsBackupMethod};

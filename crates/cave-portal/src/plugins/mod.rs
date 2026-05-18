@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Portal plugins — per-domain views rendered natively.
 //!
 //! Each plugin owns a set of panels, list pages, and detail views for one

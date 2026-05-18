@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core data models — Kong-compatible entities.
 //!
 //! Services, Routes, Upstreams, Targets, Consumers, Plugins,

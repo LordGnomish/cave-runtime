@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Query optimizer — basic rewrites.
 
 use crate::sql::ast::*;

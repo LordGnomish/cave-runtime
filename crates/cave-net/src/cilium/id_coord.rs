@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Identity allocation coordinator — etcd-lock-based race protection.
 //!
 //! Mirrors `pkg/identity/cache/allocator.go::Allocator.AllocateIdentity`.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! File-system-backed `Backend` — one regular file per logical key.
 //! Equivalent to OpenBao's `physical/file`: writes go to a tmp file
 //! in the same directory then `rename()` onto the destination, so a

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hubble — observability surface for cave-net.
 //!
 //! Mirrors `pkg/hubble/parser/parser.go` plus the drop-reason taxonomy from

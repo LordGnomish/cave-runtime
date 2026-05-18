@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-cdc — MySQL binlog tests.
 //! Pinned to debezium-connector-mysql v3.5.0.Final.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Hosts plugin — /etc/hosts style static records.
 use std::collections::HashMap;
 use std::net::IpAddr;

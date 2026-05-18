@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster tab — Nodes / Namespaces / Events.
 
 use super::K8sDashboardViewError;

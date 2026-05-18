@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hubble Prometheus metrics + `cilium monitor` event stream.
 //!
 //! Mirrors `pkg/hubble/metrics/api/api.go` (the metric registry +

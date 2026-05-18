@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Light-weight GC controllers — separate from the central GarbageCollector
 //! because they operate on narrower object kinds with simpler triggers.
 //!

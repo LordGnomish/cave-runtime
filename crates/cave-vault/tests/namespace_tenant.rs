@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Namespace + tenant_id — parity tests against openbao v2.5.3.
 //!
 //! Upstream package: `helper/namespace/namespace.go`. cave-vault adds a

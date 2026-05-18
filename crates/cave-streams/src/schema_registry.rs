@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Confluent-compatible Schema Registry.
 //!
 //! Implements the Schema Registry REST API:

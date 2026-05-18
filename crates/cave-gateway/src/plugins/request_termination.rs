@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! request-termination plugin — always return a fixed response.
 //!
 //! Config: status_code, message, content_type, body, trigger (optional header check)

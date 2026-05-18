@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MutatingAdmissionPolicy — JSON-Patch / Apply-style mutation (KEP-3962).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

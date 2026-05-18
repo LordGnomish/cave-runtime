@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service Performance Monitoring (SPM) — RED metrics derived from traces.
 //!
 //! Computes Request rate, Error rate, Duration histograms per (service, operation)

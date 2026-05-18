@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cosign-compatible signature module for cave-artifacts.
 //!
 //! Implements two algorithm tracks against the same wire surface:

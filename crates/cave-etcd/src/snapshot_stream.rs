@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Snapshot streaming — chunked transmission with resume support, plus
 //! the *learner-bootstrap* state machine that drives a new member from
 //! `Joining` → `CatchingUp` → `Healthy`.

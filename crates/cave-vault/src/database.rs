@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Database Secrets Engine — dynamic credential generation for PostgreSQL and MySQL.
 //!
 //! Generates short-lived credentials without a live DB connection.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// ACL plugin — allow or deny queries by source IP/CIDR.
 use std::str::FromStr;
 

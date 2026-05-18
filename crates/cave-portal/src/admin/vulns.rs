@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/vulns` — DefectDojo parity. CVE browser with severity
 //! pills + unfixed counter (preserves existing helpers).
 //!

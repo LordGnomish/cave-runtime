@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/adr` view — Architecture Decision Record browser.
 //!
 //! Walks the workspace's `docs/adr/` directory (`.md` files at the

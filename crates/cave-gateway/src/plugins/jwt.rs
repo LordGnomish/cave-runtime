@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! JWT plugin — RS256, HS256, ES256 validation.
 //!
 //! Config keys:

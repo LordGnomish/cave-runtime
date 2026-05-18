@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Upstream — Continuous open source project tracking + self-improving port loop.
 //!
 //! ## Two halves

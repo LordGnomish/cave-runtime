@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `GET /api/compliance/snapshot` — JSON view of the Charter compliance dashboard.
 //!
 //! The HTML dashboard at `/admin/compliance` is rendered by

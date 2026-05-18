@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-002: SPDY/WebSocket exec/attach byte transport.
 //!
 //! Upstream: containerd v2.2.3 `pkg/cri/streaming/server.go` →

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Merkle hash chain — append-only log with integrity verification.
 
 use crate::entry::{LedgerEntry, LedgerEntryKind};

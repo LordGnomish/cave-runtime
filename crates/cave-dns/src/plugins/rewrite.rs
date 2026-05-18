@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Rewrite plugin — query name/type/class/TTL rewriting.
 use async_trait::async_trait;
 use hickory_proto::rr::{Name, RecordType};

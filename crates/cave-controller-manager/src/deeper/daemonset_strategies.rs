@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DaemonSet update strategies — `pkg/controller/daemon/update.go`.
 //!
 //! `UpdateStrategy.type` is one of:

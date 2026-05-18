@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! License detection — SPDX license matching and risk classification.
 
 use serde::{Deserialize, Serialize};

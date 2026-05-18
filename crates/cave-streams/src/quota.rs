@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka quota management — produce/fetch byte rate and request rate limits.
 
 use chrono::Utc;

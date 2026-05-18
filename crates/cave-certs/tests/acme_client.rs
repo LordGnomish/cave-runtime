@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-certs — ACME client smoke tests against in-process
 //! cave-acme::AcmeServer.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Controller epoch + voter set — the two opaque values the
 //! Raft layer feeds the controller on each leadership change.
 //!

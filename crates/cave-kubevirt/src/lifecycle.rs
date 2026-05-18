@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! VM lifecycle stub.
 //!
 //! Upstream reference: pkg/virt-controller/watch/vm.go (Reconcile)

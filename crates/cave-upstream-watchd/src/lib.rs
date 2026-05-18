@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-upstream-watchd — release watch daemon.
 //!
 //! Polls GitHub's `/releases/latest` for every tracked upstream, diffs

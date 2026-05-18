@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ValidatingAdmissionPolicy parity tests.
 //!
 //! Each test references the upstream Go test name in its doc comment so reverse

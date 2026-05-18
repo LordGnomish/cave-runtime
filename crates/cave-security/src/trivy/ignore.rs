@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! .trivyignore parser — CVE/misconfiguration suppression.
 
 use chrono::{DateTime, Utc};

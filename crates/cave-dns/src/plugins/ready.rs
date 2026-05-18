@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Ready plugin — HTTP /ready endpoint.
 use std::sync::{
     atomic::{AtomicBool, Ordering},

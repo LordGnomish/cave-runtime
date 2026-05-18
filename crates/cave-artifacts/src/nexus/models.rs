@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Sonatype Nexus 3 domain model.
 //!
 //! Mirrors Nexus' public REST shapes for repositories, components, assets,

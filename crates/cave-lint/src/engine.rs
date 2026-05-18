@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Lint dispatcher: content-type detection and per-type rule filtering.
 
 use crate::models::{BatchLintRequest, BatchLintResult, ContentType, LintRequest, LintResult};

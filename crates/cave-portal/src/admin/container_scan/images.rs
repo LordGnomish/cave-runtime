@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/container_scan/images` — Trivy "Images" tab. Per-image
 //! roster with the latest scan timestamp. Operators reach this
 //! tab when they need to see "which images do we even have on

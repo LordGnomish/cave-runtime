@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Harbor / Docker / OCI container registry module.
 //!
 //! Compatible with: Harbor v2.10

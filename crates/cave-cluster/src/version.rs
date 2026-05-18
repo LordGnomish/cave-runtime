@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kubernetes version management — catalog, validation, upgrade paths.
 
 use crate::error::{ClusterError, ClusterResult};

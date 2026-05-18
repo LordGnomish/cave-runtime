@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Secrets — Secret detection engine.
 //!
 //! Compatible with: Trufflehog + gitleaks

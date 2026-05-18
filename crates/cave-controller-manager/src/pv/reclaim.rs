@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PersistentVolume reclaim — `pkg/controller/volume/persistentvolume/pv_controller.go::reclaimVolume`.
 //!
 //! When a bound PVC is deleted, the PV transitions to `Released`. The

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MongoDB oplog connector (change streams).
 //!
 //! Cite: debezium-connector-mongodb v3.5.0.Final

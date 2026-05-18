@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persistent log store backed by the WAL.
 
 use std::path::Path;

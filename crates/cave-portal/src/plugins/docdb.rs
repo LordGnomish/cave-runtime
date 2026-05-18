@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DocDB wrap — native MongoDB-compatible admin UI.
 //!
 //! Replaces MongoDB Compass / Atlas Data Explorer for the cave runtime.

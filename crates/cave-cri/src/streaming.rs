@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Streaming protocol — exec / attach / portforward multiplexing.
 //!
 //! Kubernetes wraps remote command execution in a multi-stream channel

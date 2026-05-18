@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Events — append-only audit feed for portal-visible activity.
 
 use std::collections::VecDeque;

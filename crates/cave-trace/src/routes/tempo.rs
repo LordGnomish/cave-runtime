@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Grafana Tempo HTTP API — full parity with Tempo 2.x.
 //!
 //! Endpoints

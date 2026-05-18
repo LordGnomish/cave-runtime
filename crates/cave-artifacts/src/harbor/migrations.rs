@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL schema migrations for cave_registry.
 
 use cave_db::CavePool;

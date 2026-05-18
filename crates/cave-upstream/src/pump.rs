@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Qwen pump payload writer.
 //!
 //! When [`crate::delta::detect_release_delta`] returns a

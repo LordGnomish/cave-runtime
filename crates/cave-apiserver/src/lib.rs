@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-apiserver — Kubernetes-compatible API server.
 //!
 //! Implements core K8s resource CRUD with watch support.

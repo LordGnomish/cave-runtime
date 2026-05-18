@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! EndpointSlice — per-service slice allocator + hash-based slice keying.
 //!
 //! Mirrors `pkg/controller/endpointslice/util/utils.go` plus the

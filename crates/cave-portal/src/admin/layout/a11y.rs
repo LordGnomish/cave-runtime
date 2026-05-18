@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! WCAG 2.1 AA static analyser for server-rendered admin HTML.
 //!
 //! 2026-05-15 polish sweep — checks the rendered chrome + known admin

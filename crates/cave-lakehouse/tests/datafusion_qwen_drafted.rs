@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // === cycle 1777501001 (qwen success at retry 1; ollama_calls=1; ollama_secs=508) ===
 

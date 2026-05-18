@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Linting rules for Dockerfiles and Kubernetes manifests.
 
 use serde::Serialize;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-001: Mount table — enable+disable, namespace scoping, listing,
 //! defaults, longest-prefix dispatch. Pinned to openbao v2.5.3.
 

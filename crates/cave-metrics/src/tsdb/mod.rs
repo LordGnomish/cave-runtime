@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Time-series database with Gorilla-style XOR compression, inverted index,
 //! block-based compaction, downsampling, and configurable retention.
 

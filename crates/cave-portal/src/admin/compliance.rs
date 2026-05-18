@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/compliance` view — Charter compliance + 4-track audit dashboard.
 //!
 //! Replaces the manual "audit each crate by hand" loop with a live

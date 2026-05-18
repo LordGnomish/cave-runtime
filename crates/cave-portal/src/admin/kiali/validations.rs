@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Validations tab — Istio config linting results.
 //!
 //! Kiali's validation pipeline checks for issues like

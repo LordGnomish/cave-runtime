@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Upstream-named test cases declared in `parity.manifest.toml`.
 //!
 //! Each function here mirrors a containerd CRI integration test by name and

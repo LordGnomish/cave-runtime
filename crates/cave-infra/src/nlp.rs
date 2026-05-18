@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Natural language to infrastructure intent parser.
 
 use crate::resource::{ResourceKind, ResourceSpec};

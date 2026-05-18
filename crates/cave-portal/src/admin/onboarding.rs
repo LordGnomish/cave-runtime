@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persona-tailored onboarding tour.
 //!
 //! On first login a new persona sees a 4-5 step wizard with the

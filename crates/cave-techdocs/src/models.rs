@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TechDocs data models — port of Backstage TechDocs types.
 //!
 //! Upstream: @backstage/techdocs-common TechDocsMetadata, EntityName, EntityMetadata

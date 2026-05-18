@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/erp/invoices` — ERPNext "Sales Invoice" list. The
 //! authoritative source — every other sub-page derives from
 //! this dataset.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Real behavior tests for cave-vault policy engine (Mode B-prime spike).
 //! Exercises Vault-style path-glob ACL + Deny-overrides-cap invariant.
 //! Generated 2026-05-04 via local Ollama (qwen3.6:35b-a3b-coding-mxfp8).

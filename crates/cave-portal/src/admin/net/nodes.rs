@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Nodes tab — Cilium endpoint + agent state. The endpoint accessor
 //! lives here so other tabs (policies impact, services aggregator)
 //! can reuse it without a cycle.

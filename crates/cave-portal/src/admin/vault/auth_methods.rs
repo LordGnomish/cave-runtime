@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Auth-methods tab — mirrors Vault's `Access` page
 //! (`GET /v1/sys/auth`). Lists every mounted auth method
 //! (`token`, `userpass`, `kubernetes`, `approle`, `oidc`, …).

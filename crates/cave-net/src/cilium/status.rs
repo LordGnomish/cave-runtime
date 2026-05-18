@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cilium agent Status API — `cilium status` shape.
 //!
 //! Mirrors `pkg/status/status.go` plus the

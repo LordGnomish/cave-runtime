@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant / namespace registry shared by the Kafka and Pulsar wire layers.
 //!
 //! Per ADR-RUNTIME-STREAMING-CONSOLIDATION-001, addressing is Pulsar-native

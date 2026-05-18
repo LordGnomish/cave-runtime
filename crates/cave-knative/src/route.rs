@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Knative Route — traffic routing to Revisions.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/route_types.go
 

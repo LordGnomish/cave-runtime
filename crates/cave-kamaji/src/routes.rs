@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::lifecycle;
 use crate::models::{CreateTenantRequest, TenantControlPlane, TenantPhase, TenantStatus};
 use crate::KamajiState;

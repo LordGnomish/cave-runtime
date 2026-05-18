@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core data model — `TraceId`, `SpanId`, `SpanContext`, `SpanData`,
 //! `SpanKind`, `Status`, attribute values.
 

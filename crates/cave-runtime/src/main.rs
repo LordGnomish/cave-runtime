@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Unified Runtime — entry point.
 //!
 //! Single binary that hosts all enabled platform modules.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KEDA scaler catalog.
 //!
 //! The set of scalers below is the upstream list as of KEDA 2.14

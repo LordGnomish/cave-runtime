@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! request-size-limiting plugin.
 //!
 //! Config: allowed_payload_size (MB, float, default 128)

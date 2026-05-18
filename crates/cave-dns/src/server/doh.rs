@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// DNS-over-HTTPS server (RFC 8484).
 use std::sync::Arc;
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Reflex Engine console — action approval workflow.
 //!
 //! Reflex actions are platform-side automations that require human approval

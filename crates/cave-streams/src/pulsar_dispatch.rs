@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pulsar subscription-type dispatchers.
 //!
 //! For each subscription type [`SubscriptionType`], this module owns the

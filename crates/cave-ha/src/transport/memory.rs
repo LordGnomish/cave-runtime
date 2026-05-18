@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-process transport for tests and single-binary deployments.
 //!
 //! A `MemNetwork` owns a shared router; each node gets a `MemTransport` handle.

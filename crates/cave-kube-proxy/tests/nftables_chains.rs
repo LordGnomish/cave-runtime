@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! nftables proxier — preferred datapath on Linux ≥ 7.1.
 //!
 //! Upstream: `pkg/proxy/nftables/proxier.go` k8s v1.36.0.

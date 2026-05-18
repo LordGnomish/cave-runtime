@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant lifecycle — suspend/resume support for `cavectl tenant suspend|resume`.
 //!
 //! ADR-012 v7 destekleyici: tenant operasyonlarında suspend reason zorunlu, audit'e

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MongoDB OP_MSG wire protocol (opcode 2013).
 
 use crate::bson::{self, Document};

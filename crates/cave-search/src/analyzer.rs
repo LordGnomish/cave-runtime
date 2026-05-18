@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Text analyzer: tokenization + stop-word filtering.
 //! upstream: opensearch v3.0/server/src/main/java/org/opensearch/index/analysis/
 

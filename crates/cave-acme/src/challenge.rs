@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ACMEv2 challenge types.
 //!
 //! Cite: RFC 8555 §8 (Challenge object), §8.3 (HTTP-01),

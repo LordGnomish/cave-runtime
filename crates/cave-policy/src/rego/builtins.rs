@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OPA built-in functions — 150+ functions covering all OPA built-in categories.
 //!
 //! Categories:

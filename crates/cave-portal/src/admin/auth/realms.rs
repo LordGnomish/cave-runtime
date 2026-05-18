@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth/realms` — Keycloak Admin Console "Realm Settings"
 //! tab. Lists the realms the operator's tenant touches, derived
 //! from the live session list (one realm row per distinct

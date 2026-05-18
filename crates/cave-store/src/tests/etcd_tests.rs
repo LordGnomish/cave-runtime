@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for the etcd v3 API (MVCC engine).
 
 use crate::engine::{Compare, CompareResult, CompareTarget, MvccEngine, TxnOp, TxnRequest};

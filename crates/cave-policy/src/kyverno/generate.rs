@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kyverno generation engine.
 //!
 //! Supports: create resources from data, clone, sync, cloneList.

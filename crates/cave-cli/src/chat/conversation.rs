@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Conversation resolution for `cavectl chat --conversation new|last|<id>`.
 //!
 //! `new`  — always create a fresh conversation.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cavectl library — testable surface for chat REPL, tenant/env lifecycle,
 //! approval workflow, audit query, watch/stream output, and the native +
 //! compatibility command surfaces (per ADR-RUNTIME-CLI-CONSOLIDATION-001).

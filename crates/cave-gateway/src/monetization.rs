@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee API Monetization — usage-based billing plans, metering, and
 //! invoice generation.
 

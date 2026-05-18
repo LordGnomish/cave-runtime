@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::ui::{MetricCard, Panel, Table};
 
 /// First real screen — mirrors the cluster overview tile of the web portal.

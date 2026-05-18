@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Approval workflow — `cavectl approval list|approve|cancel|show`.
 //!
 //! Two-person rule: bir kullanıcı kendi talep ettiği approval'ı approve edemez,

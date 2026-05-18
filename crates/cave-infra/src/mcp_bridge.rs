@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MCP Provider Bridge — register, discover, execute, health-check MCP servers.
 //!
 //! MCP (Model Context Protocol) servers provide the actual cloud-provider

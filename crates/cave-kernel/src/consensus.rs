@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Raft consensus primitives — log/state-machine/handle traits.
 //!
 //! Upstream cite: hashicorp/raft, etcd-io/raft. The CAVE kernel provides a

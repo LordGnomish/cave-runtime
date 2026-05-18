@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cave-upstream-watchd` — upstream release watch daemon.
 //!
 //! Usage:

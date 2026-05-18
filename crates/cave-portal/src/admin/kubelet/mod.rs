@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/kubelet` — Kubernetes-Dashboard parity surface for the
 //! workload view (Pods, Nodes, Volumes, Events, per-node metrics).
 //!

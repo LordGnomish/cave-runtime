@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Progressive delivery models — Flagger + Argo Rollouts parity.
 
 use chrono::{DateTime, Utc};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/keda/scaledobjects` — ScaledObject CRUD UI.
 //!
 //! Mirrors upstream's `oc get scaledobject -o yaml` + Backstage `KedaCard`

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Proxy logic — request routing, load balancing, circuit breaking, retries, timeouts.
 
 use crate::models::{HealthStatus, HttpRoute, LoadBalancerAlgorithm, ServiceInstance, StringMatch};

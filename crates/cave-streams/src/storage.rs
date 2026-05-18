@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Storage abstraction for cave-streams.
 //!
 //! [`StreamStorage`] is the core trait that decouples the streaming engine from

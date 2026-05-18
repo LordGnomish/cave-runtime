@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ReplicaSet / Deployment revision history — `pkg/controller/deployment/util/deployment_util.go`.
 //!
 //! Each ReplicaSet owned by a Deployment carries

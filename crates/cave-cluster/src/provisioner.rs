@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster provisioning operations.
 //!
 //! Wraps cloud-provider APIs (via cave-infra MCP bridge) and kubeadm for

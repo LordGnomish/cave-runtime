@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TechDocs plugin — per-service docs index + search.
 //!
 //! Each service registers a doc tree (markdown pages keyed by path). The

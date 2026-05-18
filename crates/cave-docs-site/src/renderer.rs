@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Markdown rendering, navigation tree construction, and search index generation.
 
 use crate::models::{DocPage, SearchIndex, SearchEntry};

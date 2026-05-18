@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Connection pool management using deadpool-postgres.
 
 use cave_core::config::DatabaseConfig;

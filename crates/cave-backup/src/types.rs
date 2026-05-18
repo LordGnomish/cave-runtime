@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Domain types for cave-backup.
 
 use chrono::{DateTime, Utc};

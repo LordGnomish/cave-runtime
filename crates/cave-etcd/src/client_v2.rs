@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! v3 client refinements — auth-token interceptor, retry classifier with
 //! gRPC codes, lease keep-alive heartbeat scheduler, and watch reconnect
 //! state machine.

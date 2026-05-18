@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/lakehouse` view — Iceberg table browser + snapshot timeline.
 //!
 //! Mirrors the Apache Iceberg REST catalog dashboard: namespaces +

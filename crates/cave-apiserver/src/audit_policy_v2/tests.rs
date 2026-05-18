@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! audit.k8s.io/v1 Policy + PolicyRule parity tests.
 
 use super::*;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `MetadataRecord` — one entry in the compacted metadata log.
 //!
 //! Mirrors `org.apache.kafka.common.metadata.*Record` from
