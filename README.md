@@ -2,7 +2,7 @@
 
 **Sovereign, self-healing, self-improving Cloud OS. Multi-tenant by construction. Line-by-line TDD reimplementation of best-of-breed upstream projects in Rust.**
 
-> Status: pre-v1. OSS launch target: 21 May 2026. See [docs/adr/ADR-CHARTER-001.md](docs/adr/ADR-CHARTER-001.md) for the mission, [docs/adr/](docs/adr/) for the full decision record.
+> Status: pre-v1. OSS launch target: 21 May 2026. The mission, golden rules, and per-module decisions are all tracked in [docs/adr/](docs/adr/README.md).
 
 ---
 
@@ -15,7 +15,7 @@ Because every upstream is reimplemented under one roof:
 - Cross-module capabilities that no single upstream CLI can express (federated watch, consistent cross-module snapshot, tenant-scoped policy) ship as first-class verbs.
 - A single upgrade path rolls the whole platform forward with zero user-visible downtime.
 
-**This is not a thin wrapper over existing projects.** It is a from-scratch Rust implementation that passes the upstream's own tests. See [ADR-GOLDEN-001](docs/adr/ADR-GOLDEN-001-upstream-parity.md) for the rule.
+**This is not a thin wrapper over existing projects.** It is a from-scratch Rust implementation that passes the upstream's own tests. The line-by-line upstream-parity + TDD rule is governed by the golden rules in [docs/adr/](docs/adr/README.md) (see `RUNTIME-UPSTREAM-MIRROR-001` and the upstream-test-port batches recorded in module manifests).
 
 ## Charter
 
@@ -30,7 +30,7 @@ Because every upstream is reimplemented under one roof:
 9. **Zero-downtime upgrade** — rolling, blue-green, version-skew tolerant.
 10. **HA/DR latency hiding** — replication delays never leak to the client SLA.
 11. **Multi-tenant by construction** — every module carries `tenant_id` as first-class attribute; default-deny between tenants; per-tenant quota, SLO, billing. See [ADR-MULTI-TENANT-001](docs/adr/ADR-MULTI-TENANT-001.md).
-12. **Post-quantum crypto migration in progress** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. See [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md).
+12. **Post-quantum crypto migration in progress** — ML-KEM / ML-DSA / SLH-DSA at the primitives layer, no classical-only paths. The PQC path is covered in [`ADR-RUNTIME-CERT-LIFECYCLE-001`](docs/adr/ADR-RUNTIME-CERT-LIFECYCLE-001-sovereign-cert-hierarchy-pqc-acme.md) and [ADR-142 Passwordless Authentication](docs/adr/ADR-142_Passwordless_Authentication_Strategy.md).
 
 ## Project layout
 
@@ -86,12 +86,12 @@ CAVE_JWT_SECRET=dev ./target/release/cave-runtime
 # Use the CLI
 ./target/release/cave --help
 ./target/release/cave etcd get /foo   # cave-native shortcut
-./target/release/cave etcdctl get /foo  # upstream etcdctl parity (see ADR-CLI-HYBRID-001)
+./target/release/cave etcdctl get /foo  # upstream etcdctl parity (see ADR-RUNTIME-CLI-CONSOLIDATION-001)
 ```
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: read [ADR-GOLDEN-001](docs/adr/) first — all contributions follow line-by-line upstream TDD parity. No stubs, no `todo!()`, no behavioral approximation.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: read the golden rules in [docs/adr/](docs/adr/README.md) first — all contributions follow line-by-line upstream TDD parity. No stubs, no `todo!()`, no behavioral approximation.
 
 ## Security
 

@@ -58,7 +58,7 @@ cave-runtime/
 │   ├── cave-crossplane/  # Infrastructure provisioning
 │   └── ... (78 crates total)
 ├── docs/
-│   └── adr/              # 123 Architecture Decision Records
+│   └── adr/              # Architecture Decision Records (~120 root + provider-specific archive in internal/)
 ├── .github/workflows/    # CI (cargo check + test + clippy)
 └── Cargo.toml            # Workspace manifest
 ```
@@ -97,5 +97,5 @@ let app = Router::new()
 
 ## Related Documents
 
-- [ADR Index](./docs/adr/README.md) — 123 Architecture Decision Records
+- [ADR Index](./docs/adr/README.md) — Architecture Decision Records (numbered + Cave Runtime / Portal topic ADRs; provider-specific archive in `docs/adr/internal/`)
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — How to contribute

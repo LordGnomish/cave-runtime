@@ -4,11 +4,9 @@ Thank you for considering a contribution. Cave Runtime is a platform-grade, line
 
 ## The non-negotiables
 
-Read these three ADRs before opening a PR:
-
-1. [ADR-CHARTER-001](docs/adr/ADR-CHARTER-001.md) — the mission.
-2. [ADR-GOLDEN-001](docs/adr/ADR-GOLDEN-001-upstream-parity.md) — upstream line-by-line parity + TDD.
-3. [ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md) — no backward-compat port; PQC-ready crypto.
+Before opening a PR, read the charter and golden rules in
+[docs/adr/](docs/adr/README.md). The non-negotiables are summarised
+below; the authoritative source is the ADR catalogue.
 
 Golden rule summary:
 
@@ -29,7 +27,7 @@ Golden rule summary:
 4. Run the full workspace suite: `cargo test --workspace`. Zero failures, zero `#[ignore]`d tests added in your PR.
 5. Lint: `cargo fmt --all && cargo clippy --all-targets --all-features -- -D warnings`.
 6. Update the module's `parity.manifest.toml` (file_parity, function_parity, test_parity, surface_parity metrics).
-7. If your change touches a 4-track module (backend + portal + cavectl + observability per [ADR-GOLDEN-004](docs/adr/)), all four tracks ship in the same PR.
+7. If your change touches a 4-track module (backend + portal + cavectl + observability per the golden rules in [docs/adr/](docs/adr/README.md)), all four tracks ship in the same PR.
 8. Commit message uses [Conventional Commits](https://www.conventionalcommits.org/): `feat(scope): …`, `fix(scope): …`, `test(scope): …`, `docs(scope): …`.
 9. Include a `Co-Authored-By: <model/name>` trailer if the PR was LLM-assisted (required for attribution; see [ADR-CONTRIB-ATTRIBUTION-001](docs/adr/)).
 
@@ -41,7 +39,7 @@ Any change that:
 - Adds a third-party dependency,
 - Modifies the public API surface of a tier-1 module (apiserver, etcd, kubelet, scheduler, cri, net, kernel, auth),
 
-requires an ADR PR first. Template in [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md). Merge ADR before merging implementation.
+requires an ADR PR first. Follow the structure of any existing ADR in [docs/adr/](docs/adr/README.md) (a formal `TEMPLATE.md` is on the post-launch backlog). Merge the ADR before merging the implementation.
 
 ## Reporting issues
 

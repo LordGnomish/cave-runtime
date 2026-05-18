@@ -14,7 +14,8 @@
 ### Post-quantum crypto
 PQC migration is on the roadmap, not complete. ML-KEM / ML-DSA / SLH-DSA
 adoption is staged across `cave-crypto`, `cave-vault`, and `cave-auth`. See
-[ADR-GOLDEN-003](docs/adr/ADR-GOLDEN-003-no-backcompat-pqc.md). Classical-
+[`ADR-RUNTIME-CERT-LIFECYCLE-001`](docs/adr/ADR-RUNTIME-CERT-LIFECYCLE-001-sovereign-cert-hierarchy-pqc-acme.md)
+for the sovereign cert hierarchy + PQC + multi-DNS ACMEv2 plan. Classical-
 crypto paths remain for compatibility during the migration; please flag any
 production-only-classical paths.
 
@@ -47,7 +48,7 @@ production-only-classical paths.
 - [ ] cave-ledger — Sovereign audit ledger
 
 ### Documentation
-- [x] 123 Architecture Decision Records (scope-classified)
+- [x] ~120 Architecture Decision Records — scope-classified; provider-specific deploy ADRs archived in `docs/adr/internal/` (see [docs/adr/README.md](docs/adr/README.md))
 - [x] README, LICENSE, CONTRIBUTING, CI
 - [ ] Per-module API documentation
 - [ ] Operations runbook
