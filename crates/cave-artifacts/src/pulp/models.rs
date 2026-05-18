@@ -8,6 +8,51 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// ─── Plugin abstraction enums + per-plugin content carrier ───────────────────
+
+/// One value per Pulp content-plugin family. Used as a routing key inside
+/// the `PluginRegistry` and as the discriminator on `ContentUnit`.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum PluginType {
+    File,
+    Python,
+    Rpm,
+    Deb,
+    Container,
+    Ansible,
+    Maven,
+    Ostree,
+    Helm,
+}
+
+/// Plugin-emitted content unit. Carries the digest + size + plugin-specific
+/// metadata (NEVRA for RPM, GAV for Maven, manifest digest for OCI, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentUnit {
+    pub pulp_id: Uuid,
+    pub pulp_created: DateTime<Utc>,
+    pub plugin_type: PluginType,
+    pub relative_path: Option<String>,
+    pub sha256: Option<String>,
+    pub size: Option<u64>,
+    pub metadata: serde_json::Value,
+}
+
+impl ContentUnit {
+    pub fn new(plugin_type: PluginType, metadata: serde_json::Value) -> Self {
+        Self {
+            pulp_id: Uuid::new_v4(),
+            pulp_created: Utc::now(),
+            plugin_type,
+            relative_path: None,
+            sha256: None,
+            size: None,
+            metadata,
+        }
+    }
+}
+
 // ─── Content type enum ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]

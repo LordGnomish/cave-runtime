@@ -32,6 +32,13 @@ cave-certs = { path = "../cave-certs" }
 ed25519-dalek = { workspace = true }
 p256 = { workspace = true }
 rand = { workspace = true }
+# Pulp content-plugin deep-port (Phase 2):
+#   flate2  — gzip wrappers for primary.xml.gz, Packages.gz, sdist tar.gz, collection tarballs, chart .tgz
+#   tar     — extract control.tar.gz from .deb, METADATA from wheel/sdist, FILES.json from ansible, Chart.yaml from helm chart
+#   serde_yaml — Chart.yaml + role meta/main.yml
+flate2 = { workspace = true }
+tar = "0.4"
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
 tower = { workspace = true }

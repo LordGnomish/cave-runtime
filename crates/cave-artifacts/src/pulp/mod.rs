@@ -7,7 +7,10 @@
 
 pub mod content;
 pub mod distribution;
+pub mod error;
 pub mod models;
+pub mod plugin;
+pub mod plugins;
 pub mod rbac;
 pub mod repair;
 pub mod repository;
