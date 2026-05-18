@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/server/registry/handler.go + OCI distribution-spec v1.1
 //! Docker Registry V2 + OCI Distribution Spec 1.1 routes.
 //!
 //! All repository-scoped endpoints are dispatched through a single

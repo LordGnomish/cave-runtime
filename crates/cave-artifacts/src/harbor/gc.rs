@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/jobservice/job/impl/gc/garbage_collection.go
 //! Garbage collection for unreferenced blobs.
 //!
 //! GC is run manually via POST /api/v2.0/system/gc or on a schedule.

@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-use crate::models::{ComponentVersion, Severity, VulnScanResult, Vulnerability, VulnState};
+//! Legacy scoring/aggregation helpers — kept for backwards compatibility
+//! with the original cave-vulns scaffold. New DefectDojo-parity scoring
+//! lives in `crate::cvss` and `crate::dedup`.
+//!
+//! Source: original cave-vulns scaffold, pre-deep-port.
+
+use crate::models::{ComponentVersion, Severity, VulnScanResult, Vulnerability};
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -71,6 +77,7 @@ pub fn version_lt(current: &str, fixed_in: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::VulnState;
     use chrono::Utc;
 
     fn make_vuln(component: &str, version: &str, severity: Severity) -> Vulnerability {

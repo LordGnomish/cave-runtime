@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+//! Legacy `Vulnerability` model kept for backwards compatibility with
+//! the original cave-vulns scaffold. The DefectDojo-parity model lives
+//! in `crate::finding::Finding`.
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

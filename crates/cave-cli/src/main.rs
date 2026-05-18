@@ -778,18 +778,141 @@ enum ScanCmd {
 
 #[derive(Subcommand)]
 enum VulnsCmd {
-    /// Trigger a vulnerability scan
+    /// Trigger a legacy vulnerability scan (kept for backwards compat).
     Scan {
         /// Target (image, repo, or path)
         #[arg(long)]
         target: String,
     },
-    /// List vulnerabilities
+    /// List vulnerabilities (legacy endpoint).
     List,
-    /// Get vulnerability detail
+    /// Get vulnerability detail (legacy endpoint).
     Detail {
         /// Vulnerability ID
         id: String,
+    },
+    /// Finding triage (DefectDojo-parity).
+    Finding {
+        #[command(subcommand)]
+        cmd: VulnsFindingCmd,
+    },
+    /// Engagement management.
+    Engagement {
+        #[command(subcommand)]
+        cmd: VulnsEngagementCmd,
+    },
+    /// Product / ProductType browser.
+    Product {
+        #[command(subcommand)]
+        cmd: VulnsProductCmd,
+    },
+    /// Import a native scan output (Bandit/Trivy/ZAP/Semgrep/SARIF/Snyk/Nuclei).
+    ImportScan {
+        /// DefectDojo scan_type — e.g. "Bandit Scan", "SARIF", "Trivy Scan".
+        #[arg(long)]
+        scan_type: String,
+        /// Path to the scan output file.
+        #[arg(long)]
+        file: String,
+        /// Override dedup algorithm (legacy / hash_code / unique_id_from_tool /
+        /// unique_id_from_tool_or_hash_code). Default: hash_code.
+        #[arg(long)]
+        dedup: Option<String>,
+    },
+    /// RiskAcceptance workflow.
+    RiskAccept {
+        #[command(subcommand)]
+        cmd: VulnsRiskAcceptCmd,
+    },
+    /// SLA configuration + rollup.
+    Sla {
+        #[command(subcommand)]
+        cmd: VulnsSlaCmd,
+    },
+    /// Executive report.
+    Report {
+        #[command(subcommand)]
+        cmd: VulnsReportCmd,
+    },
+    /// List registered scan parsers.
+    ScanTypes,
+    /// Health.
+    Health,
+}
+
+#[derive(Subcommand)]
+enum VulnsFindingCmd {
+    /// List findings (paginated).
+    List {
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+        #[arg(long, default_value_t = 0)]
+        offset: usize,
+    },
+    /// Get a finding by id.
+    Get { id: String },
+    /// Create a finding from inline JSON (`@-` for stdin).
+    Create {
+        #[arg(long)]
+        json: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum VulnsEngagementCmd {
+    List,
+    Create {
+        #[arg(long)]
+        json: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum VulnsProductCmd {
+    List,
+    Create {
+        #[arg(long)]
+        json: String,
+    },
+    /// ProductType helpers.
+    Types {
+        #[command(subcommand)]
+        cmd: VulnsProductTypeCmd,
+    },
+}
+
+#[derive(Subcommand)]
+enum VulnsProductTypeCmd {
+    List,
+    Create {
+        #[arg(long)]
+        json: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum VulnsRiskAcceptCmd {
+    List,
+    Create {
+        #[arg(long)]
+        json: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum VulnsSlaCmd {
+    /// Rollup + config.
+    Rollup,
+}
+
+#[derive(Subcommand)]
+enum VulnsReportCmd {
+    /// Executive summary as JSON.
+    Executive,
+    /// Executive summary as HTML (saved to file).
+    ExecutiveHtml {
+        #[arg(long, default_value = "vulns-executive.html")]
+        out: String,
     },
 }
 
@@ -804,13 +927,95 @@ enum SbomCmd {
         #[arg(long)]
         version: Option<String>,
     },
-    /// List SBOMs
+    /// List SBOMs (legacy)
     List,
-    /// Get SBOM detail
+    /// Get SBOM detail (legacy)
     Detail {
         /// SBOM ID
         id: String,
     },
+    /// Upload (ingest) a BOM file (auto-detect CycloneDX/SPDX)
+    Ingest {
+        /// Path to BOM file (JSON or XML)
+        #[arg(long)]
+        file: String,
+        /// Existing project UUID; omitted = create new
+        #[arg(long)]
+        project_uuid: Option<String>,
+    },
+    /// Component sub-commands (Dependency-Track parity)
+    #[command(subcommand)]
+    Component(SbomComponentCmd),
+    /// Project sub-commands
+    #[command(subcommand)]
+    Project(SbomProjectCmd),
+    /// Vulnerability sub-commands
+    #[command(subcommand)]
+    Vuln(SbomVulnCmd),
+    /// Policy sub-commands
+    #[command(subcommand)]
+    Policy(SbomPolicyCmd),
+    /// Portfolio metrics
+    Portfolio,
+}
+
+#[derive(Subcommand)]
+enum SbomComponentCmd {
+    /// List components (paginated)
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get component detail by UUID
+    Get { uuid: String },
+}
+
+#[derive(Subcommand)]
+enum SbomProjectCmd {
+    /// List projects
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get project detail by UUID
+    Get { uuid: String },
+    /// Create a project
+    Create {
+        #[arg(long)]
+        name: String,
+        #[arg(long = "ver", id = "proj_ver")]
+        version: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum SbomVulnCmd {
+    /// List vulnerabilities
+    List {
+        #[arg(long, default_value_t = 1)]
+        page: usize,
+        #[arg(long, default_value_t = 50)]
+        page_size: usize,
+    },
+    /// Get vulnerability by ID (CVE / GHSA / OSV)
+    Get { id: String },
+    /// Transition the analysis state
+    Analyze {
+        id: String,
+        /// One of NOT_SET / EXPLOITABLE / IN_TRIAGE / RESOLVED / FALSE_POSITIVE / NOT_AFFECTED
+        #[arg(long)]
+        state: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum SbomPolicyCmd {
+    /// List policies
+    List,
 }
 
 #[derive(Subcommand)]
@@ -2632,6 +2837,21 @@ fn urlencode(input: &str) -> String {
     out
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Read JSON either inline (the arg itself) or from stdin (when `@-`).
+fn read_inline_or_stdin(arg: &str) -> anyhow::Result<String> {
+    if arg == "@-" {
+        let mut s = String::new();
+        std::io::Read::read_to_string(&mut std::io::stdin(), &mut s)?;
+        Ok(s)
+    } else if let Some(path) = arg.strip_prefix('@') {
+        std::fs::read_to_string(path).map_err(|e| anyhow::anyhow!("read {path}: {e}"))
+    } else {
+        Ok(arg.to_owned())
+    }
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 #[tokio::main]
@@ -2813,6 +3033,62 @@ async fn run(cli: Cli) -> Result<()> {
             }
             VulnsCmd::List => c.get("/api/vulns").await,
             VulnsCmd::Detail { id } => c.get(&format!("/api/vulns/{id}")).await,
+            VulnsCmd::Health => c.get("/api/vulns/health").await,
+            VulnsCmd::ScanTypes => c.get("/api/vulns/scan-types").await,
+            VulnsCmd::Finding { cmd } => match cmd {
+                VulnsFindingCmd::List { limit, offset } => {
+                    c.get(&format!("/api/vulns/findings?limit={limit}&offset={offset}")).await
+                }
+                VulnsFindingCmd::Get { id } => c.get(&format!("/api/vulns/findings/{id}")).await,
+                VulnsFindingCmd::Create { json } => {
+                    let body: serde_json::Value = serde_json::from_str(&read_inline_or_stdin(&json)?)?;
+                    c.post("/api/vulns/findings", body).await
+                }
+            },
+            VulnsCmd::Engagement { cmd } => match cmd {
+                VulnsEngagementCmd::List => c.get("/api/vulns/engagements").await,
+                VulnsEngagementCmd::Create { json } => {
+                    let body: serde_json::Value = serde_json::from_str(&read_inline_or_stdin(&json)?)?;
+                    c.post("/api/vulns/engagements", body).await
+                }
+            },
+            VulnsCmd::Product { cmd } => match cmd {
+                VulnsProductCmd::List => c.get("/api/vulns/products").await,
+                VulnsProductCmd::Create { json } => {
+                    let body: serde_json::Value = serde_json::from_str(&read_inline_or_stdin(&json)?)?;
+                    c.post("/api/vulns/products", body).await
+                }
+                VulnsProductCmd::Types { cmd } => match cmd {
+                    VulnsProductTypeCmd::List => c.get("/api/vulns/product-types").await,
+                    VulnsProductTypeCmd::Create { json } => {
+                        let body: serde_json::Value = serde_json::from_str(&read_inline_or_stdin(&json)?)?;
+                        c.post("/api/vulns/product-types", body).await
+                    }
+                }
+            },
+            VulnsCmd::ImportScan { scan_type, file, dedup } => {
+                let content = std::fs::read_to_string(&file)
+                    .map_err(|e| anyhow::anyhow!("read {file}: {e}"))?;
+                let mut body = serde_json::json!({"scan_type": scan_type, "content": content});
+                if let Some(d) = dedup { body["dedup"] = serde_json::Value::String(d); }
+                c.post("/api/vulns/import-scan", body).await
+            }
+            VulnsCmd::RiskAccept { cmd } => match cmd {
+                VulnsRiskAcceptCmd::List => c.get("/api/vulns/risk-acceptances").await,
+                VulnsRiskAcceptCmd::Create { json } => {
+                    let body: serde_json::Value = serde_json::from_str(&read_inline_or_stdin(&json)?)?;
+                    c.post("/api/vulns/risk-acceptances", body).await
+                }
+            },
+            VulnsCmd::Sla { cmd } => match cmd {
+                VulnsSlaCmd::Rollup => c.get("/api/vulns/sla").await,
+            },
+            VulnsCmd::Report { cmd } => match cmd {
+                VulnsReportCmd::Executive => c.get("/api/vulns/reports/executive").await,
+                VulnsReportCmd::ExecutiveHtml { out: _ } => {
+                    c.get("/api/vulns/reports/executive.html").await
+                }
+            },
         },
 
         // ── SBOM ──────────────────────────────────────────────────────────────
@@ -2822,6 +3098,49 @@ async fn run(cli: Cli) -> Result<()> {
             }
             SbomCmd::List => c.get("/api/sbom").await,
             SbomCmd::Detail { id } => c.get(&format!("/api/sbom/{id}")).await,
+            SbomCmd::Ingest { file, project_uuid } => {
+                use base64::Engine;
+                let bytes = std::fs::read(&file)
+                    .map_err(|e| anyhow::anyhow!("read {}: {}", file, e))?;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                c.post(
+                    "/api/v1/bom",
+                    json!({ "project_uuid": project_uuid, "bom_b64": b64 }),
+                )
+                .await
+            }
+            SbomCmd::Component(sub) => match sub {
+                SbomComponentCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/component?page={page}&page_size={page_size}")).await
+                }
+                SbomComponentCmd::Get { uuid } => c.get(&format!("/api/v1/component/{uuid}")).await,
+            },
+            SbomCmd::Project(sub) => match sub {
+                SbomProjectCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/project?page={page}&page_size={page_size}")).await
+                }
+                SbomProjectCmd::Get { uuid } => c.get(&format!("/api/v1/project/{uuid}")).await,
+                SbomProjectCmd::Create { name, version } => {
+                    c.post("/api/v1/project", json!({ "name": name, "version": version })).await
+                }
+            },
+            SbomCmd::Vuln(sub) => match sub {
+                SbomVulnCmd::List { page, page_size } => {
+                    c.get(&format!("/api/v1/vulnerability?page={page}&page_size={page_size}")).await
+                }
+                SbomVulnCmd::Get { id } => c.get(&format!("/api/v1/vulnerability/{id}")).await,
+                SbomVulnCmd::Analyze { id, state } => {
+                    c.post(
+                        &format!("/api/v1/vulnerability/{id}/analysis"),
+                        json!({ "state": state }),
+                    )
+                    .await
+                }
+            },
+            SbomCmd::Policy(sub) => match sub {
+                SbomPolicyCmd::List => c.get("/api/v1/policy").await,
+            },
+            SbomCmd::Portfolio => c.get("/api/v1/metrics/portfolio").await,
         },
 
         // ── Registry (legacy alias of `artifacts pulp`) ──────────────────────
@@ -5420,5 +5739,280 @@ mod batch4_parse_tests {
             cli.command,
             Commands::Scan { cmd: ScanCmd::Results { .. } }
         ));
+    }
+}
+
+#[cfg(test)]
+mod sbom_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn sbom_ingest_parses_with_file_arg() {
+        let cli = parse(&["cavectl", "sbom", "ingest", "--file", "bom.json"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Ingest { file, project_uuid } } => {
+                assert_eq!(file, "bom.json");
+                assert!(project_uuid.is_none());
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_ingest_accepts_project_uuid_override() {
+        let cli = parse(&[
+            "cavectl", "sbom", "ingest",
+            "--file", "bom.json", "--project-uuid", "uu-123"
+        ]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Ingest { project_uuid, .. } } => {
+                assert_eq!(project_uuid.as_deref(), Some("uu-123"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_component_list_default_pagination() {
+        let cli = parse(&["cavectl", "sbom", "component", "list"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::List { page, page_size }) } => {
+                assert_eq!(page, 1);
+                assert_eq!(page_size, 50);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_component_get_takes_uuid() {
+        let cli = parse(&["cavectl", "sbom", "component", "get", "uu-abc"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Component(SbomComponentCmd::Get { uuid }) } => {
+                assert_eq!(uuid, "uu-abc");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_project_create_requires_name() {
+        let cli = parse(&["cavectl", "sbom", "project", "create", "--name", "p", "--ver", "1.0"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::Create { name, version }) } => {
+                assert_eq!(name, "p");
+                assert_eq!(version.as_deref(), Some("1.0"));
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_project_list_paginates() {
+        let cli = parse(&["cavectl", "sbom", "project", "list", "--page", "3", "--page-size", "25"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Project(SbomProjectCmd::List { page, page_size }) } => {
+                assert_eq!(page, 3);
+                assert_eq!(page_size, 25);
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_vuln_get_takes_cve_id() {
+        let cli = parse(&["cavectl", "sbom", "vuln", "get", "CVE-2024-12345"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Get { id }) } => {
+                assert_eq!(id, "CVE-2024-12345");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_vuln_analyze_requires_state() {
+        let cli = parse(&["cavectl", "sbom", "vuln", "analyze", "CVE-1", "--state", "RESOLVED"]);
+        match cli.command {
+            Commands::Sbom { cmd: SbomCmd::Vuln(SbomVulnCmd::Analyze { id, state }) } => {
+                assert_eq!(id, "CVE-1");
+                assert_eq!(state, "RESOLVED");
+            }
+            other => panic!("wrong variant: {:?}", std::mem::discriminant(&other)),
+        }
+    }
+
+    #[test]
+    fn sbom_policy_list_parses() {
+        let cli = parse(&["cavectl", "sbom", "policy", "list"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Policy(SbomPolicyCmd::List) }));
+    }
+
+    #[test]
+    fn sbom_portfolio_parses() {
+        let cli = parse(&["cavectl", "sbom", "portfolio"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::Portfolio }));
+    }
+
+    #[test]
+    fn sbom_legacy_list_still_parses() {
+        let cli = parse(&["cavectl", "sbom", "list"]);
+        assert!(matches!(cli.command, Commands::Sbom { cmd: SbomCmd::List }));
+    }
+}
+
+#[cfg(test)]
+mod vulns_parse_tests {
+    use super::*;
+    use clap::Parser;
+
+    fn parse(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|e| panic!("parse {args:?}: {e}"))
+    }
+
+    #[test]
+    fn legacy_scan_target_parses() {
+        let cli = parse(&["cavectl", "vulns", "scan", "--target", "alpine:3"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Scan { target } } => assert_eq!(target, "alpine:3"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_health_parses() {
+        let cli = parse(&["cavectl", "vulns", "health"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Health }));
+    }
+
+    #[test]
+    fn vulns_scan_types_parses() {
+        let cli = parse(&["cavectl", "vulns", "scan-types"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::ScanTypes }));
+    }
+
+    #[test]
+    fn vulns_finding_list_with_pagination_parses() {
+        let cli = parse(&["cavectl", "vulns", "finding", "list", "--limit", "50", "--offset", "10"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::List { limit, offset } } } => {
+                assert_eq!(limit, 50);
+                assert_eq!(offset, 10);
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_finding_list_uses_defaults() {
+        let cli = parse(&["cavectl", "vulns", "finding", "list"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::List { limit, offset } } } => {
+                assert_eq!(limit, 100);
+                assert_eq!(offset, 0);
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_finding_get_requires_id() {
+        let cli = parse(&["cavectl", "vulns", "finding", "get", "abc-123"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::Get { id } } } => {
+                assert_eq!(id, "abc-123");
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert!(Cli::try_parse_from(&["cavectl", "vulns", "finding", "get"]).is_err());
+    }
+
+    #[test]
+    fn vulns_finding_create_with_json() {
+        let cli = parse(&["cavectl", "vulns", "finding", "create", "--json", "{}"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Finding { cmd: VulnsFindingCmd::Create { json } } } => {
+                assert_eq!(json, "{}");
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_import_scan_requires_scan_type_and_file() {
+        let cli = parse(&["cavectl", "vulns", "import-scan", "--scan-type", "SARIF", "--file", "out.sarif"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::ImportScan { scan_type, file, dedup } } => {
+                assert_eq!(scan_type, "SARIF");
+                assert_eq!(file, "out.sarif");
+                assert!(dedup.is_none());
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert!(Cli::try_parse_from(&["cavectl", "vulns", "import-scan", "--scan-type", "SARIF"]).is_err());
+    }
+
+    #[test]
+    fn vulns_import_scan_accepts_dedup_override() {
+        let cli = parse(&["cavectl", "vulns", "import-scan", "--scan-type", "Bandit Scan", "--file", "b.json", "--dedup", "legacy"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::ImportScan { dedup, .. } } => assert_eq!(dedup, Some("legacy".into())),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_engagement_list_parses() {
+        let cli = parse(&["cavectl", "vulns", "engagement", "list"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Engagement { cmd: VulnsEngagementCmd::List } }));
+    }
+
+    #[test]
+    fn vulns_product_list_parses() {
+        let cli = parse(&["cavectl", "vulns", "product", "list"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Product { cmd: VulnsProductCmd::List } }));
+    }
+
+    #[test]
+    fn vulns_product_types_list_parses() {
+        let cli = parse(&["cavectl", "vulns", "product", "types", "list"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Product { cmd: VulnsProductCmd::Types { cmd: VulnsProductTypeCmd::List } } } => {}
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn vulns_risk_accept_list_parses() {
+        let cli = parse(&["cavectl", "vulns", "risk-accept", "list"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::RiskAccept { cmd: VulnsRiskAcceptCmd::List } }));
+    }
+
+    #[test]
+    fn vulns_sla_rollup_parses() {
+        let cli = parse(&["cavectl", "vulns", "sla", "rollup"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Sla { cmd: VulnsSlaCmd::Rollup } }));
+    }
+
+    #[test]
+    fn vulns_report_executive_parses() {
+        let cli = parse(&["cavectl", "vulns", "report", "executive"]);
+        assert!(matches!(cli.command, Commands::Vulns { cmd: VulnsCmd::Report { cmd: VulnsReportCmd::Executive } }));
+    }
+
+    #[test]
+    fn vulns_report_executive_html_default_out() {
+        let cli = parse(&["cavectl", "vulns", "report", "executive-html"]);
+        match cli.command {
+            Commands::Vulns { cmd: VulnsCmd::Report { cmd: VulnsReportCmd::ExecutiveHtml { out } } } => {
+                assert_eq!(out, "vulns-executive.html");
+            }
+            _ => panic!("wrong variant"),
+        }
     }
 }

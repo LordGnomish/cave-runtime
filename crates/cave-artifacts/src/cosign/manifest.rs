@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: sigstore/cosign@HEAD pkg/oci/signature.go + specs/SIGNATURE_SPEC.md
 //! OCI signature manifest attachment.
 //!
 //! Cosign attaches signatures to a subject manifest by:

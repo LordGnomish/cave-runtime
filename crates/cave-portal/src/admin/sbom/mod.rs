@@ -1,9 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! `/admin/sbom` — Dependency-Track parity. Component browser
-//! grouped by image with license/package count summary.
+//! `/admin/sbom` — Dependency-Track parity. Top-level component browser plus
+//! sub-pages for projects, vulnerabilities, policies, portfolio metrics, BOM
+//! ingest, notifications. Each tab mirrors a Dependency-Track UI panel.
 //!
 //! Upstream UI: <https://dependencytrack.org/>
+//!
+//! Sub-pages:
+//! * [`components`]   — full component browser (default landing)
+//! * [`projects`]     — project roster + last-import timestamp
+//! * [`vulnerabilities`] — CVE table joined to affected components
+//! * [`policies`]     — license / vuln / age policy roster
+//! * [`portfolio`]    — Inherited-Risk-Score grid + trend sparkline
+//! * [`ingest`]       — paste-and-parse BOM uploader
+//! * [`notifications`]— rule roster + sink-config preview
+
+pub mod components;
+pub mod ingest;
+pub mod notifications;
+pub mod policies;
+pub mod portfolio;
+pub mod projects;
+pub mod vulnerabilities;
 
 use crate::admin::permission::{Permission, RequestCtx};
 use crate::admin::render::{escape, page_shell_full, table};

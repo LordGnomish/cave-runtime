@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: sonatype/nexus-public@HEAD components/nexus-repository/.../routing/
 //! Routing rule evaluation. Given a request path, decide whether one of the
 //! configured rules permits or denies it. `Allow` rules act as an
 //! allowlist (matched paths pass, others fail); `Block` rules act as a

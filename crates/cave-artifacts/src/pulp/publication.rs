@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: pulp/pulpcore@0f991c2fa2bf6c8635e8a2de064ef04dacbbcf4f pulpcore/app/models/publication.py
 //! Publication workflow: create_publication triggers metadata generation.
 
 use crate::pulp::error::ArtifactsError;

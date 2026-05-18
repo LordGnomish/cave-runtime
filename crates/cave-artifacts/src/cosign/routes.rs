@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: sigstore/cosign@HEAD cmd/cosign/cli/sign/ + cmd/cosign/cli/verify/
 //! HTTP surface for the Cosign module.
 //!
 //! Endpoint shapes mirror the cosign-style "sigstore policy" REST surface

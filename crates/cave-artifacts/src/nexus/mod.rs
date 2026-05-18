@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: META — cave-artifacts nexus sub-module root
 //! Sonatype Nexus 3-compatible universal artifact repository module.
 //!
 //! Initial port (Faz 2): Repository CRUD (hosted/proxy/group), Component

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: pulp/pulp_maven@HEAD pulp_maven/app/models.py
 //! pulp_maven — Maven2 artifact content plugin.
 
 use crate::pulp::error::ArtifactsError;

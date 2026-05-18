@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: pulp/pulpcore@0f991c2fa2bf6c8635e8a2de064ef04dacbbcf4f pulpcore/plugin/__init__.py + pulpcore/plugin/models/
 //! Plugin trait and registry.
 //!
 //! Each plugin corresponds to a Pulp content plugin (pulp_file, pulp_python, etc.)

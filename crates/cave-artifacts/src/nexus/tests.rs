@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: META — cave-artifacts nexus integration tests
 //! Nexus module unit + integration tests.
 //!
 //! Covers the new code introduced by Faz 2: format adapter behaviour,

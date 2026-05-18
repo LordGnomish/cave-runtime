@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/scan/scanner/manager.go + src/pkg/scan/report/manager.go
 //! Vulnerability scanning integration hooks.
 //! Provides an async hook interface; concrete scanners (Trivy, Grype, etc.)
 //! implement ScanHook and are registered with the ScanManager.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
+// Source: goharbor/harbor@c80058d52f555c9bd4552ea14c9d3e73ba0e4b12 src/pkg/blob/manager.go + src/pkg/blob/storage.go
 //! Content-addressable in-memory registry storage.
 //!
 //! Production deployments would back this with S3/GCS/Azure Blob, but the

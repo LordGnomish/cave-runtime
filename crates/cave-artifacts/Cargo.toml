@@ -9,6 +9,7 @@ license.workspace = true
 cave-core = { path = "../cave-core" }
 cave-auth = { path = "../cave-auth" }
 cave-db = { path = "../cave-db" }
+cave-scan = { path = "../cave-scan" }
 axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
