@@ -7,6 +7,8 @@
 # but without the JVM. cave-search reimplements its query surface.
 #
 # Stubbed 2026-05-02.
+# Skeleton modules implemented 2026-05-18 (TDD): analyzer, scoring,
+# embeddings (hash sketch), in-memory inverted index, query AST eval.
 
 [upstream]
 org     = "manticoresoftware"
@@ -18,13 +20,70 @@ language= "C++"
 url     = "https://github.com/manticoresoftware/manticoresearch"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# Honest module-level inventory against Manticore's top-level subsystems.
+# Five subsystems now have real (if minimal) implementations; five remain
+# unmapped and are explicitly documented below.
+ratio          = 0.40
+mapped_count   = 5
+partial_count  = 2        # embeddings + query (no positions / no parser)
+unmapped_count = 5
+total          = 10
+fill_ratio     = 0.40
+honest_ratio   = 0.40
+last_audit     = "2026-05-18"
+infra_only     = false
+
 [module]
 name        = "cave-search"
 description = "Full-text + analytics search — Manticore reimplementation"
 source_root = "src"
+
+# Mapped subsystems (have a Rust impl + tests in tests/search_impl.rs):
+[[mapped]]
+upstream = "src/sphinxsoft.cpp tokenizer + charset_table"
+ours     = "src/analyzer.rs::tokenize"
+notes    = "ASCII alphanumeric split + lowercase; English stop-word filter."
+
+[[mapped]]
+upstream = "src/sphinxquery.cpp BM25 ranker"
+ours     = "src/scoring.rs::bm25_score"
+notes    = "Lucene-default k1=1.2 b=0.75 with smoothed IDF."
+
+[[mapped]]
+upstream = "src/sphinxrt.cpp inverted index (RT segments)"
+ours     = "src/index.rs::Index + PostingList"
+notes    = "In-memory HashMap<term, FnvHashMap<doc,tf>>; no on-disk segments yet."
+
+[[mapped]]
+upstream = "src/sphinxquery.cpp query AST"
+ours     = "src/query.rs::Query::execute + BooleanQuery"
+notes    = "Term / Phrase (collapses to AND, no positions) / Bool must|should|must_not."
+
+[[mapped]]
+upstream = "src/knn_brute.cpp + src/knn_hnsw.cpp"
+ours     = "src/embeddings.rs::compute_embedding + cosine_similarity"
+notes    = "Hash-sketch 64-dim embedding; HNSW + learned models deferred."
+
+# Unmapped — explicit deferrals so the audit dashboard shows the honest gap:
+[[unmapped]]
+upstream = "src/searchd_*.cpp (HTTP, SphinxQL, MySQL listeners)"
+notes    = "Network surface — cave-portal /admin/search routes are the future home."
+
+[[unmapped]]
+upstream = "src/sphinxrt.cpp segment merge + on-disk RT"
+notes    = "Durability + segment merges land when cave-kernel::codec storage is wired."
+
+[[unmapped]]
+upstream = "src/replication_*.cpp Galera-style cluster"
+notes    = "HA / replication — Raft consensus reuse via cave-etcd is the planned path."
+
+[[unmapped]]
+upstream = "src/secondaryindex.cpp + columnar/"
+notes    = "Columnar + secondary indexes for analytics — out of scope until full-text lands."
+
+[[unmapped]]
+upstream = "src/percolate.cpp"
+notes    = "Stored-query / percolate index — deferred."
 
 [portal_ui]
 upstream_ui  = "OpenSearch Dashboards"
