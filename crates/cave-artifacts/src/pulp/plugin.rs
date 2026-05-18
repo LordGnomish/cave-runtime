@@ -74,6 +74,7 @@ impl Default for PluginRegistry {
         r.register(Arc::new(AnsiblePlugin));
         r.register(Arc::new(MavenPlugin));
         r.register(Arc::new(HelmPlugin));
+        r.register(Arc::new(OstreePlugin));
         r
     }
 }
