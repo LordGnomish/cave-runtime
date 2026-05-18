@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/sbom/notifications` — Dependency-Track "Notifications" panel.
 //! Lists the default sinks (Slack / Teams / Email / Jira / Webhook) and
 //! the matched event-group set.

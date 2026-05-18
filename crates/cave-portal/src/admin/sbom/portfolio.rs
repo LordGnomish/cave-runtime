@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! `/admin/sbom/portfolio` — Dependency-Track "Portfolio" panel. Renders the
 //! per-project Inherited Risk Score grid; pulls weights from cave-sbom's
 //! `portfolio::ProjectRisk` math.
