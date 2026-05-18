@@ -488,6 +488,81 @@ enum AuthCmd {
     KerberosValidateKeytab,
     /// Drive the SPNEGO 401-challenge / Negotiate handshake.
     KerberosTestSpnego,
+    // ── WebAuthn / FIDO2 (Keycloak services/.../webauthn parity) ─────────────
+    /// PublicKeyCredentialCreationOptions for a `--user-id`.
+    WebauthnRegisterOptions,
+    /// Verify an attestation response against a registered challenge.
+    WebauthnVerifyAttestation,
+    /// PublicKeyCredentialRequestOptions for a `--user-id`.
+    WebauthnAssertOptions,
+    /// Verify an authentication assertion against the stored credential.
+    WebauthnVerifyAssertion,
+    // ── OAuth/OIDC endpoints (Keycloak oauth_endpoints parity) ───────────────
+    /// RFC 9126 Pushed Authorization Requests status.
+    OauthPar,
+    /// RFC 8628 Device Authorization Grant status.
+    OauthDevice,
+    /// OpenID CIBA back-channel auth-req status.
+    OauthCiba,
+    /// RFC 7009 token revocation status.
+    OauthRevoke,
+    // ── WS-Federation 1.x (Keycloak wsfed parity) ───────────────────────────
+    /// WS-Federation metadata XML download.
+    WsfedMetadata,
+    /// WS-Federation signin (wa=wsignin1.0) status.
+    WsfedSignin,
+    /// WS-Federation signout (wa=wsignout1.0) status.
+    WsfedSignout,
+    // ── OID4VC issuance / verification (Keycloak oid4vc parity) ─────────────
+    /// Issue a verifiable credential (OID4VCI offer + nonce status).
+    Oid4vcIssue,
+    /// `/credential` endpoint surface — current cred-builder output.
+    Oid4vcCredential,
+    /// OID4VP presentation-request status.
+    Oid4vcPresent,
+    /// Issuer + verifier metadata download.
+    Oid4vcMetadata,
+    // ── UMA 2.0 (Kantara Federated Authz parity) ────────────────────────────
+    /// Registered resource_set list.
+    UmaResourceSet,
+    /// Outstanding permission tickets.
+    UmaPermissionTicket,
+    /// RPT (Requesting Party Token) mint/inspect status.
+    UmaRpt,
+    // ── RFC 8693 Token Exchange parity ──────────────────────────────────────
+    /// Drive a subject_token + actor_token exchange.
+    TokenExchangeExchange,
+    // ── RFC 9449 DPoP parity ────────────────────────────────────────────────
+    /// Verify a DPoP proof against an access-token's cnf.jkt.
+    DpopVerifyProof,
+    /// Compute RFC 7638 JWK thumbprint for a key.
+    DpopThumbprint,
+    // ── RFC 7516 JWE parity ─────────────────────────────────────────────────
+    /// RSA-OAEP + A256GCM compact JWE issuance.
+    JweEncrypt,
+    /// JWE decrypt + protected-header inspect.
+    JweDecrypt,
+    // ── Admin REST: Identity Providers + Auth Flows ─────────────────────────
+    /// `/admin/realms/{r}/identity-provider/instances` list.
+    AdminIdpInstances,
+    /// Per-instance attribute mappers list.
+    AdminIdpMappers,
+    /// `/admin/realms/{r}/authentication/flows` list.
+    AdminFlowsFlows,
+    /// Per-flow execution chain.
+    AdminFlowsExecutions,
+    /// Required-actions list.
+    AdminFlowsRequiredActions,
+    // ── Email listener / SMTP outbox ────────────────────────────────────────
+    /// Outbox queue depth + per-template counts.
+    EmailQueue,
+    /// Drive a templated test mail through SMTP.
+    EmailTestSend,
+    // ── JPA persistence backend ─────────────────────────────────────────────
+    /// PersistenceBackend health + applied-migration list.
+    PersistenceStatus,
+    /// Run pending migrations forward.
+    PersistenceMigrate,
 }
 
 #[derive(Subcommand)]
@@ -4390,6 +4465,49 @@ source_root = "src"
             // Kerberos / SPNEGO
             AuthCmd::KerberosValidateKeytab => c.get(cavectl::auth::kerberos::PATH_VALIDATE_KEYTAB).await,
             AuthCmd::KerberosTestSpnego     => c.get(cavectl::auth::kerberos::PATH_TEST_SPNEGO).await,
+            // WebAuthn / FIDO2 — backing-trait probes (full ceremony driven by portal A6)
+            AuthCmd::WebauthnRegisterOptions   => c.get("/api/auth/webauthn/register-options").await,
+            AuthCmd::WebauthnVerifyAttestation => c.get("/api/auth/webauthn/verify-attestation").await,
+            AuthCmd::WebauthnAssertOptions     => c.get("/api/auth/webauthn/assert-options").await,
+            AuthCmd::WebauthnVerifyAssertion   => c.get("/api/auth/webauthn/verify-assertion").await,
+            // OAuth/OIDC endpoint surface
+            AuthCmd::OauthPar    => c.get(cavectl::auth::oauth_endpoints::PATH_PAR).await,
+            AuthCmd::OauthDevice => c.get(cavectl::auth::oauth_endpoints::PATH_DEVICE).await,
+            AuthCmd::OauthCiba   => c.get(cavectl::auth::oauth_endpoints::PATH_CIBA).await,
+            AuthCmd::OauthRevoke => c.get(cavectl::auth::oauth_endpoints::PATH_REVOKE).await,
+            // WS-Federation 1.x
+            AuthCmd::WsfedMetadata => c.get(cavectl::auth::wsfed::PATH_METADATA).await,
+            AuthCmd::WsfedSignin   => c.get(cavectl::auth::wsfed::PATH_SIGNIN).await,
+            AuthCmd::WsfedSignout  => c.get(cavectl::auth::wsfed::PATH_SIGNOUT).await,
+            // OID4VC issuance + verification
+            AuthCmd::Oid4vcIssue      => c.get(cavectl::auth::oid4vc::PATH_ISSUE).await,
+            AuthCmd::Oid4vcCredential => c.get(cavectl::auth::oid4vc::PATH_CREDENTIAL).await,
+            AuthCmd::Oid4vcPresent    => c.get(cavectl::auth::oid4vc::PATH_PRESENT).await,
+            AuthCmd::Oid4vcMetadata   => c.get(cavectl::auth::oid4vc::PATH_METADATA).await,
+            // UMA 2.0
+            AuthCmd::UmaResourceSet      => c.get(cavectl::auth::uma::PATH_RESOURCE_SET).await,
+            AuthCmd::UmaPermissionTicket => c.get(cavectl::auth::uma::PATH_PERMISSION_TICKET).await,
+            AuthCmd::UmaRpt              => c.get(cavectl::auth::uma::PATH_RPT).await,
+            // Token exchange (RFC 8693)
+            AuthCmd::TokenExchangeExchange => c.get(cavectl::auth::token_exchange::PATH_EXCHANGE).await,
+            // DPoP (RFC 9449)
+            AuthCmd::DpopVerifyProof => c.get(cavectl::auth::dpop::PATH_VERIFY_PROOF).await,
+            AuthCmd::DpopThumbprint  => c.get(cavectl::auth::dpop::PATH_THUMBPRINT).await,
+            // JWE (RFC 7516)
+            AuthCmd::JweEncrypt => c.get(cavectl::auth::jwe::PATH_ENCRYPT).await,
+            AuthCmd::JweDecrypt => c.get(cavectl::auth::jwe::PATH_DECRYPT).await,
+            // Admin REST: IdP + Auth Flows
+            AuthCmd::AdminIdpInstances        => c.get(cavectl::auth::admin_idp::PATH_INSTANCES).await,
+            AuthCmd::AdminIdpMappers          => c.get(cavectl::auth::admin_idp::PATH_MAPPERS).await,
+            AuthCmd::AdminFlowsFlows          => c.get(cavectl::auth::admin_flows::PATH_FLOWS).await,
+            AuthCmd::AdminFlowsExecutions     => c.get(cavectl::auth::admin_flows::PATH_EXECUTIONS).await,
+            AuthCmd::AdminFlowsRequiredActions=> c.get(cavectl::auth::admin_flows::PATH_REQUIRED_ACTIONS).await,
+            // Email listener / SMTP outbox
+            AuthCmd::EmailQueue    => c.get(cavectl::auth::email_listener::PATH_QUEUE).await,
+            AuthCmd::EmailTestSend => c.get(cavectl::auth::email_listener::PATH_TEST_SEND).await,
+            // JPA persistence backend
+            AuthCmd::PersistenceStatus  => c.get(cavectl::auth::persistence::PATH_STATUS).await,
+            AuthCmd::PersistenceMigrate => c.get(cavectl::auth::persistence::PATH_MIGRATE).await,
         },
         Commands::ContainerScan { cmd } => match cmd {
             ContainerScanCmd::List            => c.get("/api/container-scan/list").await,
