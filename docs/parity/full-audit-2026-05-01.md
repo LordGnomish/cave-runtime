@@ -76,7 +76,7 @@ declared (typically tests + surfaces) or implementations of declared items.
 | Crate              | Upstream | overall | what's declared / missing |
 |--------------------|----------|--------:|---------------------------|
 | cave-local-llm     | huggingface/transformers @ v4.36 | 0.50 | 5/5 fn, 3/3 surf — **3 stubs** in src; needs file + test mappings |
-| cave-portal        | backstage/backstage @ v1.20.0 | 0.25 | 10/10 files only — needs fn/test/surface mappings |
+| cave-portal        | backstage/backstage @ v1.50.3 | 0.95 | FINALIZED 2026-05-18 — 78 mapped + 8 partial + 13 skipped + 5 unmapped of 104 admin entities; source_sha pinned |
 | cave-mesh          | istio/istio @ 1.20.0 | 0.25 | 8/8 files only — needs fn/test/surface mappings |
 | cave-controller-manager | kubernetes/kubernetes @ v1.28.0 | 0.25 | 10/10 files only, **3 stubs** in src |
 | cave-kube-proxy    | kubernetes/kubernetes @ v1.28.0 | 0.25 | 10/10 files; **8 fn missing, 4 surfaces missing** |

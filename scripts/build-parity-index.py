@@ -456,17 +456,34 @@ def disk_manifest_state(crate: str) -> dict:
     im = re.search(r'^\s*infra_only\s*=\s*(true|false)', block, flags=re.MULTILINE)
     infra = im.group(1) == "true" if im else False
 
-    # Check [upstream].license
+    # Check [upstream].license + lift [upstream].{version,source_sha,org,repo}
+    # so the index reflects the manifest's pinned upstream identity rather
+    # than the frozen audit-doc snapshot. Added 2026-05-18 alongside the
+    # cave-portal FINALIZE close-out.
     upstream_m = re.search(
         r"^\[upstream\][^\[]*",
         text,
         flags=re.MULTILINE,
     )
     has_license = False
+    upstream_version_disk: str | None = None
+    upstream_source_sha_disk: str | None = None
+    upstream_orgrepo_disk: str | None = None
     if upstream_m:
+        block_text = upstream_m.group(0)
         has_license = bool(
-            re.search(r'^\s*license\s*=\s*"', upstream_m.group(0), flags=re.MULTILINE)
+            re.search(r'^\s*license\s*=\s*"', block_text, flags=re.MULTILINE)
         )
+        vm = re.search(r'^\s*version\s*=\s*"([^"]+)"', block_text, flags=re.MULTILINE)
+        if vm:
+            upstream_version_disk = vm.group(1)
+        sm = re.search(r'^\s*source_sha\s*=\s*"([^"]+)"', block_text, flags=re.MULTILINE)
+        if sm:
+            upstream_source_sha_disk = sm.group(1)
+        om = re.search(r'^\s*org\s*=\s*"([^"]+)"', block_text, flags=re.MULTILINE)
+        rm2 = re.search(r'^\s*repo\s*=\s*"([^"]+)"', block_text, flags=re.MULTILINE)
+        if om and rm2:
+            upstream_orgrepo_disk = f"{om.group(1)}/{rm2.group(1)}"
 
     # `manifest_filled` = `[upstream]` carries license info (or infra-only)
     # AND `[parity]` exists with `last_audit`.
@@ -482,6 +499,9 @@ def disk_manifest_state(crate: str) -> dict:
         "skipped_count": skipped_count,
         "unmapped_count": unmapped_count,
         "total_count": total_count,
+        "upstream_version_disk": upstream_version_disk,
+        "upstream_source_sha_disk": upstream_source_sha_disk,
+        "upstream_orgrepo_disk": upstream_orgrepo_disk,
     }
 
 
@@ -576,6 +596,16 @@ def overlay_disk_state(crates: dict[str, dict]) -> dict[str, int]:
         # Surface infra_only signal from disk for E-tier entries.
         if disk.get("infra_only_disk"):
             entry["infra_only"] = True
+        # 2026-05-18 — also overlay the upstream identity (version /
+        # source_sha / org-repo) so the index doesn't lag the manifest's
+        # pinned upstream. The audit doc is a 2026-05-01 freeze; manifest
+        # updates landed afterwards on per-crate close-out branches.
+        if disk.get("upstream_version_disk"):
+            entry["upstream_version"] = disk["upstream_version_disk"]
+        if disk.get("upstream_source_sha_disk"):
+            entry["upstream_source_sha"] = disk["upstream_source_sha_disk"]
+        if disk.get("upstream_orgrepo_disk"):
+            entry["upstream"] = disk["upstream_orgrepo_disk"]
         # Behavioral-parity overlay: read the manifest's
         # `[[upstream_test]]` entries and attach the per-crate ratio.
         bp = behavioral_parity_state(name)

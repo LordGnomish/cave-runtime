@@ -11,8 +11,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "smallstep/certificates",
+      "upstream_version": "v0.30.2"
     },
     "cave-admission": {
       "cave_src_loc": 1620,
@@ -76,7 +76,7 @@
       "total_count": 51,
       "unmapped_count": 6,
       "upstream": "kubernetes/kubernetes",
-      "upstream_version": "v1.28.0"
+      "upstream_version": "v1.36.0"
     },
     "cave-artifacts": {
       "cave_src_loc": 4994,
@@ -88,8 +88,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": "sonatype/nexus-public",
-      "upstream_version": "v3.0.0"
+      "upstream": "pulp/pulpcore",
+      "upstream_version": "3.49.0"
     },
     "cave-auth": {
       "behavioral_missing": 1,
@@ -125,7 +125,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "vmware-tanzu/velero",
-      "upstream_version": "v1.12.0"
+      "upstream_version": "main"
     },
     "cave-cache": {
       "behavioral_audit_at": "2026-05-14",
@@ -162,8 +162,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "debezium/debezium-server",
+      "upstream_version": "v3.5.0.Final"
     },
     "cave-certs": {
       "cave_src_loc": 914,
@@ -189,8 +189,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D1",
-      "upstream": "towncrier/towncrier",
-      "upstream_version": "23.0.0"
+      "upstream": "twisted/towncrier",
+      "upstream_version": "25.8.0"
     },
     "cave-chaos": {
       "cave_src_loc": 1125,
@@ -229,8 +229,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "E",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-cloud-controller-manager": {
       "cave_src_loc": null,
@@ -267,7 +267,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "open-policy-agent/gatekeeper",
-      "upstream_version": "v3.14.0"
+      "upstream_version": "main"
     },
     "cave-container-scan": {
       "cave_src_loc": 2340,
@@ -280,7 +280,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "aquasecurity/trivy",
-      "upstream_version": "v0.48.0"
+      "upstream_version": "main"
     },
     "cave-controller-manager": {
       "behavioral_audit_at": "2026-05-14",
@@ -305,7 +305,7 @@
       "total_count": 45,
       "unmapped_count": 4,
       "upstream": "kubernetes/kubernetes",
-      "upstream_version": "v1.28.0"
+      "upstream_version": "v1.36.0"
     },
     "cave-core": {
       "cave_src_loc": 1990,
@@ -318,8 +318,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-cost": {
       "cave_src_loc": 1965,
@@ -371,7 +371,7 @@
       "total_count": 34,
       "unmapped_count": 2,
       "upstream": "containerd/containerd",
-      "upstream_version": "v1.7.0"
+      "upstream_version": "v2.2.3"
     },
     "cave-crm": {
       "cave_src_loc": null,
@@ -395,7 +395,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "crossplane/crossplane",
-      "upstream_version": "v1.14.0"
+      "upstream_version": "main"
     },
     "cave-dashboard": {
       "cave_src_loc": 8092,
@@ -445,8 +445,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-deploy": {
       "cave_src_loc": 4743,
@@ -539,8 +539,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-ebpf-common": {
       "cave_src_loc": 127,
@@ -566,8 +566,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": "erpnext/erpnext",
-      "upstream_version": "v15.0.0"
+      "upstream": "frappe/erpnext",
+      "upstream_version": "v16.16.0"
     },
     "cave-etcd": {
       "behavioral_audit_at": "2026-05-13",
@@ -592,7 +592,7 @@
       "total_count": 71,
       "unmapped_count": 6,
       "upstream": "etcd-io/etcd",
-      "upstream_version": "v3.5.13"
+      "upstream_version": "v3.6.10"
     },
     "cave-external-secrets": {
       "cave_src_loc": 652,
@@ -631,7 +631,7 @@
       "stubs": null,
       "tier": "D1",
       "upstream": "cilium/tetragon",
-      "upstream_version": "v1.0.0"
+      "upstream_version": "v1.2.0"
     },
     "cave-gateway": {
       "cave_src_loc": 12187,
@@ -656,8 +656,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": "fluxcd/flux2",
-      "upstream_version": "v2.1.0"
+      "upstream": "argoproj/argo-cd",
+      "upstream_version": "main"
     },
     "cave-ha": {
       "cave_src_loc": 5882,
@@ -749,8 +749,8 @@
       "tier": "C",
       "total_count": 17,
       "unmapped_count": 6,
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "kubernetes-sigs/karpenter",
+      "upstream_version": "v1.12.0"
     },
     "cave-keda": {
       "cave_src_loc": 1145,
@@ -776,8 +776,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "E",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-knative": {
       "cave_src_loc": 1167,
@@ -790,7 +790,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "knative/serving",
-      "upstream_version": "v1.12.0"
+      "upstream_version": "knative-v1.22.0"
     },
     "cave-kube-proxy": {
       "cave_src_loc": null,
@@ -861,8 +861,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-lint": {
       "cave_src_loc": 625,
@@ -938,7 +938,7 @@
       "total_count": 36,
       "unmapped_count": 4,
       "upstream": "istio/istio",
-      "upstream_version": "1.20.0"
+      "upstream_version": "1.29.2"
     },
     "cave-metrics": {
       "cave_src_loc": 9530,
@@ -1014,8 +1014,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "casbin/casbin",
+      "upstream_version": "v3.10.0"
     },
     "cave-pg": {
       "cave_src_loc": 2184,
@@ -1067,8 +1067,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "smallstep/certificates",
+      "upstream_version": "v0.30.2"
     },
     "cave-policy": {
       "cave_src_loc": 11624,
@@ -1089,7 +1089,7 @@
       "last_audit_disk": "2026-05-18",
       "manifest_filled": true,
       "mapped_count": 78,
-      "note": "10/10 files only \u2014 needs fn/test/surface mappings",
+      "note": "FINALIZED 2026-05-18 \u2014 78 mapped + 8 partial + 13 skipped + 5 unmapped of 104 admin entities; source_sha pinned",
       "parity_ratio": 0.9519,
       "parity_ratio_source": "manifest",
       "partial_count": 8,
@@ -1099,7 +1099,8 @@
       "total_count": 104,
       "unmapped_count": 5,
       "upstream": "backstage/backstage",
-      "upstream_version": "v1.20.0"
+      "upstream_source_sha": "v1.50.3",
+      "upstream_version": "v1.50.3"
     },
     "cave-portal-api": {
       "cave_src_loc": null,
@@ -1112,8 +1113,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "E",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.50.4"
     },
     "cave-portal-web": {
       "cave_src_loc": null,
@@ -1126,8 +1127,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "E",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.50.4"
     },
     "cave-profiler": {
       "cave_src_loc": 180,
@@ -1185,8 +1186,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": "goharbor/harbor",
-      "upstream_version": "v2.10.0"
+      "upstream": "distribution/distribution",
+      "upstream_version": "v3.1.1"
     },
     "cave-rollouts": {
       "cave_src_loc": 1898,
@@ -1212,8 +1213,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-runtime": {
       "cave_src_loc": null,
@@ -1226,8 +1227,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "E",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-sbom": {
       "behavioral_missing": 0,
@@ -1245,7 +1246,7 @@
       "stubs": null,
       "tier": "D1",
       "upstream": "DependencyTrack/dependency-track",
-      "upstream_version": "v4.9.0"
+      "upstream_version": "v4.11.6"
     },
     "cave-scaffold": {
       "cave_src_loc": 1398,
@@ -1277,7 +1278,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "SonarSource/sonarqube",
-      "upstream_version": "v10.3.0"
+      "upstream_version": "v10.4.1"
     },
     "cave-scan-db": {
       "cave_src_loc": null,
@@ -1313,7 +1314,7 @@
       "total_count": 29,
       "unmapped_count": 3,
       "upstream": "kubernetes/kubernetes",
-      "upstream_version": "v1.28.0"
+      "upstream_version": "v1.36.0"
     },
     "cave-search": {
       "cave_src_loc": 172,
@@ -1325,8 +1326,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "manticoresoftware/manticoresearch",
+      "upstream_version": "25.8.2"
     },
     "cave-secrets": {
       "cave_src_loc": 648,
@@ -1339,7 +1340,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "trufflesecurity/trufflehog",
-      "upstream_version": "v3.63.0"
+      "upstream_version": "v3.63.7"
     },
     "cave-security": {
       "cave_src_loc": 6350,
@@ -1378,8 +1379,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D1",
-      "upstream": "OpenSLO/OpenSLO",
-      "upstream_version": "v0.1.0"
+      "upstream": "nobl9/nobl9-go",
+      "upstream_version": "v0.126.1"
     },
     "cave-spire": {
       "cave_src_loc": 705,
@@ -1418,7 +1419,7 @@
       "stubs": null,
       "tier": "C",
       "upstream": "minio/minio",
-      "upstream_version": null
+      "upstream_version": "RELEASE.2024-01-01"
     },
     "cave-streams": {
       "behavioral_audit_at": "2026-05-13",
@@ -1443,7 +1444,7 @@
       "total_count": 45,
       "unmapped_count": 6,
       "upstream": "apache/kafka",
-      "upstream_version": "3.6.0"
+      "upstream_version": "4.2.0"
     },
     "cave-techdocs": {
       "cave_src_loc": 835,
@@ -1456,8 +1457,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "backstage/backstage",
+      "upstream_version": "v1.50.4"
     },
     "cave-trace": {
       "cave_src_loc": 8923,
@@ -1483,8 +1484,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "D2",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "jaegertracing/jaeger",
+      "upstream_version": "v2.17.0"
     },
     "cave-tracker": {
       "cave_src_loc": 4898,
@@ -1496,8 +1497,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": "linear-app/linear",
-      "upstream_version": "v1.0.0"
+      "upstream": "makeplane/plane",
+      "upstream_version": "v1.3.0"
     },
     "cave-upstream": {
       "cave_src_loc": 3519,
@@ -1510,8 +1511,8 @@
       "parity_ratio_source": "manifest",
       "stubs": null,
       "tier": "C",
-      "upstream": null,
-      "upstream_version": null
+      "upstream": "cave-runtime/cave-runtime",
+      "upstream_version": "v0.1.0"
     },
     "cave-upstream-watchd": {
       "cave_src_loc": null,
@@ -1559,8 +1560,8 @@
       "tier": "A",
       "total_count": 38,
       "unmapped_count": 8,
-      "upstream": "hashicorp/vault",
-      "upstream_version": "v1.15.0"
+      "upstream": "openbao/openbao",
+      "upstream_version": "v2.5.3"
     },
     "cave-vcluster": {
       "cave_src_loc": 532,
@@ -1590,7 +1591,7 @@
       "stubs": null,
       "tier": "D1",
       "upstream": "DefectDojo/django-DefectDojo",
-      "upstream_version": "v2.28.0"
+      "upstream_version": "v2.58.2"
     },
     "cave-workflows": {
       "cave_src_loc": 666,
