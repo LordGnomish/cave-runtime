@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! AppRole auth backend — parity tests against openbao v2.5.3.
 //!
 //! Upstream package: `builtin/credential/approle/`.

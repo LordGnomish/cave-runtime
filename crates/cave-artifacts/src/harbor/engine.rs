@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::harbor::models::{GCPolicy, GCResult, ImageMetadata};
 use chrono::Utc;
 

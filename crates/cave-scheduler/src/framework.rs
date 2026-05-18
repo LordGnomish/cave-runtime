@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scheduling framework — Filter/Score plugin chain runtime.
 //!
 //! Cite: kubernetes/kubernetes v1.36.0

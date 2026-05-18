@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego policy engine — public interface.
 //!
 //! Implements the full OPA Rego language: rules, functions, comprehensions,

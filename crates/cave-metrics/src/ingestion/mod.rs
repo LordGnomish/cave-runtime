@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Ingestion protocol implementations.
 //! Supports: remote_write, remote_read, Prometheus exposition, OpenMetrics,
 //!           OTLP (gRPC+HTTP), StatsD, Graphite, InfluxDB line protocol.

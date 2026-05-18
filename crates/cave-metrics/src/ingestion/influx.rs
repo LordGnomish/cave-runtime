@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! InfluxDB line protocol parser.
 //! Format: <measurement>[,tag_key=tag_val...] field_key=field_val[,...] [unix_timestamp_ns]
 //! Reference: https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/

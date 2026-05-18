@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tiered storage (KIP-405) — skeleton.
 //!
 //! Mirrors `storage/internals/log/RemoteLogManager.java` and the

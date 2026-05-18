@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Write-Ahead Log (WAL) for crash recovery — delegates to cave-core::wal.
 //!
 //! `WalEntry` owns the S3 + etcd domain op shapes.

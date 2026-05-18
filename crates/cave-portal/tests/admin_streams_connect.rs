@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for `/admin/streams/connect/*`.
 //!
 //! Each test verifies a public API contract of the new

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka-wire-shaped KRaft RPCs — the bytes the controller
 //! quorum exchanges over the Kafka binary protocol (KIP-595).
 //!

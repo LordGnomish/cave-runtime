@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ip-restriction plugin — allow/deny by CIDR or exact IP.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

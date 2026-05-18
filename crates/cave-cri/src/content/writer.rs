@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Streaming ingest writer.
 //!
 //! Mirrors `core/content/local/writer.go`. The caller opens a writer

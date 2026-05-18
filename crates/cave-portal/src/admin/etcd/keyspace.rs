@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keyspace tab — KV browser + watch event stream.
 //! Mirrors `etcdctl get --prefix=` for keys + `etcdctl watch` for events.
 

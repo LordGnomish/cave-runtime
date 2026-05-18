@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prober worker pool + restart-coordination ledger.
 //!
 //! Mirrors `pkg/kubelet/prober/worker.go` + `pkg/kubelet/prober/results/`.

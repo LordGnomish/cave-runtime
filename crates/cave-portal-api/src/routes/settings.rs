@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant settings — key/value store for portal configuration.
 //!
 //! Settings are *namespaced* per tenant. Operators can read all tenants

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl secrets list/add/rotate/get/delete`
 //!
 //! Native secrets verb. Backend is cave-vault (OpenBao parity) but

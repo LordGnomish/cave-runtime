@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LogQL lexer — converts a query string into a flat token stream.
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Domain models for cave-docs-site.
 
 use chrono::{DateTime, Utc};

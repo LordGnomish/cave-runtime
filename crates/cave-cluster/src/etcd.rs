@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! etcd backup and restore per cluster.
 
 use crate::error::{ClusterError, ClusterResult};

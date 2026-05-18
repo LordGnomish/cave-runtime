@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Production runtime mode driven by `<data_dir>/cluster.json`.
 //!
 //! When `cave-runtime serve` is launched on a data directory that was

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Deploy — GitOps deployment engine.
 //!
 //! Compatible with: ArgoCD + Flux

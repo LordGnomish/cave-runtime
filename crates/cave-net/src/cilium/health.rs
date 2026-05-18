@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cilium-health — cluster-wide connectivity probes.
 //!
 //! Mirrors `pkg/health/probe/probe.go` (the prober that pings every

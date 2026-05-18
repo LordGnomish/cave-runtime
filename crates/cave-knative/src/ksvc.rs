@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Knative Service (ksvc) — top-level CRD wrapping Configuration + Route.
 //! upstream: knative/serving v1.18.x — pkg/apis/serving/v1/service_types.go
 

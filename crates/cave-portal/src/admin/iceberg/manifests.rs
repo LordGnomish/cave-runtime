@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Manifests sub-page — per-snapshot manifest file listing.
 
 use super::snapshots;

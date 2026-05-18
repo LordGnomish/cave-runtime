@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! WORM (Write-Once-Read-Many) audit log streaming.
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

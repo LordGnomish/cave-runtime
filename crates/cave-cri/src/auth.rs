@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Registry authentication.
 //!
 //! Mirrors containerd's `pkg/cri/server/image_pull.go` resolver and the

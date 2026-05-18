@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! API analytics store + query layer.
 //!
 //! Tracks API metrics: latency, error rates, throughput, consumer behavior.

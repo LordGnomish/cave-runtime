@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Health check subsystem — active probes + passive observation.
 //!
 //! Active: periodic HTTP/TCP pings to each target.

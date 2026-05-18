@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTML dashboard renderer — produces self-contained Bootstrap-based HTML
 //! for embedding or standalone viewing. Mirrors Grafana's dark-theme aesthetics.
 

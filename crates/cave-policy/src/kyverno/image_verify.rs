@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kyverno image verification engine.
 //!
 //! Supports: cosign, notary, attestations, image references, mutateDigest.

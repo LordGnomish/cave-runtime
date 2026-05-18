@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cilium agent REST API — the surface the `cilium` CLI hits.
 //!
 //! Mirrors `api/v1/server/restapi/...` plus the route registry in

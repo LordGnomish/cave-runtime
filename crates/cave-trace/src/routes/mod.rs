@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP route modules.
 //!
 //! Routes are split by API surface:

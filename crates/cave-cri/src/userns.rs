@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! User namespace support — KEP-127 / Pod-level user namespaces.
 //!
 //! When `pod.spec.hostUsers: false`, the kubelet asks the runtime to put

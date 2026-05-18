@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Real behavior tests for cave-status (Mode B-prime spike).
 //! Exercises existing public API with non-trivial assertions.
 //! Generated 2026-05-04 via local Ollama (qwen3.6:35b-a3b-coding-mxfp8).

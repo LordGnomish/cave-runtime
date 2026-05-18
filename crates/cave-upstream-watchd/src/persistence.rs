@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persistent state — `<data_dir>/watchd/state.json`.
 //!
 //! One file, JSON, atomic write via tempfile+rename. Per-project

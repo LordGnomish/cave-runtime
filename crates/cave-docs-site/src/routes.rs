@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for cave-docs-site.
 
 use crate::{models::{DocPage, DocSite}, renderer, DocsSiteState};

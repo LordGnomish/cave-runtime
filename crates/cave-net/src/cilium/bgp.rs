@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! BGP control plane — `cilium-operator` BGP integration.
 //!
 //! Mirrors `pkg/bgpv1/manager/manager.go` (the per-instance BGP daemon

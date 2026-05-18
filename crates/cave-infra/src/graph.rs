@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Resource dependency graph — topological sort for apply ordering.
 
 use crate::error::{InfraError, InfraResult};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared types for the `/admin/mlflow` page set. Mirrors mlflow/mlflow
 //! v2.x REST API shapes (experiments, runs, registered models, model
 //! versions, deployments).

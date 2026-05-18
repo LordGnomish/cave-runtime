@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SBOM & dependency intelligence — compatible with DependencyTrack
 //!
 //! Compatible with: DependencyTrack

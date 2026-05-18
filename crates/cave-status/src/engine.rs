@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Worst-status aggregator for status pages.
 //!
 //! Computes the overall status of a page by taking the highest-rank

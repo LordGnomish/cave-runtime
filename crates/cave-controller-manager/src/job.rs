@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Job controller — runs N pods to completion (with optional parallelism).
 //!
 //! Upstream: [`pkg/controller/job`]. The full controller implements indexed

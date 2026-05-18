@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::error::{VaultError, VaultResult};
 use crate::response::VaultResponse;
 use crate::token::CreateTokenParams;

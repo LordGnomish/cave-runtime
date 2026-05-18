@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CRUD operations: find, insert, update, delete, count.
 
 use crate::bson::Document;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cgroup v2 unified-hierarchy writer abstraction.
 //!
 //! Mirrors `pkg/kubelet/cm/util/cgroups/` from upstream's

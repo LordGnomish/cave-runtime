@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Reusable task catalog — built-in and user-defined tasks.
 
 use crate::models::*;

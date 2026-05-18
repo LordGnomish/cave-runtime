@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-cdc — MongoDB oplog tests.
 //! Pinned to debezium-connector-mongodb v3.5.0.Final.
 

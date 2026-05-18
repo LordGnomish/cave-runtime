@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unified error types for the CAVE Runtime.
 
 use thiserror::Error;

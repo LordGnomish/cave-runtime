@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Abstract Syntax Tree for the Rego-compatible policy language.
 
 use serde_json::Value;

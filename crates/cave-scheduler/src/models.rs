@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scheduler models — nodes, resource capacity, scheduling decisions.
 
 use chrono::{DateTime, Utc};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SELECT statement execution.
 
 use crate::sql::ast::{BinaryOp, Expr, FromClause, Literal, SelectColumn, SelectStmt};

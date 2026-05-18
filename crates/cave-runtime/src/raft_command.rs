@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! State-machine commands carried in Raft log entries.
 //!
 //! The Raft core in [`crate::raft_core`] replicates opaque

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scan pipeline — runs between `ProxyClient::fetch()` and the final
 //! response. This is the enforcement point from ADR-133 §3.1 steps 4-7.
 //!

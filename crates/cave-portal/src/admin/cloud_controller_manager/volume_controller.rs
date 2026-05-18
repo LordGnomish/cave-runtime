@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Volume controller tab — managed cloud volumes (attach/detach).
 
 use super::CloudControllerViewError;

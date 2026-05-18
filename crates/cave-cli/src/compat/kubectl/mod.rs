@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl kubectl …` — drop-in shim for kubectl users.
 //!
 //! Each subcommand here mirrors `kubectl` flags and output, then maps

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/audit` — append-only activity log.
 //!
 //! Every persona action that mutates Portal state (a KEDA pause, a

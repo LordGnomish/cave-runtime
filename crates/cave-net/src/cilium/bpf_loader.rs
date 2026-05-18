@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! BPF program loader simulator — mirrors the agent-side loader that
 //! consumes compiled `.o` ELFs and attaches them to TC / cgroup / XDP
 //! hooks.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NodeLease controller — `pkg/controller/nodelifecycle/node_lifecycle_controller.go`.
 //!
 //! Each node renews a `coordination.k8s.io/Lease` named after itself in the

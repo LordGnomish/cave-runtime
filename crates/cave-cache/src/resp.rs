@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! RESP3 protocol serializer/deserializer.
 //!
 //! Supports both RESP2 (inline/array) and RESP3 (all types).

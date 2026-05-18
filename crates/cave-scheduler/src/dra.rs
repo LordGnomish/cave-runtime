@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Dynamic Resource Allocation (DRA) — KEP-4381 (GA in v1.36).
 //!
 //! Cite: kubernetes/kubernetes v1.36.0

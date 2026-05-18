@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ClusterRole aggregation — `pkg/controller/clusterroleaggregation/clusterroleaggregation_controller.go`.
 //!
 //! When a ClusterRole has `aggregationRule.clusterRoleSelectors[]` set, the

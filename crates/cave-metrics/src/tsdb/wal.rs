@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TSDB write-ahead log — thin domain wrapper over cave-core::wal.
 //!
 //! `WalRecord` owns the Prometheus-specific entry shape.  The actual

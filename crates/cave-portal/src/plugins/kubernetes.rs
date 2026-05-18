@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kubernetes plugin — per-crate panels for the K8s control-plane and
 //! data-plane modules cave-runtime ships.
 //!

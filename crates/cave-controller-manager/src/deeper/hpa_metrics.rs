@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA metric ingest — `pkg/controller/podautoscaler/replica_calculator.go`.
 //!
 //! Mirrors the sub-pipeline that goes from raw `metrics-server` ingest to the

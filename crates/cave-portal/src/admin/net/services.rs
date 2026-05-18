@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Services tab — Kubernetes services (ClusterIP / NodePort / LB).
 //! Derived from the endpoint set so each tenant sees its own services.
 

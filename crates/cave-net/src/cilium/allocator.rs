@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Generic key→ID allocator.
 //!
 //! Mirrors `pkg/allocator/allocator.go`. Cilium's allocator is the

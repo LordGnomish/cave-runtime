@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Error type for the Nexus module.
 
 use thiserror::Error;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTML rendering primitives.
 //!
 //! Server-rendered htmx + Tailwind-light. Mirrors the layout shell from

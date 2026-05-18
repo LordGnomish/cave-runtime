@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Userspace simulation of Cilium's `bpf_lxc.c` LXC endpoint map.
 //!
 //! Cite: cilium/bpf/lxc/bpf_lxc.c + cilium/bpf/lib/lxc.h (v1.19.3).

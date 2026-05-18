@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `<samlp:Response>` + `<saml:Assertion>` — the IdP → SP message
 //! that carries the authenticated subject and any attribute
 //! statements.

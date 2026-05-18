@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kyverno-compatible policy engine.
 //!
 //! Implements: ClusterPolicy/Policy, validate/mutate/generate/verifyImages rules,

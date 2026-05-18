@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Distributed task assignment. Mirrors
 //! `org.apache.kafka.connect.runtime.distributed.DistributedHerder`
 //! from upstream — the herder decides which Worker process

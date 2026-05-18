@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kubelet agent — watches for pod assignments and manages lifecycle.
 
 use crate::models::*;

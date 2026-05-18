@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Connection tracking — Cilium's per-flow state table.
 //!
 //! Mirrors `bpf/lib/conntrack.h` (the kernel-side state machine) and

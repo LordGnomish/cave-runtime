@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core database structures and shared server state.
 
 use std::collections::{HashMap, VecDeque};

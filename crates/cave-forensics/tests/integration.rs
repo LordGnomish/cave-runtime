@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for cave-forensics public surface.
 
 use cave_forensics::engine::{evidence_count, has_valid_evidence, highest_severity, open_cases, severity_rank};

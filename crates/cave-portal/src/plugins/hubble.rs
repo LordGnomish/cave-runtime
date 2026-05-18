@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hubble-equivalent L7 flow visualizer — replaces the Cilium Hubble UI.
 //!
 //! cave-net produces L7 flow records; this plugin shapes them for the

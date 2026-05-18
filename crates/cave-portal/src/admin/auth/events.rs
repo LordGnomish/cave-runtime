@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth/events` — Keycloak "Events" tab. Audit log of
 //! admin actions. cave-portal synthesises a per-realm event
 //! trail from the live session set: each session generates a

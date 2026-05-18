@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! AuthorizationPolicy evaluator.
 //!
 //! Mirrors `pilot/pkg/security/authz/builder/builder.go` plus the runtime

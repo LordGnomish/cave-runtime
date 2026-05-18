@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Layer diff service.
 //!
 //! Ports `core/diff/` from upstream containerd. Two operations:

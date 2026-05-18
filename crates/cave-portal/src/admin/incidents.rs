@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/incidents` — Grafana OnCall incidents parity. Severity
 //! grouped pills + state-transition mutator (preserved).
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core S3/MinIO object store implementation.
 //!
 //! Objects are stored as files on disk (data_dir/bucket/object-path).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl events` — federated event stream.
 //!
 //! A native cross-module verb: events surface from cave-kernel's

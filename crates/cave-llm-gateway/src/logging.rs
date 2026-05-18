@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Request/response logging for the LLM gateway.
 
 use crate::openai::{ChatCompletionRequest, ChatCompletionResponse};

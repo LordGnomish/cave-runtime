@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/keda/metrics` — per-scaler Prometheus-backed stats.
 //!
 //! Mirrors the upstream KEDA Grafana dashboard

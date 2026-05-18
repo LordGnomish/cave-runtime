@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core DNS management: sync, drift detection, validation, change application, health probes.
 
 use crate::models::{ChangeAction, DnsChange, DnsDrift, DnsRecord, DriftType, RecordData, RecordType};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explore tab — ad-hoc PromQL/LogQL editor surface.
 //!
 //! Mirrors Grafana's Explore view header (datasource picker + query

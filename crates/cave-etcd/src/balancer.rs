@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! v3 client balancer — endpoint pool, round-robin pick, leader-pinning,
 //! per-endpoint health tracking, and retry-on-leader-change.
 //!

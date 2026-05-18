@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Falco condition language — tokenizer, recursive-descent parser, and evaluator.
 //!
 //! Supports the full Falco condition grammar:

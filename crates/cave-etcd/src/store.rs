@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MVCC key-value store with revision tracking.
 //!
 //! Implements etcd's multi-version concurrency control model:

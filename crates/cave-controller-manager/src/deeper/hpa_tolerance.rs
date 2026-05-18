@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA tolerance check — `pkg/controller/podautoscaler/replica_calculator.go`.
 //!
 //! Upstream picks `currentReplicas` (no-op) when the usage ratio is within a

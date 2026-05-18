@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod readiness gate — `cilium-startup-conf` integration.
 //!
 //! Mirrors `pkg/k8s/podreadinessgate.go` and the readiness-gate

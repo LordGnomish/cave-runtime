@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Argo CD wrap — advanced features.
 //!
 //! Layered on top of [`super::argocd`]: this module models the bits the

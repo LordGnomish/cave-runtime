@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Falco output channels — JSON formatting, HTTP webhook, gRPC-compatible type.
 
 use crate::falco::engine::Alert;

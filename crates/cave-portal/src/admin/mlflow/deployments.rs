@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deployments sub-page — model-serving endpoints + traffic stats.
 
 use super::types::{MlflowViewError, ModelDeployment};

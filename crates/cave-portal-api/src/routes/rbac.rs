@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared RBAC + tenant scoping guard for cave-portal-api routes.
 //!
 //! Every route handler that touches tenant-owned data must call

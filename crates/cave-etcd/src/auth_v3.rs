@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Auth subsystem refinements — auth revision, range-permission cache,
 //! TLS client-cert (CN-based) auth, and root-role bootstrap.
 //!

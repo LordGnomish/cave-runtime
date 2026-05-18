@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! VirtualService → ordered route table compiler.
 //!
 //! Mirrors `pilot/pkg/networking/core/v1alpha3/route/route.go::translateRoutes`.

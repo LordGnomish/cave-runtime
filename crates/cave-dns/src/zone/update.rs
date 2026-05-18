@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// RFC 2136 Dynamic DNS update processing.
 use hickory_proto::{
     op::{Message, MessageType, OpCode, ResponseCode},

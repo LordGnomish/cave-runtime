@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CRL (Certificate Revocation List) responder.
 //!
 //! Cite: RFC 5280 §5 — CRL structure and revocation reasons; openbao

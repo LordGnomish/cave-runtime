@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Parity calculator: resolves a `ParityManifest` against the local filesystem.
 
 use super::manifest::ParityManifest;

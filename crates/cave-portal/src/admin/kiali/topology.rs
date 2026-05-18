@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Topology tab — Istio Kiali service-graph parity.
 
 use super::KialiViewError;

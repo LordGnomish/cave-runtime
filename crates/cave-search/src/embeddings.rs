@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Vector embeddings + cosine similarity for semantic search.
 //! upstream: opensearch v3.0/server/src/main/java/org/opensearch/knn/
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! grpc-gateway plugin — REST→gRPC transcoding.
 //!
 //! Converts HTTP/JSON requests to gRPC binary frames and back.

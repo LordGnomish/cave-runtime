@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for cave-streams.
 //!
 //! Covers: produce/consume, consumer groups, offsets, compaction, schema

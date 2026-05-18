@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Field-level RBAC — admission deny on protected field changes (KEP-3633).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

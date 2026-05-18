@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Per-tenant rate limiting and query limits.
 //!
 //! Uses a token-bucket algorithm for ingestion rate limiting:

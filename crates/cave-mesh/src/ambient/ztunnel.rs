@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ztunnel — node-local L4 mTLS proxy.
 //!
 //! Mirrors `istio/ztunnel` (release-1.29) — the per-node Rust proxy that

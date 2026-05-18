@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Step type validation and metadata.
 use crate::models::{Step, StepType};
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for cave-runbook.
 use crate::models::*;
 use crate::RunbookState;

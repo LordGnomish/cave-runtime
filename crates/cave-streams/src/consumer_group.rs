@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Consumer group coordinator — join/sync/heartbeat/leave + rebalance protocols.
 //!
 //! Supports: range, roundrobin, sticky, cooperative-sticky

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/controller-manager` — kube-controller-manager Web UI parity.
 //!
 //! Tabs mirror the upstream controller-manager's per-controller scope

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! XML DSig — RSA-SHA256 sign and verify over the bytes of a
 //! SAML message. This module owns the *crypto step* of XML DSig;
 //! the *canonicalization step* (`exc-c14n`) is the caller's

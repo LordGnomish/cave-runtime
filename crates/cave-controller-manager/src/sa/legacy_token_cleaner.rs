@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Legacy ServiceAccount-token cleaner —
 //! `pkg/controller/serviceaccount/legacyserviceaccounttokencleaner.go`.
 //!

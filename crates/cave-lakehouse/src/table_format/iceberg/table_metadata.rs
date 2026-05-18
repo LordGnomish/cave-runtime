@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Iceberg TableMetadata — top-level table descriptor (`metadata.json`).
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/table_metadata.rs and

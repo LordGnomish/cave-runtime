@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Egress gateway — `CiliumEgressGatewayPolicy` evaluator.
 //!
 //! Mirrors `pkg/egressgateway/manager.go` (per-policy state machine) and

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant scoping helpers (Cortex/Mimir/Loki-compatible `X-Scope-OrgID`).
 
 use crate::models::{Alert, DEFAULT_TENANT, TENANT_LABEL};

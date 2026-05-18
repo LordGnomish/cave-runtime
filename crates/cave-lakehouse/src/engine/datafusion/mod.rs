@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-datafusion — DataFusion-style logical + execution plans.
 //!
 //! Mirrors apache/datafusion v40 logical-plan / physical-plan layering:

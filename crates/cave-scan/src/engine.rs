@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{Finding, FindingSeverity, RuleType, ScanResult, ScanRule};
 use chrono::Utc;
 use uuid::Uuid;

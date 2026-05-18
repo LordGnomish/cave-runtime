@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Admin views — per-module Backstage-parity panels gated by WebAuthn + RBAC.
 //!
 //! Each submodule is a self-contained view with three layers:

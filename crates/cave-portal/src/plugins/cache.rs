@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cache wrap — native Redis/Valkey-compatible admin UI.
 //!
 //! Replaces RedisInsight / Valkey UI for the cave runtime. Tenants browse

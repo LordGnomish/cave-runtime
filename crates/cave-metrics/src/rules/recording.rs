@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Recording rules: evaluate a PromQL expression and write back to TSDB.
 
 use crate::error::Result;

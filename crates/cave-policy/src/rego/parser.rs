@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego parser — converts token stream into AST.
 
 use super::ast::*;

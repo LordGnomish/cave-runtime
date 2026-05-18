@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OCI / Docker manifest and blob models.
 
 use chrono::{DateTime, Utc};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Topology manager — NUMA alignment for CPU, memory, and device hints.
 //!
 //! Mirrors `pkg/kubelet/cm/topologymanager`: each hint provider supplies

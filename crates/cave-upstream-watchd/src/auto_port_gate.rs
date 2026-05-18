@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Charter v2 gate — verifies an auto-port commit before merge.
 //!
 //! Gates (every one must pass):

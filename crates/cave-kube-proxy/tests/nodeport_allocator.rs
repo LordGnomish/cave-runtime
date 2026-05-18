@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NodePort allocator — parity tests against k8s v1.36.0.
 //!
 //! Upstream: `pkg/registry/core/service/portallocator/allocator.go`.

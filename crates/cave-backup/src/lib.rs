@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Backup — Kubernetes backup/restore engine.
 //!
 //! Compatible with: Velero

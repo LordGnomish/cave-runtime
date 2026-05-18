@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/streams/partitions` — per-partition view, derived
 //! from each topic's `partitions` count. Surfaces the leader
 //! broker and the partition-id range so the operator can see

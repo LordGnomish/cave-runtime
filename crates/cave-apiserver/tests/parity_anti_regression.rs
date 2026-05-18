@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Strict anti-regression for cave-apiserver parity.
 //!
 //! Asserts each parity dimension is 1.000 and `stubs_detected == 0`. This is

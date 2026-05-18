@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! discovery v2 + OpenAPI v3 transport tests.
 
 use super::*;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #[derive(Debug, thiserror::Error)]
 pub enum DocsError {
     #[error("space not found: {0}")]

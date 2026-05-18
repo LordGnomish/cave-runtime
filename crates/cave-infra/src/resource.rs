@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Resource model — desired state, actual state, resource kinds.
 
 use crate::error::{InfraError, InfraResult};

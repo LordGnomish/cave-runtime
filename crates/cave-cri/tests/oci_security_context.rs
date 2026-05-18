@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-002: real security-context injection into the OCI runtime spec.
 //!
 //! Upstream: containerd v2.2.3

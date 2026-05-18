@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Silence application — Alertmanager silence semantics.
 
 use crate::matcher::all_match;

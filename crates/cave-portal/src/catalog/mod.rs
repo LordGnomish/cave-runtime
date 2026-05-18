@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Backstage-compatible catalog module for cave-portal.
 //!
 //! Provides entity / location / refresh-state persistence with two backends:

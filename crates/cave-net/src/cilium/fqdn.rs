@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! FQDN-based identity — Cilium's `toFQDNs` policy support.
 //!
 //! Mirrors `pkg/fqdn/fqdn.go` plus the FQDN identity-allocation logic

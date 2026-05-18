@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Surface-delta computation for upstream releases.
 //!
 //! ## Phase 1 (this file): tag-level delta — production

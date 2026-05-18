@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Linux namespace management for container isolation.
 //!
 //! Creates pid, net, mnt, uts, ipc namespaces using clone(2) flags.

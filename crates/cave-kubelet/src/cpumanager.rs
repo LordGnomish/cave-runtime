@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CPU manager — static policy with topology-aware exclusive allocation.
 //!
 //! Mirrors `pkg/kubelet/cm/cpumanager`: Guaranteed-QoS pods with integer

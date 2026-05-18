@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SelectorCache — deduplication + reverse-index for EndpointSelectors
 //! used by the policy compiler.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Services tab — Services + Endpoints + Ingresses.
 //!
 //! Derives Service rows per node (one ClusterIP-style service per

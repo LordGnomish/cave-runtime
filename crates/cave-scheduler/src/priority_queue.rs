@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Priority scheduling queue with active / backoff / unschedulable subqueues.
 //!
 //! Cite: kubernetes/kubernetes v1.36.0

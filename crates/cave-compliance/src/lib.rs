@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Compliance — Compliance & audit engine.
 //! Compatible with: Manual CIS Benchmark checks, SOC2/PCI-DSS/HIPAA audit tooling.
 //! Features: Automated control checks, evidence collection, audit trail, policy mapping.

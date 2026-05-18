@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{ChaosExperiment, ExperimentStatus, ExperimentType};
 
 /// Validate experiment parameters based on type

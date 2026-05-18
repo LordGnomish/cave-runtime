@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Source-connector offset store. Mirrors
 //! `org.apache.kafka.connect.storage.OffsetStorageReader/Writer`
 //! from upstream — the durable map of `(connector,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CRIU integration — Checkpoint/Restore in Userspace, KEP-2008.
 //!
 //! KEP-2008 wires the existing CRIU tooling into the CRI as

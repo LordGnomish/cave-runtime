@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA status conditions — `pkg/controller/podautoscaler/horizontal.go`.
 //!
 //! The HPA controller writes three conditions onto each HPA's status:

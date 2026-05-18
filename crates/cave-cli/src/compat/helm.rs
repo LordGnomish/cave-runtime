@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl helm …` — Helm v3 compat shim.
 //!
 //! Targets `/api/compat/helm/v3/...`. Cave's registry+gitops modules

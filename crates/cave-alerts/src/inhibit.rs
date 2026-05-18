@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Inhibit rules — Alertmanager `inhibit_rules` semantics.
 //!
 //! Source alerts whose labels match the rule's `source_matchers` cause target

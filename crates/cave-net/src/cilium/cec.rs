@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CiliumEnvoyConfig (CEC) reconciler.
 //!
 //! Mirrors `pkg/ciliumenvoyconfig/cec_resource_parser.go` and

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CNI plugin chain — Cilium as a chained plugin alongside portmap,
 //! bandwidth, sbr, etc.
 //!

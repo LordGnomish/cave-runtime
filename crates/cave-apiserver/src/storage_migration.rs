@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Storage migration controller — orchestrates alpha → beta → GA promotions
 //! against `storage_version::StorageVersionRegistry`.
 //!

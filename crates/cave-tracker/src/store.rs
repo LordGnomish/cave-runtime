@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store for cave-tracker (stub for production cave-db backend).
 
 use crate::jql::{JqlEvaluator, JqlParser};

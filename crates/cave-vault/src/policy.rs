@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Policy engine — path-based ACL with capabilities.
 
 use serde::{Deserialize, Serialize};

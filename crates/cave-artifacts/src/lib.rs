@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-artifacts — consolidated artifact repository platform.
 //!
 //! Bundles best-of-breed upstream parities under one crate, mirroring the

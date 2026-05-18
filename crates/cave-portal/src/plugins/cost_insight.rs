@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cost Insight plugin — per-tenant spend breakdown and trend.
 
 use serde::{Deserialize, Serialize};

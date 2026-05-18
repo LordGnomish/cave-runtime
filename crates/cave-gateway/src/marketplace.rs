@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee Developer Portal & API Marketplace — self-service API catalog,
 //! consumer management, subscription plans, and API key self-provisioning.
 

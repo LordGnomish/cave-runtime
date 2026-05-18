@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Auto-breadcrumb from URL path.
 //!
 //! Given a request path like `/admin/keda/scaledobjects/foo`, produce

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Log-based alerting: rule evaluation, pattern detection, anomaly detection.
 
 use crate::models::{AlertCondition, AlertSeverity, LogAlert, LogLevel};

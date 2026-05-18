@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! W3C Trace-Context propagation (`traceparent` + `tracestate`).
 //!
 //! Mirrors the strict spec semantics: rejects version `ff`, all-zero IDs,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/docdb` view — document-store collection browser.
 //!
 //! Surfaces per-database collection sizes; mirrors the Backstage

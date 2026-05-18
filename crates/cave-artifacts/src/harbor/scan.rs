@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Vulnerability scanning integration hooks.
 //! Provides an async hook interface; concrete scanners (Trivy, Grype, etc.)
 //! implement ScanHook and are registered with the ScanManager.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Axum middleware for JWT authentication.
 //! Validates tokens, extracts CaveIdentity, injects into request extensions.
 

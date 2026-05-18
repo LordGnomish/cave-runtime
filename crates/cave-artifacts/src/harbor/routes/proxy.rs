@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pull-through proxy routes — HTTP surface for every supported ecosystem.
 //!
 //! Wire shape:

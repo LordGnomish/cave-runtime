@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Defrag scheduler — coordinates one-at-a-time defragmentation across
 //! cluster members with rate limiting and follower-first ordering.
 //!

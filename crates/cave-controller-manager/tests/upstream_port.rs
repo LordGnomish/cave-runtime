@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Line-by-line ports of upstream kube-controller-manager tests,
 //! cross-referenced from `parity.manifest.toml`'s `[[upstream_test]]`
 //! block (batch3 — 2026-05-14).

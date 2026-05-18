@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Vulnerability database — NVD-style CVE records, in-memory store.
 
 use chrono::{DateTime, Utc};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! User-namespace remapping — KEP-127 (v1.30 beta).
 //!
 //! Mirrors `pkg/kubelet/userns/` from upstream. Computes the

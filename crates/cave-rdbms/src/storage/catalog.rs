@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL system catalog.
 
 use crate::storage::schema::Database;

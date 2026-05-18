@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IP Address Management — Cilium's IPAM modes.
 //!
 //! Mirrors `pkg/ipam/ipam.go` plus `pkg/ipam/types.go` (the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runbook execution engine — steps in order, retries, timeouts, approvals.
 
 use crate::{

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plugin host — the registry of pages, panels, and nav entries contributed by
 //! modules.
 //!

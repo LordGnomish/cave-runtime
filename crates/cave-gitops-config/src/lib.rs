@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE GitOps Config — Platform-as-a-product promise management.
 //!
 //! Compatible with: Kratix

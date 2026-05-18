@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OIDC authentication flow — authorization code with PKCE.
 //!
 //! Implements RFC 7636 (PKCE) and RFC 6749 (OAuth2 authorization code grant).

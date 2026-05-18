@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CiliumNode CRD + cluster-pool CIDR allocator.
 //!
 //! Mirrors `pkg/k8s/apis/cilium.io/v2/types.go::CiliumNode` and the

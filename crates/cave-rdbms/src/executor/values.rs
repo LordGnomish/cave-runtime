@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Value coercion and comparison helpers.
 
 use crate::types::SqlValue;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Registered models sub-page — per-model version registry.
 
 use super::types::{MlflowViewError, ModelVersion};

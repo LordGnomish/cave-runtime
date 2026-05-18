@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `GAP_OPENED` event + sinks.
 //!
 //! The daemon emits one event per upstream whose `tag_name` has

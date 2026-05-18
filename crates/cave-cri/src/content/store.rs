@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Content store trait + filesystem-backed local implementation.
 //!
 //! Mirrors `core/content/local/store.go` from upstream containerd.

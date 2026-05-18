@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::ApiSpec;
 
 /// Check if a version string looks like a valid semver

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LogQL Abstract Syntax Tree.
 //!
 //! Covers the full LogQL grammar:

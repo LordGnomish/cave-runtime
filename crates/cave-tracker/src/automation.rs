@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Workflow automation engine: trigger → condition → action rules.
 
 use crate::models::*;

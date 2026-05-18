@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DAG execution engine for pipelines.
 //!
 //! Resolves task dependencies, runs steps in parallel where possible,

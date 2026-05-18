@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster-wide health, quota-driven defrag trigger, and the v3.6
 //! `Downgrade` state-machine — three pieces of the maintenance / cluster
 //! API surface that share one source of truth (per-member status).

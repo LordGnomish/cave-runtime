@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/pipelines` — Tekton Dashboard parity. PipelineRun graph
 //! grouped by pipeline + per-status summary cards.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Reload plugin — signal-triggered or timed config hot-reload.
 use std::sync::{
     atomic::{AtomicBool, Ordering},

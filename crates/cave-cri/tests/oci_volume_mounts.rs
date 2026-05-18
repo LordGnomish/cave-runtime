@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-002: real OCI mount-list injection from CRI volume mounts.
 //!
 //! Upstream: containerd v2.2.3 `pkg/cri/server/container_create_linux.go`

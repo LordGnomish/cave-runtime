@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cross-region DR replication.
 //!
 //! The DR replicator runs on the primary leader and streams committed log

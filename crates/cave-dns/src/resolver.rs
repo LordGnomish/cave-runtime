@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::cache::DnsCache;
 use crate::types::*;
 use crate::zone::{Zone, ZoneStore};

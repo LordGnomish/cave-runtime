@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! 16,384-slot routing table.
 //!
 //! Mirrors the slot-ownership half of `src/cluster.c` plus the

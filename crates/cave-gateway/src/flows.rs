@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee Flow-based Policy Designer — visual request/response policy chains
 //! with pre-route, route, post-route, and error stages plus conditional execution.
 

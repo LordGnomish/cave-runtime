@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod lifecycle hooks — `preStop` + `postStart` orchestration.
 //!
 //! Cite: pkg/kubelet/lifecycle/ (v1.36.0).

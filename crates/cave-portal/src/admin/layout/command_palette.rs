@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cmd+K / Ctrl+K command palette.
 //!
 //! Server-rendered modal + inline JS that:

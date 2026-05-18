@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL store for cave-policy — persists policies, data documents, decision logs.
 
 use cave_db::CavePool;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Artifact-platform portal page.
 //!
 //! Renders the consolidated artifact dashboard (Harbor + Pulp + Nexus +

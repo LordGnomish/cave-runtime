@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service dependency graph.
 //!
 //! Builds a directed graph of service → service calls from span parent/child

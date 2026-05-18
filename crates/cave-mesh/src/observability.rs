@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Per-service latency histograms and golden signals.
 //!
 //! Uses a standalone `ObservabilityStore` (not MeshMetrics) so it can track

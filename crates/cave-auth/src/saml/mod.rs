@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SAML 2.0 broker — port of Keycloak's `saml-core` + the
 //! `services/.../protocol/saml/` endpoint set. cave-auth is
 //! primarily OIDC; this module adds the second federation

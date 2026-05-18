@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service discovery registry.
 //!
 //! Maintains a live map of namespace/service → endpoints.

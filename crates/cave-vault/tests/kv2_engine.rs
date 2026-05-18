@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KV v2 secret engine — parity tests against openbao v2.5.3.
 //!
 //! Exercises put / get / list / delete / destroy / undelete plus version &

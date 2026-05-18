@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! /api/v1/labels and /api/v1/label/{name}/values
 
 use axum::{extract::{Path, Query, State}, Json};

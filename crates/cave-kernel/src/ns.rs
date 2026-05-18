@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant / namespace identity primitive.
 //!
 //! Every multi-tenant request in CAVE flows past a `TenantId`. cave-apiserver,

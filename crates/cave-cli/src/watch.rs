@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Watch mode + JSON streaming + exit code propagation.
 //!
 //! `cavectl ... --watch` periodic poll, `cavectl ... --json-stream` line-delimited

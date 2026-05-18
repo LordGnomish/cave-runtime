@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runbook execution engine — sequential, parallel, conditional steps.
 use crate::models::*;
 use chrono::Utc;

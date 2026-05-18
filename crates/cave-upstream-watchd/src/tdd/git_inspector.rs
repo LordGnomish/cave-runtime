@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Git inspection trait and a `git` CLI–backed implementation.
 //!
 //! Trait is small enough to mock in unit tests; the real implementation

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Sync engine — manual, auto, self-heal, prune, dry-run, waves, hooks.
 
 use crate::models::*;

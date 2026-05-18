@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ServiceAccount controller — `pkg/controller/serviceaccount/serviceaccounts_controller.go`.
 //!
 //! Ensures every active namespace has a `default` ServiceAccount. Mirrors

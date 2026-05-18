@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Automatic leader failover and split-brain prevention.
 //!
 //! The `FailoverManager` monitors cluster health and:

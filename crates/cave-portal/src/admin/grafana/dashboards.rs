@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Dashboards tab — Grafana `/dashboards` parity. Folder-tree
 //! grouping + flat list, mirroring `GET /api/search?type=dash-db`.
 

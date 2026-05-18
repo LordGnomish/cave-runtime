@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-pki — chain validation tests.
 
 use cave_pki::{Ca, ChainValidator, CrlResponder, KeyAlgorithm, RevocationReason, ValidationResult};

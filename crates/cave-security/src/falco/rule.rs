@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Falco rule types — YAML-deserializable rule, macro, list structures.
 
 use serde::{Deserialize, Serialize};

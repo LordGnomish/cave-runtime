@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Priority queue backed by per-repo YAML files in `<repo>/queue/`.
 //!
 //! File-lock (exclusive flock) + atomic rename guarantee concurrent-safe

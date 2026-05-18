@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! RDB snapshot and AOF (Append-Only File) persistence.
 
 use std::collections::VecDeque;

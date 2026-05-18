@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Sovereign Ledger — immutable audit log with Merkle tree hash chain.
 //!
 //! Implements Principle 14 (Sovereign Auditability), ADR-093.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Language-specific package scanner.
 //!
 //! Parses: go.sum, package-lock.json (npm), requirements.txt (pip),

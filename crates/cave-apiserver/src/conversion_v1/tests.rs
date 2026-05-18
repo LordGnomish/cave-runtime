@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! conversion_v1 tests — strategy validation, hub/spoke versioning, dispatch.
 
 use super::*;

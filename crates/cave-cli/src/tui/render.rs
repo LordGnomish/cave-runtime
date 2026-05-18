@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pure formatters for the TUI.
 //!
 //! These functions take state and produce strings. Ratatui owns the

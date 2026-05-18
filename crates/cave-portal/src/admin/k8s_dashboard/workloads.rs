@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Workloads tab — joined scheduler nodes ⨝ kubelet pods view.
 
 use super::K8sDashboardViewError;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::error::{VaultError, VaultResult};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Draft document model — frontmatter, rendering, and Ollama prompt construction.
 
 use chrono::{DateTime, Utc};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Typed reference held by a lease.
 
 use crate::content::digest::Digest;

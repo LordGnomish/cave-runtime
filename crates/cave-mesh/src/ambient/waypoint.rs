@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Waypoint proxy — per-namespace L7 router.
 //!
 //! Mirrors `pilot/pkg/networking/core/v1alpha3/waypoint.go` plus the runtime

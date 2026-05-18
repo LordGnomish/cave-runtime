@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! REST API routes for the scheduler.
 
 use crate::models::*;

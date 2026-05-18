@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared types for cave-cloud-controller-manager.
 //!
 //! `TenantId` is re-exported from `cave_kernel::ns` (sweep-002 F2-G adoption,

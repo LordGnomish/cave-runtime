@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `FrameCodec` trait + common error taxonomy.
 
 use bytes::BytesMut;

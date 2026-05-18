@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tunneling — VXLAN / Geneve / native-routing encap modes.
 //!
 //! Mirrors `pkg/datapath/tunnel/tunnel.go` (the per-mode tunnel manager)

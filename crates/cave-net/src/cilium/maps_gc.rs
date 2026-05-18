@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Maps GC controller — periodic sweep across BPF map families.
 //!
 //! Mirrors `pkg/maps/gc/gc.go`. The agent runs a periodic sweep of

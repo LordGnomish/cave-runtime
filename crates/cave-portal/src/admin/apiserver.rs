@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/apiserver` view — RBAC-filtered Kubernetes resource browser.
 //!
 //! Mirrors the `kubernetes-resources` panes Backstage's Kubernetes plugin

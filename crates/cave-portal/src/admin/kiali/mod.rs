@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/kiali` — Istio Kiali Web UI parity surface.
 //!
 //! Tabs mirror Kiali's top navigation:

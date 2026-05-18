@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Workload identity primitives — SPIFFE ID & SVID metadata.
 //!
 //! Implements the SPIFFE 1.0 ID grammar:

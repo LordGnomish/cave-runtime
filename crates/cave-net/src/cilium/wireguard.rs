@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! WireGuard transparent encryption — per-node key + peer registry.
 //!
 //! Mirrors `pkg/wireguard/agent.go` (the cilium-agent's WG manager).

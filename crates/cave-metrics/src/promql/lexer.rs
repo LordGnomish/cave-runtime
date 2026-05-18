@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PromQL lexer — tokenises a query string into tokens.
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes for cave-changelog.
 
 use axum::{routing::get, Json, Router};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared types for the `/admin/litellm` page set. Mirrors
 //! BerriAI/litellm v1.x proxy admin schemas (models, routes, API keys,
 //! budgets, traffic stats).

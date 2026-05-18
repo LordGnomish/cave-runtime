@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DefaultPreemption — PostFilter plugin running upstream's preemption flow.
 //!
 //! Cite: kubernetes/kubernetes v1.31.0

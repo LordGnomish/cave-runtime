@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/artifacts` — Pulp Web UI parity. Image / file registry
 //! browser grouped by upstream registry with size totals.
 //!

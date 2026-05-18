@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Istio `DestinationRule.TrafficPolicy` → Envoy XDS cluster translation.
 //!
 //! Upstream: `pilot/pkg/networking/core/cluster_traffic_policy.go`

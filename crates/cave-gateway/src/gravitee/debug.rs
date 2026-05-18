@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Request recorder/replayer (Gravitee Debug mode).
 //!
 //! Captures requests/responses for debugging. Supports replay with modified upstream.

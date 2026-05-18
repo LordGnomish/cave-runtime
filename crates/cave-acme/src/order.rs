@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ACMEv2 Order + Authorization model.
 //!
 //! Cite: RFC 8555 §7.4 (newOrder), §7.4.1 (Order object), §7.5

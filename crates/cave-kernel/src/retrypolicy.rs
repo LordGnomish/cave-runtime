@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Retry policy with exponential backoff + jitter, async retry executor.
 //!
 //! Upstream cite: AWS SDK `@aws-sdk/util-retry` for jitter strategies (full,

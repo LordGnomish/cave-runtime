@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL schema for rollouts, analysis templates, and analysis runs.
 
 /// v1: core rollout schema.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Command dispatch table and connection state machine.
 
 pub mod bitmap;

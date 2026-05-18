@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE kernel — shared infrastructure used by all CAVE modules.
 //!
 //! Modules:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-acme — Order + Authorization tests pinned to RFC 8555.
 
 use cave_acme::{Identifier, IdentifierType, Order, OrderStatus};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `parity.manifest.toml` deserialization structs.
 
 use serde::{Deserialize, Serialize};

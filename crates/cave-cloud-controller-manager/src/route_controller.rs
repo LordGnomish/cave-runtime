@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cloud route controller — keeps the cloud's VPC route table in sync with
 //! the set of `Node.spec.podCIDR` values.
 //!

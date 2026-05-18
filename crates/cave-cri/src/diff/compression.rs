@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! gzip compression + diff-id computation.
 //!
 //! Mirrors `core/diff/diff.go`'s helpers. The "diff id" of a layer is

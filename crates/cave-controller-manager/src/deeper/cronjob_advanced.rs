@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CronJob deeper — `pkg/controller/cronjob/cronjob_controllerv2.go`.
 //!
 //! Beyond the deeper-002 cron parser, this module models:

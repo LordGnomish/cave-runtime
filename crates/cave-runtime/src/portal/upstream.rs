@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Upstream Tracker page + API.
 //!
 //! Renders the 65+ tracked upstream OSS projects with the four columns Burak

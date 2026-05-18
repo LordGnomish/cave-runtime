@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pulsar-style topic addressing: `persistent://tenant/ns/topic`.
 //!
 //! Cave Streams uses Pulsar's hierarchical naming scheme as the canonical

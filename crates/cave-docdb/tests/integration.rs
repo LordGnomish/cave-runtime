@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-docdb integration tests.
 //!
 //! Upstream parity reference: MongoDB community `jstests/core` (CRUD, query

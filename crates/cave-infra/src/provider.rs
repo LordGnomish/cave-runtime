@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Provider abstraction — bare metal and cloud-like providers.
 
 use crate::error::{InfraError, InfraResult};

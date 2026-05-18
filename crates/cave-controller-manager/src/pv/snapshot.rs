@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! VolumeSnapshot lifecycle — `external-snapshotter` controllers
 //! (`pkg/controller/volume/snapshot.go` upstream / sigs.k8s.io/external-snapshotter).
 //!

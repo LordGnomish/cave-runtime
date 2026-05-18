@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! request-transformer plugin — add/remove/rename/replace headers, query params, body fields.
 //!
 //! Config structure mirrors Kong's:

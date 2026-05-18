@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Attribute-Based Access Control (ABAC) policy engine.
 //!
 //! Evaluates policies of the form:

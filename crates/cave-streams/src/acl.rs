@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka ACL management — per topic, group, and cluster resources.
 
 use crate::error::{StreamsError, StreamsResult};

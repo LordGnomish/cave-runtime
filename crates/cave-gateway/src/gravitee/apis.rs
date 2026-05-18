@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee API / Plan / Application / Subscription port.
 //!
 //! Surfaces ported from Gravitee APIM v4.x:

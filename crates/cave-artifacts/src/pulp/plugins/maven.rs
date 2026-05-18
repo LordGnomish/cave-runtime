@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! pulp_maven — Maven2 artifact content plugin.
 
 use crate::pulp::error::ArtifactsError;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! End-to-end integration tests for the watch daemon.
 //!
 //! These exercise the daemon loop against a `mockito` GitHub server,

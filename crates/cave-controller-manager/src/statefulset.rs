@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! StatefulSet controller — ordered, identity-stable pod management.
 //!
 //! Upstream: [`pkg/controller/statefulset`]. Identity is `<name>-<ordinal>`;

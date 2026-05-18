@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Events tab — recent reconcile-loop events. Derived from lease
 //! renewals so the page has a meaningful timeline without a separate
 //! Event store.

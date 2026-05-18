@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store for cave-runbook.
 
 use crate::models::{Execution, ExecutionStatus, Runbook, StepExecution};

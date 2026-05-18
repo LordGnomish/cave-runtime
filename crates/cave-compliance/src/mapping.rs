@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Predefined control → CAVE module mappings and control seeding.
 
 use crate::models::{Control, Framework};

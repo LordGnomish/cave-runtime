@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Smoke tests for `cavectl streams connect …`.
 //!
 //! These call the compiled `cavectl` binary as a subprocess

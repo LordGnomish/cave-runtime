@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Optional Raft seam for the etcd write-path handlers.
 //!
 //! Single-node deployments mutate [`crate::store::KvStore`] directly

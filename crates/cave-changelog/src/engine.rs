@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{Change, ChangeType, ChangelogEntry};
 
 /// Parse a conventional commit message into a ChangeType and description.

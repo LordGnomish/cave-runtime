@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! StatsD protocol parser.
 //! Format: metric.name:value|type[|@rate][|#tag1:val1,tag2:val2]
 //! Types: c (counter), g (gauge), ms (timer/histogram), s (set), h (histogram)

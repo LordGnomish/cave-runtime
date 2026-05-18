@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DefectDojo wrap — finding list, SLA tracker, risk acceptance.
 //!
 //! Replaces the DefectDojo web UI. Tenant-scoped findings come from

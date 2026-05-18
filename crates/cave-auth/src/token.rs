@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Token management — introspection, revocation, ID token handling.
 //! Wraps the Okta/Keycloak token endpoints and maintains a local revocation cache.
 

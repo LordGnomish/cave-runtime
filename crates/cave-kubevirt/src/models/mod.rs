@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KubeVirt v1 CRD models.
 //!
 //! Upstream: kubevirt/kubevirt v1.8.2

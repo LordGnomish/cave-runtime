@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Auth — full enterprise authentication & authorization layer.
 //!
 //! ## What's included

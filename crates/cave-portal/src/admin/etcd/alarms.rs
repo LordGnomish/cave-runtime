@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Alarms tab — `etcdctl alarm list` parity (NOSPACE / CORRUPT).
 
 use super::EtcdViewError;

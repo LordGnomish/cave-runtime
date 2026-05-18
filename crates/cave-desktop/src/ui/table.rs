@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// A generic row-oriented table primitive.
 ///
 /// Cluster Overview uses this for the pod/node lists; later screens (logs,

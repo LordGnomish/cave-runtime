@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Log query engine: filtering, aggregation (count_over_time, rate, top_k), full-text search.
 
 use crate::models::{LogEntry, LogQuery, LogQueryOp};

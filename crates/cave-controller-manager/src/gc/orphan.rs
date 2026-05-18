@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Orphan / foreground finalizer mechanics — `pkg/controller/garbagecollector/garbagecollector.go::orphanDependents`.
 //!
 //! Two finalizer-driven flows:

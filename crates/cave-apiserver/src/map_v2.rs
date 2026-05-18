@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MutatingAdmissionPolicy v2 (KEP-3962, alpha 1.32, beta 1.33).
 //!
 //! Sister module to `vap_advanced` (validating). Reuses the same

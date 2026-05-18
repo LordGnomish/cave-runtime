@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PodGC controller — `pkg/controller/podgc/gc_controller.go`.
 //!
 //! Background-deletes pods that are no longer needed:

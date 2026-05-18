@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bindings tab — recent pod → node scheduling decisions.
 
 use super::SchedulerViewError;

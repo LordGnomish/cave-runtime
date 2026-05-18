@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::error::{PgError, PgResult};
 use crate::types::{PoolConfig, PoolMode};
 use chrono::{DateTime, Utc};

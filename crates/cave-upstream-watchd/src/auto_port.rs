@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Auto-port dispatcher — turns `GAP_OPENED` events into port tasks.
 //!
 //! ## Lifecycle

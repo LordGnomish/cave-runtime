@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE DNS — CoreDNS-compatible authoritative and recursive DNS server.
 #![allow(dead_code, unused_imports, unused_variables, unused_mut)]
 //!

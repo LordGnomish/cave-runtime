@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keyboard shortcuts + the `?` help modal.
 //!
 //! `cave-runtime` doesn't yet ship a SPA, so the shortcuts live on

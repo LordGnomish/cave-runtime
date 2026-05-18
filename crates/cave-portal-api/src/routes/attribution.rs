@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GET /api/attribution?days=7&repo=all|cave-runtime|pipeline-platform
 //!
 //! Security: uses `git log -z` with NUL-separated records so commit bodies

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/streams/consumer_groups` — Kafka admin "Consumer
 //! Groups" tab. Per-group state, lag, and topic binding —
 //! the page operators visit first when a downstream consumer

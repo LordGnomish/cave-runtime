@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service Account Token issuance + JWT signing (TokenRequest API).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

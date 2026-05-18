@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/backup` view — backup job browser + manual trigger.
 
 use crate::admin::permission::{Permission, RequestCtx};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rules tab — alerting + recording rule groups.
 //!
 //! Mirrors Prometheus `/rules` (rule groups + per-rule state + last

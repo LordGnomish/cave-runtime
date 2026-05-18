@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cilium agent flag/option name table.
 //!
 //! Mirrors `pkg/option/config.go`. Upstream defines ~278 string constants

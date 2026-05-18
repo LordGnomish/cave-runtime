@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Log ingestion subsystem — multiple protocol receivers.
 
 pub mod fluentd;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KRaft mode — Kafka's ZooKeeper-replacement metadata quorum.
 //!
 //! Upstream: `apache/kafka` raft/ + metadata/ + controller/

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Leader election for the controller-manager itself.
 //!
 //! Mirrors upstream `kube-controller-manager`'s `--leader-elect=true`

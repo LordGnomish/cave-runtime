@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cluster-pool subnet refill controller — per-node watermark
 //! pre-allocation.
 //!

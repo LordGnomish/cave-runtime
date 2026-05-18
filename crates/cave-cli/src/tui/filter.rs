@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Fuzzy filter for the TUI item list.
 //!
 //! Subsequence match (each byte of `query` must appear in `target` in

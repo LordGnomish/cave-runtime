@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Dynamic Resource Allocation (DRA) — KEP-3063 + KEP-4381 (structured params).
 //!
 //! Mirrors `pkg/kubelet/cm/dra` and the upstream `resource.k8s.io/v1alpha2`

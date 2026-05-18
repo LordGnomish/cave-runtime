@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shamir secret sharing + seal lifecycle — parity tests against
 //! openbao v2.5.3.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CSR auto-approver — `pkg/controller/certificates/approver/sarapprove.go`.
 //!
 //! Auto-approves kubelet-bootstrap CSRs that satisfy:

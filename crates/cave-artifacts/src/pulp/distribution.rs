@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Distribution and publication management.
 
 use crate::pulp::models::*;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Content type operations — search, filter, verification.
 
 use crate::pulp::models::*;

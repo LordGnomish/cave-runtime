@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scrape targets: Prometheus exposition format parsing, service discovery.
 
 use crate::models::{Sample, ScrapeTarget};

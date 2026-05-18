@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Notification payload construction for rollout events.
 
 use crate::types::{NotificationEvent, Rollout, RolloutPhase};

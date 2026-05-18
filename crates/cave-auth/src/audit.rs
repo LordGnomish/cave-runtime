@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Audit logging for every auth decision.
 //!
 //! Every allow/deny is logged via `tracing` with structured fields so that

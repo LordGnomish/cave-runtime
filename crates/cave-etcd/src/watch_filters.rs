@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Watch event filters — `NOPUT` / `NODELETE` / `prev_kv`-strip per-watch
 //! filtering layered on top of the existing watch dispatcher in
 //! [`crate::store`].

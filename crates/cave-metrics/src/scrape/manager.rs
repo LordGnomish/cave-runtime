@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scrape manager: discovers, scrapes, and injects metrics into the TSDB.
 
 use std::sync::Arc;

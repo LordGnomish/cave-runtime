@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Line-by-line ports of upstream Kafka tests, cross-referenced from
 //! `parity.manifest.toml`'s `[[upstream_test]]` block.
 //!

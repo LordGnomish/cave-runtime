@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ResourceClaim controller — `pkg/controller/resourceclaim/controller.go`.
 //!
 //! KEP-4381 Dynamic Resource Allocation (GA in v1.36). The cluster-side

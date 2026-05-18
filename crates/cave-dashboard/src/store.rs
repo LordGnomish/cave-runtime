@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store — CRUD for all dashboard entities with versioning.
 
 use crate::models::*;

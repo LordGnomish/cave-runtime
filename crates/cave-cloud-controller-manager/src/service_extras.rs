@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service controller extras — beyond the basic ensure/update/delete loop.
 //!
 //! Mirrors the surface upstream's `controllers/service` reads from a Service:

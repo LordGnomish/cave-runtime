@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod Security admission (PSA) — KEP-2579.
 //!
 //! Upstream sources (kubernetes/kubernetes v1.31):

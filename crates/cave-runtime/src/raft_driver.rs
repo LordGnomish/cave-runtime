@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Glue between [`RaftCore`] and the HTTP transport.
 //!
 //! The core ([`crate::raft_core::RaftCore`]) is a pure state machine: it

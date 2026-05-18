@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-node Raft **transport scaffolding** — honest scope.
 //!
 //! What this module DOES:

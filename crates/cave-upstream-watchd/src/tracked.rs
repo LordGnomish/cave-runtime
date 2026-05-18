@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tracked-project discovery.
 //!
 //! The set of upstreams we watch is derived from each crate's own

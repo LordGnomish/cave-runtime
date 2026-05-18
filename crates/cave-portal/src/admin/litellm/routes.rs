@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Routes sub-page.
 
 use super::types::{LiteLlmRoute, LiteLlmViewError};

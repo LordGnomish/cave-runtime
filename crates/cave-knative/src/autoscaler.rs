@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Knative Pod Autoscaler (KPA) — concurrency-based scaling.
 //! upstream: knative/serving v1.18.x — pkg/autoscaler/scaling/
 

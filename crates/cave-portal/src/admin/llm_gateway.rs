@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/llm-gateway` view — llm-gateway resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};

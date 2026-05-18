@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PII detection & redaction — compatible with Presidio
 //!
 //! Compatible with: Presidio

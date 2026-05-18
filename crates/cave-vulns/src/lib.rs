@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Vulnerability aggregation hub — compatible with DefectDojo
 //!
 //! Compatible with: DefectDojo

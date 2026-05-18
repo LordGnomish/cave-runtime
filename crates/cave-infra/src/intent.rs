@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Intent engine — parse, resolve dependencies, validate, diff state.
 
 use crate::models::{

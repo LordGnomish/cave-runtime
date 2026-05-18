@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unleash-compatible data models for feature flags.
 
 use chrono::{DateTime, Utc};

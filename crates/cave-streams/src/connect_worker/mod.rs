@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka Connect Worker runtime — the per-process side of the
 //! Connect framework. Mirrors `connect/runtime/` from upstream
 //! (`Worker.java`, `WorkerTask`, `OffsetStorage*`,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Controller-runtime style scheduler primitives.
 //!
 //! Mirrors `pkg/controller/controller.go`. Cilium's controller is the

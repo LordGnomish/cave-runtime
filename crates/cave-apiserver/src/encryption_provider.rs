@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Encryption-at-rest provider for the apiserver storage layer.
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-tenancy: namespace per tenant, resource quotas, limit ranges.
 
 use crate::error::{ClusterError, ClusterResult};

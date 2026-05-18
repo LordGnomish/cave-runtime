@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::types::{PgStatActivity, PgStatTable, ReplicaInfo};
 use std::collections::HashMap;
 

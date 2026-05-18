@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service controller — provisions external load balancers for
 //! `Service.spec.type == "LoadBalancer"` and finalises cleanup on delete.
 //!

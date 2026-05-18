@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Guardrails — input/output content filtering.
 
 use crate::error::{GatewayError, GatewayResult};

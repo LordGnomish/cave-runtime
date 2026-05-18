@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! AuthLayer — full enterprise auth middleware for axum.
 //!
 //! ## Tower Layer architecture

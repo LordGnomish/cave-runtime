@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/erp` — ERPNext parity. Mirrors the upstream's Invoices
 //! landing page with status-group pills + totals.
 //!

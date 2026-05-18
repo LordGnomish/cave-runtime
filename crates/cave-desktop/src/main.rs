@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // cave-desktop — native admin shell for CAVE Runtime.
 //
 // See docs/adr/ADR-PORTAL-DESKTOP-001-gpui-native-admin-shell.md for the design.

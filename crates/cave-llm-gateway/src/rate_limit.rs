@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Per-consumer rate limiting — request bucket + cost-weighted token bucket.
 //!
 //! **Sweep-006 adoption (2026-05-12)** — the bucket primitive is now

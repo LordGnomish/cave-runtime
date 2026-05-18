@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PromQL evaluation engine.
 //! Evaluates a parsed Expr against the TSDB.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Members tab — cluster membership (`etcdctl member list`).
 //! Synthesised from a 3-node baseline so the page has the right
 //! shape; a live cluster surfaces this via the etcd MemberList RPC.

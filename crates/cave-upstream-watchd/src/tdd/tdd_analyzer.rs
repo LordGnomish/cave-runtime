@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Walks a branch's commit history and computes [`TddCompliance`].
 //!
 //! The four signals:

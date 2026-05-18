@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Tracker — Issue & project tracking engine.
 //! Compatible with: Jira
 //! Features: Projects, boards, sprints, issues, workflows, custom fields, JQL-like queries.

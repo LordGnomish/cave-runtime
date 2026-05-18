@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Per-invocation telemetry for `cavectl`.
 //!
 //! Captures verb, surface (native/compat), tenant scope, exit status,

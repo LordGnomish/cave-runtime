@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plan approval workflow — human-in-the-loop gate before applying changes.
 
 use std::collections::HashMap;

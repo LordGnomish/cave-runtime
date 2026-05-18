@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MutatingAdmissionPolicy v2 tests — KEP-3962.
 
 use super::*;

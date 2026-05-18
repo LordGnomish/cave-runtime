@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Deployments — list, get, rollout/rollback. Tenant-scoped.
 
 use std::collections::HashMap;

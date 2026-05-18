@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Built-in runbook templates — operators instantiate these into live runbooks.
 
 use crate::models::{ActionType, OnFailure, RunbookStep, RunbookTemplate, TriggerKind};

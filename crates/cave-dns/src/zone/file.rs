@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use std::path::Path;
 
 use hickory_proto::rr::{DNSClass, Name, RData, Record, RecordType};

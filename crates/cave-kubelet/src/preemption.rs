@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Critical-pod preemption admit handler.
 //!
 //! Cite: pkg/kubelet/preemption/ (v1.36.0).

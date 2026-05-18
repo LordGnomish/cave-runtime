@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IP masquerade agent (config + map shape).
 //!
 //! Mirrors `pkg/ipmasq/ipmasq.go`. Cilium ships an ip-masq-agent-compatible

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/chaos` — Chaos Dashboard parity. Experiment timeline +
 //! per-kind counters + last-run staleness flag.
 //!

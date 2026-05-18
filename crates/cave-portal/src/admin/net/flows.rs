@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Flows tab — Hubble-style L3/L4/L7 flow viewer.
 //!
 //! Sourced from the seeded `mesh_flows` collection; verdict pills

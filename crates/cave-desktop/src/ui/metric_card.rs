@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// A single big-number metric tile with optional delta and unit.
 ///
 /// Same data contract as `.stat-card` in the web portal — value rendered

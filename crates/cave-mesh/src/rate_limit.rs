@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Token-bucket rate limiter per service.
 
 use crate::models::{RateLimitPolicy, RateLimitUnit};

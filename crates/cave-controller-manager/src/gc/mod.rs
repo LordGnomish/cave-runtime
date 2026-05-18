@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GarbageCollector controller — `pkg/controller/garbagecollector`.
 //!
 //! Mirrors the Kubernetes GC controller. Three propagation modes:

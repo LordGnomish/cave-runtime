@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Admin commands: endSessions, currentOp, serverStatus.
 
 use crate::bson::Document;

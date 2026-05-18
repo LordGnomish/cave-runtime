@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-acme — Challenge tests pinned to RFC 8555 §8 + RFC 8737.
 
 use cave_acme::{Challenge, ChallengeStatus, ChallengeType, Jwk};

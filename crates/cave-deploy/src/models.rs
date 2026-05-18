@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ArgoCD/Flux-compatible CRD models.
 //!
 //! Covers: Application, ApplicationSet, AppProject, sync policy,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl harbor …` — Harbor (and OCI registry) compat shim.
 
 use anyhow::{bail, Result};

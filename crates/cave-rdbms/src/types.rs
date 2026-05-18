@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SQL type system and value coercion.
 
 use serde_json::{json, Value};

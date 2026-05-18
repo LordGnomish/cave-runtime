@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Keyspace tab — Redis/Valkey-style per-namespace key browser with
 //! TTL editor and delete mutator.
 

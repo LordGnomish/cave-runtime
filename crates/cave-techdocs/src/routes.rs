@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP routes — port of router.ts from @backstage/plugin-techdocs-backend.
 //!
 //! Upstream: backstage/plugins/techdocs-backend/src/service/router.ts

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Secondary plugin — serve secondary zones (AXFR from masters).
 use std::sync::Arc;
 use std::time::Duration;

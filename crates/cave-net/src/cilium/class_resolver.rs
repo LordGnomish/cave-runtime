@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IngressClass / GatewayClass parameter resolver.
 //!
 //! Mirrors `pkg/ingress/class_resolver.go` and the gateway-API

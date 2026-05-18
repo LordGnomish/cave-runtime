@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenants CRUD endpoint state.
 //!
 //! All operations are RBAC-gated via [`crate::routes::rbac::Guard`]. The store

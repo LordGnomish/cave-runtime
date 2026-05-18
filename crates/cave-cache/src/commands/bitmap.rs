@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bitmap commands: SETBIT, GETBIT, BITCOUNT, BITOP, BITPOS, BITFIELD.
 
 use crate::db::Db;

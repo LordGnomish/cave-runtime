@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KV-v2 browser — the legacy `list_secrets` surface, kept under the
 //! folder split so older callers keep compiling and the new
 //! folder-shaped module owns every Vault concern in one place.

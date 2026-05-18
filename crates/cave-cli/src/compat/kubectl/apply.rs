@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl kubectl apply -f file.yaml` — server-side apply.
 
 use anyhow::{bail, Context, Result};

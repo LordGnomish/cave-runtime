@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus metrics for cave-local-llm.
 //!
 //! Phase 1 metrics:

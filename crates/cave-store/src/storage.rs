@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory object store: buckets, objects, versioning, multipart uploads.
 
 use crate::models::{

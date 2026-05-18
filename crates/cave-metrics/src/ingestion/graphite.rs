@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Graphite plaintext protocol parser.
 //! Format: <metric.path> <value> <unix_timestamp>\n
 //! Also supports the Graphite pickle protocol (skipped here; use plaintext).

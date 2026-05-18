@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{CaseStatus, EvidenceItem, ForensicCase, ForensicSeverity};
 
 pub fn severity_rank(s: &ForensicSeverity) -> u8 {

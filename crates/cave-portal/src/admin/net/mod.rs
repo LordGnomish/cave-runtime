@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/net` — Cilium Hubble Web UI parity surface.
 //!
 //! Tabs mirror Cilium Hubble UI + the Kubernetes Dashboard Network

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! EndpointSliceMap — parity tests against k8s v1.36.0.
 //!
 //! Upstream: `pkg/proxy/endpointslicecache.go` (cache + change tracking)

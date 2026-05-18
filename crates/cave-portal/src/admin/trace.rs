@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/trace` — Jaeger UI parity. Service list with span-rate +
 //! error-rate health classification.
 //!

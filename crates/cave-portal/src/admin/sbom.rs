@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom` — Dependency-Track parity. Component browser
 //! grouped by image with license/package count summary.
 //!

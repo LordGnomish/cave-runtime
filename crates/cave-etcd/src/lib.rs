@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-etcd — Distributed key-value store.
 //!
 //! Reimplements etcd's v3 API with MVCC, watch, leases, transactions, auth,

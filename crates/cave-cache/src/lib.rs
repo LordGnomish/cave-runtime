@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-cache — Full Redis parity cache server.
 //!
 //! Implements the RESP2/RESP3 wire protocol, all Redis data types, pub/sub,

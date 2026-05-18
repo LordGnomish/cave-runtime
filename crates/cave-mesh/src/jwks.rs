@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! JWKS cache + key resolution.
 //!
 //! Complements [`crate::auth`] (which does authentication-policy

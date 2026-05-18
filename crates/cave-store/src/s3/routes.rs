@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! S3/MinIO HTTP routes.
 //!
 //! Implements the S3 REST API:

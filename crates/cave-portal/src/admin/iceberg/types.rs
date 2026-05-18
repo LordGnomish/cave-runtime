@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared types for the `/admin/iceberg` page set.
 //!
 //! Mirrors Apache Iceberg's REST-catalog payload shape (table → snapshots

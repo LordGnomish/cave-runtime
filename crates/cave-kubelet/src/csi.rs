@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CSI volume manager — Node service operations.
 //!
 //! Mirrors the upstream kubelet's `pkg/volume/csi` and `pkg/kubelet/volumemanager`

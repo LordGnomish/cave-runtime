@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/rollouts` — Argo Rollouts UI parity. Canary progression
 //! with per-state summary + traffic-percentage badge.
 //!

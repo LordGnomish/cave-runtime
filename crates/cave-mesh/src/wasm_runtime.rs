@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! WASM runtime — sandboxed execution of WasmPlugin bytecode.
 //!
 //! Mirrors the proxy-wasm ABI surface that Envoy ships with: a wasm

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! BGPv1 / BGPv2 shared types — root pkg/bgp/.
 //!
 //! Mirrors `pkg/bgp/cell.go` and the small CRD-shaped types used across

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL v3 frame codec built on `cave_kernel::codec::FrameCodec`.
 //!
 //! PostgreSQL's wire protocol has two framing modes that share the same

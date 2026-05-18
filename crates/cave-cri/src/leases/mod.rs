@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Resource leases.
 //!
 //! Ports `core/leases/` from upstream containerd. A lease is a

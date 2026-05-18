@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Token management and storage for the Vault runtime.
 //!
 //! This module provides structures and logic for creating, storing,

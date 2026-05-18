@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NodeManager — multi-node identity exchange.
 //!
 //! Mirrors `pkg/node/types/node.go::Node` and the in-memory NodeManager

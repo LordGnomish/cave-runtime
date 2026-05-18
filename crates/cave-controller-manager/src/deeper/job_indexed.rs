@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Indexed Job — per-completion-index scheduler + completion table.
 //!
 //! Mirrors `pkg/controller/job/indexed_job_utils.go::firstPendingIndexes`

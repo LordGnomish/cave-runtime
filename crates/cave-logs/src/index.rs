@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Label index and bloom filter layer for fast stream/chunk lookup.
 //!
 //! The index maps:

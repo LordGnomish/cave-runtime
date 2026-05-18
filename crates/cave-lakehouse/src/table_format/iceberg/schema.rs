@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Iceberg Schema — typed column list with stable field ids.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/schema.rs and

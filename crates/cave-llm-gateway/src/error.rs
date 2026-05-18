@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Error types for cave-llm-gateway.
 
 use thiserror::Error;

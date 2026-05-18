@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pooler CRD reconciler.
 //!
 //! Mirrors CloudNativePG's Pooler — a higher-level CRD that owns a

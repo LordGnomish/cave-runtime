@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL wire protocol server.
 //!
 //! Framing — both startup and regular phase — runs through

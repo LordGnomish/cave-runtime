@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Status page — auto-generated from cave-uptime probes
 //!
 //! Upstream tracking: custom

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KEDA CRD schema, ported field-by-field from upstream.
 //!
 //! References:

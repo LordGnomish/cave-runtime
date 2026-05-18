@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/iceberg` — Apache Iceberg catalog views.
 //!
 //! Mirrors the apache/iceberg v1.5.x REST-catalog and Java-API surface:

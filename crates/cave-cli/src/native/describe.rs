@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl describe <resource> <name>`
 //!
 //! Native describe — returns the rich, human-readable view of a Cave

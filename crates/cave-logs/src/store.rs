@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-tenant log store with chunk-based storage, retention, and compaction.
 //!
 //! Architecture:

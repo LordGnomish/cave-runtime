@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth` view — user list + role assignment + RBAC matrix.
 //!
 //! Mirrors the user-management surface Backstage exposes through

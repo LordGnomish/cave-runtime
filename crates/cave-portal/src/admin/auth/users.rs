@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth/users` — Keycloak "Users" tab. Per-realm user
 //! roster. cave-portal derives the list from the principal
 //! field of live sessions; one row per distinct (realm, principal)

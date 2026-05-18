@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Events tab — chronological per-node feed derived from pod state.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's Events view (timestamp,

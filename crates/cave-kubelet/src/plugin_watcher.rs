@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plugin watcher — kubelet's `/var/lib/kubelet/plugins_registry/`
 //! observation + registration handshake for CSI / DRA / DevicePlugin.
 //!

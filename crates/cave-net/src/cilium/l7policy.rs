@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CiliumNetworkPolicy L7 evaluator.
 //!
 //! Mirrors `pkg/policy/api/l7.go` plus the per-protocol matcher modules:

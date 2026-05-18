@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Master / replica replication.
 //!
 //! Ports the master-side and replica-side state machines from

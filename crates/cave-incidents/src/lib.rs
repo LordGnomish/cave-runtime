@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Incident management — compatible with Grafana OnCall (partial)
 //!
 //! Compatible with: Grafana OnCall

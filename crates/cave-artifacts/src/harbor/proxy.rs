@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pull-through proxy — upstream registry adapters for multiple ecosystems.
 //!
 //! When `cave-registry` receives a request for an artefact it does not yet

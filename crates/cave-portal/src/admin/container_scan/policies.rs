@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/container_scan/policies` — Trivy "Policies" tab.
 //! Surfaces the admission-gate rules cave-streams enforces
 //! against scan output. cave-portal exposes the canonical set

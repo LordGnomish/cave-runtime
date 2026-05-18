@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// TCP DNS server with 2-byte length-prefix framing.
 use std::net::SocketAddr;
 use std::sync::Arc;

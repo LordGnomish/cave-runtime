@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! aggregator_v2 tests — availability, proxy reasons, openapi merging,
 //! priority ordering.
 

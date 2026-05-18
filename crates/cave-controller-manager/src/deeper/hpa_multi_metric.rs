@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA multi-metric reconciliation — `pkg/controller/podautoscaler/horizontal.go::computeReplicasForMetrics`.
 //!
 //! When an HPA carries multiple `metrics[]` sources, the controller computes

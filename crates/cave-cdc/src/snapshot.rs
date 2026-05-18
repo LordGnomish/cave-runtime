@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Snapshot + incremental snapshot mode.
 //!
 //! Cite: debezium-connector-common

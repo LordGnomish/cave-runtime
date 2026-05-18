@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tag immutability policies and repository-level access control.
 
 use crate::harbor::store::RegistryStore;

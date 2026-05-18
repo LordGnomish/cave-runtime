@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Path → page router.
 //!
 //! Routes are registered as patterns: literal segments and `:name`

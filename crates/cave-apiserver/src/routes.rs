@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! K8s-compatible API routes — full core surface.
 
 use crate::resources::*;

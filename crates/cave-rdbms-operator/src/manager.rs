@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Domain logic for PostgreSQL management.
 //!
 //! Pure functions operating on model slices — no I/O, easily testable.

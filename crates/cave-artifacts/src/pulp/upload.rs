@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Chunked upload API — Pulp v3 upload workflow.
 //!
 //! Upload → finalize → create artifact → create content → add to repo.

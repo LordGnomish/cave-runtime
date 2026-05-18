@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Observability primitives — tracer + metric + structured log
 //! shapes that match the OpenTelemetry / Prometheus contracts so
 //! every cave module can emit telemetry through a single import.

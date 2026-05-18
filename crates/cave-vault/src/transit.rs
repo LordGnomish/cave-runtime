@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Transit secrets engine — encryption as a service.
 //!
 //! Provides AES-256-GCM encryption/decryption and Ed25519 sign/verify

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Snapshotting and log compaction for Raft nodes.
 
 use std::sync::Arc;

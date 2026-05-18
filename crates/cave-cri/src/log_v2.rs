@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container log v2 — kubelet-style tagged line format.
 //!
 //! The CRI specifies a single line format that the kubelet parses out of

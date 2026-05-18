@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plan executor — run steps in dependency order, rollback, dry-run, stream progress.
 
 use crate::mcp_bridge::McpRegistry;

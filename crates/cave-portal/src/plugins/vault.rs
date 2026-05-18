@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Vault wrap — native secret-engine UI.
 //!
 //! Replaces the OpenBao / Vault web console. Tenants list and read their own

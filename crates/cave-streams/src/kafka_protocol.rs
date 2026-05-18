@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka-compatible wire protocol implementation.
 //!
 //! Implements enough of the Kafka binary protocol for existing Kafka clients

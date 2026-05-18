@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pages — the unit a plugin contributes to the web shell.
 //!
 //! A [`Page`] is a metadata + render-fn pair. The metadata declares the

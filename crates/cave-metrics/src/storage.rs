@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Time series storage: insert, compact, downsample, retention.
 
 use crate::models::{Sample, TimeSeries};

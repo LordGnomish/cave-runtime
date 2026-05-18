@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Push API — parse JSON and Protobuf+Snappy push requests, ingest into LogStore.
 
 use crate::models::{Labels, LogEntry, PushRequest};

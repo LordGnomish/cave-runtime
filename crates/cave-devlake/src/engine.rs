@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{DeployStatus, DeploymentRecord};
 
 pub fn deployment_frequency(records: &[DeploymentRecord], days: u32) -> f64 {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! K8s object handlers — `EndpointSlice` consumer, `ServiceCIDR`
 //! awareness.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego AST — covers the full OPA Rego language grammar.
 
 /// A complete Rego module (one .rego file).

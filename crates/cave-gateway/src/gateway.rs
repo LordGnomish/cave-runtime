@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core gateway engine: rate limiting, auth, load balancing, circuit breaker.
 
 use crate::models::*;

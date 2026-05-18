@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Fluentd forward protocol receiver.
 //!
 //! Implements the [Fluentd forward protocol v1]

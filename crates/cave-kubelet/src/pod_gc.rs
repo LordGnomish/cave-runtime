@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod garbage collector — sweeps terminated pods on this kubelet instance.
 //!
 //! Mirrors upstream kubelet's `pkg/kubelet/pod/pod_gc.go` (and the related

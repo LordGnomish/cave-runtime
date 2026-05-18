@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use chrono::{DateTime, Duration, Utc};
 use ring::hmac::{self, Key, HMAC_SHA256};
 

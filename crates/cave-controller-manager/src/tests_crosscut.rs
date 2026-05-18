@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cross-controller crosscut tests.
 //!
 //! Verifies behaviours that span multiple controller reconcile loops in the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Security — Falco runtime rule engine + Trivy vulnerability scanner.
 //!
 //! Compatible with: Falco + Trivy (full feature parity)

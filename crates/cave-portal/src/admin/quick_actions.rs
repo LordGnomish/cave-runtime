@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Quick-action suggester for the compliance dashboard.
 //!
 //! Walks every crate in a [`ComplianceSnapshot`] and emits a typed

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Release-body parser → structured `Changelog`.
 //!
 //! GitHub release bodies are free-form markdown. The convention this

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Gateway — Kong + Gravitee parity API gateway (charter-aligned).
 //!
 //! Per ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 the canonical upstream pair

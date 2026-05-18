@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Event-driven automation — compatible with n8n
 //!
 //! Compatible with: n8n

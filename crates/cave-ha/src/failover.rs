@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Leader failover and split-brain protection.
 //!
 //! Failure detection is consensus-based: an instance is only declared failed

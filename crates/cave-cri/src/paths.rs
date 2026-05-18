@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Centralised filesystem paths.
 //!
 //! In production cave-cri stores container state under `/var/lib/cave/`. Tests

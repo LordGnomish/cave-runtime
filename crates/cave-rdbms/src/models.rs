@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Data models for JSON API responses.
 
 use serde::{Deserialize, Serialize};

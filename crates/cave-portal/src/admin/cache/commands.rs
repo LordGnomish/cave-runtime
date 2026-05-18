@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Commands tab — Redis-style command history + SLOWLOG.
 //!
 //! Today we synthesise rows from the keyspace activity so the page

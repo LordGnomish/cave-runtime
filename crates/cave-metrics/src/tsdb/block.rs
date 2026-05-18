@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gorilla-style XOR float compression for block chunks.
 //! Implements the Facebook Gorilla paper delta-of-delta timestamps + XOR values.
 

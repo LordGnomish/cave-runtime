@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Loki push API handler — supports both JSON and protobuf+snappy wire formats.
 //!
 //! Implements the Loki v1 push endpoint:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Load balancing algorithms: round-robin, least-connections,
 //! consistent-hash (ketama), and weighted random.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Low-level network address types — IPv4/IPv6/MAC/PortMap/XFRM.
 //!
 //! Mirrors `pkg/types/`. Upstream defines small thin wrappers around

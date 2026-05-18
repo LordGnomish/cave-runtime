@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Policies tab — NetworkPolicy editor (Ingress / Egress / Both).
 //! Endpoint browser lives in `nodes.rs`; this module is focused on
 //! the policy CRUD path.

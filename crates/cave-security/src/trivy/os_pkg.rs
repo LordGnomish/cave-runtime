@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OS package extraction — Alpine APK, Debian dpkg, RHEL/CentOS RPM.
 
 use serde::{Deserialize, Serialize};

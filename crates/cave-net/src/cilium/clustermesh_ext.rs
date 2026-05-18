@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ClusterMesh deepening — KVStore (etcd-style), RemoteCluster lifecycle,
 //! global service shadowing, service affinity.
 //!

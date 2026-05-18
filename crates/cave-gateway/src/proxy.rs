@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core reverse proxy engine.
 //!
 //! Handles HTTP/1.1, HTTP/2, WebSocket, gRPC, and TCP stream proxying.

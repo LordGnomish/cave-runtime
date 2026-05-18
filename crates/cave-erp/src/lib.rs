@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE ERP — Sovereign open-source ERP.
 //!
 //! Compatible with: Odoo Community Edition.

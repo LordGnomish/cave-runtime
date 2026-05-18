@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared eBPF types and BPF map definitions.
 //! Used by both kernel-space eBPF programs (via Aya) and user-space consumers.
 

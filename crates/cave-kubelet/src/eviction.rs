@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Eviction manager — node-pressure pod eviction.
 //!
 //! Mirrors `pkg/kubelet/eviction` semantics: soft and hard thresholds against

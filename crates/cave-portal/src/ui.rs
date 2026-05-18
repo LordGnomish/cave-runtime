@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Embedded single-page application for cave-portal.
 //!
 //! Returns a self-contained HTML document that communicates with the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `volume/ephemeral` — generic-ephemeral-volume controller.
 //!
 //! Mirrors `pkg/controller/volume/ephemeral/` from upstream.

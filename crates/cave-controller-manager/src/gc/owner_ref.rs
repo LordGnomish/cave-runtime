@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OwnerReference validation — `pkg/apis/meta/v1/types.go::OwnerReference`
 //! plus `pkg/controller/garbagecollector/operations.go` consistency checks.
 

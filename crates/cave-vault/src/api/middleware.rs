@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use axum::{extract::{Request, State}, middleware::Next, response::Response};
 use std::sync::Arc;
 use crate::VaultState;

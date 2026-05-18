@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shell completion script generation.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 M6: ship completions for

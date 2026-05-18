@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DaemonSet controller — one pod per (eligible) node.
 //!
 //! Upstream: [`pkg/controller/daemon`]. The full controller computes the

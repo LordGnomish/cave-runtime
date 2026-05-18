@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Catalog entity models — port from @backstage/catalog-model.
 //!
 //! Upstream references:

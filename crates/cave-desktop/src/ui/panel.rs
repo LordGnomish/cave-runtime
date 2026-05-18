@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// A titled container with optional sidebar/footer slots.
 ///
 /// Mirrors the `<div class="panel">` shape used in `portal_index.html` so

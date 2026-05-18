@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NodeRestriction admission — line-by-line port of upstream
 //! `plugin/pkg/admission/noderestriction/admission.go`.
 //!

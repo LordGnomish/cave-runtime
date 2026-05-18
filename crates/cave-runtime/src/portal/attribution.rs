@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Attribution dashboard — answers "who wrote what" by parsing `git log`.
 //!
 //! Three author buckets, derived from commit metadata:

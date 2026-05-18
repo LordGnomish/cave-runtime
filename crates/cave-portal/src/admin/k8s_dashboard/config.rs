@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Config tab — ConfigMaps / Secrets / ResourceQuotas.
 //!
 //! Today we synthesise rows from the workload set so the page has the

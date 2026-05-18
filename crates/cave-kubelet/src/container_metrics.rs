@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container metrics aggregator — cgroup v2 stat reader + per-pod
 //! rollup.
 //!

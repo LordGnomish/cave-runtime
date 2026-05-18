@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Any plugin — handle or block ANY queries (RFC 8482).
 use async_trait::async_trait;
 use hickory_proto::{

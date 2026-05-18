@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LB / kube-proxy-replacement deepening — XDP/host-routing modes,
 //! SNAT/DSR/Hybrid, traffic policies, source-range filtering, DSR
 //! conntrack encoding.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! k9s-style keybindings for the TUI.
 //!
 //! Maps a `Key` (parsed from `crossterm::event::KeyEvent` at the I/O

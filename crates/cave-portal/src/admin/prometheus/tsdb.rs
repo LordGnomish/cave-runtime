@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TSDB Status tab — head series, chunks, symbol table, WAL size.
 //!
 //! Mirrors Prometheus `/tsdb-status`. Numbers are derived from the

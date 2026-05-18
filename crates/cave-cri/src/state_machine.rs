@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Container lifecycle state machine — strict transition validation.
 //!
 //! Legal transitions mirror containerd's task.go state model:

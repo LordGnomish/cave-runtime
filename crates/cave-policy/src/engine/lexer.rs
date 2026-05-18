@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego lexer — converts source text into a flat token stream.
 
 #[derive(Debug, Clone, PartialEq)]

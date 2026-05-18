@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LLM provider abstraction — OpenAI, Anthropic, local models.
 
 use crate::error::{GatewayError, GatewayResult};

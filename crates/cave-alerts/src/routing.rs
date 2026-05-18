@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hierarchical route walker — Alertmanager `route` semantics.
 //!
 //! Walks the route tree top-down. Stops at the first matching child unless

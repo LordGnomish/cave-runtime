@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Prometheus metric registry — Cilium-parity port of `pkg/metrics/metrics.go`.
 //!
 //! Wire-faithful: every metric name and every subsystem here matches the

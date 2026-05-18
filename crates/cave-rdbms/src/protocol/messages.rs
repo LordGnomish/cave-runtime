@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Postgres frontend + backend protocol messages.
 
 use bytes::{Bytes, BytesMut};

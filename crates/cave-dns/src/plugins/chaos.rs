@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Chaos plugin — version.bind and hostname.bind (CHAOS class).
 use async_trait::async_trait;
 use hickory_proto::rr::{DNSClass, RData, Record, RecordType};

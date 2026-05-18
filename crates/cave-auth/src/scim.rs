@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SCIM 2.0 provisioning — RFC 7643 / RFC 7644.
 //!
 //! Provides /Users and /Groups CRUD, list/filter, and bulk operations.

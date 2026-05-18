@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Circuit breaker (Closed → Open → HalfOpen → Closed).
 //!
 //! Configured per (host, optional subset).  Transitions:

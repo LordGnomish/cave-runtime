@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl chaos run/list/abort` — native chaos engineering verb.
 
 use anyhow::{bail, Result};

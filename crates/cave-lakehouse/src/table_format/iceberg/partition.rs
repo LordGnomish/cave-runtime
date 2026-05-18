@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Iceberg PartitionSpec — partition transforms bound to source field ids.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/partition.rs and

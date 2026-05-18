@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{ComponentVersion, Severity, VulnScanResult, Vulnerability, VulnState};
 use chrono::Utc;
 use uuid::Uuid;

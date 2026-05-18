@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Garbage collection for unreferenced blobs.
 //!
 //! GC is run manually via POST /api/v2.0/system/gc or on a schedule.

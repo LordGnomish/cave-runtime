@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ExecutionPlan — physical operators that execute against a RecordBatch.
 //!
 //! Mirrors apache/datafusion datafusion-physical-plan/src/{projection,filter,

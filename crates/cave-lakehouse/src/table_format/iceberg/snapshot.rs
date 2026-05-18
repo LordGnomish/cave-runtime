@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Iceberg Snapshot — atomic table version pointing at a manifest list.
 //!
 //! Mirrors apache/iceberg-rust crates/iceberg/src/spec/snapshot.rs and

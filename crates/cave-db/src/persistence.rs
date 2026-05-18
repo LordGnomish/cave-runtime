@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persistence layer for CAVE modules.
 //!
 //! Provides a `Storage` trait with three implementations:

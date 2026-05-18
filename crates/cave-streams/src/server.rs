@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TCP Kafka wire protocol server.
 //!
 //! Listens on KAFKA_PORT (9092) and handles the binary Kafka protocol.

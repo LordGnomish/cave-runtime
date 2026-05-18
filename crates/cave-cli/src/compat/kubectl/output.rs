@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! kubectl output-format mapping (`-o yaml`/`-o json`/`-o name`/`-o wide`).
 //!
 //! Translates the kubectl `-o` flag values into Cave's canonical

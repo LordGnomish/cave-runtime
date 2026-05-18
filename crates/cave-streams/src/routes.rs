@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! REST management routes: Schema Registry, Kafka Connect, admin endpoints.
 
 use crate::schema_registry::{

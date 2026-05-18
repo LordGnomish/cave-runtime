@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Trivy vulnerability scanner subsystem.
 //!
 //! Full parity with Trivy 0.49:

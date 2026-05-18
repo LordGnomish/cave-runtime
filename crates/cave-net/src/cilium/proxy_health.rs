@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Proxy health checks — agent ↔ envoy readiness probe.
 //!
 //! Mirrors `pkg/proxy/healthcheck.go`. The agent polls the envoy

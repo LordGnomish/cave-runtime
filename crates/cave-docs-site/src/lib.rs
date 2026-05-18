@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Docs Site — Developer documentation platform.
 //!
 //! Compatible with: GitBook / Docusaurus

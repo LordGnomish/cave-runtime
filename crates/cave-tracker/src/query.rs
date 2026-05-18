@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! JQL-like query language for filtering issues.
 use crate::models::{Issue, IssueType, Priority};
 

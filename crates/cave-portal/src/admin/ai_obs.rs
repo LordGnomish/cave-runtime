@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/ai-obs` view — ai-obs resource browser.
 
 use crate::admin::permission::{Permission, RequestCtx};

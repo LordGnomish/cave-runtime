@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! UX foundation — global chrome (nav, sidebar, breadcrumb, footer),
 //! command palette, keyboard shortcuts, dark-mode toggle, toast +
 //! skeleton components.

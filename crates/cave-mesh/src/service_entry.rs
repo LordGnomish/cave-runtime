@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ServiceEntry manager.
 //!
 //! Mirrors Istio's `networking.istio.io/v1alpha3` ServiceEntry — the

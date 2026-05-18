@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Generic append-only write-ahead log.
 //!
 //! Wire format per record: `[4-byte LE length][4-byte LE CRC32][N-byte JSON payload]`

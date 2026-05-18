@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! response-transformer plugin — add/remove/rename/replace response headers and body fields.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

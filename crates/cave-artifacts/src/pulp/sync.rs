@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Content sync logic — mirror upstream remotes into a repository.
 
 use crate::pulp::error::ArtifactsError;

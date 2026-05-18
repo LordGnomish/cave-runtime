@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Strict parity assertion — fails CI if any dimension of `parity.manifest.toml`
 //! drifts away from 1.0 against the source tree.
 //!

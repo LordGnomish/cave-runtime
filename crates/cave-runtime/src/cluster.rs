@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cave-runtime cluster` subcommands: `init`, `join`, `status`, `destroy`.
 //!
 //! Cluster lifecycle plumbing — provisions data dir, PKI hierarchy

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Admin API — topic, consumer group, and broker-level management operations.
 
 use crate::compaction::{CompactionEngine, CompactionStats, RetentionStats};

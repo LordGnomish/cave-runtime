@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pipeline CRD models — Tekton-compatible.
 //!
 //! Covers: Pipeline, PipelineRun, Task, TaskRun, StepAction,

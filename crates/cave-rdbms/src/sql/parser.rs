@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Recursive-descent SQL parser.
 
 use crate::sql::ast::*;

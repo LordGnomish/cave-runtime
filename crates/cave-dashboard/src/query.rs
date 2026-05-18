@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Query engine — mixed datasource queries, caching, query inspector,
 //! and all Grafana transformations.
 

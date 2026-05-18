@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `validatingadmissionpolicystatus` — reconciler that
 //! aggregates per-CRD-version type-check outcomes onto a
 //! `ValidatingAdmissionPolicy.status` block.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Schema-evolution rules — `BACKWARD`, `FORWARD`, `FULL` (and their
 //! transitive variants) for Avro / JSON Schema / Protobuf.
 //!

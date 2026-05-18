@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Wire-faithful parity tests.
 //!
 //! These tests pin the *exact bytes* (or close-to-exact field shape)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rego evaluator and built-in functions.
 
 use std::collections::HashMap;

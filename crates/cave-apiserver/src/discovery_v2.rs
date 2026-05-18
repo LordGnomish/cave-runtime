@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Aggregated discovery v2 (KEP-3352) + OpenAPI v3 transport — gzip, ETag,
 //! pagination. Layered on top of `discovery.rs`.
 //!

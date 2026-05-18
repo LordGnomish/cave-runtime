@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitHub release poller.
 //!
 //! One method: `fetch_latest(client, repo)` → `PollOutcome`. The

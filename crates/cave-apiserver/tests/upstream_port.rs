@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Line-by-line ports of upstream kube-apiserver tests, cross-
 //! referenced from the `[[upstream_test]]` block of
 //! `parity.manifest.toml`.

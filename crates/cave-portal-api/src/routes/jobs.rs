@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Background jobs — submit, list, cancel. Tenant-scoped.
 
 use std::collections::HashMap;

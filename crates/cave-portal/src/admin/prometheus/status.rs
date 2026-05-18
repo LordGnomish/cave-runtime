@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Status tab — service discovery + config + alertmanagers.
 //!
 //! Mirrors Prometheus `/status` page (build info, runtime info,

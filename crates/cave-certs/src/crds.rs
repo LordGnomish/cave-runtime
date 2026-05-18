@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Certificate + Issuer CRDs (cert-manager API parity).
 //!
 //! Cite: cert-manager v1.20.2

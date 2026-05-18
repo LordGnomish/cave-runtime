@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node lifecycle controller — `pkg/controller/nodelifecycle`.
 //!
 //! Sub-modules:

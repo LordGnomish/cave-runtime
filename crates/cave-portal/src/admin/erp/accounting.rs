@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/erp/accounting` — ERPNext "Accounting" tab. Synthesises
 //! a per-status revenue waterfall from the invoice dataset:
 //! `Paid` → recognised, `Pending` → AR, `Overdue` → bad-debt

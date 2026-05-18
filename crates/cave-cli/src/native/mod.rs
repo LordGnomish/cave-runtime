@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Native verbs for `cavectl` — Cave-domain, upstream-agnostic.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001 these are the canonical

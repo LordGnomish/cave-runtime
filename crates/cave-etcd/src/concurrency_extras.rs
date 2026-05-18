@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Higher-level concurrency primitives layered on top of
 //! [`crate::concurrency`]: `Session`, `Barrier`, `PriorityQueue`, and an
 //! STM (software transactional memory) abstraction.

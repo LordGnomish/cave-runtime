@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/crm/workflows` — Twenty CRM "Workflows" tab. Lists
 //! the lifecycle automation operators have configured. cave-portal
 //! exposes a fixed canonical set keyed off the plan tiers

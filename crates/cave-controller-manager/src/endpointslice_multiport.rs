@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! EndpointSlice multi-port + slice cap — `pkg/controller/endpointslice/topologycache`
 //! and `pkg/controller/endpointslice/utils.go`.
 //!

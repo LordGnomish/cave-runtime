@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `TaskQueue` — pluggable backend for submitting auto-port tasks.
 //!
 //! Four implementations ship today:

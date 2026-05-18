@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! /api/v1/query and /api/v1/query_range handlers.
 
 use axum::{

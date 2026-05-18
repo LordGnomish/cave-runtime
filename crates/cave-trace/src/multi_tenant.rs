@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-tenant support.
 //!
 //! Tenancy follows the Grafana/Tempo convention: the `X-Scope-OrgID` HTTP header

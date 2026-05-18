@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Environment lifecycle — `cavectl env suspend|resume`.
 //!
 //! ADR-012 v7 destekleyici (vcluster PR environments). Env tenant'a bağlı,

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Namespace controller — `pkg/controller/namespace/namespace_controller.go`.
 //!
 //! Drives a Namespace through the deletion finalizer dance:

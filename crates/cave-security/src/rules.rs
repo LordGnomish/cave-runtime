@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Rule engine: evaluates Falco-style conditions against security events.
 
 use crate::models::{Condition, Priority, SecurityAlert, SecurityEvent, SecurityRule};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! L2 announcer — ARP/ND-based service VIP advertisement.
 //!
 //! Mirrors `pkg/l2announcer/l2announcer.go` plus the

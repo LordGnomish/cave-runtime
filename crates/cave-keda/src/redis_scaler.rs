@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Redis scaler — scales on Redis list-length / stream-length.
 //! upstream: kedacore/keda v2.x — pkg/scalers/redis_scaler.go
 

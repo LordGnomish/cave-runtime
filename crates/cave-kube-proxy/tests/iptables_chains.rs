@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! iptables proxier — KUBE-SERVICES + KUBE-NODEPORTS chain emission.
 //!
 //! Upstream: `pkg/proxy/iptables/proxier.go` k8s v1.36.0.

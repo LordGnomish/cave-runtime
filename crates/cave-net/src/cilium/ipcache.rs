@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IPCache — IP → (identity, encryption-key, tunnel-endpoint) map.
 //!
 //! Mirrors `pkg/ipcache/ipcache.go` plus the BPF map shape from

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HPA metric source typing — `pkg/api/autoscaling/v2/types.go`.
 //!
 //! The autoscaling/v2 API has five metric source kinds. Each carries a

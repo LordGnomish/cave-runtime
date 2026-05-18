@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Query planner — AST to logical plan to physical plan.
 
 use crate::sql::ast::*;

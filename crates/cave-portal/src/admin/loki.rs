@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/loki` — Loki LogQL query upstream-UI parity scaffold.
 //!
 //! Distinct from `admin/logs.rs` (cave-logs catalog view). This page

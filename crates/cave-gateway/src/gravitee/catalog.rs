@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! API catalog + versioning (Gravitee API Registry).
 //!
 //! Manages API definitions, versions, publication states, deprecation.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/tracker` — Linear / Plane parity. Issue browser grouped
 //! by state with assignee summary.
 //!

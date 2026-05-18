@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka scaler — scales on Kafka consumer-group lag.
 //! upstream: kedacore/keda v2.x — pkg/scalers/kafka_scaler.go
 

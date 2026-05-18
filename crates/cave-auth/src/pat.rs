@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Personal Access Tokens (PAT) — create, list, validate, revoke.
 //!
 //! PATs are long-lived tokens scoped to specific capabilities.

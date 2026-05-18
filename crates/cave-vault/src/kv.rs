@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KV secrets engine v2 — versioned key-value store.
 //!
 //! Mirrors HashiCorp Vault's KV v2 semantics: versioning, soft-delete,
