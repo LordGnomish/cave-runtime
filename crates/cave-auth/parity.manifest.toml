@@ -1,18 +1,30 @@
 # parity.manifest.toml — cave-auth
-# Upstream: keycloak/keycloak  https://github.com/keycloak/keycloak  pinned v22.0.0
+# Upstream: keycloak/keycloak  https://github.com/keycloak/keycloak  pinned v26.0.0
 #
 # cave-auth implements the Keycloak realm/user/token endpoint set, OIDC
 # discovery, JWKS publication, RBAC + ABAC, PKCE, post-quantum-crypto
 # (PQC) JWS keys, plus an Okta and a generic OIDC adapter.
+#
+# 2026-05-18 FINALIZE — version pin bumped v22.0.0 → v26.0.0.
+# All Phase 3 module ports already track the v26 upstream surface
+# (SAML 2.0 broker, WebAuthn L2 + passkey, LDAP federation, Kerberos
+# libgssapi, UMA 2.0, RFC 8693 token exchange, RFC 9449 DPoP, RFC 7516
+# JWE, RFC 9126 PAR / RFC 8628 device-flow / OpenID CIBA / RFC 7009
+# revoke endpoints, admin REST IdP + AuthN-flow, WS-Federation 1.x,
+# OID4VCI/OID4VP, lettre SMTP email_listener, rusqlite-backed JPA
+# persistence) — no v22→v26 source delta required for this crate's
+# parity contract. The `source_sha` field below pins the v26.0.0 tag
+# tree-ish for reproducibility audits.
 
 [upstream]
-org     = "keycloak"
-repo    = "keycloak"
-version = "v22.0.0"
-name    = "Keycloak"
-license = "Apache-2.0"
-language= "Java"
-url     = "https://github.com/keycloak/keycloak"
+org        = "keycloak"
+repo       = "keycloak"
+version    = "v26.0.0"
+source_sha = "v26.0.0"
+name       = "Keycloak"
+license    = "Apache-2.0"
+language   = "Java"
+url        = "https://github.com/keycloak/keycloak"
 
 [parity]
 # Package-level inventory against keycloak/keycloak v22.0.0 — a
@@ -28,8 +40,27 @@ unmapped_count = 0
 total          = 44
 fill_ratio     = 1.0000
 honest_ratio   = 0.9773
-last_audit     = "2026-05-17"
+last_audit     = "2026-05-18"
 infra_only     = false
+# 2026-05-18 FINALIZE — 4-track close-out sweep on top of Phase 3.
+# Backend (cave-auth lib)  : 917 lib + 26 integration tests pass; 0 unimpls.
+#                            No new backend mappings — Phase 3 already
+#                            covered every Keycloak v22→v26 domain package.
+# Portal /admin/auth/      : added 3 sub-pages (webauthn / flows / idp) on
+#                            top of the existing realms/clients/users/
+#                            sessions/events; 11 integration tests pass.
+# cavectl auth             : 11 new lib modules (oauth_endpoints / wsfed /
+#                            oid4vc / uma / token_exchange / dpop / jwe /
+#                            admin_idp / admin_flows / email_listener /
+#                            persistence) + 27 new AuthCmd variants wired
+#                            through main.rs dispatch (PATH prefix
+#                            invariants enforced by 12 integration tests).
+# Observability            : new `cave-auth.phase3` rule group with 8
+#                            paged-on signals (LDAP / Kerberos GSSAPI /
+#                            OAuth device-grant anomaly / UMA RPT / OID4VC
+#                            issuance / WS-Fed signin / email outbox
+#                            stalled / persistence migration failure);
+#                            14 → 22 total cave-auth alerts.
 # 2026-05-17 Phase 3 close-out — 6-parallel-agent 100% run.
 # K1 admin handler mount  : admin_idp + admin_flows routers wired into
 #                            cave-runtime binary + persona gate on /admin/realms/*
@@ -406,8 +437,8 @@ upstream_url = "https://www.keycloak.org/documentation"
 status       = "partial"
 loc          = 174
 priority     = "P1"
-notes        = "Realm / client / user management"
-last_audit   = "2026-05-11"
+notes        = "Realm / client / user management — extended 2026-05-18 with webauthn / flows / idp sub-pages"
+last_audit   = "2026-05-18"
 
 
 # ═════════════════════════════════════════════════════════════════════════════
