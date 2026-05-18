@@ -19,14 +19,17 @@
 //! last 12 samples per axis. PlatformAdmin only — same gate as
 //! `/admin/compliance` because the data is cross-tenant.
 
-use crate::admin::compliance::{self, ComplianceSnapshot, ComplianceViewError};
+use crate::admin::charter_matrix::{
+    self, CharterMatrix, CrateScan, FilterMode, SortKey,
+};
+use crate::admin::compliance::{self, CommitRow, ComplianceSnapshot, ComplianceViewError};
 use crate::admin::layout::a11y;
 use crate::admin::layout::shell::{shell_v2, ShellOptions};
 use crate::admin::permission::{Permission, Persona, RequestCtx};
 use crate::admin::render::{escape, page_shell_full};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, OnceLock};
 
 /// One audit axis on the roll-up dashboard.
@@ -139,7 +142,21 @@ pub fn summary_from(snap: &ComplianceSnapshot, last_audit: DateTime<Utc>) -> Aud
 /// Render the dashboard HTML. Returns `PersonaRequired` for any
 /// caller that isn't PlatformAdmin so the route handler can map to a
 /// 403.
+///
+/// Defaults: `FilterMode::All`, `SortKey::PassCount` (clean crates
+/// surface at the top of the Charter v2 matrix).
 pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
+    render_with(ctx, None, None)
+}
+
+/// Variant that honours the `?filter=` and `?sort=` query parameters
+/// when driving the Charter v2 matrix. Unknown values fall back to the
+/// matrix module's defaults (`FilterMode::All`, `SortKey::Name`).
+pub fn render_with(
+    ctx: &RequestCtx,
+    filter: Option<&str>,
+    sort: Option<&str>,
+) -> Result<String, AuditViewError> {
     if !ctx.persona.is_platform() {
         return Err(AuditViewError::PersonaRequired);
     }
@@ -159,6 +176,13 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let filter_mode = filter
+        .map(FilterMode::parse)
+        .unwrap_or(FilterMode::All);
+    let sort_key = sort.map(SortKey::parse).unwrap_or(SortKey::PassCount);
+    let matrix = live_charter_matrix(filter_mode, sort_key);
+    let matrix_html = charter_matrix::render_section(&matrix, ctx.tenant.as_str());
+
     let body = format!(
         r#"<section aria-labelledby="audit-heading">
   <header class="mb-4 flex items-baseline justify-between">
@@ -170,11 +194,13 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
     {cards}
   </div>
-  <div class="flex gap-3 text-sm">
+  <div class="flex gap-3 text-sm flex-wrap">
     <a class="px-3 py-1 rounded bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
        href="/admin/compliance/refresh?tenant_id={tid}">Refresh now</a>
     <a class="px-3 py-1 rounded border border-zinc-300 dark:border-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
        href="/admin/_audit.json?tenant_id={tid}">JSON feed</a>
+    <a class="px-3 py-1 rounded border border-zinc-300 dark:border-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+       href="/admin/_audit/charter.json?tenant_id={tid}">Charter matrix JSON</a>
     <a class="px-3 py-1 rounded border border-zinc-300 dark:border-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
        href="/admin/compliance?tenant_id={tid}">Open Compliance →</a>
     <a class="px-3 py-1 rounded border border-zinc-300 dark:border-zinc-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
@@ -184,6 +210,7 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
     Sparkline shows the last {hist} samples taken on each render of
     this page; samples are kept in-memory and reset across restarts.
   </p>
+  {matrix}
 </section>"#,
         ts = s.last_audit.to_rfc3339(),
         ts_short = s.last_audit.format("%Y-%m-%d %H:%M UTC"),
@@ -192,6 +219,7 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
         tid = escape(ctx.tenant.as_str()),
         cards = cards,
         hist = HISTORY_CAP,
+        matrix = matrix_html,
     );
 
     Ok(page_shell_full(
@@ -202,6 +230,33 @@ pub fn render(ctx: &RequestCtx) -> Result<String, AuditViewError> {
     ))
 }
 
+/// Build a [`CharterMatrix`] from the cached compliance snapshot. Each
+/// crate's `src/` is scanned for SPDX coverage + `#[deprecated]` count;
+/// the last commit touching `crates/<name>` is fetched via git.
+pub fn live_charter_matrix(filter: FilterMode, sort: SortKey) -> CharterMatrix {
+    let snap = compliance::cached_snapshot_or_refresh();
+    let root = compliance::workspace_root();
+
+    let scans: BTreeMap<String, CrateScan> = snap
+        .crates
+        .iter()
+        .map(|c| (c.name.clone(), charter_matrix::scan_crate_io(&root, &c.name)))
+        .collect();
+    let last_commits: BTreeMap<String, CommitRow> = snap
+        .crates
+        .iter()
+        .filter_map(|c| {
+            compliance::recent_commits_for_crate(&root, &c.name, 1)
+                .into_iter()
+                .next()
+                .map(|cr| (c.name.clone(), cr))
+        })
+        .collect();
+
+    let today = Utc::now().date_naive();
+    charter_matrix::build_matrix(&snap, today, &scans, &last_commits, filter, sort)
+}
+
 /// JSON shape — same `AuditSummary` returned to the dashboard, but
 /// without HTML wrapping. Used by `cavectl portal audit`.
 pub fn render_json(ctx: &RequestCtx) -> Result<AuditSummary, AuditViewError> {
@@ -210,6 +265,24 @@ pub fn render_json(ctx: &RequestCtx) -> Result<AuditSummary, AuditViewError> {
     }
     ctx.authorise(Permission::AdminComplianceView)?;
     Ok(summary())
+}
+
+/// JSON shape for the Charter v2 per-crate matrix. Used by automation
+/// pipelines (and by `cavectl portal audit charter`).
+pub fn render_matrix_json(
+    ctx: &RequestCtx,
+    filter: Option<&str>,
+    sort: Option<&str>,
+) -> Result<CharterMatrix, AuditViewError> {
+    if !ctx.persona.is_platform() {
+        return Err(AuditViewError::PersonaRequired);
+    }
+    ctx.authorise(Permission::AdminComplianceView)?;
+    let filter_mode = filter
+        .map(FilterMode::parse)
+        .unwrap_or(FilterMode::All);
+    let sort_key = sort.map(SortKey::parse).unwrap_or(SortKey::Name);
+    Ok(live_charter_matrix(filter_mode, sort_key))
 }
 
 // ── Card / sparkline helpers ──────────────────────────────────────
@@ -534,6 +607,52 @@ mod tests {
         let html = render(&platform_ctx()).unwrap();
         assert!(html.contains("/admin/_audit.json?tenant_id=acme"));
         assert!(html.contains("/admin/compliance/refresh?tenant_id=acme"));
+    }
+
+    // ── Charter v2 matrix integration ────────────────────────────────
+
+    #[test]
+    fn render_includes_charter_v2_matrix_section() {
+        let html = render(&platform_ctx()).unwrap();
+        assert!(
+            html.contains("Charter v2 matrix"),
+            "/admin/_audit must include the Charter v2 matrix heading"
+        );
+    }
+
+    #[test]
+    fn render_links_to_charter_matrix_json_feed() {
+        let html = render(&platform_ctx()).unwrap();
+        assert!(
+            html.contains("/admin/_audit/charter.json?tenant_id=acme"),
+            "/admin/_audit must surface the Charter matrix JSON link"
+        );
+    }
+
+    #[test]
+    fn render_with_filter_and_sort_honours_query_params() {
+        let html =
+            render_with(&platform_ctx(), Some("failing"), Some("fill_ratio")).unwrap();
+        // Filter chip for `failing` is the active link → marked with
+        // "font-semibold underline" by the matrix renderer.
+        assert!(html.contains("filter=any_failing"));
+        // Sort chip for `fill_ratio` should be present and active.
+        assert!(html.contains("sort=fill_ratio"));
+    }
+
+    #[test]
+    fn render_matrix_json_refuses_tenant_admin() {
+        let err = render_matrix_json(&tenant_ctx(), None, None).unwrap_err();
+        assert!(matches!(err, AuditViewError::PersonaRequired));
+    }
+
+    #[test]
+    fn render_matrix_json_returns_matrix_for_platform_admin() {
+        let m = render_matrix_json(&platform_ctx(), None, None).unwrap();
+        // Sanity: the wire shape has the eight rule_pass_counts slots.
+        assert_eq!(m.rule_pass_counts.len(), 8);
+        assert_eq!(m.rule_fail_counts.len(), 8);
+        assert_eq!(m.rule_na_counts.len(), 8);
     }
 
     // ── sparkline ─────────────────────────────────────────────────

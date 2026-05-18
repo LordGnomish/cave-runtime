@@ -664,19 +664,41 @@ pub struct ComplianceQuery {
     pub filter: Option<String>,
 }
 
+/// Query type for `/admin/_audit` — carries `filter` + `sort` for the
+/// Charter v2 per-crate matrix in addition to `tenant_id`. Named with
+/// the `Meta` prefix to avoid colliding with the `AuditQuery` used by
+/// `/admin/audit` (the audit-log page).
+#[derive(Debug, Deserialize)]
+pub struct MetaAuditQuery {
+    pub tenant_id: String,
+    #[serde(default)]
+    pub filter: Option<String>,
+    #[serde(default)]
+    pub sort: Option<String>,
+}
+
+impl MetaAuditQuery {
+    fn into_admin(&self) -> AdminQuery {
+        AdminQuery { tenant_id: self.tenant_id.clone() }
+    }
+}
+
 /// `/admin/_audit` — consolidated portal-wide audit roll-up.
 /// PlatformAdmin only.
 async fn meta_audit_handler(
-    Query(q): Query<AdminQuery>,
+    Query(q): Query<MetaAuditQuery>,
     claims: Option<axum::Extension<JwtClaims>>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    let admin = q.into_admin();
+    let filter = q.filter.clone();
+    let sort = q.sort.clone();
     let ctx = extract_ctx_from_query_with_claims(
-        q,
+        admin,
         claims.as_ref().map(|axum::Extension(c)| c),
     );
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
-    meta_audit::render(&ctx)
+    meta_audit::render_with(&ctx, filter.as_deref(), sort.as_deref())
         .map(Html)
         .map_err(meta_audit_err_to_response)
 }
@@ -694,6 +716,25 @@ async fn meta_audit_json_handler(
     ctx.require_persona(Persona::PlatformAdmin)
         .map_err(err_to_response)?;
     meta_audit::render_json(&ctx)
+        .map(axum::Json)
+        .map_err(meta_audit_err_to_response)
+}
+
+/// `/admin/_audit/charter.json` — Charter v2 per-crate matrix feed.
+async fn meta_audit_charter_json_handler(
+    Query(q): Query<MetaAuditQuery>,
+    claims: Option<axum::Extension<JwtClaims>>,
+) -> Result<axum::Json<charter_matrix::CharterMatrix>, (StatusCode, Html<String>)> {
+    let admin = q.into_admin();
+    let filter = q.filter.clone();
+    let sort = q.sort.clone();
+    let ctx = extract_ctx_from_query_with_claims(
+        admin,
+        claims.as_ref().map(|axum::Extension(c)| c),
+    );
+    ctx.require_persona(Persona::PlatformAdmin)
+        .map_err(err_to_response)?;
+    meta_audit::render_matrix_json(&ctx, filter.as_deref(), sort.as_deref())
         .map(axum::Json)
         .map_err(meta_audit_err_to_response)
 }
@@ -1464,6 +1505,7 @@ pub fn router(state: Arc<AdminState>) -> Router {
         .route("/admin/streams", get(streams_handler))
         .route("/admin/_audit", get(meta_audit_handler))
         .route("/admin/_audit.json", get(meta_audit_json_handler))
+        .route("/admin/_audit/charter.json", get(meta_audit_charter_json_handler))
         .route("/admin/compliance", get(compliance_handler))
         .route("/admin/compliance/refresh", get(compliance_refresh_handler))
         .route("/admin/compliance/{crate_name}", get(compliance_detail_handler))

@@ -25,6 +25,7 @@
 //! fill_ratio / test count / last audit / manifest pin / last commit.
 
 use crate::admin::compliance::{CommitRow, ComplianceSnapshot, CrateCompliance};
+use crate::admin::render::escape;
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
@@ -58,13 +59,29 @@ impl CharterRule {
     ];
 
     pub fn slug(&self) -> &'static str {
-        // RED stub — every variant slugged the same so canonical-order
-        // tests fail.
-        "tdd"
+        match self {
+            CharterRule::Tdd => "tdd",
+            CharterRule::Spdx => "spdx",
+            CharterRule::SourceStamp => "source_stamp",
+            CharterRule::NoStub => "no_stub",
+            CharterRule::NoBackcompat => "no_backcompat",
+            CharterRule::AlwaysLatest => "always_latest",
+            CharterRule::FourTrack => "four_track",
+            CharterRule::Honest => "honest",
+        }
     }
 
     pub fn label(&self) -> &'static str {
-        "TDD"
+        match self {
+            CharterRule::Tdd => "TDD",
+            CharterRule::Spdx => "SPDX",
+            CharterRule::SourceStamp => "src-stamp",
+            CharterRule::NoStub => "no-stub",
+            CharterRule::NoBackcompat => "no-backcompat",
+            CharterRule::AlwaysLatest => "always-latest",
+            CharterRule::FourTrack => "4-track",
+            CharterRule::Honest => "honest",
+        }
     }
 }
 
@@ -116,9 +133,12 @@ impl CrateCharter {
     pub fn fail_count(&self) -> u32 {
         self.verdicts.iter().filter(|v| **v == Verdict::Fail).count() as u32
     }
-    pub fn verdict_for(&self, _rule: CharterRule) -> Verdict {
-        // RED stub.
-        Verdict::Na
+    pub fn verdict_for(&self, rule: CharterRule) -> Verdict {
+        let idx = CharterRule::ALL
+            .iter()
+            .position(|r| *r == rule)
+            .expect("CharterRule::ALL covers every variant");
+        self.verdicts[idx]
     }
 }
 
@@ -133,13 +153,21 @@ pub enum FilterMode {
 }
 
 impl FilterMode {
-    pub fn parse(_s: &str) -> Self {
-        // RED stub.
-        FilterMode::All
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "any_failing" | "failing" => FilterMode::AnyFailing,
+            "tier1" => FilterMode::Tier1,
+            "infra" | "infra_only" => FilterMode::InfraOnly,
+            _ => FilterMode::All,
+        }
     }
     pub fn slug(&self) -> &'static str {
-        // RED stub.
-        "all"
+        match self {
+            FilterMode::All => "all",
+            FilterMode::AnyFailing => "any_failing",
+            FilterMode::Tier1 => "tier1",
+            FilterMode::InfraOnly => "infra",
+        }
     }
 }
 
@@ -153,13 +181,23 @@ pub enum SortKey {
 }
 
 impl SortKey {
-    pub fn parse(_s: &str) -> Self {
-        // RED stub.
-        SortKey::Name
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "fill_ratio" | "ratio" => SortKey::FillRatio,
+            "test_count" | "tests" => SortKey::TestCount,
+            "last_audit" | "audit" => SortKey::LastAudit,
+            "pass_count" | "passes" => SortKey::PassCount,
+            _ => SortKey::Name,
+        }
     }
     pub fn slug(&self) -> &'static str {
-        // RED stub.
-        "name"
+        match self {
+            SortKey::Name => "name",
+            SortKey::FillRatio => "fill_ratio",
+            SortKey::TestCount => "test_count",
+            SortKey::LastAudit => "last_audit",
+            SortKey::PassCount => "pass_count",
+        }
     }
 }
 
@@ -175,42 +213,510 @@ pub struct CharterMatrix {
     pub sort: SortKey,
 }
 
-// ── Public API (RED stubs) ───────────────────────────────────────────
+// ── Public API ───────────────────────────────────────────────────────
 
-pub fn evaluate(_c: &CrateCompliance, _scan: &CrateScan, _today: NaiveDate) -> [Verdict; 8] {
-    // RED stub — always Na, so every rule-evaluation test fails.
-    [Verdict::Na; 8]
+/// Evaluate the eight Charter v2 rules for one crate. Pure function:
+/// every signal it needs is in `c` (compliance row) and `scan` (I/O).
+/// `today` is injected so the always-latest window is testable.
+pub fn evaluate(c: &CrateCompliance, scan: &CrateScan, today: NaiveDate) -> [Verdict; 8] {
+    [
+        evaluate_tdd(c),
+        evaluate_spdx(scan),
+        evaluate_source_stamp(c),
+        evaluate_no_stub(c),
+        evaluate_no_backcompat(scan),
+        evaluate_always_latest(c, today),
+        evaluate_four_track(c),
+        evaluate_honest(c),
+    ]
 }
 
+fn evaluate_tdd(c: &CrateCompliance) -> Verdict {
+    if c.infra_only && c.backend_test_count == 0 {
+        return Verdict::Na;
+    }
+    if c.backend_test_count > 0 && c.ignored_test_count == 0 {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_spdx(scan: &CrateScan) -> Verdict {
+    if scan.src_rs_files == 0 {
+        return Verdict::Na;
+    }
+    if scan.spdx_marked_files == scan.src_rs_files {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_source_stamp(c: &CrateCompliance) -> Verdict {
+    if c.infra_only {
+        return Verdict::Na;
+    }
+    match (&c.upstream_org_repo, &c.upstream_version) {
+        (Some(slug), Some(ver))
+            if !slug.trim().is_empty()
+                && slug.contains('/')
+                && !ver.trim().is_empty() =>
+        {
+            Verdict::Pass
+        }
+        _ => Verdict::Fail,
+    }
+}
+
+fn evaluate_no_stub(c: &CrateCompliance) -> Verdict {
+    if c.unimplemented_count == 0 && c.todo_count == 0 {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_no_backcompat(scan: &CrateScan) -> Verdict {
+    if scan.deprecated_attr_count == 0 {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_always_latest(c: &CrateCompliance, today: NaiveDate) -> Verdict {
+    let Some(raw) = c.parity_ratio_last_audit.as_deref() else {
+        return Verdict::Na;
+    };
+    let Ok(d) = NaiveDate::parse_from_str(raw, "%Y-%m-%d") else {
+        return Verdict::Fail;
+    };
+    let age_days = today.signed_duration_since(d).num_days();
+    if age_days <= 90 && age_days >= 0 {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_four_track(c: &CrateCompliance) -> Verdict {
+    if c.infra_only {
+        return Verdict::Na;
+    }
+    if c.portal_admin_present
+        && c.cavectl_subcommand_present
+        && c.obs_alerts_present
+        && c.obs_dashboard_present
+    {
+        Verdict::Pass
+    } else {
+        Verdict::Fail
+    }
+}
+
+fn evaluate_honest(c: &CrateCompliance) -> Verdict {
+    if c.infra_only {
+        return Verdict::Na;
+    }
+    match (c.honest_parity_ratio, c.manifest_filled) {
+        (Some(_), Some(true)) => Verdict::Pass,
+        _ => Verdict::Fail,
+    }
+}
+
+/// Build the matrix from a compliance snapshot plus per-crate scan +
+/// last-commit lookups. `scans` and `last_commits` are keyed by crate
+/// name; missing entries fall back to [`CrateScan::empty`] / `None`.
 pub fn build_matrix(
-    _snap: &ComplianceSnapshot,
-    _today: NaiveDate,
-    _scans: &std::collections::BTreeMap<String, CrateScan>,
-    _last_commits: &std::collections::BTreeMap<String, CommitRow>,
+    snap: &ComplianceSnapshot,
+    today: NaiveDate,
+    scans: &std::collections::BTreeMap<String, CrateScan>,
+    last_commits: &std::collections::BTreeMap<String, CommitRow>,
     filter: FilterMode,
     sort: SortKey,
 ) -> CharterMatrix {
-    // RED stub — empty matrix; build/filter/sort tests will fail.
+    let rows_unfiltered: Vec<CrateCharter> = snap
+        .crates
+        .iter()
+        .map(|c| {
+            let scan = scans.get(&c.name).copied().unwrap_or_else(CrateScan::empty);
+            let verdicts = evaluate(c, &scan, today);
+            let manifest_pin = match (&c.upstream_org_repo, &c.upstream_version) {
+                (Some(slug), Some(ver))
+                    if !slug.trim().is_empty() && !ver.trim().is_empty() =>
+                {
+                    Some(format!("{slug} @ {ver}"))
+                }
+                _ => None,
+            };
+            CrateCharter {
+                name: c.name.clone(),
+                infra_only: c.infra_only,
+                fill_ratio: c.parity_ratio,
+                fill_ratio_source: c.parity_ratio_source.clone(),
+                honest_ratio: c.honest_parity_ratio,
+                test_count: c.backend_test_count,
+                last_audit: c.parity_ratio_last_audit.clone(),
+                manifest_pin,
+                last_commit: last_commits.get(&c.name).cloned(),
+                verdicts,
+            }
+        })
+        .collect();
+
+    let total_crates = rows_unfiltered.len() as u32;
+    let crates_with_any_fail = rows_unfiltered
+        .iter()
+        .filter(|r| r.fail_count() > 0)
+        .count() as u32;
+
+    let mut rule_pass_counts = [0u32; 8];
+    let mut rule_fail_counts = [0u32; 8];
+    let mut rule_na_counts = [0u32; 8];
+    for r in &rows_unfiltered {
+        for (i, v) in r.verdicts.iter().enumerate() {
+            match v {
+                Verdict::Pass => rule_pass_counts[i] += 1,
+                Verdict::Fail => rule_fail_counts[i] += 1,
+                Verdict::Na => rule_na_counts[i] += 1,
+            }
+        }
+    }
+
+    let mut rows: Vec<CrateCharter> = rows_unfiltered
+        .into_iter()
+        .filter(|r| match filter {
+            FilterMode::All => true,
+            FilterMode::AnyFailing => r.fail_count() > 0,
+            FilterMode::Tier1 => !r.infra_only,
+            FilterMode::InfraOnly => r.infra_only,
+        })
+        .collect();
+
+    match sort {
+        SortKey::Name => rows.sort_by(|a, b| a.name.cmp(&b.name)),
+        SortKey::FillRatio => rows.sort_by(|a, b| match (a.fill_ratio, b.fill_ratio) {
+            (Some(av), Some(bv)) => bv
+                .partial_cmp(&av)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.name.cmp(&b.name)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.name.cmp(&b.name),
+        }),
+        SortKey::TestCount => rows.sort_by(|a, b| {
+            b.test_count
+                .cmp(&a.test_count)
+                .then(a.name.cmp(&b.name))
+        }),
+        SortKey::LastAudit => rows.sort_by(|a, b| match (&a.last_audit, &b.last_audit) {
+            (Some(av), Some(bv)) => bv.cmp(av).then(a.name.cmp(&b.name)),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.name.cmp(&b.name),
+        }),
+        SortKey::PassCount => rows.sort_by(|a, b| {
+            b.pass_count()
+                .cmp(&a.pass_count())
+                .then(a.name.cmp(&b.name))
+        }),
+    }
+
     CharterMatrix {
-        rows: Vec::new(),
-        total_crates: 0,
-        crates_with_any_fail: 0,
-        rule_pass_counts: [0; 8],
-        rule_fail_counts: [0; 8],
-        rule_na_counts: [0; 8],
+        rows,
+        total_crates,
+        crates_with_any_fail,
+        rule_pass_counts,
+        rule_fail_counts,
+        rule_na_counts,
         filter,
         sort,
     }
 }
 
-pub fn scan_crate_io(_workspace_root: &std::path::Path, _crate_name: &str) -> CrateScan {
-    // RED stub — always empty.
-    CrateScan::empty()
+/// Scan one crate's `src/` for SPDX coverage + `#[deprecated]` count.
+pub fn scan_crate_io(workspace_root: &std::path::Path, crate_name: &str) -> CrateScan {
+    let src = workspace_root.join("crates").join(crate_name).join("src");
+    if !src.is_dir() {
+        return CrateScan::empty();
+    }
+    let mut s = CrateScan::empty();
+    for f in walk_rs_files(&src) {
+        s.src_rs_files += 1;
+        let Ok(text) = std::fs::read_to_string(&f) else {
+            continue;
+        };
+        let first_lines: String = text.lines().take(8).collect::<Vec<_>>().join("\n");
+        if first_lines.contains("SPDX-License-Identifier:") {
+            s.spdx_marked_files += 1;
+        }
+        for line in text.lines() {
+            let t = line.trim_start();
+            if t.starts_with("#[deprecated") {
+                s.deprecated_attr_count += 1;
+            }
+        }
+    }
+    s
 }
 
-pub fn render_section(_m: &CharterMatrix, _tenant_id: &str) -> String {
-    // RED stub — render placeholder so HTML-asserting tests fail.
-    String::from("<section><!-- RED stub --></section>")
+fn walk_rs_files(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    fn inner(p: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(read) = std::fs::read_dir(p) else { return };
+        for ent in read.flatten() {
+            let path = ent.path();
+            if path.is_dir() {
+                inner(&path, out);
+            } else if path.extension().and_then(|s| s.to_str()) == Some("rs") {
+                out.push(path);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    inner(root, &mut out);
+    out
+}
+
+// ── HTML render ──────────────────────────────────────────────────────
+
+/// Render the matrix as a standalone HTML section. Designed to be
+/// stitched below the five-axis summary on `/admin/_audit`.
+pub fn render_section(m: &CharterMatrix, tenant_id: &str) -> String {
+    let header = render_header(m, tenant_id);
+    let table = render_table(m);
+    format!(
+        r#"<section aria-labelledby="charter-matrix-heading" class="mt-6">
+  <header class="mb-3 flex items-baseline justify-between flex-wrap gap-2">
+    <h2 id="charter-matrix-heading" class="text-lg font-semibold">Charter v2 matrix</h2>
+    <p class="text-xs text-zinc-500 dark:text-zinc-400">
+      {n_show} of {n_total} crates · {n_fail} with at least one FAIL
+    </p>
+  </header>
+  {header}
+  {table}
+</section>"#,
+        n_show = m.rows.len(),
+        n_total = m.total_crates,
+        n_fail = m.crates_with_any_fail,
+        header = header,
+        table = table,
+    )
+}
+
+fn render_header(m: &CharterMatrix, tenant_id: &str) -> String {
+    let pills = CharterRule::ALL
+        .iter()
+        .enumerate()
+        .map(|(i, rule)| {
+            let pass = m.rule_pass_counts[i];
+            let fail = m.rule_fail_counts[i];
+            let na = m.rule_na_counts[i];
+            format!(
+                r#"<div class="rounded border border-zinc-200 dark:border-zinc-800 px-2 py-1 text-xs" aria-label="rule {slug} workspace tally">
+  <div class="font-mono uppercase tracking-wider text-zinc-500">{label}</div>
+  <div class="tabular-nums"><span class="text-emerald-600">{pass}</span> / <span class="text-red-600">{fail}</span> · <span class="text-zinc-400">{na}</span></div>
+</div>"#,
+                slug = rule.slug(),
+                label = rule.label(),
+                pass = pass,
+                fail = fail,
+                na = na,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let filter_links = render_filter_links(m, tenant_id);
+    let sort_links = render_sort_links(m, tenant_id);
+
+    format!(
+        r#"<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-3">{pills}</div>
+<div class="flex flex-wrap gap-3 text-xs text-zinc-600 dark:text-zinc-300 mb-3" aria-label="matrix controls">
+  <div>Filter: {filters}</div>
+  <div>Sort: {sorts}</div>
+</div>"#,
+        pills = pills,
+        filters = filter_links,
+        sorts = sort_links,
+    )
+}
+
+fn render_filter_links(m: &CharterMatrix, tenant_id: &str) -> String {
+    let modes = [
+        (FilterMode::All, "all"),
+        (FilterMode::AnyFailing, "failing"),
+        (FilterMode::Tier1, "tier-1"),
+        (FilterMode::InfraOnly, "infra"),
+    ];
+    modes
+        .iter()
+        .map(|(mode, label)| {
+            let active = *mode == m.filter;
+            let cls = if active {
+                "font-semibold underline"
+            } else {
+                "underline-offset-2 hover:underline"
+            };
+            format!(
+                r#"<a class="{cls}" href="/admin/_audit?tenant_id={tid}&filter={f}&sort={s}">{label}</a>"#,
+                cls = cls,
+                tid = escape(tenant_id),
+                f = mode.slug(),
+                s = m.sort.slug(),
+                label = label,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+fn render_sort_links(m: &CharterMatrix, tenant_id: &str) -> String {
+    let keys = [
+        (SortKey::Name, "name"),
+        (SortKey::FillRatio, "fill_ratio"),
+        (SortKey::TestCount, "test_count"),
+        (SortKey::LastAudit, "last_audit"),
+        (SortKey::PassCount, "pass_count"),
+    ];
+    keys.iter()
+        .map(|(k, label)| {
+            let active = *k == m.sort;
+            let cls = if active {
+                "font-semibold underline"
+            } else {
+                "underline-offset-2 hover:underline"
+            };
+            format!(
+                r#"<a class="{cls}" href="/admin/_audit?tenant_id={tid}&filter={f}&sort={s}">{label}</a>"#,
+                cls = cls,
+                tid = escape(tenant_id),
+                f = m.filter.slug(),
+                s = k.slug(),
+                label = label,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(" · ")
+}
+
+fn render_table(m: &CharterMatrix) -> String {
+    if m.rows.is_empty() {
+        return r#"<p class="text-sm text-zinc-500 italic">No crates match the current filter.</p>"#.into();
+    }
+    let head = CharterRule::ALL
+        .iter()
+        .map(|r| {
+            format!(
+                r#"<th scope="col" class="px-2 py-1 text-left font-mono uppercase text-[10px] text-zinc-500">{}</th>"#,
+                r.label(),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let rows = m
+        .rows
+        .iter()
+        .map(render_row)
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        r#"<div class="overflow-x-auto">
+<table class="min-w-full text-sm border-collapse" aria-label="charter v2 matrix">
+  <thead class="bg-zinc-50 dark:bg-zinc-900">
+    <tr>
+      <th scope="col" class="px-2 py-1 text-left text-xs uppercase text-zinc-500">Crate</th>
+      <th scope="col" class="px-2 py-1 text-right text-xs uppercase text-zinc-500">fill</th>
+      <th scope="col" class="px-2 py-1 text-right text-xs uppercase text-zinc-500">tests</th>
+      <th scope="col" class="px-2 py-1 text-left text-xs uppercase text-zinc-500">audit</th>
+      {head}
+      <th scope="col" class="px-2 py-1 text-left text-xs uppercase text-zinc-500">pin</th>
+      <th scope="col" class="px-2 py-1 text-left text-xs uppercase text-zinc-500">last commit</th>
+    </tr>
+  </thead>
+  <tbody>
+    {rows}
+  </tbody>
+</table>
+</div>"#,
+        head = head,
+        rows = rows,
+    )
+}
+
+fn render_row(r: &CrateCharter) -> String {
+    let pills = r
+        .verdicts
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let rule = CharterRule::ALL[i];
+            let (cls, text, aria) = match v {
+                Verdict::Pass => (
+                    "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200",
+                    "PASS",
+                    format!("{} PASS", rule.label()),
+                ),
+                Verdict::Fail => (
+                    "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200",
+                    "FAIL",
+                    format!("{} FAIL", rule.label()),
+                ),
+                Verdict::Na => (
+                    "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+                    "—",
+                    format!("{} not applicable", rule.label()),
+                ),
+            };
+            format!(
+                r#"<td class="px-2 py-1"><span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-mono {cls}" aria-label="{aria}">{text}</span></td>"#,
+                cls = cls,
+                text = text,
+                aria = escape(&aria),
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("");
+    let fill_cell = match r.fill_ratio {
+        Some(v) => format!(r#"<span class="tabular-nums">{:.2}</span>"#, v),
+        None => "<span class=\"text-zinc-400\">—</span>".into(),
+    };
+    let audit_cell = r
+        .last_audit
+        .as_deref()
+        .map(|s| format!(r#"<time datetime="{0}" class="tabular-nums">{0}</time>"#, escape(s)))
+        .unwrap_or_else(|| "<span class=\"text-zinc-400\">—</span>".into());
+    let pin_cell = r
+        .manifest_pin
+        .as_deref()
+        .map(|s| format!(r#"<span class="font-mono text-xs">{}</span>"#, escape(s)))
+        .unwrap_or_else(|| "<span class=\"text-zinc-400\">—</span>".into());
+    let commit_cell = match &r.last_commit {
+        Some(c) => format!(
+            r#"<code class="text-[11px] text-zinc-700 dark:text-zinc-300">{} {}</code>"#,
+            escape(&c.sha),
+            escape(&c.subject),
+        ),
+        None => "<span class=\"text-zinc-400\">—</span>".into(),
+    };
+    format!(
+        r#"<tr class="border-t border-zinc-200 dark:border-zinc-800">
+  <td class="px-2 py-1 font-mono text-xs">{name}</td>
+  <td class="px-2 py-1 text-right">{fill}</td>
+  <td class="px-2 py-1 text-right tabular-nums">{tests}</td>
+  <td class="px-2 py-1">{audit}</td>
+  {pills}
+  <td class="px-2 py-1">{pin}</td>
+  <td class="px-2 py-1">{commit}</td>
+</tr>"#,
+        name = escape(&r.name),
+        fill = fill_cell,
+        tests = r.test_count,
+        audit = audit_cell,
+        pills = pills,
+        pin = pin_cell,
+        commit = commit_cell,
+    )
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
