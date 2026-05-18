@@ -73,6 +73,7 @@ impl Default for PluginRegistry {
         r.register(Arc::new(ContainerPlugin));
         r.register(Arc::new(AnsiblePlugin));
         r.register(Arc::new(MavenPlugin));
+        r.register(Arc::new(HelmPlugin));
         r
     }
 }
