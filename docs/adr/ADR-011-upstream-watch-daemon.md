@@ -1,4 +1,4 @@
-# ADR-RUNTIME-UPSTREAM-WATCH-001 — Upstream watch daemon
+# ADR-011 — Upstream watch daemon
 
 - Status: Accepted
 - Date: 2026-04-28

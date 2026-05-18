@@ -1,4 +1,4 @@
-# ADR-RUNTIME-STACK-001 — Cave Runtime Stack Architecture
+# ADR-002 — Cave Runtime Stack Architecture
 
 **Status:** Accepted
 **Scope:** Cave Runtime (universal, no deployment-target dependency)
@@ -71,7 +71,7 @@ Talos (veya benzeri) sadece **Platform repo deployment ADR'lerinde** opsiyondur 
 
 ## Compliance / Cross-cutting
 - **Altın kural** (TDD upstream parity): Layer 3+4 için zaten uygulanıyor, Layer 1+2 reimpl başlayınca da geçerli.
-- **Multi-tenant invariant** (ADR-MULTI-TENANT-001): Layer 1+ tüm katmanlar tenant_id taşıması zorunlu.
+- **Multi-tenant invariant** (ADR-003): Layer 1+ tüm katmanlar tenant_id taşıması zorunlu.
 - **No-backcompat + PQC-ready** (cave_runtime_no_backcompat_pqc.md): Bu ADR'nin özel hali — Layer 1 kernel 7.1 ve crypto baştan PQC.
 
 ## Supersedes / Conflicts
@@ -81,7 +81,7 @@ Talos (veya benzeri) sadece **Platform repo deployment ADR'lerinde** opsiyondur 
 ## Related
 - `cave_runtime_charter.md` (memory) — bu ADR onun formal hali
 - `cave_runtime_no_backcompat_pqc.md` (memory) — bu ADR'nin Layer 1 kısmı
-- ADR-MULTI-TENANT-001 — tenant invariant tüm katmanlarda
+- ADR-003 — tenant invariant tüm katmanlarda
 - ADR-GOLDEN-001..004 — TDD parity altın kuralı
 
 ---

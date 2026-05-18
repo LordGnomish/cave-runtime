@@ -1,4 +1,4 @@
-# ADR-149 — KubeVirt for Sovereign VM Workloads
+# ADR-015 — KubeVirt for Sovereign VM Workloads
 
 | Status | Accepted (scaffold only — implementation pending) |
 | ------ | ------------------------------------------------- |
@@ -88,5 +88,5 @@ Provider notes:
   2026-04-20)
 - ADR-001 — Hetzner sovereign infrastructure
 - ADR-002 — Azure enterprise infrastructure
-- ADR-145 — Karpenter node autoscaling (companion ADR; both expand the
+- ADR-020 — Karpenter node autoscaling (companion ADR; both expand the
   workload surface beyond stateless containers)

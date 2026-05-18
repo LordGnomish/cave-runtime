@@ -1,4 +1,4 @@
-# ADR-RUNTIME-UPSTREAM-MIRROR-001 — Platform–Runtime Upstream Mirror
+# ADR-005 — Platform–Runtime Upstream Mirror
 
 **Status:** Accepted
 **Scope:** Cross-project organizing principle (Platform + Runtime ADR'leri)
@@ -22,7 +22,7 @@ Cevap **ikisine birden**: Platform onu KULLANIR, Runtime onu REIMPLEMENTE eder. 
 | OSS app | Platform (deployment) ADR'si | Runtime (upstream-reimpl) ADR'si |
 |---|---|---|
 | Hetzner Cloud | "Sovereign infra Hetzner" | yok (Cave Runtime cloud-agnostic) |
-| Talos Linux | "Sovereign K8s host OS Talos" | yok (Cave Runtime kendi OS, ADR-RUNTIME-STACK-001) |
+| Talos Linux | "Sovereign K8s host OS Talos" | yok (Cave Runtime kendi OS, ADR-002) |
 | Cilium | "Sovereign CNI Cilium" | "cave-net upstream = Cilium-inspired eBPF" |
 | Istio Ambient | "Sovereign mesh Istio Ambient" | "cave-mesh upstream = Istio Ambient-inspired" |
 | Kong / Envoy | "Sovereign N-S gateway Kong" | "cave-gateway upstream = Kong/Envoy-inspired" |
@@ -53,7 +53,7 @@ Bir OSS app `X` Platform için seçildiğinde:
 
 Cave Runtime kendisi Cloud OS olduğu için bazı katmanlarda eşleşme **kırılır**:
 
-- **Layer 1 (Linux kernel 7.1)**: Cave Runtime kendi kernel'i. Platform'da Talos kullanılır (deployment), Runtime'da Talos KULLANILMAZ — Runtime kendi kernel'i olur. (ADR-RUNTIME-STACK-001)
+- **Layer 1 (Linux kernel 7.1)**: Cave Runtime kendi kernel'i. Platform'da Talos kullanılır (deployment), Runtime'da Talos KULLANILMAZ — Runtime kendi kernel'i olur. (ADR-002)
 - **Layer 0 (Hardware)**: Platform deployment-specific (Hetzner VM / Azure VM / bare metal); Runtime hardware-agnostic.
 
 Bu istisnalar açıkça belgelenir; aksi her durumda mirror geçerlidir.
@@ -62,7 +62,7 @@ Bu istisnalar açıkça belgelenir; aksi her durumda mirror geçerlidir.
 
 ADR review sırasında **her ürün seçimi ADR'si**:
 1. **Platform tarafı kalır** — orijinal ADR Platform repo'ya taşınır (deployment kararı olarak), gerekirse SHRINK + roadmap eklenir
-2. **Runtime tarafı yeni ADR** — `ADR-RUNTIME-UPSTREAM-<X>` formatında, reimpl scope ile
+2. **Runtime tarafı yeni ADR** — Runtime mirror ADR (numerik), reimpl scope ile (varsa)
 
 ## Consequences
 
@@ -75,7 +75,7 @@ ADR review sırasında **her ürün seçimi ADR'si**:
 
 ### Negative
 - ADR sayısı 2× artar (her ürün için 2 ADR)
-- Mitigation: Platform ADR'sinde "Runtime mirror: ADR-RUNTIME-UPSTREAM-<X>" şeklinde cross-reference + Runtime ADR'sinde "Platform mirror: ADR-<original>" şeklinde aynı.
+- Mitigation: Platform ADR'sinde "Runtime mirror: <Runtime ADR id>" şeklinde cross-reference + Runtime ADR'sinde "Platform mirror: <Platform ADR id>" şeklinde aynı.
 - ADR review iki repo'da paralel ilerlemeli
 
 ### Risks
@@ -92,12 +92,13 @@ ADR review sırasında her bir ürün seçimi ADR'si için karar tablosuna şu k
 | ADR | Platform decision | Runtime mirror needed? | Runtime ADR ID (if needed) |
 |---|---|---|---|
 
-Örnek:
-- ADR-001 Hetzner → Platform KEEP, Runtime mirror **YOK** (Cave Runtime cloud-agnostic)
-- ADR-003 Talos → Platform KEEP, Runtime mirror **YOK** (Layer 1 istisna, Cave Runtime kendi OS)
-- ADR-004 Cilium+Istio → Platform KEEP, Runtime mirror **VAR** → `ADR-RUNTIME-UPSTREAM-NETWORKING-001`
-- ADR-006 Keycloak → Platform KEEP, Runtime mirror **VAR** → `ADR-RUNTIME-UPSTREAM-AUTH-001`
-- ADR-008 Valkey → Platform KEEP, Runtime mirror **VAR** → `ADR-RUNTIME-UPSTREAM-CACHE-001`
+Örnek (numaralar Platform repo'sundaki tarihsel ADR id'leridir; bu repo'da
+artık tutulmuyor — sadece pattern göstermek için):
+- Platform Hetzner ADR → Platform KEEP, Runtime mirror **YOK** (Cave Runtime cloud-agnostic)
+- Platform Talos ADR → Platform KEEP, Runtime mirror **YOK** (Layer 1 istisna, Cave Runtime kendi OS)
+- Platform Cilium+Istio ADR → Platform KEEP, Runtime mirror **VAR** → cave-net + cave-mesh crate'leri
+- Platform Keycloak ADR → Platform KEEP, Runtime mirror **VAR** → cave-auth crate'i
+- Platform Valkey ADR → Platform KEEP, Runtime mirror **VAR** → cave-cache crate'i
 
 ## ADR Quality Bar (her ürün seçimi ADR'si için zorunlu)
 
@@ -113,8 +114,8 @@ Her ürün seçimi ADR'si zorunlu olarak:
 Bu standart şu anki çoğu ADR'de eksik. ADR review sırasında "SHRINK + add roadmap" işaretlenebilir.
 
 ## Related
-- ADR-RUNTIME-STACK-001 — Cave Runtime stack (Layer 1-4) tanımı; Layer 1 Talos istisnasının kaynağı
-- ADR-MULTI-TENANT-001 — Cross-cutting invariant
+- ADR-002 — Cave Runtime stack (Layer 1-4) tanımı; Layer 1 Talos istisnasının kaynağı
+- ADR-003 — Cross-cutting invariant
 - 2026-04-25 ADR review session decisions tracker — bu prensibin uygulanma kayıtları
 
 ---

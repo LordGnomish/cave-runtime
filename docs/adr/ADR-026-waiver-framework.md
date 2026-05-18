@@ -2,14 +2,14 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# ADR-140: Waiver Framework for Temporary Policy Exceptions
+# ADR-026: Waiver Framework for Temporary Policy Exceptions
 
 ## Status
 Accepted
 
 ## Context
 Cave Runtime enforces policy through `cave-policy` and the
-constitutional tiers of ADR-137. Real operations occasionally need
+constitutional tiers of ADR-024. Real operations occasionally need
 *temporary* relief from a rule — for example: an unfixed upstream CVE,
 a tenant migration that briefly needs a relaxed egress rule, a workload
 needing host networking until a feature lands.
@@ -28,7 +28,7 @@ properties.
 |----------|------|
 | Scope | A waiver names a specific tenant, namespace and resource selector. Cluster-wide or wildcard waivers are forbidden. |
 | Justification | A written risk assessment in the PR that creates the waiver: what is being waived, why, what compensating controls are in place, what is the blast radius. |
-| Approval | Tier A artefacts (ADR-137) cannot be waived. Tier B requires the named owner. Tier C requires team-lead approval. |
+| Approval | Tier A artefacts (ADR-024) cannot be waived. Tier B requires the named owner. Tier C requires team-lead approval. |
 | TTL | Maximum 90 days. Renewable once with fresh justification. Hard cap 180 days. |
 | Compensating control | Mandatory for security-relevant waivers; optional for operational ones. |
 | Audit | A `waiver_granted` event is written to the signed-event log: hash of justification, scope, TTL, approver identity. |
@@ -44,7 +44,7 @@ properties.
   silent policy change. The 90-day cap forces re-evaluation.
 - **Single approver for all tiers.** Treats a Tier-A exception (which
   the Runtime forbids) the same as a Tier-C operational tweak; loses
-  the safety property of ADR-137.
+  the safety property of ADR-024.
 
 ## Consequences
 
@@ -72,6 +72,6 @@ reference this ADR as the documented exception process. Mapping detail
 lives in `docs/compliance/`.
 
 ## Related ADRs
-- ADR-137 (Constitutional Tiering — which tiers may be waived at all)
-- ADR-138 (Evidence Tiering — a waiver does not reduce the evidence
+- ADR-024 (Constitutional Tiering — which tiers may be waived at all)
+- ADR-025 (Evidence Tiering — a waiver does not reduce the evidence
   required for the change it accompanies)

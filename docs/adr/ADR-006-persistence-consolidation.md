@@ -1,4 +1,4 @@
-# ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001 — Data Persistence Multi-Upstream Konsolide Reimpl
+# ADR-006 — Data Persistence Multi-Upstream Konsolide Reimpl
 
 **Status:** Proposed (Burak'ın "sanki bir şeyler daha vardı" notu — tam liste kesinleşmemiş, draft)
 **Scope:** Cave Runtime (independent override; multi-upstream consolidation)
@@ -7,7 +7,7 @@
 
 ## Context
 
-`ADR-RUNTIME-UPSTREAM-MIRROR-001` default mirror = 1 Platform OSS → 1 Runtime crate. Persistence katmanı bu defaulttan **sapan** özel durum: Cave Runtime'da data persistence için **birden fazla upstream konsolide** reimpl ediliyor.
+`ADR-005` default mirror = 1 Platform OSS → 1 Runtime crate. Persistence katmanı bu defaulttan **sapan** özel durum: Cave Runtime'da data persistence için **birden fazla upstream konsolide** reimpl ediliyor.
 
 Mevcut crate'ler:
 - `cave-pg` — PostgreSQL upstream (relational, ACID, OLTP)
@@ -97,10 +97,10 @@ Tenant deployment'ında Crossplane XR ile gerekli olan crate'ler aktive edilir (
 | Workload-crate mapping yanlış (tenant cave-pg ihtiyacında cave-distsql kullanır) | Backstage Scaffolder template'ler ile rehberli seçim |
 
 ## Related
-- ADR-RUNTIME-UPSTREAM-MIRROR-001 — Mirror prensibinin multi-upstream consolidation istisnası
-- ADR-RUNTIME-STACK-001 — Layer 4 ekosistem
-- ADR-MULTI-TENANT-001 — tenant_id her data layer'da
-- ADR-RUNTIME-STREAMING-CONSOLIDATION-001 — kardeş ADR (streaming için aynı pattern)
+- ADR-005 — Mirror prensibinin multi-upstream consolidation istisnası
+- ADR-002 — Layer 4 ekosistem
+- ADR-003 — tenant_id her data layer'da
+- ADR-007 — kardeş ADR (streaming için aynı pattern)
 - ADR-DATA-LAYER-001 (varsa) — cave-iceberg + cave-datafusion analytics
 
 ---

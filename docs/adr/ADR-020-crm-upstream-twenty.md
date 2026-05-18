@@ -1,9 +1,9 @@
-# ADR-145 — CRM Upstream Selection: Twenty
+# ADR-020 — CRM Upstream Selection: Twenty
 
 - **Status:** Accepted
 - **Date:** 2026-05-05
 - **Decision owner:** Burak Tartan
-- **Implemented by:** `crates/cave-crm/` (function-based, ADR-147 naming)
+- **Implemented by:** `crates/cave-crm/` (function-based, ADR-014 naming)
 - **Upstream:** [twentyhq/twenty](https://github.com/twentyhq/twenty) — v2.2.0 (released 2026-05-04)
 - **License:** AGPL-3.0 (upstream); cave-crm reimplementation under workspace Apache-2.0
 
@@ -28,7 +28,7 @@ into a standalone `cave-crm` crate.
 
 Adopt **Twenty** ([twentyhq/twenty](https://github.com/twentyhq/twenty)) as the
 sovereign CRM upstream. Implement a standalone `cave-crm` crate (function-based
-naming per ADR-147), independent from `cave-erp`'s CRM submodule. Deprecate
+naming per ADR-014), independent from `cave-erp`'s CRM submodule. Deprecate
 `crates/cave-erp/src/modules/crm.rs` for removal in the v0.2 OSS launch hygiene
 pass.
 
@@ -45,7 +45,7 @@ pass.
 ## Decision rationale
 
 1. **Modern stack alignment.** Twenty's Postgres + GraphQL spine matches
-   `cave-rdbms-operator` (ADR-147) and the cave data plane assumptions; no
+   `cave-rdbms-operator` (ADR-014) and the cave data plane assumptions; no
    PHP-specific runtime infrastructure required.
 2. **License alignment.** AGPL-3.0 aligns with the sovereign-OSS posture the
    workspace already accepts for `cave-erp`. cave-crm itself is an independent
@@ -80,7 +80,7 @@ pass.
   Twenty's REST + GraphQL surfaces).
 - PostgreSQL backend (replacing the in-memory `RwLock` placeholder), driven
   through `cave-rdbms-operator`.
-- Tenant isolation per ADR-MULTI-TENANT-001 — Kamaji vCluster boundary.
+- Tenant isolation per ADR-003 — Kamaji vCluster boundary.
 
 ### Charter compliance
 
@@ -88,7 +88,7 @@ pass.
   GitHub releases API at scaffold time (2026-05-05) and stamped into both
   `parity.manifest.toml` and the `routes::health` payload.
 - **No-backcompat / PQC-ready.** New crate; Linux 7.1 only, no legacy shims.
-- **Function-based naming (ADR-147).** Crate is `cave-crm`, not `cave-twenty`.
+- **Function-based naming (ADR-014).** Crate is `cave-crm`, not `cave-twenty`.
 - **No-stub / no-mock golden rule.** Skeleton is honest — placeholder tests
   are `#[ignore]` with a clear reason, not silently passing.
 - **Four-track full standard.** This PR delivers Backend wiring only (1/4);
@@ -97,8 +97,8 @@ pass.
 
 ## References
 
-- ADR-147 — Persistence Consolidation (function-based crate naming pattern).
-- ADR-MULTI-TENANT-001 — Kamaji multi-tenant boundary.
+- ADR-014 — Persistence Consolidation (function-based crate naming pattern).
+- ADR-003 — Kamaji multi-tenant boundary.
 - `crates/cave-erp/src/modules/crm.rs` — deprecated CRM submodule (kept in
   this PR; removed v0.2).
 - Twenty release notes: https://github.com/twentyhq/twenty/releases/tag/v2.2.0

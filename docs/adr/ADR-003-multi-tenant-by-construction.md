@@ -1,4 +1,4 @@
-# ADR-MULTI-TENANT-001: Cave Runtime is multi-tenant by construction
+# ADR-003: Cave Runtime is multi-tenant by construction
 
 **Status:** Accepted
 **Date:** 2026-04-23
@@ -66,7 +66,7 @@ A single sentinel `tenant_id = "system"` owns:
 | **cave-metrics / cave-trace** | Mandatory `tenant_id` label; tenant-level query RBAC; admin can disable label filter (audited). |
 | **cave-auth** | Claims include `tenant_id`; RBAC roles can be tenant-scoped or cluster-scoped; SPIFFE trust domain segments. |
 | **cave-kernel** | Shared primitives (Raft groups, EventBus topics, Labels, WAL) expose tenant-aware APIs; no global topic that leaks cross-tenant state. |
-| **cave-agent** (ADR-SELF-IMPROVE-001) | Proposes changes within tenant scope; cluster-wide changes require `system` role + explicit approval. |
+| **cave-agent** (ADR-022) | Proposes changes within tenant scope; cluster-wide changes require `system` role + explicit approval. |
 | **cave-portal-api** | RBAC middleware reads `tenant_id` from auth claim; filters every response; admin gets cross-tenant, tenants get own. |
 
 ### Isolation tiers
@@ -106,7 +106,7 @@ Hard multi-tenancy is expensive and not every tenant needs it. Offering both —
 - Audit: grep every crate for endpoints that accept requests without a tenant claim. Every one gets either a tenant-require wrapper or a `system`-only explicit annotation.
 - cave-etcd key prefix enforcement (runtime rejects `/foo` without `/t/<tenant>/` prefix).
 - cave-metrics scrape rejects series without `tenant_id` label.
-- Portal admin/tenant split (ADR-PORTAL-PERSONAS-001) implemented.
+- Portal admin/tenant split (ADR-017) implemented.
 - Minimum viable tenant onboarding: create tenant → issue credentials → deploy sample app → see metrics scoped.
 
 **Post-OSS:**
@@ -129,7 +129,7 @@ Hard multi-tenancy is expensive and not every tenant needs it. Offering both —
 - ADR-GOLDEN-002 — cave-kernel shared primitives (all tenant-aware)
 - ADR-GOLDEN-003 — no-backcompat + PQC-ready (don't retrofit isolation later)
 - ADR-GOLDEN-004 — 4-track completion (Portal UX track split into admin + tenant per PORTAL-PERSONAS-001)
-- ADR-PORTAL-PERSONAS-001 — portal admin/tenant split as a consequence of this ADR
-- ADR-PORTAL-AUTH-001 — authentication gate; tenant_id claim sourced from auth
-- ADR-SELF-IMPROVE-001 — cave-agent operates within tenant scope
+- ADR-017 — portal admin/tenant split as a consequence of this ADR
+- ADR-016 — authentication gate; tenant_id claim sourced from auth
+- ADR-022 — cave-agent operates within tenant scope
 - 2026-04-23 user framing: *"tum runtime multi tenant degil mi?"* — yes, ratified here.

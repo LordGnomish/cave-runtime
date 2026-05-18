@@ -2,13 +2,13 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# ADR-014: Zero-Trust as a Runtime Architectural Principle
+# ADR-004: Zero-Trust as a Runtime Architectural Principle
 
 ## Status
 Accepted
 
 ## Context
-Cave Runtime is multi-tenant by construction (ADR-MULTI-TENANT-001).
+Cave Runtime is multi-tenant by construction (ADR-003).
 Workloads from different tenants share the underlying control plane, the
 same network fabric, and the same persistence layer. A perimeter-based
 trust model — "trust everything inside the cluster" — is incompatible
@@ -45,7 +45,7 @@ Concretely:
 4. **Independent control-plane mTLS.**
    `cave-runtime` listeners (apiserver, etcd, kubelet) use a separate CA
    hierarchy from data-plane mTLS. A data-plane compromise must not
-   yield control-plane reach (see ADR-RUNTIME-CERT-LIFECYCLE-001).
+   yield control-plane reach (see ADR-010).
 
 5. **No backwards-compatible "insecure" mode.**
    The Charter forbids backcompat. There is no flag to disable mTLS, no
@@ -62,12 +62,12 @@ cluster never operates without the four properties above.
 
 Specific upstream tool selections (which eBPF agent, which mesh
 implementation) live on the Platform side and are inherited via
-ADR-RUNTIME-UPSTREAM-MIRROR-001.
+ADR-005.
 
 ## Consequences
 
 Positive
-- Tenant isolation property of ADR-MULTI-TENANT-001 has a concrete
+- Tenant isolation property of ADR-003 has a concrete
   network-layer enforcement contract.
 - A compromised workload cannot reach other tenants without crossing
   two independently enforced layers (L3/L4 policy and L7 mTLS).
@@ -88,6 +88,6 @@ Mapping detail lives in `docs/compliance/`, not in this ADR — those
 mappings are deployment-profile specific.
 
 ## Related ADRs
-- ADR-MULTI-TENANT-001 (why zero-trust is mandatory)
-- ADR-RUNTIME-CERT-LIFECYCLE-001 (control-plane vs data-plane CA split)
-- ADR-RUNTIME-UPSTREAM-MIRROR-001 (how Platform tool choices map onto Runtime crates)
+- ADR-003 (why zero-trust is mandatory)
+- ADR-010 (control-plane vs data-plane CA split)
+- ADR-005 (how Platform tool choices map onto Runtime crates)

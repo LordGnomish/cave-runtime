@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# ADR-137: Constitutional Tiering of Governed Configuration
+# ADR-024: Constitutional Tiering of Governed Configuration
 
 ## Status
 Accepted
@@ -16,7 +16,7 @@ self-improving daemon may touch.
 
 If all of these are gated behind the same heavy approval flow, change
 velocity collapses for routine tuning. If none of them are gated, an
-operator (or the autonomous agent in ADR-SELF-IMPROVE-001) can quietly
+operator (or the autonomous agent in ADR-022) can quietly
 re-write the constitution.
 
 This ADR establishes a tiered governance taxonomy so that each governed
@@ -50,7 +50,7 @@ may move artefacts to a higher tier but may never lower one.
 | Break-glass access list | Egress allow-list policy | Dashboard layouts |
 
 ### Interaction with the self-improving agent
-ADR-SELF-IMPROVE-001 grants the resident agent a bounded write surface.
+ADR-022 grants the resident agent a bounded write surface.
 Constitutional tiering is the gate on that surface:
 
 - The agent **must not** modify Tier A.
@@ -88,6 +88,6 @@ This ADR is the hook used by external mappings for tiered change-control
 detail lives in `docs/compliance/`.
 
 ## Related ADRs
-- ADR-SELF-IMPROVE-001 (agent's write surface honours these tiers)
-- ADR-138 (Evidence Tiering — how attestations from each tier are kept)
-- ADR-140 (Waiver Framework — temporary exceptions, never to Tier A)
+- ADR-022 (agent's write surface honours these tiers)
+- ADR-025 (Evidence Tiering — how attestations from each tier are kept)
+- ADR-026 (Waiver Framework — temporary exceptions, never to Tier A)

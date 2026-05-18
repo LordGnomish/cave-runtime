@@ -1,4 +1,4 @@
-# ADR-148 — OSS Launch History Strategy
+# ADR-028 — OSS Launch History Strategy
 
 **Status:** Accepted
 **Scope:** Cave Runtime (repo-wide)
@@ -74,7 +74,7 @@ The orphan strategy gets the **same trust outcome** as any cleanup option (clean
 
 - **Public history loses the prototype narrative.** The sweep-001/002 refactor reasoning, Wave 3a Tier-A close-out arc, the CRI deep-port sprint — all visible only in local archive. Mitigation: a `docs/HISTORY.md` summary at v0.1.0 lists the milestone arcs in prose, with internal ADR refs.
 - **No "git blame" continuity past v0.1.0 for any line.** Acceptable: blame on a 6-day-old prototype isn't load-bearing for OSS contributors.
-- **External contributors who want to see "why was it written this way?" must read ADRs**, not `git log -p`. ADR-001 through ADR-148 stay; that's the explicit decision record.
+- **External contributors who want to see "why was it written this way?" must read ADRs**, not `git log -p`. ADR-001 through ADR-028 stay; that's the explicit decision record.
 - **Any OSS launch follower who clones before vs after force-push will diverge.** Mitigation: force-push happens during a single 5-minute window on launch day, before public announcement. Pre-announcement clones are zero.
 
 ### Out of scope
@@ -130,7 +130,7 @@ This is the v0.1.0 artifact. See:
   - README.md       — what's inside
   - docs/adr/       — every architectural decision (ADR-001..148)
   - docs/HISTORY.md — six-day prototype timeline (summary; full log
-                     in private archive per ADR-148)
+                     in private archive per ADR-028)
   - CREDITS.md      — humans + AI co-authors of this artifact
   - LICENSE         — Apache-2.0
 
@@ -195,7 +195,7 @@ A launch is **not** valid unless:
 2. `cargo check --workspace` is green at the orphan-commit tree.
 3. `cargo test --workspace --lib --no-fail-fast --exclude cave-upstream` failed-count is 0.
 4. `LICENSE`, `NOTICE`, `CREDITS.md`, `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `docs/HISTORY.md` all exist.
-5. The orphan commit's message references this ADR (ADR-148).
+5. The orphan commit's message references this ADR (ADR-028).
 6. The bundle (Faz 3) is created **and** verified **before** the local repo is reset.
 
 If any gate fails, the launch slips and the gate is fixed first. No partial-orphan publication.

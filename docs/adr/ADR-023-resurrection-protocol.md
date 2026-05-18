@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# ADR-088: Resurrection Protocol — Restore-from-Cold
+# ADR-023: Resurrection Protocol — Restore-from-Cold
 
 ## Status
 Accepted
@@ -84,5 +84,5 @@ Negative
 
 ## Related ADRs
 - ADR-079 (Secret-Zero Bootstrap + Break-Glass Kit)
-- ADR-RUNTIME-CERT-LIFECYCLE-001 (CA hierarchy survives restore)
-- ADR-MULTI-TENANT-001 (why identity continuity matters)
+- ADR-010 (CA hierarchy survives restore)
+- ADR-003 (why identity continuity matters)

@@ -1,16 +1,16 @@
-# ADR-031 — Cave WebApplication Composition Pattern
+# ADR-013 — Cave WebApplication Composition Pattern
 
-> **Renumber note (2026-04-26):** originally drafted as ADR-145 in this
-> repository; renumbered to ADR-031 to resolve a collision with the
-> Platform catalog's ADR-145 ("Cave Runtime — Async Runtime
+> **Renumber note (2026-04-26):** originally drafted as ADR-020 in this
+> repository; renumbered to ADR-013 to resolve a collision with the
+> Platform catalog's ADR-020 ("Cave Runtime — Async Runtime
 > tokio + io_uring").  Final semantic renumbering is deferred to a
 > separate pass; for now, slot 031 (previously empty in the catalog) is
 > used.
 
 Status: Proposed (2026-04-26 — Burak finalize edecek)
-Scope: Universal (Platform; Pipeline inherits; Runtime via mirror principle ADR-RUNTIME-UPSTREAM-MIRROR-001)
+Scope: Universal (Platform; Pipeline inherits; Runtime via mirror principle ADR-005)
 Category: Platform / Application Composition / Tenant Developer Experience
-Related: ADR-011 (Backstage), ADR-026 (ArgoCD), ADR-067 (Crossplane v2), ADR-076 (cavectl), ADR-124 (Crossplane MRAP), ADR-013 (LiteLLM Gateway), ADR-027 (Kong API Gateway), ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001, ADR-RUNTIME-CERT-LIFECYCLE-001, ADR-021 (Streaming), ADR-RUNTIME-STREAMING-CONSOLIDATION-001, ADR-008 (Cache), ADR-047 (PostgreSQL), ADR-020 (OpenBao), ADR-053 (ESO), ADR-014 (Zero-Trust), ADR-029 (LGTM Stack), ADR-043 (Schema Migration)
+Related: ADR-011 (Backstage), ADR-026 (ArgoCD), ADR-067 (Crossplane v2), ADR-012 (cavectl), ADR-124 (Crossplane MRAP), ADR-013 (LiteLLM Gateway), ADR-027 (Kong API Gateway), ADR-008, ADR-010, ADR-021 (Streaming), ADR-007, ADR-008 (Cache), ADR-047 (PostgreSQL), ADR-020 (OpenBao), ADR-053 (ESO), ADR-004 (Zero-Trust), ADR-029 (LGTM Stack), ADR-043 (Schema Migration)
 
 ## Context
 
@@ -84,7 +84,7 @@ Wizard adımları:
 - Language picker (Java + Spring/Quarkus, Python + FastAPI/Flask, Go + Gin/Echo, Node + Express/NestJS)
 - Resource picker (Postgres? Kafka? Redis? S3? Vector DB?)
 - Schema/topic naming (defaults from convention, ADR-021 governance)
-- Auth flow (OIDC scopes, ADR-PORTAL-AUTH-001)
+- Auth flow (OIDC scopes, ADR-016)
 - Endpoint config (path, domain, rate limit)
 - Replication strategy
 - Generates: project skeleton + WebApplication YAML + git push initial commit
@@ -173,8 +173,8 @@ Cave bu desenleri sovereign Rust reimpl + multi-tenant first-class + PQC-ready z
 
 ## Pipeline + Runtime Inheritance
 
-- **Pipeline-platform-starter:** ADR-031'i inherits eder. Pipeline'ın kendisi Cave WebApplication pattern'iyle yaratılan + maintained app (CI/CD pipeline'ın self-hosting'ı bu compose pattern'inin instance'ı).
-- **Runtime:** `cave-app` (XR reconciler) + `cave-app-templates/*` (Java/Python/Go/Node skeletons) + `cavectl create webapp` wizard + `cave-portal` Software Templates integration. ADR-RUNTIME-UPSTREAM-MIRROR-001 charter principle altında otomatik. Multi-tenant + PQC charter-default. **Yeni Runtime override ADR YOK.**
+- **Pipeline-platform-starter:** ADR-013'i inherits eder. Pipeline'ın kendisi Cave WebApplication pattern'iyle yaratılan + maintained app (CI/CD pipeline'ın self-hosting'ı bu compose pattern'inin instance'ı).
+- **Runtime:** `cave-app` (XR reconciler) + `cave-app-templates/*` (Java/Python/Go/Node skeletons) + `cavectl create webapp` wizard + `cave-portal` Software Templates integration. ADR-005 charter principle altında otomatik. Multi-tenant + PQC charter-default. **Yeni Runtime override ADR YOK.**
 
 `cave-app` crates plan:
 - `cave-app` — WebApplication XR + Composition reconciler
@@ -242,4 +242,4 @@ Cave bu desenleri sovereign Rust reimpl + multi-tenant first-class + PQC-ready z
 
 ## Status update plan
 
-ADR-031 v0.1 implement: Crossplane Composition + cave-app crate scaffold + Backstage template + cavectl basic. Sonraki Sonnet sprint'lerinde wave by wave.
+ADR-013 v0.1 implement: Crossplane Composition + cave-app crate scaffold + Backstage template + cavectl basic. Sonraki Sonnet sprint'lerinde wave by wave.

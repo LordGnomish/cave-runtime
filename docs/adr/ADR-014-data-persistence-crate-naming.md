@@ -1,14 +1,14 @@
-# ADR-147 — Data Persistence Crate Naming + Lakehouse Consolidation
+# ADR-014 — Data Persistence Crate Naming + Lakehouse Consolidation
 
 **Status:** Proposed — pending Burak approval
 **Scope:** Cave Runtime
 **Category:** Naming / Architecture
 **Date:** 2026-05-02
-**Related ADRs:** ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 (Kong+Gravitee→cave-gateway pattern), ADR-RUNTIME-STREAMING-CONSOLIDATION-001 (Kafka+Pulsar→cave-streams pattern), ADR-RUNTIME-UPSTREAM-MIRROR-001 (Platform OSS → Runtime crate mapping)
+**Related ADRs:** ADR-008 (Kong+Gravitee→cave-gateway pattern), ADR-007 (Kafka+Pulsar→cave-streams pattern), ADR-005 (Platform OSS → Runtime crate mapping)
 
 ## Context
 
-The data-persistence layer of `cave-runtime` has accumulated naming and topology debt that no longer matches the architectural pattern established by ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 and the streaming consolidation ADR. Three concrete misalignments:
+The data-persistence layer of `cave-runtime` has accumulated naming and topology debt that no longer matches the architectural pattern established by ADR-008 and the streaming consolidation ADR. Three concrete misalignments:
 
 ### 1. `cave-pg` overloaded
 
@@ -32,7 +32,7 @@ A modern lakehouse stack is a single composed surface:
 
 ### 3. Pattern asymmetry with already-consolidated crates
 
-`cave-streams` already collapsed Kafka + Pulsar into one Rust impl (ADR-RUNTIME-STREAMING-CONSOLIDATION-001). `cave-gateway` already collapsed Kong + Gravitee (ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001). Both ADRs cite the same justification: "two strong upstreams in the same architectural slot belong in one cave-native crate." The lakehouse stack — Iceberg + DataFusion + (future Delta/Hudi optional, Parquet IO, MinIO awareness) — is the same pattern, currently un-applied.
+`cave-streams` already collapsed Kafka + Pulsar into one Rust impl (ADR-007). `cave-gateway` already collapsed Kong + Gravitee (ADR-008). Both ADRs cite the same justification: "two strong upstreams in the same architectural slot belong in one cave-native crate." The lakehouse stack — Iceberg + DataFusion + (future Delta/Hudi optional, Parquet IO, MinIO awareness) — is the same pattern, currently un-applied.
 
 ## Decision (proposed)
 
@@ -99,7 +99,7 @@ cave-lakehouse/
 │   │   └── datafusion/    # ex-cave-datafusion src/* moves here verbatim
 │   ├── parquet_io/        # shared Arrow/Parquet read+write helpers
 │   └── time_travel.rs     # cross-cutting: engine consumes format snapshots
-└── parity.manifest.toml   # multi-upstream form per ADR-RUNTIME-UPSTREAM-MIRROR-001
+└── parity.manifest.toml   # multi-upstream form per ADR-005
 ```
 
 The internal modules keep their existing 117 + 92 = **209 tests** intact; nothing functional moves. Only the crate boundary changes.
@@ -108,7 +108,7 @@ The internal modules keep their existing 117 + 92 = **209 tests** intact; nothin
 
 Other data crates were considered and explicitly held out of this ADR:
 
-- **`cave-rdbms`** stays — it is the Postgres engine, distinct domain from the operator. Keeping engine and operator in separate crates is *correct* per the ADR-RUNTIME-UPSTREAM-MIRROR-001 default ("1 OSS → 1 crate"). The rename of `cave-pg → cave-rdbms-operator` makes that separation explicit, it does not collapse it.
+- **`cave-rdbms`** stays — it is the Postgres engine, distinct domain from the operator. Keeping engine and operator in separate crates is *correct* per the ADR-005 default ("1 OSS → 1 crate"). The rename of `cave-pg → cave-rdbms-operator` makes that separation explicit, it does not collapse it.
 - **`cave-docdb`** stays — single-upstream (mongodb/mongo), no consolidation case yet.
 - **`cave-cache`** stays — single-upstream (valkey-io/valkey), no consolidation case.
 - **`cave-store`** stays — already the MinIO mirror; lakehouse calls *into* it, doesn't absorb it.
@@ -149,6 +149,6 @@ Other data crates were considered and explicitly held out of this ADR:
 Once any of these is checked, the agent that executes the rename references this ADR in the commit message:
 
 ```
-refactor(workspace): cave-pg → cave-rdbms-operator (ADR-147)
-refactor(workspace): consolidate cave-iceberg + cave-datafusion → cave-lakehouse (ADR-147)
+refactor(workspace): cave-pg → cave-rdbms-operator (ADR-014)
+refactor(workspace): consolidate cave-iceberg + cave-datafusion → cave-lakehouse (ADR-014)
 ```

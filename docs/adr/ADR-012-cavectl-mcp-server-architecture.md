@@ -1,4 +1,4 @@
-# ADR-076: cave-ctl CLI & MCP Server Architecture
+# ADR-012: cave-ctl CLI & MCP Server Architecture
 
 **Status:** Accepted
 

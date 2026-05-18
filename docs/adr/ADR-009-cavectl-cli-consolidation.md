@@ -1,9 +1,9 @@
-# ADR-RUNTIME-CLI-CONSOLIDATION-001 — Single `cavectl` Binary, Native + Compatibility Surfaces
+# ADR-009 — Single `cavectl` Binary, Native + Compatibility Surfaces
 
 **Status:** Decided (2026-04-27, Burak Tartan)
 **Scope:** Cave Runtime CLI (`cave-cli` crate → `cavectl` binary)
 **Category:** Developer experience / consolidation
-**Supersedes:** ADR-076 (cave_ctl CLI MCP Server Architecture) on the binary-name and surface question.
+**Supersedes:** ADR-012 (cave_ctl CLI MCP Server Architecture) on the binary-name and surface question.
 
 ## Context
 
@@ -16,7 +16,7 @@ At the same time, Cave's value proposition is *cross-cutting* — federated watc
 quota, consistent cross-module snapshot, self-improvement playbooks — and these have **no
 upstream-CLI equivalent**. Forcing them into a `kubectl plugin` shape would distort them.
 
-The naming has drifted across drafts: `cave-cli`, `cavectl`, `cave-ctl`. ADR-076 left the
+The naming has drifted across drafts: `cave-cli`, `cavectl`, `cave-ctl`. ADR-012 left the
 binary undecided. The result: shipping doc references three names, and the in-tree
 `cave-cli` crate has wavered between binary names `cave` (current) and `cavectl` (planned).
 
@@ -79,7 +79,7 @@ binary with subcommands keeps those concerns single-source.
   canonical one, and the compat shim is opt-in via the `kubectl` prefix.
 
 ### Neutral
-- ADR-076's MCP-server architecture is unchanged; it now plugs into `cavectl mcp …` as
+- ADR-012's MCP-server architecture is unchanged; it now plugs into `cavectl mcp …` as
   a native subcommand.
 - Existing `cave-cli` crate references in the workspace migrate to `cavectl` mechanically
   (Cargo.toml package name, workspace member entry). The crate's directory stays

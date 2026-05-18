@@ -1,4 +1,4 @@
-# ADR-RUNTIME-API-GATEWAY-CONSOLIDATION-001 — Cave Runtime API Gateway Consolidation: Kong + Gravitee → cave-gateway
+# ADR-008 — Cave Runtime API Gateway Consolidation: Kong + Gravitee → cave-gateway
 
 **Status:** Accepted (2026-04-26)
 **Scope:** Cave Runtime (independent override; multi-upstream consolidation). **Overrides ADR-027 Platform** (Kong-only) within Runtime context.
@@ -11,7 +11,7 @@ ADR-027 (Platform) — "Kong API Gateway" — **Platform repo'da değişmiyor**.
 
 Bu ADR **sadece Cave Runtime context'inde** ADR-027'yi override ediyor: Runtime'da `cave-gateway` crate'i Kong + Gravitee'nin **konsolide reimpl'i** olarak doğuyor — Platform'daki Kong-only kararından sapan multi-upstream konsolidasyon vakası.
 
-`ADR-RUNTIME-UPSTREAM-MIRROR-001` default eşleşmesi (1 Platform OSS → 1 Runtime crate) bu ADR ile genişletiliyor: 2 Platform-relevant OSS (Kong + Gravitee) → 1 Runtime crate (cave-gateway). Streaming (Kafka+Pulsar→cave-streams) ve persistence (multi-upstream→cave-pg/docdb/cache/...) ADR'leriyle aynı consolidation pattern.
+`ADR-005` default eşleşmesi (1 Platform OSS → 1 Runtime crate) bu ADR ile genişletiliyor: 2 Platform-relevant OSS (Kong + Gravitee) → 1 Runtime crate (cave-gateway). Streaming (Kafka+Pulsar→cave-streams) ve persistence (multi-upstream→cave-pg/docdb/cache/...) ADR'leriyle aynı consolidation pattern.
 
 ## Context
 
@@ -20,9 +20,9 @@ Cave Runtime sovereign + multi-tenant Cloud OS olarak Layer 3'te kuzey-güney tr
 1. **Proxy data path** — high-throughput L7 routing, rate-limit, JWT/OAuth2/key-auth, request/response transform, circuit-breaker, observability. Kong'un güçlü olduğu alan; nginx/lua plugin DSL'i ile zengin ekosistem.
 2. **API lifecycle management** — Developer Portal (API katalog, dokümantasyon, self-service onboarding), tenant-facing API key management, OAuth2 client registration, IAM federation, analytics dashboards. Gravitee'nin güçlü olduğu alan; tek başına proxy yetenekleri Kong'un gerisinde ama portal+IAM+analytics tarafı zengin.
 
-Burak'ın **N-to-M LLM/IDM pattern paralelliği**: cave-llm-gateway nasıl ki çoklu LLM upstream'i (OpenAI/Anthropic/Mistral/Ollama) tek wire'a çekiyor (ADR-013 LiteLLM mirror), cave-auth nasıl ki çoklu IdM upstream'i (Keycloak/Okta/Entra) tek crate'te konsolide ediyor — aynı şekilde **API gateway için iki güçlü upstream'i (Kong + Gravitee) tek cave-gateway crate'inde konsolide etmek doğal**.
+Burak'ın **N-to-M LLM/IDM pattern paralelliği**: cave-llm-gateway nasıl ki çoklu LLM upstream'i (OpenAI/Anthropic/Mistral/Ollama) tek wire'a çekiyor (cave-llm-gateway is the LiteLLM-equivalent Runtime crate), cave-auth nasıl ki çoklu IdM upstream'i (Keycloak/Okta/Entra) tek crate'te konsolide ediyor — aynı şekilde **API gateway için iki güçlü upstream'i (Kong + Gravitee) tek cave-gateway crate'inde konsolide etmek doğal**.
 
-Multi-tenant invariant (ADR-MULTI-TENANT-001) gateway'in tenant_id üzerinden default-deny çalışmasını zorunlu kılıyor; ne Kong tek başına ne Gravitee tek başına Cave'in tenant modeline doğal değil — her ikisinin birleşik fonksiyonu cave-native olarak yeniden yazılmalı.
+Multi-tenant invariant (ADR-003) gateway'in tenant_id üzerinden default-deny çalışmasını zorunlu kılıyor; ne Kong tek başına ne Gravitee tek başına Cave'in tenant modeline doğal değil — her ikisinin birleşik fonksiyonu cave-native olarak yeniden yazılmalı.
 
 ## Decision
 
@@ -41,8 +41,8 @@ cave-gateway-plugins/
   ├─ transformations/               — request/response rewrite, header inject
   ├─ cors/
   ├─ circuit-breaker/
-  ├─ cave-llm-bridge/               — cave-llm-gateway integration (ADR-013)
-  ├─ cave-secrets/                  — secret-scan inline (ADR-RUNTIME-SECRET-SCAN-001)
+  ├─ cave-llm-bridge/               — cave-llm-gateway integration
+  ├─ cave-secrets/                  — inline secret-scan (deferred ADR)
   └─ cave-audit-pqc/                — PQC-signed audit log emit
 ```
 
@@ -112,9 +112,9 @@ Tüm plugin'ler ortak trait implement eder; runtime chain'de sıralı çalışı
 
 ### Cave extensions (Runtime-only, upstream'lerde olmayan)
 
-- **`cave-llm-bridge`** — cave-gateway → cave-llm-gateway (ADR-013 mirror) entegrasyonu. Tenant LLM trafiği gateway'den geçerken otomatik LiteLLM-equivalent routing, token accounting, model-allowlist enforcement.
-- **`cave-secrets`** — tenant request/response payload'larında inline secret-scan (ADR-RUNTIME-SECRET-SCAN-001 ile aynı detector engine). Tespit edilen secret block + audit emit.
-- **`cave-audit-pqc`** — her admin API call ve tenant authn event'i ML-DSA / SLH-DSA ile imzalı audit log üretir; cave-kernel WAL'a yazılır. ADR-014 (Zero-Trust) zorunluluğu.
+- **`cave-llm-bridge`** — cave-gateway → cave-llm-gateway entegrasyonu. Tenant LLM trafiği gateway'den geçerken otomatik LiteLLM-equivalent routing, token accounting, model-allowlist enforcement.
+- **`cave-secrets`** — tenant request/response payload'larında inline secret-scan (cave-secrets detector engine, ayrı ADR planlı). Tespit edilen secret block + audit emit.
+- **`cave-audit-pqc`** — her admin API call ve tenant authn event'i ML-DSA / SLH-DSA ile imzalı audit log üretir; cave-kernel WAL'a yazılır. ADR-004 (Zero-Trust) zorunluluğu.
 
 ### Multi-tenant model
 
@@ -178,20 +178,19 @@ Tüm plugin'ler ortak trait implement eder; runtime chain'de sıralı çalışı
 - **SOC2 CC6.1** — API access controls; per-tenant authn/authz, key rotation, audit trail.
 - **NIS2 Art.21** — API security (authn, rate-limit, OpenAPI validation, secret scan inline).
 - **GDPR Art.32** — Tenant data isolation (per-tenant namespace + cross-tenant default-deny).
-- **PQC-ready** — admin API + audit log ML-DSA/SLH-DSA imzalı (ADR-014 Zero-Trust hattı).
+- **PQC-ready** — admin API + audit log ML-DSA/SLH-DSA imzalı (ADR-004 Zero-Trust hattı).
 
 ## Related
 
-- **ADR-027 (Platform)** — Kong API Gateway; bu ADR onu Runtime context'inde override eder.
-- **ADR-RUNTIME-UPSTREAM-MIRROR-001** — bu ADR onun multi-upstream consolidation istisnası.
-- **ADR-RUNTIME-CONSOLIDATION-PRINCIPLE-001** — N-to-M konsolidasyon prensibi (LLM/IDM paralel pattern).
-- **ADR-013** — LiteLLM as Unified LLM Gateway; cave-llm-bridge plugin entegrasyonu.
-- **ADR-RUNTIME-SECRET-SCAN-001** — cave-secrets plugin için detector engine kaynağı.
-- **ADR-014** — Zero-Trust Network Architecture; cave-audit PQC signing zorunluluğu.
-- **ADR-RUNTIME-STREAMING-CONSOLIDATION-001** — kardeş ADR (streaming için aynı multi-upstream pattern).
-- **ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001** — kardeş ADR (persistence için aynı multi-upstream pattern).
-- **ADR-RUNTIME-STACK-001** — Layer 3 (cave-gateway) ve Layer 4 (Developer Portal) konumlandırması.
-- **ADR-MULTI-TENANT-001** — namespace = tenant boundary; cross-tenant default-deny.
+- Platform's Kong API Gateway ADR — bu ADR onu Runtime context'inde override eder.
+- **ADR-005** — bu ADR onun multi-upstream consolidation istisnası; N-to-M konsolidasyon prensibi (LLM/IDM paralel pattern) implicit olarak burada kapsanır.
+- cave-llm-gateway (cave-llm-bridge plugin'in entegre olduğu Runtime crate, ayrı ADR planlı).
+- cave-secrets plugin — detector engine için ayrı ADR planlı.
+- **ADR-004** — Zero-Trust Network Architecture; cave-audit PQC signing zorunluluğu.
+- **ADR-007** — kardeş ADR (streaming için aynı multi-upstream pattern).
+- **ADR-006** — kardeş ADR (persistence için aynı multi-upstream pattern).
+- **ADR-002** — Layer 3 (cave-gateway) ve Layer 4 (Developer Portal) konumlandırması.
+- **ADR-003** — namespace = tenant boundary; cross-tenant default-deny.
 
 ---
 *Decided by Burak Tartan, recorded by Sonnet, 2026-04-26 ADR session.*

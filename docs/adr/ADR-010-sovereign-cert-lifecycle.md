@@ -1,15 +1,15 @@
-# ADR-RUNTIME-CERT-LIFECYCLE-001 — Sovereign Cert Hierarchy + PQC-Ready + Multi-DNS ACMEv2
+# ADR-010 — Sovereign Cert Hierarchy + PQC-Ready + Multi-DNS ACMEv2
 
 Status: Accepted (2026-04-26)
 Scope: Cave Runtime (overrides ADR-015 for Runtime context)
 Category: Charter / Architecture (Layer 4 Security — Cert Lifecycle)
-Related: ADR-015 (Platform — kept intact), ADR-014 (Zero-Trust Network), ADR-RUNTIME-UPSTREAM-MIRROR-001 (override pattern), ADR-RUNTIME-STACK-001 (Cloud OS Layers 1-4)
+Related: ADR-015 (Platform — kept intact), ADR-004 (Zero-Trust Network), ADR-005 (override pattern), ADR-002 (Cloud OS Layers 1-4)
 
 ## Override Notice
 
 ADR-015 (TLS Certificate Lifecycle via cert-manager) **Platform context'te aynen geçerli kalır** — cert-manager + Let's Encrypt ACME + Cloudflare DNS-01 30-day rotation. Bu ADR Cave Runtime context'inde ADR-015'i override eder, sovereign + no-backcompat + PQC-ready charter prensiplerine göre.
 
-ADR-RUNTIME-UPSTREAM-MIRROR-001 override pattern'ine göre yazılır.
+ADR-005 override pattern'ine göre yazılır.
 
 ## Context
 

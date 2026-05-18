@@ -1,4 +1,4 @@
-# ADR-PORTAL-DESKTOP-001: GPUI Native Desktop Shell Alongside Web Portal
+# ADR-018: GPUI Native Desktop Shell Alongside Web Portal
 
 **Status:** Accepted
 
@@ -8,7 +8,7 @@
 
 **Date:** 2026-04-30
 
-**Related ADRs:** ADR-011 (Backstage portal), ADR-145 (web composition), ADR-034 (tenant analytics)
+**Related ADRs:** ADR-011 (Backstage portal), ADR-020 (web composition), ADR-034 (tenant analytics)
 
 ## Context
 

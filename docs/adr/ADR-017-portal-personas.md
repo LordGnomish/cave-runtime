@@ -1,10 +1,10 @@
-# ADR-PORTAL-PERSONAS-001: two-persona portal — admin vs tenant
+# ADR-017: two-persona portal — admin vs tenant
 
 **Status:** Accepted
 **Date:** 2026-04-23
 **Author:** Burak Tartan (raised the split), Sonnet (scribe)
 **Scope:** Universal (charter-binding)
-**Related:** ADR-CHARTER-001, ADR-GOLDEN-004 (4-track completion incl. Portal UX), ADR-PORTAL-AUTH-001 (companion)
+**Related:** ADR-CHARTER-001, ADR-GOLDEN-004 (4-track completion incl. Portal UX), ADR-016 (companion)
 
 ## Context
 
@@ -29,7 +29,7 @@ Cave Portal is split into two distinct personas, each with its own URL space, na
 - Observability — SLO dashboards, alert rules, incident oncall at the platform level (`/admin/observability`)
 - Control-plane tools: cave-scheduler state, cave-etcd health, cave-apiserver logs (`/admin/control-plane`)
 - Build-time agent telemetry: `cave-local-llm` queue, drafts/ready, drafts/failed (`/admin/agents/build`)
-- Runtime agent telemetry: `cave-agent` proposals, canary state, applied changes (`/admin/agents/runtime` — per ADR-SELF-IMPROVE-001)
+- Runtime agent telemetry: `cave-agent` proposals, canary state, applied changes (`/admin/agents/runtime` — per ADR-022)
 - Tenant administration: onboard/offboard tenants, set quotas & resource limits, audit tenant activity (`/admin/tenants`)
 - Billing & cost rollup across tenants (`/admin/billing`)
 - Security posture — cluster-wide vulnerabilities, policy violations (`/admin/security`)
@@ -56,7 +56,7 @@ Cave Portal is split into two distinct personas, each with its own URL space, na
 
 **RBAC default roles:** `tenant:admin`, `tenant:developer`, `tenant:viewer`, `tenant:security`.
 
-**Release criteria (pre-OSS):** skeleton shell with auth gate (ADR-PORTAL-AUTH-001) + catalog + gateway policy editor. Full tenant portal is post-OSS v1 roadmap.
+**Release criteria (pre-OSS):** skeleton shell with auth gate (ADR-016) + catalog + gateway policy editor. Full tenant portal is post-OSS v1 roadmap.
 
 ### Cross-cutting rules
 
@@ -89,7 +89,7 @@ Because admin is not "a tenant whose name happens to be system". Admin is struct
 **Pre-OSS (28 days):**
 - Admin shell canonicalised; `/admin/parity` is the one honest parity page.
 - Tenant shell skeleton exists with catalog + gateway policy editor; other tenant surfaces are stub pages labelled "roadmap v1.1".
-- Auth gate in place (ADR-PORTAL-AUTH-001); no unauthenticated access.
+- Auth gate in place (ADR-016); no unauthenticated access.
 
 **Post-OSS:**
 - Tenant portal expands module by module (incidents, security findings, pipelines, logs, secrets, cost).
@@ -106,6 +106,6 @@ Because admin is not "a tenant whose name happens to be system". Admin is struct
 
 - ADR-CHARTER-001 — sovereign Cloud OS (platform, therefore multi-persona)
 - ADR-GOLDEN-004 — 4-track completion includes Portal UX; now split into admin+tenant tracks
-- ADR-PORTAL-AUTH-001 — companion, mandates authentication before any portal page
-- ADR-SELF-IMPROVE-001 — cave-agent lives under `/admin/agents/runtime`
+- ADR-016 — companion, mandates authentication before any portal page
+- ADR-022 — cave-agent lives under `/admin/agents/runtime`
 - 2026-04-23 user observation: *"cave bir platform ve adminleri var … tenantları gelecek jira gibi kullanacak … portale elini kolunu sallayarak girememen lazım"*

@@ -1,9 +1,9 @@
-# ADR-143 — Cave Communication Hub: Multi-Surface Team + LLM Chat Platform
+# ADR-019 — Cave Communication Hub: Multi-Surface Team + LLM Chat Platform
 
 **Status:** Proposed (Burak finalize edecek)
 **Scope:** Universal (Cave Runtime — all tenants, all profiles)
 **Category:** Communication / Collaboration / AI Workbench
-**Related:** ADR-011 (Backstage Portal), ADR-013 (LiteLLM Gateway), ADR-014 (Zero-Trust), ADR-016 (Pod Security / Tetragon)
+**Related:** ADR-011 (Backstage Portal), ADR-013 (LiteLLM Gateway), ADR-004 (Zero-Trust), ADR-016 (Pod Security / Tetragon)
 **Decided draft:** 2026-04-26 (Burak Tartan)
 
 ---
@@ -231,7 +231,7 @@ RBAC kararları **cave-rbac** crate (mevcut) tarafından enforce edilir; cave-ch
 | Audit | `cave-audit` | Signed append-log (PQC ML-DSA-65) | Append-only |
 | Secrets (device keys, signing keys) | `cave-vault` | E2EE key material per device | KMS |
 
-**Why split cave-pg vs cave-docdb?** Matrix room state mutating, ACID, cross-row transactional → relational. Event DAG append-heavy, schemaless variants (m.room.message, m.reaction, m.redaction, custom event types) → document store more natural. Cave kernel WAL ve Raft her iki crate'te paylaşımlı (ADR-RUNTIME-PERSISTENCE-CONSOLIDATION-001).
+**Why split cave-pg vs cave-docdb?** Matrix room state mutating, ACID, cross-row transactional → relational. Event DAG append-heavy, schemaless variants (m.room.message, m.reaction, m.redaction, custom event types) → document store more natural. Cave kernel WAL ve Raft her iki crate'te paylaşımlı (ADR-006).
 
 ---
 
@@ -239,7 +239,7 @@ RBAC kararları **cave-rbac** crate (mevcut) tarafından enforce edilir; cave-ch
 
 ### 8.1 Transport
 
-- **Surface ↔ cave-chat:** TLS 1.3, hybrid Kyber768+X25519 (ADR-014 Zero-Trust gereği). PQC-only mode v0.3'te opsiyonel.
+- **Surface ↔ cave-chat:** TLS 1.3, hybrid Kyber768+X25519 (ADR-004 Zero-Trust gereği). PQC-only mode v0.3'te opsiyonel.
 - **Server ↔ Server (federation):** mTLS, PQC-hybrid mandatory.
 
 ### 8.2 At-Rest
@@ -290,7 +290,7 @@ RBAC kararları **cave-rbac** crate (mevcut) tarafından enforce edilir; cave-ch
 
 ### 10.1 Portal Web (`cave-chat-portal-ui`)
 
-- Yew (Rust→WASM) veya Leptos — kararlanmamış (ADR-PORTAL-* uyumlu olmalı).
+- Yew (Rust→WASM) veya Leptos — kararlanmamış (cave-portal ADR'leri ile uyumlu olmalı: ADR-016, ADR-017, ADR-018).
 - Embed olarak Backstage Portal'a iframe; standalone modu da var.
 - Matrix C-S long-poll + WebSocket (sync_v3).
 - E2EE: vodozemac (libolm Rust port) WASM bundle.
@@ -512,5 +512,5 @@ Toplam yeni crate sayısı: **11**. Mevcut `cave-pg`, `cave-docdb`, `cave-iceber
 - **Tauri 2.0 mobile:** https://v2.tauri.app/start/prerequisites/
 - **ADR-011:** Backstage as Developer Portal
 - **ADR-013:** LiteLLM as Unified LLM Gateway
-- **ADR-014:** Zero-Trust Network Architecture
+- **ADR-004:** Zero-Trust Network Architecture
 - **ADR-016:** Container Runtime Security (Pod Security / Tetragon)

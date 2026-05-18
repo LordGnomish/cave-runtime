@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# ADR-138: Evidence Tiering for Runtime Changes
+# ADR-025: Evidence Tiering for Runtime Changes
 
 ## Status
 Accepted
@@ -45,7 +45,7 @@ Three tiers, scoped by *where* the change lands, not who proposed it.
 | Signed-ledger attestation | `upgrade_safe` | `upgrade_safe` + `compliance_verified` | CI audit log only |
 
 ### Tier escalation rules
-- Any change touching a Tier-A Constitutional artefact (ADR-137) is
+- Any change touching a Tier-A Constitutional artefact (ADR-024) is
   automatically Tier 1 minimum.
 - Any change affecting a regulated-flagged tenant is automatically
   Tier 2.
@@ -84,5 +84,5 @@ NIS2 Art.21) reference this ADR as the policy on tiered evidence
 production. Mapping detail lives in `docs/compliance/`.
 
 ## Related ADRs
-- ADR-137 (Constitutional Tiering — change-control tiers)
-- ADR-140 (Waiver Framework — temporary tier downgrades)
+- ADR-024 (Constitutional Tiering — change-control tiers)
+- ADR-026 (Waiver Framework — temporary tier downgrades)

@@ -1,4 +1,4 @@
-# ADR-SELF-IMPROVE-001: cave-agent — runtime-resident self-improvement
+# ADR-022: cave-agent — runtime-resident self-improvement
 
 **Status:** Accepted
 **Date:** 2026-04-23

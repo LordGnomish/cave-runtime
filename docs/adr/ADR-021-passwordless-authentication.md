@@ -1,4 +1,4 @@
-# ADR-142: Passwordless Authentication Strategy
+# ADR-021: Passwordless Authentication Strategy
 
 **Status:** Accepted
 

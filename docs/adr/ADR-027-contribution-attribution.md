@@ -1,4 +1,4 @@
-# ADR-CONTRIB-ATTRIBUTION-001: commit author + trailer attribution
+# ADR-027: commit author + trailer attribution
 
 **Status:** Accepted
 **Date:** 2026-04-23

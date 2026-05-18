@@ -1,4 +1,4 @@
-# ADR-RUNTIME-STREAMING-CONSOLIDATION-001 — Kafka + Pulsar Konsolide Reimpl
+# ADR-007 — Kafka + Pulsar Konsolide Reimpl
 
 **Status:** Accepted
 **Scope:** Cave Runtime (independent override; multi-upstream consolidation)
@@ -7,14 +7,14 @@
 
 ## Context
 
-`ADR-RUNTIME-UPSTREAM-MIRROR-001` default mirror = 1 Platform OSS → 1 Runtime crate (örn. Cilium → cave-net). Streaming katmanı bu defaulttan **sapan** bir özel durum: Cave Runtime'da streaming için **Kafka ve Pulsar tek bir crate'te (cave-streams) konsolide reimpl** ediliyor.
+`ADR-005` default mirror = 1 Platform OSS → 1 Runtime crate (örn. Cilium → cave-net). Streaming katmanı bu defaulttan **sapan** bir özel durum: Cave Runtime'da streaming için **Kafka ve Pulsar tek bir crate'te (cave-streams) konsolide reimpl** ediliyor.
 
 İki upstream tek crate'te birleştirilmesinin sebepleri:
 
 - Kafka ekosistemi geniş ve yerleşik (en yaygın streaming protokolü)
 - Pulsar multi-tenancy ve geo-replication mimarisi Kafka'dan üstün (broker-decoupled storage, namespace-tier hiyerarşisi)
 - İki ayrı engine bakımı zor; tek konsolide implementasyon her iki wire-protokolünü servis ederse tenant'ların migration ihtiyacı sıfır
-- Cave Runtime'ın multi-tenant invariant'ı (ADR-MULTI-TENANT-001) Pulsar'ın namespace modeline yakın, Kafka'ya wire-uyumluluğu da gerek
+- Cave Runtime'ın multi-tenant invariant'ı (ADR-003) Pulsar'ın namespace modeline yakın, Kafka'ya wire-uyumluluğu da gerek
 
 ## Decision
 
@@ -82,9 +82,9 @@ Pulsar'ın `tenant/namespace/topic` üçlü hiyerarşisi Cave default modelidir.
 - Runtime bu ADR ile **iki upstream'i konsolide** ediyor — Mirror'ın özel hali.
 
 ## Related
-- ADR-RUNTIME-UPSTREAM-MIRROR-001 — bu ADR onun istisnası (multi-upstream consolidation)
-- ADR-MULTI-TENANT-001 — namespace = tenant boundary
-- ADR-RUNTIME-STACK-001 — Layer 4 ekosistem reimpl
+- ADR-005 — bu ADR onun istisnası (multi-upstream consolidation)
+- ADR-003 — namespace = tenant boundary
+- ADR-002 — Layer 4 ekosistem reimpl
 - cave-kernel sweep-001/002 — WAL/Raft shared primitives
 
 ---
