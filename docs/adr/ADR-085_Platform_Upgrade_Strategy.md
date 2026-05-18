@@ -1,4 +1,5 @@
-# ADR-085: Platform Upgrade Strategy
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# ADR-085: Cave Runtime Upgrade Strategy
 
 **Status:** Accepted
 

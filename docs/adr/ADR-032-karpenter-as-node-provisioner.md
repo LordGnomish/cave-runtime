@@ -1,4 +1,12 @@
-# ADR-032: Platform Karpenter as Node Provisioner
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# ADR-032: Karpenter as Node Provisioner
+
+> **OSS Cave Runtime context.** Originally authored for the two-provider
+> (Hetzner + Azure) closed-source CAVE platform. In the OSS Cave Runtime
+> the Karpenter integration ships as an optional plugin and the
+> architectural rationale below (pod-driven provisioning, scale-to-zero,
+> consolidation, spot awareness) holds against any provider that exposes
+> a Karpenter CloudProvider. See also ADR-146 (Cave Runtime selection).
 
 **Status:** Accepted
 

@@ -1,4 +1,5 @@
-# ADR-078: Platform RBAC Architecture
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# ADR-078: RBAC Architecture
 
 **Status:** Accepted
 

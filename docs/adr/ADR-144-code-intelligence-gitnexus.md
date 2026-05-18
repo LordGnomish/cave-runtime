@@ -1,4 +1,12 @@
-# ADR-144 — Platform Code Intelligence: GitNexus
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# ADR-144 — Code Intelligence: GitNexus
+
+<!-- needs Burak verify: Proposed status — does GitNexus remain the OSS-launch direction? -->
+
+> **OSS Cave Runtime context.** Originally drafted for the closed-source CAVE
+> platform. In the OSS Cave Runtime, GitNexus is the reimpl target for the
+> code-intelligence layer (Graph RAG over the workspace); the tool-selection
+> rationale below transfers verbatim.
 
 Status: Proposed (2026-04-26 — Burak finalize edecek)
 Scope: Universal (Platform; Runtime + Pipeline inherit via ADR-RUNTIME-UPSTREAM-MIRROR-001)

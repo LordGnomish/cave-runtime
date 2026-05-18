@@ -1,4 +1,12 @@
-# ADR-033: Platform KEDA as Event-Driven Pod Autoscaler
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+# ADR-033: KEDA as Event-Driven Pod Autoscaler
+
+> **OSS Cave Runtime context.** Originally authored for the two-provider
+> closed-source CAVE platform. In the OSS Cave Runtime, KEDA is reimplemented
+> in `cave-keda` (see cave-streams Connect Worker ports). The decision
+> rationale below (event-driven scaling, scale-to-zero on queue depth,
+> ScaledObject CRDs, 64-scaler catalog) is the architectural anchor for that
+> reimpl; Hetzner/Azure-specific scaler examples are illustrative only.
 
 **Status:** Accepted
 
