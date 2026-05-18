@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
 //! Pulp v3 data models.
 //!
 //! Repository, RepositoryVersion, Remote, Distribution, Publication,
@@ -7,6 +9,97 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
+
+// ─── Plugin type enum (drives plugin registry) ────────────────────────────────
+
+/// Identifies which Pulp upstream plugin owns a content unit.
+///
+/// This is distinct from [`ContentType`]: `PluginType` is the *plugin*
+/// identifier used by the registry, while `ContentType` is the historical
+/// repository-classification enum used by routes/RBAC. The two will be
+/// unified in a future cleanup; for now each plugin owns a single entry.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum PluginType {
+    Rpm,
+    Deb,
+    Python,
+    Container,
+    File,
+    Ansible,
+    Maven,
+    OSTree,
+    Helm,
+}
+
+impl PluginType {
+    /// Canonical Pulp package name, e.g. `"pulp_rpm"`.
+    pub fn pulp_package_name(&self) -> &'static str {
+        match self {
+            Self::Rpm => "pulp_rpm",
+            Self::Deb => "pulp_deb",
+            Self::Python => "pulp_python",
+            Self::Container => "pulp_container",
+            Self::File => "pulp_file",
+            Self::Ansible => "pulp_ansible",
+            Self::Maven => "pulp_maven",
+            Self::OSTree => "pulp_ostree",
+            Self::Helm => "pulp_helm",
+        }
+    }
+
+    /// API URL segment, e.g. `"rpm"` for `/pulp/api/v3/repositories/rpm/rpm/`.
+    pub fn api_segment(&self) -> &'static str {
+        match self {
+            Self::Rpm => "rpm",
+            Self::Deb => "deb",
+            Self::Python => "python",
+            Self::Container => "container",
+            Self::File => "file",
+            Self::Ansible => "ansible",
+            Self::Maven => "maven",
+            Self::OSTree => "ostree",
+            Self::Helm => "helm",
+        }
+    }
+}
+
+// ─── Generic content unit (produced by plugin parse_content) ──────────────────
+
+/// A single piece of content (one package, one chart, one manifest, …) emitted
+/// by a plugin's `parse_content`. The `metadata` blob is plugin-specific; the
+/// envelope fields (`pulp_href`, `sha256`, `size`, `relative_path`) are
+/// invariant across all plugins.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct ContentUnit {
+    pub pulp_href: String,
+    pub pulp_id: Uuid,
+    pub plugin_type: PluginType,
+    pub metadata: serde_json::Value,
+    pub sha256: Option<String>,
+    pub size: Option<u64>,
+    pub relative_path: Option<String>,
+}
+
+impl ContentUnit {
+    pub fn new(plugin_type: PluginType, metadata: serde_json::Value) -> Self {
+        let id = Uuid::new_v4();
+        Self {
+            pulp_href: format!(
+                "/pulp/api/v3/content/{}/packages/{}/",
+                plugin_type.api_segment(),
+                id
+            ),
+            pulp_id: id,
+            plugin_type,
+            metadata,
+            sha256: None,
+            size: None,
+            relative_path: None,
+        }
+    }
+}
 
 // ─── Content type enum ────────────────────────────────────────────────────────
 

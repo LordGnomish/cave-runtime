@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
 //! Plugin trait and registry.
 //!
 //! Each plugin corresponds to a Pulp content plugin (pulp_file, pulp_python, etc.)
@@ -73,6 +75,8 @@ impl Default for PluginRegistry {
         r.register(Arc::new(ContainerPlugin));
         r.register(Arc::new(AnsiblePlugin));
         r.register(Arc::new(MavenPlugin));
+        r.register(Arc::new(OstreePlugin));
+        r.register(Arc::new(HelmPlugin));
         r
     }
 }
