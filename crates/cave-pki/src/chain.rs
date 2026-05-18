@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Chain validation. Cite: RFC 5280 §6.1 (Certification Path Validation),
 //! §6.1.3 (basic certificate processing), §4.2.1.9 (Basic Constraints).
 

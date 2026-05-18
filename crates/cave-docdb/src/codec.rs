@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MongoDB OP_MSG frame codec built on `cave_kernel::codec::FrameCodec`.
 //!
 //! OP_MSG framing on the wire is `[4B LE total_len][4B request_id][4B

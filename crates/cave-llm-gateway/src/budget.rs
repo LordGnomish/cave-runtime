@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Token budget tracking — per user/team/project, daily/weekly/monthly limits.
 
 use crate::models::{BudgetPeriod, BudgetScope};

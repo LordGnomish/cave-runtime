@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/streams` view — Kafka/Pulsar topic + consumer-group browser.
 //!
 //! Mirrors the Kafka admin dashboard pattern: per-tenant topics with

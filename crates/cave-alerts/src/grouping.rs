@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Alert grouping + dedup, plus Notification log throttling.
 //!
 //! Implements Alertmanager's group_wait / group_interval / repeat_interval:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CronJob — real 5-field cron expression parser + concurrencyPolicy
 //! state machine + suspend.
 //!

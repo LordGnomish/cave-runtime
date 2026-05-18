@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CORS plugin.
 
 use super::{GatewayPlugin, PluginCtx, PluginResult};

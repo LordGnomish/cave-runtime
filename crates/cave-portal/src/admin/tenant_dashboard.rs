@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/t/{tenant}/dashboard` overview — resource summary + recent activity.
 //!
 //! Pulls counts from every other admin view's data source, plus the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Challenge solvers — DNS-01 + HTTP-01.
 //!
 //! The solver SIDE of the workflow: given a challenge token + the

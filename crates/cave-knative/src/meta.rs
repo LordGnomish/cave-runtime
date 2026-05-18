@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Shared metadata + spec primitives used across Knative resources.
 //! upstream: knative/serving v1.18.x
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Rollouts — Progressive delivery engine.
 //!
 //! Compatible with: Flagger + Argo Rollouts

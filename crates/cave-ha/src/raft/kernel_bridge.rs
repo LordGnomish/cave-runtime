@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bridge between cave-ha's concrete Raft node and the abstract
 //! `cave_kernel::consensus` trait surface (sweep-002 F2-A).
 //!

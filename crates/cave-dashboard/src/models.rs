@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Full Grafana v10 data model — panels, variables, annotations, alerting,
 //! datasources, folders, permissions, users, orgs, teams.
 

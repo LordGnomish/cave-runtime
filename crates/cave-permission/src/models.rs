@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Permission models — port from @backstage/permission-common
 //!
 //! Upstream: backstage/plugins/permission-common/src/types.ts

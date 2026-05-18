@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Unified Alerting engine — rule evaluation, contact points, notification routing,
 //! silences, mute timings, and alert group aggregation.
 

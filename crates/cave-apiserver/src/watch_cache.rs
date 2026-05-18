@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Watch cache with bookmark events.
 //!
 //! Upstream: kubernetes/kubernetes v1.30.0

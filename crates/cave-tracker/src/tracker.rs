@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core tracker engine: issue lifecycle, assignment, metrics, AI-assisted triage.
 
 use crate::models::*;

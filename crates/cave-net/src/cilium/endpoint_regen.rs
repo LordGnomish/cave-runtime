@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Endpoint regeneration controller — per-endpoint BPF program rebuild.
 //!
 //! Mirrors `pkg/endpoint/policy.go::Endpoint.Regenerate` and the work

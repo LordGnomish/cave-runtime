@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Projection evaluation for MongoDB-like field inclusion/exclusion.
 
 use crate::bson::Document;

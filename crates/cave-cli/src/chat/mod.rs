@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Chat module — REPL state machine + conversation resolution + tool mode + pipe output.
 //!
 //! ratatui is used by the binary for rendering; the state machine here is

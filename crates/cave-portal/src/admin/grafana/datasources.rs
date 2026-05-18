@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Datasources tab — registered datasources with health probe state.
 //!
 //! Mirrors Grafana's `Configuration → Data sources` view. The set is

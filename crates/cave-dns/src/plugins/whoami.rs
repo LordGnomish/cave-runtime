@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Whoami plugin — respond with the client's IP address.
 use std::net::IpAddr;
 

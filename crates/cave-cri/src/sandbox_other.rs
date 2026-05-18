@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cross-platform sandbox runners — Windows + FreeBSD.
 //!
 //! Cite: containerd `pkg/cri/server/podsandbox/sandbox_run_other.go`

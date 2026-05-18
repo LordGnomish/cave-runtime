@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Exactly-once semantics: idempotent producer + transaction coordinator.
 
 use crate::error::{StreamsError, StreamsResult};

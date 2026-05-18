@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Renewal controller — fires when the renewal window opens.
 //!
 //! Cite: cert-manager v1.20.2

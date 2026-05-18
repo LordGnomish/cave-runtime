@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 pub mod kernel_bridge;
 pub mod log;
 pub mod membership;

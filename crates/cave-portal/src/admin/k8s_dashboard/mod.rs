@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/k8s-dashboard` — Kubernetes Dashboard Web UI parity surface.
 //!
 //! Tabs mirror the upstream Kubernetes Dashboard top navigation:

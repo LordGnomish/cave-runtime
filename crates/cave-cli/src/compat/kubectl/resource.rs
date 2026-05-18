@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! kubectl resource short-name normalisation.
 //!
 //! kubectl accepts `po`, `svc`, `deploy`, `ns`, `cm`, etc. The shim

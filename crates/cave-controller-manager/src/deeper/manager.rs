@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Manager loop wiring.
 //!
 //! Mirrors `cmd/kube-controller-manager/app/controllermanager.go` plus the

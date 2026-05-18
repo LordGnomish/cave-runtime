@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Aggregation pipeline: $match, $project, $limit, $skip, $sort, $group.
 
 use crate::bson::Document;

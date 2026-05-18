@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Span exporters.
 //!
 //! - `InMemoryExporter` — collects spans in a vector for tests.

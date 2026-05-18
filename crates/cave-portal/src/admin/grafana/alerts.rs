@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Alerts tab — alerting rule list with state (Firing / Pending /
 //! Resolved). Sourced from the seeded `active_alerts` collection so
 //! the surface is meaningful without a live Prometheus rule eval.

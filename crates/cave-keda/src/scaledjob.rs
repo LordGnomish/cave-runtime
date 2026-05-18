@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ScaledJob CRD — autoscale Job workloads with per-event Job creation.
 //! upstream: kedacore/keda v2.x — apis/keda/v1alpha1/scaledjob_types.go
 

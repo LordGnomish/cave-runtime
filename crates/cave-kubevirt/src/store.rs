@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store for VirtualMachine / VirtualMachineInstance / DataVolume.
 //!
 //! Placeholder backing for the KubeVirt scaffold. Persistence layer

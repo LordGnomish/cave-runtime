@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Maintenance API extensions — full `StatusResponse`, `AlarmList`, and
 //! revision-bounded `Hash`.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 pub mod log_store;
 pub mod snapshot_store;
 pub mod wal;

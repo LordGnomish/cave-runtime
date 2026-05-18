@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Runtime forensics — consumes Tetragon eBPF data
 //!
 //! Compatible with: Tetragon (consumer)

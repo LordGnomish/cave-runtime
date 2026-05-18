@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service-side data model + change tracker.
 //!
 //! Cite: `pkg/proxy/serviceport.go:35` (ServicePort interface),

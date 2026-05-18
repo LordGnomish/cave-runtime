@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Endpoint program model — per-pod datapath state.
 //!
 //! Mirrors `pkg/endpoint/endpoint.go` (the in-memory `Endpoint` struct

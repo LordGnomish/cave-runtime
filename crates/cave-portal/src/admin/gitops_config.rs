@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/gitops-config` — Flux HelmRelease / Kustomization parity.
 //! Flux's main artefacts (HelmRelease, Kustomization, GitRepository)
 //! all share the `(name, repo, path, synced_at)` shape; the page

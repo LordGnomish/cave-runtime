@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! On-call scheduling, paging, and escalation — compatible with Grafana OnCall.
 //!
 //! Compatible with: Grafana OnCall

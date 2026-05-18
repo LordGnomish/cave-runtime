@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Node discovery loop.
 //!
 //! Mirrors `pkg/nodediscovery/nodediscovery.go`. The agent keeps a

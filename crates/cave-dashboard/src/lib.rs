@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Dashboard — Grafana-compatible dashboard engine.
 //!
 //! Compatible with: Grafana v10

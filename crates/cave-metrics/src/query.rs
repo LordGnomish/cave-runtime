@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PromQL-like query execution: instant and range queries.
 
 use crate::models::{QueryData, QueryResult, SeriesResult};

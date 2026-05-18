@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Distributed-lease primitive — etcd-style leader-election lease
 //! with renewal + expiry. Adopters use this to implement
 //! "exactly one controller is the active leader at any moment"

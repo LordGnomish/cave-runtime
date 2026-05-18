@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kafka L7 policy — `PortRuleKafka` evaluator.
 //!
 //! Mirrors `pkg/policy/api/kafka.go` and the Kafka request/response

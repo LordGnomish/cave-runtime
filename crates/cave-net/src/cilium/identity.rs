@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cilium numeric identity allocator.
 //!
 //! Mirrors `pkg/identity/cache/local.go::LocalIdentityCache` plus the

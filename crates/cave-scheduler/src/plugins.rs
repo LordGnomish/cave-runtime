@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Built-in Filter/Score plugins.
 //!
 //! Cite: kubernetes/kubernetes v1.36.0

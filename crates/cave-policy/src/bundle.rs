@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OPA Bundle support.
 //!
 //! Implements: bundle download, activation, delta bundles, signature verification.

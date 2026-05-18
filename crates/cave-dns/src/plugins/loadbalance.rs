@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Loadbalance plugin — round-robin shuffle of A/AAAA answer records.
 use std::sync::{atomic::{AtomicUsize, Ordering}, Arc};
 

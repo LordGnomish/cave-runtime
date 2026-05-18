@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Compatibility shims for `cavectl`.
 //!
 //! Per ADR-RUNTIME-CLI-CONSOLIDATION-001, each shim accepts the

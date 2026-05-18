@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Persistent storage backends — the "physical.Backend" surface
 //! every Vault deployment chooses one of.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Inline help — tooltips + empty-state CTAs.
 //!
 //! Tooltips wrap a label with a native `<span title="...">` so they

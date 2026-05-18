@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/alerts` — Alertmanager UI parity. Rules + active alerts
 //! with severity-grouped pills and the existing ack mutator.
 //!

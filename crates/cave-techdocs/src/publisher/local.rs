@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! LocalPublisher — port of LocalPublisher from backstage-plugin-techdocs-node.
 //!
 //! Upstream: techdocs-node/src/publishing/local.ts — LocalPublisher class

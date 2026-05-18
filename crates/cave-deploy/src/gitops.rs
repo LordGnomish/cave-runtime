@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitOps sync engine — drift detection, manifest rendering, and auto-sync.
 
 use crate::models::{

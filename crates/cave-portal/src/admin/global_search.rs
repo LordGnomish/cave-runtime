@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Global search — top-bar full-text index over admin routes,
 //! resources, commands, and crate names.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Core data model for cave-trace.
 //!
 //! TraceId is a 128-bit unsigned integer (wire format: lowercase 32-char hex or base64).

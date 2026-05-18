@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Partitions sub-page — partition-spec view.
 //!
 //! A partition spec is the operator-defined mapping from row columns to

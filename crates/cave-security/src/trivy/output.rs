@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Trivy-compatible output formats — JSON, table (text), SARIF.
 
 use crate::trivy::scanner::{ScanResult, VulnFinding};

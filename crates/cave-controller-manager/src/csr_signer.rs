@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CertificateSigningRequest signer — `pkg/controller/certificates/signer/cfssl_signer.go`.
 //!
 //! Each CSR has a `signerName` and a list of `usages`. The signer:

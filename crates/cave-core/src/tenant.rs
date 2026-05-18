@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant model — tiers, isolation levels, and lifecycle states.
 //!
 //! Implements Principle 8 (Multi-Tenant Isolation), ADR-012, ADR-084.

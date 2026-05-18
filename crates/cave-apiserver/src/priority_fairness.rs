@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! API Priority and Fairness (KEP-1040).
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

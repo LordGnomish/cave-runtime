@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Synthetic monitoring — compatible with Uptime Kuma
 //!
 //! Compatible with: Uptime Kuma

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cilium → Rust idiom mapping table.
 //!
 //! Cilium has a long tail of small Go packages that exist purely to

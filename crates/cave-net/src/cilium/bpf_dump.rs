@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! BPF map introspection — `cilium bpf <map> list` shape.
 //!
 //! Mirrors `pkg/maps/cmd/dump.go` and the per-map pretty-printers in

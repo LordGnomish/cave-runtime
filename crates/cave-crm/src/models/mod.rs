@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Twenty CRM data model placeholders.
 //!
 //! Mirrors Twenty's core objects: Person, Company, Opportunity, Activity.

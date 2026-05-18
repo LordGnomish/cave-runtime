@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Badges plugin — small SVG-style status badges per service.
 
 use serde::{Deserialize, Serialize};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Frame codec primitives shared by wire-protocol crates.
 //!
 //! Three CAVE crates speak distinct wire protocols (PostgreSQL v3 in

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration: the auto-port dispatcher's `CharterV2Gate::verify_with_tdd`
 //! folds the TDD analyzer's verdict into its existing `VerifyResult`.
 //!

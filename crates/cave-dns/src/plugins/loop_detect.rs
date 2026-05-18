@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Loop plugin — detect forwarding loops.
 use std::net::SocketAddr;
 use std::sync::Arc;

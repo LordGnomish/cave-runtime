@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::error::{VaultError, VaultResult};
 use base64::Engine as _;
 use ring::rand::{SecureRandom, SystemRandom};

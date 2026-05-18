@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! MongoDB OP_MSG wire protocol server.
 //!
 //! Framing runs through [`crate::codec::OpMsgCodec`], which delegates to

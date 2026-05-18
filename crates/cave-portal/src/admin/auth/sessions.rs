@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth/sessions` — Keycloak "Sessions" tab.
 //! Per-session detail view, complementary to the realm-grouped
 //! summary on the parent page. Operators reach this tab to

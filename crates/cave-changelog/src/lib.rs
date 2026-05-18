@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Release intelligence — git + SBOM diff based release notes
 //!
 //! Upstream tracking: custom

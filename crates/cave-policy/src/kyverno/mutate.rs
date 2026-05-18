@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Kyverno mutation engine.
 //!
 //! Supports: patchStrategicMerge, patchesJson6902, foreach.

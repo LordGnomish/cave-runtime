@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Reconcile-loop adoption layer (sweep-002 F2-D).
 //!
 //! Bridges every per-controller pure-function `reconcile(spec, status, tenant)`

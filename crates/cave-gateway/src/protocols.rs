@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee Multi-Protocol Gateway — HTTP, gRPC, WebSocket, GraphQL, MQTT, and
 //! SSE as first-class citizens with unified routing and policy enforcement.
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-certs — PQC hybrid signer (ML-DSA-65 + Ed25519) tests.
 //!
 //! The Ed25519 half is real (ed25519-dalek); the ML-DSA-65 half is the

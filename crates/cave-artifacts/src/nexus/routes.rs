@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! HTTP surface for the Nexus module.
 //!
 //! Endpoint base mirrors Nexus' `/service/rest/v1` surface but rooted under

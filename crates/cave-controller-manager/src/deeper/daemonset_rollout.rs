@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! DaemonSet — rolling update partition + taint/toleration evaluator.
 //!
 //! Mirrors `pkg/controller/daemon/update.go::rollingUpdate` plus the shared

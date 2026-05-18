@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store for the Alertmanager-style HTTP surface.
 
 use crate::models::{Alert, InhibitRule, Receiver, Route, Silence};

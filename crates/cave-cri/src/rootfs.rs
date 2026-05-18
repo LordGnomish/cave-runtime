@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Root filesystem assembly from OCI image layers using overlayfs.
 
 use crate::error::{CriError, CriResult};

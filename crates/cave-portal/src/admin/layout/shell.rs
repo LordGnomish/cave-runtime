@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Page-shell v2 — top bar + sidebar + breadcrumb + content + footer
 //! + command palette + shortcuts + toasts, all wired together.
 //!

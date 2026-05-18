@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Beta APIs disabled-by-default registry.
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

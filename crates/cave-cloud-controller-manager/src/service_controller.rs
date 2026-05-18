@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cloud service controller — drives `Service.spec.type == LoadBalancer`
 //! through a per-cloud `LoadBalancer` provider.
 //!

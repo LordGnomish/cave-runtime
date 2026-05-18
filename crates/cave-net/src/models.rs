@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Networking models — pods, services, endpoints, network policies.
 
 use chrono::{DateTime, Utc};

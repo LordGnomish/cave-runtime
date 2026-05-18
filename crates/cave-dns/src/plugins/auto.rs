@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Auto plugin — automatically load all zone files from a directory.
 use std::path::PathBuf;
 use std::sync::Arc;

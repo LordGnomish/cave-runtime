@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! kube-aggregator deeper — APIService availability conditions, OpenAPI v3
 //! spec merging across delegated APIServices, proxy reason categories.
 //!

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Footer — cluster info, version, support links.
 
 use crate::admin::render::escape;

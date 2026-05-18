@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KVStore identity allocator — cluster-wide identity allocation backend.
 //!
 //! Mirrors `pkg/identity/cache/global.go::CRDBackedAllocator` plus the

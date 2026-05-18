@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Root CA publisher — `pkg/controller/certificates/rootcacertpublisher/publisher.go`.
 //!
 //! Maintains a `kube-root-ca.crt` ConfigMap in every active namespace whose

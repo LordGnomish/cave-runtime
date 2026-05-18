@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Infra — LLM + MCP-driven Infrastructure-as-Code engine.
 //!
 //! Compatible with: Terraform, Pulumi, custom IaC tooling

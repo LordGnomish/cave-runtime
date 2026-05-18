@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/cache` — Valkey/Redis Web UI parity surface.
 //!
 //! Tabs mirror RedisInsight + Valkey native console:

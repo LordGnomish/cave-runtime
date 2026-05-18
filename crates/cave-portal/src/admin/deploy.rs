@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/deploy` — Argo CD parity surface. Lists Application sync
 //! activity for the caller's tenant, grouped by sync status so the
 //! header can show "5 Synced / 2 OutOfSync / 1 Failed" at a glance

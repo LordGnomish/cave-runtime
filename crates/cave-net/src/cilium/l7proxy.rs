@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! L7 proxy redirect — the in-cave equivalent of Cilium's Envoy proxy hook.
 //!
 //! Mirrors `pkg/proxy/proxy.go` plus the per-protocol redirect modules

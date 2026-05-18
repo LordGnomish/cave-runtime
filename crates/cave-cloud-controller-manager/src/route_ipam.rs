@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! IPAM (IP Address Management) — pod CIDR allocator + route retry policy.
 //!
 //! Mirrors the upstream pieces in

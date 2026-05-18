@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Presigned URL generation and verification.
 //!
 //! Uses HMAC-SHA256 to sign URL parameters. Compatible with AWS SigV4 presigned

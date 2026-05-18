@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Synchronous RESP3 codec on `BytesMut`, conforming to
 //! `cave_kernel::codec::FrameCodec`.
 //!

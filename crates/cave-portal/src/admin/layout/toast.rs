@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Toast notification container + helper to emit toasts from
 //! the server via HX-Trigger response headers.
 //!

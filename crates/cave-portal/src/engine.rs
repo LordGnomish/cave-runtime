@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{Service, ServiceTier};
 
 pub fn filter_by_team<'a>(services: &'a [Service], team: &str) -> Vec<&'a Service> {

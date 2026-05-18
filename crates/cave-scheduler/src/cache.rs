@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scheduler cache — assume/finish/forget mechanism for in-flight bindings.
 //!
 //! Mirrors upstream kube-scheduler's `pkg/scheduler/internal/cache/cache.go`.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Zipkin v2 ingestion — JSON and protobuf (proto requires prost build).
 //!
 //! Zipkin v2 JSON format: https://zipkin.io/zipkin-api/#/default/post_spans

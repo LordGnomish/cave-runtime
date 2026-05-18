@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TLS certificate lifecycle — compatible with cert-manager
 //!
 //! Upstream tracking: cert-manager

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/cri` view — sandbox list + container inspect + exec terminal
 //! placeholder (xterm.js wired client-side, no server-side runtime).
 //!

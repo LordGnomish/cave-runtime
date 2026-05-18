@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Zone transfer — AXFR (full) and IXFR (incremental), RFC 5936 / RFC 1995.
 use std::net::SocketAddr;
 

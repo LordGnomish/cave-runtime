@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Plugin system — Kong-compatible plugin pipeline.
 //!
 //! Each plugin implements the `GatewayPlugin` trait and is executed in

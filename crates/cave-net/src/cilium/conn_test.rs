@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Connectivity test framework — `cilium connectivity test` model.
 //!
 //! Mirrors `cilium-cli/connectivity/check/check.go` and the result

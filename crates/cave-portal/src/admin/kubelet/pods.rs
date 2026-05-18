@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pods tab — kube-state-metrics-style per-pod table plus `restart`
 //! mutator. Mirrors the upstream Kubernetes Dashboard's
 //! `Pod` list + drawer view.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gratuitous ARP/NDP announce — pushed by the L2 announcer when it
 //! claims a VIP.
 //!

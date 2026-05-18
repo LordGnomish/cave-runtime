@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Audit entry types + in-memory ring buffer store.
 
 use serde::{Deserialize, Serialize};

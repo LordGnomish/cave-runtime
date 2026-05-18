@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! NodeLease deeper — `pkg/kubelet/nodelease/controller.go` +
 //! `pkg/controller/nodelifecycle`.
 //!

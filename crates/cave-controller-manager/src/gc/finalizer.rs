@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! GC finalizer string handling — `pkg/controller/garbagecollector/finalizer.go`.
 //!
 //! Finalizers in `metadata.finalizers[]`:

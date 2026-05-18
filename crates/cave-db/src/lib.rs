@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE DB — shared PostgreSQL connection pool, migration runner, and
 //! pluggable persistence layer.
 //!

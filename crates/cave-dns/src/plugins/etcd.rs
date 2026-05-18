@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Etcd plugin — DNS records from etcd key-value store.
 use std::collections::HashMap;
 use std::sync::Arc;

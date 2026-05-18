@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Telemetry API — Istio Telemetry resource manager.
 //!
 //! Controls per-workload metrics, access logging, and tracing configuration.

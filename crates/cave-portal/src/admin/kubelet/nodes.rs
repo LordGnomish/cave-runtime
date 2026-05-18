@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Nodes tab — per-node summary aggregating pods + capacity + taints.
 //!
 //! Mirrors the upstream Kubernetes Dashboard's Node list (Name,

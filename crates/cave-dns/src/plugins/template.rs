@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// Template plugin — dynamic response generation using regex templates.
 use async_trait::async_trait;
 use hickory_proto::op::ResponseCode;

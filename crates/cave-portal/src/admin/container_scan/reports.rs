@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/container_scan/reports` — Trivy "Reports" tab. Per-
 //! severity roll-up with derived high/medium/low buckets so the
 //! operator can answer "how dirty is the registry overall".

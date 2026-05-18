@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-certs — Certificate + Issuer CRD tests pinned to cert-manager v1.20.2.
 
 use cave_certs::crds::{

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-policy — Policy engine replacing OPA Gatekeeper + OPAL + Kyverno.
 //!
 //! ## OPA Rego engine

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Personal Access Token (PAT) and Service-to-Service token management.
 //!
 //! ## Token formats

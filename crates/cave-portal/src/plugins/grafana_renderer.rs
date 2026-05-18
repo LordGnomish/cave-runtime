@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Grafana wrap — variable resolution + native SVG renderer.
 //!
 //! Layered atop [`super::grafana`]. The basic wrap holds dashboard

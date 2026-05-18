@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Sidecar, EnvoyFilter, and WorkloadGroup resource managers.
 //!
 //! Three independent managers:

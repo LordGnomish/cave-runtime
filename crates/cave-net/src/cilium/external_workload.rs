@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CiliumExternalWorkload — non-K8s pod onboarding (VMs, bare-metal).
 //!
 //! Mirrors `pkg/clustermesh/externalworkloads/manager.go` plus the

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! File-path classifier: is this a test file, an impl file, or neither?
 //!
 //! The classifier is pure (path → kind) so it can be unit-tested without

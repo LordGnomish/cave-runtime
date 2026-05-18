@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant invariant — every plan + batch is scoped per tenant.
 //!
 //! Mirrors cave-iceberg/src/tenant.rs (RFC 1123 DNS label).

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Recursive-descent PromQL parser.
 //! Operator precedence (highest → lowest):
 //!   ^  (right-associative)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use crate::models::{AnomalousSpan, Span, SpanStatus, Trace, TraceNode};
 use crate::TraceStore;
 use std::collections::{HashMap, HashSet};

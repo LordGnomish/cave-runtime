@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Data models for cave-upstream.
 
 use chrono::{DateTime, Utc};

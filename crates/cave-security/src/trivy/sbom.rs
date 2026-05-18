@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SBOM generation — CycloneDX 1.4 and SPDX 2.3 (JSON format).
 
 use crate::trivy::{

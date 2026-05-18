@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Compile-before-commit probe.
 //!
 //! Given a skeleton extracted from an Ollama response, [`DraftProbe`] writes

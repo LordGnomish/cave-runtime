@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Roadmap and capacity planning: timeline, dependencies, risk detection.
 
 use crate::models::*;

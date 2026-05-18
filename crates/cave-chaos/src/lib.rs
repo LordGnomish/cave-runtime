@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Chaos engineering — compatible with Chaos Mesh
 //!
 //! Compatible with: Chaos Mesh

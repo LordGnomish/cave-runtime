@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Traffic tab — VirtualService / DestinationRule / Gateway summary.
 //!
 //! Today the rules are synthesised one-per-service so the page has

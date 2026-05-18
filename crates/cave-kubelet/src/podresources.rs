@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pod Resources API — `kubelet.sock`-style v1alpha1 + v1 endpoints.
 //!
 //! Mirrors `pkg/kubelet/apis/podresources/v1` and the v1alpha1 surface used

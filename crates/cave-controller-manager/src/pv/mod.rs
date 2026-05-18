@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PersistentVolume controllers — `pkg/controller/volume/persistentvolume`
 //! and `pkg/controller/volume/expand`.
 //!

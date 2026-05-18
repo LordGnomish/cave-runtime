@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KMSv2 binary-envelope layer — extends [`crate::kms`] with the wire-format,
 //! AAD-binding, and DEK caching that Kubernetes' KMSv2 (KEP-3299) and etcd
 //! v3.6's encryption-at-rest feature both rely on.

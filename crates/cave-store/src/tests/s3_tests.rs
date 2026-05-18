@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Integration tests for the S3/MinIO object store.
 
 use crate::s3::store::ObjectStore;

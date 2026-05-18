@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Lua scripting: EVAL, EVALSHA, SCRIPT LOAD/EXISTS/FLUSH/DEBUG.
 //!
 //! Implements a Redis-compatible Lua environment subset.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! RDBMS execution engine.
 
 use crate::storage::schema::{ColumnDef, Database, Table};

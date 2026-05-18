@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Aggregated API server (kube-aggregator) — APIService registration + routing.
 //!
 //! Upstream: kubernetes/kubernetes v1.36.0

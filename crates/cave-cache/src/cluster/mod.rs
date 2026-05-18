@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Redis Cluster — slot routing, gossip, migration, epoch tracking.
 //!
 //! Ports `src/cluster.c` and `src/cluster_slot_stats.c` from upstream

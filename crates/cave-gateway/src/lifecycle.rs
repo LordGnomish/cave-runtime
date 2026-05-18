@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Gravitee API Lifecycle Management — draft → published → deprecated → retired
 //! state machine, review/approval workflow, changelog, and audit trail.
 

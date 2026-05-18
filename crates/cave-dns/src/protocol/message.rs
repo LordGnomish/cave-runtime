@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use hickory_proto::{
     op::{Message, MessageType, OpCode, Query, ResponseCode},
     rr::{DNSClass, Name, RData, Record, RecordType},

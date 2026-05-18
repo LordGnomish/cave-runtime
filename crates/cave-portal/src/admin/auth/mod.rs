@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/auth` — Keycloak Admin Console parity. Lists active
 //! sessions for the caller's tenant grouped by realm so the operator
 //! can see per-realm utilisation at a glance, matching the upstream's

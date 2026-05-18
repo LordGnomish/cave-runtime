@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bandwidth manager — per-pod rate limiting via EDT (Earliest Departure
 //! Time) and BBR congestion-control hand-off.
 //!

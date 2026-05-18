@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Multi-org, role-based access control, API key validation, service accounts.
 
 use crate::models::{ApiKey, OrgRole};

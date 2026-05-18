@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Audit log query — `cavectl audit log --filter`.
 //!
 //! cave-audit query layer subset. Filter mini-DSL: `key=value` ya da `key~regex`

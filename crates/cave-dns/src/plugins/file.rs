@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// File plugin — serve zones loaded from zone files, with hot-reload.
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

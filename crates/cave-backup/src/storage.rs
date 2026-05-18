@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Backup storage location validation and lifecycle.
 
 use crate::models::{BackupStorageLocation, BslPhase};

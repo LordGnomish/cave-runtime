@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hetzner FloatingIP failover state machine.
 //!
 //! Mirrors the failover pathway upstream uses for HA control planes — a

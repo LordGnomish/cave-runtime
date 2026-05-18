@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Lock-manager — deeper-cut distributed-lock primitives layered on
 //! [`crate::concurrency::DistMutex`] / [`crate::concurrency::DistElection`].
 //!

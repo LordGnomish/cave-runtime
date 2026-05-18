@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// UDP DNS server.
 use std::net::SocketAddr;
 use std::sync::Arc;

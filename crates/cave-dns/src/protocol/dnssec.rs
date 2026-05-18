@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /// DNSSEC validation and signing support.
 ///
 /// Wraps hickory_proto's DNSSEC primitives behind a stable interface.

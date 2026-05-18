@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! ACL (Access Control List) system — Redis 6+ compatible.
 
 use std::collections::{HashMap, HashSet};

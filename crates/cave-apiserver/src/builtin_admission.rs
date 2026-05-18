@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Built-in admission plugins — line-by-line port of upstream
 //! `plugin/pkg/admission/{namespace,resourcequota,limitranger}/`.
 //!

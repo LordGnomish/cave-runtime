@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! S3-compatible HTTP router — full AWS S3 API surface via axum.
 
 use std::{collections::HashMap, sync::Arc};

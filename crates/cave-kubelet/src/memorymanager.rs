@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Memory manager — Single-NUMA-node policy with reserved memory.
 //!
 //! Mirrors `pkg/kubelet/cm/memorymanager`: per-NUMA-node accounting of

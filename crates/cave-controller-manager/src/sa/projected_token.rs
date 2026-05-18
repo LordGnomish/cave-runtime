@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Projected service-account-token volumes — `pkg/serviceaccount/jwt.go`
 //! plus `pkg/api/v1/types.go::ServiceAccountTokenProjection`.
 //!

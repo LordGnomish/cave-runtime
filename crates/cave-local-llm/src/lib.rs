@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-local-llm — offline draft-generation daemon using Ollama.
 //!
 //! Phase 1: Ollama client, manifest reader, draft format, metrics, CLI binary.

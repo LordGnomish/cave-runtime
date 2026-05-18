@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl flag toggle/set/unset/list/group`
 //!
 //! Native flag verb. Per ADR-RUNTIME-CLI-CONSOLIDATION-001, `flag`

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostFilter preemption — when no node admits the pod, evict lower-priority pods
 //! to make room. Sets NominatedNodeName on the preemptor.
 //!

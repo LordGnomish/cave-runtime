@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! KEPs landing in Kubernetes 1.31–1.34 — bundled module so we don't
 //! sprout a top-level mod for each individual KEP.
 //!

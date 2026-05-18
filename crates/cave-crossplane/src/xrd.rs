@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! XRD (Composite Resource Definition) store.
 
 use crate::error::{CrossplaneError, CrossplaneResult};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Tenant context — every portal request is scoped to a tenant id.
 //!
 //! Default-deny: a plugin that declares [`super::Scope::Tenant`] cannot be

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! TTLAfterFinished controller — `pkg/controller/ttlafterfinished`.
 //!
 //! Reads `Job.spec.ttlSecondsAfterFinished` and deletes the Job (with

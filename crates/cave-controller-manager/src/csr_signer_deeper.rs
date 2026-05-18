@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CSR signer deeper — `pkg/controller/certificates/signer/signer.go`.
 //!
 //! Extends [`crate::csr_signer`] with:

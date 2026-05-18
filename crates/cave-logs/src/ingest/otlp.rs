@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! OTLP Logs ingestion — HTTP/JSON format.
 //!
 //! Implements the OpenTelemetry Protocol log format as received via:

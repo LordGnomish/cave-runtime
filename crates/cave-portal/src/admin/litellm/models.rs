@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Models sub-page.
 
 use super::types::{LiteLlmModel, LiteLlmViewError};

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/crm/reports` — Twenty CRM "Reports" tab. Computes a
 //! per-plan MRR roll-up + total ARR for the operator.
 //!

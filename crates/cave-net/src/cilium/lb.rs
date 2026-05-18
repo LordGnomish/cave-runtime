@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Service load balancer — backend selection algorithms.
 //!
 //! Mirrors `pkg/loadbalancer/loadbalancer.go` (algorithm enum + selection

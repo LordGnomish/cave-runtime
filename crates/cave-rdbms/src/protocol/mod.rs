@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! PostgreSQL wire protocol (v3) message handling.
 
 pub mod auth;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Scrape manager: scrapes Prometheus /metrics endpoints on configurable intervals.
 //! Service discovery: static, file-based, and Kubernetes.
 

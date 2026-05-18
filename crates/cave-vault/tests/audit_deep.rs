@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! deeper-001: Audit log — file backend write, syslog format, signed
 //! envelope, multi-backend fan-out. Pinned to openbao v2.5.3.
 

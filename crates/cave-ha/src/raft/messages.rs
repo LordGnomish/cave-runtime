@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use serde::{Deserialize, Serialize};
 use crate::raft::log::LogEntry;
 use crate::raft::types::{LogIndex, NodeId, SnapshotMeta, Term};

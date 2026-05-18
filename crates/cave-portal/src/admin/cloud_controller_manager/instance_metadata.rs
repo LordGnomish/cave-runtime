@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Instance metadata tab — per-node InstanceID / zone / region /
 //! instance type. Mirrors the AWS/GCP IMDSv2 surface the cloud-
 //! controller fans out for kubelet labels.

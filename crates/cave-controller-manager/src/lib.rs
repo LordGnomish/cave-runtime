@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-controller-manager — parity scaffold for `kube-controller-manager`.
 //!
 //! Mirrors `k8s.io/kubernetes/pkg/controller` (pinned to

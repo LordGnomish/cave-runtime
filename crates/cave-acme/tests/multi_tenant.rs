@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! cave-acme — multi-tenant ACME server tests.
 
 use cave_acme::{AcmeError, AcmeServer, Identifier, Jwk, OrderStatus};

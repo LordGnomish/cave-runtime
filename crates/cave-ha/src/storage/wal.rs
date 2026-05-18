@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Write-ahead log for durable Raft state.
 //!
 //! WAL format — each record:

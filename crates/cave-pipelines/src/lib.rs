@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! CAVE Pipelines — CI/CD pipeline engine.
 //!
 //! Compatible with: Tekton Pipelines + Jenkins

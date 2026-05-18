@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! In-memory store for cave-admission webhook policies and violations.
 
 use crate::models::{

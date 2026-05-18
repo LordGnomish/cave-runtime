@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! AttachDetach controller — `pkg/controller/volume/attachdetach`.
 //!
 //! Reconciles the desired-state (pods that need volumes mounted on

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Per-connector lifecycle — start a connector, generate its
 //! tasks, stop and tear it down. Mirrors
 //! `org.apache.kafka.connect.runtime.WorkerConnector` from

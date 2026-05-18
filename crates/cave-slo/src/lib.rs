@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! SLO tracking engine — error budgets, burn rates
 //!
 //! Compatible with: Custom (Prometheus rules)

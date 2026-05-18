@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Cron scaler — schedule-based scaling.
 //! upstream: kedacore/keda v2.x — pkg/scalers/cron_scaler.go
 

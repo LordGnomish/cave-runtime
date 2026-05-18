@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Garbage collection for expired backups.
 
 use crate::models::{Backup, BackupPhase};

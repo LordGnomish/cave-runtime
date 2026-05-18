@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! Byte-level snapshot wire protocol.
 //!
 //! [`crate::store::KvStore::snapshot_stream`] already produces JSON
