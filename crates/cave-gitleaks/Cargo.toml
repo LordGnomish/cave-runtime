@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright 2026 Cave Runtime contributors
+#
+# cave-gitleaks — Gitleaks-compatible secret scanner (MVP)
+# Upstream: gitleaks/gitleaks v8.29.1 (commit fb5d707e08fe0d2578b155458fdd53b6782dcab2)
+# Upstream license: MIT (Zachary Rice 2019); cave-gitleaks is AGPL-3.0-or-later.
+
+[package]
+name = "cave-gitleaks"
+description = "Secret scanner — Gitleaks-parity rule engine (regex + entropy + allowlist), JSON/SARIF reporters, git-history walker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+git2 = { version = "0.19", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"

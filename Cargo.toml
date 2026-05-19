@@ -134,6 +134,8 @@ members = [
     "crates/cave-knative",
     # === Event-driven Autoscaler (KEDA) ===
     "crates/cave-keda",
+    # === Gitleaks-parity secret scanner ===
+    "crates/cave-gitleaks",
     # === Node Autoscaler (Karpenter) ===
     "crates/cave-karpenter",
     # === Virtualization (KubeVirt) ===
