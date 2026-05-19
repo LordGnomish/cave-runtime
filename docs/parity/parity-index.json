@@ -112,7 +112,7 @@
       "total_count": 44,
       "unmapped_count": 0,
       "upstream": "keycloak/keycloak",
-      "upstream_version": "v22.0.0"
+      "upstream_version": "v26.0.0"
     },
     "cave-backup": {
       "cave_src_loc": 2662,

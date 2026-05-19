@@ -107,7 +107,7 @@ Sorted by total src LoC (largest first — biggest dashboard wins per hour spent
 | cave-store | 10,711 | minio/minio |
 | cave-metrics | 9,530 | prometheus/prometheus @ v2.48.0 |
 | cave-trace | 8,923 | jaegertracing/jaeger @ v1.52.0 |
-| cave-auth | 8,236 | keycloak/keycloak @ v22.0.0 |
+| cave-auth | 8,236 | keycloak/keycloak @ v26.0.0 |
 | cave-dashboard | 8,092 | grafana/grafana @ v10.2.0 |
 | cave-dns | 7,796 | coredns/coredns @ v1.11.0 |
 | cave-logs | 7,285 | grafana/loki @ v2.9.0 |
