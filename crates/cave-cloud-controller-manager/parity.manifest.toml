@@ -3,9 +3,140 @@
 # two out-of-tree provider implementations (Hetzner, Azure).
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.36.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
+
+[parity]
+# Package-level inventory (see [[mapped]]/[[partial]]/[[skipped]]/[[unmapped]] below):
+#   fill_ratio   = (mapped + partial + skipped) / total
+#   honest_ratio = (mapped + skipped)            / total
+# 2026-05-19 close-out — the previous file-level [[files]] index was
+# converted into a subsystem-level inventory, classifying every top-level
+# `staging/src/k8s.io/cloud-provider/` package plus the two supported
+# out-of-tree providers (Hetzner + Azure) honestly against
+# kubernetes/kubernetes v1.36.0. See PARITY_REPORT.md for the
+# methodology and scope-cut table.
+mapped_count        = 12
+partial_count       = 1
+skipped_count       = 9
+unmapped_count      = 1
+total               = 23
+fill_ratio          = 0.9565
+honest_ratio        = 0.9130
+last_audit          = "2026-05-19"
+parity_ratio_source = "manifest"
+infra_only          = false
+
+# ── Mapped subsystems ────────────────────────────────────────────────────────
+[[mapped]]
+name    = "cloud-provider/ root (cloud.go interface)"
+local   = "src/provider.rs"
+notes   = "Cloud + Instances + Routes + LoadBalancer + Zones traits."
+
+[[mapped]]
+name    = "controllers/node"
+local   = "src/node_controller.rs"
+notes   = "Address sync, node init, taint removal."
+
+[[mapped]]
+name    = "controllers/nodelifecycle"
+local   = "src/node_lifecycle.rs"
+notes   = "Provider shutdown detection + node deletion."
+
+[[mapped]]
+name    = "controllers/nodeipam"
+local   = "src/route_ipam.rs"
+notes   = "Range allocator + CIDR exhaustion + double-alloc reject."
+
+[[mapped]]
+name    = "controllers/route"
+local   = "src/route_controller.rs"
+notes   = "Pod-CIDR → cloud route reconciliation."
+
+[[mapped]]
+name    = "controllers/service"
+local   = "src/service_controller.rs"
+notes   = "LoadBalancer Service ↔ cloud LB lifecycle."
+
+[[mapped]]
+name    = "cmd/cloud-controller-manager/options"
+local   = "src/provider_runtime.rs"
+notes   = "Backoff + retry + flowcontrol + options.go fields."
+
+[[mapped]]
+name    = "service-extras (api/service/util + portallocator + validation)"
+local   = "src/service_extras.rs"
+notes   = "Port allocator + validation + util helpers."
+
+[[mapped]]
+name    = "service-topology (discovery EndpointSlice)"
+local   = "src/service_topology.rs"
+notes   = "Zone-aware endpoint subsetting + zone count."
+
+[[mapped]]
+name    = "service-lb-lifecycle (slow-start + drain)"
+local   = "src/service_lb_lifecycle.rs"
+notes   = "Slow-start tick + drain + probe-driven steps."
+
+[[mapped]]
+name    = "out-of-tree: hcloud-cloud-controller-manager"
+local   = "src/providers/hetzner*.rs"
+notes   = "Hetzner LB + targets + failover + resources (6 files)."
+
+[[mapped]]
+name    = "out-of-tree: cloud-provider-azure"
+local   = "src/providers/azure*.rs"
+notes   = "Azure LB + resources + networking + extras (5 files)."
+
+# ── Partial subsystems ───────────────────────────────────────────────────────
+[[partial]]
+name    = "node_helpers/address utility"
+local   = "src/node_controller.rs"
+notes   = "AddressNodeAddresses + GetInstanceProviderID present; the broader staging/cloud-provider/node/helpers/ pack is not mapped 1:1."
+
+# ── Skipped subsystems (intentional scope-cut, with reason) ─────────────────
+[[skipped]]
+name   = "fake/ (cloud-provider test scaffolding)"
+reason = "Upstream-only test double; replaced by Rust mocks in tests_crosscut.rs."
+
+[[skipped]]
+name   = "credentialconfig/ (cloud credential loader stubs)"
+reason = "Replaced by per-provider config (HCLOUD_TOKEN env, Azure MSI)."
+
+[[skipped]]
+name   = "names/ (controller-name constants)"
+reason = "One-line const list; not load-bearing."
+
+[[skipped]]
+name   = "api/ (cloud-provider API types)"
+reason = "Types sourced from k8s.io/api via cave-apiserver/cave-controller-manager."
+
+[[skipped]]
+name   = "providers/ (in-tree legacy GCE/AWS/etc.)"
+reason = "Removed upstream by KEP-2395 in v1.36; replaced by out-of-tree providers."
+
+[[skipped]]
+name   = "cloud-provider-aws (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-gcp (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-openstack (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+[[skipped]]
+name   = "cloud-provider-vsphere (out-of-tree)"
+reason = "Out of OSS-launch scope (Hetzner + Azure only)."
+
+# ── Unmapped subsystems (gap, not deferred) ──────────────────────────────────
+[[unmapped]]
+name   = "volume/ (cloud volume controllers)"
+reason = "CSI subsumes in-tree volume mounts; cave-storage handles CSI provisioner — cloud-volume gap left for post-launch."
 
 [module]
 name        = "cave-cloud-controller-manager"

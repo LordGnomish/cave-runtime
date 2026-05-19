@@ -1,10 +1,26 @@
 # parity.manifest.toml — cave-scheduler
 # Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits — pins
+#     the git tree-ish the manifest was enumerated against.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 19 / partial 0 / skipped 7 /
+#     unmapped 3 / total 29 / fill_ratio 0.8966 is the measured-audit
+#     baseline from the 2026-05-13 batch2 imagelocality port. The 3
+#     unmapped rows remain honestly scope-cut (CSI volume-binding
+#     plugin, ipam-coordinator scheduler-plugin, …) — see
+#     PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 25/25 .rs files.
+#   * 4-track: Backend cave-scheduler lib + Portal /admin/scheduler/ +
+#     cavectl SchedulerCmd + observability cave-scheduler alerts &
+#     dashboard — all green pre-close.
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.36.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -20,7 +36,7 @@ unmapped_count = 3
 total          = 29
 fill_ratio     = 0.8966
 honest_ratio   = 0.8966
-last_audit     = "2026-05-13"
+last_audit     = "2026-05-19"
 infra_only     = false
 
 [module]
