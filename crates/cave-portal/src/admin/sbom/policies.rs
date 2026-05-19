@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/policies` — Dependency-Track "Policy" panel. Lists the
 //! built-in license + vuln + age policies and shows their match/no-match
 //! counts against the seeded component set.

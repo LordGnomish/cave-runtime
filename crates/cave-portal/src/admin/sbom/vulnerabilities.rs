@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/vulnerabilities` — Dependency-Track "Vulnerabilities" tab.
 //! Synthesises a CVE roster from the seeded component set (illustrative;
 //! live wiring routes through cave-sbom REST `/api/v1/vulnerability`).

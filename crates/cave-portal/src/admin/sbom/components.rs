@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/components` — Dependency-Track "Components" panel. Same
 //! component roster the parent page shows, but with explicit purl/license
 //! sort and a license dropdown summary.

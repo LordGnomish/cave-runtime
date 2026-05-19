@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // === cycle 1779052669 (qwen success at retry 3; ollama_calls=3; ollama_secs=105) ===
 // cargo test --test qwen_drafted -- --nocapture
