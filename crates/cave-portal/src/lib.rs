@@ -12,6 +12,17 @@ pub mod ui;
 /// + per-tenant dashboard. Pinned to backstage/backstage v1.50.3.
 pub mod admin;
 
+/// Cross-cutting security hardening — CSP / HSTS / X-Frame-Options /
+/// X-Content-Type-Options / Referrer-Policy / Permissions-Policy / COOP /
+/// CORP / CSRF / secure cookies / token-bucket rate limiter. Wired by
+/// the HTTP layer in `cave-runtime`.
+pub mod hardening;
+
+/// Internationalisation / localisation. Compile-time translation tables
+/// for en-US (default) + tr-TR, with Accept-Language + cookie
+/// negotiation and en-US fallback for missing keys.
+pub mod i18n;
+
 use axum::Router;
 use cave_kernel::parity::ParityReport;
 use std::collections::HashMap;

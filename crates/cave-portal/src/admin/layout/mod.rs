@@ -27,6 +27,7 @@ pub mod shortcuts;
 pub mod skeleton;
 pub mod theme;
 pub mod toast;
+pub mod ux;
 
 pub use a11y::{audit as a11y_audit, A11yCode, A11yIssue};
 pub use breadcrumb::{breadcrumb_for_path, Crumb};
@@ -39,3 +40,4 @@ pub use shortcuts::{shortcuts_help_modal, ShortcutBinding, DEFAULT_BINDINGS};
 pub use skeleton::{error_panel, skeleton_table};
 pub use theme::{theme_class_for_cookie, ThemePreference};
 pub use toast::toast_container;
+pub use ux::{confirm_dialog, form_field_error, search_box, validation_summary};

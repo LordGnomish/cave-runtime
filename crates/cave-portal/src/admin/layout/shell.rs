@@ -108,7 +108,7 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
     let footer_html = footer(opts.cluster_info);
 
     format!(
-        r#"<!doctype html>
+        r##"<!doctype html>
 <html lang="en" class="{theme_class}">
 <head>
   <meta charset="utf-8">
@@ -120,12 +120,14 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
     :focus-visible {{ outline: 2px solid #3b82f6; outline-offset: 2px; }}
     [data-list-row][data-active] {{ background: rgba(59, 130, 246, 0.1); }}
     .dark [data-list-row][data-active] {{ background: rgba(59, 130, 246, 0.2); }}
+    .sr-only {{ position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }}
   </style>
 </head>
 <body class="bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-zinc-100 font-sans min-h-screen">
+<a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:px-3 focus:py-2 focus:rounded focus:bg-blue-600 focus:text-white focus:outline-none focus:ring-2 focus:ring-blue-400">Skip to main content</a>
 {topbar}
 {sidebar}
-<main class="{main_classes}">
+<main id="main" class="{main_classes}" tabindex="-1">
   {breadcrumb}
   <h1 class="text-xl font-semibold mb-4">{title}</h1>
   {body}
@@ -135,7 +137,7 @@ pub fn shell_v2(opts: ShellOptions<'_>) -> String {
 {shortcuts}
 {toasts}
 </body>
-</html>"#,
+</html>"##,
         theme_class = theme_class,
         title = title_e,
         topbar = topbar,

@@ -116,7 +116,7 @@ pub fn table(headers: &[&str], rows: &[Vec<String>]) -> String {
     out.push_str(r#"<table class="min-w-full text-sm border-collapse">"#);
     out.push_str(r#"<thead class="bg-gray-100"><tr>"#);
     for h in headers {
-        let _ = write!(out, r#"<th class="px-3 py-2 text-left">{}</th>"#, escape(h));
+        let _ = write!(out, r#"<th scope="col" class="px-3 py-2 text-left">{}</th>"#, escape(h));
     }
     out.push_str("</tr></thead><tbody>");
     for row in rows {
@@ -147,7 +147,7 @@ pub fn table_html(headers: &[&str], rows: &[Vec<String>]) -> String {
     out.push_str(r#"<table class="min-w-full text-sm border-collapse">"#);
     out.push_str(r#"<thead class="bg-gray-100"><tr>"#);
     for h in headers {
-        let _ = write!(out, r#"<th class="px-3 py-2 text-left">{}</th>"#, escape(h));
+        let _ = write!(out, r#"<th scope="col" class="px-3 py-2 text-left">{}</th>"#, escape(h));
     }
     out.push_str("</tr></thead><tbody>");
     for row in rows {
