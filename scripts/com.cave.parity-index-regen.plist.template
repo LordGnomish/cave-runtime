@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hourly regenerator for docs/parity/parity-index.json.
+
+  Source-of-truth for the live `/admin/compliance` dashboard and the
+  `parity_ratio` field every dispatcher / audit consumes. Reading the
+  manifests + audit doc takes <1s and the script only writes the JSON
+  output — no git state mutated, no network calls — so running it
+  hourly is safe.
+
+  Install:
+    cp scripts/com.cave.parity-index-regen.plist.template \
+      ~/Library/LaunchAgents/com.cave.parity-index-regen.plist
+    launchctl bootstrap gui/$UID \
+      ~/Library/LaunchAgents/com.cave.parity-index-regen.plist
+
+  Verify (after 1 tick — StartInterval is 3600s, RunAtLoad is true):
+    launchctl list | grep parity-index-regen
+    tail ~/Library/Application\ Support/cave-runtime/parity-index-regen.log
+
+  Uninstall:
+    launchctl bootout gui/$UID \
+      ~/Library/LaunchAgents/com.cave.parity-index-regen.plist
+    rm ~/Library/LaunchAgents/com.cave.parity-index-regen.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.cave.parity-index-regen</string>
+
+	<key>Disabled</key>
+	<false/>
+
+	<key>WorkingDirectory</key>
+	<string>/Users/gnomish/Code/cave-runtime-main</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/gnomish</string>
+		<key>PATH</key>
+		<string>/Users/gnomish/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+
+	<!--
+	  Homebrew python3 (>=3.10) is required — the script uses PEP 604
+	  union syntax (`list[str] | None`) which the system /usr/bin/python3
+	  (3.9 on macOS 14) does NOT support.
+	-->
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/homebrew/bin/python3</string>
+		<string>/Users/gnomish/Code/cave-runtime-main/scripts/build-parity-index.py</string>
+	</array>
+
+	<!-- One regen per hour. RunAtLoad=true so the first tick fires
+	     immediately on bootstrap. -->
+	<key>StartInterval</key>
+	<integer>3600</integer>
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>10</integer>
+
+	<key>StandardOutPath</key>
+	<string>/Users/gnomish/Library/Application Support/cave-runtime/parity-index-regen.log</string>
+	<key>StandardErrorPath</key>
+	<string>/Users/gnomish/Library/Application Support/cave-runtime/parity-index-regen.err</string>
+</dict>
+</plist>
