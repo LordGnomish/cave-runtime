@@ -57,8 +57,7 @@ fn gate_2_source_sha_pinned() {
 fn gate_3_last_audit_2026_05_18() {
     let m = read_manifest();
     assert!(
-        m.contains("last_audit     = \"2026-05-18\"")
-            || m.contains("last_audit = \"2026-05-18\""),
+        has_kv(&m, "last_audit", "\"2026-05-18\""),
         "last_audit must be 2026-05-18 in [parity] block"
     );
 }
@@ -67,10 +66,25 @@ fn gate_3_last_audit_2026_05_18() {
 fn gate_4_parity_ratio_source_manifest() {
     let m = read_manifest();
     assert!(
-        m.contains("parity_ratio_source = \"manifest\"")
-            || m.contains("parity_ratio_source=\"manifest\""),
+        has_kv(&m, "parity_ratio_source", "\"manifest\""),
         "parity_ratio_source must be \"manifest\" so parity-index reads fill_ratio directly"
     );
+}
+
+fn has_kv(s: &str, key: &str, expected_value: &str) -> bool {
+    for line in s.lines() {
+        let l = line.trim();
+        if l.starts_with(key) {
+            if let Some(eq) = l.find('=') {
+                let v = l[eq + 1..].trim().trim_end_matches(',');
+                let v = v.split('#').next().unwrap_or(v).trim();
+                if v == expected_value {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 #[test]
