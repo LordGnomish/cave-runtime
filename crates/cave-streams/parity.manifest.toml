@@ -7,13 +7,19 @@
 
 [upstream]
 # Primary upstream (kept for the legacy single-upstream parity audit).
-org     = "apache"
-repo    = "kafka"
-version = "4.2.0"
-name    = "Apache Kafka"
-license = "Apache-2.0"
-language= "Java"
-url     = "https://github.com/apache/kafka"
+org         = "apache"
+repo        = "kafka"
+version     = "4.2.0"
+source_sha  = "4.2.0"  # Apache Kafka 4.2.0 release tag (KIP-482 flexible versions, KRaft)
+name        = "Apache Kafka"
+license     = "Apache-2.0"
+language    = "Java"
+url         = "https://github.com/apache/kafka"
+# secondary wire upstream — Pulsar binary protocol
+secondary_upstream      = "apache/pulsar"
+secondary_source_sha    = "v4.2.0"  # Apache Pulsar v4.2.0 release tag
+secondary_license       = "Apache-2.0"
+
 [[upstreams]]
 org     = "apache"
 repo    = "kafka"
@@ -28,20 +34,21 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 
 [parity]
 # Package-level inventory against Kafka (primary) + Pulsar
-# (secondary). Inventory hand-curated 2026-05-12 against Kafka's
+# (secondary). Inventory hand-curated 2026-05-18 against Kafka's
 # package tree (server/, controller/, common/, clients/, log/,
 # coordinator/, network/, raft/, streams/, connect/, storage/)
 # plus Pulsar's pulsar-broker / pulsar-common / pulsar-client.
 # Each entry counts once, even when both Kafka and Pulsar contribute.
-mapped_count   = 23
-partial_count  = 0
-skipped_count  = 16
-unmapped_count = 6
-total          = 45
-fill_ratio     = 0.8667
-honest_ratio   = 0.8667
-last_audit     = "2026-05-14"
-infra_only     = false
+mapped_count          = 23
+partial_count         = 0
+skipped_count         = 16
+unmapped_count        = 6
+total                 = 45
+fill_ratio            = 0.8667   # (mapped + partial + skipped) / total
+honest_ratio          = 0.8667   # (mapped + skipped) / total — no partial entries
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-18"
+infra_only            = false
 
 [module]
 name          = "cave-streams"
