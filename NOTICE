@@ -12,7 +12,7 @@ licensed as listed below. License strings are extracted from each
 crate's `parity.manifest.toml` — verify against upstream LICENSE files
 before redistribution of any derived artifact.
 
-Total upstreams: 78
+Total upstreams: 79
 
 AGPL-3.0:
   - minio/minio
@@ -94,6 +94,9 @@ Apache-2.0:
 
 GPL-3.0:
   - frappe/erpnext
+
+MIT:
+  - gitleaks/gitleaks       (cave-gitleaks; upstream copyright 2019 Zachary Rice)
 
 PostgreSQL (BSD-2-style):
   - postgres/postgres
