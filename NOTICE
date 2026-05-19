@@ -42,7 +42,7 @@ canonical machine-readable list lives in
 `crates/cave-upstream/src/projects.rs` and is exposed at runtime via
 `/api/portal/upstream`.
 
-Total upstreams: 98
+Total upstreams: 99
 
 AGPL-3.0:
   - grafana/grafana
@@ -131,6 +131,7 @@ ISC:
 
 MIT:
   - BerriAI/litellm
+  - NousResearch/hermes-agent  (cave-hermes; upstream copyright 2025 Nous Research)
   - danny-avila/LibreChat
   - gitleaks/gitleaks       (cave-gitleaks; upstream copyright 2019 Zachary Rice)
   - go-gitea/gitea
