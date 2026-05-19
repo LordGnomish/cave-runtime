@@ -234,12 +234,19 @@
     },
     "cave-cloud-controller-manager": {
       "cave_src_loc": null,
+      "honest_ratio": 0.913,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 12,
       "note": "6 fn missing, **0 tests / 0 surfaces declared**",
-      "parity_ratio": 0.4444,
-      "parity_ratio_source": "audit",
+      "parity_ratio": 0.9565,
+      "parity_ratio_source": "manifest",
+      "partial_count": 1,
+      "skipped_count": 9,
       "stubs": null,
       "tier": "A",
+      "total_count": 23,
+      "unmapped_count": 1,
       "upstream": "kubernetes/kubernetes",
       "upstream_version": "v1.28.0"
     },
@@ -1656,7 +1663,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 33
+    "ratio_overrides": 34
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
