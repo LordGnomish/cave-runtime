@@ -3,21 +3,26 @@
 # the UX patterns of `kubectl` (kubernetes/kubernetes) and `step` CLI
 # (smallstep/cli) where it makes sense, the crate itself is sovereign.
 #
-# Stubbed 2026-05-02.
+# 2026-05-19 Charter v2 paperwork close — first-party exemption noted
+# explicitly. fill_ratio is intentionally absent because there is no
+# external upstream to measure against; parity_ratio_source="infra_only"
+# signals this to /admin/compliance and gate-5 is exempted.
 
 [upstream]
-org     = "cave-runtime"
-repo    = "cave-runtime"
-version = "v0.1.0"
+org        = "cave-runtime"
+repo       = "cave-runtime"
+version    = "v0.1.0"
+source_sha = "v0.1.0"   # cave-runtime workspace version (first-party self-pin)
 
 [module]
-name        = "cave-cli"
-description = "cavectl — top-level CLI (first-party)"
-source_root = "src"
-first_party = true
+name         = "cave-cli"
+description  = "cavectl — top-level CLI (first-party)"
+source_root  = "src"
+first_party  = true
 
 [parity]
-infra_only = true
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
+infra_only           = true
+ratio                = 0.0        # first-party: no external upstream to measure against
+parity_ratio_source  = "infra_only"
+last_audit           = "2026-05-19"
 

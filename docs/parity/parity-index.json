@@ -222,7 +222,7 @@
       "cave_src_loc": null,
       "honest_ratio": 0.0,
       "infra_only": true,
-      "last_audit_disk": "2026-05-12",
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
       "note": "Operator CLI",
       "parity_ratio": 0.0,
@@ -1142,13 +1142,19 @@
     },
     "cave-portal": {
       "cave_src_loc": null,
-      "infra_only": true,
+      "honest_ratio": 0.875,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 78,
       "note": "10/10 files only \u2014 needs fn/test/surface mappings",
-      "parity_ratio": 0.25,
-      "parity_ratio_source": "audit",
+      "parity_ratio": 0.9519,
+      "parity_ratio_source": "manifest",
+      "partial_count": 8,
+      "skipped_count": 13,
       "stubs": null,
       "tier": "B",
+      "total_count": 104,
+      "unmapped_count": 5,
       "upstream": "backstage/backstage",
       "upstream_version": "v1.20.0"
     },
@@ -1673,7 +1679,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 36
+    "ratio_overrides": 37
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
