@@ -613,15 +613,19 @@
     },
     "cave-flags": {
       "cave_src_loc": 2948,
-      "honest_ratio": 0.0,
-      "infra_only": true,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.8462,
+      "last_audit_disk": "2026-05-18",
       "manifest_filled": true,
+      "mapped_count": 25,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8923,
       "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 30,
       "stubs": null,
       "tier": "C",
+      "total_count": 65,
+      "unmapped_count": 7,
       "upstream": "Unleash/unleash",
       "upstream_version": "v5.0.0"
     },
@@ -1652,7 +1656,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 32
+    "ratio_overrides": 33
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
