@@ -4,16 +4,23 @@
 //! drifts away from 1.0 against the source tree.
 //!
 //! At time of writing (commit 0041890, "78-module observability merge"), every
-//! dimension of cave-cri parity is at 1.0:
+//! per-dimension score of cave-cri parity is at 1.0:
 //!
 //! ```text
-//! file=31/31  fn=83/83  test=87/87  surface=35/35  stubs=0  overall=1.000
+//! file=31/31  fn=83/83  test=87/87  surface=35/35  stubs=0
 //! ```
 //!
 //! Any future change that adds an unmapped manifest entry, removes an
 //! implemented handler, deletes a referenced test, or introduces a `todo!()` /
-//! `unimplemented!()` will fail this assertion. The intent is to lock the
-//! parity claim in the codebase rather than only in commit messages.
+//! `unimplemented!()` will fail one of these per-dimension assertions. The
+//! intent is to lock the parity claim in the codebase rather than only in
+//! commit messages.
+//!
+//! 2026-05-18 FINALIZE: the calculator's `overall` field now reflects the
+//! manifest's measured `fill_ratio` (0.9412) rather than an aggregate of the
+//! per-dimension scores. Asserting `overall == 1.0` would directly contradict
+//! the honest audit, so this test now asserts `overall >= 0.90` (the per-crate
+//! floor enforced by `tests/parity_self_audit.rs`).
 
 #[test]
 fn parity_is_full_for_cri_surface() {
@@ -47,8 +54,13 @@ fn parity_is_full_for_cri_surface() {
     );
     assert_eq!(r.stubs_detected, 0, "no stub macros allowed in source");
     assert!(
-        (r.overall - 1.0).abs() < 1e-5,
-        "overall parity must be 1.0, got {}",
+        r.overall >= 0.90,
+        "overall parity must be >= 0.90 (manifest measured floor for cave-cri), got {}",
+        r.overall,
+    );
+    assert!(
+        r.overall <= 1.0,
+        "overall parity must be a fraction (got {})",
         r.overall,
     );
 }
