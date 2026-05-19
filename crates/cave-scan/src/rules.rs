@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Built-in rule catalogue with 50+ SAST rules across 6 languages.
 //!
 //! Rules are organized by language and categorized as Security (SEC),

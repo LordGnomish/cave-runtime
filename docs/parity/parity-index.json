@@ -1251,14 +1251,19 @@
     },
     "cave-scan": {
       "cave_src_loc": 1189,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.6316,
+      "last_audit_disk": "2026-05-18",
       "manifest_filled": true,
+      "mapped_count": 10,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.6842,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 14,
       "stubs": null,
       "tier": "C",
+      "total_count": 38,
+      "unmapped_count": 12,
       "upstream": "SonarSource/sonarqube",
       "upstream_version": "v10.3.0"
     },
@@ -1579,7 +1584,7 @@
     "injected": 6,
     "new_filled": 84,
     "phantoms": 5,
-    "ratio_overrides": 27
+    "ratio_overrides": 28
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
