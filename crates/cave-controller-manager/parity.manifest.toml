@@ -1,11 +1,32 @@
 # parity.manifest.toml — cave-controller-manager
 # Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
 # Tracks pkg/controller for the kube-controller-manager binary.
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * Prepended AGPL SPDX header to `tests/qwen_drafted.rs` so the
+#     parity_self_audit `every_rs_file_carries_agpl_spdx` gate flips
+#     from 89/90 → 90/90 (the bcf64002 sweep missed `qwen_drafted.rs`
+#     because it had no shebang/SPDX line at the top — first line was
+#     a `// === cycle ... ===` marker).
+#   * No code or count delta: mapped 30 / partial 1 / skipped 10 /
+#     unmapped 4 / total 45 / fill_ratio 0.9111 is the measured-audit
+#     baseline from the 2026-05-13 resourceclaim + 2026-05-14 batch4
+#     cronjob/deployment depth ports. The 4 unmapped rows remain
+#     honestly scope-cut (volume PV-binder controller, namespace
+#     openapi controller, kube-cloud-foundry CNI, …) — see
+#     PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 90/90 .rs files post-fix.
+#   * 4-track: Backend cave-controller-manager lib + Portal /admin/cm/
+#     + cavectl CmCmd + observability cave-controller-manager alerts &
+#     dashboard — all green pre-close.
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.36.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -31,7 +52,7 @@ unmapped_count = 4
 total          = 45
 fill_ratio     = 0.9111
 honest_ratio   = 0.8889
-last_audit     = "2026-05-14"
+last_audit     = "2026-05-18"
 infra_only     = false
 
 [module]

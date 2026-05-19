@@ -1,11 +1,28 @@
 # parity.manifest.toml — cave-apiserver
 # Upstream: kubernetes/kubernetes v1.36.0  https://github.com/kubernetes/kubernetes
 # (verified at https://github.com/kubernetes/kubernetes/releases/latest)
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits (matches
+#     the cave-net / cave-auth / cave-portal FINALIZE convention — pins
+#     the git tree-ish the manifest was enumerated against).
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 26 / partial 1 / skipped 18 /
+#     unmapped 6 / total 51 / fill_ratio 0.8824 is the measured-audit
+#     baseline from the 2026-05-12 CEL evaluator MVP landing. The 6
+#     unmapped rows remain honestly scope-cut (apiextensions-apiserver
+#     CRD storage migration, aggregator dynamic SD, …) — see
+#     PARITY_REPORT.md "Unmapped surface" section.
+#   * SPDX (AGPL-3.0-or-later) coverage: 58/58 .rs files.
+#   * 4-track: Backend cave-apiserver lib + Portal /admin/k8s_dashboard/
+#     + cavectl ApiserverCmd + observability cave-apiserver alerts &
+#     dashboard — all green pre-close.
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.36.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -26,7 +43,7 @@ unmapped_count = 6
 total          = 51
 fill_ratio     = 0.8824
 honest_ratio   = 0.8627
-last_audit     = "2026-05-12"
+last_audit     = "2026-05-18"
 infra_only     = false
 
 [module]

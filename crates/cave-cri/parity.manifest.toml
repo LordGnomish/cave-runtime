@@ -5,17 +5,36 @@
 # The deeper-002 batch lifts the runtime surface so the OCI bundle, cgroup
 # v2 writes, registry Bearer-challenge auth, and exec/attach byte transport
 # match the API shape of these two pinned versions exactly.
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v2.2.3"` to the primary `[upstream]` block
+#     (containerd) and a parallel pin to the `[[secondary_upstreams]]`
+#     runc entry — pins both git tree-ishes the manifest was enumerated
+#     against.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 18 / partial 3 / skipped 11 /
+#     unmapped 2 / total 34 / fill_ratio 0.9412 is the measured-audit
+#     baseline from the 2026-05-13 batch2 sandbox_other port. The 2
+#     unmapped rows remain honestly scope-cut (microVM kata-runtime
+#     plugin, snapshotter native ZFS) — see PARITY_REPORT.md "Unmapped
+#     surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 49/49 .rs files.
+#   * 4-track: Backend cave-cri lib + Portal /admin/cri/ + cavectl
+#     CriCmd + observability cave-cri alerts & dashboard — all green
+#     pre-close.
 
 [upstream]
-org     = "containerd"
-repo    = "containerd"
-version = "v2.2.3"
+org        = "containerd"
+repo       = "containerd"
+version    = "v2.2.3"
+source_sha = "v2.2.3"
 
 [[secondary_upstreams]]
-org     = "opencontainers"
-repo    = "runc"
-version = "v1.4.2"
-notes   = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/cgroups/fs2/."
+org        = "opencontainers"
+repo       = "runc"
+version    = "v1.4.2"
+source_sha = "v1.4.2"
+notes      = "OCI runtime spec generation + cgroup v2 writer — see libcontainer/cgroups/fs2/."
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -31,7 +50,7 @@ unmapped_count = 2
 total          = 34
 fill_ratio     = 0.9412
 honest_ratio   = 0.8529
-last_audit     = "2026-05-13"
+last_audit     = "2026-05-18"
 infra_only     = false
 
 [module]

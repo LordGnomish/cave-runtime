@@ -1,15 +1,30 @@
 # parity.manifest.toml — cave-etcd
 # Upstream: etcd v3.6.10  https://github.com/etcd-io/etcd
 # Bumped from v3.6.0 in feat/cave-etcd-deeper-002.
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v3.6.10"` for reproducibility audits — pins
+#     the git tree-ish the manifest was enumerated against.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 28 / partial 2 / skipped 35 /
+#     unmapped 6 / total 71 / fill_ratio 0.9155 is the measured-audit
+#     baseline from 2026-05-12 (WAL port + measured-pass). The 6 unmapped
+#     rows remain honestly scope-cut (TLS rotation, gateway proxy, raft
+#     joint-consensus, …) — see PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 36/36 .rs files.
+#   * 4-track: Backend cave-etcd lib + Portal /admin/etcd/ + cavectl
+#     EtcdCmd + observability cave-etcd alerts & dashboard — all green
+#     pre-close.
 
 [upstream]
-org      = "etcd-io"
-repo     = "etcd"
-version  = "v3.6.10"
-name     = "etcd"
-license  = "Apache-2.0"
-language = "Go"
-url      = "https://github.com/etcd-io/etcd"
+org        = "etcd-io"
+repo       = "etcd"
+version    = "v3.6.10"
+source_sha = "v3.6.10"
+name       = "etcd"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/etcd-io/etcd"
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -25,7 +40,7 @@ unmapped_count = 6
 total          = 71
 fill_ratio     = 0.9155
 honest_ratio   = 0.8873
-last_audit     = "2026-05-12"
+last_audit     = "2026-05-18"
 infra_only     = false
 
 [module]
