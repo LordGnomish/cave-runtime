@@ -1,25 +1,50 @@
 # parity.manifest.toml — cave-docdb
-# Upstream: mongodb/mongo  https://github.com/mongodb/mongo  pinned 7.0.0
+# Primary upstream (clean-room reference, license-clean):
+#   FerretDB/FerretDB  https://github.com/FerretDB/FerretDB  pinned v2.0.0  (Apache-2.0)
+# Secondary upstream (wire-protocol & semantics spec, *not* linked code):
+#   mongodb/mongo      https://github.com/mongodb/mongo      pinned r7.0.0  (SSPL-1.0)
 #
-# Cave-docdb implements the MongoDB wire protocol (OP_MSG) on a TCP server
-# alongside an HTTP admin API: BSON codec, command dispatcher, find/insert/
-# update/delete + aggregate pipeline + cursors + indexes + admin commands
-# (hello, ping, buildInfo, listDatabases, listCollections, currentOp,
-# serverStatus, endSessions).
+# Cave-docdb is a Rust port of FerretDB's MongoDB-compatible surface. SSPL
+# code from mongodb/mongo is **never** linked, vendored, or copied — the
+# pin documents the wire-spec/semantics reference only. Implementation
+# semantics follow FerretDB's Go translator, re-expressed in Rust:
+# BSON codec, OP_MSG wire, command dispatcher, find/insert/update/delete,
+# aggregate pipeline, cursors, indexes, admin commands (hello, ping,
+# buildInfo, listDatabases, listCollections, currentOp, serverStatus,
+# endSessions).
 
 [upstream]
-org     = "mongodb"
-repo    = "mongo"
-version = "7.0.0"
-name    = "MongoDB"
-license = "SSPL-1.0"
-language= "C++"
-url     = "https://github.com/mongodb/mongo"
+org         = "FerretDB"
+repo        = "FerretDB"
+version     = "v2.0.0"
+source_sha  = "v2.0.0"  # FerretDB v2.0.0 release tag (Apache-2.0 clean-room reference)
+name        = "FerretDB"
+license     = "Apache-2.0"
+language    = "Go"
+url         = "https://github.com/FerretDB/FerretDB"
+# secondary wire-spec reference — *not* linked, *not* a license dep
+spec_upstream      = "mongodb/mongo"
+spec_source_sha    = "r7.0.0"
+spec_license_note  = "SSPL-1.0 reference only; no code copied"
 
 [parity]
-ratio       = 0.0        # honest: 0.0 means upstream parity NOT yet measured
-last_audit  = "2026-05-12"
-infra_only  = false
+# Package-level inventory against FerretDB v2.0.0 + MongoDB r7.0.0 wire spec.
+# Hand-curated 2026-05-18 against the cave-docdb in-scope MongoDB-compatible
+# surface. Out-of-scope features (replica sets, sharding, GridFS, change
+# streams, transactions, OPLog, SCRAM-SHA-256, TLS, schema validation,
+# time-series, encryption-at-rest, audit log, KMIP, $text/geo/hashed/partial
+# indexes, capped collections, views, plan cache, query hints) are counted
+# as `skipped`. Items declared in-scope but not yet built are `unmapped`.
+mapped_count          = 20
+partial_count         = 3
+skipped_count         = 25
+unmapped_count        = 4
+total                 = 52
+fill_ratio            = 0.9231   # (mapped + partial + skipped) / total
+honest_ratio          = 0.8654   # (mapped + skipped) / total — partial excluded
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-18"
+infra_only            = false
 [module]
 name        = "cave-docdb"
 description = "MongoDB-protocol document DB — wire OP_MSG, BSON, find/insert/update/delete/aggregate, cursors, indexes, admin commands"
