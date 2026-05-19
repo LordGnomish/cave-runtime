@@ -1,35 +1,47 @@
 # parity.manifest.toml — cave-cache
-# Upstream: redis/redis  https://github.com/redis/redis  pinned 7.2.0
+# Primary upstream: valkey-io/valkey  https://github.com/valkey-io/valkey  pinned 8.0.0  (BSD-3-Clause)
+# Forked from Redis 7.2.4 in 2024 after Redis Inc. relicensed Redis 7.4+
+# to RSALv2/SSPL. cave-cache tracks the Valkey 8.x lineage because BSD-3
+# is compatible with cave-runtime's AGPL stance and Redis 7.4+ (SSPL)
+# is forbidden by cargo deny. Valkey's directory layout still mirrors
+# redis 7.2.x, so the file mappings below remain accurate.
 #
-# Full Redis-equivalent cache server: RESP2/RESP3 wire protocol, all data
-# types (strings, lists, hashes, sets, sorted-sets, streams, hyperloglog,
-# bitmap, geo), pub/sub, ACL, scripting, transactions, expiry, persistence,
-# cluster slots, plus a side REST surface (src/routes.rs) for cave-runtime.
+# Full Valkey/Redis-equivalent cache server: RESP2/RESP3 wire protocol,
+# all data types (strings, lists, hashes, sets, sorted-sets, streams,
+# hyperloglog, bitmap, geo), pub/sub, ACL, scripting, transactions, expiry,
+# persistence, cluster slots, plus a side REST surface (src/routes.rs)
+# for cave-runtime.
 
 [upstream]
-org     = "redis"
-repo    = "redis"
-version = "7.2.0"
-name    = "Redis"
-license = "BSD-3-Clause"
-language= "C"
-url     = "https://github.com/redis/redis"
+org         = "valkey-io"
+repo        = "valkey"
+version     = "8.0.0"
+source_sha  = "8.0.0"  # Valkey 8.0.0 release tag (BSD-3-Clause; Linux Foundation fork of Redis 7.2.4)
+name        = "Valkey"
+license     = "BSD-3-Clause"
+language    = "C"
+url         = "https://github.com/valkey-io/valkey"
+# legacy reference — redis was the original upstream until 7.4 relicensed to SSPL
+legacy_upstream         = "redis/redis"
+legacy_source_sha       = "7.2.0"
+legacy_license_note     = "BSD-3-Clause up to 7.2.x; SSPL from 7.4 — no SSPL code linked"
 
 [parity]
-# Package-level inventory against redis/redis 7.2.0. Inventory
-# hand-curated 2026-05-12 against the Redis source tree
+# Package-level inventory against valkey 8.0.0 (= redis 7.2.4 + valkey patches).
+# Inventory hand-curated 2026-05-18 against the Valkey source tree
 # (`src/{server,networking,db,t_*,replication,cluster,scripting,
 # expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
-# cache `src/commands/` directory mirrors Redis's `t_*.c` 1:1.
-mapped_count   = 19
-partial_count  = 4
-skipped_count  = 13
-unmapped_count = 2
-total          = 38
-fill_ratio     = 0.9474
-honest_ratio   = 0.8421
-last_audit     = "2026-05-13"
-infra_only     = false
+# cache `src/commands/` directory mirrors Valkey's `t_*.c` 1:1.
+mapped_count          = 19
+partial_count         = 4
+skipped_count         = 13
+unmapped_count        = 2
+total                 = 38
+fill_ratio            = 0.9474
+honest_ratio          = 0.8421
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-19"
+infra_only            = false
 [module]
 name        = "cave-cache"
 description = "Redis 7.2 reimplementation — RESP wire + all data types + pub/sub + scripting + persistence + cluster slots + REST shim"
