@@ -1,0 +1,67 @@
+# -----------------------------------------------------------------------------
+# Hermes Agent — cave-runtime host configuration reference
+#
+# This is a TRIMMED REFERENCE COPY of the active host config at
+# ~/.hermes/config.yaml on Burak's macOS workstation, captured 2026-05-19.
+#
+# The active file is the installer template (57 KB of provider documentation)
+# with a small handful of surgical edits — those edits are the only thing
+# that's actually load-bearing, so this reference holds just those edits.
+#
+# To regenerate the active config from a fresh install:
+#   1. Run scripts/install.sh from NousResearch/hermes-agent (pinned tag
+#      v2026.5.16), with --skip-setup --skip-browser.
+#   2. Apply the edits below to ~/.hermes/config.yaml.
+#   3. `hermes doctor` should show no Configuration warnings.
+#   4. `hermes -z "ping"` should reach Ollama and return a response.
+#
+# See ADR-150 for the rationale.
+# -----------------------------------------------------------------------------
+
+# ============================================================
+# (1) Top of file — defensive telemetry kill switches.
+# ============================================================
+# These keys are not (yet) read by Hermes; they exist so that a future
+# release which DOES add opt-in analytics surfaces will see explicit
+# `false` rather than an unset default.
+
+telemetry:
+  enabled: false
+analytics:
+  enabled: false
+
+# ============================================================
+# (2) model section — the only load-bearing edits.
+# ============================================================
+model:
+  # Tier-1 ACTIVE: bare model name (no vendor prefix when provider is explicit)
+  default: "qwen3.6:35b-a3b-coding-mxfp8"
+  # Tier-2 PLACEHOLDER (swap + change provider below to flip):
+  # default: "claude-opus-4.6"
+
+  # "custom" is the canonical provider for an OpenAI-compatible local server
+  # (Ollama exposes /v1 at port 11434). "ollama" is also a runtime alias for
+  # "custom". "ollama-local" is a NAMED-OVERRIDE label only — Hermes's
+  # resolver treats it as a timeout profile, not a top-level provider.
+  provider: "custom"
+  # provider: "anthropic"   # ← uncomment to flip Tier-2 default
+
+  base_url: "http://localhost:11434/v1"
+
+# ============================================================
+# (3) providers section — per-provider timeout profiles.
+# ============================================================
+# ollama-local: longer timeouts to absorb 35B MoE cold-start on Apple Silicon
+# anthropic:    pre-wired Sonnet 4.6 / Opus 4.7 timeouts; activates the
+#               moment ANTHROPIC_API_KEY appears in ~/.hermes/.env.
+providers:
+  ollama-local:
+    request_timeout_seconds: 600
+    stale_timeout_seconds: 1200
+  anthropic:
+    request_timeout_seconds: 60
+    models:
+      claude-sonnet-4.6:
+        timeout_seconds: 300
+      claude-opus-4.7:
+        timeout_seconds: 900
