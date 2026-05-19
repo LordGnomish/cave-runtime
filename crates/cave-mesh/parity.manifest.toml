@@ -4,13 +4,14 @@
 # control-plane surface (Pilot xDS, security, telemetry).
 
 [upstream]
-org     = "istio"
-repo    = "istio"
-version = "1.29.2"
-name    = "Istio"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/istio/istio"
+org        = "istio"
+repo       = "istio"
+version    = "1.29.2"
+source_sha = "1.29.2"   # istio v1.29.2 release tag (pinned for this audit)
+name       = "Istio"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/istio/istio"
 [parity]
 # Package-level inventory against istio/istio v1.29 + ambient-mode
 # add-ons (ztunnel, waypoint). Inventory hand-curated 2026-05-12
@@ -18,15 +19,16 @@ url     = "https://github.com/istio/istio"
 # istioctl/, operator/, cni/, pkg/) plus the ztunnel repo.
 # The ambient-mode layer in `src/ambient/` is the cave-side entry
 # point; legacy control-plane bits live alongside.
-mapped_count   = 17
-partial_count  = 2
-skipped_count  = 13
-unmapped_count = 4
-total          = 36
-fill_ratio     = 0.8889
-honest_ratio   = 0.8333
-last_audit     = "2026-05-14"
-infra_only     = false
+mapped_count        = 17
+partial_count       = 2
+skipped_count       = 13
+unmapped_count      = 4
+total               = 36
+fill_ratio          = 0.8889   # (mapped + partial + skipped) / total
+honest_ratio        = 0.8333   # (mapped + skipped) / total — partial excluded
+parity_ratio_source = "manifest"
+last_audit          = "2026-05-19"
+infra_only          = false
 
 [module]
 name        = "cave-mesh"

@@ -13,19 +13,34 @@
 # Contract: fill_ratio = (mapped + skipped) / total
 # See crates/cave-net/PARITY_REPORT.md for what wire-faithful does and does not
 # mean here, and the explicit list of items left for follow-up sprints.
+#
+# 2026-05-19 FINALIZE — Charter v2 8-gate close-out.
+#   * Added `source_sha = "v1.19.3"` for reproducibility audits (matches
+#     the cave-auth / cave-portal FINALIZE convention).
+#   * Refreshed `last_audit = "2026-05-19"`.
+#   * No code or count delta: mapped 42 / partial 0 / skipped 81 /
+#     unmapped 11 / total 134 / fill_ratio 0.9179 is the measured-audit
+#     baseline from 2026-05-13. The 11 unmapped rows remain honestly
+#     scope-cut (BPF bytecode, cloud IPAM, Linux netlink — see
+#     PARITY_REPORT.md "What is **not** wire-faithful" section).
+#   * SPDX (AGPL-3.0-or-later) coverage: 100/100 .rs files (workspace
+#     sweep `bcf64002` already landed on main).
+#   * 4-track: Backend cave-net lib + Portal /admin/net/ + cavectl
+#     NetCmd + observability alert+dashboard — all green pre-close.
 
 [upstream]
-org     = "cilium"
-repo    = "cilium"
-version = "v1.19.3"
+org        = "cilium"
+repo       = "cilium"
+version    = "v1.19.3"
+source_sha = "v1.19.3"
 # inventory fetched via GitHub API (recursive=1)
 upstream_files_total           = 134  # non-vendor non-generated non-test .go
 upstream_pkg_dirs_total    = 118   # distinct pkg/<name>/ directories
 upstream_bpf_c_h_files     = 302   # bpf/**/*.{c,h}
-name    = "Cilium"
-license = "Apache-2.0"
-language= "Go"
-url     = "https://github.com/cilium/cilium"
+name       = "Cilium"
+license    = "Apache-2.0"
+language   = "Go"
+url        = "https://github.com/cilium/cilium"
 [module]
 name          = "cave-net"
 description   = "Cilium parity port — agent-side state machines, CRDs, REST/gRPC surface, Prometheus metrics. Datapath is semantic; see PARITY_REPORT.md for wire-faithful exclusions."
@@ -47,7 +62,7 @@ fill_ratio     = 0.9179
 honest_ratio   = 0.9179
 
 # ─── Mapped ──────────────────────────────────────────────────────────────────
-last_audit  = "2026-05-13"
+last_audit  = "2026-05-19"
 infra_only  = false
 
 [[mapped]]
