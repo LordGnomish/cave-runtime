@@ -12,18 +12,25 @@ language= "Java"
 url     = "https://github.com/DependencyTrack/dependency-track"
 
 [parity]
-ratio       = 0.0
-# fill_ratio = (files with a real port: ported + partial) / total_files
-#            = (39 + 8) / 55 = 47 / 55 = 0.8545
+ratio       = 0.8545
+# fill_ratio = (mapped + partial + skipped) / total
+#            = (39 + 8 + 0) / 55 = 47 / 55 = 0.8545
+# honest_ratio = mapped / total = 39 / 55 = 0.7091
 # Under stricter weighted formula:
 #   (ported + 0.5 * partial) / total = (39 + 4) / 55 = 0.7818
 # The 8 partials each have a real port with documented scope-cut; gaps
-# enumerated as `status="missing"`.
-# Plus 28 ported upstream_test mappings; behavioral coverage drives the
-# next pass.
-fill_ratio  = 0.8545
-last_audit  = "2026-05-17"
-infra_only  = false
+# enumerated as `status="missing"`. Plus 28 ported upstream_test
+# mappings; behavioral coverage drives the next pass.
+mapped_count          = 39
+partial_count         = 8
+skipped_count         = 0
+unmapped_count        = 8
+total                 = 55
+fill_ratio            = 0.8545
+honest_ratio          = 0.7091
+parity_ratio_source   = "manifest"
+last_audit            = "2026-05-18"
+infra_only            = false
 
 [module]
 name        = "cave-sbom"
