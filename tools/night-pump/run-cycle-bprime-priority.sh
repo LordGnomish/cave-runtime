@@ -32,7 +32,7 @@ CONTRIB="$SCRIPT_DIR/contributions.jsonl"
 LOCK_DIR="$SCRIPT_DIR/run-cycle.lockdir"
 PHANTOM_TSV="$SCRIPT_DIR/phantom-counter.tsv"
 BPRIME_SHELF="$SCRIPT_DIR/bprime-shelf.tsv"  # crate \t consecutive_failures \t last_error
-REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-$HOME/Code/cave-runtime}"
 
 # Mode B-prime tuning knobs (env-overridable for ad-hoc testing).
 BPRIME_TARGET_TESTS_DEFAULT="${BPRIME_TARGET_TESTS_DEFAULT:-30}"

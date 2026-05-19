@@ -106,24 +106,24 @@ else
   TOTAL_LEAKS=$((TOTAL_LEAKS + BUILD_HITS))
 fi
 
-# ── 4. Path leakage — /Users/gnomish/ ───────────────────────────────────────
-section "4. Path leakage — \`/Users/gnomish/\`"
+# ── 4. Path leakage — /Users/<user>/ ───────────────────────────────────────
+section "4. Path leakage — \`/Users/<user>/\`"
 
 # Scope: source + docs + scripts + configs. Skip target/, node_modules/, .git/.
-PATH_HITS=$(rg -l '/Users/gnomish' \
+PATH_HITS=$(rg -l '/Users/[^/]+' \
   --glob '!target/**' \
   --glob '!node_modules/**' \
   --glob '!.git/**' \
   --glob '!.claude/worktrees/**' \
   2>/dev/null | wc -l | tr -d ' ')
 
-note "Files containing \`/Users/gnomish\`: **${PATH_HITS}**"
+note "Files containing `/Users/<user>`: **${PATH_HITS}**"
 
 if [[ $PATH_HITS -gt 0 ]]; then
   note ""
   note "Top 30 by file (path → line count):"
   printf '```\n' >> "$OUTPUT"
-  rg -c '/Users/gnomish' \
+  rg -c '/Users/[^/]+' \
     --glob '!target/**' \
     --glob '!node_modules/**' \
     --glob '!.git/**' \
@@ -232,7 +232,7 @@ note ""
 note "Breakdown:"
 note "- .DS_Store files: ${DS_COUNT}"
 note "- Build artefacts tracked: ${BUILD_HITS}"
-note "- Files with \`/Users/gnomish\`: ${PATH_HITS}"
+note "- Files with `/Users/<user>`: ${PATH_HITS}"
 note "- Files with \`btartan@gmail.com\`: ${EMAIL_HITS}"
 note "- Compliance files missing: ${MISSING}"
 note ""

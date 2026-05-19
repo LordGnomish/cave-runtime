@@ -25,7 +25,7 @@ Cave Runtime is a 6-day-old prototype repo carrying a working tree of substantia
 
 The history contains real engineering value — the sweep-001/002 refactor narrative, Wave 1/3a manifest fills, CRI/etcd/apiserver parity sprints — but it also contains shapes the project must not ship publicly:
 
-1. **Path leakage.** Many commit messages, scripts, CI snippets, and inline comments embed `/Users/gnomish/...` paths. Useful local; trivial fingerprint when public.
+1. **Path leakage.** Many commit messages, scripts, CI snippets, and inline comments embed `/Users/<user>/...` paths. Useful local; trivial fingerprint when public.
 2. **Email leakage.** `btartan@gmail.com` appears in committer fields throughout, plus other developer emails embedded in comments / test fixtures.
 3. **Co-Authored-By noise.** Claude/Qwen/Sonnet trailers are not "co-authors" in the SPDX legal sense; they are pairing markers. Public viewers will infer either too much (Anthropic owns the code) or too little (no human responsibility).
 4. **Private-repo URLs and secrets-shaped strings.** Even after `gitleaks` cleanup, private-repo refs may persist in commit messages or sample config snippets.
@@ -90,7 +90,7 @@ The orphan strategy gets the **same trust outcome** as any cleanup option (clean
 Working-tree-level cleanup that benefits whether we orphan or filter:
 
 - **Secret scan.** `trufflehog` + `gitleaks` against working tree (not history). Triage hits, scrub or move to `.env.example` placeholders.
-- **Path scrubbing.** `rg -l '/Users/gnomish'` across `crates/`, `docs/`, `scripts/`, configs. Replace with `$HOME` / `~/` / `<repo>/` placeholders or env-var lookups.
+- **Path scrubbing.** `rg -l '/Users/<user>'` across `crates/`, `docs/`, `scripts/`, configs. Replace with `$HOME` / `~/` / `<repo>/` placeholders or env-var lookups.
 - **Email scrubbing.** Personal addresses in test fixtures, comments, `.gitmessage` templates, CI configs → replace with `noreply@example.com` / `<contributor>` placeholders.
 - **`.DS_Store` purge.** `find . -name '.DS_Store' -delete`.
 - **Build artefact purge.** Confirm `target/`, `node_modules/`, `dist/`, `.cache/` listed in `.gitignore` and not committed; `git rm --cached` if any slipped.

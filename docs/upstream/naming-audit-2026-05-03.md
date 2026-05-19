@@ -1,7 +1,7 @@
 # Naming + Phantom Audit (2026-05-03)
 
 > ⚠️ **CORRECTION (2026-05-03 23:35Z):** Sections 1 & 2 were wrong about
-> ADR-147. The audit `find` ran against `/Users/gnomish/Code/cave-runtime/crates/`
+> ADR-147. The audit `find` ran against `$HOME/Code/cave-runtime/crates/`
 > while the main repo dir was checked out to `feat/cave-upstream-watchd-001`
 > (1478 commits behind main). On main HEAD, ADR-147 is **fully executed**:
 > `cave-rdbms-operator/` and `cave-lakehouse/` exist as real workspace
@@ -186,7 +186,7 @@ Names that show up in `~/Library/Application Support/cave-qwen-pump/queue.txt` b
 # and several steps depend on Burak per-row decisions (Sections 2, 4, 5).
 
 set -euo pipefail
-cd /Users/gnomish/Code/cave-runtime
+cd $HOME/Code/cave-runtime
 
 # ---------------------------------------------------------------------------
 # Step 1 — Section 1 phantom drops (tracker-side rows pointing to non-crates).
