@@ -174,3 +174,65 @@ local_test    = "test_lifecycle_module_accessible_20231027_100013"
 [[tests]]
 upstream_test = "qwen-scaffold pending review"
 local_test    = "test_constants_are_strings_20231027_100014"
+
+# Qwen-pump B-prime cycle 1779193143 (model=qwen3.6:35b-a3b-coding-mxfp8, success_at_retry=3)
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_module_name_20231027_100000"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_repo_20231027_100001"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_upstream_version_20231027_100002"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_store_type_exists_20231027_100003"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_desired_phase_function_exists_20231027_100004"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_type_exists_20231027_100005"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_spec_type_exists_20231027_100006"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_status_type_exists_20231027_100007"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_instance_type_exists_20231027_100008"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_instance_spec_type_exists_20231027_100009"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_virtual_machine_instance_status_type_exists_20231027_100010"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_domain_type_exists_20231027_100011"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_data_volume_type_exists_20231027_100012"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_condition_type_exists_20231027_100013"
+
+[[tests]]
+upstream_test = "qwen-scaffold pending review"
+local_test    = "test_run_strategy_enum_exists_20231027_100014"
