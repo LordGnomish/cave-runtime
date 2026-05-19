@@ -1,0 +1,261 @@
+# parity.manifest.toml — cave-gitleaks
+# Upstream: gitleaks/gitleaks  https://github.com/gitleaks/gitleaks  pinned v8.29.1
+#
+# Cave-gitleaks ports the in-scope MVP surface of Gitleaks line-by-line in
+# Rust: TOML config loader, rule engine (regex + entropy + keyword pre-filter
+# + allowlist), Finding type with redaction, JSON + SARIF reporters, working-
+# tree and git-history walkers (libgit2 via the `git2` crate).
+#
+# This is a scaffold/MVP close-out: 12 of >700 upstream built-in rules are
+# bundled (high-signal cross-industry providers), 2 of 5 reporters land
+# (JSON + SARIF), the `detect` subcommand orchestrator is ported,
+# `protect` (pre-commit/pre-push) is honest-deferred.
+
+[upstream]
+org         = "gitleaks"
+repo        = "gitleaks"
+version     = "v8.29.1"
+name        = "Gitleaks"
+license     = "MIT"
+language    = "Go"
+url         = "https://github.com/gitleaks/gitleaks"
+source_sha  = "v8.29.1"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.6578
+honest_ratio        = 0.6578
+last_audit          = "2026-05-19"
+infra_only          = false
+mapped_count        = 10
+partial_count       = 0
+skipped_count       = 8
+unmapped_count      = 0
+total               = 18
+
+# fill_ratio derivation (Charter v2 honest measurement):
+#   impl_lines               = 1065 (cave-gitleaks src/, excl #[cfg(test)])
+#   upstream_in_scope_lines  = 1619 (sum of subsystem in-scope LOC, see below)
+#   1065 / 1619              = 0.6578
+#
+# Per-subsystem in-scope LOC against v8.29.1 (line counts from
+# `curl https://raw.githubusercontent.com/gitleaks/gitleaks/v8.29.1/<file>`):
+#   config/config.go         350 / 492 (extends + condition AND/OR deferred)
+#   config/rule.go           107 / 107 (full)
+#   config/allowlist.go      150 / 179 (regexTarget deferred)
+#   detect/detect.go         400 / 900 (detectRule + scan; source/decoder chains deferred)
+#   detect/files.go           80 /  92 (working-tree walker)
+#   detect/git.go             35 /  35 (full)
+#   detect/location.go        60 /  80 (column-coarse; offset diagnostics deferred)
+#   detect/reader.go          50 / 108 (covered via scan_str surface)
+#   detect/utils.go           80 / 263 (shannon entropy + helpers)
+#   report/finding.go        100 / 126 (struct + fingerprint)
+#   report/json.go            17 /  17 (full)
+#   report/sarif.go          170 / 217 (subset; invocations + conversion deferred)
+#   report/report.go          16 /  16 (full)
+#   report/constants.go        4 /   4 (full)
+#  ─────────────────────────────────────
+#  Total in-scope LOC      1 619 upstream
+
+[module]
+name        = "cave-gitleaks"
+description = "Secret scanner — Gitleaks parity (TOML rule engine, entropy + keyword pre-filter, allowlist, JSON + SARIF reporters, libgit2 history walker)"
+source_root = "src"
+
+# ── File mappings (mapped) ──────────────────────────────────────────────────
+
+[[files]]
+upstream = "config/config.go"
+local    = "src/config.rs"
+
+[[files]]
+upstream = "config/rule.go"
+local    = "src/rule.rs"
+
+[[files]]
+upstream = "config/allowlist.go"
+local    = "src/config.rs"
+
+[[files]]
+upstream = "detect/detect.go"
+local    = "src/detect.rs"
+
+[[files]]
+upstream = "detect/files.go"
+local    = "src/detect.rs"
+
+[[files]]
+upstream = "detect/git.go"
+local    = "src/git_walker.rs"
+
+[[files]]
+upstream = "detect/utils.go"
+local    = "src/detect.rs"
+
+[[files]]
+upstream = "report/finding.go"
+local    = "src/finding.rs"
+
+[[files]]
+upstream = "report/json.go"
+local    = "src/report.rs"
+
+[[files]]
+upstream = "report/sarif.go"
+local    = "src/report.rs"
+
+# ── Function mappings ───────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "detect.Detector.detectRule"
+local_name    = "Detector::check_rule_on_line"
+file          = "src/detect.rs"
+
+[[functions]]
+upstream_name = "detect.Detector.Detect"
+local_name    = "Detector::scan_str"
+file          = "src/detect.rs"
+
+[[functions]]
+upstream_name = "detect.Detector.DetectFiles"
+local_name    = "Detector::scan_working_tree"
+file          = "src/detect.rs"
+
+[[functions]]
+upstream_name = "detect.Detector.DetectGit"
+local_name    = "scan_repo_history"
+file          = "src/git_walker.rs"
+
+[[functions]]
+upstream_name = "detect.shannonEntropy"
+local_name    = "shannon_entropy"
+file          = "src/detect.rs"
+
+[[functions]]
+upstream_name = "config.Config.Translate"
+local_name    = "Config::into_rules"
+file          = "src/config.rs"
+
+[[functions]]
+upstream_name = "config.Allowlist.RegexAllowed"
+local_name    = "Allowlist::secret_allowed"
+file          = "src/config.rs"
+
+[[functions]]
+upstream_name = "config.Allowlist.PathAllowed"
+local_name    = "Allowlist::path_allowed"
+file          = "src/config.rs"
+
+[[functions]]
+upstream_name = "config.Allowlist.CommitAllowed"
+local_name    = "Allowlist::commit_allowed"
+file          = "src/config.rs"
+
+[[functions]]
+upstream_name = "report.Finding.Redact"
+local_name    = "redact"
+file          = "src/finding.rs"
+
+[[functions]]
+upstream_name = "report.writeJson"
+local_name    = "write_json"
+file          = "src/report.rs"
+
+[[functions]]
+upstream_name = "report.writeSarif"
+local_name    = "write_sarif"
+file          = "src/report.rs"
+
+# ── Mapped subsystems (Charter v2 [[mapped]] block) ────────────────────────
+
+[[mapped]]
+name = "config-loader"
+upstream = "config/config.go"
+note = "TOML schema parsing — title, [allowlist], [[rules]], per-rule allowlist."
+
+[[mapped]]
+name = "rule-engine"
+upstream = "config/rule.go"
+note = "Rule struct + compiled regex + path scope + keyword pre-filter + entropy floor."
+
+[[mapped]]
+name = "allowlist"
+upstream = "config/allowlist.go"
+note = "Path/secret/commit allowlists, per-rule overrides."
+
+[[mapped]]
+name = "detector"
+upstream = "detect/detect.go"
+note = "Per-line per-rule detectRule loop; secret + match redaction."
+
+[[mapped]]
+name = "shannon-entropy"
+upstream = "detect/utils.go"
+note = "Pure shannonEntropy port; gate on per-rule entropy floor."
+
+[[mapped]]
+name = "finding"
+upstream = "report/finding.go"
+note = "Finding struct with upstream JSON tag parity, fingerprint computation."
+
+[[mapped]]
+name = "json-reporter"
+upstream = "report/json.go"
+note = "Array-of-Finding JSON writer with upstream field names."
+
+[[mapped]]
+name = "sarif-reporter"
+upstream = "report/sarif.go"
+note = "SARIF 2.1.0 subset — tool driver, rules dedup, results+regions."
+
+[[mapped]]
+name = "working-tree-walker"
+upstream = "detect/files.go"
+note = "Filesystem walker, .git/.hg/.svn skip, binary file tolerated."
+
+[[mapped]]
+name = "git-history-walker"
+upstream = "detect/git.go"
+note = "libgit2 revwalk; per-commit diff; commit metadata stamping."
+
+# ── Skipped subsystems (out-of-scope MVP, Charter v2 [[skipped]] block) ────
+
+[[skipped]]
+name = "protect"
+upstream = "cmd/protect.go"
+reason = "Pre-commit / pre-push staged-blob enforcement — separate cavectl ray."
+
+[[skipped]]
+name = "baseline"
+upstream = "detect/baseline.go"
+reason = "Persistent baseline + redact files — needs FS state design, deferred."
+
+[[skipped]]
+name = "csv-reporter"
+upstream = "report/csv.go"
+reason = "CSV output unused by upstream consumers in practice (JSON+SARIF dominate)."
+
+[[skipped]]
+name = "junit-reporter"
+upstream = "report/junit.go"
+reason = "JUnit output is CI-specific; ZAP/Dep-Track wave covers JUnit-ish via SARIF."
+
+[[skipped]]
+name = "template-reporter"
+upstream = "report/template.go"
+reason = "Go-template render port deferred — no Rust analog without large dep."
+
+[[skipped]]
+name = "decoders"
+upstream = "detect/decoders/"
+reason = "Auto-decode base64/gzip payload chains — large surface, deferred."
+
+[[skipped]]
+name = "stopwords"
+upstream = "config/gitleaks.toml [stopwords]"
+reason = "Anti-FP stoplist deferred until built-in rule pack expands beyond 12."
+
+[[skipped]]
+name = "extends-and-useDefault"
+upstream = "config/config.go::Extend"
+reason = "Config composition (Extend + UseDefault + Path inheritance) — separate ray."

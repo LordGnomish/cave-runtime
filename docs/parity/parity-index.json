@@ -651,6 +651,24 @@
       "upstream": "Kong/kong",
       "upstream_version": "v3.5.0"
     },
+    "cave-gitleaks": {
+      "cave_src_loc": null,
+      "honest_ratio": 0.6578,
+      "last_audit_disk": "2026-05-19",
+      "manifest_filled": true,
+      "mapped_count": 10,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.6578,
+      "parity_ratio_source": "manifest",
+      "partial_count": 0,
+      "skipped_count": 8,
+      "stubs": null,
+      "tier": "C",
+      "total_count": 18,
+      "unmapped_count": 0,
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-gitops-config": {
       "cave_src_loc": 2182,
       "honest_ratio": 0.0,
@@ -1612,11 +1630,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 84,
-    "injected": 7,
-    "new_filled": 84,
+    "flipped": 85,
+    "injected": 8,
+    "new_filled": 85,
     "phantoms": 5,
-    "ratio_overrides": 30
+    "ratio_overrides": 31
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
