@@ -25,7 +25,9 @@ hex = { workspace = true }
 parking_lot = { workspace = true }
 uuid = { workspace = true }
 regex = { workspace = true }
+rusqlite = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
-tokio = { workspace = true }
