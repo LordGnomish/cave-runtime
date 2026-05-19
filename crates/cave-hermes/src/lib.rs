@@ -29,8 +29,10 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod gateway;
 pub mod memory;
 pub mod planner;
+pub mod prompt;
 pub mod recall;
 pub mod router;
 pub mod session;
@@ -39,9 +41,16 @@ pub mod tools_builtin;
 pub mod workflow;
 
 pub use error::HermesError;
-pub use memory::{InMemoryStore, MemoryProvider, MemoryRecord};
+pub use gateway::{
+    AnthropicStubGateway, CompletionRequest, CompletionResponse, LlmGateway, OllamaGateway,
+};
+pub use memory::{FileStore, InMemoryStore, MemoryProvider, MemoryRecord, SqliteStore};
 pub use planner::{HeuristicPlanner, Plan, PlanStep, Planner};
-pub use recall::{HashRecall, RecallEngine, RecallHit};
+pub use prompt::{
+    AnthropicPrompt, OllamaPrompt, OpenAiPrompt, OpenRouterPrompt, ProviderKind, ProviderPrompt,
+    PromptContext, ToolDescriptor,
+};
+pub use recall::{EmbeddingRecall, Embedder, HashEmbedder, HashRecall, RecallEngine, RecallHit};
 pub use router::{ModelRouter, ModelTier, RouteDecision, TaskComplexity};
 pub use session::{Event, EventKind, SessionStore};
 pub use tool::{ToolEntry, ToolRegistry, ToolResult};
