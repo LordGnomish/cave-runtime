@@ -34,7 +34,7 @@ was deliberately not performed, for the reasons below.
 
 ### 1. Main worktree has ~150 files of uncommitted in-flight work
 
-The `main` worktree at `/Users/gnomish/Code/cave-runtime/.claude/worktrees/hopeful-poincare-b0ede9`
+The `main` worktree at `$HOME/Code/cave-runtime/.claude/worktrees/hopeful-poincare-b0ede9`
 showed (at the time of this run) extensive staged additions and modifications
 spanning what looks like several integration sprints:
 

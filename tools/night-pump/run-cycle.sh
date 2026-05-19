@@ -26,7 +26,7 @@ CONTRIB="$SCRIPT_DIR/contributions.jsonl"
 LOCK_DIR="$SCRIPT_DIR/run-cycle.lockdir"
 # Git ops run against the canonical Cave Runtime repo. Override with
 # QWEN_PUMP_REPO_ROOT for local testing or alternate installs.
-REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-$HOME/Code/cave-runtime}"
 if [ ! -d "$REPO_ROOT/.git" ] && [ ! -f "$REPO_ROOT/.git" ]; then
   echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] FATAL: REPO_ROOT '$REPO_ROOT' is not a git repo" >&2
   exit 1

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/notifications` — Dependency-Track "Notifications" panel.
 //! Lists the default sinks (Slack / Teams / Email / Jira / Webhook) and
 //! the matched event-group set.

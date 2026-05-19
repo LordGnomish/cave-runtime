@@ -25,9 +25,9 @@ Sample (first 10):
 
 ✓ No build artefacts tracked in git.
 
-## 4. Path leakage — `/Users/gnomish/`
+## 4. Path leakage — `/Users/<user>/`
 
-Files containing `/Users/gnomish`: **10**
+Files containing `/Users/<user>`: **10**
 
 Top 30 by file (path → line count):
 ```
@@ -129,7 +129,7 @@ Top Co-Authored-By trailers (count → trailer):
 Breakdown:
 - .DS_Store files: 1
 - Build artefacts tracked: 0
-- Files with `/Users/gnomish`: 10
+- Files with `/Users/<user>`: 10
 - Files with `btartan@gmail.com`: 2
 - Compliance files missing: 4
 

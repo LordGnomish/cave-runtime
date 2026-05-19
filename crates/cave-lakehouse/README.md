@@ -21,7 +21,7 @@ This crate is currently in the pre-open-source-launch phase. Feature parity with
 - Support for time-travel queries to access historical data states.
 - Schema evolution capabilities including column addition, removal, and type changes.
 - Partitioning strategies such as bucketing, range, and hash partitioning.
-- Integration with the `cave-runtime` cloud OS for seamless deployment on Hetzner infrastructure.
+- Integration with the `cave-runtime` cloud OS for seamless deployment on sovereign cloud infrastructure.
 
 ## Public API
 

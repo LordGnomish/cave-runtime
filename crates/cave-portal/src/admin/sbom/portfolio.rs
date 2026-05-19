@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/portfolio` — Dependency-Track "Portfolio" panel. Renders the
 //! per-project Inherited Risk Score grid; pulls weights from cave-sbom's
 //! `portfolio::ProjectRisk` math.

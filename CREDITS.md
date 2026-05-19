@@ -85,7 +85,7 @@ Runtime's own code is **AGPL-3.0-or-later** (see [LICENSE](LICENSE) and
 ### Foundation
 - The **Linux kernel** (≥ 7.0 baseline per ADR-014) — eBPF, cgroup v2, namespaces, io_uring
 - The **Rust** language and **Tokio** ecosystem — workspace, async runtime, ecosystem deps
-- **Hetzner Cloud** — sovereign infrastructure provider that motivated the architecture (ADR-001)
+- **Sovereign cloud providers** — the existence of independent, non-hyperscaler IaaS motivated the architecture (see public ADR-001)
 
 The full list of tracked upstreams is in
 `crates/cave-upstream/src/projects.rs`; the running runtime exposes it at

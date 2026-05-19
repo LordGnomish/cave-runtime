@@ -63,7 +63,7 @@ production-only-classical paths.
 
 ## Phase 3: GA
 
-- [ ] Production deployment guides (Hetzner + Azure)
+- [ ] Production deployment guides (sovereign cloud + hyperscaler)
 - [ ] Helm chart / Kustomize manifests
 - [ ] Plugin system for custom modules
 - [ ] Upgrade / migration tooling

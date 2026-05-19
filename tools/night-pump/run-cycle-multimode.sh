@@ -30,7 +30,7 @@ CYCLE_LOG="$LOG_DIR/run-cycle.log"
 CONTRIB="$SCRIPT_DIR/contributions.jsonl"
 LOCK_DIR="$SCRIPT_DIR/run-cycle.lockdir"
 PHANTOM_TSV="$SCRIPT_DIR/phantom-counter.tsv"
-REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+REPO_ROOT="${QWEN_PUMP_REPO_ROOT:-$HOME/Code/cave-runtime}"
 
 if [ ! -d "$REPO_ROOT/.git" ] && [ ! -f "$REPO_ROOT/.git" ]; then
   echo "FATAL: REPO_ROOT '$REPO_ROOT' is not a git repo" >&2; exit 1

@@ -3,7 +3,7 @@
 # Analysis-only by default. Pass --apply to actually delete.
 set -uo pipefail
 
-REPO="/Users/gnomish/Code/cave-runtime"
+REPO="$HOME/Code/cave-runtime"
 NOW=$(date +%s)
 THIRTY_DAYS=$((30 * 86400))
 APPLY=0

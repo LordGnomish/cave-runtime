@@ -13,7 +13,7 @@ This crate is currently in a pre-open-source-launch phase. Feature parity with t
 ## Surface ported
 
 - **System Initialization**: Handles the boot sequence and initialization of core runtime services, ensuring the sovereign OS environment is correctly configured before user interaction.
-- **Service Management**: Provides commands to start, stop, restart, and inspect the status of individual runtime services and daemons within the Hetzner OSS stack.
+- **Service Management**: Provides commands to start, stop, restart, and inspect the status of individual runtime services and daemons within the cave-runtime stack.
 - **Configuration Management**: Allows users to view, edit, and validate the system configuration files that drive the cave-runtime behavior, ensuring atomic updates and rollback capabilities.
 - **Log Inspection**: Offers real-time log streaming and historical log retrieval for debugging and monitoring system health, integrating with the central logging infrastructure.
 - **User and Permission Control**: Manages user accounts, roles, and access control lists, enforcing the security policies defined in the sovereign OS architecture.

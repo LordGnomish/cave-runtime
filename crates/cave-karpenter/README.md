@@ -12,7 +12,7 @@ This crate is currently in the pre-open-source-launch phase, with implementation
 
 ## Surface ported
 
-- Node provisioning logic scaffolding for Hetzner Cloud infrastructure.
+- Node provisioning logic scaffolding for sovereign cloud infrastructure.
 - Integration points for the CAVE runtime's sovereign Cloud OS layer.
 - Support for Linux 7.1 kernel compatibility checks.
 - Basic configuration parsing for cluster scaling policies.
@@ -43,5 +43,4 @@ Apache-2.0
 ## See also
 
 - [cave-runtime](../cave-runtime)
-- [cave-hetzner](../cave-hetzner)
 - [cave-control-plane](../cave-control-plane)

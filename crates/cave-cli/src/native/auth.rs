@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `cavectl auth` — authentication & authorization CLI subcommand.
 //!
 //! STAGED MODULE — ready to drop into `crates/cave-cli/src/cmd/auth.rs`

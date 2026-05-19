@@ -20,7 +20,7 @@ This crate is currently in a pre-open-source-launch phase, with feature parity t
 - Secure session management with configurable expiration and renewal policies.
 - Multi-tenancy support ensuring strict isolation between tenant identities.
 - Integration with Okta for enterprise-grade identity provider connectivity.
-- Secure storage of credentials and secrets within the Hetzner OSS stack.
+- Secure storage of credentials and secrets within the cave-runtime stack.
 - Extensible middleware for intercepting and validating incoming authentication requests.
 
 ## Public API

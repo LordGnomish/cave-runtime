@@ -17,7 +17,7 @@ set -uo pipefail
 QUEUE="$HOME/Library/Application Support/cave-qwen-pump/queue.txt"
 LOG_DIR="$HOME/Library/Logs/cave-qwen-pump"
 LOG="$LOG_DIR/auto-refill.log"
-REPO="${QWEN_PUMP_REPO_ROOT:-/Users/gnomish/Code/cave-runtime}"
+REPO="${QWEN_PUMP_REPO_ROOT:-$HOME/Code/cave-runtime}"
 THRESHOLD=25
 
 mkdir -p "$LOG_DIR"

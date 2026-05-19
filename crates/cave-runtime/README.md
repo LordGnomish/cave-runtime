@@ -4,7 +4,7 @@ Unified runtime binary hosting all platform modules for the sovereign Cloud OS.
 
 ## Status
 
-This crate is currently in a pre-open-source-launch phase, with feature parity tracked against the broader cave-runtime workspace. It serves as the central execution environment for the Hetzner OSS stack on Linux 7.1, ensuring consistent behavior across all distributed components. Development focuses on stability and modular isolation rather than public API stability.
+This crate is currently in a pre-open-source-launch phase, with feature parity tracked against the broader cave-runtime workspace. It serves as the central execution environment for the cave-runtime stack on Linux 7.1, ensuring consistent behavior across all distributed components. Development focuses on stability and modular isolation rather than public API stability.
 
 ## Upstream
 

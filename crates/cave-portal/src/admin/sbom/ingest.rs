@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/ingest` — Dependency-Track "BOM upload" panel. Static
 //! form HTML; live POST routes to cave-sbom's `/api/v1/bom`.
 //!

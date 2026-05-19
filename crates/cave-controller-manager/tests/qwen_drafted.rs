@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 // === cycle 1779014729 (qwen success at retry 2; ollama_calls=2; ollama_secs=132) ===
 // test: cave_controller_manager integration tests

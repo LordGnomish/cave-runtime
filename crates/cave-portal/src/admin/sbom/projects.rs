@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 //! `/admin/sbom/projects` — Dependency-Track "Projects" panel. Each image
 //! in the SBOM roster is treated as a project; we group by image and report
 //! the component count and license-spread.
