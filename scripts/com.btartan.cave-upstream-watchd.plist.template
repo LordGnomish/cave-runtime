@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-upstream-watchd long-running daemon (Burak's install).
+
+  Installation:
+    1. Build: cargo build --release -p cave-upstream-watchd
+    2. Symlink: ln -sf "$PWD/target/release/cave-upstream-watchd" \
+                     ~/.local/bin/cave-upstream-watchd
+    3. Drop GitHub PAT into the macOS keychain:
+         security add-generic-password -U \
+           -s cave-upstream-watchd -a "$USER" -w "<PAT>"
+    4. Install + start:
+         cp scripts/com.btartan.cave-upstream-watchd.plist.template \
+           ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+         launchctl bootstrap gui/$UID \
+           ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+
+  GitHub PAT resolution (cave-upstream-watchd reads in this order):
+    1. CLI --github-token (cave-upstream legacy binary only)
+    2. macOS keychain — service `cave-upstream-watchd`, account `$USER`
+    3. github_token field in upstream-watch.toml (DEPRECATED — warn log)
+    4. $GITHUB_TOKEN env (DEPRECATED — warn log)
+    5. Anonymous (60 req/h).
+
+  Verify:
+    launchctl list | grep cave-upstream-watchd
+    tail -f ~/Library/Logs/cave-upstream-watchd.log
+
+  Uninstall:
+    launchctl bootout gui/$UID \
+      ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+    rm ~/Library/LaunchAgents/com.btartan.cave-upstream-watchd.plist
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.btartan.cave-upstream-watchd</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/gnomish/.local/bin/cave-upstream-watchd</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RUST_LOG</key>
+        <string>info</string>
+        <!--
+          GITHUB_TOKEN is read from the keychain (see header).
+          Do NOT add it here; the deprecated env path will only
+          take effect if the keychain item is missing.
+        -->
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>Nice</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/gnomish/Library/Logs/cave-upstream-watchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/gnomish/Library/Logs/cave-upstream-watchd.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/gnomish</string>
+
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+</dict>
+</plist>

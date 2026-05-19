@@ -13,7 +13,14 @@
 //! `~/Library/Application Support/cave-runtime/upstream-watch.toml`
 //! (or `$CAVE_UPSTREAM_CONFIG` if set).
 //!
-//! GitHub token is read from `$GITHUB_TOKEN` if not set in the TOML.
+//! GitHub token resolution order (first hit wins):
+//!   1. `--github-token` CLI flag
+//!   2. macOS keychain (service `cave-upstream-watchd`, account `$USER`)
+//!      via [`cave_upstream_watchd::keychain::resolve_github_token`]
+//!   3. `github_token = "ghp_..."` in the TOML config file (DEPRECATED —
+//!      emits a warn log; migrate to the keychain)
+//!   4. `$GITHUB_TOKEN` env (DEPRECATED — same warn)
+//!   5. anonymous (60 req/h)
 
 use cave_upstream::{
     daemon::{install_signal_handler, Config, Daemon},
@@ -84,14 +91,36 @@ async fn main() -> anyhow::Result<()> {
     let cfg_path = cli.config.clone().unwrap_or_else(default_config_path);
     let mut cfg = load_config(&cfg_path)?;
 
-    // CLI overrides
+    // Resolution order: CLI flag → keychain → toml → env → anonymous.
+    // Keychain wins over toml+env so the operator can migrate
+    // incrementally; toml/env stay as deprecated fallbacks so legacy
+    // installs keep working until the keychain item exists.
     if let Some(t) = cli.github_token.clone() {
         cfg.github_token = Some(t);
-    } else if cfg.github_token.is_none() {
-        if let Ok(t) = std::env::var("GITHUB_TOKEN") {
-            if !t.is_empty() {
+        info!(source = "cli", "github PAT resolved");
+    } else {
+        let (kc_tok, kc_src) = cave_upstream_watchd::keychain::resolve_github_token(None);
+        match (kc_tok, kc_src, cfg.github_token.as_ref()) {
+            (Some(t), "keychain", _) => {
                 cfg.github_token = Some(t);
+                info!(source = "keychain", "github PAT resolved");
             }
+            (Some(t), "env", None) => {
+                // No toml token, env fallback wins. The deprecation
+                // warning was already emitted by resolve_github_token.
+                cfg.github_token = Some(t);
+                info!(source = "env", "github PAT resolved");
+            }
+            (_, _, Some(_)) => {
+                warn!(
+                    source = "toml",
+                    "github_token in upstream-watch.toml is DEPRECATED — \
+                     migrate to the macOS keychain (service \
+                     `cave-upstream-watchd`, account `$USER`) and clear \
+                     the toml field."
+                );
+            }
+            _ => { /* nothing — handled by the anonymous warn below */ }
         }
     }
 

@@ -9,6 +9,8 @@ license.workspace = true
 cave-core = { path = "../cave-core" }
 cave-db = { path = "../cave-db" }
 cave-kernel = { path = "../cave-kernel" }
+# Shared GitHub PAT resolver (keychain-first, env fallback).
+cave-upstream-watchd = { path = "../cave-upstream-watchd" }
 axum = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }

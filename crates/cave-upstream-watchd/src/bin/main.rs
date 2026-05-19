@@ -7,8 +7,11 @@
 //!   cave-upstream-watchd list          print tracked projects + pinned versions
 //!   cave-upstream-watchd dump-events   print events.jsonl as JSON array
 //!
-//! Configuration via env:
-//!   GITHUB_TOKEN              GitHub PAT (recommended; 5000 req/h)
+//! Configuration:
+//!   GitHub PAT is resolved by [`cave_upstream_watchd::keychain::resolve_github_token`]:
+//!     1. macOS keychain — service `cave-upstream-watchd`, account `$USER`
+//!     2. `GITHUB_TOKEN` env (DEPRECATED — emits a warn log)
+//!     3. anonymous (60 req/h)
 //!   CAVE_WATCHD_WORKSPACE     workspace root (default: walk up to Cargo.lock)
 //!   CAVE_WATCHD_STATE         state.json path
 //!   CAVE_WATCHD_EVENTS        events.jsonl path
@@ -314,9 +317,16 @@ async fn run_poll(
         .and_then(|s| s.parse().ok())
         .unwrap_or(projects.len());
 
-    let token = std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty());
+    let (token, source) = cave_upstream_watchd::keychain::resolve_github_token(None);
     if token.is_none() {
-        warn!("no GITHUB_TOKEN set — anonymous limit is 60 req/h, watchd will throttle quickly");
+        warn!(
+            "no GitHub PAT found in keychain (service `cave-upstream-watchd`) \
+             nor in $GITHUB_TOKEN — anonymous limit is 60 req/h, watchd \
+             will throttle quickly. Run `security add-generic-password -U \
+             -s cave-upstream-watchd -a \"$USER\" -w <PAT>` to enable."
+        );
+    } else {
+        info!(source = source, "github PAT resolved");
     }
     let client = GitHubClient::new(token);
     let mut state = WatchState::load(state_path)?;

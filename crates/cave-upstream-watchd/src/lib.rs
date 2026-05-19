@@ -37,6 +37,7 @@
 pub mod changelog;
 pub mod diff;
 pub mod event;
+pub mod keychain;
 pub mod persistence;
 pub mod poller;
 pub mod tracked;

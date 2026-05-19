@@ -15,9 +15,18 @@
     ~/Library/Application Support/cave-runtime/watchd/watchd.err
 
   Environment:
-    GITHUB_TOKEN must be set in the system keychain or as a launchd
-    `EnvironmentVariables` key (NOT shown here — the operator should
-    edit the copy in LaunchAgents/ rather than commit a token).
+    The GitHub PAT is read by cave-upstream-watchd via the macOS
+    keychain (service `cave-upstream-watchd`, account `$USER`):
+
+      security add-generic-password -U \
+        -s cave-upstream-watchd \
+        -a "$USER" \
+        -w "<your-PAT>"
+
+    If the keychain item is missing the daemon falls back to
+    `$GITHUB_TOKEN` (DEPRECATED — emits a warn log), then to
+    anonymous 60 req/h. Do NOT commit a token in
+    `EnvironmentVariables`.
 
   Cadence:
     StartInterval = 300 seconds = 5 minutes. Matches Burak's
@@ -57,13 +66,11 @@
   <key>StandardErrorPath</key>
   <string>/Users/gnomish/Library/Application Support/cave-runtime/watchd/watchd.err</string>
 
-  <!-- Operator: replace with `pbpaste` of a token, then `chmod 600`. -->
   <!--
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>GITHUB_TOKEN</key>
-    <string>ghp_REPLACE_ME_DO_NOT_COMMIT</string>
-  </dict>
+    No EnvironmentVariables{GITHUB_TOKEN} block — keychain-first PAT
+    resolution is the supported path. See the header comment for the
+    `security add-generic-password` command. PATH/HOME are picked up
+    from the launchd user-agent context by default.
   -->
 
   <!-- Lower priority so the daemon doesn't compete with the runtime. -->

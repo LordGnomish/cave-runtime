@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  cave-upstream-watchd POLLER (every 5 min).
+
+  Install:
+    cp scripts/com.cave.upstream-watchd-poller.plist.template \
+      ~/Library/LaunchAgents/com.cave.upstream-watchd-poller.plist
+    launchctl bootstrap gui/$UID \
+      ~/Library/LaunchAgents/com.cave.upstream-watchd-poller.plist
+
+  GitHub PAT resolution (cave-upstream-watchd reads in this order):
+    1. macOS keychain — service `cave-upstream-watchd`, account `$USER`:
+         security add-generic-password -U \
+           -s cave-upstream-watchd -a "$USER" -w "<PAT>"
+    2. $GITHUB_TOKEN env (DEPRECATED — warn log, kept for legacy CI).
+    3. Anonymous (60 req/h).
+
+  After rotating the PAT (revoke old → keychain set new), reload:
+    launchctl unload ~/Library/LaunchAgents/com.cave.upstream-watchd-poller.plist
+    launchctl load   ~/Library/LaunchAgents/com.cave.upstream-watchd-poller.plist
+
+  Logs:
+    ~/Library/Logs/cave-upstream-watchd-poller.{log,err}
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.cave.upstream-watchd-poller</string>
+
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>HOME</key>
+		<string>/Users/gnomish</string>
+		<key>PATH</key>
+		<string>/Users/gnomish/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+
+	<key>ProgramArguments</key>
+	<array>
+		<string>/Users/gnomish/Code/cave-runtime-main/target/release/cave-upstream-watchd</string>
+		<string>poll</string>
+		<string>--workspace</string>
+		<string>/Users/gnomish/Code/cave-runtime-main</string>
+	</array>
+
+	<key>StartInterval</key>
+	<integer>300</integer>
+
+	<key>RunAtLoad</key>
+	<true/>
+
+	<key>LowPriorityIO</key>
+	<true/>
+	<key>Nice</key>
+	<integer>10</integer>
+
+	<key>StandardErrorPath</key>
+	<string>/Users/gnomish/Library/Logs/cave-upstream-watchd-poller.err</string>
+	<key>StandardOutPath</key>
+	<string>/Users/gnomish/Library/Logs/cave-upstream-watchd-poller.log</string>
+</dict>
+</plist>
