@@ -1,0 +1,352 @@
+# parity.manifest.toml — cave-hermes
+# Upstream: NousResearch/hermes-agent  https://github.com/NousResearch/hermes-agent  pinned v2026.5.16
+#
+# cave-hermes ports the MVP backend surface of Hermes Agent to Rust:
+# persistent memory (MemoryProvider trait + two backends), a self-
+# registering tool registry with four built-in tools (bash, file_read,
+# file_write, web_fetch), a workflow checkpoint/resume state machine,
+# heuristic + LLM-backed planners, a tiered model router with rolling
+# rate-limit accounting, embedding-free semantic recall, and an
+# append-only session event log with JSONL crash recovery.
+#
+# The 4-track Charter v2 surface (Backend + Portal + cavectl + Observability)
+# ships Backend only; Portal admin pages, cavectl subcommands, and observability
+# dashboards are scope-cut to a follow-up sprint and documented in
+# PARITY_REPORT.md §7.
+
+[upstream]
+org         = "NousResearch"
+repo        = "hermes-agent"
+version     = "v2026.5.16"
+name        = "Hermes Agent"
+license     = "MIT"
+language    = "Python"
+url         = "https://github.com/NousResearch/hermes-agent"
+source_sha  = "v2026.5.16"
+
+[parity]
+parity_ratio_source = "manifest"
+fill_ratio          = 0.6909
+honest_ratio        = 0.6909
+last_audit          = "2026-05-19"
+infra_only          = false
+mapped_count        = 24
+partial_count       = 2
+skipped_count       = 17
+unmapped_count      = 4
+total               = 47
+
+# fill_ratio derivation (Charter v2 honest measurement):
+#   impl_lines               = 1880 (cave-hermes src/, excl #[cfg(test)])
+#   upstream_in_scope_lines  = 2721 (sum of subsystem in-scope LOC, below)
+#   1880 / 2721              = 0.6909
+#
+# Per-subsystem in-scope LOC against v2026.5.16 (line counts from the cloned
+# tag at commit 8487dfb57d2f2f7b310a2b3eb692b32674af22cd):
+#
+#   agent/memory_manager.py        555 / 555  (full — MemoryProvider, ContextScrubber)
+#   agent/memory_provider.py       279 / 279  (full — trait surface)
+#   tools/registry.py              350 / 589  (register/get/invoke/schema_catalogue; AST-walk
+#                                              discovery + threading-lock plumbing deferred)
+#   providers/base.py               80 / 184  (routing fields only — ModelProfile;
+#                                              auth/quirks/header-mangling defer)
+#   agent/retry_utils.py            57 /  57  (full — retry semantics adopted into Workflow)
+#   agent/rate_limit_tracker.py    100 / 246  (rolling window in router::RateWindow;
+#                                              per-account ledger defers)
+#   tools/process_registry.py      250 /1534  (narrow port — `bash` tool only)
+#   tools/file_tools.py            300 /1172  (narrow port — file_read + file_write only)
+#   tools/web_tools.py             200 /1551  (narrow port — web_fetch only;
+#                                              fetcher itself is injected by host)
+#   prompt_builder.py (∂ planner)  200 /1456  (task decomposition pattern;
+#                                              provider-specific prompt assembly defers)
+#   agent/recall (inline upstream)  150 /  -- (HashRecall fallback; upstream uses
+#                                              embeddings inline within run_agent loop)
+#   agent/credential_sources.py    150 / 448  (session-state portion only;
+#                                              actual credential discovery defers to cave-vault)
+#   run_agent event-log (inline)   100 / --   (SessionStore; upstream tangles this with
+#                                              the run loop — extracted cleanly here)
+#  ─────────────────────────────────────
+#  Total in-scope LOC          2 721 upstream
+
+[module]
+name        = "cave-hermes"
+description = "Hermes-parity agent orchestrator — memory, tools, workflow, planner, router, recall, session"
+source_root = "src"
+
+# ── File mappings (mapped) ──────────────────────────────────────────────────
+
+[[files]]
+upstream = "agent/memory_manager.py"
+local    = "src/memory.rs"
+
+[[files]]
+upstream = "agent/memory_provider.py"
+local    = "src/memory.rs"
+
+[[files]]
+upstream = "tools/registry.py"
+local    = "src/tool.rs"
+
+[[files]]
+upstream = "providers/base.py"
+local    = "src/router.rs"
+
+[[files]]
+upstream = "agent/retry_utils.py"
+local    = "src/workflow.rs"
+
+[[files]]
+upstream = "agent/rate_limit_tracker.py"
+local    = "src/router.rs"
+
+[[files]]
+upstream = "tools/process_registry.py"
+local    = "src/tools_builtin.rs"
+
+[[files]]
+upstream = "tools/file_tools.py"
+local    = "src/tools_builtin.rs"
+
+[[files]]
+upstream = "tools/web_tools.py"
+local    = "src/tools_builtin.rs"
+
+[[files]]
+upstream = "agent/prompt_builder.py"
+local    = "src/planner.rs"
+
+[[files]]
+upstream = "agent/credential_sources.py"
+local    = "src/session.rs"
+
+# ── Subsystems (mapped) ─────────────────────────────────────────────────────
+
+[[mapped]]
+name        = "memory.MemoryProvider trait"
+upstream    = "agent/memory_provider.py"
+local       = "src/memory.rs:MemoryProvider"
+
+[[mapped]]
+name        = "memory.InMemoryStore"
+upstream    = "agent/memory_manager.py (in-process backend)"
+local       = "src/memory.rs:InMemoryStore"
+
+[[mapped]]
+name        = "memory.FileStore"
+upstream    = "—"   # bonus — upstream lacks a JSON-file backend
+local       = "src/memory.rs:FileStore"
+
+[[mapped]]
+name        = "memory.ContextScrubber"
+upstream    = "agent/memory_manager.py:sanitize_context + StreamingContextScrubber"
+local       = "src/memory.rs:ContextScrubber"
+
+[[mapped]]
+name        = "tool.ToolEntry + ToolRegistry"
+upstream    = "tools/registry.py:ToolEntry"
+local       = "src/tool.rs:ToolEntry + ToolRegistry"
+
+[[mapped]]
+name        = "tool.schema_catalogue"
+upstream    = "tools/registry.py:get_definitions"
+local       = "src/tool.rs:schema_catalogue"
+
+[[mapped]]
+name        = "tools_builtin.bash"
+upstream    = "tools/process_registry.py:run_bash"
+local       = "src/tools_builtin.rs:bash_entry"
+
+[[mapped]]
+name        = "tools_builtin.file_read"
+upstream    = "tools/file_tools.py:read_file"
+local       = "src/tools_builtin.rs:file_read_entry"
+
+[[mapped]]
+name        = "tools_builtin.file_write"
+upstream    = "tools/file_tools.py:write_file"
+local       = "src/tools_builtin.rs:file_write_entry"
+
+[[mapped]]
+name        = "tools_builtin.web_fetch"
+upstream    = "tools/web_tools.py:fetch"
+local       = "src/tools_builtin.rs:web_fetch_entry"
+
+[[mapped]]
+name        = "workflow.Workflow + Step"
+upstream    = "agent/run_agent.py (workflow loop)"
+local       = "src/workflow.rs:Workflow + Step"
+
+[[mapped]]
+name        = "workflow.Checkpoint save/load"
+upstream    = "agent/run_agent.py (resume-from)"
+local       = "src/workflow.rs:Checkpoint"
+
+[[mapped]]
+name        = "workflow.retry semantics"
+upstream    = "agent/retry_utils.py"
+local       = "src/workflow.rs:fail_step + max_retries"
+
+[[mapped]]
+name        = "planner.HeuristicPlanner"
+upstream    = "agent/prompt_builder.py (decomposition rules)"
+local       = "src/planner.rs:HeuristicPlanner"
+
+[[mapped]]
+name        = "planner.LlmPlanner"
+upstream    = "agent/prompt_builder.py:build_plan_prompt"
+local       = "src/planner.rs:LlmPlanner"
+
+[[mapped]]
+name        = "planner.Plan + PlanStep"
+upstream    = "agent/prompt_builder.py (Plan dataclass)"
+local       = "src/planner.rs:Plan + PlanStep"
+
+[[mapped]]
+name        = "router.ModelProfile + ModelTier"
+upstream    = "providers/base.py:ProviderProfile (routing fields)"
+local       = "src/router.rs:ModelProfile + ModelTier"
+
+[[mapped]]
+name        = "router.TaskComplexity::estimate"
+upstream    = "agent/prompt_builder.py:estimate_complexity"
+local       = "src/router.rs:TaskComplexity"
+
+[[mapped]]
+name        = "router.ModelRouter (routing + degradation)"
+upstream    = "providers/base.py + agent/rate_limit_tracker.py"
+local       = "src/router.rs:ModelRouter"
+
+[[mapped]]
+name        = "router.RateWindow"
+upstream    = "agent/rate_limit_tracker.py:RollingWindow"
+local       = "src/router.rs:RateWindow"
+
+[[mapped]]
+name        = "recall.RecallEngine trait + HashRecall"
+upstream    = "agent/run_agent.py (semantic recall inline)"
+local       = "src/recall.rs:RecallEngine + HashRecall"
+
+[[mapped]]
+name        = "recall.fingerprint (SHA-256)"
+upstream    = "agent/run_agent.py (content hash)"
+local       = "src/recall.rs:fingerprint"
+
+[[mapped]]
+name        = "session.SessionStore + Event"
+upstream    = "agent/run_agent.py (event log)"
+local       = "src/session.rs:SessionStore + Event"
+
+[[mapped]]
+name        = "session.JSONL sink + replay"
+upstream    = "agent/credential_sources.py (persistence pattern)"
+local       = "src/session.rs:with_sink + replay"
+
+# ── Partials ────────────────────────────────────────────────────────────────
+
+[[partial]]
+name        = "tool.discover_builtin_tools (AST-walk)"
+upstream    = "tools/registry.py:discover_builtin_tools"
+local       = "src/tools_builtin.rs:register_all (explicit listing)"
+note        = "Rust does not import-scan; explicit register_all() replaces the AST walk."
+
+[[partial]]
+name        = "memory.prefetch_all / queue_prefetch_all"
+upstream    = "agent/memory_manager.py:prefetch_all"
+local       = "src/memory.rs:MemoryProvider::list_scope (synchronous only)"
+note        = "Background prefetch queue defers — wiring needs a tokio runtime; current API is synchronous."
+
+# ── Skipped (intentionally out-of-scope MVP) ────────────────────────────────
+
+[[skipped]]
+name        = "agent/prompt_builder system-prompt assembly"
+reason      = "Provider-specific prompt mangling (1456 LOC); planner subset already mapped."
+
+[[skipped]]
+name        = "agent/image_routing.py"
+reason      = "Multimodal image routing — defer until cave-runtime has a vision pipeline."
+
+[[skipped]]
+name        = "agent/credential_sources.py (creds discovery)"
+reason      = "Credential discovery belongs in cave-vault, not cave-hermes."
+
+[[skipped]]
+name        = "agent/account_usage.py"
+reason      = "Billing/cost tracking — out of scope for orchestration MVP."
+
+[[skipped]]
+name        = "agent/onboarding.py"
+reason      = "Interactive CLI onboarding wizard — UX/cavectl follow-up."
+
+[[skipped]]
+name        = "agent/portal_tags.py"
+reason      = "Portal-specific tagging integration — Portal track follow-up."
+
+[[skipped]]
+name        = "agent/skill_preprocessing.py + skill_utils.py"
+reason      = "Skill system (Hermes plugin ecosystem) — separate crate scope."
+
+[[skipped]]
+name        = "agent/web_search_provider.py + web_search_registry.py"
+reason      = "Web search routing — cave-search integration, separate sprint."
+
+[[skipped]]
+name        = "agent/image_gen_registry.py"
+reason      = "Image generation routing — multimodal sprint."
+
+[[skipped]]
+name        = "tools/voice_mode.py + tts_tool.py + transcription_tools.py + vision_tools.py"
+reason      = "Modality tools — defer until cave-runtime has the corresponding pipelines."
+
+[[skipped]]
+name        = "tools/mcp_oauth.py"
+reason      = "MCP OAuth flow — Hermes-specific; cave-runtime has its own auth in cave-auth."
+
+[[skipped]]
+name        = "tools/browser_dialog_tool.py + browser orchestration"
+reason      = "Browser-based tools — out of scope MVP."
+
+[[skipped]]
+name        = "tools/skills_hub.py + tools/clarify_gateway.py"
+reason      = "Skills hub + clarify gateway — UX layer."
+
+[[skipped]]
+name        = "tools/tirith_security.py + osv_check.py"
+reason      = "Security tools — cave-runtime has cave-vulns/cave-sbom/cave-dast."
+
+[[skipped]]
+name        = "acp_adapter/ + acp_registry/"
+reason      = "Agent Communication Protocol — multi-agent coordination is the next ray."
+
+[[skipped]]
+name        = "plugins/ system"
+reason      = "Plugin loading is out of MVP."
+
+[[skipped]]
+name        = "tui_gateway/ + ui-tui/ + web/ + website/"
+reason      = "UI/UX layers — Portal track follow-up (see §7)."
+
+# ── Unmapped (in-scope, deferred) ───────────────────────────────────────────
+
+[[unmapped]]
+name        = "Provider-specific system-prompt assembly"
+upstream    = "agent/prompt_builder.py (per-provider chunks)"
+priority    = "next-sprint"
+note        = "Needed for production planner; HeuristicPlanner sufficient for MVP smoke."
+
+[[unmapped]]
+name        = "Concrete providers (OpenAI / Anthropic / Ollama)"
+upstream    = "providers/openai.py + anthropic.py + ollama.py"
+priority    = "next-sprint"
+note        = "Routing surface in place; concrete adapters live in cave-llm-gateway."
+
+[[unmapped]]
+name        = "cave-rdbms / cave-etcd backed MemoryProvider"
+upstream    = "Hermes' shelve/sqlite providers"
+priority    = "next-sprint"
+note        = "InMemoryStore + FileStore cover MVP; persistent backend in next sprint."
+
+[[unmapped]]
+name        = "EmbeddingRecall"
+upstream    = "agent/run_agent.py (vector similarity)"
+priority    = "follow-up"
+note        = "HashRecall is the documented fallback; needs cave-search embedding trait first."

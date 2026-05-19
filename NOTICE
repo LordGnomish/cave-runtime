@@ -42,7 +42,7 @@ canonical machine-readable list lives in
 `crates/cave-upstream/src/projects.rs` and is exposed at runtime via
 `/api/portal/upstream`.
 
-Total upstreams: 78
+Total upstreams: 79
 
 AGPL-3.0:
   - minio/minio
@@ -124,6 +124,9 @@ Apache-2.0:
 
 GPL-3.0:
   - frappe/erpnext
+
+MIT:
+  - NousResearch/hermes-agent  (Copyright 2025 Nous Research)
 
 PostgreSQL (BSD-2-style):
   - postgres/postgres

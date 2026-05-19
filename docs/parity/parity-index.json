@@ -672,6 +672,24 @@
       "upstream": "etcd-io/etcd",
       "upstream_version": "v3.5.13"
     },
+    "cave-hermes": {
+      "cave_src_loc": null,
+      "honest_ratio": 0.6909,
+      "last_audit_disk": "2026-05-19",
+      "manifest_filled": true,
+      "mapped_count": 24,
+      "note": "added by disk-overlay; not in audit doc",
+      "parity_ratio": 0.6909,
+      "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 17,
+      "stubs": null,
+      "tier": "C",
+      "total_count": 47,
+      "unmapped_count": 4,
+      "upstream": null,
+      "upstream_version": null
+    },
     "cave-hubble": {
       "cave_src_loc": 572,
       "manifest_filled": false,
@@ -1602,11 +1620,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 84,
-    "injected": 7,
-    "new_filled": 84,
+    "flipped": 85,
+    "injected": 8,
+    "new_filled": 85,
     "phantoms": 5,
-    "ratio_overrides": 29
+    "ratio_overrides": 30
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"

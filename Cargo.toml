@@ -138,6 +138,8 @@ members = [
     "crates/cave-karpenter",
     # === Virtualization (KubeVirt) ===
     "crates/cave-kubevirt",
+    # === Hermes Agent Orchestrator ===
+    "crates/cave-hermes",
 ]
 
 [workspace.package]
