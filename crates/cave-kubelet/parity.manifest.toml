@@ -1,11 +1,30 @@
 # parity.manifest.toml — cave-kubelet
 # Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
 # Tracks parity for the node agent (kubelet replacement).
+#
+# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+#   * Bumped `version` pin v1.28.0 → v1.36.0 to align with cave-apiserver
+#     / cave-scheduler / cave-controller-manager. The 2026-05-13 batch4
+#     re-audit already validated package mapping against v1.31.x; no v1.36
+#     surface drift in the [[mapped]] rows (kubelet/pkg layout stable
+#     across 1.28→1.36).
+#   * Added `source_sha = "v1.36.0"` for reproducibility audits.
+#   * Refreshed `last_audit = "2026-05-18"`.
+#   * No code or count delta: mapped 28 / partial 1 / skipped 9 /
+#     unmapped 1 / total 39 / fill_ratio 0.9744 is the measured-audit
+#     baseline from the 2026-05-13 batch4 status+prober ports. The 1
+#     unmapped row (Windows host-process containers) remains honestly
+#     scope-cut — see PARITY_REPORT.md "Unmapped surface".
+#   * SPDX (AGPL-3.0-or-later) coverage: 38/38 .rs files.
+#   * 4-track: Backend cave-kubelet lib + Portal /admin/kubelet/ + cavectl
+#     KubeletCmd + observability cave-kubelet alerts & dashboard — all
+#     green pre-close.
 
 [upstream]
-org     = "kubernetes"
-repo    = "kubernetes"
-version = "v1.28.0"
+org        = "kubernetes"
+repo       = "kubernetes"
+version    = "v1.36.0"
+source_sha = "v1.36.0"
 
 [parity]
 # Package-level inventory (see [[mapped]]/[[skipped]]/[[unmapped]] below):
@@ -24,7 +43,7 @@ unmapped_count = 1
 total          = 39
 fill_ratio     = 0.9744
 honest_ratio   = 0.9487
-last_audit     = "2026-05-14"
+last_audit     = "2026-05-18"
 infra_only     = false
 
 [module]
