@@ -34,9 +34,11 @@
 //! scope for the 2026-05-13 Fix-C scaffold; this crate is responsible
 //! only for **detecting** and **publishing** gaps.
 
+pub mod atom;
 pub mod changelog;
 pub mod diff;
 pub mod event;
+pub mod github_app;
 pub mod keychain;
 pub mod persistence;
 pub mod poller;
@@ -58,7 +60,9 @@ pub mod task_queue;
 /// supplied, and exposed standalone via the `cave-tdd-check` binary.
 pub mod tdd;
 
+pub use atom::{parse_first_entry, AtomClient};
 pub use changelog::{parse_release_body, Changelog, ChangelogEntry, ChangeKind};
+pub use github_app::{detect_app, mint_app_jwt, AppDetection, AppError};
 pub use diff::{compare_pin_against_latest, Severity, VersionDiff};
 pub use event::{emit, GapEvent, GapEventSink, JsonlSink};
 pub use persistence::{WatchState, WatchStateEntry};

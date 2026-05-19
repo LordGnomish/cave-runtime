@@ -29,6 +29,8 @@ dirs = "5"
 semver = "1"
 async-trait = { workspace = true }
 sha2 = { workspace = true }
+quick-xml = "0.37"
+jsonwebtoken = { workspace = true }
 
 [dev-dependencies]
 httpmock = "0.7"

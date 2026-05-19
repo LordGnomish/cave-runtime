@@ -8,10 +8,20 @@
 //!   cave-upstream-watchd dump-events   print events.jsonl as JSON array
 //!
 //! Configuration:
-//!   GitHub PAT is resolved by [`cave_upstream_watchd::keychain::resolve_github_token`]:
-//!     1. macOS keychain — service `cave-upstream-watchd`, account `$USER`
-//!     2. `GITHUB_TOKEN` env (DEPRECATED — emits a warn log)
-//!     3. anonymous (60 req/h)
+//!   Release-detection strategy (ADR-026, 2026-05-19):
+//!     1. Default — public Atom feed at
+//!        `https://github.com/<owner>/<repo>/releases.atom`. No auth.
+//!     2. Optional — REST JSON via a GitHub App when both keychain
+//!        items `cave-upstream-github-app` and `cave-upstream-github-app-id`
+//!        are present. See `docs/runbooks/github-app-setup.md`.
+//!     3. Legacy PAT fallback — REST JSON with a `GITHUB_TOKEN` env
+//!        var or the keychain item `cave-upstream-watchd`. Kept for
+//!        operators who haven't migrated to Atom; emits a `deprecated`
+//!        warn log when used.
+//!   CAVE_WATCHD_PRIMARY       atom (default) | json | auto. `auto` =
+//!                              Atom unless the GitHub App is configured,
+//!                              in which case prefer the App-backed JSON
+//!                              path for richer release notes.
 //!   CAVE_WATCHD_WORKSPACE     workspace root (default: walk up to Cargo.lock)
 //!   CAVE_WATCHD_STATE         state.json path
 //!   CAVE_WATCHD_EVENTS        events.jsonl path
@@ -320,6 +330,35 @@ async fn run_dispatch(
     Ok(())
 }
 
+/// Which release-detection backend a tick should use. Resolved
+/// once at tick start from `CAVE_WATCHD_PRIMARY` env + the
+/// optional GitHub App keychain detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PollStrategy {
+    /// Public Atom feed — no auth, no PAT (default).
+    Atom,
+    /// REST JSON via a GitHub PAT (legacy or `--strategy=json`).
+    LegacyJson,
+}
+
+fn resolve_strategy() -> PollStrategy {
+    let primary = std::env::var("CAVE_WATCHD_PRIMARY")
+        .unwrap_or_else(|_| "atom".into())
+        .to_ascii_lowercase();
+    let app = cave_upstream_watchd::github_app::detect_app();
+    match (primary.as_str(), app) {
+        ("json", _) => PollStrategy::LegacyJson,
+        ("auto", cave_upstream_watchd::github_app::AppDetection::Configured { .. }) => {
+            // App enrichment provisioned — caller would mint a token
+            // and use the JSON path. Phase 2 wiring lands the JWT
+            // exchange; until then we still walk the Atom path for
+            // safety.
+            PollStrategy::Atom
+        }
+        _ => PollStrategy::Atom,
+    }
+}
+
 async fn run_poll(
     workspace: &std::path::Path,
     state_path: &std::path::Path,
@@ -333,18 +372,26 @@ async fn run_poll(
         .and_then(|s| s.parse().ok())
         .unwrap_or(projects.len());
 
-    let (token, source) = cave_upstream_watchd::keychain::resolve_github_token(None);
-    if token.is_none() {
-        warn!(
-            "no GitHub PAT found in keychain (service `cave-upstream-watchd`) \
-             nor in $GITHUB_TOKEN — anonymous limit is 60 req/h, watchd \
-             will throttle quickly. Run `security add-generic-password -U \
-             -s cave-upstream-watchd -a \"$USER\" -w <PAT>` to enable."
-        );
+    let strategy = resolve_strategy();
+    info!(strategy = ?strategy, "poll strategy resolved");
+
+    let atom_client = cave_upstream_watchd::atom::AtomClient::new();
+    let legacy_client = if strategy == PollStrategy::LegacyJson {
+        let (token, source) = cave_upstream_watchd::keychain::resolve_github_token(None);
+        if token.is_none() {
+            warn!(
+                "LegacyJson strategy requested but no PAT in keychain \
+                 (`cave-upstream-watchd`) nor $GITHUB_TOKEN — falling \
+                 back to anonymous 60 req/h."
+            );
+        } else {
+            info!(source = source, "github PAT resolved (legacy strategy)");
+        }
+        Some(GitHubClient::new(token))
     } else {
-        info!(source = source, "github PAT resolved");
-    }
-    let client = GitHubClient::new(token);
+        None
+    };
+
     let mut state = WatchState::load(state_path)?;
     let sink = JsonlSink::new(events_path.to_path_buf());
 
@@ -355,7 +402,22 @@ async fn run_poll(
     let mut errors = 0;
 
     for project in projects.iter().take(max_projects) {
-        match poll_one(&client, &sink, &mut state, project, Utc::now()).await {
+        let outcome = match strategy {
+            PollStrategy::Atom => {
+                poll_one_atom(&atom_client, &sink, &mut state, project, Utc::now()).await
+            }
+            PollStrategy::LegacyJson => {
+                poll_one(
+                    legacy_client.as_ref().expect("legacy client present"),
+                    &sink,
+                    &mut state,
+                    project,
+                    Utc::now(),
+                )
+                .await
+            }
+        };
+        match outcome {
             Ok(PollOutcome::NewRelease { .. }) => new_releases += 1,
             Ok(PollOutcome::NotModified { .. }) => not_modified += 1,
             Ok(PollOutcome::NoRelease) => no_release += 1,
@@ -383,16 +445,35 @@ async fn run_poll(
         "tick complete"
     );
     println!(
-        "watchd tick: new={} not_modified={} no_release={} rate_limited={} errors={}",
-        new_releases, not_modified, no_release, rate_limited, errors,
+        "watchd tick: strategy={:?} new={} not_modified={} no_release={} rate_limited={} errors={}",
+        strategy, new_releases, not_modified, no_release, rate_limited, errors,
     );
     Ok(())
 }
 
-/// Poll one project. Returns the underlying outcome so the caller
-/// can tally aggregates. Side-effects: appends an event if there's a
-/// new release that's actually beyond our pin, and writes the state
-/// entry regardless of outcome.
+/// Atom-feed variant of [`poll_one`]. Same persistence and event
+/// side-effects, different fetcher.
+pub async fn poll_one_atom(
+    client: &cave_upstream_watchd::atom::AtomClient,
+    sink: &dyn GapEventSink,
+    state: &mut WatchState,
+    project: &TrackedProject,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<PollOutcome, anyhow::Error> {
+    let prev = state.get(&project.github_repo).cloned().unwrap_or_default();
+    let outcome = client
+        .fetch_latest_atom(
+            &project.github_repo,
+            prev.etag.as_deref(),
+            prev.last_modified.as_deref(),
+        )
+        .await?;
+    apply_outcome(&outcome, sink, state, project, now)?;
+    Ok(outcome)
+}
+
+/// Poll one project via the legacy JSON REST API. Returns the
+/// underlying outcome so the caller can tally aggregates.
 pub async fn poll_one(
     client: &GitHubClient,
     sink: &dyn GapEventSink,
@@ -408,8 +489,21 @@ pub async fn poll_one(
             prev.last_modified.as_deref(),
         )
         .await?;
+    apply_outcome(&outcome, sink, state, project, now)?;
+    Ok(outcome)
+}
 
-    match &outcome {
+/// Persist the poll outcome (state mutation + optional gap event).
+/// Shared by both the Atom and JSON poll variants — they only differ
+/// in the fetcher.
+fn apply_outcome(
+    outcome: &PollOutcome,
+    sink: &dyn GapEventSink,
+    state: &mut WatchState,
+    project: &TrackedProject,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<(), anyhow::Error> {
+    match outcome {
         PollOutcome::NewRelease {
             release,
             etag,
@@ -461,8 +555,7 @@ pub async fn poll_one(
             // so the next tick retries with the same cache.
         }
     }
-
-    Ok(outcome)
+    Ok(())
 }
 
 #[cfg(test)]
