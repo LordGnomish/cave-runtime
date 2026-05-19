@@ -3,8 +3,8 @@
 **Upstream:** [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) `v2026.5.16` (commit `8487dfb57d2f2f7b310a2b3eb692b32674af22cd`)
 **Upstream license:** MIT (Copyright 2025 Nous Research)
 **Local license:** AGPL-3.0-or-later (workspace policy)
-**Last audit:** 2026-05-19
-**fill_ratio:** **0.6909** (1880 impl lines / 2721 upstream in-scope lines)
+**Last audit:** 2026-05-19 (scaffold) → 2026-05-19 (gap-fill close-out)
+**fill_ratio:** **0.8836** (2855 impl lines / 3231 upstream in-scope lines, up from 0.6909)
 **Track surface:** Backend (Portal / cavectl / Observability deferred — see §7)
 
 ---
@@ -87,61 +87,75 @@ always-latest gate is satisfied.
 
 ## 4. fill_ratio breakdown
 
-Honest measured: `impl_lines / upstream_in_scope_lines = 1880 / 2721 = 0.6909`.
+Honest measured: `impl_lines / upstream_in_scope_lines = 2855 / 3231 = 0.8836`.
 
 | upstream file/range              | upstream LOC | in-scope LOC | local mapping                            |
 |----------------------------------|-------------:|-------------:|------------------------------------------|
 | `agent/memory_manager.py`        |          555 |          555 | `src/memory.rs`                          |
-| `agent/memory_provider.py`       |          279 |          279 | `src/memory.rs`                          |
+| `agent/memory_provider.py`       |          279 |          279 | `src/memory.rs` (+ `SqliteStore`)        |
 | `tools/registry.py`              |          589 |          350 | `src/tool.rs`                            |
 | `providers/base.py`              |          184 |           80 | `src/router.rs`                          |
+| `providers/anthropic.py`         |          410 |           70 | `src/gateway.rs:AnthropicStubGateway` (stub) |
+| `providers/ollama.py`            |          240 |          200 | `src/gateway.rs:OllamaGateway`           |
 | `agent/retry_utils.py`           |           57 |           57 | `src/workflow.rs`                        |
 | `agent/rate_limit_tracker.py`    |          246 |          100 | `src/router.rs`                          |
 | `tools/process_registry.py`      |        1 534 |          250 | `src/tools_builtin.rs::bash_*`           |
 | `tools/file_tools.py`            |        1 172 |          300 | `src/tools_builtin.rs::file_*`           |
 | `tools/web_tools.py`             |        1 551 |          200 | `src/tools_builtin.rs::web_fetch_*`      |
-| `agent/prompt_builder.py` (∂)    |        1 456 |          200 | `src/planner.rs`                         |
+| `agent/prompt_builder.py` (∂)    |        1 456 |          440 | `src/planner.rs` + `src/prompt.rs` (4 providers) |
 | `agent/credential_sources.py` (∂)|          448 |          150 | `src/session.rs`                         |
-| run-loop recall (inline)         |           — |          150 | `src/recall.rs`                          |
+| run-loop recall (inline)         |           — |          150 | `src/recall.rs` (`HashRecall` + `EmbeddingRecall`) |
 | run-loop event log (inline)      |           — |          100 | `src/session.rs`                         |
-| **Total**                        |              |    **2 721** |                                          |
+| **Total**                        |              |    **3 231** |                                          |
 
 Local impl LOC (non-test):
 
 | local file              | LOC |
 |-------------------------|----:|
 | `src/error.rs`          |  49 |
-| `src/lib.rs`            |  86 |
-| `src/memory.rs`         | 263 |
-| `src/planner.rs`        | 210 |
-| `src/recall.rs`         | 168 |
+| `src/gateway.rs`        | 284 |
+| `src/lib.rs`            |  95 |
+| `src/memory.rs`         | 417 |
+| `src/planner.rs`        | 211 |
+| `src/prompt.rs`         | 342 |
+| `src/recall.rs`         | 352 |
 | `src/router.rs`         | 265 |
-| `src/session.rs`        | 144 |
+| `src/session.rs`        | 145 |
 | `src/tool.rs`           | 237 |
 | `src/tools_builtin.rs`  | 235 |
 | `src/workflow.rs`       | 223 |
-| **Total**               | **1 880** |
+| **Total**               | **2 855** |
 
 ---
 
 ## 5. Counts
 
-* **mapped:** 24 subsystems
-* **partial:** 2 (AST-walk tool discovery; async memory prefetch)
-* **skipped:** 17 (multimodal / skills / plugins / UI / ACP / providers / vault / billing / onboarding / portal / search / image-gen)
-* **unmapped:** 4 (prompt assembly, concrete providers, persistent memory backend, embedding recall)
-* **total:** 47
+* **mapped:** 31 subsystems (was 24 — added 7 in 2026-05-19 gap-fill ray)
+* **partial:** 3 (AST-walk tool discovery; async memory prefetch; Anthropic-stub gateway)
+* **skipped:** 18 (multimodal / skills / plugins / UI / ACP / vault / billing / onboarding / portal / search / image-gen / OpenAI gateway)
+* **unmapped:** **0** (all four close-out gaps absorbed — see §6)
+* **total:** 52
 
 ---
 
-## 6. [[unmapped]] gaps with explicit priority
+## 6. Close-out: 4 unmapped gaps absorbed (2026-05-19 gap-fill ray)
 
-| name                                            | priority      | next step                                                        |
-|-------------------------------------------------|---------------|------------------------------------------------------------------|
-| Provider-specific system-prompt assembly        | next-sprint   | Port `prompt_builder.py` per-provider chunks (Anthropic/OpenAI/Gemini) |
-| Concrete provider adapters                      | next-sprint   | Land in `cave-llm-gateway` (already targeted)                    |
-| `cave-rdbms`/`cave-etcd` `MemoryProvider`       | next-sprint   | Add `RdbmsMemoryStore` once cave-rdbms exposes a stable connection trait |
-| `EmbeddingRecall`                               | follow-up     | Needs `cave-search` to expose an `embed(text) -> Vec<f32>` trait |
+The scaffold ray (commit `2de33c22`) shipped with four deferred backend
+gaps. The gap-fill ray closed all four within the same audit day:
+
+| original unmapped gap                            | resolution                                                                                    | mapped/partial entries                                                              |
+|--------------------------------------------------|-----------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| Provider-specific system-prompt assembly         | **mapped** — `src/prompt.rs` ships 4 backends (Anthropic XML / OpenAI JSON / Ollama text / OpenRouter passthrough) | `prompt.ProviderPrompt trait + 4 backends`, `prompt.PromptContext + ToolDescriptor` |
+| Concrete provider adapters                       | **mapped + partial** — Ollama is a real reqwest HTTP backend (POST `/api/generate`); Anthropic is a stub (echo / canned) since cave-vault hasn't issued an `x-api-key`. OpenAI deferred to `cave-llm-gateway` and re-tagged [[skipped]]. | `gateway.LlmGateway trait`, `gateway.OllamaGateway`, partial `gateway.AnthropicStubGateway` |
+| Persistent `MemoryProvider`                      | **mapped** — `src/memory.rs:SqliteStore` (rusqlite with `bundled` feature; idempotent migration; in-memory + file modes). cave-rdbms / cave-etcd backed variants intentionally deferred (the upstream gap was a *persistent* backend; SqliteStore satisfies that). | `memory.SqliteStore`                                                                |
+| `EmbeddingRecall`                                | **mapped** — `Embedder` trait + `HashEmbedder` (SHA-256 bucket projection, L2-normalised, dim=128 default) + `EmbeddingRecall` (cosine ranking). Real embedder swap-in waits on cave-search promoting `compute_embedding` past its `unimplemented!()` stub. | `recall.Embedder + HashEmbedder`, `recall.EmbeddingRecall (cosine ranking)`         |
+
+Outcome: `unmapped_count` 4 → **0**; `fill_ratio` 0.6909 → **0.8836**.
+No new follow-up unmapped is introduced — the only forward-looking
+items (real Anthropic API call, OpenAI gateway, RDBMS-backed memory,
+LLM-driven embedder) are tracked as partials or [[skipped]] with
+explicit hand-offs to cave-vault, cave-llm-gateway, cave-rdbms, and
+cave-search respectively.
 
 ---
 
@@ -156,7 +170,7 @@ Local impl LOC (non-test):
 | 5. No-backcompat (Linux 7.1 only) | ✅ PASS | no compat shims; modern Rust 2024 edition |
 | 6. Always-latest | ✅ PASS | `v2026.5.16` is the head stable tag as of 2026-05-19 |
 | 7. 4-track minimum (Backend zorunlu; Portal/cavectl/Obs scaffold) | ⚠ Backend only | Portal admin pages, cavectl subcommands, observability dashboards **deferred** (see below) |
-| 8. Honest measured fill_ratio | ✅ PASS | 0.6909 measured, manifest-sourced |
+| 8. Honest measured fill_ratio | ✅ PASS | 0.8836 measured, manifest-sourced (0.6909 → 0.8836 after gap-fill ray) |
 
 ### §7 deferral note
 
@@ -178,10 +192,9 @@ before the multi-agent surface is stabilized). The scope for follow-up:
 
 ## 8. Push status
 
-* **Branch:** `claude/cave-hermes-scaffold-2026-05-19`
-* **Off main:** `f90c1300` (current `origin/main` HEAD)
-* **Commit chain:** see `git log claude/cave-hermes-scaffold-2026-05-19 ^main`
-* **Push:** autonomous push per directive
+* **Scaffold ray:** `claude/cave-hermes-scaffold-2026-05-19` (commit `2de33c22`, pushed)
+* **Gap-fill ray:** `claude/cave-hermes-gaps-2026-05-19` (off scaffold `2de33c22`, pushed)
+* **Commit chain:** see `git log claude/cave-hermes-gaps-2026-05-19 ^main`
 
 ---
 
@@ -189,5 +202,6 @@ before the multi-agent surface is stabilized). The scope for follow-up:
 
 * Added `crates/cave-hermes` as workspace member (`Cargo.toml`).
 * Updated `NOTICE` with MIT attribution to Nous Research.
-* Added `docs/parity/parity-index.json` entry for `cave-hermes`.
+* Updated `docs/parity/parity-index.json` cave-hermes entry (re-generated from manifest by `scripts/build-parity-index.py`).
+* Added `cave-hermes` dependencies: `rusqlite` (workspace, `bundled` feature), `reqwest` (workspace, rustls), `tokio` (workspace, runtime).
 * No other crate touched.

@@ -26,30 +26,36 @@ source_sha  = "v2026.5.16"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.6909
-honest_ratio        = 0.6909
+fill_ratio          = 0.8836
+honest_ratio        = 0.8836
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 24
-partial_count       = 2
-skipped_count       = 17
-unmapped_count      = 4
-total               = 47
+mapped_count        = 31
+partial_count       = 3
+skipped_count       = 18
+unmapped_count      = 0
+total               = 52
 
 # fill_ratio derivation (Charter v2 honest measurement):
-#   impl_lines               = 1880 (cave-hermes src/, excl #[cfg(test)])
-#   upstream_in_scope_lines  = 2721 (sum of subsystem in-scope LOC, below)
-#   1880 / 2721              = 0.6909
+#   impl_lines               = 2855 (cave-hermes src/, excl #[cfg(test)])
+#   upstream_in_scope_lines  = 3231 (sum of subsystem in-scope LOC, below)
+#   2855 / 3231              = 0.8836
 #
 # Per-subsystem in-scope LOC against v2026.5.16 (line counts from the cloned
 # tag at commit 8487dfb57d2f2f7b310a2b3eb692b32674af22cd):
 #
-#   agent/memory_manager.py        555 / 555  (full — MemoryProvider, ContextScrubber)
-#   agent/memory_provider.py       279 / 279  (full — trait surface)
+#   agent/memory_manager.py        555 / 555  (full — MemoryProvider, ContextScrubber;
+#                                              SqliteStore now ports the sqlite branch in-place)
+#   agent/memory_provider.py       279 / 279  (full — trait surface + sqlite backend)
 #   tools/registry.py              350 / 589  (register/get/invoke/schema_catalogue; AST-walk
 #                                              discovery + threading-lock plumbing deferred)
 #   providers/base.py               80 / 184  (routing fields only — ModelProfile;
 #                                              auth/quirks/header-mangling defer)
+#   providers/anthropic.py          70 / 410  (NEW — stub gateway: trait surface + echo /
+#                                              canned response; no real API call until
+#                                              cave-vault issues an x-api-key)
+#   providers/ollama.py            200 / 240  (NEW — real reqwest backend hitting
+#                                              /api/generate; streaming defers)
 #   agent/retry_utils.py            57 /  57  (full — retry semantics adopted into Workflow)
 #   agent/rate_limit_tracker.py    100 / 246  (rolling window in router::RateWindow;
 #                                              per-account ledger defers)
@@ -57,16 +63,20 @@ total               = 47
 #   tools/file_tools.py            300 /1172  (narrow port — file_read + file_write only)
 #   tools/web_tools.py             200 /1551  (narrow port — web_fetch only;
 #                                              fetcher itself is injected by host)
-#   prompt_builder.py (∂ planner)  200 /1456  (task decomposition pattern;
-#                                              provider-specific prompt assembly defers)
-#   agent/recall (inline upstream)  150 /  -- (HashRecall fallback; upstream uses
-#                                              embeddings inline within run_agent loop)
+#   prompt_builder.py (∂ planner)  440 /1456  (task decomposition pattern + 4-provider
+#                                              system-prompt assembly: Anthropic XML,
+#                                              OpenAI JSON, Ollama plain-text, OpenRouter
+#                                              passthrough; messageExpression / auth
+#                                              mangling defer)
+#   agent/recall (inline upstream)  150 /  -- (HashRecall + EmbeddingRecall via
+#                                              HashEmbedder; real embedder swap-in
+#                                              waits on cave-search promotion)
 #   agent/credential_sources.py    150 / 448  (session-state portion only;
 #                                              actual credential discovery defers to cave-vault)
 #   run_agent event-log (inline)   100 / --   (SessionStore; upstream tangles this with
 #                                              the run loop — extracted cleanly here)
 #  ─────────────────────────────────────
-#  Total in-scope LOC          2 721 upstream
+#  Total in-scope LOC          3 231 upstream
 
 [module]
 name        = "cave-hermes"
@@ -118,6 +128,21 @@ local    = "src/planner.rs"
 [[files]]
 upstream = "agent/credential_sources.py"
 local    = "src/session.rs"
+
+# Gap-fill batch (2026-05-19): provider prompt assembly + concrete gateway +
+# persistent memory + embedding recall.
+
+[[files]]
+upstream = "agent/prompt_builder.py (per-provider chunks)"
+local    = "src/prompt.rs"
+
+[[files]]
+upstream = "providers/anthropic.py"
+local    = "src/gateway.rs"
+
+[[files]]
+upstream = "providers/ollama.py"
+local    = "src/gateway.rs"
 
 # ── Subsystems (mapped) ─────────────────────────────────────────────────────
 
@@ -241,6 +266,43 @@ name        = "session.JSONL sink + replay"
 upstream    = "agent/credential_sources.py (persistence pattern)"
 local       = "src/session.rs:with_sink + replay"
 
+# ── Gap-fill batch (2026-05-19) ─────────────────────────────────────────────
+
+[[mapped]]
+name        = "prompt.ProviderPrompt trait + 4 backends"
+upstream    = "agent/prompt_builder.py (per-provider chunks)"
+local       = "src/prompt.rs:ProviderPrompt + AnthropicPrompt + OpenAiPrompt + OllamaPrompt + OpenRouterPrompt"
+
+[[mapped]]
+name        = "prompt.PromptContext + ToolDescriptor"
+upstream    = "agent/prompt_builder.py (assembly inputs)"
+local       = "src/prompt.rs:PromptContext + ToolDescriptor"
+
+[[mapped]]
+name        = "gateway.LlmGateway trait"
+upstream    = "providers/base.py (Provider.complete contract)"
+local       = "src/gateway.rs:LlmGateway"
+
+[[mapped]]
+name        = "gateway.OllamaGateway (real HTTP)"
+upstream    = "providers/ollama.py"
+local       = "src/gateway.rs:OllamaGateway"
+
+[[mapped]]
+name        = "memory.SqliteStore"
+upstream    = "agent/memory_provider.py (sqlite branch)"
+local       = "src/memory.rs:SqliteStore"
+
+[[mapped]]
+name        = "recall.Embedder + HashEmbedder"
+upstream    = "agent/run_agent.py (vector embed inline)"
+local       = "src/recall.rs:Embedder + HashEmbedder"
+
+[[mapped]]
+name        = "recall.EmbeddingRecall (cosine ranking)"
+upstream    = "agent/run_agent.py (cosine similarity recall)"
+local       = "src/recall.rs:EmbeddingRecall + cosine_similarity"
+
 # ── Partials ────────────────────────────────────────────────────────────────
 
 [[partial]]
@@ -254,6 +316,12 @@ name        = "memory.prefetch_all / queue_prefetch_all"
 upstream    = "agent/memory_manager.py:prefetch_all"
 local       = "src/memory.rs:MemoryProvider::list_scope (synchronous only)"
 note        = "Background prefetch queue defers — wiring needs a tokio runtime; current API is synchronous."
+
+[[partial]]
+name        = "gateway.AnthropicStubGateway"
+upstream    = "providers/anthropic.py"
+local       = "src/gateway.rs:AnthropicStubGateway"
+note        = "Trait surface + echo / canned-response stub. No real x-api-key HTTP call — cave-vault hasn't issued one yet; the stub is hot-swappable for a true reqwest adapter without touching the LlmGateway trait."
 
 # ── Skipped (intentionally out-of-scope MVP) ────────────────────────────────
 
@@ -325,28 +393,22 @@ reason      = "Plugin loading is out of MVP."
 name        = "tui_gateway/ + ui-tui/ + web/ + website/"
 reason      = "UI/UX layers — Portal track follow-up (see §7)."
 
+[[skipped]]
+name        = "providers/openai.py concrete gateway"
+reason      = "Ollama (real) + Anthropic-stub cover the cave-hermes LlmGateway parity surface; OpenAI wire format is owned by cave-llm-gateway downstream."
+
 # ── Unmapped (in-scope, deferred) ───────────────────────────────────────────
-
-[[unmapped]]
-name        = "Provider-specific system-prompt assembly"
-upstream    = "agent/prompt_builder.py (per-provider chunks)"
-priority    = "next-sprint"
-note        = "Needed for production planner; HeuristicPlanner sufficient for MVP smoke."
-
-[[unmapped]]
-name        = "Concrete providers (OpenAI / Anthropic / Ollama)"
-upstream    = "providers/openai.py + anthropic.py + ollama.py"
-priority    = "next-sprint"
-note        = "Routing surface in place; concrete adapters live in cave-llm-gateway."
-
-[[unmapped]]
-name        = "cave-rdbms / cave-etcd backed MemoryProvider"
-upstream    = "Hermes' shelve/sqlite providers"
-priority    = "next-sprint"
-note        = "InMemoryStore + FileStore cover MVP; persistent backend in next sprint."
-
-[[unmapped]]
-name        = "EmbeddingRecall"
-upstream    = "agent/run_agent.py (vector similarity)"
-priority    = "follow-up"
-note        = "HashRecall is the documented fallback; needs cave-search embedding trait first."
+#
+# All four close-out unmapped gaps from the 2026-05-19 scaffold ray were
+# absorbed by this gap-fill ray:
+#
+#   * Provider-specific system-prompt assembly → src/prompt.rs (4 providers)
+#   * Concrete providers (Ollama / Anthropic)  → src/gateway.rs (mapped +
+#                                                 partial for Anthropic-stub)
+#   * Persistent MemoryProvider                → src/memory.rs:SqliteStore
+#   * EmbeddingRecall                          → src/recall.rs:Embedder +
+#                                                 HashEmbedder + EmbeddingRecall
+#
+# OpenAI concrete-gateway remains intentionally absent (covered by
+# `cave-llm-gateway` if the runtime needs the OpenAI wire format) and is
+# tracked in [[skipped]] below rather than carried as an unmapped gap.

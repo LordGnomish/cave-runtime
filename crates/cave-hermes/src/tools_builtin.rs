@@ -314,8 +314,14 @@ mod tests {
         assert!(matches!(err, crate::error::HermesError::Io(_)));
     }
 
+    // FETCHER is process-global; these two tests serialise against a
+    // shared mutex so `cargo test`'s parallel scheduler can't interleave
+    // install / clear and surface false negatives.
+    static FETCHER_TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
     #[test]
     fn web_fetch_without_installed_fetcher_fails_clearly() {
+        let _g = FETCHER_TEST_LOCK.lock();
         clear_fetcher();
         let mut r = ToolRegistry::new();
         register_all(&mut r);
@@ -332,6 +338,7 @@ mod tests {
 
     #[test]
     fn web_fetch_with_installed_fetcher_returns_body() {
+        let _g = FETCHER_TEST_LOCK.lock();
         install_fetcher(Arc::new(|url: &str| Ok(format!("body of {url}"))));
         let mut r = ToolRegistry::new();
         register_all(&mut r);
