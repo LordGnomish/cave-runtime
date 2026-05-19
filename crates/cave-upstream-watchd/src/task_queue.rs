@@ -10,8 +10,14 @@
 //!     completion marker the dispatcher polls.
 //!   * [`ClaudeCliTaskQueue`] — spawns the local `claude` binary
 //!     (Claude Code) with `-p <prompt> --output-format json`.
-//!     Production default — uses the operator's existing Claude
-//!     Code session, no external `ANTHROPIC_API_KEY` required.
+//!     Uses the operator's existing Claude Code session.
+//!   * [`HermesTaskQueue`] — spawns the local `hermes` binary
+//!     (Hermes Agent) with `-z <prompt>`. Routes to the operator's
+//!     configured Hermes provider (Ollama tier-1 by default), so
+//!     no `ANTHROPIC_API_KEY` and no Claude Code session required.
+//!     Use this when the Claude Code session has expired (HTTP 401
+//!     `Invalid authentication credentials` in the claude-cli logs)
+//!     or when you want a local-LLM dispatch path.
 //!   * [`OpusTaskQueue`] — submits the prompt to Anthropic's
 //!     Messages API directly. Useful on headless hosts without
 //!     the Claude Code CLI; requires `ANTHROPIC_API_KEY`.
@@ -799,6 +805,264 @@ impl TaskQueue for ClaudeCliTaskQueue {
     }
 }
 
+// ── HermesTaskQueue (added 2026-05-19) ─────────────────────────────────────
+//
+// Same shape as [`ClaudeCliTaskQueue`] but invokes the local `hermes`
+// wrapper (`~/.local/bin/hermes`) with `-z <prompt>`. Hermes Agent
+// routes the prompt to the operator's configured provider (Ollama by
+// default on the dev box) so no Anthropic API key and no Claude Code
+// session are required. The completion contract is identical —
+// [`parse_completion_text`] expects `commit_sha: <40-hex>` etc. on
+// stdout regardless of which model produced it.
+//
+// Added on 2026-05-19 after the claude-cli backend started returning
+// HTTP 401 `Invalid authentication credentials` on every dispatch
+// (the operator's Claude Code session had expired); Hermes is the
+// fallback that lets the auto-port loop keep moving while the
+// session is restored.
+
+#[derive(Clone)]
+pub struct HermesTaskQueue {
+    workspace_root: PathBuf,
+    hermes_binary: PathBuf,
+    output_log_dir: PathBuf,
+    /// Skip the actual subprocess when true (integration tests).
+    test_mode_echo: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct HermesRecord {
+    task_id: String,
+    branch: String,
+    prompt: String,
+    ctx: HashMap<String, String>,
+    started_at: chrono::DateTime<chrono::Utc>,
+    completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    cmd_args: Vec<String>,
+    stdout_path: PathBuf,
+    /// `dispatched` until the subprocess returns, then `completed` /
+    /// `failed`.
+    status: String,
+    exit_code: Option<i32>,
+    /// Final assistant text used by [`parse_completion_text`].
+    result_text: Option<String>,
+}
+
+impl HermesTaskQueue {
+    /// Locate the `hermes` binary on standard install paths. Same
+    /// walk order as [`ClaudeCliTaskQueue::locate_binary`].
+    pub fn locate_binary() -> Option<PathBuf> {
+        if let Ok(path_env) = std::env::var("PATH") {
+            for dir in path_env.split(':') {
+                let p = PathBuf::from(dir).join("hermes");
+                if Self::is_executable(&p) {
+                    return Some(p);
+                }
+            }
+        }
+        if let Ok(home) = std::env::var("HOME") {
+            let p = PathBuf::from(home).join(".local/bin/hermes");
+            if Self::is_executable(&p) {
+                return Some(p);
+            }
+        }
+        let p = PathBuf::from("/usr/local/bin/hermes");
+        if Self::is_executable(&p) {
+            return Some(p);
+        }
+        None
+    }
+
+    fn is_executable(p: &Path) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(p) {
+            Ok(m) => m.is_file() && (m.permissions().mode() & 0o111 != 0),
+            Err(_) => false,
+        }
+    }
+
+    /// Construct from environment — discovers `hermes`, uses
+    /// `CAVE_WORKSPACE_ROOT` env var (or the passed `output_log_dir`'s
+    /// parent as a fallback). Returns `TaskQueueError::Disabled` when
+    /// no binary is found.
+    pub fn from_env(output_log_dir: PathBuf) -> Result<Self, TaskQueueError> {
+        let hermes_binary = Self::locate_binary().ok_or_else(|| {
+            TaskQueueError::Disabled(
+                "no `hermes` binary found in $PATH, $HOME/.local/bin, \
+                 or /usr/local/bin — install Hermes Agent first \
+                 (`pipx install hermes-agent` or similar)",
+            )
+        })?;
+        let workspace_root = std::env::var("CAVE_WORKSPACE_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                output_log_dir
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| PathBuf::from("."))
+            });
+        std::fs::create_dir_all(&output_log_dir)?;
+        Ok(Self {
+            workspace_root,
+            hermes_binary,
+            output_log_dir,
+            test_mode_echo: false,
+        })
+    }
+
+    /// Override the discovered binary path (integration tests use
+    /// `/bin/echo`). Flips `test_mode_echo` so submit() drops the
+    /// `-z` flag.
+    pub fn set_hermes_binary_for_test(&mut self, p: PathBuf) {
+        self.hermes_binary = p;
+        self.test_mode_echo = true;
+    }
+
+    fn record_path(&self, task_id: &TaskId) -> PathBuf {
+        self.output_log_dir.join(format!("{}.json", task_id.0))
+    }
+
+    fn stdout_path(&self, task_id: &TaskId) -> PathBuf {
+        self.output_log_dir.join(format!("{}.stdout", task_id.0))
+    }
+
+    fn read_record(&self, task_id: &TaskId) -> Result<HermesRecord, TaskQueueError> {
+        let p = self.record_path(task_id);
+        let raw = std::fs::read(&p)
+            .map_err(|_| TaskQueueError::NotFound(task_id.0.clone()))?;
+        let rec: HermesRecord = serde_json::from_slice(&raw)?;
+        Ok(rec)
+    }
+
+    fn write_record(&self, rec: &HermesRecord) -> Result<(), TaskQueueError> {
+        let p = self.output_log_dir.join(format!("{}.json", rec.task_id));
+        let raw = serde_json::to_vec_pretty(rec)?;
+        std::fs::write(&p, raw)?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl TaskQueue for HermesTaskQueue {
+    async fn submit(
+        &self,
+        prompt: &str,
+        target_branch: &str,
+        context: HashMap<String, String>,
+    ) -> Result<TaskId, TaskQueueError> {
+        let task_id = TaskId::new(format!(
+            "hermes-{}",
+            chrono::Utc::now().format("%Y%m%dT%H%M%S%3f")
+        ));
+        let stdout_path = self.stdout_path(&task_id);
+
+        // Build args: `hermes -z <prompt>`. The `-z` flag is the
+        // one-shot non-interactive mode. test_mode_echo skips it so
+        // /bin/echo exits cleanly.
+        let args: Vec<String> = if self.test_mode_echo {
+            vec![prompt.to_string()]
+        } else {
+            vec!["-z".into(), prompt.into()]
+        };
+
+        let rec = HermesRecord {
+            task_id: task_id.0.clone(),
+            branch: target_branch.to_string(),
+            prompt: prompt.to_string(),
+            ctx: context,
+            started_at: chrono::Utc::now(),
+            completed_at: None,
+            cmd_args: {
+                let mut a = vec![self.hermes_binary.display().to_string()];
+                a.extend(args.iter().cloned());
+                a
+            },
+            stdout_path: stdout_path.clone(),
+            status: "dispatched".to_string(),
+            exit_code: None,
+            result_text: None,
+        };
+        self.write_record(&rec)?;
+
+        let mut cmd = tokio::process::Command::new(&self.hermes_binary);
+        cmd.args(&args);
+        cmd.current_dir(&self.workspace_root);
+        cmd.stdin(std::process::Stdio::null());
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::piped());
+        let output = cmd
+            .output()
+            .await
+            .map_err(|e| TaskQueueError::Http(format!("hermes spawn: {e}")))?;
+
+        std::fs::write(&stdout_path, &output.stdout)?;
+
+        let result_text = String::from_utf8_lossy(&output.stdout).into_owned();
+        let exit_code = output.status.code();
+        let status = if output.status.success() {
+            "completed"
+        } else {
+            "failed"
+        };
+        let rec_done = HermesRecord {
+            completed_at: Some(chrono::Utc::now()),
+            status: status.to_string(),
+            exit_code,
+            result_text: Some(result_text),
+            ..rec
+        };
+        self.write_record(&rec_done)?;
+        Ok(task_id)
+    }
+
+    async fn status(&self, task_id: &TaskId) -> Result<TaskStatus, TaskQueueError> {
+        let rec = self.read_record(task_id)?;
+        match (rec.status.as_str(), rec.exit_code) {
+            ("dispatched", _) => Ok(TaskStatus::Running),
+            ("completed", _) => {
+                let text = rec.result_text.clone().unwrap_or_default();
+                if let Some(o) = parse_completion_text(&text, &rec.branch) {
+                    Ok(TaskStatus::Completed {
+                        commit_sha: o.commit_sha,
+                        branch: o.branch,
+                    })
+                } else {
+                    Ok(TaskStatus::Failed {
+                        reason: format!(
+                            "hermes exit 0 but no commit_sha: line in stdout (record at {})",
+                            self.record_path(task_id).display()
+                        ),
+                    })
+                }
+            }
+            ("failed", code) => Ok(TaskStatus::Failed {
+                reason: format!(
+                    "hermes exited {} (record at {})",
+                    code.map(|c| c.to_string())
+                        .unwrap_or_else(|| "signal".to_string()),
+                    self.record_path(task_id).display()
+                ),
+            }),
+            (other, _) => Err(TaskQueueError::Http(format!(
+                "unknown record status: {other}"
+            ))),
+        }
+    }
+
+    async fn output(&self, task_id: &TaskId) -> Result<Option<TaskOutput>, TaskQueueError> {
+        let rec = self.read_record(task_id)?;
+        if rec.status != "completed" {
+            return Ok(None);
+        }
+        let text = rec.result_text.unwrap_or_default();
+        Ok(parse_completion_text(&text, &rec.branch))
+    }
+
+    fn backend_name(&self) -> &'static str {
+        "hermes"
+    }
+}
+
 pub fn parse_completion_text(text: &str, fallback_branch: &str) -> Option<TaskOutput> {
     let mut commit_sha: Option<String> = None;
     let mut branch: Option<String> = None;
@@ -988,6 +1252,88 @@ mod tests {
             "located path should end with `claude`: {}",
             p.display()
         );
+    }
+
+    // ── HermesTaskQueue (added 2026-05-19) ─────────────────────
+
+    #[tokio::test]
+    async fn hermes_task_queue_from_env_locates_binary_on_standard_paths() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let q = HermesTaskQueue::from_env(dir.path().to_path_buf())
+            .expect("must locate hermes on a host with hermes-agent installed");
+        assert_eq!(q.backend_name(), "hermes");
+    }
+
+    #[tokio::test]
+    async fn hermes_task_queue_submit_records_task_under_log_dir() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut q = HermesTaskQueue::from_env(dir.path().to_path_buf())
+            .expect("hermes binary present");
+        q.set_hermes_binary_for_test(std::path::PathBuf::from("/bin/echo"));
+        let id = q
+            .submit("test prompt", "auto-port/test-event", ctx())
+            .await
+            .expect("submit ok");
+        assert!(id.0.starts_with("hermes-"), "TaskId prefix");
+        let record = dir.path().join(format!("{}.json", id.0));
+        assert!(
+            record.exists(),
+            "submit must persist task record at {}",
+            record.display()
+        );
+    }
+
+    #[tokio::test]
+    async fn hermes_task_queue_status_returns_not_found_for_unknown_task() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let q = HermesTaskQueue::from_env(dir.path().to_path_buf()).unwrap();
+        let err = q
+            .status(&TaskId::new("hermes-nonexistent"))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, TaskQueueError::NotFound(_)),
+            "got {:?}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn hermes_task_queue_submit_with_echo_records_completion_and_parses_commit_sha() {
+        // End-to-end: feed /bin/echo a commit_sha-shaped string and verify
+        // the queue records `completed`, status() returns Completed, and
+        // output() parses the contract fields.
+        let dir = tempfile::TempDir::new().unwrap();
+        let mut q = HermesTaskQueue::from_env(dir.path().to_path_buf()).unwrap();
+        q.set_hermes_binary_for_test(std::path::PathBuf::from("/bin/echo"));
+        let prompt = "commit_sha: 0a45a85b6e1fb43f6177b5181285cf2c0973974f\n\
+                      branch: auto-port/HERMES-1\n\
+                      files_changed: 1\n";
+        let id = q.submit(prompt, "auto-port/fallback", ctx()).await.unwrap();
+        let st = q.status(&id).await.unwrap();
+        match st {
+            TaskStatus::Completed { commit_sha, branch } => {
+                assert_eq!(commit_sha.len(), 40);
+                assert_eq!(branch, "auto-port/HERMES-1");
+            }
+            other => panic!("expected Completed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn hermes_locate_binary_finds_local_bin() {
+        if !std::path::Path::new(
+            &std::env::var("HOME")
+                .map(|h| format!("{h}/.local/bin/hermes"))
+                .unwrap_or_default(),
+        )
+        .exists()
+        {
+            eprintln!("skipping — no ~/.local/bin/hermes on this host");
+            return;
+        }
+        let p = HermesTaskQueue::locate_binary().expect("must find hermes");
+        assert!(p.ends_with("hermes"), "located path ends with hermes: {}", p.display());
     }
 
     // ── DryRun ─────────────────────────────────────────────────

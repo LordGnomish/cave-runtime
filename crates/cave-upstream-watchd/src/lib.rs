@@ -72,8 +72,8 @@ pub use auto_port::{
 pub use auto_port_gate::{CharterBaseline, CharterGate, CharterV2Gate, VerifyResult};
 pub use prompt::{build_prompt, PortContext};
 pub use task_queue::{
-    DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput, TaskQueue, TaskQueueError,
-    TaskStatus,
+    DryRunTaskQueue, HermesTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskId, TaskOutput,
+    TaskQueue, TaskQueueError, TaskStatus,
 };
 pub use tdd::{
     analyze_tdd_compliance, scan_stubs, ClassifiedCommit, CommitKind, FileChange, FileChangeKind,

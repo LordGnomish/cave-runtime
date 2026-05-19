@@ -23,6 +23,13 @@
     operator's locally-installed Claude Code binary (no external
     API key required — the CLI carries the existing session).
     Alternatives:
+      --backend hermes    — local Hermes Agent (~/.local/bin/hermes),
+                            routes to the operator's configured Hermes
+                            provider (Ollama tier-1 by default). Use
+                            this when claude-cli returns HTTP 401
+                            Invalid authentication credentials
+                            (Claude Code session expired) and a
+                            fresh `claude login` isn't possible yet.
       --backend dryrun    — record submissions to JSONL, no side-effects
       --backend pump      — local LLM via the qwen-pump queue dir
       --backend opus      — Anthropic Messages API direct (requires

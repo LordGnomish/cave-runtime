@@ -83,12 +83,15 @@ enum Cmd {
         /// Override audit.jsonl path.
         #[arg(long)]
         audit: Option<PathBuf>,
-        /// Backend: `dryrun` | `pump` | `claude-cli` | `opus`.
+        /// Backend: `dryrun` | `pump` | `claude-cli` | `hermes` | `opus`.
         /// Default: dryrun (safe — never side-effects until the operator
-        /// opts in). `claude-cli` is the recommended production default
-        /// when Claude Code is installed locally — no external API key
-        /// required; `opus` keeps the Anthropic-API path for headless
-        /// hosts that don't have the CLI.
+        /// opts in). `claude-cli` was the production default until
+        /// 2026-05-19 when the local Claude Code session started
+        /// returning HTTP 401; `hermes` is the local-LLM fallback that
+        /// routes through the operator's configured Hermes provider
+        /// (Ollama tier-1 by default — no API key, no Anthropic
+        /// session required). `opus` keeps the Anthropic-API path for
+        /// headless hosts.
         #[arg(long, default_value = "dryrun")]
         backend: String,
         /// Skip the verify_completed pass (only run scan_and_dispatch).
@@ -204,7 +207,8 @@ async fn run_dispatch(
         auto_port::{AutoPortDispatcher, DispatcherConfig, WorkspaceContextResolver},
         auto_port_gate::CharterV2Gate,
         task_queue::{
-            ClaudeCliTaskQueue, DryRunTaskQueue, OpusTaskQueue, PumpTaskQueue, TaskQueue,
+            ClaudeCliTaskQueue, DryRunTaskQueue, HermesTaskQueue, OpusTaskQueue,
+            PumpTaskQueue, TaskQueue,
         },
     };
     use std::sync::Arc;
@@ -253,15 +257,27 @@ async fn run_dispatch(
             let q = ClaudeCliTaskQueue::from_env(log_dir).map_err(|e| {
                 anyhow::anyhow!(
                     "could not initialise ClaudeCliTaskQueue: {e} \
-                     (install Claude Code: https://claude.com/code; or use --backend pump)"
+                     (install Claude Code: https://claude.com/code; or use --backend hermes/pump)"
                 )
             })?;
             tracing::info!(backend = "claude-cli", "auto-port dispatcher up");
             Arc::new(q)
         }
+        "hermes" => {
+            let log_dir = state_path.with_file_name("hermes");
+            let q = HermesTaskQueue::from_env(log_dir).map_err(|e| {
+                anyhow::anyhow!(
+                    "could not initialise HermesTaskQueue: {e} \
+                     (install Hermes Agent: `pipx install hermes-agent`; \
+                     or use --backend pump/claude-cli)"
+                )
+            })?;
+            tracing::info!(backend = "hermes", "auto-port dispatcher up");
+            Arc::new(q)
+        }
         other => {
             anyhow::bail!(
-                "unknown backend '{other}' — pick dryrun | pump | opus | claude-cli"
+                "unknown backend '{other}' — pick dryrun | pump | opus | claude-cli | hermes"
             );
         }
     };
