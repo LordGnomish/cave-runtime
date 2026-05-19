@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Unleash-compatible HTTP API for cave-flags.
 //!
 //! Adds the exact API surface that Unleash server exposes so that any

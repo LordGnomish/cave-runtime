@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright 2026 Cave Runtime contributors
 //! Self-contained PostgreSQL connection pool for cave-flags.
 //!
 //! Mirrors the interface of `cave-db::CavePool` but lives entirely within this crate
