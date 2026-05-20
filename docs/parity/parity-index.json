@@ -444,12 +444,19 @@
     },
     "cave-datafusion": {
       "cave_src_loc": 1921,
-      "manifest_filled": null,
+      "honest_ratio": 0.4242,
+      "last_audit_disk": "2026-05-19",
+      "manifest_filled": true,
+      "mapped_count": 14,
       "note": "needs manifest; likely upstream: apache/arrow-datafusion",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
+      "parity_ratio": 0.7879,
+      "parity_ratio_source": "manifest",
+      "partial_count": 4,
+      "skipped_count": 8,
       "stubs": null,
       "tier": "D2",
+      "total_count": 33,
+      "unmapped_count": 7,
       "upstream": null,
       "upstream_version": null
     },
@@ -1689,11 +1696,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 88,
+    "flipped": 89,
     "injected": 9,
-    "new_filled": 88,
+    "new_filled": 89,
     "phantoms": 5,
-    "ratio_overrides": 39
+    "ratio_overrides": 40
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
