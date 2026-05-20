@@ -1,85 +1,41 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright 2026 Cave Runtime contributors
-//! Twenty CRM data model placeholders.
+//
+//! Twenty CRM data model — mirrors `packages/twenty-server/src/modules/`
+//! workspace-entity definitions at upstream `twentyhq/twenty` v2.6.0.
 //!
-//! Mirrors Twenty's core objects: Person, Company, Opportunity, Activity.
-//! Field set is intentionally minimal at scaffold time; expanded by qwen-amele
-//! drafts against the parity manifest.
+//! Per ADR-145 (CRM Upstream Selection — Twenty), cave-crm is a function-
+//! based reimplementation of Twenty's data model and HTTP/GraphQL surface.
+//! No upstream source is vendored; the entity shapes here are independent
+//! Rust definitions whose semantics match Twenty's TypeORM @WorkspaceEntity
+//! decorators line-by-line per parity manifest mappings.
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+pub mod activity;
+pub mod api_key;
+pub mod calendar_event;
+pub mod company;
+pub mod custom_field;
+pub mod custom_object;
+pub mod lead;
+pub mod opportunity;
+pub mod person;
+pub mod pipeline_step;
+pub mod task;
+pub mod user;
+pub mod view;
+pub mod workspace;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Person {
-    pub id: Uuid,
-    pub first_name: String,
-    pub last_name: String,
-    pub email: Option<String>,
-    pub phone: Option<String>,
-    pub job_title: Option<String>,
-    pub company_id: Option<Uuid>,
-    pub city: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Company {
-    pub id: Uuid,
-    pub name: String,
-    pub domain_name: Option<String>,
-    pub address: Option<String>,
-    pub employees: Option<u32>,
-    pub annual_recurring_revenue: Option<f64>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum OpportunityStage {
-    New,
-    Screening,
-    Meeting,
-    Proposal,
-    Customer,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Opportunity {
-    pub id: Uuid,
-    pub name: String,
-    pub stage: OpportunityStage,
-    pub amount: Option<f64>,
-    pub close_date: Option<DateTime<Utc>>,
-    pub probability: Option<u8>,
-    pub company_id: Option<Uuid>,
-    pub point_of_contact_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ActivityType {
-    Note,
-    Task,
-    Email,
-    Call,
-    Meeting,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Activity {
-    pub id: Uuid,
-    pub activity_type: ActivityType,
-    pub title: String,
-    pub body: Option<String>,
-    pub due_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
-    pub assignee_id: Option<Uuid>,
-    pub target_person_id: Option<Uuid>,
-    pub target_company_id: Option<Uuid>,
-    pub target_opportunity_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
+pub use activity::{Activity, ActivityKind, ActivityTarget, ActivityTargetKind, Note};
+pub use api_key::ApiKey;
+pub use calendar_event::{CalendarEvent, CalendarEventAttendee, CalendarEventVisibility};
+pub use company::Company;
+pub use custom_field::{FieldKind, FieldMetadata};
+pub use custom_object::ObjectMetadata;
+pub use lead::{Lead, LeadStatus};
+pub use opportunity::{Opportunity, OpportunityStatus};
+pub use person::Person;
+pub use pipeline_step::PipelineStep;
+pub use task::{Task, TaskStatus};
+pub use user::User;
+pub use view::{View, ViewKind};
+pub use workspace::{Workspace, WorkspaceMember, WorkspaceMemberRole};

@@ -13,7 +13,6 @@ async fn health() -> impl IntoResponse {
         "submodules": [
             "hr",
             "recruitment",
-            "crm",
             "sales",
             "purchase",
             "inventory",
@@ -29,7 +28,6 @@ pub fn create_router(state: Arc<ErpStore>) -> Router {
         .route("/api/erp/health", get(health))
         .merge(crate::modules::hr::create_router(state.clone()))
         .merge(crate::modules::recruitment::create_router(state.clone()))
-        .merge(crate::modules::crm::create_router(state.clone()))
         .merge(crate::modules::sales::create_router(state.clone()))
         .merge(crate::modules::purchase::create_router(state.clone()))
         .merge(crate::modules::inventory::create_router(state.clone()))

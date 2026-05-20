@@ -60,6 +60,8 @@ members = [
     "crates/cave-store",
     "crates/cave-streams",
     "crates/cave-lakehouse",
+    "crates/cave-iceberg",
+    "crates/cave-datafusion",
     "crates/cave-cdc",
     # === Observability ===
     "crates/cave-metrics",
