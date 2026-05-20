@@ -2,22 +2,28 @@
 // Copyright 2026 Cave Runtime contributors
 //! Charter v2 self-audit — cave-controller-manager's `parity.manifest.toml`
 //! must carry an honest measured `fill_ratio` against kubernetes/kubernetes
-//! v1.36.0, a pinned `source_sha`, the 2026-05-18 FINALIZE audit date,
+//! v1.36.0, a pinned `source_sha`, the 2026-05-19 PARITY UPLIFT audit date,
 //! and structurally consistent counts.
 //!
-//! Previous manifest carried measured `fill_ratio = 0.9111` (mapped 30 +
-//! partial 1 + skipped 10 + unmapped 4 = 45 packages, measured audit
-//! 2026-05-14 batch4 cronjob/deployment/job) but the `[upstream]` block
-//! was missing `source_sha`, `last_audit` lagged, and `tests/qwen_drafted.rs`
-//! was missing the AGPL SPDX header (1/90 short of the 100% gate).
+//! 2026-05-19 PARITY UPLIFT — fill_ratio 0.9111 → 0.9556 by:
+//!   * Mapping `pkg/controller/storageversionmigrator/` →
+//!     `src/storage_version_migrator.rs` (10 tests).
+//!   * Mapping `pkg/controller/endpoint/` →
+//!     `src/endpoint_controller_v1.rs` (10 tests).
+//!   * Promoting the `cidrallocator` partial → mapped by adding
+//!     `src/cidrallocator_v6.rs` (IPv6 + dual-stack, 13 tests).
+//!
+//! Counts: mapped 30 → 33, partial 1 → 0, unmapped 4 → 2, skipped 10,
+//! total 45. fill_ratio = (33 + 0 + 10) / 45 = 0.9556. Floor bumped
+//! from 0.90 → 0.95 to lock in the new measured baseline.
 
 use std::fs;
 use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v1.36.0";
-const FLOOR_FILL_RATIO: f64 = 0.90;
-const FLOOR_MAPPED: usize = 30;
-const FLOOR_RS_FILES: usize = 80;
+const FLOOR_FILL_RATIO: f64 = 0.95;
+const FLOOR_MAPPED: usize = 33;
+const FLOOR_RS_FILES: usize = 93;
 
 fn manifest_text() -> String {
     let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]

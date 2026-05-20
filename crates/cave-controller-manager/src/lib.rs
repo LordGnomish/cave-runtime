@@ -162,6 +162,25 @@ pub mod legacyserviceaccounttokencleaner;
 /// `pkg/controller/volume/ephemeral/`.
 pub mod ephemeralvolume;
 
+/// k8s parity-uplift 2026-05-19: StorageVersionMigration reconciler.
+/// Walks every instance of a target GVR and re-issues a touch PUT to
+/// upgrade the at-rest storage version (KEP-3331). Mirrors
+/// `pkg/controller/storageversionmigrator/` (+ inner `migrator/`).
+pub mod storage_version_migrator;
+
+/// k8s parity-uplift 2026-05-19: legacy `v1.Endpoints` reconciler.
+/// cave normally only writes EndpointSlice, but v1.36 still ships
+/// the v1.Endpoints object for older clients (KEP-572). Idempotent,
+/// deterministic-ordered. Mirrors `pkg/controller/endpoint/`.
+pub mod endpoint_controller_v1;
+
+/// k8s parity-uplift 2026-05-19: IPv6 + dual-stack pod-CIDR allocator.
+/// Closes the IPv4-only gap in [`cidrallocator`] by mirroring the
+/// `range_allocator.go` dual-stack path (KEP-563). Holds a v4 + v6
+/// pool and emits `(v4, v6)` slices per node-add with rollback safety
+/// when one leg fails.
+pub mod cidrallocator_v6;
+
 pub use types::{Cite, ControllerError, Reconcile, TenantId, UPSTREAM_PKG, UPSTREAM_VERSION};
 
 #[cfg(test)]
