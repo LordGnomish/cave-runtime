@@ -218,8 +218,11 @@ pub fn next_escalation_step<'a>(
     policy: &'a EscalationPolicy,
     elapsed_seconds: u32,
 ) -> Option<&'a EscalationStep> {
-    policy.steps.iter().find(|step| {
-        // The step's timeout must have been reached
+    // Walk steps in reverse: the *latest* step whose cumulative-timeout
+    // window has opened is the one that should fire now. A forward
+    // `.find()` would always return step 0 since its cumulative_timeout
+    // is 0 and elapsed_seconds >= 0 trivially holds.
+    policy.steps.iter().rev().find(|step| {
         let cumulative_timeout: u32 = policy
             .steps
             .iter()
