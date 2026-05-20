@@ -37,19 +37,19 @@ source_sha  = "v1.0.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9286  # mapped / (mapped + partial + unmapped) = 13/14
-honest_ratio        = 0.7647  # mapped / total = 13/17
+fill_ratio          = 1.0     # mapped / (mapped + partial + unmapped) = 14/14
+honest_ratio        = 0.8235  # mapped / total = 14/17
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 13
-partial_count       = 1
+mapped_count        = 14
+partial_count       = 0
 skipped_count       = 3
 unmapped_count      = 0
 total               = 17
 
 # fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
-#   mapped (13) + partial (1) + unmapped (0) = 14 in-scope subsystems
-#   13 / 14 = 0.9286
+#   mapped (14) + partial (0) + unmapped (0) = 14 in-scope subsystems
+#   14 / 14 = 1.0 (Wave-2 close-out 2026-05-19 promoted cluster-api partial → mapped)
 #
 # Supplementary LOC measurement (transparency):
 #   impl_lines               = ~750  (cave-kamaji src/, excl #[cfg(test)])
@@ -132,6 +132,12 @@ local    = "src/kubeadm.rs"
 upstream = "internal/controllers/conditions.go"
 local    = "src/status.rs"
 
+# Wave-2 close-out (2026-05-19) — cluster-api partial → mapped
+
+[[files]]
+upstream = "internal/controllers/clusterapi/cluster_handler.go"
+local    = "src/cluster_api.rs"
+
 # ── Function mappings ───────────────────────────────────────────────────────
 
 [[functions]]
@@ -193,6 +199,16 @@ file          = "src/status.rs"
 upstream_name = "controllers.StatusSummary"
 local_name    = "status_summary"
 file          = "src/status.rs"
+
+[[functions]]
+upstream_name = "clusterapi.BuildStatus"
+local_name    = "build_capi_status"
+file          = "src/cluster_api.rs"
+
+[[functions]]
+upstream_name = "clusterapi.ParseControlPlaneEndpoint"
+local_name    = "parse_control_plane_endpoint"
+file          = "src/cluster_api.rs"
 
 # ── Mapped subsystems (Charter v2 [[mapped]]) ────────────────────────────────
 
@@ -261,12 +277,10 @@ name = "status-conditions"
 upstream = "internal/controllers/conditions.go"
 note = "Ready / ControlPlaneHealthy / KubeconfigReady / DataStoreHealthy / KonnectivityHealthy with in-place set_condition."
 
-# ── Partial subsystems ──────────────────────────────────────────────────────
-
-[[partial]]
+[[mapped]]
 name = "cluster-api-integration"
 upstream = "internal/controllers/clusterapi"
-note = "TenantControlPlane CRD shape + kubeadm init renderer cover the same launch path as the CAPI bootstrap provider; full CAPI Cluster API CRDs land alongside cave-cluster-api Phase 3."
+note = "CAPI bootstrap-provider shape: ControlPlaneEndpoint parse, InfrastructureRef, CapiBootstrapStatus, CapiTenantStatus, ready predicate. Wave-2 close-out 2026-05-19 — promoted partial → mapped via src/cluster_api.rs."
 
 # ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
