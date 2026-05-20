@@ -36,13 +36,16 @@
 pub mod alerting;
 pub mod auth;
 pub mod datasource;
+pub mod explore;
 pub mod models;
 pub mod panels;
+pub mod plugin_sdk;
 pub mod provisioning;
 pub mod query;
 pub mod renderer;
 pub mod routes;
 pub mod store;
+pub mod transformations;
 pub mod variables;
 
 use axum::Router;
