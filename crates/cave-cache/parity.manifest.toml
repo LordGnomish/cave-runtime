@@ -32,13 +32,13 @@ legacy_license_note     = "BSD-3-Clause up to 7.2.x; SSPL from 7.4 — no SSPL c
 # (`src/{server,networking,db,t_*,replication,cluster,scripting,
 # expire,aof,rdb,acl,connection,eviction,modules}.c`). The cave-
 # cache `src/commands/` directory mirrors Valkey's `t_*.c` 1:1.
-mapped_count          = 19
+mapped_count          = 21
 partial_count         = 4
 skipped_count         = 13
-unmapped_count        = 2
+unmapped_count        = 0
 total                 = 38
-fill_ratio            = 0.9474
-honest_ratio          = 0.8421
+fill_ratio            = 1.0000   # (mapped + partial + skipped) / total = 38/38
+honest_ratio          = 0.8947   # (mapped + skipped) / total            = 34/38
 parity_ratio_source   = "manifest"
 last_audit            = "2026-05-19"
 infra_only            = false
@@ -78,6 +78,17 @@ local    = "src/cluster.rs"
 [[files]]
 upstream = "src/acl.c"
 local    = "src/acl.rs"
+
+[[files]]
+# 2026-05-19 c-tier uplift — ACL log persistence (formerly unmapped).
+upstream = "src/acl.c#ACL_LOG"
+local    = "src/acl_log.rs"
+
+[[files]]
+# 2026-05-19 c-tier uplift — CLUSTER FAILOVER takeover state machine
+# (formerly unmapped).
+upstream = "src/cluster.c#clusterHandleManualFailover"
+local    = "src/cluster/failover.rs"
 
 [[files]]
 upstream = "src/pubsub.c"
@@ -200,6 +211,36 @@ upstream = "src/server.c"
 local    = "src/routes.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
+
+[[functions]]
+upstream_name = "clusterHandleManualFailover"
+local_name    = "FailoverState::begin"
+file          = "src/cluster/failover.rs"
+
+[[functions]]
+upstream_name = "clusterProcessFailoverAuthAck"
+local_name    = "FailoverState::record_auth_ack"
+file          = "src/cluster/failover.rs"
+
+[[functions]]
+upstream_name = "clusterBumpConfigEpochWithoutConsensus"
+local_name    = "FailoverState::record_promotion"
+file          = "src/cluster/failover.rs"
+
+[[functions]]
+upstream_name = "addACLLogEntry"
+local_name    = "AclLog::append"
+file          = "src/acl_log.rs"
+
+[[functions]]
+upstream_name = "ACLLogTruncate"
+local_name    = "AclLog::reset"
+file          = "src/acl_log.rs"
+
+[[functions]]
+upstream_name = "ACLLogToReply"
+local_name    = "AclLog::tail"
+file          = "src/acl_log.rs"
 
 [[functions]]
 upstream_name = "crc16"
@@ -769,3 +810,62 @@ cave_path      = "—"
 cave_test_name = "—"
 status         = "missing"
 notes          = "Lua scripting end-to-end not yet covered behaviourally."
+
+# ── 2026-05-19 c-tier uplift — CLUSTER FAILOVER + ACL log persistence ─────
+
+[[upstream_test]]
+upstream_path  = "tests/unit/cluster/cluster.tcl"
+upstream_name  = "CLUSTER FAILOVER promotes replica"
+cave_path      = "src/cluster/failover.rs"
+cave_test_name = "auth_ack_promotes_at_quorum"
+status         = "ported"
+notes          = "Replica takeover state machine; quorum-driven auth promotion."
+
+[[upstream_test]]
+upstream_path  = "tests/unit/cluster/cluster.tcl"
+upstream_name  = "CLUSTER FAILOVER FORCE skips primary pause"
+cave_path      = "src/cluster/failover.rs"
+cave_test_name = "force_skips_pause_phase"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/cluster/cluster.tcl"
+upstream_name  = "CLUSTER FAILOVER TAKEOVER bypasses auth"
+cave_path      = "src/cluster/failover.rs"
+cave_test_name = "takeover_skips_auth_phase"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/cluster/cluster.tcl"
+upstream_name  = "CLUSTER FAILOVER timeout marks state failed"
+cave_path      = "src/cluster/failover.rs"
+cave_test_name = "tick_fails_on_timeout"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/acl.tcl"
+upstream_name  = "ACL LOG records auth failures"
+cave_path      = "src/acl_log.rs"
+cave_test_name = "in_memory_append_and_tail"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/acl.tcl"
+upstream_name  = "ACL LOG RESET truncates entries"
+cave_path      = "src/acl_log.rs"
+cave_test_name = "reset_truncates_file"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/acl.tcl"
+upstream_name  = "ACL LOG capacity eviction is LRU on age"
+cave_path      = "src/acl_log.rs"
+cave_test_name = "capacity_evicts_oldest"
+status         = "ported"
+
+[[upstream_test]]
+upstream_path  = "tests/unit/acl.tcl"
+upstream_name  = "ACL LOG survives restart via on-disk tail"
+cave_path      = "src/acl_log.rs"
+cave_test_name = "persistence_round_trip"
+status         = "ported"

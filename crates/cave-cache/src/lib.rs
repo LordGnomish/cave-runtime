@@ -10,6 +10,9 @@
 /// Handles user authentication, permissions, and command restrictions.
 pub mod acl;
 
+/// Persistent ACL audit log (`ACL LOG` + on-disk tail).
+pub mod acl_log;
+
 /// The cluster module.
 ///
 /// Manages cluster topology, node communication, and data sharding.
