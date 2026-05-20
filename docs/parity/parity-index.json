@@ -750,12 +750,19 @@
     },
     "cave-iceberg": {
       "cave_src_loc": 1986,
-      "manifest_filled": null,
+      "honest_ratio": 0.5833,
+      "last_audit_disk": "2026-05-19",
+      "manifest_filled": true,
+      "mapped_count": 14,
       "note": "needs manifest; likely upstream: apache/iceberg",
-      "parity_ratio": null,
-      "parity_ratio_source": "none",
+      "parity_ratio": 0.9167,
+      "parity_ratio_source": "manifest",
+      "partial_count": 3,
+      "skipped_count": 5,
       "stubs": null,
       "tier": "D2",
+      "total_count": 24,
+      "unmapped_count": 2,
       "upstream": null,
       "upstream_version": null
     },
@@ -1682,11 +1689,11 @@
   },
   "disk_overlay_at": "2026-05-12",
   "disk_overlay_stats": {
-    "flipped": 87,
+    "flipped": 88,
     "injected": 9,
-    "new_filled": 87,
+    "new_filled": 88,
     "phantoms": 5,
-    "ratio_overrides": 38
+    "ratio_overrides": 39
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
