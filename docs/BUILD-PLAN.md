@@ -34,7 +34,7 @@ These are architectural pieces everything else depends on.
 **Priority: CRITICAL**
 - Refactor cave-pg to provider-agnostic interface
 - RLS per tenant, migration framework
-- CloudNativePG path (Hetzner) vs Azure PG Flexible path
+- CloudNativePG path (sovereign) vs Azure PG Flexible path
 - SQLite for local profile (from Elastic Scale Tier 1)
 - **Estimate:** ~2,000 lines
 

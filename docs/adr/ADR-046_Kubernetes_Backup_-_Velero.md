@@ -28,7 +28,7 @@ CAVE needs cluster-level backup for K8s resources (Deployments, ConfigMaps, CRDs
 
 ## Decision
 
-**Velero** for K8s resource + PV backup. Restic/Kopia for file-level PV backup. MinIO (Hetzner) / ADLS (Azure) as backup storage. Scheduled: daily full, hourly incremental for prod. Restore smoke test: weekly automated (ADR restore matrix). WORM-backed backup storage for prod (ADR-106).
+**Velero** for K8s resource + PV backup. Restic/Kopia for file-level PV backup. MinIO (sovereign) / ADLS (Azure) as backup storage. Scheduled: daily full, hourly incremental for prod. Restore smoke test: weekly automated (ADR restore matrix). WORM-backed backup storage for prod (ADR-106).
 
 
 ## Rejected Options

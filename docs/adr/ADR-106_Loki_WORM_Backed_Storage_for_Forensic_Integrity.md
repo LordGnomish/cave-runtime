@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Security
 
@@ -16,14 +16,14 @@ Application and platform logs are critical forensic evidence during security inc
 
 | Storage Type | Tamper-proof | Delete-proof | Provider |
 |---|---|---|---|
-| MinIO Object Lock (Hetzner) | ✅ WORM | ✅ Object Lock retention | Self-hosted |
+| MinIO Object Lock (sovereign) | ✅ WORM | ✅ Object Lock retention | Self-hosted |
 | ADLS Immutable Blob (Azure) | ✅ WORM | ✅ Legal hold + time-based | Azure |
 | Standard Loki (S3/GCS) | ❌ Mutable | ❌ Deletable | Any |
 | Elasticsearch | ❌ Mutable | ❌ Deletable (SSPL license issue too) | Self-hosted |
 
 ## Decision
 
-Loki log chunks and index → MinIO Object Lock (Hetzner) / ADLS immutable blob storage (Azure). Delete APIs disabled via IAM deny policies. Logs cannot be tampered with or deleted during retention period.
+Loki log chunks and index → MinIO Object Lock (sovereign) / ADLS immutable blob storage (Azure). Delete APIs disabled via IAM deny policies. Logs cannot be tampered with or deleted during retention period.
 
 ## Rejected
 

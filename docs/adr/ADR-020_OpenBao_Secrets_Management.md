@@ -24,7 +24,7 @@ Secrets must be encrypted at rest, have fine-grained RBAC (tenant A cannot read 
 
 | Criteria | OpenBao | Vault (HashiCorp) | External Secrets Operator (K8s-native) | AWS Secrets Manager |
 |---|---|---|---|---|
-| **Self-hosted** | ✅ Full self-hosting (Hetzner/Azure) | ✅ Self-hosting + enterprise SaaS | ✅ External secret integration | ❌ AWS-only |
+| **Self-hosted** | ✅ Full self-hosting (sovereign / hyperscaler) | ✅ Self-hosting + enterprise SaaS | ✅ External secret integration | ❌ AWS-only |
 | **License** | Apache 2.0 (community fork post-BSL) | BSL → MPL 2.0 (commercial restrictions) | Apache 2.0 | Proprietary |
 | **Multi-tenancy** | ✅ Namespace-isolated secret engines | ⚠️ Auth method per org, complex RBAC | ✅ K8s namespace-scoped | ❌ AWS account-level |
 | **Secret types** | ✅ Key-value, PKI, transit encryption, SSH | ✅ All (standard in industry) | ⚠️ Integration-focused, limited generation | ✅ |
@@ -73,7 +73,7 @@ Secrets must be encrypted at rest, have fine-grained RBAC (tenant A cannot read 
 ### AWS Secrets Manager — Not Portable
 
 **Reasons:**
-1. **AWS-only:** CAVE runs on both Hetzner and Azure. AWS Secrets Manager cannot support Hetzner profiles.
+1. **AWS-only:** CAVE runs on both sovereign cloud and hyperscaler. AWS Secrets Manager cannot support sovereign-cloud profiles.
 2. **Vendor lock-in:** OpenBao is cloud-agnostic. Secrets management must be.
 
 ## Consequences

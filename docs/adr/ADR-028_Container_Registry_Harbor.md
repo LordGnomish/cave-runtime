@@ -101,7 +101,7 @@ Requirements:
 
 ### Negative
 
-- **Resource overhead:** ~2-4GB RAM for core + database + Redis. On Hetzner CX62 (16GB), this is 12-25% of node RAM.
+- **Resource overhead:** ~2-4GB RAM for core + database + Redis. On the sovereign profile CX62 (16GB), this is 12-25% of node RAM.
 - **PostgreSQL dependency:** Harbor requires PostgreSQL backend. Another database to backup/restore. Mitigated: CNPG provides HA (ADR-105).
 - **Garbage collection complexity:** Scheduled GC must not interfere with pulls. Risk of stale images if GC too aggressive.
 - **Upgrade complexity:** Harbor major version upgrades can require DB migrations. Testing required on staging before prod rollout.

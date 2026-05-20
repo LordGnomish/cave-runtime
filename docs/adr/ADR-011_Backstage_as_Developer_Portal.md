@@ -10,7 +10,7 @@
 
 ## Context
 
-CAVE needs a unified developer portal that provides self-service infrastructure provisioning, service catalog, documentation, CI/CD visibility, and API catalog — across both Hetzner and Azure profiles.
+CAVE needs a unified developer portal that provides self-service infrastructure provisioning, service catalog, documentation, CI/CD visibility, and API catalog — across both sovereign cloud and hyperscaler profiles.
 
 ## Candidates
 

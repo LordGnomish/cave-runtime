@@ -13,7 +13,7 @@ Architecture principles are the immune system of an Internal Developer Platform.
 
 For an IDP serving multiple tenants across multiple cloud providers, principles do three critical things:
 
-1. **Prevent Drift.** When a developer or platform engineer faces a decision, they ask: "Which principle applies here?" This creates consistent behavior across all seven deployment profiles (dev/staging/prod × Hetzner/Azure + local). Without principles, teams would solve the same problem differently in different places.
+1. **Prevent Drift.** When a developer or platform engineer faces a decision, they ask: "Which principle applies here?" This creates consistent behavior across all seven deployment profiles (dev/staging/prod × sovereign / hyperscaler + local). Without principles, teams would solve the same problem differently in different places.
 
 2. **Speed Decision-Making.** Architects don't need to debate the merits of manual kubectl each time. Principle 6 (GitOps Everything) says: use ArgoCD, create signed commits, no exceptions except Emergency CLI under ledger logging. Done.
 
@@ -26,11 +26,11 @@ This section explains each principle, the problem it solves, how CAVE implements
 ## 1.2 Principle 1: Single Pane of Glass — Backstage Only
 
 **Principle Statement:**
-Backstage is the *only* developer-facing portal for all platform interactions, regardless of underlying cloud provider or infrastructure technology. The same UX applies whether a workload runs on Hetzner or Azure.
+Backstage is the *only* developer-facing portal for all platform interactions, regardless of underlying cloud provider or infrastructure technology. The same UX applies whether a workload runs on sovereign cloud or hyperscaler.
 
 **Why This Principle Exists:**
 
-Developer portal sprawl is a platform killer. Without a single pane of glass, teams end up maintaining three portals: Backstage for templates, Azure Portal for debugging, and Hetzner console for networking. Context switching wastes cognitive energy. Inconsistent UX breeds confusion. New developers spend weeks learning three different mental models instead of one.
+Developer portal sprawl is a platform killer. Without a single pane of glass, teams end up maintaining three portals: Backstage for templates, Azure Portal for debugging, and sovereign-cloud console for networking. Context switching wastes cognitive energy. Inconsistent UX breeds confusion. New developers spend weeks learning three different mental models instead of one.
 
 Moreover, if developers can directly access cloud consoles, they circumvent platform guardrails. They may create untracked resources, bypass policy checks, or accidentally leak secrets. Inconsistent UX also means some teams adopt shortcuts, some don't, creating a fragmented audit trail.
 
@@ -122,16 +122,16 @@ Profiles also solve onboarding. A new platform engineer can bootstrap a dev envi
 Seven profiles are defined:
 
 1. **dev-local** – Single-node K3s on developer laptop. Minimal resources. For learning and testing templates.
-2. **dev-hetzner** – Three-node Talos cluster on Hetzner. For realistic multi-node debugging.
-3. **staging-hetzner** – Ten-node Hetzner cluster. Mid-scale, HA data stores, Crossplane enabled, chaos testing allowed.
-4. **staging-azure** – Equivalent to staging-hetzner but on Azure. Tests cross-cloud behavior.
-5. **prod-hetzner** – Production-grade Hetzner cluster: 30+ nodes, multi-availability-zone networking, Tetragon enabled, chaos testing forbidden.
+2. **dev-sovereign** – Three-node Talos cluster on the sovereign profile. For realistic multi-node debugging.
+3. **staging-sovereign** – Ten-node sovereign-cloud cluster. Mid-scale, HA data stores, Crossplane enabled, chaos testing allowed.
+4. **staging-azure** – Equivalent to staging-sovereign but on Azure. Tests cross-cloud behavior.
+5. **prod-sovereign** – Production-grade sovereign-cloud cluster: 30+ nodes, multi-availability-zone networking, Tetragon enabled, chaos testing forbidden.
 6. **prod-azure** – Production-grade Azure with managed services (AKS, Azure Database, Cosmos DB).
-7. **prod-hybrid** – Workloads span Hetzner and Azure with cross-cloud failover (Phase 4 roadmap).
+7. **prod-hybrid** – Workloads span sovereign cloud and hyperscaler with cross-cloud failover (Phase 4 roadmap).
 
 Each profile is defined by a YAML manifest specifying:
 - Cluster node count and machine types
-- Data store: managed (Azure) vs self-hosted (Hetzner)
+- Data store: managed (Azure) vs self-hosted (sovereign)
 - Network topology: single-AZ, multi-AZ, multi-region
 - Observability: sampling rates, retention, alerting thresholds
 - Chaos testing policies: enabled (non-prod), disabled (prod)
@@ -152,7 +152,7 @@ When a platform engineer runs `cave bootstrap --profile=prod-azure`, the bootstr
 - Profiles are not free-form. New ones require an ADR and Platform Architecture Review (PAR).
 
 **Related ADRs:**
-ADR-021 (Profile Architecture), ADR-122 (Hetzner Profile Definition), ADR-123 (Azure Profile Definition)
+ADR-021 (Profile Architecture), ADR-122 (Sovereign-Cloud Profile Definition), ADR-123 (Azure Profile Definition)
 
 ---
 
@@ -173,9 +173,9 @@ Mixing both in one tool (like Terraform) leads to confusion: which state is safe
 **How CAVE Implements It:**
 
 **OpenTofu Layer (Day 0):**
-- Creates the Kubernetes cluster (Talos on Hetzner or AKS on Azure)
+- Creates the Kubernetes cluster (Talos on the sovereign profile or AKS on Azure)
 - Creates networking (VPCs, subnets, security groups)
-- Creates foundational managed services (e.g., Azure Database for Postgres, Hetzner load balancers)
+- Creates foundational managed services (e.g., Azure Database for Postgres, sovereign-cloud load balancers)
 - Installs the Kubernetes networking add-ons (Cilium)
 - Installs ArgoCD itself
 - Produces a kubeconfig and secrets (stored in Sovereign Ledger)
@@ -183,7 +183,7 @@ Mixing both in one tool (like Terraform) leads to confusion: which state is safe
 
 **Crossplane Layer (Day 1+):**
 - Runs continuously. Applications request databases, caches, and message buses by submitting XRs (Custom Resources).
-- Crossplane compositions translate XRs into cloud-provider-specific resources (e.g., an XRD "Database" becomes an Azure Database or a Hetzner-managed Postgres instance).
+- Crossplane compositions translate XRs into cloud-provider-specific resources (e.g., an XRD "Database" becomes an Azure Database or a sovereign-managed Postgres instance).
 - Crossplane Operations (CronOperation, WatchOperation) handle recurring tasks: backups, scaling decisions, remediation (Principle 16).
 - All Crossplane operations are GitOps-driven: a developer's commit to the Git repo triggers an ArgoCD sync, which reconciles the desired Crossplane XRs.
 
@@ -211,7 +211,7 @@ Applications never depend on cloud-provider APIs or console names. All infrastru
 
 **Why This Principle Exists:**
 
-If an application's code references an Azure resource name (e.g., `my-storage-account`), migrating to Hetzner requires changing application configs. Worse, if ten teams each define their own custom resources for "a database," we end up with a fragmented ecosystem—some databases have backup policies, others don't; some are encrypted, others aren't.
+If an application's code references an Azure resource name (e.g., `my-storage-account`), migrating to the sovereign profile requires changing application configs. Worse, if ten teams each define their own custom resources for "a database," we end up with a fragmented ecosystem—some databases have backup policies, others don't; some are encrypted, others aren't.
 
 Crossplane XRDs solve this by providing a *canonical language* for expressing infrastructure dependencies. An application doesn't ask for "an Azure SQL database"; it asks for a "Database with 100 GiB, multi-AZ, 99.9% uptime SLA."
 
@@ -220,10 +220,10 @@ Crossplane XRDs solve this by providing a *canonical language* for expressing in
 **Core XRDs (Canonical Abstractions):**
 
 - **Database** – Relational database (Postgres, MySQL, MariaDB). XR specifies size, backup retention, HA mode. Composition automatically chooses Azure Database (managed) or Hetzner + self-hosted Postgres based on the target profile.
-- **Bucket** – Object storage (S3-compatible). Same abstraction across Azure Blob Storage and Hetzner S3-compatible object stores.
+- **Bucket** – Object storage (S3-compatible). Same abstraction across Azure Blob Storage and sovereign S3-compatible object stores.
 - **Cache** – Redis-compatible caching layer. Managed Azure Cache for Redis or self-hosted Redis.
 - **MessageBus** – Event streaming (Kafka-compatible or managed message queues).
-- **Search** – Elasticsearch-compatible full-text search. OpenSearch on Hetzner, Azure Cognitive Search or managed OpenSearch on Azure.
+- **Search** – Elasticsearch-compatible full-text search. OpenSearch on the sovereign profile, Azure Cognitive Search or managed OpenSearch on Azure.
 - **VectorDB** – Vector storage for embeddings (used by Principle 9, AI). Pinecone (managed) or Weaviate (self-hosted).
 
 Each XRD is authored once, tested in all profiles, and reused everywhere. The composition function (written in CEL, not Rego) maps the XRD to provider-specific resources.
@@ -356,7 +356,7 @@ By baking security into all profiles, we ensure:
 12. Push to Harbor
 13. Policy evaluation (OPA): "Is this image allowed?"
 14. Kyverno admission check (if deploying immediately)
-15. Chaos testing validation (staging-hetzner, staging-azure)
+15. Chaos testing validation (staging-sovereign, staging-azure)
 16. E2E test suite
 17. SLO validation
 18. Cost impact assessment (FinOps)
@@ -471,7 +471,7 @@ The solution: maintain a portfolio of models. Self-hosted Ollama for sensitive d
 
 **Data Classification-Driven Routing:**
 
-- **Restricted (PII, customer data, secrets):** Routes to self-hosted Ollama (Mistral 7B or Llama2 13B, fine-tuned on internal corpus). Data never leaves CAVE infrastructure. Models run on GPU nodes in the cluster (or dedicated GPU machines on Hetzner).
+- **Restricted (PII, customer data, secrets):** Routes to self-hosted Ollama (Mistral 7B or Llama2 13B, fine-tuned on internal corpus). Data never leaves CAVE infrastructure. Models run on GPU nodes in the cluster (or dedicated GPU machines on the sovereign profile).
 
 - **Confidential (product roadmap, financial forecasts, contracts):** Routes to Azure OpenAI with a Data Processing Agreement (DPA) in place. Data is encrypted in-transit and at-rest. Azure OpenAI does not retain data for model improvement. Slower but maximum privacy.
 
@@ -541,12 +541,12 @@ Full observability also supports FinOps (Principle 12): we must track resource c
 
 **Thanos (Long-Term Storage):**
 - Thanos is an ultra-long-term metrics store (object storage backed).
-- Data is deduplicated across multiple Prometheus instances. If dev-hetzner and dev-azure both scrape the same application (for comparison testing), Thanos deduplicates.
+- Data is deduplicated across multiple Prometheus instances. If dev-sovereign and dev-azure both scrape the same application (for comparison testing), Thanos deduplicates.
 - Compliance value: auditors can query metrics from 2 years ago to prove SLA compliance or investigate historical cost anomalies.
 
 **Grafana Dashboards:**
 
-All dashboards are profile-agnostic. They work in dev-local, staging-hetzner, and prod-azure without changes:
+All dashboards are profile-agnostic. They work in dev-local, staging-sovereign, and prod-azure without changes:
 
 - **Golden Signals Dashboard:** Latency, error rate, saturation, throughput. Tenant-scoped via `tenant_id` variable.
 - **FinOps Dashboard:** CPU, memory, egress, storage per tenant. Feeds Principle 12 (SLO-Driven FinOps).
@@ -702,7 +702,7 @@ ADR-096 (SLO-Driven FinOps), ADR-110 (Cost Attribution), ADR-126 (Kill Switch Me
 ## 1.14 Principle 13: Immutable Infrastructure
 
 **Principle Statement:**
-All infrastructure is immutable. Talos Linux is deployed on all Hetzner nodes. Talos provides an API-only interface with no SSH, no shell, no package manager. Nodes are never patched in place; they are destroyed and recreated (Immutable Lifecycle).
+All infrastructure is immutable. Talos Linux is deployed on all sovereign-cloud nodes. Talos provides an API-only interface with no SSH, no shell, no package manager. Nodes are never patched in place; they are destroyed and recreated (Immutable Lifecycle).
 
 **Why This Principle Exists:**
 
@@ -723,7 +723,7 @@ Talos Linux is a minimal Linux distribution designed specifically for Kubernetes
 
 **Immutable Lifecycle:**
 
-1. A new Talos version is released (e.g., v1.8.1). CAVE maintainers test it in dev-hetzner.
+1. A new Talos version is released (e.g., v1.8.1). CAVE maintainers test it in dev-sovereign.
 2. If tests pass, a commit updates the machine config YAML to specify `talosVersion: v1.8.1`.
 3. OpenTofu applies this change. Talos initiates a rolling upgrade: each node pulls the new Talos image, reboots, and joins the cluster.
 4. During the upgrade, the node is cordoned (no new pods scheduled) and drained (existing pods are evicted to other nodes).
@@ -743,11 +743,11 @@ By removing SSH, shell, and package managers, entire attack vectors disappear:
 
 - **Learning curve:** Operators must unlearn "SSH to server, debug, fix" workflows. Instead, they must understand: "Rebuild the image, redeploy the node."
 - **Debugging is different:** You can't SSH to a node and `tail -f /var/log/syslog`. Instead, you use Talos API: `talosctl logs <node>`. All logs go to Loki (Principle 10). Adjustment period is ~2 weeks for ops teams.
-- **Not suitable for all cloud providers:** Talos is production-ready on Hetzner (bare metal). On Azure (managed AKS), Talos is overkill because Azure already enforces immutability. We use Talos on Hetzner and AKS on Azure (different philosophies, same outcome).
+- **Not suitable for all cloud providers:** Talos is production-ready on the sovereign profile (bare metal). On Azure (managed AKS), Talos is overkill because Azure already enforces immutability. We use Talos on the sovereign profile and AKS on Azure (different philosophies, same outcome).
 - **Hardware specifics:** Talos must be compiled for the Hetzner CPU architecture. If a Hetzner generation changes, the Talos image might need recompilation. Mitigated by Hetzner's stability (they rarely change CPU).
 
 **Related ADRs:**
-ADR-098 (Immutable Infrastructure), ADR-122 (Talos on Hetzner), ADR-123 (AKS on Azure)
+ADR-098 (Immutable Infrastructure), ADR-122 (Talos on the sovereign profile), ADR-123 (AKS on Azure)
 
 ---
 
@@ -1014,11 +1014,11 @@ ADR-095 (Remediation Strategy), ADR-119 (Crossplane Operations), ADR-128 (Attest
 ## 1.18 Principle 17: Exit Strategy Built-In
 
 **Principle Statement:**
-Every Azure managed service has an equivalent on Hetzner, and vice versa. The platform is designed for provider portability. An annual portability drill exports workload definitions, data, and keys, then re-imports them into the alternate provider to verify no lock-in. Failure to complete the drill in one week is a platform failure.
+Every Azure managed service has an equivalent on the sovereign profile, and vice versa. The platform is designed for provider portability. An annual portability drill exports workload definitions, data, and keys, then re-imports them into the alternate provider to verify no lock-in. Failure to complete the drill in one week is a platform failure.
 
 **Why This Principle Exists:**
 
-Vendor lock-in is an existential risk. If CAVE is tightly coupled to Azure (using AKS, Azure SQL, Azure Key Vault, Azure Cognitive Services), migrating to Hetzner becomes a multi-year effort. Costs can skyrocket if a provider increases prices. Service disruptions (e.g., region outage) are unrecoverable.
+Vendor lock-in is an existential risk. If CAVE is tightly coupled to Azure (using AKS, Azure SQL, Azure Key Vault, Azure Cognitive Services), migrating to the sovereign profile becomes a multi-year effort. Costs can skyrocket if a provider increases prices. Service disruptions (e.g., region outage) are unrecoverable.
 
 Annual portability drills enforce the exit strategy. They also drive a design principle: keep abstraction layers (Principle 5, Crossplane XRDs) clean so cross-provider portability is a matter of rewriting Compositions, not rewriting applications.
 
@@ -1026,12 +1026,12 @@ Annual portability drills enforce the exit strategy. They also drive a design pr
 
 **Provider-Equivalent Mapping:**
 
-- **Azure Database for Postgres** ↔ **Hetzner Managed Postgres (or self-hosted via Crossplane)**
-- **Azure Blob Storage** ↔ **Hetzner S3 (MinIO or Wasabi)**
+- **Azure Database for Postgres** ↔ **sovereign Managed Postgres (or self-hosted via Crossplane)**
+- **Azure Blob Storage** ↔ **sovereign S3 (MinIO or Wasabi)**
 - **Azure Cosmos DB** ↔ **MongoDB (self-hosted or managed)**
-- **Azure Cache for Redis** ↔ **Hetzner Managed Redis (or self-hosted)**
+- **Azure Cache for Redis** ↔ **sovereign Managed Redis (or self-hosted)**
 - **Azure Cognitive Search** ↔ **OpenSearch (managed or self-hosted)**
-- **AKS** ↔ **Talos on Hetzner**
+- **AKS** ↔ **Talos on the sovereign profile**
 - **Azure Key Vault** ↔ **HashiCorp Vault (self-hosted)**
 
 Crossplane Compositions ensure applications don't know which provider they're using. A Composition can target either provider based on profile selection.
@@ -1044,7 +1044,7 @@ Every year (typically during a scheduled maintenance window):
 
 2. **Validation Phase (1 day):** The backup is validated: all required keys present, all images accessible, all config valid.
 
-3. **Re-Import Phase (2 days):** A temporary Hetzner cluster (or Azure cluster, if current cluster is on Hetzner) is spun up. Workloads and data are imported. Sanity tests run (can pods start? Can they reach databases? Can they serve traffic?).
+3. **Re-Import Phase (2 days):** A temporary sovereign-cloud cluster (or Azure cluster, if current cluster is on the sovereign profile) is spun up. Workloads and data are imported. Sanity tests run (can pods start? Can they reach databases? Can they serve traffic?).
 
 4. **Cross-Provider Verification (2 days):** Traffic is gradually shifted from the original cluster to the re-imported cluster. If everything works, the drill succeeds.
 
@@ -1066,7 +1066,7 @@ Failure at any stage is a Platform Failure. The root cause is investigated. Chan
 - Provider incompatibilities might be discovered late. Example: Azure has a managed Postgres feature X, Hetzner doesn't. Working around it requires application changes. Ideal: discover during drill, not in production.
 
 **Related ADRs:**
-ADR-066 (Portability and Exit Strategy), ADR-122 (Hetzner Profile), ADR-123 (Azure Profile)
+ADR-066 (Portability and Exit Strategy), ADR-122 (Sovereign-Cloud Profile), ADR-123 (Azure Profile)
 
 ---
 
@@ -1185,7 +1185,7 @@ A complexity budget forces prioritization. Before adding a new tool, ask: "What 
 
 **Guardian Onboarding Time (GOT):**
 
-GOT is measured quarterly. A new guardian is given CAVE infrastructure (empty Hetzner cluster, documentation, Backstage access) and asked to perform five operational tasks:
+GOT is measured quarterly. A new guardian is given CAVE infrastructure (empty sovereign-cloud cluster, documentation, Backstage access) and asked to perform five operational tasks:
 
 1. Deploy a sample application (Backstage template → deployment)
 2. Debug a performance issue (use Grafana, identify root cause)
@@ -1303,7 +1303,7 @@ Platform engineers and compliance teams collaborate to map each principle to spe
 ADR-014 (Complexity Budget), ADR-015 (Control Plane Architecture), ADR-020 (ADR Process), ADR-021 (Profile Architecture), ADR-025 (Backstage Plugin Architecture)
 
 **Provisioning & Infrastructure:**
-ADR-067 (OpenTofu + Crossplane Boundary), ADR-119 (Crossplane v2), ADR-122 (Hetzner Profile), ADR-123 (Azure Profile), ADR-124 (MRAP Policy)
+ADR-067 (OpenTofu + Crossplane Boundary), ADR-119 (Crossplane v2), ADR-122 (Sovereign-Cloud Profile), ADR-123 (Azure Profile), ADR-124 (MRAP Policy)
 
 **Security & Compliance:**
 ADR-007 (Secret Management), ADR-077 (Zero-Trust Networking), ADR-101 (Image Signing), ADR-105 (SBOM), ADR-106 (SLSA + Sigstore), ADR-093 (Sovereign Ledger), ADR-090 (Runtime Forensics)

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Hetzner, Universal
+**Scope:** Sovereign, Universal
 
 **Category:** Security
 
@@ -43,7 +43,7 @@ CAVE needs defense-in-depth at the container runtime level: preventing container
 
 ### gVisor / Kata Containers — Rejected
 
-**Primary:** Performance overhead. gVisor intercepts every syscall through a userspace kernel (~20-30% CPU overhead). Kata runs each pod in a lightweight VM (~100-200MB overhead per pod). On Hetzner's cost-optimized profiles, this overhead is prohibitive for 500+ pod clusters.
+**Primary:** Performance overhead. gVisor intercepts every syscall through a userspace kernel (~20-30% CPU overhead). Kata runs each pod in a lightweight VM (~100-200MB overhead per pod). On the sovereign profile's cost-optimized profiles, this overhead is prohibitive for 500+ pod clusters.
 
 **Secondary:** Incompatible with Talos Linux. Talos's immutable, API-only OS does not support gVisor's  runtime or Kata's QEMU/Cloud Hypervisor installation. Supporting these would require a different OS — contradicting ADR-003.
 

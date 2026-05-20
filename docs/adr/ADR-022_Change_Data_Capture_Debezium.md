@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Data & Messaging
 
@@ -25,13 +25,13 @@ CAVE tenants need real-time data integration between PostgreSQL and downstream s
 
 ## Decision
 
-**Debezium** via Kafka Connect for CDC from PostgreSQL (CNPG/Azure PG) to Kafka topics. Deployed as Strimzi KafkaConnector CRD (Hetzner) or Confluent managed connector (Azure). Avro serialization with Schema Registry (ADR-060).
+**Debezium** via Kafka Connect for CDC from PostgreSQL (CNPG/Azure PG) to Kafka topics. Deployed as Strimzi KafkaConnector CRD (sovereign) or Confluent managed connector (Azure). Avro serialization with Schema Registry (ADR-060).
 
 ## Rejected Options
 
 ### Maxwell — Rejected
 
-**Primary:** MySQL-only. CAVE's primary relational database is PostgreSQL (CNPG on Hetzner, Azure PG Flexible on Azure — ADR-047). Maxwell has zero PostgreSQL support.
+**Primary:** MySQL-only. CAVE's primary relational database is PostgreSQL (CNPG on the sovereign profile, Azure PG Flexible on Azure — ADR-047). Maxwell has zero PostgreSQL support.
 
 ### pg_logical_replication — Rejected
 

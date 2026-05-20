@@ -156,7 +156,7 @@ Writing a controller per event source duplicates the lag-querying, leader electi
 
 The Platform-side rollout is complete when:
 
-- `keda-operator` runs in `keda-system` on every Platform cluster (Hetzner sovereign + Azure enterprise) with PDB + 2 replicas + critical `PriorityClass`.
+- `keda-operator` runs in `keda-system` on every Platform cluster (sovereign + Azure enterprise) with PDB + 2 replicas + critical `PriorityClass`.
 - Reflex Engine workers (ADR-095) scale on Prometheus + Kafka triggers via `ScaledObject` exclusively; no manual HPA on those workloads.
 - Gatekeeper rejects (a) manual HPA on `ScaledObject`-targeted Deployments and (b) any `ClusterTriggerAuthentication` resource.
 - `TriggerAuthentication` resolution path through External Secrets + OpenBao + OIDC workload identity validated by a synthetic credential rotation in staging.

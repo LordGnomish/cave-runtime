@@ -51,7 +51,7 @@ CAVE runs on two providers with fundamentally different networking models. IP ad
 
 ## Notes
 
-**Universal scope.** **Runtime mirror EXISTS**: `cave-net` crate (Mirror-001 blanket; Cilium CNI + eBPF mirror, ADR-004). VNet/subnet topology cave-net'in provider abstraction katmanında configurable — Hetzner/Azure/on-prem KubeVirt için ortak schema. Non-overlapping invariant cave-net'in built-in validator'unda enforce (10.10.x.x ↔ 10.20.x.x ayrılığı tenant deployment'larında otomatik kontrol). Cross-provider VPN peering (WireGuard/IPsec) cave-net M6 Encryption track'inde indi (+30 test main'de). Multi-tenant: per-tenant namespace IP allocation cave-net policy engine'inde, cross-tenant default-deny.
+**Universal scope.** **Runtime mirror EXISTS**: `cave-net` crate (Mirror-001 blanket; Cilium CNI + eBPF mirror, ADR-004). VNet/subnet topology cave-net'in provider abstraction katmanında configurable — sovereign / hyperscaler/on-prem KubeVirt için ortak schema. Non-overlapping invariant cave-net'in built-in validator'unda enforce (10.10.x.x ↔ 10.20.x.x ayrılığı tenant deployment'larında otomatik kontrol). Cross-provider VPN peering (WireGuard/IPsec) cave-net M6 Encryption track'inde indi (+30 test main'de). Multi-tenant: per-tenant namespace IP allocation cave-net policy engine'inde, cross-tenant default-deny.
 
 ## Compliance Mapping
 

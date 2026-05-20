@@ -75,7 +75,7 @@ Talos (veya benzeri) sadece **Platform repo deployment ADR'lerinde** opsiyondur 
 - **No-backcompat + PQC-ready** (cave_runtime_no_backcompat_pqc.md): Bu ADR'nin özel hali — Layer 1 kernel 7.1 ve crypto baştan PQC.
 
 ## Supersedes / Conflicts
-- Önceki ADR-003 (Talos for Hetzner) Cave Runtime için irrelevant — Cave Runtime Talos kullanmaz. Talos artık sadece Platform repo'da Hetzner deployment ADR'si olarak kalır.
+- Önceki ADR-003 (Talos for Hetzner) Cave Runtime için irrelevant — Cave Runtime Talos kullanmaz. Talos artık sadece Platform repo'da sovereign-cloud deployments ADR'si olarak kalır.
 - Daha önce "Cave Runtime Layer 3+4" diye yazılmış memory/ADR ifadeleri bu ADR ile **Layer 1-4** olarak güncellenir.
 
 ## Related

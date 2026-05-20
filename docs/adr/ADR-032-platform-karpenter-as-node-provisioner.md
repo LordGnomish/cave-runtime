@@ -4,7 +4,7 @@
 
 **Date:** 2026-04-26
 
-**Scope:** Universal (Hetzner + Azure profiles)
+**Scope:** Universal (sovereign cloud + hyperscaler profiles)
 
 **Category:** Platform / Cluster Lifecycle
 
@@ -43,7 +43,7 @@ A static node pool sized for the worst case wastes 60–80% of compute during th
 | Instance flexibility | ✅ Selects from many shapes per NodePool | ❌ One shape per node group | ❌ Pre-allocated | N/A |
 | Spot integration | ✅ First-class (interruption handler, on-demand fallback) | ⚠️ Supported but coarse | ⚠️ Manual | N/A |
 | Consolidation / bin-packing | ✅ Continuous, online | ❌ Limited | ❌ | N/A |
-| Multi-profile (Azure + Hetzner) | ⚠️ Azure provider mature; Hetzner via Cluster API custom | ⚠️ Per-cloud autoscaler, varying maturity | ✅ Works anywhere — at a cost | ✅ |
+| Multi-profile (hyperscaler + sovereign cloud) | ⚠️ Azure provider mature; Hetzner via Cluster API custom | ⚠️ Per-cloud autoscaler, varying maturity | ✅ Works anywhere — at a cost | ✅ |
 | KEDA / event-driven fit | ✅ Reacts to pods queued by KEDA ScaledObjects | ⚠️ Slow to keep up with bursts | ❌ | ❌ |
 | License | Apache 2.0 (CNCF) | Apache 2.0 (CNCF) | N/A | Apache 2.0 |
 | Operational complexity | Medium (NodePool/NodeClass CRDs) | Low–Medium | Low–High depending on scale | Low |
@@ -53,9 +53,9 @@ A static node pool sized for the worst case wastes 60–80% of compute during th
 **Karpenter** (Apache 2.0, CNCF) for node provisioning across both provider profiles.
 
 - **Azure profile (AKS):** [`Azure/karpenter-provider-azure`](https://github.com/Azure/karpenter-provider-azure) — Microsoft-maintained provider, AKS-native (uses VM Scale Sets / VMs API directly, integrates with AKS networking). This replaces the implicit Karpenter dependency previously named in ADR-002 and ADR-062 with a formal platform-wide decision.
-- **Hetzner profile (K3s + Talos):** Karpenter's NodePool / NodeClass CRDs driving a Cluster API back-end via `cluster-api-provider-hetzner` (syself / community). Where the Hetzner provider lacks features (e.g. ad-hoc placement groups, Talos image rotation), a thin custom provisioner crate bridges Karpenter's `Provisioner` interface to Hetzner Cloud APIs and Talos machine config. The bridge is owned by the platform team, not the tenant.
+- **sovereign-cloud profile (K3s + Talos):** Karpenter's NodePool / NodeClass CRDs driving a Cluster API back-end via `cluster-api-provider-hetzner` (syself / community). Where the sovereign-cloud provider lacks features (e.g. ad-hoc placement groups, Talos image rotation), a thin custom provisioner crate bridges Karpenter's `Provisioner` interface to sovereign cloud APIs and Talos machine config. The bridge is owned by the platform team, not the tenant.
 - **NodePool taxonomy (per profile):** at minimum `system` (always-on platform critical), `general` (tenant default, mixed shapes, spot-preferred), `bursty` (CI / Reflex / Knative — scale-to-zero, short TTL), and `gpu` (LLM inference, ADR-009). Tenants do **not** create or edit NodePools; they request capacity via labels/taints and let Karpenter pick.
-- **Consolidation:** `consolidationPolicy: WhenUnderutilized` (Azure) and equivalent (Hetzner). Disruption budgets aligned with PodDisruptionBudgets per ADR-141 (Shared-Fate & Tenant Priority).
+- **Consolidation:** `consolidationPolicy: WhenUnderutilized` (Azure) and equivalent (sovereign). Disruption budgets aligned with PodDisruptionBudgets per ADR-141 (Shared-Fate & Tenant Priority).
 - **Spot:** spot is the default for `general` and `bursty`; on-demand fallback after configurable interruption count. `system` is on-demand only.
 
 ### NodePool reference (excerpt)
@@ -103,7 +103,7 @@ Because Karpenter has been an *implicit* dependency in ADR-002 and ADR-062 since
 1. **Inventory.** Record the current Karpenter version, provider version, and NodePool CRDs on every profile. Reconcile against the v1.x baseline this ADR pins.
 2. **NodePool consolidation.** Existing ad-hoc NodePools (per-team, per-experiment) are merged into the four canonical pools (`system`, `general`, `bursty`, `gpu`). Tenant labels migrate via Crossplane MRAP (ADR-124) so that tenant pods continue to schedule without manual edits.
 3. **RBAC tightening.** Remove any tenant-namespace ClusterRoleBindings that grant access to NodePool / NodeClass CRDs. Cluster-wide capacity decisions are platform-only; this is enforced by Gatekeeper (ADR-030).
-4. **Hetzner bridge cut-over.** The custom Cluster-API-bridge crate is shipped as `cave-node-provisioner-hetzner`. Existing Hetzner clusters that previously ran a hand-rolled scaler shim are migrated profile-by-profile during a maintenance window, with rollback to the shim available for one soak window per ADR-132.
+4. **sovereign-cloud bridge cut-over.** The custom Cluster-API-bridge crate is shipped as `cave-node-provisioner-hetzner`. Existing sovereign-cloud clusters that previously ran a hand-rolled scaler shim are migrated profile-by-profile during a maintenance window, with rollback to the shim available for one soak window per ADR-132.
 5. **Soak.** Each profile soaks per ADR-132 (Version Channel & Soak Policy) before being declared production-eligible. Soak success criteria: (a) zero unscheduled pending pods exceeding 5 minutes for 7 consecutive days; (b) consolidation churn within budget; (c) no spot-interruption-driven SLA breach.
 6. **Documentation.** Tenant-facing docs are updated to describe the four NodePools, the labels tenants set to opt in/out, and the spot semantics. Self-service troubleshooting added to the runbook.
 
@@ -124,7 +124,7 @@ Day-2 operations follow a small set of named procedures so that on-call engineer
 - **PB-KARP-01 — Pending pods despite spare cluster headroom.** Check Karpenter logs for provider quota errors first; then verify NodePool requirement intersection (a pod with conflicting requirements will never schedule, regardless of capacity).
 - **PB-KARP-02 — Consolidation oscillation.** Inspect `karpenter_consolidation_actions_total`. If churn exceeds budget, raise `consolidateAfter` and PDB minimums for the affected workload class.
 - **PB-KARP-03 — Spot interruption storm.** When `karpenter_interruption_actions_total` spikes for a region, automatically widen the on-demand fallback fraction for `general` and `bursty` for the next provisioning window.
-- **PB-KARP-04 — Hetzner provider lag.** If the Hetzner bridge falls behind Karpenter's intent for more than 10 minutes, page the platform team and fall back to the manual node-pool break-glass — without disabling Karpenter (which would compound the lag).
+- **PB-KARP-04 — sovereign-cloud provider lag.** If the sovereign-cloud bridge falls behind Karpenter's intent for more than 10 minutes, page the platform team and fall back to the manual node-pool break-glass — without disabling Karpenter (which would compound the lag).
 
 These are referenced from the Reflex Engine playbook catalog (ADR-095) and surfaced in the Backstage scorecard.
 
@@ -150,17 +150,17 @@ AKS's bundled autoscaler is Cluster Autoscaler under the hood, with the same lim
 - **Spot integration** is first-class; expected compute spend on `general` workloads drops materially with controlled risk.
 - **Bin-packing / consolidation** runs continuously; long-running platform components no longer strand fragments of nodes.
 - **Instance flexibility** lets capacity track price and availability instead of a fixed shape choice from cluster-creation day.
-- **Single mental model** for Azure and Hetzner — operators learn Karpenter once, apply it twice.
+- **Single mental model** for hyperscaler and sovereign cloud — operators learn Karpenter once, apply it twice.
 
 ### Negative
-- **Hetzner provider maturity gap.** `cluster-api-provider-hetzner` is community-maintained, not vendor-backed. The custom Cluster-API-bridge crate becomes a platform-team responsibility with its own backlog and on-call surface.
+- **sovereign-cloud provider maturity gap.** `cluster-api-provider-hetzner` is community-maintained, not vendor-backed. The custom Cluster-API-bridge crate becomes a platform-team responsibility with its own backlog and on-call surface.
 - **KEDA × Karpenter interplay.** A ScaledObject (ADR-095) creating pods that trigger Karpenter creating nodes that take 60s to join can race with KEDA's cool-down. Misconfiguration produces oscillation. We accept this risk and document tuning playbooks.
 - **NodePool RBAC surface.** Tenants must not be able to create or edit NodePools (cluster-wide capacity decisions). This is enforced via OPA Gatekeeper (ADR-030) and platform RBAC (ADR-078); a regression here is a blast-radius bug.
 - **Spot interruption noise.** `system` workloads are isolated to on-demand, but tenant `general` workloads will see occasional interruptions. PodDisruptionBudgets and tenant priority (ADR-141) absorb this; tenants who cannot tolerate it must label out of spot explicitly.
 - **Consolidation churn.** Aggressive consolidation can move pods more often than tenants expect. We tune `consolidateAfter` conservatively at first and revisit.
 
 ### Risks
-- **Provider drift between Azure and Hetzner.** Feature parity between `karpenter-provider-azure` and our Hetzner bridge is not guaranteed. We cap divergence with the Provider Parity Contract (ADR-135): both providers must implement the same NodePool feature surface; gaps are tracked as parity defects.
+- **Provider drift between hyperscaler and sovereign cloud.** Feature parity between `karpenter-provider-azure` and our sovereign-cloud bridge is not guaranteed. We cap divergence with the Provider Parity Contract (ADR-135): both providers must implement the same NodePool feature surface; gaps are tracked as parity defects.
 - **CRD upgrade churn.** Karpenter has rev'd its CRD schema between minor versions; in-place upgrades require care. Covered by ADR-132 (Version Channel & Soak Policy).
 
 ## Compliance Mapping
@@ -174,7 +174,7 @@ AKS's bundled autoscaler is Cluster Autoscaler under the hood, with the same lim
 **Implementation Status:** Accepted; rollout per profile.
 
 - **Azure profile:** Karpenter v1.x (current stable) via `karpenter-provider-azure`. Helm chart pinned by digest (ADR-108). NodePools defined in `cave-gitops-config` (ADR-026), reconciled by ArgoCD.
-- **Hetzner profile:** Karpenter v1.x with Cluster-API bridge (`cluster-api-provider-hetzner` + custom provisioner crate). Talos machine images pinned per ADR-098.
+- **sovereign-cloud profile:** Karpenter v1.x with Cluster-API bridge (`cluster-api-provider-hetzner` + custom provisioner crate). Talos machine images pinned per ADR-098.
 - **NodePools shipped at v0.1:** `system`, `general`, `bursty`. `gpu` follows once ADR-009 GPU runtime story stabilises.
 - **Observability:** Karpenter metrics scraped into Prometheus (ADR-029); dashboards for provisioning latency, consolidation churn, and spot interruption rate.
 - **Disruption controls:** PodDisruptionBudgets enforced via OPA Gatekeeper (ADR-030); tenant priority per ADR-141.
@@ -184,7 +184,7 @@ AKS's bundled autoscaler is Cluster Autoscaler under the hood, with the same lim
 Karpenter's value is proportional to workload variance. The economics model behind this decision rests on three numbers, each of which is independently observable in production:
 
 - **Idle ratio.** With static node pools, off-peak utilisation on `bursty` workloads (ARC, Reflex, scheduled jobs) is typically 5–15% of provisioned capacity. Scale-to-zero takes that floor to 0, so all `bursty` cost becomes proportional to actual work.
-- **Spot premium.** On both Azure and Hetzner the spot/on-demand price gap is large enough that even a 20–30% interruption rate yields material savings on `general` workloads. Workloads that cannot tolerate interruption opt out via a single label.
+- **Spot premium.** On both hyperscaler and sovereign cloud the spot/on-demand price gap is large enough that even a 20–30% interruption rate yields material savings on `general` workloads. Workloads that cannot tolerate interruption opt out via a single label.
 - **Bin-packing tax.** Static node pools trap fragments — half-full nodes that no single workload fills. Continuous consolidation recovers that tax. The exact recovery is workload-dependent, but is reliably non-zero on shared multi-tenant clusters.
 
 These numbers are tracked under FinOps attribution (ADR-096) and reported back to tenants on the cost dashboard.

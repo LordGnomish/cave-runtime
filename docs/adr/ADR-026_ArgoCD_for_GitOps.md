@@ -10,11 +10,11 @@
 
 ## Context
 
-CAVE needs a GitOps engine to continuously reconcile desired state (Git) with actual state (cluster) for all 73 platform components and unlimited tenant workloads across 7 profiles (3 Hetzner + 4 Azure). GitOps provides:
+CAVE needs a GitOps engine to continuously reconcile desired state (Git) with actual state (cluster) for all 73 platform components and unlimited tenant workloads across 7 profiles (3 sovereign + 4 hyperscaler). GitOps provides:
 
 - **Source of truth:** Git repository is the single source of truth for infrastructure and application state
 - **Continuous reconciliation:** Continuous loop detects drift (manual changes, failed updates) and auto-corrects
-- **Multi-profile support:** Same ArgoCD instance manages dev, staging, prod across Hetzner and Azure with tenant isolation
+- **Multi-profile support:** Same ArgoCD instance manages dev, staging, prod across sovereign cloud and hyperscaler with tenant isolation
 - **Progressive delivery:** Integration with Argo Rollouts (ADR-036) for canary deployments
 - **Audit trail:** Every state change traceable to Git commit + author
 
@@ -50,7 +50,7 @@ CAVE needs a GitOps engine to continuously reconcile desired state (Git) with ac
 
 - **cave-gitops-config** crate: ArgoCD Application/ApplicationSet manifests. CAVE components + tenant workloads organized by profile.
 - **Repository:** cave-gitops-config Git repo is source of truth. ArgoCD webhook auto-syncs on commit.
-- **Profiles:** 7 environments (hetzner-dev, hetzner-staging, hetzner-prod, azure-dev, azure-staging, azure-prod, edge). ApplicationSets template per profile.
+- **Profiles:** 7 environments (sovereign-dev, sovereign-staging, sovereign-prod, azure-dev, azure-staging, azure-prod, edge). ApplicationSets template per profile.
 - **Helm integration:** Helm charts from Harbor (ADR-028). Chart versions pinned by digest (ADR-108).
 
 **Version State (April 2026):** ArgoCD v3.2.9 (current stable) is the first major v3 release (upgraded from v2.14). v3 delivers improved ApplicationSet webhook support, UI performance improvements for large application sets, and refined server-side apply conflict resolution.
@@ -76,7 +76,7 @@ CAVE needs a GitOps engine to continuously reconcile desired state (Git) with ac
 
 **Reasons:**
 1. **Vendor lock-in:** Tightly coupled to Rancher ecosystem. CAVE doesn't run Rancher as management layer. Fleet adds unnecessary dependency.
-2. **Multi-cloud friction:** Fleet designed for Rancher-managed clusters. CAVE's heterogeneous clusters (Talos on Hetzner, AKS on Azure) don't naturally fit Rancher model.
+2. **Multi-cloud friction:** Fleet designed for Rancher-managed clusters. CAVE's heterogeneous clusters (Talos on the sovereign profile, AKS on Azure) don't naturally fit Rancher model.
 
 ## Consequences
 
@@ -91,7 +91,7 @@ CAVE needs a GitOps engine to continuously reconcile desired state (Git) with ac
 
 ### Negative
 
-- **Resource intensive:** ArgoCD server + repo-server + controller: ~500MB-1GB RAM total. On Hetzner dev (16GB), this is ~6% of node RAM.
+- **Resource intensive:** ArgoCD server + repo-server + controller: ~500MB-1GB RAM total. On the sovereign profile dev (16GB), this is ~6% of node RAM.
 - **ApplicationSet complexity:** As tenant count grows (1 → 10 → 100 tenants), ApplicationSet templates become complex. Risk of accidental cross-tenant deployments (mitigated by AppProject RBAC).
 - **Server-side apply behavior changes:** Migrating from client-side to server-side apply changes conflict resolution semantics. Requires validation with Crossplane (ADR-067).
 

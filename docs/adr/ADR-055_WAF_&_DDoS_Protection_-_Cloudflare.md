@@ -27,7 +27,7 @@ CAVE's external-facing endpoints (Kong API gateway, Backstage portal, Grafana da
 
 ## Decision
 
-**Profile-conditional WAF.** Azure profile: Cloudflare L3/L4 DDoS + L7 WAF (managed rulesets, free tier güçlü, AKS managed ekosistemiyle uyum). Sovereign profile (Hetzner-only / disconnected / on-prem): Cloudflare KULLANILMAZ — cave-waf runtime crate (Pingora-class L3/L4 + OWASP CRS L7) zorunlu replacement. Rule schema unified across both profiles (OWASP CRS sözlüğü). Kong second layer ortak.
+**Profile-conditional WAF.** Azure profile: Cloudflare L3/L4 DDoS + L7 WAF (managed rulesets, free tier güçlü, AKS managed ekosistemiyle uyum). Sovereign profile (sovereign-only / disconnected / on-prem): Cloudflare KULLANILMAZ — cave-waf runtime crate (Pingora-class L3/L4 + OWASP CRS L7) zorunlu replacement. Rule schema unified across both profiles (OWASP CRS sözlüğü). Kong second layer ortak.
 
 
 ## Rejected Options

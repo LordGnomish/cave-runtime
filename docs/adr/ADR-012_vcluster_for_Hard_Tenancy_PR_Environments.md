@@ -77,7 +77,7 @@ Soft tier tenants (namespace isolation + NetworkPolicy + ResourceQuota) are hand
 
 ### Dedicated Clusters — Rejected
 
-**Primary:** Cost and time. Provisioning a full K8s cluster takes 10-20 minutes and costs a full control plane (3 nodes minimum on Hetzner). Neither ephemeral PR use nor most production tenants justify this cost. Kamaji provides equivalent isolation at ~20% of the cost.
+**Primary:** Cost and time. Provisioning a full K8s cluster takes 10-20 minutes and costs a full control plane (3 nodes minimum on the sovereign profile). Neither ephemeral PR use nor most production tenants justify this cost. Kamaji provides equivalent isolation at ~20% of the cost.
 
 ### Capsule for Hard Tier — Rejected
 

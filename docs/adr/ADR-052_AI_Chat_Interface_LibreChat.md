@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** AI
 
@@ -27,7 +27,7 @@ CAVE users (developers, platform engineers, tenants) need a web-based AI chat in
 
 ## Decision
 
-**LibreChat** (self-hosted, MIT license) as AI chat interface for all profiles. Routes through LiteLLM (ADR-013) — inherits classification routing, PII redaction, and token metering. MongoDB backend for conversation persistence. OIDC authentication via Keycloak (Hetzner) / Okta (Azure). Model presets configured per classification level.
+**LibreChat** (self-hosted, MIT license) as AI chat interface for all profiles. Routes through LiteLLM (ADR-013) — inherits classification routing, PII redaction, and token metering. MongoDB backend for conversation persistence. OIDC authentication via Keycloak (sovereign) / Okta (Azure). Model presets configured per classification level.
 
 ## Rejected
 

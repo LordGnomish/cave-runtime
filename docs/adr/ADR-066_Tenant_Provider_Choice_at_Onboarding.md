@@ -26,12 +26,12 @@ CAVE supports two providers. Should tenants be able to choose? Can they switch l
 
 ## Decision
 
-Tenant chooses Hetzner or Azure at onboarding. Choice is **permanent by default** — no live cross-cloud traffic. Cross-cloud cold migration supported as planned operation with downtime (see Recovery Contracts). Architecture is provider-extensible (new cloud = new Crossplane Compositions + tfvars).
+Tenant chooses sovereign cloud or hyperscaler at onboarding. Choice is **permanent by default** — no live cross-cloud traffic. Cross-cloud cold migration supported as planned operation with downtime (see Recovery Contracts). Architecture is provider-extensible (new cloud = new Crossplane Compositions + tfvars).
 
 
 ## Rejected Options
 
-- **Live cross-cloud migration:** Network latency between Hetzner and Azure makes real-time data sync impractical. Split-brain risk. Kafka cross-cluster replication adds massive complexity. Data residency violations possible.
+- **Live cross-cloud migration:** Network latency between sovereign cloud and hyperscaler makes real-time data sync impractical. Split-brain risk. Kafka cross-cluster replication adds massive complexity. Data residency violations possible.
 - **Hybrid split-workload (compute on one, data on other):** Cross-provider network costs. Latency kills performance. Data residency unclear. Phase 4 future evaluation only.
 - **No choice (Azure only / Hetzner only):** Eliminates cost advantage of Hetzner for internal workloads. Eliminates enterprise SLA of Azure for paying tenants.
 

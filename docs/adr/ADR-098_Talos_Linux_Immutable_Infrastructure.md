@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Hetzner
+**Scope:** Sovereign
 
 **Category:** Infrastructure
 
@@ -10,7 +10,7 @@
 
 ## Context
 
-Hetzner profile needs a K8s-optimized, security-hardened, immutable OS. Configuration drift must be impossible. SSH access must not exist.
+sovereign-cloud profile needs a K8s-optimized, security-hardened, immutable OS. Configuration drift must be impossible. SSH access must not exist.
 
 
 ## Candidates
@@ -28,7 +28,7 @@ Hetzner profile needs a K8s-optimized, security-hardened, immutable OS. Configur
 
 ## Decision
 
-Talos Linux for ALL Hetzner profiles (dev, staging, prod). Immutable, API-only OS. Nodes never patched — destroyed and recreated from versioned image. Same OS, same management model across all environments. Debugging via `talosctl` + ephemeral debug containers (30min TTL).
+Talos Linux for ALL sovereign-cloud profiles (dev, staging, prod). Immutable, API-only OS. Nodes never patched — destroyed and recreated from versioned image. Same OS, same management model across all environments. Debugging via `talosctl` + ephemeral debug containers (30min TTL).
 
 
 ## Rejected Options
@@ -47,8 +47,8 @@ See ADR-003 for full comparison. Key: Ubuntu/Flatcar/Bottlerocket all allow SSH 
 **Negative:**
 - Engineers cannot SSH into nodes. All debugging via talosctl + debug containers.
 - Learning curve for teams familiar with SSH-based operations.
-- Kernel panic or Cilium-caused network lockout requires Hetzner console access (no SSH fallback).
-- Limited to Hetzner-supported hardware/cloud — not applicable to Azure (AKS manages OS).
+- Kernel panic or Cilium-caused network lockout requires sovereign-cloud console access (no SSH fallback).
+- Limited to the sovereign profile-supported hardware/cloud — not applicable to Azure (AKS manages OS).
 
 Compliance Mapping
 

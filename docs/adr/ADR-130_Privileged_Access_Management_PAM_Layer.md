@@ -2,7 +2,7 @@
 
 **Status:** Proposed
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 ## Category:
 
@@ -12,7 +12,7 @@
 
 ## ### 1.1 Current Identity Stack
 
-| Layer | Hetzner (Sovereign) | Azure (Enterprise) |
+| Layer | Sovereign | Azure (Enterprise) |
 |---|---|---|
 | User Identity (OIDC) | Keycloak | Okta Workforce Identity |
 | Resource RBAC | Keycloak roles → OPA | Entra ID (Azure RBAC only) |
@@ -139,7 +139,7 @@ User → Okta (MFA) → CyberArk Privilege Cloud
 5. CyberArk → Entra ID: JIT privileged role assignment (Global Admin, Sub Owner)
 6. CyberArk → Ledger: Syslog → Loki → `Privileged Session` attestation
 
-### 4.2 Hetzner: Teleport Community Edition
+### 4.2 Sovereign: Teleport Community Edition
 
 ```
 User → Keycloak (MFA) → [user sync] → Teleport (self-hosted K8s)
@@ -188,7 +188,7 @@ If upgraded to Enterprise later, sync replaced by native OIDC connector.
 
 ### 5.1 Identity Lifecycle Enhancement (ADR-104)
 
-| Capability | Before PAM | After PAM (Hetzner) | After PAM (Azure) |
+| Capability | Before PAM | After PAM (sovereign) | After PAM (Azure) |
 |---|---|---|---|
 | JIT access | n8n → Keycloak temp role (4h) | n8n → Teleport Access Request → short-lived cert | n8n → CyberArk JIT → ephemeral account |
 | Break-glass | Dual-approval → hash to Ledger → direct kubectl | Dual-approval → Teleport recorded session → Ledger | Dual-approval → CyberArk PSM recorded → Ledger |
@@ -214,7 +214,7 @@ type: Privileged Session
 schema:
   session_id: string          # PAM-generated
   operator: string            # cave_uid
-  target: string              # e.g. "k8s:prod-hetzner", "db:billing-pg"
+  target: string              # e.g. "k8s:prod-sovereign", "db:billing-pg"
   access_method: string       # "teleport" | "cyberark" | "break-glass"
   justification: string       # From access request
   approval_chain: string[]    # cave_uid list of approvers
@@ -239,7 +239,7 @@ schema:
 
 **Azure (Enterprise):** CyberArk Privilege Cloud as PAM layer, integrated with Okta (SAML federation) and Entra ID (Azure RBAC target).
 
-**Hetzner (Sovereign):** Teleport Community Edition (self-hosted on K8s) as PAM layer, integrated with Keycloak (user sync, future OIDC) and OpenBao (credential brokering).
+**Sovereign:** Teleport Community Edition (self-hosted on K8s) as PAM layer, integrated with Keycloak (user sync, future OIDC) and OpenBao (credential brokering).
 
 Both produce session audit records flowing to Sovereign Ledger as new attestation type: `Privileged Session`.
 
@@ -289,7 +289,7 @@ Teleport and CyberArk deploy in **Phase 3 (Advanced)**.
 
 | Task | Effort | Dependencies |
 |---|---|---|
-| Teleport Helm deploy on Hetzner | 1 day | K8s cluster, Keycloak |
+| Teleport Helm deploy on the sovereign profile | 1 day | K8s cluster, Keycloak |
 | Teleport K8s + DB agent config | 1 day | CloudNativePG, Talos |
 | Keycloak → Teleport user sync | 1 day | Keycloak Admin API |
 | CyberArk Privilege Cloud onboarding | 1 week | Vendor engagement, Okta |
@@ -317,7 +317,7 @@ cave-ctl pam compliance report --framework soc2
 |---|---|---|---|
 | Component count | ~70 | ~72 | +2 |
 | GOT estimate | 2 weeks | 2 weeks + 0.5 day | <10% |
-| K8s RAM (Hetzner) | Baseline | +1.5 GB | Minimal |
+| K8s RAM (sovereign) | Baseline | +1.5 GB | Minimal |
 | K8s RAM (Azure) | Baseline | +256Mi (SIA pod) | Minimal |
 
 PAM is not in resurrection critical path. GOT within 10% threshold.
@@ -342,7 +342,7 @@ PAM is not in resurrection critical path. GOT within 10% threshold.
 - CyberArk requires Windows connector VM(s) until SIA parity
 - Teleport CE OIDC limitation requires sync workaround
 - CyberArk licensing cost
-- APOL asymmetry: PAM-proxied on Hetzner (Teleport MCP), not on Azure
+- APOL asymmetry: PAM-proxied on the sovereign profile (Teleport MCP), not on Azure
 
 ### Risks
 

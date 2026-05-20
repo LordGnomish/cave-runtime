@@ -12,14 +12,14 @@
 
 CAVE's deployment profile system is the foundational concept that enables the platform's core value proposition: **infrastructure-agnostic, environment-consistent application delivery**. Rather than forcing operators to learn separate tools and procedures for each cloud provider, CAVE abstracts infrastructure differences behind a simple, standardized interface.
 
-The platform supports **seven deployment profiles**: three environment tiers (development, staging, production) across two cloud providers (Hetzner Cloud and Azure), plus a local development profile. Each profile represents a complete, validated infrastructure topology that can be provisioned with a single `cave-ctl` command, scaled according to workload requirements, and promoted through the full software development lifecycle using identical operational procedures.
+The platform supports **seven deployment profiles**: three environment tiers (development, staging, production) across two cloud providers (sovereign cloud and Azure), plus a local development profile. Each profile represents a complete, validated infrastructure topology that can be provisioned with a single `cave-ctl` command, scaled according to workload requirements, and promoted through the full software development lifecycle using identical operational procedures.
 
 ### The Seven Profiles
 
-**Hetzner Cloud Tier:**
-- **hetzner-dev**: Minimal, single-node-pool cluster for rapid iteration and testing
-- **hetzner-staging**: Mid-scale, multi-AZ cluster for infrastructure validation
-- **hetzner-prod**: High-availability, geo-distributed cluster for production workloads
+**Sovereign Cloud Tier:**
+- **sovereign-dev**: Minimal, single-node-pool cluster for rapid iteration and testing
+- **sovereign-staging**: Mid-scale, multi-AZ cluster for infrastructure validation
+- **sovereign-prod**: High-availability, geo-distributed cluster for production workloads
 
 **Azure Cloud Tier:**
 - **azure-dev**: AKS cluster with minimal managed service SKUs
@@ -34,7 +34,7 @@ The platform supports **seven deployment profiles**: three environment tiers (de
 CAVE employs a **profile-driven architecture pattern** where the same operational command produces environment-specific behavior based on the active profile. An engineer running `cave-ctl bootstrap` against a staging profile will receive a multi-AZ staging environment. The same command against a dev profile produces a minimal, single-AZ environment. This consistency dramatically reduces cognitive load and error rates during environment transitions.
 
 ```
-cave-ctl create dev hetzner      # Creates minimal Hetzner environment
+cave-ctl create dev hetzner      # Creates minimal sovereign-cloud environments
 cave-ctl create staging azure    # Creates mid-scale Azure environment
 cave-ctl create prod azure       # Creates HA Azure production cluster
 cave-ctl local up                # Spins up local vcluster in 3-5 minutes
@@ -50,7 +50,7 @@ The profile system accommodates the **dual SDLC model** that CAVE enforces: Plat
 
 **Problem:** Cloud vendor lock-in represents existential risk. Organizations adopting CAVE needed contractual and operational assurance that workloads could migrate between cloud providers without re-architecting the platform.
 
-**Decision:** Implement dual-provider parity architecture where every Hetzner Cloud service has an equivalent Azure service, with standardized mappings maintained in the platform configuration.
+**Decision:** Implement dual-provider parity architecture where every sovereign cloud service has an equivalent Azure service, with standardized mappings maintained in the platform configuration.
 
 **Rationale:**
 - Hetzner offers 40-60% cost savings on compute-intensive workloads
@@ -71,17 +71,17 @@ The profile system accommodates the **dual SDLC model** that CAVE enforces: Plat
 - Each provider has dedicated platform team (currently notional; scaled at 50+ tenant milestone)
 
 **Mapping Matrix:**
-| Service | Hetzner | Azure | Equivalence |
+| Service | Sovereign | Hyperscaler | Equivalence |
 |---------|---------|-------|-------------|
-| Compute (IaaS) | Hetzner Cloud VMs | Azure VMs | Direct |
+| Compute (IaaS) | sovereign cloud VMs | Azure VMs | Direct |
 | Kubernetes | Talos Linux + custom | AKS (managed) | Functional |
-| PostgreSQL | Hetzner Database | Azure Database for PostgreSQL | Managed service |
-| Redis | Hetzner Redis | Azure Cache for Redis | Cache layer |
-| Object Storage | S3 (Hetzner S3) | Azure Blob Storage | Object layer |
+| PostgreSQL | sovereign database service | Azure Database for PostgreSQL | Managed service |
+| Redis | sovereign Redis | Azure Cache for Redis | Cache layer |
+| Object Storage | S3 (sovereign S3) | Azure Blob Storage | Object layer |
 | Secrets | HashiCorp Vault (self-hosted) | Azure Key Vault | Secrets management |
-| Load Balancer | Hetzner Cloud LB | Azure Load Balancer | Layer 4 |
+| Load Balancer | sovereign cloud load-balancer | Azure Load Balancer | Layer 4 |
 | WAF/CDN | Kong + Cilium | Application Gateway | Layer 7 |
-| DNS | Hetzner DNS | Azure DNS | Domain management |
+| DNS | sovereign DNS | Azure DNS | Domain management |
 
 ---
 
@@ -102,7 +102,7 @@ The profile system accommodates the **dual SDLC model** that CAVE enforces: Plat
 if [ "$ENVIRONMENT" = "production" ] && [ "$PROVIDER" = "azure" ]; then
   apply azure-prod profile, scaling to 3+ zones, premium service tiers
 elif [ "$ENVIRONMENT" = "staging" ] && [ "$PROVIDER" = "hetzner" ]; then
-  apply hetzner-staging profile, 2-zone setup, standard service tiers
+  apply sovereign-staging profile, 2-zone setup, standard service tiers
 elif [ "$ENVIRONMENT" = "development" ]; then
   apply minimal profile (either provider), single zone, basic service tiers
 fi
@@ -115,11 +115,11 @@ fi
 
 ---
 
-### ADR-098: Immutable Infrastructure via Talos Linux on Hetzner
+### ADR-098: Immutable Infrastructure via Talos Linux on the sovereign profile
 
 **Problem:** Traditional Linux distributions grant operators SSH access, enabling ad-hoc mutations that diverge from declared state. This creates **configuration drift**, security vulnerabilities, and unaudited changes.
 
-**Decision:** Adopt Talos Linux for all Hetzner environments, providing immutable, declarative node management via standard Kubernetes APIs.
+**Decision:** Adopt Talos Linux for all sovereign-cloud environments, providing immutable, declarative node management via standard Kubernetes APIs.
 
 **Immutability Benefits:**
 - Every node is replaced during updates, not patched in place
@@ -133,8 +133,8 @@ fi
 - Smaller attack surface: ~50MB disk footprint vs. 4GB for full Linux
 - Automated security patching: Kubernetes orchestrates node drains and reboots
 
-**Hetzner-Specific Justifications:**
-- Hetzner Cloud provides bare-metal provisioning APIs compatible with Talos boot process
+**Sovereign-Specific Justifications:**
+- sovereign cloud provides bare-metal provisioning APIs compatible with Talos boot process
 - Hetzner allocates IP addresses to nodes within seconds, enabling rapid cluster bootstrap
 - Unlike managed Kubernetes (AKS, EKS), Hetzner requires explicit node OS management; Talos provides best-practice automation
 
@@ -271,11 +271,11 @@ CAVE's technology selections were validated against multi-dimensional criteria. 
 
 ---
 
-### Hetzner Cloud Platform Evolution
+### sovereign cloud Platform Evolution
 
 **2025-2026 Roadmap:**
 - **New Regions:** Helsinki (EU-FI) and Ankara (TR) regions coming H2 2026
-- **Hetzner Cloud DNS:** Managed DNS service (currently third-party only)
+- **sovereign cloud DNS:** Managed DNS service (currently third-party only)
 - **Network Isolation:** Enhanced private network capabilities for multi-tenant isolation
 - **Kubernetes Cost Transparency:** Quarterly billing API improvements for consumption tracking
 
@@ -362,14 +362,14 @@ Control Plane:  3× CX32 (identical to dev compute, but high availability)
 Worker Nodes:   3× CX52 (6 vCPU, 16GB RAM, 80GB NVMe)
                 Mixed AZ distribution
 Availability:   2 AZs (3-way replication across zones)
-Storage:        Hetzner Managed Volumes (multi-AZ replicated block storage)
+Storage:        sovereign Managed Volumes (multi-AZ replicated block storage)
 Total Monthly:  EUR 120-180 (includes managed volumes, inter-AZ transfer)
 ```
 
 **Networking**
 
 - **Container Networking:** Cilium with full NetworkPolicy enforcement; multi-AZ networking fully evaluated
-- **Load Balancing:** Hetzner Cloud Load Balancer (L4) fronts Kong; TLS termination at LB, passthrough to Kong
+- **Load Balancing:** sovereign cloud Load Balancer (L4) fronts Kong; TLS termination at LB, passthrough to Kong
 - **Ingress:** Kong configured with multi-replica deployment for HA
 - **Service Mesh (optional):** Istio ambient mode available for advanced routing testing
 
@@ -383,8 +383,8 @@ Staging runs full platform stack:
 
 **Storage & Persistence**
 
-- PostgreSQL: Managed Hetzner Database instance (replicated, daily backups)
-- MinIO: Hetzner Managed Volume-backed, multi-replica MinIO cluster
+- PostgreSQL: Managed sovereign database service instance (replicated, daily backups)
+- MinIO: sovereign Managed Volume-backed, multi-replica MinIO cluster
 - Persistent Volumes: 5-20GB available, suitable for test workload state
 
 **Use Cases**
@@ -415,14 +415,14 @@ Worker Nodes:   5+ (autoscaling 5-30 based on tenant load)
                 Mix of CX52 (general), CPX42 (CPU-optimized), and CX62 (memory-optimized)
                 Mixed AZ distribution, spreading load evenly
 Availability:   3 AZs, any single AZ loss does not impact workload availability
-Storage:        Hetzner Managed Volumes for all stateful components
+Storage:        sovereign Managed Volumes for all stateful components
 Total Monthly:  EUR 350-500 base (excludes tenant autoscaling, inter-AZ transfer)
 ```
 
 **Networking**
 
 - **Container Networking:** Cilium with eBPF acceleration, strict isolation between tenant namespaces
-- **Load Balancing:** Hetzner Cloud Load Balancer fronts Kong with geographically distributed health checks
+- **Load Balancing:** sovereign cloud Load Balancer fronts Kong with geographically distributed health checks
 - **Ingress:** Kong deployed with 3+ replicas across AZs; automatic failover
 - **Network Policies:** Comprehensive tenant isolation enforced at eBPF level (not just software)
 - **Service Mesh:** Istio ambient mode optional; ambient provides mTLS, observability, advanced routing
@@ -435,10 +435,10 @@ Total Monthly:  EUR 350-500 base (excludes tenant autoscaling, inter-AZ transfer
 
 **Storage & Persistence**
 
-- PostgreSQL: Hetzner Database instance with daily automated backups, 30-day retention
+- PostgreSQL: sovereign database service instance with daily automated backups, 30-day retention
 - MinIO: Managed Multi-Cloud Gateway (MCG) with bucket lifecycle policies, versioning
-- Persistent Volumes: Dynamically provisioned Hetzner Managed Volumes, 100GB+ aggregate capacity available
-- Backup: Daily full cluster state exported to Hetzner S3 (Hetzner Cloud) bucket, 90-day retention
+- Persistent Volumes: Dynamically provisioned sovereign Managed Volumes, 100GB+ aggregate capacity available
+- Backup: Daily full cluster state exported to sovereign S3 (sovereign cloud) bucket, 90-day retention
 
 **Compliance & Security**
 
@@ -461,7 +461,7 @@ Total Monthly:  EUR 350-500 base (excludes tenant autoscaling, inter-AZ transfer
 
 **Cluster Topology**
 
-Azure dev profile uses managed AKS, eliminating node OS management overhead compared to Hetzner.
+Azure dev profile uses managed AKS, eliminating node OS management overhead compared to the sovereign profile.
 
 ```
 AKS Cluster:    1 node pool, 1× Standard_D4s_v5 (4 vCPU, 16GB RAM)
@@ -480,7 +480,7 @@ Azure dev profile leverages managed services unsuitable for Hetzner:
 
 **Platform Components**
 
-Identical to Hetzner dev: Phase 1 components only. Azure-managed services replace self-hosted Helm charts where applicable.
+Identical to the sovereign profile dev: Phase 1 components only. Azure-managed services replace self-hosted Helm charts where applicable.
 
 **Use Cases**
 
@@ -681,7 +681,7 @@ kubectl port-forward -n cavity svc/keycloak 8080:80
 
 ---
 
-### Scenario 2: Promoting Code from Hetzner Staging to Azure Prod
+### Scenario 2: Promoting Code from the sovereign profile Staging to Azure Prod
 
 **Context:** Platform team has validated a new Prometheus alert configuration in staging. Ready to promote to prod with confidence that the same infrastructure change applies to Azure.
 
@@ -768,7 +768,7 @@ git push origin feature/auth-plugin
 
 ```bash
 # 1. Create snapshot of Hetzner prod cluster state
-cave-ctl snapshot hetzner-prod --name "pre-migration-state"
+cave-ctl snapshot sovereign-prod --name "pre-migration-state"
 # Exports: database dump, object store listing, secrets manifest
 
 # 2. Validate Azure prod cluster ready
@@ -780,14 +780,14 @@ cave-ctl create prod azure --copy-state-from snapshot:pre-migration-state
 # Restores: databases from dump, object storage from S3 export, secrets
 
 # 4. Validate consistency
-cave-ctl validate consistency hetzner-prod azure-prod
+cave-ctl validate consistency sovereign-prod azure-prod
 # Compares: database row counts, object store file listings, tenant configurations
 
 # 5. If validation passes: switch DNS records to Azure
 # (In real scenario, this involves external DNS changes)
 
-# 6. Cleanup Hetzner cluster
-cave-ctl destroy hetzner-prod
+# 6. Cleanup sovereign-cloud cluster
+cave-ctl destroy sovereign-prod
 ```
 
 **Outcomes:**
@@ -810,12 +810,12 @@ cave-ctl forecast --tenant enterprise-customer-xyz \
 # Output: Recommends scaling worker nodes to 25 (from 5)
 
 # 2. Update profile configuration
-# Edit: profiles/prod.hetzner.tfvars
+# Edit: profiles/prod.sovereign.tfvars
 # Change: worker_count = 5 → worker_count = 25
 
 # 3. Stage change
-git add profiles/prod.hetzner.tfvars
-git commit -m "chore(infra): scale hetzner-prod to 25 workers for enterprise-customer-xyz"
+git add profiles/prod.sovereign.tfvars
+git commit -m "chore(infra): scale sovereign-prod to 25 workers for enterprise-customer-xyz"
 
 # 4. Validate change in CI
 # Terraform plan shows: +20 CX52 VMs, +storage volumes, networking unchanged
@@ -879,7 +879,7 @@ cave-ctl/
 
 ### Profile File Structure & Annotations
 
-#### Example: `profiles/dev.hetzner.tfvars`
+#### Example: `profiles/dev.sovereign.tfvars`
 
 ```hcl
 # ============================================================================
@@ -956,12 +956,12 @@ cluster_autoscaling_enabled = false
 tags = {
   environment = "development"
   managed-by  = "cave-ctl"
-  profile     = "hetzner-dev"
+  profile     = "sovereign-dev"
   cost-center = "engineering"
 }
 ```
 
-#### Example: `profiles/prod.hetzner.tfvars`
+#### Example: `profiles/prod.sovereign.tfvars`
 
 ```hcl
 # ============================================================================
@@ -1014,7 +1014,7 @@ kong_replicas       = 3                 # HA across AZs
 kong_enable_waf     = true              # Web Application Firewall
 
 # STORAGE
-# Why: Hetzner Managed Volumes for high durability; replicated across zones
+# Why: sovereign Managed Volumes for high durability; replicated across zones
 storage_backend = "managed-volumes"
 storage_class_name = "managed-replicated"
 storage_snapshot_enabled = true         # Daily snapshots
@@ -1053,12 +1053,12 @@ max_worker_nodes = 30                   # Scale up to 30 under load
 enable_cluster_backups = true
 backup_schedule = "0 2 * * *"           # Daily at 2am UTC
 backup_retention_days = 90
-backup_destination = "s3"               # Hetzner S3 bucket
+backup_destination = "s3"               # sovereign S3 bucket
 
 tags = {
   environment = "production"
   managed-by  = "cave-ctl"
-  profile     = "hetzner-prod"
+  profile     = "sovereign-prod"
   cost-center = "infrastructure"
   compliance-level = "SOC2"
 }
@@ -1156,7 +1156,7 @@ tags = {
 
 Day-2 operations on CAVE clusters involve profile-driven procedures: changing cluster scale, upgrading Kubernetes, modifying networking topology, or migrating workloads between profiles.
 
-### Profile Switching (Hetzner to Azure)
+### Profile Switching (Sovereign to Hyperscaler)
 
 Profile switching moves a workload cluster from one provider to another. This is distinct from provider vendor lock-in; it's a deliberate operational decision driven by cost, compliance, or capacity.
 
@@ -1170,7 +1170,7 @@ Profile switching moves a workload cluster from one provider to another. This is
 
 **Estimated Duration:** 4-6 hours for small tenants, 24 hours for large multi-TB databases.
 
-**Example: Migrating hetzner-staging to azure-staging**
+**Example: Migrating sovereign-staging to azure-staging**
 
 ```bash
 # 1. Create Azure staging cluster in parallel
@@ -1180,14 +1180,14 @@ cave-ctl create staging azure
 kubectl --context=azure-staging get nodes
 # All nodes ready
 
-# 3. Backup Hetzner staging state
-cave-ctl snapshot hetzner-staging --output-path /tmp/hetzner-staging-snapshot
+# 3. Backup sovereign-cloud staging state
+cave-ctl snapshot sovereign-staging --output-path /tmp/sovereign-staging-snapshot
 
 # 4. Restore to Azure cluster
-cave-ctl restore azure-staging --snapshot /tmp/hetzner-staging-snapshot
+cave-ctl restore azure-staging --snapshot /tmp/sovereign-staging-snapshot
 
 # 5. Validate data consistency
-cave-ctl validate consistency hetzner-staging azure-staging
+cave-ctl validate consistency sovereign-staging azure-staging
 # Compare: row counts, object store listings, config maps
 
 # 6. Switch DNS (if applicable)
@@ -1196,8 +1196,8 @@ cave-ctl validate consistency hetzner-staging azure-staging
 # 7. Monitor for 1 hour
 cave-ctl monitor --duration 1h
 
-# 8. Decommission Hetzner cluster
-cave-ctl destroy hetzner-staging
+# 8. Decommission sovereign-cloud cluster
+cave-ctl destroy sovereign-staging
 ```
 
 ### Scaling Worker Nodes
@@ -1214,7 +1214,7 @@ cave-ctl forecast prod hetzner --horizon 2-weeks
 # Recommendation: scale to 10 nodes
 
 # Update profile
-sed -i 's/worker_count = 5/worker_count = 10/' profiles/prod.hetzner.tfvars
+sed -i 's/worker_count = 5/worker_count = 10/' profiles/prod.sovereign.tfvars
 
 # Apply
 cave-ctl deploy prod hetzner --approve
@@ -1229,12 +1229,12 @@ kubectl get nodes
 
 Kubernetes version upgrades are controlled via profile variables and executed through Kubernetes-native procedures (cordoning, draining, upgrading).
 
-**Hetzner (Talos) Upgrade:**
+**Sovereign (Talos) Upgrade:**
 
 ```bash
 # 1. Update profile
 sed -i 's/talos_linux_version = "v1.11"/talos_linux_version = "v1.12"/' \
-  profiles/prod.hetzner.tfvars
+  profiles/prod.sovereign.tfvars
 
 # 2. Validate plan
 cave-ctl plan prod hetzner
@@ -1296,7 +1296,7 @@ kubectl --context=cave-prod-recovered get namespaces
 
 **Symptom:** `cave-ctl create dev hetzner` hangs at "Waiting for Kubernetes API ready."
 
-**Root Cause:** Hetzner API rate-limiting, or insufficient IP pool availability.
+**Root Cause:** sovereign-cloud API rate-limiting, or insufficient IP pool availability.
 
 **Diagnosis:**
 
@@ -1305,13 +1305,13 @@ kubectl --context=cave-prod-recovered get namespaces
 cave-ctl create dev hetzner --verbose
 # Look for "API rate limit exceeded" or "IP pool exhausted"
 
-# Verify Hetzner account quota
+# Verify sovereign-cloud account quota
 hcloud quotas list
 ```
 
 **Resolution:**
 - Wait 60 seconds, retry: `cave-ctl create dev hetzner --retry`
-- Contact Hetzner support if quota exhausted
+- Contact sovereign-cloud support if quota exhausted
 - Use different region: `--region eu-west-1` (switch from Frankfurt)
 
 ---
@@ -1382,7 +1382,7 @@ kubectl get storageclass
 kubectl get pv
 ```
 
-**Resolution (Hetzner local storage):**
+**Resolution (sovereign local storage):**
 - Ensure pod is scheduled on node with available local volume:
 
 ```yaml
@@ -1431,7 +1431,7 @@ kubectl port-forward -n cavity svc/kong 8443:443 &
 
 **Resolution (staging/prod):**
 ```bash
-# Verify Hetzner Load Balancer created
+# Verify sovereign cloud Load Balancer created
 hcloud loadbalancer list
 # Should show "kong-ingress" LB
 
@@ -1464,8 +1464,8 @@ kubectl top pods --all-namespaces | sort -k 3 -n
 - Scale cluster (add memory-optimized nodes):
 
 ```bash
-# Hetzner
-sed -i 's/worker_count = 5/worker_count = 7/' profiles/prod.hetzner.tfvars
+# Sovereign
+sed -i 's/worker_count = 5/worker_count = 7/' profiles/prod.sovereign.tfvars
 # Azure
 sed -i 's/min_count      = 3/min_count      = 5/' profiles/prod.azure.tfvars
 ```
@@ -1492,7 +1492,7 @@ kubectl exec -it postgresql-0 -n cavity -- \
   psql -U postgres -c "SHOW max_connections;"
 ```
 
-**Resolution (Hetzner self-hosted PostgreSQL):**
+**Resolution (sovereign self-hosted PostgreSQL):**
 ```bash
 # Increase max_connections
 kubectl patch statefulset postgresql -n cavity --type=json \
@@ -1509,7 +1509,7 @@ sed -i 's/Standard_B2s/Standard_D2s_v3/' profiles/prod.azure.tfvars
 
 ### Issue 7: Talos Node Fails to Boot
 
-**Symptom:** Node appears in Hetzner console as "Started," but Kubernetes shows "NotReady."
+**Symptom:** Node appears in sovereign-cloud console as "Started," but Kubernetes shows "NotReady."
 
 **Root Cause:** Talos machine config not applied; node booted without cluster credentials.
 
@@ -1526,7 +1526,7 @@ talosctl -n <node-ip> logs
 ```
 
 **Resolution:**
-- Reboot node via Hetzner API; cluster bootstrap will retry
+- Reboot node via sovereign-cloud API; cluster bootstrap will retry
 
 ```bash
 hcloud server reboot <server-id>
@@ -1669,7 +1669,7 @@ open /Applications/Docker.app
 
 ```bash
 # Check state file validity
-terraform validate -var-file=profiles/dev.hetzner.tfvars
+terraform validate -var-file=profiles/dev.sovereign.tfvars
 # Reports state format errors
 
 # List state backups
@@ -1699,9 +1699,9 @@ CAVE's deployment profiles are designed with regulatory requirements in mind. Th
 **Requirement:** Encryption in transit (TLS 1.2+), encryption at rest, access controls, audit logging.
 
 **Profile Mapping:**
-- **hetzner-dev:** TLS for Kong ingress, no encryption at rest (dev acceptable)
-- **hetzner-staging:** TLS + audit logging, encryption optional
-- **hetzner-prod:** TLS 1.3 required, encryption at rest (AES-256), comprehensive audit logging
+- **sovereign-dev:** TLS for Kong ingress, no encryption at rest (dev acceptable)
+- **sovereign-staging:** TLS + audit logging, encryption optional
+- **sovereign-prod:** TLS 1.3 required, encryption at rest (AES-256), comprehensive audit logging
 - **azure-prod:** TLS 1.3, CMK encryption, Azure Policy compliance checks
 
 **Validation:** Annual SOC 2 audit of prod profiles confirms compliance.
@@ -1715,7 +1715,7 @@ CAVE's deployment profiles are designed with regulatory requirements in mind. Th
 **Profile Mapping:**
 - **RBAC:** All profiles enforce Kubernetes RBAC; role-based access to cluster operations
 - **Secrets Management:** Vault available on all profiles; encryption enforced on prod
-- **Backup:** hetzner-prod and azure-prod maintain daily backups, 90-day retention
+- **Backup:** sovereign-prod and azure-prod maintain daily backups, 90-day retention
 - **Vulnerability Scanning:** Container images scanned on staging/prod before deployment
 - **Incident Response:** Comprehensive audit logs on prod profiles enable forensic analysis
 
@@ -1769,16 +1769,16 @@ Cost estimates are based on March 2026 pricing (Hetzner EU, Azure EU-West region
 
 | Profile | Base Compute | Managed Services | Storage | Networking | Total EUR/mo |
 |---------|--------------|------------------|---------|------------|--------------|
-| **hetzner-dev** | 40 (1 CP + 2 workers) | 0 (self-hosted) | 5 | 5 | 50-80 |
-| **hetzner-staging** | 90 (3 CP + 3 workers) | 40 (PostgreSQL, Redis) | 30 | 20 | 120-180 |
-| **hetzner-prod** | 200 (3 CP + 5+ workers) | 100 (managed services) | 80 (snapshots) | 50 | 350-500 |
+| **sovereign-dev** | 40 (1 CP + 2 workers) | 0 (self-hosted) | 5 | 5 | 50-80 |
+| **sovereign-staging** | 90 (3 CP + 3 workers) | 40 (PostgreSQL, Redis) | 30 | 20 | 120-180 |
+| **sovereign-prod** | 200 (3 CP + 5+ workers) | 100 (managed services) | 80 (snapshots) | 50 | 350-500 |
 | **azure-dev** | 150 | 100 (Basic AKS, managed services) | 30 | 20 | 400-800 |
 | **azure-staging** | 250 | 200 (Standard tier) | 50 | 30 | 800-1,500 |
 | **azure-prod** | 500+ | 400+ (Premium tier) | 150 | 100 | 2,000-5,000 |
 | **local** | 0 (runs on laptop) | 0 (containerized) | 2 (Docker images) | 0 | Free |
 
 **Cost Optimization Strategies:**
-- Co-host dev and staging on single Hetzner region to amortize inter-AZ transfer
+- Co-host dev and staging on single sovereign-cloud region to amortize inter-AZ transfer
 - Use spot instances (Azure Spot VMs) for non-critical workloads (saves 50-70%)
 - Delete dev/staging clusters during off-hours (nights, weekends) to reduce EUR 150-250/month
 - Annual reserved capacity discounts available from both providers (15-25% savings)

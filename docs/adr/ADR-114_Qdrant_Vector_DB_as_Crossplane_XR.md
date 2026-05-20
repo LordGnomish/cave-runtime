@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Data
 
@@ -36,7 +36,7 @@ Unified VectorDB XRD. Hetzner: Qdrant operator. Azure: Azure AI Search vector ca
 
 **Positive:**
 - Same XR API for vector search across both providers.
-- Lightweight on Hetzner (Qdrant), managed on Azure (AI Search).
+- Lightweight on the sovereign profile (Qdrant), managed on Azure (AI Search).
 - Classification + residency enforcement inherited from XR framework.
 
 **Negative:**

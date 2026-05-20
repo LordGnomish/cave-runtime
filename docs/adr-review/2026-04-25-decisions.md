@@ -17,9 +17,9 @@
 
 ## Decisions
 
-### ADR-001 — Hetzner Cloud as Sovereign Infrastructure Provider
+### ADR-001 — sovereign cloud as Sovereign Infrastructure Provider
 - **File:** `docs/adr/ADR-001_Hetzner_Cloud_as_Sovereign_Infrastructure_Provider.md`
-- **Original status:** Accepted (Hetzner)
+- **Original status:** Accepted (sovereign)
 - **Decision (2026-04-25):** **PLATFORM, HETZNER-only**
 - **Rationale:** Deployment target seçimi; Cave Runtime cloud-agnostic, OSS branch'inde olmamalı. Burak'ın iş yerindeki sovereign profili için üst Platform repo'sunda kalır.
 - **Action:** OSS Cave Runtime branch'inden çıkar; `platform/docs/adr/` altında kalır.
@@ -31,12 +31,12 @@
 - **Rationale:** Burak'ın iş yerindeki enterprise deployment profili. Cave Runtime cloud-agnostic, bu karar OSS kullanıcısı için değil.
 - **Action:** OSS Cave Runtime branch'inden çıkar; `platform/docs/adr/` altında kalır.
 
-### ADR-003 — Talos Linux for All Hetzner Profiles
+### ADR-003 — Talos Linux for All Sovereign-Cloud Profiles
 - **File:** `docs/adr/ADR-003_Talos_Linux_for_All_Hetzner_Profiles.md`
-- **Original status:** Accepted (Hetzner)
+- **Original status:** Accepted (sovereign)
 - **Decision (2026-04-25):** **RETIRE FROM RUNTIME** (Cave Runtime için irrelevant); **PLATFORM, HETZNER+AZURE option**
 - **Rationale (Burak):** Cave Runtime kendisi bir Cloud OS — Layer 1 (Linux kernel 7.1, no backward compat) + Layer 2-4 (unified Rust reimpl: userspace + K8s + ekosist). Talos Cave Runtime'a TEMAS ETMEZ. Talos sadece Platform deployment'larında (Cave Runtime kullanmayan workload veya geçiş döneminde) opsiyondur.
-- **Action:** Cave Runtime ADR'lerinden çıkar. Platform repo'da kalır, scope: Hetzner deployment için zorunlu (Hetzner managed K8s yok), Azure deployment için AKS-alternative seçenek.
+- **Action:** Cave Runtime ADR'lerinden çıkar. Platform repo'da kalır, scope: sovereign-cloud deployments için zorunlu (Hetzner managed K8s yok), Azure deployment için AKS-alternative seçenek.
 - **Yeni ADR ihtiyacı:** Runtime tarafına `ADR-RUNTIME-STACK-001 — Cave Runtime Stack Architecture` yazılacak (Layer 1-4 tanımı + no Talos).
 
 ### ADR-RUNTIME-UPSTREAM-MIRROR-001 — Platform–Runtime Upstream Mirror (NEW)
@@ -100,9 +100,9 @@ Yani bir ADR Pipeline-spesifik olsa bile (örn. Buildah CI tool seçimi), **Plat
 - **Decision (revize 2026-04-25):** **PLATFORM KEEP**, otomatik Runtime mirror (cave-net + cave-mesh + cave-gateway = Cilium + Istio Ambient + Kong/Envoy reimpl). Ayrı ADR YOK.
 - **Action:** ADR Platform repo'da kalır; runtime mirror ADR-RUNTIME-UPSTREAM-MIRROR-001'de implicit.
 
-### ADR-006 — Keycloak for Hetzner Identity Provider
+### ADR-006 — Keycloak for Sovereign Identity Provider
 - **File:** `docs/adr/ADR-006_Keycloak_for_Hetzner_Identity_Provider.md`
-- **Original status:** Accepted (Hetzner)
+- **Original status:** Accepted (sovereign)
 - **Decision (2026-04-25):** **PLATFORM KEEP**. Otomatik Runtime mirror (cave-auth = Keycloak reimpl).
 - **Rationale (Burak):** Mirror otomatik, ayrı Runtime ADR yazmaya gerek yok. ADR-006 quality bar'ı zaten karşılıyor (4 alternatif karşılaştırma + Zitadel 2027 watch + risk analizi).
 - **Action:** ADR Platform repo'da kalır. cave-auth zaten Keycloak reimpl yapıyor (91 test passing, main'de).
@@ -114,16 +114,16 @@ Yani bir ADR Pipeline-spesifik olsa bile (örn. Buildah CI tool seçimi), **Plat
 - **Rationale (Burak):** Azure deployment için SaaS identity (Okta workforce + Entra Azure RBAC). Cave Runtime SaaS reimpl etmiyor; cave-auth (Keycloak reimpl) zaten BYOID brokering ile enterprise tenants'ın Okta/Entra ile federate olmasını destekliyor.
 - **Action:** Platform repo'da kalır (Azure-only). Cave Runtime Azure'da deploy edilirse cave-auth + Okta/Entra brokering çalışır.
 
-### ADR-008 — Cache: Valkey (Hetzner) / Azure Redis (Azure)
+### ADR-008 — Cache: Valkey (sovereign) / Azure Redis (Azure)
 - **File:** `docs/adr/ADR-008_Cache_-_Valkey_Hetzner___Azure_Redis_Azure.md`
-- **Original status:** Accepted (Universal+Hetzner+Azure)
+- **Original status:** Accepted (Universal+sovereign cloud + hyperscaler)
 - **Decision (2026-04-25):** **PLATFORM KEEP**
-- **Rationale:** Hetzner Valkey self-hosted + Azure Cache for Redis managed, Crossplane XR ile unified. Quality bar OK (4 alternatif + Dragonfly/Spotahome/Glide forward-looking watch'lar).
+- **Rationale:** sovereign Valkey self-hosted + Azure Cache for Redis managed, Crossplane XR ile unified. Quality bar OK (4 alternatif + Dragonfly/Spotahome/Glide forward-looking watch'lar).
 - **Action:** Platform repo'da kalır. Otomatik Runtime mirror: cave-cache = Valkey upstream reimpl (ADR-RUNTIME-UPSTREAM-MIRROR-001 kapsamında).
 
-### ADR-009 — Ollama (Hetzner) / Azure OpenAI (Azure)
+### ADR-009 — Ollama (sovereign) / Azure OpenAI (Azure)
 - **File:** `docs/adr/ADR-009_Ollama_Hetzner___Azure_OpenAI_Azure.md`
-- **Original status:** Accepted (Universal+Hetzner+Azure)
+- **Original status:** Accepted (Universal+sovereign cloud + hyperscaler)
 - **Decision (2026-04-25):** **PLATFORM KEEP** + **monthly review cadence (zorunlu)**
 - **Rationale (Burak):** AI/LLM alanında çok hızlı gelişme var; ADR-009 ayda bir review edilip güncellenmeli (model recommendations, provider capabilities, cost/perf, EU AI Act compliance). Quality bar zaten "Review Cadence: Monthly" diyor — kalın altını çiz.
 - **Action:** Platform repo'da kalır. Monthly review item olarak workflow doc'ta tracked. Otomatik Runtime mirror: cave-local-llm = Ollama wrapper (şu an), full reimpl uzun vade.

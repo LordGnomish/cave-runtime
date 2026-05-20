@@ -2,7 +2,7 @@
 
 **Status:** Proposed (Phase 4)
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Platform
 
@@ -30,7 +30,7 @@ Some tenant workloads have bursty traffic patterns suited to serverless executio
 ## Rejected
 
 - **OpenFaaS:** Smaller community than Knative. Separate scaling model — KEDA already in CAVE for Reflex Engine, adding OpenFaaS scaling is redundant.
-- **AWS Lambda / Azure Functions:** Cloud-specific proprietary runtimes. Not self-hostable on Hetzner. Vendor lock-in.
+- **AWS Lambda / Azure Functions:** Cloud-specific proprietary runtimes. Not self-hostable on the sovereign profile. Vendor lock-in.
 - **KEDA only (no Knative):** KEDA handles event-driven scaling but not HTTP request routing, cold start management, concurrency control, or revision-based traffic splitting. Knative provides the HTTP serverless layer that KEDA doesn't.
 
 ## Consequences

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Governance
 
@@ -24,7 +24,7 @@ Cloud environments accumulate unmanaged resources: manually created VMs, ad-hoc 
 
 ## Decision
 
-**`cave-ctl doctor`** scans for unmanaged resources: (1) Query cloud provider API (Azure Resource Manager, Hetzner API). (2) Compare against OpenTofu state + Crossplane managed resources. (3) Flag unmanaged resources as `Platform Violation`. (4) 72h grace period for creator to import to IaC or justify. (5) Auto-terminate (if opt-in enabled) after grace period.
+**`cave-ctl doctor`** scans for unmanaged resources: (1) Query cloud provider API (Azure Resource Manager, sovereign-cloud API). (2) Compare against OpenTofu state + Crossplane managed resources. (3) Flag unmanaged resources as `Platform Violation`. (4) 72h grace period for creator to import to IaC or justify. (5) Auto-terminate (if opt-in enabled) after grace period.
 
 **Frequency:** 6h prod, 12h staging, daily dev. Grafana entropy dashboard shows unmanaged resource count over time. Tenant risk score increases with shadow IT count.
 

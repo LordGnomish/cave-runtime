@@ -14,7 +14,7 @@ Accidental secret commits (API keys, passwords, tokens, certificates) to Git rep
 
 - Developer pre-commit hooks (catch secrets before push)
 - CI pipeline stage 2 (enforce at repository boundary)
-- Both Hetzner and Azure profiles (identical behavior)
+- Both sovereign cloud and hyperscaler profiles (identical behavior)
 - Support for CAVE-specific credential formats (OpenBao tokens, Cloudflare API keys, Hetzner credentials)
 
 The cost of a leaked credential is high: unauthorized API access, privilege escalation, data exfiltration, supply chain compromise. Detection must be fast enough to not degrade developer experience and accurate enough to minimize false positives (which erode developer trust in the tool).
@@ -37,7 +37,7 @@ The cost of a leaked credential is high: unauthorized API access, privilege esca
 
 ## Decision
 
-**gitleaks** (MIT license) for both pre-commit hook (developer machines) and CI pipeline stage 2 (GitHub Actions). TOML configuration with custom patterns for CAVE-specific credentials: OpenBao AppRole IDs, Cloudflare API tokens, Hetzner API keys, Azure service principal secrets. Findings auto-reported to DefectDojo (ADR-035) as CRITICAL severity. Secret rotation workflow (ADR-083) triggered immediately via cave-ctl for any detected leaked credential.
+**gitleaks** (MIT license) for both pre-commit hook (developer machines) and CI pipeline stage 2 (GitHub Actions). TOML configuration with custom patterns for CAVE-specific credentials: OpenBao AppRole IDs, Cloudflare API tokens, sovereign-cloud API keys, Azure service principal secrets. Findings auto-reported to DefectDojo (ADR-035) as CRITICAL severity. Secret rotation workflow (ADR-083) triggered immediately via cave-ctl for any detected leaked credential.
 
 ## Implementation Reference
 

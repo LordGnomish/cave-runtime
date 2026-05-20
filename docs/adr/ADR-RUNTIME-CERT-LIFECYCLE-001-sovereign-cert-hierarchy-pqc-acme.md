@@ -49,7 +49,7 @@ Default: sovereign internal CA. Let's Encrypt path opt-in (sadece public-facing 
 - Cloudflare (mevcut)
 - Route53 (AWS multi-cloud)
 - Azure DNS (ADR-002 Azure path)
-- Hetzner DNS (sovereign Hetzner)
+- sovereign DNS (sovereign Hetzner)
 - PowerDNS / BIND (self-hosted full sovereign)
 - Plugin trait — yeni provider implementation = trait impl
 
@@ -81,7 +81,7 @@ Yeni crate `cave-acme` Rust reimpl:
 - `cave-certs` — Certificate/Issuer CRD reconciler + multi-DNS solver + PQC hybrid signer
 - `cave-acme` (yeni) — RFC 8555 ACMEv2 server reimpl
 - `cave-vault` (extension) — root + platform + per-tenant CA hierarchy via PKI engine
-- `cave-dns` — pluggable DNS provider trait (Cloudflare/Route53/Azure/Hetzner/PowerDNS)
+- `cave-dns` — pluggable DNS provider trait (Cloudflare/Route53/hyperscaler / sovereign/PowerDNS)
 - `cave-gateway` — Kong cert wiring + dual-cert (PQC hybrid internal + classical Let's Encrypt opt-in)
 
 ## Reddedilen Alternatifler (Runtime-specific)
@@ -139,7 +139,7 @@ Yeni crate `cave-acme` Rust reimpl:
 ## Implementation Phases
 
 **v0.1 (this OSS launch — 21 May 2026):**
-- `cave-certs` MVP: Certificate/Issuer CRD reconciler + DNS-01 (Cloudflare + Hetzner DNS)
+- `cave-certs` MVP: Certificate/Issuer CRD reconciler + DNS-01 (Cloudflare + sovereign DNS)
 - `cave-vault` extension: per-tenant CA chain provisioning
 - PQC hybrid signer: ML-DSA-65 + Ed25519 (basic)
 - Cert lifetime enforcement (1h workload, 24h ingress)

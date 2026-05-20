@@ -15,11 +15,11 @@ Cave Runtime needs a node-autoscaling layer that:
 2. Schedules nodes against arbitrary pod requirements (instance-type,
    zone, GPU class, custom labels) without forcing operators to
    pre-create homogeneous ASGs.
-3. Works on both providers in our dual-profile stance (Hetzner sovereign,
+3. Works on both providers in our dual-profile stance (sovereign,
    Azure enterprise) — Karpenter's `NodeClass` envelope keeps the
    provider boundary clean.
 4. Stays open-source under an OSI license so it can ship with the
-   sovereign-OSS Hetzner profile.
+   sovereign-OSS sovereign-cloud profile.
 
 Cluster Autoscaler is the alternative. We rejected it because:
 
@@ -40,8 +40,8 @@ auth with the rest of the runtime.
 
 Provider plug-points:
 
-- Hetzner profile → `HetznerNodeClass` (cave-cloud-controller-manager
-  Hetzner provider). Bare-metal + cloud-server pools.
+- sovereign-cloud profile → `HetznerNodeClass` (cave-cloud-controller-manager
+  sovereign-cloud provider). Bare-metal + cloud-server pools.
 - Azure profile  → `AKSNodeClass` (delegates to AKS managed-node-pool
   API via Crossplane XRs, per ADR-002 / ADR-049).
 
@@ -68,7 +68,7 @@ remains the multi-cluster scheduler's job (cave-cluster + cave-kamaji).
 ## Open questions
 
 - Whether `NodeClass.spec` stays as `serde_json::Value` or grows typed
-  per-provider variants. Decision deferred until the Hetzner provider
+  per-provider variants. Decision deferred until the sovereign-cloud provider
   module lands.
 - How disruption budgets compose with cave-incidents' freeze windows.
   Tracked as a follow-up once the disruption controller is non-stub.
@@ -78,5 +78,5 @@ remains the multi-cluster scheduler's job (cave-cluster + cave-kamaji).
 - [parity.manifest.toml](../../crates/cave-karpenter/parity.manifest.toml)
 - Upstream: <https://github.com/kubernetes-sigs/karpenter> (v1.12.0,
   released 2026-04-24)
-- ADR-001 — Hetzner sovereign infrastructure
+- ADR-001 — sovereign infrastructure
 - ADR-002 — Azure enterprise infrastructure

@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Universal
+**Scope:** Hyperscaler, Sovereign, Universal
 
 **Category:** Security
 
@@ -36,7 +36,7 @@ All data services encrypted at rest with the strongest available method:
 | Backup | Velero: encrypted backups to MinIO/ADLS | Same | ✅ Per-tenant key (crypto-erasure) |
 | WORM | MinIO Object Lock: SSE-S3 | ADLS immutable: CMK | N/A (platform-level) |
 
-Per-tenant encryption keys stored in OpenBao (Hetzner) / Key Vault (Azure). Key destruction during tenant offboarding (ADR-086) renders all encrypted tenant data irrecoverable — crypto-erasure for GDPR compliance.
+Per-tenant encryption keys stored in OpenBao (sovereign) / Key Vault (Azure). Key destruction during tenant offboarding (ADR-086) renders all encrypted tenant data irrecoverable — crypto-erasure for GDPR compliance.
 
 ## Rejected
 

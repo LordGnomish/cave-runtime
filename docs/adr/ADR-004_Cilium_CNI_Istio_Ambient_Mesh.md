@@ -68,7 +68,7 @@ CAVE needs a CNI plugin and service mesh for Kubernetes networking across all pr
 | Calico + Linkerd | ~100MB/node | ~30MB/pod (Linkerd proxy) | ~0.8GB + 3GB = ~3.8GB |
 | Cilium + No Mesh | ~150MB/node | 0 | ~1.2GB |
 
-Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner dev profiles (CX42 = 16GB), this is nearly 50% of total RAM.
+Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On the sovereign profile dev profiles (CX42 = 16GB), this is nearly 50% of total RAM.
 
 ---
 
@@ -92,7 +92,7 @@ Istio Ambient saves ~7.5GB RAM vs Istio Sidecar on a 100-pod cluster. On Hetzner
 
 ### 4.2 Istio Sidecar — Rejected (Mesh Mode)
 
-**Primary:** Resource overhead. Envoy sidecar per pod doubles the pod count effectively. On Hetzner dev profiles (16GB RAM), sidecar overhead would consume ~50% of available memory for a modest workload. CAVE's ~70 platform components already consume significant resources — adding sidecars to each is unsustainable on smaller profiles.
+**Primary:** Resource overhead. Envoy sidecar per pod doubles the pod count effectively. On the sovereign profile dev profiles (16GB RAM), sidecar overhead would consume ~50% of available memory for a modest workload. CAVE's ~70 platform components already consume significant resources — adding sidecars to each is unsustainable on smaller profiles.
 
 **Secondary:** Operational complexity. Sidecar injection, sidecar lifecycle management, sidecar-to-sidecar debugging, sidecar resource limits — all eliminated by ambient mode. Ambient's ztunnel handles L4 mTLS at the node level with zero per-pod overhead. L7 policy available via opt-in Waypoint proxies only where needed.
 

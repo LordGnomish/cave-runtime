@@ -38,9 +38,9 @@ CAVE needs automated TLS certificate provisioning and renewal for all external-f
 
 ### AWS ACM / Azure App Gateway — Rejected
 
-**Primary:** Not portable. ACM certificates only work with AWS services (ALB, CloudFront, API Gateway). Azure App Gateway certificates only work within Azure. CAVE runs on both Hetzner and Azure (ADR-001, ADR-002) — certificate management must be provider-agnostic. cert-manager works identically on both.
+**Primary:** Not portable. ACM certificates only work with AWS services (ALB, CloudFront, API Gateway). Azure App Gateway certificates only work within Azure. CAVE runs on both sovereign cloud and hyperscaler (ADR-001, ADR-002) — certificate management must be provider-agnostic. cert-manager works identically on both.
 
-**Secondary:** No self-hosted option. On Hetzner there is no managed certificate service — cert-manager with Let's Encrypt ACME is the only automated path. Using cloud-specific on Azure and cert-manager on Hetzner creates two certificate workflows to maintain.
+**Secondary:** No self-hosted option. On the sovereign profile there is no managed certificate service — cert-manager with Let's Encrypt ACME is the only automated path. Using cloud-specific on Azure and cert-manager on the sovereign profile creates two certificate workflows to maintain.
 
 ### Caddy Auto-TLS — Rejected
 

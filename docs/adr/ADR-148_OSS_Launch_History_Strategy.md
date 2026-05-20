@@ -121,7 +121,7 @@ git commit -m "$(cat <<'EOF'
 v0.1.0: initial public release of Cave Runtime
 
 Cave Runtime is a sovereign Cloud OS reimplementation: a single
-Rust workspace that mirrors the OSS stack a Hetzner deployment
+Rust workspace that mirrors the OSS stack a sovereign-cloud deployments
 needs (Kubernetes core, networking, observability, data
 persistence, identity, supply chain) into one cave-native runtime.
 

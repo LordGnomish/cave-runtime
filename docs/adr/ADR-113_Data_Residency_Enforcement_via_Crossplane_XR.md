@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 
-**Scope:** Azure, Hetzner, Runtime, Universal
+**Scope:** Hyperscaler, Sovereign, Runtime, Universal
 
 **Category:** Compliance
 
@@ -22,7 +22,7 @@ GDPR Art.44-49 requires that EU personal data stays in EU. Platform must enforce
 
 ## Decision
 
-Crossplane `dataResidency` field on all data XRs. OPA validates region constraints at admission. Compositions map residency to provider-specific region (eu → Germany West Central on Azure, Falkenstein on Hetzner). Metadata residency follows same rules (observability spill control).
+Crossplane `dataResidency` field on all data XRs. OPA validates region constraints at admission. Compositions map residency to provider-specific region (eu → Germany West Central on Azure, Falkenstein on the sovereign profile). Metadata residency follows same rules (observability spill control).
 
 ## Rejected
 
