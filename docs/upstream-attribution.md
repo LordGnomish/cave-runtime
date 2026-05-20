@@ -69,7 +69,7 @@ This file is generated from `crates/*/parity.manifest.toml`. Re-run
 | `cave-llm-gateway` | BerriAI/litellm | v1.0.0 | [https://github.com/BerriAI/litellm](https://github.com/BerriAI/litellm) |
 | `cave-local-llm` | ollama/ollama | v0.3.0 | [https://github.com/ollama/ollama](https://github.com/ollama/ollama) |
 | `cave-logs` | grafana/loki | v2.9.0 | [https://github.com/grafana/loki](https://github.com/grafana/loki) |
-| `cave-mesh` | istio/istio | 1.29.2 | [https://github.com/istio/istio](https://github.com/istio/istio) |
+| `cave-mesh` | istio/istio | 1.30.0 | [https://github.com/istio/istio](https://github.com/istio/istio) |
 | `cave-metrics` | prometheus/prometheus | v2.48.0 | [https://github.com/prometheus/prometheus](https://github.com/prometheus/prometheus) |
 | `cave-net` | cilium/cilium | v1.19.3 | [https://github.com/cilium/cilium](https://github.com/cilium/cilium) |
 | `cave-oncall` | grafana/oncall | v1.4.0 | [https://github.com/grafana/oncall](https://github.com/grafana/oncall) |

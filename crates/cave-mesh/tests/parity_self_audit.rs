@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Charter v2 8-gate self-audit for cave-mesh (Istio service mesh parity).
+// Charter v2 8-gate self-audit for cave-mesh (Istio service mesh —
+// Ambient-only re-baseline 2026-05-19).
 //
 // Asserts that the close-out invariants for this crate hold:
 //   * SPDX coverage 100% of src/*.rs
-//   * source_sha pinned in manifest (istio 1.29.x release tag)
+//   * source_sha pinned to Istio 1.30.0 commit
+//     (badd809ed7d57954d4c16e12e75e15a7722a7b96)
 //   * last_audit = 2026-05-19
 //   * parity_ratio_source = "manifest"
-//   * fill_ratio >= 0.85  (already measured 0.8889 — partial-credit narrow MVP)
+//   * fill_ratio >= 0.85 (measured 0.8919 — 33/37 after ambient-only cuts)
 //   * mapped + partial + skipped + unmapped == total
 //   * no unimplemented!() / todo!() in src/
-//   * PARITY_REPORT.md exists
+//   * PARITY_REPORT.md exists and references the ambient-only mandate
+//   * deleted sidecar/xds/wasm files stay deleted (regression gate)
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -37,8 +40,12 @@ fn gate_2_source_sha_pinned() {
     let m = read_manifest();
     assert!(m.contains("source_sha"), "source_sha required");
     assert!(
-        m.contains("1.29.2") || m.contains("1.29."),
-        "source_sha must pin an istio 1.29.x release tag"
+        m.contains("badd809ed7d57954d4c16e12e75e15a7722a7b96"),
+        "source_sha must pin the Istio v1.30.0 commit"
+    );
+    assert!(
+        m.contains("version    = \"1.30.0\""),
+        "[upstream].version must be \"1.30.0\""
     );
 }
 
@@ -92,6 +99,10 @@ fn gate_8_parity_report_exists() {
     let body = fs::read_to_string(&report).unwrap();
     assert!(body.contains("Charter v2"));
     assert!(body.contains("8/8 PASS") || body.contains("8-gate"));
+    assert!(
+        body.contains("Ambient-only"),
+        "PARITY_REPORT.md must document the ambient-only mandate"
+    );
 }
 
 #[test]
@@ -101,6 +112,40 @@ fn gate_9_charter_v2_summary() {
     let total = extract_int(&m, "total").unwrap_or(0);
     let mapped = extract_int(&m, "mapped_count").unwrap_or(0);
     assert!(r >= 0.85 && total > 0 && mapped > 0 && m.contains("source_sha"));
+}
+
+/// Regression gate — the 5 sidecar-legacy files removed in commit d1b4e0c6
+/// must stay deleted. Anyone re-adding them is silently re-introducing the
+/// sidecar plane the no-backcompat mandate banned. The matching
+/// `[[scope_cuts]]` block and `ambient-only-mandate` skipped entries in
+/// `parity.manifest.toml` must also remain.
+#[test]
+fn gate_10_ambient_only_mandate_regression() {
+    let src = crate_root().join("src");
+    for forbidden in [
+        "sidecar.rs",
+        "xds.rs",
+        "proxy.rs",
+        "wasm_plugin.rs",
+        "wasm_runtime.rs",
+    ] {
+        let p = src.join(forbidden);
+        assert!(
+            !p.exists(),
+            "src/{forbidden} re-introduced — Cave Runtime Ambient-only mandate \
+             forbids the sidecar legacy / xDS / WASM surface. See PARITY_REPORT.md."
+        );
+    }
+    let m = read_manifest();
+    assert!(
+        m.contains("[[scope_cuts]]"),
+        "parity.manifest.toml must document the ambient-only [[scope_cuts]] block"
+    );
+    assert!(
+        m.contains("ambient-only-mandate"),
+        "parity.manifest.toml must mark sidecar/xds/wasm packages as \
+         reason = \"ambient-only-mandate\" under [[skipped]]"
+    );
 }
 
 fn scan_spdx(dir: &Path) -> (usize, usize) {

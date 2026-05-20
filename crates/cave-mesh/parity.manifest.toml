@@ -1,41 +1,69 @@
 # parity.manifest.toml — cave-mesh
 # Upstream: istio/istio  https://github.com/istio/istio
-# Tracks the Ambient-mode pieces (ztunnel, waypoint) plus the legacy
-# control-plane surface (Pilot xDS, security, telemetry).
+# Cave Runtime no-backcompat mandate: Ambient-only. The sidecar data
+# plane (Sidecar / EnvoyFilter / WorkloadGroup CRDs, xDS v3
+# LDS/RDS/CDS/EDS/SDS streams, Envoy WASM filter runtime) is removed
+# from the workspace, not deferred — see [[skipped]] block + the
+# 2026-05-19 ambient-only sweep.
 
 [upstream]
 org        = "istio"
 repo       = "istio"
-version    = "1.29.2"
-source_sha = "1.29.2"   # istio v1.29.2 release tag (pinned for this audit)
+version    = "1.30.0"
+source_sha = "badd809ed7d57954d4c16e12e75e15a7722a7b96"   # istio v1.30.0 commit (tag → commit deref)
 name       = "Istio"
 license    = "Apache-2.0"
 language   = "Go"
 url        = "https://github.com/istio/istio"
 [parity]
-# Package-level inventory against istio/istio v1.29 + ambient-mode
-# add-ons (ztunnel, waypoint). Inventory hand-curated 2026-05-12
-# against the Istio repo layout (pilot/, security/, telemetry/,
-# istioctl/, operator/, cni/, pkg/) plus the ztunnel repo.
-# The ambient-mode layer in `src/ambient/` is the cave-side entry
-# point; legacy control-plane bits live alongside.
-mapped_count        = 17
-partial_count       = 2
-skipped_count       = 13
+# Package-level inventory against istio/istio v1.30.0 + ambient-mode
+# add-ons (ztunnel, waypoint). 2026-05-19 ambient-only re-baseline:
+# 3 previously-mapped sidecar packages (sidecar, proxy, pilot xds)
+# and 1 previously-partial (Envoy extension/wasm) moved to [[skipped]]
+# under the Cave Runtime no-backcompat Ambient-only mandate; new
+# pkg/wasm/ skipped entry added (was reported as unmapped, now
+# explicitly out-of-scope). Net: total 36 → 37, mapped 17 → 14,
+# partial 2 → 1, skipped 13 → 18, unmapped 4 → 4.
+mapped_count        = 14
+partial_count       = 1
+skipped_count       = 18
 unmapped_count      = 4
-total               = 36
-fill_ratio          = 0.8889   # (mapped + partial + skipped) / total
-honest_ratio        = 0.8333   # (mapped + skipped) / total — partial excluded
+total               = 37
+fill_ratio          = 0.8919   # (mapped + partial + skipped) / total = 33/37
+honest_ratio        = 0.8649   # (mapped + skipped) / total = 32/37 — partial excluded
 parity_ratio_source = "manifest"
 last_audit          = "2026-05-19"
 infra_only          = false
 
 [module]
 name        = "cave-mesh"
-description = "Service mesh — Istio-parity control plane (sidecar + ambient mode: ztunnel L4 mTLS, waypoint L7 routing, AuthZ, VS/DR, SPIFFE, telemetry)"
+description = "Service mesh — ambient-only mode (ztunnel L4 mTLS + waypoint L7 routing, AuthZ, VS/DR, SPIFFE, telemetry). Sidecar/EnvoyFilter/WorkloadGroup CRDs + xDS v3 streams + Envoy WASM filters are intentionally absent per Cave Runtime no-backcompat mandate."
 source_root = "src"
 pump_priority = "HIGH"  # qwen-pump B-prime priority gate
 target_tests = 30        # qwen-pump B-prime target (#[test] count in tests/qwen_drafted.rs); below this, B-prime fires
+
+# ── Scope cuts (Ambient-only mandate, 2026-05-19) ────────────────────────────
+# The five `src/*.rs` files listed below were deleted from the workspace in
+# commit `d1b4e0c6` (chore(mesh): remove sidecar legacy + xDS + WASM —
+# Ambient-only mandate enforcement). They are NOT deferred work; they are
+# permanently out-of-scope. See `[[skipped]]` entries flagged with
+# `reason = "ambient-only-mandate"` for the per-package record.
+[[scope_cuts]]
+removed_files = [
+    "src/sidecar.rs",       # 297 LOC — SidecarManager + EnvoyFilterManager + WorkloadGroupManager
+    "src/xds.rs",           # 1095 LOC — xDS v3 LDS/RDS/CDS/EDS/SDS snapshot stream
+    "src/proxy.rs",         # 257 LOC — Envoy sidecar proxy abstraction
+    "src/wasm_plugin.rs",   # 460 LOC — Envoy WASM filter CRD lifecycle
+    "src/wasm_runtime.rs",  # 601 LOC — wasmtime-backed proxy-wasm runtime
+]
+removed_loc     = 2710
+mandate         = "Cave Runtime no-backcompat Ambient-only"
+ambient_replacement = "src/ambient/{ztunnel.rs,waypoint.rs,hbone.rs,svid.rs,authz.rs,telemetry.rs,virtualservice.rs,destinationrule.rs}"
+phase_2_backlog = [
+    "Ambient telemetry deep (per-workload metrics labels + tracing exemplars)",
+    "Multi-cluster ambient federation (cross-mesh ztunnel peering)",
+    "IPv6 dual-stack waypoint",
+]
 
 # ── Ambient-mode file mappings (this batch) ──────────────────────────────────
 [[files]]
@@ -97,11 +125,6 @@ local_files  = ["src/routes.rs", "src/traffic.rs"]
 note         = "Routing rules — VirtualService → cluster + retry + fault + match"
 
 [[mapped]]
-upstream_pkg = "istio/istio:pilot/pkg/xds"
-local_files  = ["src/lib.rs"]
-note         = "xDS discovery service (ADS, CDS, EDS, LDS, RDS shapes)"
-
-[[mapped]]
 upstream_pkg = "istio/istio:security/pkg/pki"
 local_files  = ["src/spiffe.rs", "src/mtls.rs"]
 note         = "SPIFFE ID + workload PKI + mTLS handshake"
@@ -110,16 +133,6 @@ note         = "SPIFFE ID + workload PKI + mTLS handshake"
 upstream_pkg = "istio/istio:security/pkg/server"
 local_files  = ["src/auth.rs"]
 note         = "AuthorizationPolicy enforcement, JWT validation"
-
-[[mapped]]
-upstream_pkg = "istio/istio:pilot/pkg/networking/sidecar"
-local_files  = ["src/sidecar.rs"]
-note         = "Sidecar resource — workload-scoped reachability + policy filter"
-
-[[mapped]]
-upstream_pkg = "istio/istio:pilot/pkg/networking/proxy"
-local_files  = ["src/proxy.rs"]
-note         = "Envoy proxy state machine + circuit breaker integration"
 
 [[mapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/circuitbreaker"
@@ -166,7 +179,39 @@ upstream_pkg = "istio/istio:pilot/pkg/networking/core/cluster_traffic_policy.go"
 local_files  = ["src/traffic_policy.rs"]
 note         = "TrafficPolicy → Envoy translation (batch4 2026-05-14). Pure-function port of applyOutlierDetection, applyConnectionPool, and the selectTrafficPolicyComponents per-port overlay. Mirrors istio 1.29.2 cluster_traffic_policy.go branch-for-branch: Consecutive_5xx / ConsecutiveGatewayFailure with their >0 ? 100 : 0 enforcing peers, SplitExternalLocalOriginErrors gating local-origin failure counter, MaxEjectionPercent / Interval / BaseEjectionTime passthrough, TCP/HTTP threshold mapping, TcpKeepalive lift, idle-timeout HTTP→TCP fallback, CommonHttpProtocolOptions materialised only when at least one field set."
 
-# ─── Skipped (13) ──────────────────────────────────────────────────────────
+# ─── Skipped (18) ──────────────────────────────────────────────────────────
+
+# ── Ambient-only mandate cuts (2026-05-19) ──────────────────────────────────
+# Cave Runtime no-backcompat policy: these are permanently out of scope, not
+# deferred. The corresponding `src/*.rs` files were deleted in
+# commit d1b4e0c6. See `[[scope_cuts]]` at the top of this manifest.
+
+[[skipped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/sidecar"
+reason       = "ambient-only-mandate"
+note         = "Istio sidecar legacy — Cave Runtime no-backcompat mandate. Deleted src/sidecar.rs (297 LOC). Replaced by Ambient mode (ztunnel L4 + waypoint L7)."
+
+[[skipped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/proxy"
+reason       = "ambient-only-mandate"
+note         = "Istio Envoy sidecar proxy abstraction — Cave Runtime no-backcompat mandate. Deleted src/proxy.rs (257 LOC). Ambient mode uses ztunnel + waypoint instead of sidecar Envoy."
+
+[[skipped]]
+upstream_pkg = "istio/istio:pilot/pkg/xds"
+reason       = "ambient-only-mandate"
+note         = "Istio xDS v3 LDS/RDS/CDS/EDS/SDS snapshot stream — Cave Runtime no-backcompat mandate. Deleted src/xds.rs (1095 LOC). Ambient mode programs ztunnel via SVID + waypoint config, not Envoy xDS."
+
+[[skipped]]
+upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
+reason       = "ambient-only-mandate"
+note         = "Istio EnvoyFilter / WasmPlugin CRD lifecycle — Cave Runtime no-backcompat mandate. Deleted src/wasm_plugin.rs (460 LOC). EnvoyFilter direct-patch surface is incompatible with ambient mode."
+
+[[skipped]]
+upstream_pkg = "istio/istio:pkg/wasm/"
+reason       = "ambient-only-mandate"
+note         = "Istio wasmtime-backed proxy-wasm runtime — Cave Runtime no-backcompat mandate. Deleted src/wasm_runtime.rs (601 LOC), wasmtime + wat Cargo deps dropped. Ambient mode does not load per-request WASM filters."
+
+# ── Pre-existing skips (Istio packages outside cave-mesh's scope) ───────────
 
 [[skipped]]
 upstream_pkg = "istio/istio:istioctl/"
@@ -226,13 +271,9 @@ upstream_pkg = "istio/istio:operator/cmd/mesh/"
 reason       = "CLI"
 note         = "mesh CLI subcommand"
 
-# ─── Unmapped (8) — honest gaps ────────────────────────────────────────────
-
-[[partial]]
-upstream_pkg = "istio/istio:pilot/pkg/networking/extension/"
-local_files  = ["src/wasm_plugin.rs", "src/wasm_runtime.rs"]
-note         = "WasmPlugin CRD lifecycle + filter-chain projection (wasm_plugin.rs) plus an embedded wasmtime-backed runtime (wasm_runtime.rs): wat/wasm compile + validate, ResourceLimits with fuel cap + memory ceiling, proxy-wasm ABI shim (proxy_log + proxy_set_header_map_value + 10 stub responders returning WasmResultUnimplemented = 12), per-invocation RequestContext capturing log records / set_header calls / response body, fuel exhaustion → typed FuelExhausted error. Filter modules built against proxy-wasm-rust-sdk run end-to-end in process; the full ~50-function proxy-wasm host surface is documented as a follow-up."
-
+# ─── Unmapped (4) — honest gaps ────────────────────────────────────────────
+# pilot/pkg/networking/extension/ (was partial) moved to [[skipped]] above
+# under the ambient-only mandate. See scope_cuts at the top of this manifest.
 # pilot/pkg/networking/federation/ promoted to mapped 2026-05-13 — see `[[mapped]]` entry below.
 
 [[partial]]
