@@ -5,7 +5,7 @@ Pinned upstreams (unified Rust crate, per ADR-RUNTIME-STREAMING-CONSOLIDATION-00
 * **apache/kafka @ 4.2.0**   `source_sha.kafka  = 9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2`
 * **apache/pulsar @ v4.2.0** `source_sha.pulsar = 1940aebc6ade10050399cd65f870353eedf80008`
 
-Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19
+Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19 · Phase 2 deep-port: 2026-05-19
 
 This document is the honest companion to `parity.manifest.toml`. The
 manifest proves *coverage*; this report describes *fidelity* — which
@@ -19,15 +19,16 @@ remains for streaming-ray-2.
 | metric | value |
 |---|---|
 | upstream packages enumerated (Kafka + Pulsar, counted once) | 45 |
-| mapped | 23 |
+| mapped | **27** (+4 Phase 2) |
 | partial | 0 |
 | skipped (alt-language toolchain / browser-UI / vendor-spec) | 16 |
-| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **6** |
-| `fill_ratio` (mapped + partial + skipped) / total | **0.8667** (measured) |
-| `honest_ratio` | **0.8667** |
+| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **2** (was 6) |
+| `fill_ratio` (mapped + partial + skipped) / total | **0.9556** (was 0.8667) |
+| `honest_ratio` | **0.9556** |
 | `parity_ratio_source` | `"manifest"` |
-| cave-streams `.rs` files | 77 |
-| SPDX AGPL-3.0-or-later coverage | **77/77 (100 %)** |
+| cave-streams `.rs` files | **81** (+4 Phase 2) |
+| SPDX AGPL-3.0-or-later coverage | **81/81 (100 %)** |
+| Phase 2 new tests | **+39 unit tests** (10 pulsar_geo + 12 managed_ledger + 9 io_connectors + 13 streams_processor) |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
 | `#[test]` + `#[tokio::test]` (lib + integration) | **592 → 601** (incl. 9 new self-audit) |
 | workspace build | clean |

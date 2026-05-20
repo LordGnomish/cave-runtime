@@ -50,17 +50,28 @@ notes   = "Apache Pulsar binary protocol + persistent://tenant/ns/topic addressi
 #     (kafka/pulsar/connect/tiered) + cavectl streams sub-commands +
 #     observability cave-streams alerts & dashboard — all green
 #     pre-close.
-mapped_count   = 23
+mapped_count   = 27
 partial_count  = 0
 skipped_count  = 16
-unmapped_count = 6
+unmapped_count = 2
 total          = 45
-fill_ratio     = 0.8667
-honest_ratio   = 0.8667
+fill_ratio     = 0.9556
+honest_ratio   = 0.9556
 parity_ratio_source = "manifest"
 source_sha     = { kafka = "9f8b3ad416bd416f3706f3d7a1f425b9dd8bc5f2", pulsar = "1940aebc6ade10050399cd65f870353eedf80008" }
 last_audit     = "2026-05-19"
 infra_only     = false
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * 4 of 6 prior [[scope_cuts]] promoted to [[mapped]] via real Rust ports:
+#       pulsar-geographic-replication → src/pulsar_geo_replication.rs
+#       pulsar-managed-ledger         → src/pulsar_managed_ledger.rs
+#       pulsar-io-connectors          → src/pulsar_io_connectors.rs
+#       kafka-streams-processor-api   → src/kafka_streams_processor.rs
+#   * 2 [[scope_cuts]] retained for streaming-ray-2:
+#       pulsar-transactions (Kafka EOS is mapped; Pulsar TC remains a gap),
+#       kafka-share-groups  (KIP-932 preview feature, not stable upstream).
+#   * mapped 23 → 27, unmapped 6 → 2, fill_ratio 0.8667 → 0.9556.
 
 [module]
 name          = "cave-streams"
@@ -144,6 +155,24 @@ local    = "src/pulsar_topic.rs"
 [[files]]
 upstream = "bookkeeper-server/src/main/java/org/apache/bookkeeper/bookie/Bookie.java"
 local    = "src/segment_log.rs"
+
+# Phase 2 — 2026-05-19 deep-port
+
+[[files]]
+upstream = "pulsar-broker/src/main/java/org/apache/pulsar/broker/service/persistent/PersistentReplicator.java"
+local    = "src/pulsar_geo_replication.rs"
+
+[[files]]
+upstream = "managed-ledger/src/main/java/org/apache/bookkeeper/mledger/{ManagedLedger,ManagedCursor}.java"
+local    = "src/pulsar_managed_ledger.rs"
+
+[[files]]
+upstream = "pulsar-io/core/src/main/java/org/apache/pulsar/io/core/{Source,Sink,FunctionRuntime}.java"
+local    = "src/pulsar_io_connectors.rs"
+
+[[files]]
+upstream = "streams/src/main/java/org/apache/kafka/streams/processor/{Processor,ProcessorContext,StateStore,Punctuator}.java"
+local    = "src/kafka_streams_processor.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -551,6 +580,28 @@ local_files  = [
 ]
 note         = "Kafka Connect REST admin state machine — ConnectorsResource (list/create/restart/pause/resume/delete/status) + ConnectorPluginsResource.validateConfigs + RootResource.serverInfo. Pure (status, body) dispatch: HttpStatus enum + typed CreatedConnector/RestartReport/ConnectorStatus/ValidationResult/ServerInfo DTOs + CreateError/RestartError/AdminError envelopes. POST /connectors name-trim + null-normalise + config-mismatch 400 + duplicate 409. 4.2.0 RestServerTest jersey/jetty framing layer deferred (HTTP-server bootstrapping, not REST semantics)."
 
+# ─── Phase 2 mapped (2026-05-19 deep-port — 4 of 6 scope_cuts resolved) ────
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-broker/.../replication/"
+local_files  = ["src/pulsar_geo_replication.rs"]
+note         = "Pulsar geographic replication — ClusterRegistry + PersistentReplicator with per-topic queue, dedup set keyed by (source_cluster, message_id), in-flight map, durable cursor per peer, retry_in_flight path for reconnects, loop-guard rejecting non-local-source messages, per-peer sent/rejected/network_errors counters."
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:managed-ledger/"
+local_files  = ["src/pulsar_managed_ledger.rs"]
+note         = "Managed ledger — LedgerSegment with seal/append/size, ManagedLedger rolling on entry-count and byte threshold, ManagedCursor mark-delete with backward-move guard and out-of-order ack_individual collapse (contiguous run merge), RetentionPolicy enforcement (time + earliest-cursor-ledger). EntryId = (ledger_id, entry_id)."
+
+[[mapped]]
+upstream_pkg = "apache/pulsar:pulsar-io/"
+local_files  = ["src/pulsar_io_connectors.rs"]
+note         = "Pulsar IO connector framework — ConnectorConfig (kind/class/topic/parallelism/processing_guarantees) + validate(), ConnectorRuntime install/start/pause/fail with InstanceState lifecycle, ProcessingGuarantees parsing (AT_MOST/AT_LEAST/EFFECTIVELY_ONCE), per-instance counters, PulsarSource + PulsarSink traits with SourceRecord/SinkRecord + context."
+
+[[mapped]]
+upstream_pkg = "apache/kafka:streams/processor-api"
+local_files  = ["src/kafka_streams_processor.rs"]
+note         = "Low-level Streams Processor API — Topology(add_source/add_processor/add_sink/add_state_store) with parent validation; Processor trait + StateStore (put/get/delete/keys); ProcessorContext.forward/commit/schedule; ScheduledPunctuator wall-clock + stream-time with last_fired interval check; BFS routing source→processor→sink with explicit forward override."
+
 # ─── Skipped (16) ──────────────────────────────────────────────────────────
 
 [[skipped]]
@@ -633,28 +684,18 @@ note         = "BC crypto provider — Rust uses ring"
 # connect/runtime/standalone/ + distributed/ + KafkaOffsetBackingStore added to that mapped entry's local_files 2026-05-14.
 
 [[unmapped]]
-upstream_pkg = "apache/kafka:streams/processor-api"
-note         = "Kafka Streams Processor API (low-level state stores + punctuation). streams_api.rs stubs the DSL only."
-
-[[unmapped]]
 upstream_pkg = "apache/kafka:server/group-coordinator/share/"
-note         = "Share groups (KIP-932) — queue-style consumption. Newer feature, not yet in scope."
-
-[[unmapped]]
-upstream_pkg = "apache/pulsar:pulsar-broker/.../replication/"
-note         = "Geo-replication between Pulsar clusters. Single-cluster only."
+note         = "Share groups (KIP-932) — queue-style consumption. Preview feature in Kafka 4.x, not yet stable."
 
 [[unmapped]]
 upstream_pkg = "apache/pulsar:pulsar-broker/.../transactions/"
-note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar equivalent is a gap."
+note         = "Pulsar transactional producer + ack groups. Kafka EOS is mapped; Pulsar's transaction buffer + TC deferred."
 
-[[unmapped]]
-upstream_pkg = "apache/pulsar:managed-ledger/"
-note         = "BookKeeper-backed durable log — Pulsar's storage substrate. cave-streams uses its own segment_log instead."
-
-[[unmapped]]
-upstream_pkg = "apache/pulsar:pulsar-io/"
-note         = "Pulsar IO connector framework (parallel to Kafka Connect). connect.rs covers Kafka Connect only."
+# Phase 2 promotions (2026-05-19) — moved from [[unmapped]] to [[mapped]]:
+#   apache/kafka:streams/processor-api          → src/kafka_streams_processor.rs
+#   apache/pulsar:pulsar-broker/.../replication/ → src/pulsar_geo_replication.rs
+#   apache/pulsar:managed-ledger/                → src/pulsar_managed_ledger.rs
+#   apache/pulsar:pulsar-io/                     → src/pulsar_io_connectors.rs
 
 # ─── Scope cuts ─── deferred to next streaming ray (Pulsar-heavy) ─────────────
 # The 6 [[unmapped]] above are the formally scope-cut deferrals for the
@@ -663,33 +704,9 @@ note         = "Pulsar IO connector framework (parallel to Kafka Connect). conne
 # (mapped + partial + skipped + unmapped) ≡ (45 − 6) / 45 = 0.8667.
 
 [[scope_cuts]]
-name      = "pulsar-geographic-replication"
-upstream  = "apache/pulsar:pulsar-broker/.../replication/"
-reason    = "Single-cluster cave-streams MVP. Cross-cluster topic replication is post-OSS-launch."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
 name      = "pulsar-transactions"
 upstream  = "apache/pulsar:pulsar-broker/.../transactions/"
 reason    = "Kafka EOS (idempotent producer + transaction coordinator) is mapped; Pulsar's transaction buffer + TC is a separate subsystem deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
-name      = "pulsar-managed-ledger"
-upstream  = "apache/pulsar:managed-ledger/"
-reason    = "BookKeeper-backed durable log substrate. cave-streams uses its own segment_log (RocksDB + KRaft) for both Kafka and Pulsar protocols — managed-ledger deferred as a parity-only port."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
-name      = "pulsar-io-connectors"
-upstream  = "apache/pulsar:pulsar-io/"
-reason    = "Pulsar IO connector framework (parallel to Kafka Connect). connect_worker covers Kafka Connect fully; Pulsar IO bridge deferred to streaming-ray-2."
-deferred_to = "streaming-ray-2"
-
-[[scope_cuts]]
-name      = "kafka-streams-processor-api"
-upstream  = "apache/kafka:streams/processor-api"
-reason    = "Low-level Streams Processor API (state stores + punctuation). streams_api.rs covers the high-level DSL; low-level API deferred to streaming-ray-2."
 deferred_to = "streaming-ray-2"
 
 [[scope_cuts]]
@@ -697,6 +714,12 @@ name      = "kafka-share-groups"
 upstream  = "apache/kafka:server/group-coordinator/share/"
 reason    = "KIP-932 queue-style share groups (Kafka 4.x preview feature). Deferred to streaming-ray-2."
 deferred_to = "streaming-ray-2"
+
+# Resolved scope_cuts (2026-05-19 Phase 2 deep-port):
+#   * pulsar-geographic-replication → mapped (src/pulsar_geo_replication.rs)
+#   * pulsar-managed-ledger          → mapped (src/pulsar_managed_ledger.rs)
+#   * pulsar-io-connectors           → mapped (src/pulsar_io_connectors.rs)
+#   * kafka-streams-processor-api    → mapped (src/kafka_streams_processor.rs)
 
 
 # ── Upstream test cross-reference (behavioral parity) ────────────────────────
