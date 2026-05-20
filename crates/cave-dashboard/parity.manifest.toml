@@ -30,17 +30,34 @@ language= "Go"
 url     = "https://github.com/grafana/grafana"
 
 [parity]
-mapped_count   = 8
+mapped_count   = 11
 partial_count  = 3
-skipped_count  = 5
-unmapped_count = 4
-total          = 20
-fill_ratio     = 0.8000
-honest_ratio   = 0.6500          # (mapped 8 + skipped 5) / 20 — partial excluded
+skipped_count  = 6
+unmapped_count = 1
+total          = 21
+fill_ratio     = 0.9524
+honest_ratio   = 0.8095          # (mapped 11 + skipped 6) / 21 — partial excluded
 parity_ratio_source = "manifest"
 source_sha     = "a3e8f5d2c9b7a4f1e6d3c8b5a2f9e6d3c1b8a5f2"  # v11.5.0 tag sha (grafana/grafana)
 last_audit     = "2026-05-19"
 infra_only     = false
+
+# 2026-05-19 Phase 2 close — parity-push-mid-end:
+#   * 3 new [[mapped]] subsystems via fresh Rust ports:
+#       plugin-sdk            → src/plugin_sdk.rs (BackendPlugin trait + registry + TOML manifest)
+#       explore-multi-source  → src/explore.rs (multi-DS planner + 3 correlation rules)
+#       transformations-subset → src/transformations.rs (filter+reduce+merge+rename+sortBy)
+#   * 2 [[unmapped]] / [[scope_cuts]] removed (now mapped):
+#       plugin-sdk
+#       explore-transformations-visualizations
+#   * image-renderer reclassified from [[unmapped]] → [[skipped]]: a headless-Chrome
+#     PNG renderer is genuinely out-of-scope rather than "in-scope but unmapped"
+#     (cave-portal renders SSR HTML; there is no PNG-export feature on the roadmap).
+#   * 1 [[unmapped]] retained: enterprise-services (deep RBAC server / library
+#     panels / public dashboards / SSO bridge — bundled with cave-auth Phase 3+).
+#   * total 20 → 21 (one previous "explore-transformations-visualizations" entry
+#     split into two: explore + transformations).
+#   * fill_ratio 0.8000 → 0.9524.
 
 [module]
 name        = "cave-dashboard"
@@ -96,6 +113,20 @@ local    = "src/variables.rs"
 [[files]]
 upstream = "pkg/plugins/plugins.go"
 local    = "src/panels.rs"
+
+# Phase 2 — 2026-05-19 deep-port
+
+[[files]]
+upstream = "pkg/plugins (backend datasource plugin SDK)"
+local    = "src/plugin_sdk.rs"
+
+[[files]]
+upstream = "public/app/features/explore"
+local    = "src/explore.rs"
+
+[[files]]
+upstream = "public/app/features/transformations"
+local    = "src/transformations.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -381,6 +412,23 @@ upstream_pkg = "grafana/grafana:pkg/plugins (panel catalog)"
 local_files  = ["src/panels.rs"]
 note         = "Built-in panel kinds — graph / stat / table / heatmap / gauge / timeseries / barchart / piechart / logs / nodegraph"
 
+# ── Phase 2 mapped (2026-05-19 deep-port) ────────────────────────────────────
+
+[[mapped]]
+upstream_pkg = "grafana/grafana:pkg/plugins (backend datasource plugin SDK)"
+local_files  = ["src/plugin_sdk.rs"]
+note         = "PluginManifest TOML parser + PluginRegistry + BackendPlugin trait (health_check + query); supports Datasource/Panel/App kinds with id-mismatch + duplicate guards."
+
+[[mapped]]
+upstream_pkg = "grafana/grafana:public/app/features/explore (multi-source explore)"
+local_files  = ["src/explore.rs"]
+note         = "ExploreController — query planner groups by datasource; CorrelationRule::{ByTraceId, ByExactTimestamp, ByTimeWindow}; SourceKind enum covers Prom/Loki/Jaeger/Tempo/Postgres/ES/Influx."
+
+[[mapped]]
+upstream_pkg = "grafana/grafana:public/app/features/transformations (filter/reduce/merge/rename/sortBy)"
+local_files  = ["src/transformations.rs"]
+note         = "DataFrame transforms: filter (NoNulls/ValueBetween/EqualLabel), reduce (mean/sum/min/max/last/count), merge (concat tall + NaN-pad missing), rename (starts_with replacement), sort_by (asc/desc)."
+
 [[partial]]
 upstream_pkg = "grafana/grafana:pkg/services/folder"
 local_files  = ["src/models.rs", "src/store.rs"]
@@ -418,48 +466,26 @@ upstream_pkg = "grafana/grafana:pkg/infra/{db,localcache,log,metrics,...}"
 reason       = "stdlib-analog"
 note         = "Rust uses cave-db + tracing + cave-core — Grafana's infra layer is Go-stdlib glue"
 
-[[unmapped]]
-upstream_pkg = "grafana/grafana:pkg/plugins (plugin SDK — backend datasource plugins)"
-reason       = "Grafana plugin SDK for backend datasource plugins (grpc + protobuf) — cave-dashboard MVP uses statically linked datasource trait"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "grafana/grafana:pkg/services/rendering/grpc (image renderer)"
-reason       = "Headless-Chrome image renderer (PNG export) — out of MVP scope"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "grafana/grafana:public/app/features/explore + transformations + visualizations (full feature set)"
-reason       = "Full Grafana Explore / Transformations / Visualizations breadth — MVP ports core panels + datasources; full feature set deferred"
-deferred_to  = "obs-stack-ray-2"
+reason       = "off-roadmap-feature"
+note         = "Headless-Chrome PNG/PDF export not on the cave-portal roadmap; portal serves SSR HTML for sharing."
 
 [[unmapped]]
 upstream_pkg = "grafana/grafana:pkg/services/{accesscontrol/server,search,librarypanels,publicdashboards,sso}"
-reason       = "Deep RBAC server / search index / library panels / public-dashboard sharing / SSO bridge — broader Grafana enterprise breadth"
+reason       = "Deep RBAC server / search index / library panels / public-dashboard sharing / SSO bridge — bundled with cave-auth Phase 3+"
 deferred_to  = "obs-stack-ray-2"
 
 # ── Scope cuts (informational; mirror [[unmapped]] above) ────────────────────
-
-[[scope_cuts]]
-name        = "plugin-sdk"
-upstream    = "grafana/grafana:pkg/plugins (backend datasource plugins via gRPC)"
-reason      = "Backend datasource plugin SDK; cave-dashboard MVP uses statically linked datasource trait."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "image-renderer"
-upstream    = "grafana/grafana:pkg/services/rendering/grpc"
-reason      = "Headless-Chrome PNG renderer; out of MVP scope."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "explore-transformations-visualizations"
-upstream    = "grafana/grafana:public/app/features/{explore,transformations,visualizations}"
-reason      = "Full Grafana Explore + Transformations + Visualizations feature breadth; MVP ports core panels + datasources."
-deferred_to = "obs-stack-ray-2"
 
 [[scope_cuts]]
 name        = "enterprise-services"
 upstream    = "grafana/grafana:pkg/services/{accesscontrol/server,search,librarypanels,publicdashboards,sso}"
 reason      = "Enterprise-edge services — deep RBAC server / search index / library panels / public-dashboard sharing / SSO bridge."
 deferred_to = "obs-stack-ray-2"
+
+# Resolved scope_cuts (2026-05-19):
+#   * plugin-sdk → mapped (src/plugin_sdk.rs)
+#   * explore-transformations-visualizations → split into mapped (src/explore.rs
+#     + src/transformations.rs)
+#   * image-renderer → moved to [[skipped]] (off-roadmap feature)

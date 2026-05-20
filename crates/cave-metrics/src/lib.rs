@@ -15,14 +15,19 @@
 
 pub mod alertmgr;
 pub mod api;
+pub mod discovery_cloud;
 pub mod error;
+pub mod exemplars;
 pub mod ingestion;
 pub mod model;
 pub mod multitenant;
+pub mod notifier_sharded;
 pub mod promql;
+pub mod remote_read_backend;
 pub mod rules;
 pub mod scrape;
 pub mod state;
+pub mod template;
 pub mod tsdb;
 
 pub use error::{MetricsError, Result};
@@ -30,6 +35,14 @@ pub use model::{Labels, LabelMatcher, MatchOp, MetricType, QueryResult, Sample, 
 pub use promql::{Engine, parse};
 pub use tsdb::{Tsdb, TsdbConfig};
 pub use state::MetricsState;
+pub use discovery_cloud::{Target as CloudTarget, parse_hetzner_servers, parse_azure_vms};
+pub use exemplars::{Exemplar, ExemplarRing, NativeHistogram};
+pub use notifier_sharded::{Notification, PeerQueue, ShardedNotifier};
+pub use remote_read_backend::{
+    LabelMatcher as RemoteLabelMatcher, MatcherKind, MemoryReadBackend, ReadQuery,
+    RemoteReadBackend, Sample as RemoteSample, SeriesSamples,
+};
+pub use template::{render as render_template, TemplateContext};
 
 use axum::Router;
 use std::sync::Arc;

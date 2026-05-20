@@ -5,27 +5,50 @@
 //! upstream: knative/serving v1.18.x, knative/eventing v1.18.x
 //!
 //! Modules:
-//!   meta         — shared CRD primitives (ObjectMeta, RevisionTemplateSpec, TrafficTarget, validators)
-//!   ksvc         — top-level Service (wraps Configuration + Route)
-//!   configuration — desired-state spec; spawns Revisions
-//!   revision     — immutable code+config snapshot, scaling target
-//!   route        — traffic split between revisions
-//!   eventing     — Source/Sink/Channel/Subscription/Trigger
-//!   autoscaler   — Knative Pod Autoscaler (KPA) with stable/panic modes
+//!   meta              — shared CRD primitives (ObjectMeta, RevisionTemplateSpec, TrafficTarget, validators)
+//!   ksvc              — top-level Service (wraps Configuration + Route)
+//!   configuration     — desired-state spec; spawns Revisions
+//!   revision          — immutable code+config snapshot, scaling target
+//!   route             — traffic split between revisions
+//!   eventing          — Source/Sink/Channel/Subscription/Trigger
+//!   autoscaler        — Knative Pod Autoscaler (KPA) with stable/panic modes
+//!   sources_ping      — PingSource cron event emitter (Phase 2)
+//!   sources_apiserver — ApiServerSource K8s watch → CloudEvent (Phase 2)
+//!   sources_container — ContainerSource deployment projection (Phase 2)
+//!   eventing_transports — Kafka / RabbitMQ / Pulsar / NATS / GitHub adapters (Phase 2)
+//!   broker_controller — Broker reconciler state machine (Phase 2)
+//!   webhook           — Admission validation + defaulting (Phase 2)
+//!   cert_bridge       — cert-manager Certificate CR projection (Phase 2)
 
 #![allow(non_snake_case)]
 
 pub mod autoscaler;
+pub mod broker_controller;
+pub mod cert_bridge;
 pub mod configuration;
 pub mod eventing;
+pub mod eventing_transports;
 pub mod ksvc;
 pub mod meta;
 pub mod revision;
 pub mod route;
+pub mod sources_apiserver;
+pub mod sources_container;
+pub mod sources_ping;
+pub mod webhook;
 
 pub use autoscaler::{Autoscaler, AutoscalerConfig, AutoscalerMetric, AutoscalerMode, ScaleDecision};
+pub use broker_controller::{Broker, BrokerSpec, BrokerStatus, ConditionState, DeliverySpec, ReconcileAction};
+pub use cert_bridge::{
+    CertManagerCertificate, CertManagerStatus, IssuerRef, KnativeCertificate,
+    KnativeCertificateSpec, KnativeCertificateStatus, project_status_back, to_cert_manager,
+};
 pub use configuration::{Configuration, ConfigurationSpec, ConfigurationStatus};
 pub use eventing::{Channel, EventingSink, EventingSource, Subscription, Trigger, TriggerFilter};
+pub use eventing_transports::{
+    DeliveryReceipt, GitHubSource, KafkaTransport, NatsTransport, PulsarTransport,
+    RabbitMqTransport, Transport, hmac_sha256_hex, sha256,
+};
 pub use ksvc::{Ksvc, ServiceSpec, ServiceStatus};
 pub use meta::{
     Container, EnvVar, ObjectMeta, PodSpec, RevisionTemplateSpec, TrafficTarget,
@@ -35,6 +58,16 @@ pub use meta::{
 };
 pub use revision::{Revision, RevisionSpec, RevisionStatus};
 pub use route::{Route, RouteSpec, RouteStatus};
+pub use sources_apiserver::{
+    ApiServerSource, ApiServerSourceSpec, ApiServerSourceStatus, EventMode, ResourceEvent,
+    ResourceEventType,
+};
+pub use sources_container::{ContainerSource, ContainerSourceSpec, ContainerSourceStatus};
+pub use sources_ping::{CloudEvent, PingSource, PingSourceSpec, PingSourceStatus};
+pub use webhook::{
+    admit, validate_ksvc_template, AdmissionObject, AdmissionOp, PatchOp, WebhookRequest,
+    WebhookResponse,
+};
 
 #[cfg(test)]
 mod tests {

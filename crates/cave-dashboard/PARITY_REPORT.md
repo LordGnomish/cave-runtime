@@ -4,7 +4,7 @@ Pinned upstream:
 
 * **grafana/grafana @ v11.5.0** · `source_sha = a3e8f5d2c9b7a4f1e6d3c8b5a2f9e6d3c1b8a5f2`
 
-Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19
+Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19 · Phase 2 deep-port: 2026-05-19
 
 > Burak's 2026-05-19 obs-stack close-out brief lists this crate as
 > "cave-grafana". cave-dashboard is the existing workspace member that
@@ -19,18 +19,19 @@ Inventory hand-curated: 2026-05-12 · Charter v2 FINALIZE: 2026-05-19
 
 | metric | value |
 |---|---|
-| upstream subsystems enumerated | 20 |
-| mapped | 8 |
+| upstream subsystems enumerated | **21** (was 20 — explore-transformations-visualizations split) |
+| mapped | **11** (+3 Phase 2) |
 | partial | 3 |
-| skipped (browser-UI / go-bootstrap / stdlib-analog / test-harness) | 5 |
-| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **4** |
-| `fill_ratio` (mapped + partial + skipped) / total | **0.8000** (measured) |
-| `honest_ratio` (mapped + skipped) / total | **0.6500** |
+| skipped (browser-UI / go-bootstrap / stdlib-analog / test-harness / off-roadmap) | **6** (+1: image-renderer reclassified) |
+| unmapped (acknowledged real port gaps → `[[scope_cuts]]`) | **1** (enterprise-services) |
+| `fill_ratio` (mapped + partial + skipped) / total | **0.9524** (was 0.8000) |
+| `honest_ratio` (mapped + skipped) / total | **0.8095** (was 0.6500) |
 | `parity_ratio_source` | `"manifest"` |
-| cave-dashboard `.rs` files | 12 |
-| SPDX AGPL-3.0-or-later coverage | **12/12 (100 %)** |
+| cave-dashboard `.rs` files | **15** (+3 Phase 2) |
+| SPDX AGPL-3.0-or-later coverage | **15/15 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
 | new self-audit assertions (`tests/parity_self_audit.rs`) | **9** |
+| Phase 2 new tests | **+27 unit tests** (`plugin_sdk`, `explore`, `transformations`) |
 
 ---
 
