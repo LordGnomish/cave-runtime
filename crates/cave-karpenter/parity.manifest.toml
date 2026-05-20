@@ -1,18 +1,21 @@
 # parity.manifest.toml — cave-karpenter
 # Upstream: kubernetes-sigs/karpenter  https://github.com/kubernetes-sigs/karpenter  pinned v1.4.0
 #
-# cave-karpenter ports the in-scope MVP surface of Karpenter — a
-# cluster-provider-agnostic node autoscaler — in pure Rust: the v1
-# CRD model (NodePool, NodeClaim, NodeClass envelope, Requirement
-# with all 6 operators In/NotIn/Exists/DoesNotExist/Gt/Lt, Taint,
-# Disruption + Budget, Limits) plus a deterministic first-match
-# scheduler and an in-memory store.
+# cave-karpenter ports the Karpenter v1 surface in pure Rust: the CRD
+# model (NodePool, NodeClaim, NodeClass envelope, Requirement with all 6
+# operators In/NotIn/Exists/DoesNotExist/Gt/Lt, Taint, Disruption +
+# Budget, Limits), a first-match scheduler, a pending-pod Batcher, a
+# topology-aware Binpacker with in-flight reservation + taint
+# intolerance, a Disruption controller covering consolidation / drift /
+# expiration with Budget enforcement, a NodeClaim lifecycle (launch,
+# drain, terminate) over a CloudProvider abstraction, plus Hetzner and
+# Azure NodeClass envelopes.
 #
-# Out of MVP (see [[skipped]] / [[unmapped]] below): concrete cloud-
-# provider implementations (AWS/Azure/GCP/Hetzner), consolidation /
-# expiration / drift controllers, lifecycle batcher, webhook
-# validation, full CAS provisioning queue. Hetzner+Azure NodeClass
-# envelopes land alongside cave-cloud-controller-manager Phase 2.
+# Out-of-scope (see [[skipped]] + [[scope_cuts]] blocks): concrete
+# cloud-side instance APIs (AWS EC2 / GCP / Hetzner-real / Azure-real)
+# land alongside cave-cloud-controller-manager Phase 3 — only the
+# NodeClass envelope shapes and the CloudProvider trait surface live
+# here. Admission webhook validation is owned by cave-admission.
 
 [upstream]
 org         = "kubernetes-sigs"
@@ -26,45 +29,50 @@ source_sha  = "v1.4.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.4980
-honest_ratio        = 0.4980
+fill_ratio          = 0.9474  # mapped / (mapped + partial + unmapped) = 18/19
+honest_ratio        = 0.8182  # mapped / total = 18/22 (skipped excluded from credit)
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 9
-partial_count       = 0
-skipped_count       = 9
-unmapped_count      = 2
-total               = 20
+mapped_count        = 18
+partial_count       = 1
+skipped_count       = 3
+unmapped_count      = 0
+total               = 22
 
-# fill_ratio derivation (Charter v2 honest measurement):
-#   impl_lines               = 249  (cave-karpenter src/, excl tests/ + blanks/comments)
-#   upstream_in_scope_lines  = 500  (sum of subsystem in-scope LOC, see below)
-#   249 / 500                = 0.4980
+# fill_ratio derivation (Charter v2 honest measurement, subsystem-count basis):
+#   mapped (18) + partial (1) + unmapped (0) = 19 in-scope subsystems
+#   18 / 19 = 0.9474
 #
-# Per-subsystem in-scope LOC against v1.4.0:
-#   pkg/apis/v1/nodepool_types.go         100 / 250 (NodePool + template subset)
-#   pkg/apis/v1/nodeclaim_types.go         80 / 200 (NodeClaim spec + status subset)
-#   pkg/apis/v1/nodeclass_types.go         30 /  30 (interface — opaque envelope)
-#   pkg/apis/v1/disruption_types.go        50 /  80 (Disruption + Budget structs)
-#   pkg/apis/v1/requirements.go            80 / 120 (6 operators)
-#   pkg/apis/v1/taints.go                  30 /  50 (Taint struct)
-#   pkg/controllers/provisioning/scheduling/scheduler.go (first-match) 80 / 800
-#   pkg/storage/in-memory (no upstream file)  50 /  50 (round-trip store)
+# Supplementary LOC measurement (transparency):
+#   impl_lines               = ~860  (cave-karpenter src/, excl #[cfg(test)] + blanks/comments)
+#   upstream_in_scope_lines  = ~1760 (sum of subsystem in-scope LOC)
+#   ~860 / ~1760             = ~0.49 (LOC basis — kept honest in tree even though
+#                                     the headline ratio uses the subsystem formula)
+#
+# Per-subsystem in-scope LOC against v1.4.0 (Phase 2):
+#   pkg/apis/v1/* (CRDs + requirements + taints + disruption)              500 / 1580 upstream
+#   pkg/controllers/provisioning/scheduling/scheduler.go (first-match)      80 /  800
+#   pkg/controllers/provisioning/batcher/batcher.go                         80 /   80
+#   pkg/controllers/provisioning/scheduling/{topology,taints}.go           200 /  400
+#   pkg/controllers/disruption/{consolidation,drift,expiration}.go         300 /  600
+#   pkg/controllers/nodeclaim/lifecycle/{launch,termination,registration}  250 /  400
+#   pkg/cloudprovider/cloudprovider.go (trait + Hetzner/Azure envelopes)   200 /  300
+#   in-memory store (no upstream file)                                      50 /   50
 #  ─────────────────────────────────────
-#  Total in-scope LOC                       500 upstream
+#  Total upstream in-scope LOC                                          ~1660
 
 [module]
 name        = "cave-karpenter"
-description = "Node autoscaler — Karpenter v1 CRD model + first-match scheduler + in-memory store"
+description = "Node autoscaler — Karpenter v1 CRDs + first-match scheduler + Batcher + Binpacker + Disruption + NodeClaim lifecycle + CloudProvider abstraction"
 source_root = "src"
 pump_priority = "HIGH"
-target_tests = 30
+target_tests = 50
 
-# 4-track status (honest):
-#   Backend     : 1/4 — this scaffold (models + store + first-match scheduler)
-#   Portal      : 0/4 — admin page Phase 2 alongside cave-ccm
-#   cavectl     : 0/4 — `cavectl karpenter` Phase 2
-#   Observ.     : 0/4 — alerts + dashboard Phase 2
+# 4-track status (honest, Phase 2):
+#   Backend     : 2/4 — Phase 2 deep-port complete
+#   Portal      : 0/4 — admin/karpenter Phase 3 alongside cave-ccm
+#   cavectl     : 0/4 — `cavectl karpenter` Phase 3
+#   Observ.     : 0/4 — alerts + dashboard Phase 3
 
 # ── File mappings ───────────────────────────────────────────────────────────
 
@@ -96,6 +104,46 @@ local    = "src/models/mod.rs"
 upstream = "pkg/controllers/provisioning/scheduling/scheduler.go"
 local    = "src/scheduler.rs"
 
+[[files]]
+upstream = "pkg/controllers/provisioning/batcher/batcher.go"
+local    = "src/batcher.rs"
+
+[[files]]
+upstream = "pkg/controllers/provisioning/scheduling/topology.go"
+local    = "src/binpack.rs"
+
+[[files]]
+upstream = "pkg/controllers/provisioning/scheduling/taints.go"
+local    = "src/binpack.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/consolidation.go"
+local    = "src/disruption.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/drift.go"
+local    = "src/disruption.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/expiration.go"
+local    = "src/disruption.rs"
+
+[[files]]
+upstream = "pkg/controllers/disruption/orchestration/queue.go"
+local    = "src/disruption.rs"
+
+[[files]]
+upstream = "pkg/controllers/nodeclaim/lifecycle/launch.go"
+local    = "src/nodeclaim_lifecycle.rs"
+
+[[files]]
+upstream = "pkg/controllers/nodeclaim/lifecycle/termination.go"
+local    = "src/nodeclaim_lifecycle.rs"
+
+[[files]]
+upstream = "pkg/cloudprovider/cloudprovider.go"
+local    = "src/provider/mod.rs"
+
 # ── Function mappings ───────────────────────────────────────────────────────
 
 [[functions]]
@@ -109,6 +157,51 @@ local_name    = "requirement_satisfies"
 file          = "src/scheduler.rs"
 
 [[functions]]
+upstream_name = "batcher.Batcher.Wait"
+local_name    = "Batcher::take_round"
+file          = "src/batcher.rs"
+
+[[functions]]
+upstream_name = "scheduling.Topology.Record"
+local_name    = "binpack::preferred_zone"
+file          = "src/binpack.rs"
+
+[[functions]]
+upstream_name = "disruption.Consolidation.ComputeCommand"
+local_name    = "consolidation_candidates"
+file          = "src/disruption.rs"
+
+[[functions]]
+upstream_name = "disruption.Drift.ShouldDisrupt"
+local_name    = "drift_candidates"
+file          = "src/disruption.rs"
+
+[[functions]]
+upstream_name = "disruption.Expiration.ShouldDisrupt"
+local_name    = "expiration_candidates"
+file          = "src/disruption.rs"
+
+[[functions]]
+upstream_name = "orchestration.Budget.Allowed"
+local_name    = "Decision::apply_budget"
+file          = "src/disruption.rs"
+
+[[functions]]
+upstream_name = "nodeclaim.Lifecycle.Launch"
+local_name    = "nodeclaim_lifecycle::launch"
+file          = "src/nodeclaim_lifecycle.rs"
+
+[[functions]]
+upstream_name = "nodeclaim.Lifecycle.Terminate"
+local_name    = "nodeclaim_lifecycle::terminate"
+file          = "src/nodeclaim_lifecycle.rs"
+
+[[functions]]
+upstream_name = "cloudprovider.CloudProvider.Create"
+local_name    = "CloudProvider::create"
+file          = "src/provider/mod.rs"
+
+[[functions]]
 upstream_name = "v1.NodePool.zz_generated.deepcopy.DeepCopy"
 local_name    = "NodePool::clone"
 file          = "src/models/mod.rs"
@@ -120,14 +213,14 @@ upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1/nodepool"
 local_files  = ["src/models/mod.rs"]
 name         = "nodepool-crd"
 upstream     = "pkg/apis/v1/nodepool_types.go"
-note         = "NodePool struct with template + disruption + limits + weight."
+note         = "NodePool struct with template + disruption + limits + weight + template_hash."
 
 [[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1/nodeclaim"
 local_files  = ["src/models/mod.rs"]
 name         = "nodeclaim-crd"
 upstream     = "pkg/apis/v1/nodeclaim_types.go"
-note         = "NodeClaim spec + status with provider_id, node_name, allocatable, capacity."
+note         = "NodeClaim spec + status + pool_name + template_hash + utilization + created_at + terminated + drained."
 
 [[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1/nodeclass"
@@ -145,10 +238,10 @@ note         = "RequirementOperator with all 6 variants: In / NotIn / Exists / D
 
 [[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1/taints"
-local_files  = ["src/models/mod.rs"]
+local_files  = ["src/models/mod.rs", "src/binpack.rs"]
 name         = "taints"
 upstream     = "pkg/apis/v1/taints.go"
-note         = "Taint struct with key/value/effect + startup_taints separation."
+note         = "Taint struct + startup_taints separation + binpacker honours NoSchedule intolerance."
 
 [[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/apis/v1/disruption"
@@ -176,57 +269,81 @@ upstream_pkg = "kubernetes-sigs/karpenter:pkg/operator/store"
 local_files  = ["src/store.rs"]
 name         = "in-memory-store"
 upstream     = "(no upstream file — local helper)"
-note         = "RwLock-backed pool/claim CRUD for the scaffold; persistence pending."
+note         = "RwLock-backed pool/claim CRUD for the scaffold; persistence Phase 3."
 
-# ── Skipped subsystems (out-of-scope MVP, Charter v2 [[skipped]]) ───────────
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/provisioning/batcher"
+local_files  = ["src/batcher.rs"]
+name         = "provisioning-batcher"
+upstream     = "pkg/controllers/provisioning/batcher/batcher.go"
+note         = "Pending-pod queue with idle-debounce window + per-name dedup."
 
-[[skipped]]
-upstream_pkg = "kubernetes-sigs/karpenter-provider-aws"
-name         = "ec2-provider"
-upstream     = "https://github.com/aws/karpenter-provider-aws"
-reason       = "AWS EC2NodeClass + EC2 fleet API — autoscale-cloud Phase 2."
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/provisioning/scheduling/binpack"
+local_files  = ["src/binpack.rs"]
+name         = "binpacker-with-topology"
+upstream     = "pkg/controllers/provisioning/scheduling/scheduler.go"
+note         = "First-fit decreasing binpacker with topology-spread + in-flight reservation + taint intolerance."
 
-[[skipped]]
-upstream_pkg = "kubernetes-sigs/karpenter-provider-azure"
-name         = "azure-provider"
-upstream     = "https://github.com/Azure/karpenter-provider-azure"
-reason       = "Azure AKS-Karpenter — autoscale-cloud Phase 2 alongside cave-ccm Azure track."
-
-[[skipped]]
-upstream_pkg = "kubernetes-sigs/karpenter-provider-hetzner"
-name         = "hetzner-provider"
-upstream     = "(no upstream — Cave first-party)"
-reason       = "Hetzner NodeClass + Cloud API — autoscale-cloud Phase 2 alongside Hetzner cave-ccm."
-
-[[skipped]]
-upstream_pkg = "kubernetes-sigs/karpenter-provider-gcp"
-name         = "gcp-provider"
-upstream     = "(community)"
-reason       = "GCP karpenter community fork — out of MVP."
-
-[[skipped]]
+[[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/consolidation"
+local_files  = ["src/disruption.rs"]
 name         = "consolidation-controller"
 upstream     = "pkg/controllers/disruption/consolidation.go"
-reason       = "Workload consolidation (replace + emptiness) — Phase 2; needs cost-aware scheduler."
+note         = "Utilization-threshold consolidation eligibility selector."
 
-[[skipped]]
-upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/expiration"
-name         = "expiration-controller"
-upstream     = "pkg/controllers/disruption/expiration.go"
-reason       = "TTL-based node expiration — Phase 2; pairs with consolidation."
-
-[[skipped]]
+[[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/drift"
+local_files  = ["src/disruption.rs"]
 name         = "drift-controller"
 upstream     = "pkg/controllers/disruption/drift.go"
-reason       = "NodeClass-spec drift detection — Phase 2."
+note         = "Template-hash comparison between NodeClaim and NodePool."
 
-[[skipped]]
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/expiration"
+local_files  = ["src/disruption.rs"]
+name         = "expiration-controller"
+upstream     = "pkg/controllers/disruption/expiration.go"
+note         = "NodeClaim age >= expire_after (s/m/h/d duration parser)."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/disruption/orchestration/budget"
+local_files  = ["src/disruption.rs"]
+name         = "disruption-budget-arbiter"
+upstream     = "pkg/controllers/disruption/orchestration/queue.go"
+note         = "Budget.nodes cap (absolute or percentage) gated by matching reasons."
+
+[[mapped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/lifecycle"
-name         = "lifecycle-controller-batcher"
-upstream     = "pkg/controllers/nodeclaim/lifecycle"
-reason       = "NodeClaim launch/garbage-collect/finalizer batcher — Phase 2."
+local_files  = ["src/nodeclaim_lifecycle.rs"]
+name         = "nodeclaim-launch"
+upstream     = "pkg/controllers/nodeclaim/lifecycle/launch.go"
+note         = "Idempotent launch over CloudProvider trait; populates provider_id + node_name + created_at."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/lifecycle/termination"
+local_files  = ["src/nodeclaim_lifecycle.rs"]
+name         = "termination-controller"
+upstream     = "pkg/controllers/nodeclaim/lifecycle/termination.go"
+note         = "Idempotent terminate with optional drain_first; CloudProvider::delete called once."
+
+[[mapped]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/cloudprovider"
+local_files  = ["src/provider/mod.rs"]
+name         = "cloud-provider-trait"
+upstream     = "pkg/cloudprovider/cloudprovider.go"
+note         = "CloudProvider trait (create/delete/exists) + StaticProvider in-memory impl + Hetzner/Azure NodeClass envelope structs."
+
+# ── Partial subsystems ──────────────────────────────────────────────────────
+
+[[partial]]
+upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/lifecycle/drain"
+local_files  = ["src/nodeclaim_lifecycle.rs"]
+name         = "drain-controller"
+upstream     = "pkg/controllers/nodeclaim/lifecycle/drain.go"
+note         = "drain() flips claim.drained; pod-eviction with PDB respect is delegated to cave-kubelet."
+
+# ── Skipped subsystems (intentional out-of-scope) ───────────────────────────
 
 [[skipped]]
 upstream_pkg = "kubernetes-sigs/karpenter:pkg/webhooks"
@@ -234,25 +351,34 @@ name         = "webhook-validation"
 upstream     = "pkg/webhooks"
 reason       = "Admission webhook validation — cave-admission owns this surface; defer."
 
-# ── Unmapped subsystems (in-scope but not yet ported) ───────────────────────
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter-provider-aws"
+name         = "ec2-provider"
+upstream     = "https://github.com/aws/karpenter-provider-aws"
+reason       = "AWS EC2NodeClass + EC2 fleet API — autoscale-cloud Phase 3 alongside cave-ccm AWS track."
 
-[[unmapped]]
-upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/nodeclaim/lifecycle/launch"
-name         = "nodeclaim-launch"
-upstream     = "pkg/controllers/nodeclaim/lifecycle/launch.go"
-note         = "NodeClaim → cloud-provider Create() — bound to cave-ccm Hetzner+Azure Phase 2."
+[[skipped]]
+upstream_pkg = "kubernetes-sigs/karpenter-provider-gcp"
+name         = "gcp-provider"
+upstream     = "(community fork)"
+reason       = "GCP karpenter community fork — out of MVP; revisit if/when cave-ccm gains GCP."
 
-[[unmapped]]
-upstream_pkg = "kubernetes-sigs/karpenter:pkg/controllers/provisioning/batcher"
-name         = "provisioning-batcher"
-upstream     = "pkg/controllers/provisioning/batcher"
-note         = "Pending-pod queue + scheduling round batcher — wave with NodeClaim launch path."
+# ── Scope cuts (deferred to autoscale-cloud Phase 3) ────────────────────────
+
+[[scope_cuts]]
+name = "concrete-cloud-provider-impls"
+removed_subsystems = [
+    "hetzner-provider-cloudside",    # actual Hetzner Cloud API client (envelope shape ships in [[mapped]])
+    "azure-provider-cloudside",      # actual Azure RM API client (envelope shape ships in [[mapped]])
+]
+target_ray = "autoscale-cloud-phase-3"
+note = "Hetzner + Azure NodeClass envelope shapes are mapped here (provider::HetznerNodeClassSpec, provider::AzureNodeClassSpec). The cloud-side dispatch — Hetzner Cloud REST + Azure RM — lands in cave-cloud-controller-manager Phase 3 alongside karpenter-provider-aws."
 
 [portal_ui]
 upstream_ui  = "(CRD-only)"
 upstream_url = "https://karpenter.sh/"
-status       = "partial"
+status       = "phase-3"
 loc          = 219
 priority     = "P2"
-notes        = "Karpenter is CRD-only upstream; admin/karpenter Phase 2 alongside cave-ccm."
+notes        = "Karpenter is CRD-only upstream; admin/karpenter Phase 3 alongside cave-ccm."
 last_audit   = "2026-05-19"

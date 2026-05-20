@@ -5,17 +5,33 @@
 //! Upstream: kubernetes-sigs/karpenter v1.12.0
 //!
 //! Modules:
-//!   models     — NodePool / NodeClaim / NodeClass v1 CRD shapes
-//!   store      — In-memory store (RwLock) for the scaffold; real persistence pending
-//!   scheduler  — first-match NodePool selection stub; production logic pending
+//!   models               — NodePool / NodeClaim / NodeClass v1 CRD shapes
+//!   store                — In-memory store (RwLock)
+//!   scheduler            — first-match NodePool selection
+//!   batcher              — pending-pod queue with scheduling-round window
+//!   binpack              — first-fit-decreasing instance assignment with
+//!                          topology spread + taint-intolerance + in-flight
+//!                          reservation
+//!   disruption           — consolidation / drift / expiration decisions
+//!                          with Budget enforcement
+//!   nodeclaim_lifecycle  — launch / drain / terminate over a
+//!                          CloudProvider abstraction
+//!   provider             — CloudProvider trait + StaticProvider +
+//!                          Hetzner/Azure NodeClass envelopes
 //!
 //! 4-track status (honest):
-//!   Backend   1/4 — this scaffold
-//!   Portal    0/4 — admin page not yet wired
-//!   cavectl   0/4 — `cavectl karpenter` not yet wired
-//!   Observ.   0/4 — alerts + dashboard not yet authored
+//!   Backend   2/4 — scaffold + Phase 2 deep-port (disruption, lifecycle,
+//!                   batcher, binpack, provider abstraction)
+//!   Portal    0/4 — admin page Phase 3 alongside cave-ccm
+//!   cavectl   0/4 — `cavectl karpenter` Phase 3
+//!   Observ.   0/4 — alerts + dashboard Phase 3
 
+pub mod batcher;
+pub mod binpack;
+pub mod disruption;
 pub mod models;
+pub mod nodeclaim_lifecycle;
+pub mod provider;
 pub mod scheduler;
 pub mod store;
 

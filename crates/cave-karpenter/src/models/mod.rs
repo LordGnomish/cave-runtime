@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::time::SystemTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NodePool {
@@ -18,6 +19,9 @@ pub struct NodePool {
     pub disruption: Option<Disruption>,
     pub limits: Option<Limits>,
     pub weight: Option<i32>,
+    /// Hash of the template envelope; controllers compare claim.template_hash
+    /// against this to detect drift.
+    pub template_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -33,6 +37,21 @@ pub struct NodeClaim {
     pub namespace: Option<String>,
     pub spec: NodeClaimSpec,
     pub status: Option<NodeClaimStatus>,
+    /// Which NodePool produced this claim — used by the drift controller.
+    pub pool_name: Option<String>,
+    /// Template hash at launch time; compared against NodePool.template_hash
+    /// to detect drift.
+    pub template_hash: Option<String>,
+    /// 0.0..1.0 normalised utilisation; consolidation flags claims below the
+    /// pool's policy threshold.
+    pub utilization: f64,
+    /// Launch wall-clock; expiration controller uses this with spec.expire_after.
+    pub created_at: Option<SystemTime>,
+    /// Set by the termination controller once the cloud-provider Delete()
+    /// completes.
+    pub terminated: bool,
+    /// Set by drain() once eviction completes.
+    pub drained: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
