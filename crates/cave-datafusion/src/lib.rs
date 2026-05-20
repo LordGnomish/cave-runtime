@@ -20,6 +20,7 @@ pub mod catalog;
 pub mod context;
 pub mod data_source;
 pub mod dataframe;
+pub mod dml;
 pub mod error;
 pub mod functions;
 pub mod logical_expr;
@@ -29,6 +30,7 @@ pub mod physical_plan;
 pub mod row;
 pub mod schema;
 pub mod sql_parser;
+pub mod window;
 
 pub use catalog::SessionCatalog;
 pub use context::SessionContext;
@@ -42,7 +44,9 @@ pub use physical_expr::{BinaryPhysicalOp, PhysicalExpr};
 pub use physical_plan::{ExecutionPlan, PhysicalPlan};
 pub use row::{Row, Value};
 pub use schema::{DataType, Field, SchemaRef, TableSchema};
+pub use dml::{delete, insert_from_plan, insert_values, update, DmlPlan, InsertSource};
 pub use sql_parser::parse_sql;
+pub use window::{Frame, WindowFunction};
 
 pub const UPSTREAM: &str = "apache/datafusion";
 pub const UPSTREAM_VERSION: &str = "53.1.0";

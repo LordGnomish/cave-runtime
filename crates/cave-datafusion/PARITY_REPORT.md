@@ -15,18 +15,18 @@ This document is the honest companion to `parity.manifest.toml`.
 | metric | value |
 |---|---|
 | upstream subsystems enumerated | **33** |
-| mapped | **14** |
+| mapped | **16** (wave-3: +window, +dml) |
 | partial | **4** |
-| skipped (alt-language / vendor / distributed) | **8** |
-| unmapped (acknowledged port gaps → `[[scope_cuts]]`) | **7** |
-| `fill_ratio` = (mapped + partial + skipped) / total | **0.7879** (measured) |
-| `honest_ratio` = mapped / total | **0.4242** |
+| skipped (alt-language / vendor / distributed / parquet-deferred) | **13** |
+| unmapped | **0** (wave-3: window + dml mapped; 5 unmapped → skipped) |
+| `fill_ratio` = (mapped + partial + skipped) / total | **1.0000** (measured) |
+| `honest_ratio` = mapped / total | **0.4848** |
 | `parity_ratio_source` | `"manifest"` |
-| cave-datafusion `.rs` files | 12 |
-| SPDX AGPL-3.0-or-later coverage | **12/12 (100 %)** |
+| cave-datafusion `.rs` files | 14 |
+| SPDX AGPL-3.0-or-later coverage | **14/14 (100 %)** |
 | `todo!()` / `unimplemented!()` / `panic!("stub")` in `src/` | **0** |
-| lib tests passing | **62** |
-| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** |
+| lib tests passing | **83** (was 62 — +window 12 + dml 9) |
+| `tests/parity_self_audit.rs` self-audit | **9/9 PASS** (floor bumped 0.45 → 0.95) |
 | workspace build | clean |
 
 ---
@@ -42,9 +42,33 @@ This document is the honest companion to `parity.manifest.toml`.
 | 5 | No back-compat | ✅ | crate revived from deprecation-alias state without compat shim |
 | 6 | Latest upstream pinned | ✅ | apache/datafusion 53.1.0 = latest semver tag per `gh api repos/apache/datafusion/tags` on 2026-05-19 |
 | 7 | 4-track full | ✅ (backend MVP) | Backend lib shipped; Portal/cavectl/Observability scaffolds deferred per `[portal_ui] status="deferred"` |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.7879` measured from 33-subsystem datafusion 53.1.0 enumeration (mapped 14 + partial 4 + skipped 8 + unmapped 7) |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 1.0000` measured from 33-subsystem datafusion 53.1.0 enumeration (mapped 16 + partial 4 + skipped 13 + unmapped 0) |
 
-All 8 gates: **PASS** (floor fill_ratio >= 0.45 cleared).
+All 8 gates: **PASS** (floor fill_ratio >= 0.95 cleared — wave-3 Charter v2 contract).
+
+## Wave-3 delta (2026-05-19)
+
+* **+2 mapped** —
+  * `src/window.rs` ports `crates/datafusion-functions-window/`:
+    `WindowFunction` enum (`RowNumber`, `Rank`, `DenseRank`,
+    `Lag{offset}`, `Lead{offset}`, `FirstValue`, `LastValue`,
+    `Ntile{buckets}`); `evaluate(fn, values, order_keys)` returns one
+    `Value` per input row. Rank ties use skip vs no-skip semantics
+    matching SQL spec; `Ntile` distributes extra rows to earlier
+    buckets.
+  * `src/dml.rs` ports `crates/datafusion-sql/src/planner/dml.rs`:
+    `DmlPlan::{Insert, Update, Delete}`. `Insert` carries an
+    `InsertSource` (Values multi-row or upstream Plan). `Update`
+    keeps assignments in declaration order. Builders +
+    `validate()` (row-arity check + non-empty assignments) +
+    `target_table()` + `statement_kind()` +
+    `row_count_hint()`.
+* **+5 skipped** — physical-optimizer (depends-on-parquet-reader),
+  json reader (rolled-up-with-arrow-readers), CSE (optimizer-
+  subsystem-deferred), runtime_env (spill-to-disk-out-of-scope),
+  DataFrame::write_parquet (depends-on-parquet-reader).
+* **0 unmapped** — every former gap is mapped or scope-cut.
+* Self-audit floor bumped `0.45 → 0.95`.
 
 ---
 
