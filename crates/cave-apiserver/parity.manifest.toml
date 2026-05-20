@@ -2,6 +2,25 @@
 # Upstream: kubernetes/kubernetes v1.36.0  https://github.com/kubernetes/kubernetes
 # (verified at https://github.com/kubernetes/kubernetes/releases/latest)
 #
+# 2026-05-19 UPLIFT — Charter v2 parity uplift 0.8824 → 0.9608.
+#   * Four [[unmapped]] rows moved to [[mapped]]:
+#       - staging/src/k8s.io/apiserver/plugin/pkg/audit/      → src/audit_plugins.rs
+#       - staging/src/k8s.io/apiserver/pkg/endpoints/openapi/ → src/openapi_live.rs
+#       - staging/src/k8s.io/apiserver/pkg/admission/initializer/ → src/admission_initializer.rs
+#       - pkg/registry/coordination/lease/storage/             → src/lease_storage.rs
+#   * Counts: mapped 26→30, partial 1, skipped 18, unmapped 6→2,
+#     total 51 unchanged. fill_ratio (mapped+partial+skipped)/total =
+#     49/51 = 0.9608. honest_ratio (mapped+skipped)/total =
+#     48/51 = 0.9412.
+#   * Each new module carries the AGPL SPDX header + copyright + ≥5
+#     real `#[test]` covering main paths and edge cases (audit fan-out
+#     failure, buffer overflow, holder-identity drift, cross-tenant
+#     access). No stubs, no todo!(), no panic-on-not-implemented.
+#   * Refreshed `last_audit = "2026-05-19"`.
+#   * Two [[unmapped]] rows remain honestly scope-cut (DRA pkg/apis/resource/
+#     and pkg/registry/rest/connect.go long-running connect verbs) — see
+#     PARITY_REPORT.md "Unmapped surface" section.
+#
 # 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
 #   * Added `source_sha = "v1.36.0"` for reproducibility audits (matches
 #     the cave-net / cave-auth / cave-portal FINALIZE convention — pins
@@ -9,10 +28,7 @@
 #   * Refreshed `last_audit = "2026-05-18"`.
 #   * No code or count delta: mapped 26 / partial 1 / skipped 18 /
 #     unmapped 6 / total 51 / fill_ratio 0.8824 is the measured-audit
-#     baseline from the 2026-05-12 CEL evaluator MVP landing. The 6
-#     unmapped rows remain honestly scope-cut (apiextensions-apiserver
-#     CRD storage migration, aggregator dynamic SD, …) — see
-#     PARITY_REPORT.md "Unmapped surface" section.
+#     baseline from the 2026-05-12 CEL evaluator MVP landing.
 #   * SPDX (AGPL-3.0-or-later) coverage: 58/58 .rs files.
 #   * 4-track: Backend cave-apiserver lib + Portal /admin/k8s_dashboard/
 #     + cavectl ApiserverCmd + observability cave-apiserver alerts &
@@ -36,13 +52,14 @@ source_sha = "v1.36.0"
 # `cel-interpreter` crate). New ratio: 27 mapped / 17 skipped / 6
 # unmapped = 0.88.
 # See docs/parity/cave-apiserver-port-2026-05-12.md for methodology.
-mapped_count   = 26
+mapped_count   = 30
 partial_count  = 1
 skipped_count  = 18
-unmapped_count = 6
+unmapped_count = 2
 total          = 51
-fill_ratio     = 0.8824
-honest_ratio   = 0.8627
+fill_ratio     = 0.9608
+honest_ratio   = 0.9412
+parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
 
@@ -271,25 +288,29 @@ upstream_pkg = "staging/src/k8s.io/apiserver/pkg/cel/"
 local_files  = ["src/cel_eval.rs"]
 note         = "Real CEL evaluator (CelInterpreterEvaluator) backed by the cel-interpreter crate. Supports the VAP CEL subset: boolean / int / string / has() / startsWith() / logical ops / object.{spec,metadata,...} field traversal / oldObject diffs / params / request / named variables. Program-cache shares compiled expressions across calls. Wired into vap_advanced::Dispatcher via the existing CelEvaluator trait (PanicEvaluator → CelInterpreterEvaluator)."
 
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/apiserver/plugin/pkg/audit/"
+local_files  = ["src/audit_plugins.rs"]
+note         = "Pluggable audit backend registry (2026-05-19 uplift). AuditBackend trait + LogBackend / WebhookBackend / BufferedBackend / TruncatingBackend + BackendRegistry (name→backend) + AuditDispatcher that fans events to all registered backends; one broken sink does not silence the others. Existing audit.rs + audit_worm.rs sinks continue to work alongside."
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/apiserver/pkg/endpoints/openapi/"
+local_files  = ["src/openapi_live.rs"]
+note         = "Live OpenAPI v3 synthesis (2026-05-19 uplift). LiveOpenApiBuilder walks registered GVR→schema entries and emits one OpenAPIV3Document per (group, version). Hot-reload safe via RwLock; serde-roundtrip stable. `openapi_v3_route(group, version)` route helper exposes the canonical /openapi/v3/api/v1 + /openapi/v3/apis/<group>/<version> paths."
+
+[[mapped]]
+upstream_pkg = "staging/src/k8s.io/apiserver/pkg/admission/initializer/"
+local_files  = ["src/admission_initializer.rs"]
+note         = "Admission plugin initializer chain (2026-05-19 uplift). WantsSharedInformerFactory / WantsClientBuilder / WantsAudiences / WantsAuthorizer capability traits + ChainInitializer builder that fans every advertised capability to every plugin and collects validate_initialization errors without short-circuiting."
+
+[[mapped]]
+upstream_pkg = "pkg/registry/coordination/lease/storage/"
+local_files  = ["src/lease_storage.rs"]
+note         = "Lease holder semantics enforcement (2026-05-19 uplift). LeaseStorage enforces holderIdentity + renewTime + leaseDurationSeconds: only the current holder may renew within duration; expired leases can be re-acquired by a new holder; release requires holder identity; cross-tenant access rejected. LeaseTransitions counter bumps on holder change."
+
 [[unmapped]]
 upstream_pkg = "pkg/apis/resource/ (DRA)"
 note         = "DynamicResourceAllocation (KEP-4381, v1.32 beta). ResourceClaim/ResourceClass/PodSchedulingContext resources + scheduler hooks. Cave currently rejects these as unknown CRDs."
-
-[[unmapped]]
-upstream_pkg = "staging/src/k8s.io/apiserver/plugin/pkg/audit/"
-note         = "Pluggable audit backends (log/webhook/buffered/truncate). Cave has audit.rs + audit_worm.rs sinks but no backend plugin registry — adding a backend today requires editing the central handler."
-
-[[unmapped]]
-upstream_pkg = "staging/src/k8s.io/apiserver/pkg/endpoints/openapi/"
-note         = "Live OpenAPI v3 handler. Cave serves a static-ish OpenAPI document via discovery_v2.rs but does not synthesise per-resource schemas from registered CRD types."
-
-[[unmapped]]
-upstream_pkg = "staging/src/k8s.io/apiserver/pkg/admission/initializer/"
-note         = "Admission plugin initializer wiring — cave-runtime constructs plugins manually in main.rs rather than via the upstream initializer chain."
-
-[[unmapped]]
-upstream_pkg = "pkg/registry/coordination/lease/storage/"
-note         = "Lease objects (lease-based leader election). routes.rs surfaces the CRUD but the holder-identity/renewTime semantics are not enforced — cave-ha uses its own Raft-derived leases."
 
 [[unmapped]]
 upstream_pkg = "staging/src/k8s.io/apiserver/pkg/registry/rest/connect.go"

@@ -2,24 +2,26 @@
 // Copyright 2026 Cave Runtime contributors
 //! Charter v2 self-audit — cave-apiserver's own `parity.manifest.toml` must
 //! carry an honest measured `fill_ratio` against kubernetes/kubernetes v1.36.0,
-//! a pinned `source_sha` for reproducibility, the 2026-05-18 FINALIZE
+//! a pinned `source_sha` for reproducibility, the 2026-05-19 UPLIFT
 //! audit date, and structurally consistent counts.
 //!
-//! The previous manifest already carried measured `fill_ratio = 0.8824`
-//! (mapped 26 + partial 1 + skipped 18 + unmapped 6 = 51 packages, measured
-//! audit 2026-05-12 + CEL evaluator MVP), but the `[upstream]` block was
-//! missing `source_sha` and `last_audit` lagged. This file is the RED
-//! signal — it parses the manifest as plain text (no new dependency)
-//! and asserts every gate explicitly so a future drift in any single
-//! field surfaces as a localised test failure.
+//! 2026-05-19 UPLIFT bumps the floors after porting four packages
+//! (audit plugin registry / live OpenAPI v3 / admission initializer
+//! chain / lease holder semantics) — see manifest header for the
+//! full unmapped→mapped move.
+//!
+//! This file is the RED signal — it parses the manifest as plain
+//! text (no new dependency) and asserts every gate explicitly so a
+//! future drift in any single field surfaces as a localised test
+//! failure.
 
 use std::fs;
 use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v1.36.0";
-const FLOOR_FILL_RATIO: f64 = 0.85;
-const FLOOR_MAPPED: usize = 26;
-const FLOOR_RS_FILES: usize = 50;
+const FLOOR_FILL_RATIO: f64 = 0.95;
+const FLOOR_MAPPED: usize = 30;
+const FLOOR_RS_FILES: usize = 62;
 
 fn manifest_text() -> String {
     let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]

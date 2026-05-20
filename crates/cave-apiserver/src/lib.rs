@@ -17,9 +17,11 @@
 //! ```
 
 pub mod admission;
+pub mod admission_initializer;
 pub mod aggregated_apiserver;
 pub mod aggregator_v2;
 pub mod audit;
+pub mod audit_plugins;
 pub mod audit_policy_v2;
 pub mod audit_worm;
 pub mod auth_review;
@@ -37,9 +39,11 @@ pub mod error;
 pub mod etcd_backend;
 pub mod field_rbac;
 pub mod kep_v1_34;
+pub mod lease_storage;
 pub mod map_v2;
 pub mod mutating_admission_policy;
 pub mod node_restriction;
+pub mod openapi_live;
 pub mod pod_security;
 pub mod priority_fairness;
 pub mod rbac;
