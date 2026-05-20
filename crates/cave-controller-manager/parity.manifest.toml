@@ -2,22 +2,34 @@
 # Upstream: kubernetes/kubernetes  https://github.com/kubernetes/kubernetes
 # Tracks pkg/controller for the kube-controller-manager binary.
 #
-# 2026-05-18 FINALIZE — Charter v2 8-gate close-out.
+# 2026-05-19 PARITY UPLIFT — Charter v2 8-gate close, fill_ratio
+# 0.9111 → 0.9556.
+#   * 2 unmapped → mapped:
+#       - `pkg/controller/storageversionmigrator/` → new
+#         `src/storage_version_migrator.rs` (StorageVersionMigration
+#         reconciler — Pending → Running → Succeeded/Failed state
+#         machine, trait-based `MigrationSource`, batch touch with
+#         per-instance error tracking, 10 tests).
+#       - `pkg/controller/endpoint/` → new
+#         `src/endpoint_controller_v1.rs` (legacy v1.Endpoints
+#         computed from Service + Pod state; named-port resolution;
+#         publish-not-ready-addresses toggle; deterministic ordering;
+#         10 tests).
+#   * 1 partial → mapped:
+#       - `pkg/controller/cidrallocator/` was the partial — IPv4-only.
+#         New `src/cidrallocator_v6.rs` adds the IPv6 leg and a
+#         dual-stack wrapper with rollback safety (13 tests).
+#   * Counts: mapped 30 → 33, partial 1 → 0, unmapped 4 → 2, skipped
+#     10 (unchanged), total 45 (unchanged).
+#   * fill_ratio  = (33 + 0 + 10) / 45 = 0.9556  (was 0.9111).
+#   * honest_ratio= (33 + 10) / 45      = 0.9556  (was 0.8889).
+#   * SPDX coverage 100 % (3 new files all carry AGPL header).
+#   * `last_audit = "2026-05-19"`.
+#
+# 2026-05-18 FINALIZE — prior baseline.
 #   * Added `source_sha = "v1.36.0"` for reproducibility audits.
-#   * Refreshed `last_audit = "2026-05-18"`.
-#   * Prepended AGPL SPDX header to `tests/qwen_drafted.rs` so the
-#     parity_self_audit `every_rs_file_carries_agpl_spdx` gate flips
-#     from 89/90 → 90/90 (the bcf64002 sweep missed `qwen_drafted.rs`
-#     because it had no shebang/SPDX line at the top — first line was
-#     a `// === cycle ... ===` marker).
-#   * No code or count delta: mapped 30 / partial 1 / skipped 10 /
-#     unmapped 4 / total 45 / fill_ratio 0.9111 is the measured-audit
-#     baseline from the 2026-05-13 resourceclaim + 2026-05-14 batch4
-#     cronjob/deployment depth ports. The 4 unmapped rows remain
-#     honestly scope-cut (volume PV-binder controller, namespace
-#     openapi controller, kube-cloud-foundry CNI, …) — see
-#     PARITY_REPORT.md "Unmapped surface".
-#   * SPDX (AGPL-3.0-or-later) coverage: 90/90 .rs files post-fix.
+#   * Prepended AGPL SPDX header to `tests/qwen_drafted.rs` (89/90 →
+#     90/90 .rs SPDX coverage).
 #   * 4-track: Backend cave-controller-manager lib + Portal /admin/cm/
 #     + cavectl CmCmd + observability cave-controller-manager alerts &
 #     dashboard — all green pre-close.
@@ -45,13 +57,13 @@ source_sha = "v1.36.0"
 # (we filled in sub-package depth, not new sub-package surface), so
 # fill_ratio stays at 0.9111 — bump comes only via behavioral_parity.
 # See docs/parity/cave-controller-manager-port-2026-05-12.md for methodology.
-mapped_count   = 30
-partial_count  = 1
+mapped_count   = 33
+partial_count  = 0
 skipped_count  = 10
-unmapped_count = 4
+unmapped_count = 2
 total          = 45
-fill_ratio     = 0.9111
-honest_ratio   = 0.8889
+fill_ratio     = 0.9556
+honest_ratio   = 0.9556
 last_audit     = "2026-05-19"
 infra_only     = false
 
@@ -217,23 +229,25 @@ upstream_pkg = "pkg/controller/legacyserviceaccounttokencleaner/"
 local_files  = ["src/legacyserviceaccounttokencleaner.rs"]
 note         = "k8s-streams-mesh batch 2026-05-13: KEP-2799 deprecated SA token Secret cleanup. `evaluate` per-secret (Skip / PreservedByReference / Delete) with grace-window check (default 365 d) + SA reference preservation; `plan_pass` returns alphabetical (ns, name) capped at `max_per_pass`. 9 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/storageversionmigrator/"
-note         = "StorageVersionMigration CRD reconciler. cave-apiserver storage_migration.rs has the trigger surface but the loop is missing."
+local_files  = ["src/storage_version_migrator.rs"]
+note         = "k8s parity-uplift 2026-05-19: StorageVersionMigration CRD reconciler (Pending→Running→Succeeded/Failed); trait-based MigrationSource backend with InMemoryMigrationSource fake; batched touch with per-instance error counting; chrono timestamps + serde_json status. 10 tests."
 
 [[mapped]]
 upstream_pkg = "pkg/controller/tainteviction/"
 local_files  = ["src/tainteviction.rs"]
 note         = "k8s-cri push batch2 2026-05-13: per-pod NoExecute eviction with tolerationSeconds timers. Pure-function `evaluate` returns EvictionAction (Tolerated / EvictNow / Schedule / Expired); `EvictionLedger` tracks pending evictions with deterministic `due(now)` polling. 12 tests."
 
-[[partial]]
+[[mapped]]
 upstream_pkg = "pkg/controller/cidrallocator/"
-local_files  = ["src/cidrallocator.rs"]
-note         = "k8s-cri push batch2 2026-05-13: pod-CIDR slice allocator for clusters without a cloud provider. `CidrAllocator::new(cluster, node_mask)` carves the cluster CIDR into N slots; `allocate(node)` / `occupy(node, cidr)` / `release(node)` + idempotency + slot reuse + cluster-range bounds checking. 17 tests."
+local_files  = ["src/cidrallocator.rs", "src/cidrallocator_v6.rs"]
+note         = "k8s-cri push batch2 2026-05-13 (IPv4) + k8s parity-uplift 2026-05-19 (IPv6 + dual-stack — closed the IPv4-only gap). `CidrAllocator` (v4) + `CidrAllocatorV6` (v6) carve cluster CIDRs into per-node slots; `DualStackAllocator` holds both pools and emits `(v4, v6)` atomically with v4 rollback on v6 failure (KEP-563). 17 + 13 = 30 tests."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "pkg/controller/endpoint/"
-note         = "Legacy v1 Endpoints controller — superseded by endpointslice/. v1.32 still ships it for older clients; cave only writes EndpointSlice."
+local_files  = ["src/endpoint_controller_v1.rs"]
+note         = "k8s parity-uplift 2026-05-19: legacy v1.Endpoints reconciler. Computes the v1 Endpoints object purely from Service + Pod state (KEP-572 — v1.36 still ships v1.Endpoints for older clients in addition to EndpointSlice). Selector + namespace + IP + terminating filtering; named-port resolution against pod containerPorts; publish-not-ready-addresses toggle; deterministic ordering. Idempotent. 10 tests."
 
 [[unmapped]]
 upstream_pkg = "pkg/controller/replication/"

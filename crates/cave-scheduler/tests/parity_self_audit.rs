@@ -14,9 +14,11 @@ use std::fs;
 use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v1.36.0";
-const FLOOR_FILL_RATIO: f64 = 0.85;
-const FLOOR_MAPPED: usize = 19;
-const FLOOR_RS_FILES: usize = 20;
+// 2026-05-19 uplift — interpodaffinity_scoring + volumezone_plugin moved
+// two [[unmapped]] → [[mapped]], pushing fill_ratio from 0.8966 to 0.9655.
+const FLOOR_FILL_RATIO: f64 = 0.95;
+const FLOOR_MAPPED: usize = 21;
+const FLOOR_RS_FILES: usize = 28;
 
 fn manifest_text() -> String {
     let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]

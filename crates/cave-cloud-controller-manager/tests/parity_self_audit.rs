@@ -15,9 +15,9 @@ use std::fs;
 use std::path::PathBuf;
 
 const UPSTREAM_VERSION: &str = "v1.36.0";
-const FLOOR_FILL_RATIO: f64 = 0.90;
-const FLOOR_MAPPED: usize = 12;
-const FLOOR_RS_FILES: usize = 20;
+const FLOOR_FILL_RATIO: f64 = 0.95;
+const FLOOR_MAPPED: usize = 13;
+const FLOOR_RS_FILES: usize = 30;
 
 fn manifest_text() -> String {
     let p: PathBuf = [env!("CARGO_MANIFEST_DIR"), "parity.manifest.toml"]

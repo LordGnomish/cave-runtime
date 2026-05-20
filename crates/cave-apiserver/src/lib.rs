@@ -17,9 +17,11 @@
 //! ```
 
 pub mod admission;
+pub mod admission_initializer;
 pub mod aggregated_apiserver;
 pub mod aggregator_v2;
 pub mod audit;
+pub mod audit_backends;
 pub mod audit_policy_v2;
 pub mod audit_worm;
 pub mod auth_review;
@@ -31,6 +33,7 @@ pub mod conversion_v1;
 pub mod crd_controller;
 pub mod discovery;
 pub mod discovery_v2;
+pub mod dra;
 pub mod encryption_provider;
 pub mod endpointslice_mirror;
 pub mod error;
@@ -40,6 +43,7 @@ pub mod kep_v1_34;
 pub mod map_v2;
 pub mod mutating_admission_policy;
 pub mod node_restriction;
+pub mod openapi_v3;
 pub mod pod_security;
 pub mod priority_fairness;
 pub mod rbac;

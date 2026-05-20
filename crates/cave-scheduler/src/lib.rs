@@ -20,6 +20,7 @@ pub mod extender;
 pub mod extension_points;
 pub mod framework;
 pub mod gates;
+pub mod interpodaffinity_scoring;
 pub mod models;
 pub mod noderesources;
 pub mod plugins;
@@ -31,6 +32,7 @@ pub mod routes;
 pub mod scheduler;
 pub mod topology;
 pub mod volume;
+pub mod volumezone_plugin;
 
 use scheduler::SchedulerState;
 use std::sync::Arc;

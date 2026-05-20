@@ -21,6 +21,7 @@ pub mod provider;
 pub mod provider_runtime;
 pub mod types;
 
+pub mod cloud_volume_controller;
 pub mod node_controller;
 pub mod node_lifecycle;
 pub mod route_controller;

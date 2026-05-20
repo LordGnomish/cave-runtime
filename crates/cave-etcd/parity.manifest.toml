@@ -15,6 +15,21 @@
 #   * 4-track: Backend cave-etcd lib + Portal /admin/etcd/ + cavectl
 #     EtcdCmd + observability cave-etcd alerts & dashboard — all green
 #     pre-close.
+#
+# 2026-05-19 K8s parity uplift — Phase 2 deep-port.
+#   * v3election RPC service ported (src/election_rpc.rs) wrapping the
+#     existing DistElection primitives; multiplexes one election per
+#     `name`, exposes Campaign/Proclaim/Resign/Leader/observe-once.
+#   * Consistent-index helper ported (src/cindex.rs) — atomic get/set,
+#     monotone advancement, rename-into-place disk persistence.
+#   * Per-tenant quota module ported (src/quota.rs) — longest-prefix
+#     match, byte+key limits, accounting deltas. The cluster-wide
+#     `db-size-bytes` alarm in maintenance.rs continues to work; this
+#     module adds per-tenant fencing without raising the global alarm.
+#   * Counts: mapped 28→30 (+v3election, +cindex), partial 2→3 (+quota),
+#     unmapped 6→3 (-v3election, -cindex, -quota), total 71 unchanged.
+#   * fill_ratio 0.9155 → 0.9577, honest_ratio 0.8873 → 0.9296.
+#   * last_audit = "2026-05-19".
 
 [upstream]
 org        = "etcd-io"
@@ -33,15 +48,16 @@ url        = "https://github.com/etcd-io/etcd"
 # measured value: every etcd v3.6.x top-level package was enumerated
 # and classified honestly. WAL was newly ported in this pass.
 # See docs/parity/cave-etcd-port-2026-05-12.md for methodology.
-mapped_count   = 28
-partial_count  = 2
+mapped_count   = 30
+partial_count  = 3
 skipped_count  = 35
-unmapped_count = 6
+unmapped_count = 3
 total          = 71
-fill_ratio     = 0.9155
-honest_ratio   = 0.8873
+fill_ratio     = 0.9577
+honest_ratio   = 0.9296
 last_audit     = "2026-05-19"
 infra_only     = false
+parity_ratio_source = "manifest"
 
 [module]
 name          = "cave-etcd"
@@ -1185,23 +1201,28 @@ upstream_pkg = "client/v3/yaml"
 reason       = "stdlib-analog"
 note         = "Rust uses serde directly"
 
-# ─── Unmapped (6) — real port gaps acknowledged ──────────────────────────────
+# ─── Newly mapped 2026-05-19 (K8s parity uplift Phase 2) ─────────────────────
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/api/v3election/"
+local_files  = ["src/election_rpc.rs"]
+note         = "v3election RPC service: Campaign/Proclaim/Resign/Leader/Observe-once wrapping the existing concurrency::DistElection primitives, with per-name multiplexing matching upstream election.go behaviour."
+
+[[mapped]]
+upstream_pkg = "server/etcdserver/cindex/"
+local_files  = ["src/cindex.rs"]
+note         = "Consistent-index helper — atomic monotone (index, term), rename-into-place persistence, apply-gate (should_apply) for raft replay dedup."
+
+[[partial]]
+upstream_pkg = "server/storage/quota/"
+local_files  = ["src/quota.rs"]
+note         = "Per-tenant quota tracker: longest-prefix tenant match, byte+key limits, put/delete accounting deltas, unbounded sentinel. Scope cut: backend-bytes feedback loop into the maintenance.rs alarm is still operator-triggered; per-tenant fences are non-alarm denials only."
+
+# ─── Unmapped (3 remaining) — real port gaps acknowledged ────────────────────
 
 [[unmapped]]
 upstream_pkg = "server/storage/wal/walpb/"
 note         = "etcd's protobuf record wire format. cave-etcd's wal.rs uses JSON-framed records for forensic readability in the single-node MVP; the protobuf shape is a follow-up for multi-node Raft compatibility."
-
-[[unmapped]]
-upstream_pkg = "server/etcdserver/api/v3election/"
-note         = "Election RPC service. Equivalent primitive (campaign/resign) is available via concurrency.rs but not exposed as a top-level v3rpc endpoint yet."
-
-[[unmapped]]
-upstream_pkg = "server/etcdserver/cindex/"
-note         = "Consistent-index helper — coupled with raft, will land alongside Paket C."
-
-[[unmapped]]
-upstream_pkg = "server/storage/quota/"
-note         = "Standalone quota module; basic db-size-bytes alarm is in maintenance.rs but per-tenant quota enforcement is a gap."
 
 [[unmapped]]
 upstream_pkg = "etcdutl/"

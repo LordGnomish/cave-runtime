@@ -17,6 +17,24 @@
 #   * 4-track: Backend cave-apiserver lib + Portal /admin/k8s_dashboard/
 #     + cavectl ApiserverCmd + observability cave-apiserver alerts &
 #     dashboard — all green pre-close.
+#
+# 2026-05-19 K8s parity uplift — Phase 2 deep-port.
+#   * Audit-backend plugin registry ported (src/audit_backends.rs):
+#     LogBackend / WebhookBackend / BufferedBackend / TruncateBackend +
+#     `AuditBackendRegistry` with fan-out / flush / shutdown.
+#   * OpenAPI v3 live handler ported (src/openapi_v3.rs): `Registry` of
+#     resource registrations synthesises full v3 doc — per-resource
+#     schema fragments + paths + `x-kubernetes-group-version-kind`.
+#   * Admission plugin initializer ported (src/admission_initializer.rs):
+#     `WantsAuthorizer` / `WantsInformers` / `WantsRestMapper` /
+#     `WantsClient` / `WantsFeatureGate` markers + `PluginInitializer`
+#     builder + `drive()` dispatcher.
+#   * DRA types ported (src/dra.rs): `ResourceClass` / `ResourceClaim` /
+#     `PodSchedulingContext` + `DraRegistry` (CRUD + allocate + reserve +
+#     deallocate). Reconciler stays in cave-controller-manager.
+#   * Counts: mapped 26→30 (+4), partial 1 unchanged, skipped 18, unmapped
+#     6→2 (-4). fill_ratio 0.8824 → 0.9608, honest_ratio 0.8627 → 0.9412.
+#   * last_audit = "2026-05-19", parity_ratio_source = "manifest".
 
 [upstream]
 org        = "kubernetes"
@@ -36,15 +54,16 @@ source_sha = "v1.36.0"
 # `cel-interpreter` crate). New ratio: 27 mapped / 17 skipped / 6
 # unmapped = 0.88.
 # See docs/parity/cave-apiserver-port-2026-05-12.md for methodology.
-mapped_count   = 26
+mapped_count   = 30
 partial_count  = 1
 skipped_count  = 18
-unmapped_count = 6
+unmapped_count = 2
 total          = 51
-fill_ratio     = 0.8824
-honest_ratio   = 0.8627
+fill_ratio     = 0.9608
+honest_ratio   = 0.9412
 last_audit     = "2026-05-19"
 infra_only     = false
+parity_ratio_source = "manifest"
 
 [module]
 name          = "cave-apiserver"
@@ -271,21 +290,27 @@ upstream_pkg = "staging/src/k8s.io/apiserver/pkg/cel/"
 local_files  = ["src/cel_eval.rs"]
 note         = "Real CEL evaluator (CelInterpreterEvaluator) backed by the cel-interpreter crate. Supports the VAP CEL subset: boolean / int / string / has() / startsWith() / logical ops / object.{spec,metadata,...} field traversal / oldObject diffs / params / request / named variables. Program-cache shares compiled expressions across calls. Wired into vap_advanced::Dispatcher via the existing CelEvaluator trait (PanicEvaluator → CelInterpreterEvaluator)."
 
-[[unmapped]]
+# ── Newly mapped 2026-05-19 (K8s parity uplift Phase 2) ─────────────────────
+
+[[mapped]]
 upstream_pkg = "pkg/apis/resource/ (DRA)"
-note         = "DynamicResourceAllocation (KEP-4381, v1.32 beta). ResourceClaim/ResourceClass/PodSchedulingContext resources + scheduler hooks. Cave currently rejects these as unknown CRDs."
+local_files  = ["src/dra.rs"]
+note         = "DynamicResourceAllocation (KEP-4381, v1.32 beta). ResourceClass / ResourceClaim / PodSchedulingContext type surface + DraRegistry with create/get/list/delete on classes, full claim lifecycle (allocate / reserve_for / unreserve / deallocate with reservation gate). Feature-gated via DraRegistry::enable() to match upstream feature-gate semantics. Reconciler stays in cave-controller-manager."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "staging/src/k8s.io/apiserver/plugin/pkg/audit/"
-note         = "Pluggable audit backends (log/webhook/buffered/truncate). Cave has audit.rs + audit_worm.rs sinks but no backend plugin registry — adding a backend today requires editing the central handler."
+local_files  = ["src/audit_backends.rs"]
+note         = "Pluggable audit-backend registry — LogBackend / WebhookBackend (with injectable sender) / BufferedBackend (capacity-flush) / TruncateBackend (large-body redaction) + AuditBackendRegistry fan-out / flush / shutdown lifecycle. Backends register at boot; routes.rs no longer needs to know each sink."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "staging/src/k8s.io/apiserver/pkg/endpoints/openapi/"
-note         = "Live OpenAPI v3 handler. Cave serves a static-ish OpenAPI document via discovery_v2.rs but does not synthesise per-resource schemas from registered CRD types."
+local_files  = ["src/openapi_v3.rs"]
+note         = "Live OpenAPI v3 handler — Registry of ResourceRegistration synthesises full v3 document at request time: per-resource schema fragments with `x-kubernetes-group-version-kind` annotations, paths for list / item / create / delete, namespaced vs cluster-scoped routing, naive pluraliser with K8s irregulars (endpoints, ingresses, networkpolicies, storageclasses)."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "staging/src/k8s.io/apiserver/pkg/admission/initializer/"
-note         = "Admission plugin initializer wiring — cave-runtime constructs plugins manually in main.rs rather than via the upstream initializer chain."
+local_files  = ["src/admission_initializer.rs"]
+note         = "Admission plugin initializer — Wants{Authorizer,Informers,RestMapper,Client,FeatureGate} marker traits + PluginInitializer builder + drive() dispatcher. Replaces hand-wired construction in main.rs; FeatureGate is shared by Arc across all plugins."
 
 [[unmapped]]
 upstream_pkg = "pkg/registry/coordination/lease/storage/"
