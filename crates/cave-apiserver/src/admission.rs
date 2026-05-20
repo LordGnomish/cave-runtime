@@ -134,7 +134,7 @@ impl AdmissionChain {
                     422,
                     format!("mutating webhook {} altered tenant_id", hook.name()),
                 );
-                deny.tenant_id = original_tenant_id.clone();
+                deny.tenant_id = original_tenant_id;
                 return (req, deny);
             }
         }

@@ -363,7 +363,7 @@ fn lr_store_replaces_same_name() {
         tenant_id: "acme".into(),
         namespace: "default".into(),
         name: "lr".into(),
-        items: vec![item.clone()],
+        items: vec![item],
     });
     s.put(LimitRange {
         tenant_id: "acme".into(),

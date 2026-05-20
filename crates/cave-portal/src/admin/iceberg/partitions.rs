@@ -4,7 +4,7 @@
 //!
 //! A partition spec is the operator-defined mapping from row columns to
 //! partition values. Iceberg supports identity / year / month / day /
-//! hour / bucket[N] / truncate[N] transforms. This page derives a
+//! hour / `bucket[N]` / `truncate[N]` transforms. This page derives a
 //! synthetic spec from each table's columns so the operator can see the
 //! shape that ingest jobs are writing into.
 

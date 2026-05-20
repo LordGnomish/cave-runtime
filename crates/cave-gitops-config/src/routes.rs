@@ -215,7 +215,7 @@ async fn create_request(
 
     let stored = state
         .store
-        .create_resource_request(resource_request.clone());
+        .create_resource_request(resource_request);
 
     // Run the pipeline
     let clusters = state.store.list_clusters();

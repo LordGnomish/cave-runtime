@@ -34,8 +34,8 @@ pub fn router(
 ) -> axum::Router {
     axum::Router::new()
         .merge(realm::router(realm_store.clone()))
-        .merge(client::router(client_store.clone(), realm_store.clone()))
-        .merge(user::router(user_store.clone(), realm_store.clone()))
+        .merge(client::router(client_store, realm_store.clone()))
+        .merge(user::router(user_store, realm_store))
         .merge(token_router(token_service.clone()))
         .merge(discovery_router(token_service))
 }

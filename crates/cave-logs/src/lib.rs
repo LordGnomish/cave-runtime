@@ -249,7 +249,7 @@ mod parity_tests {
         let idx = LabelIndex::new();
         let key = StreamKey::new("t", 1);
         idx.add_chunk(ChunkMeta::new(key.clone(), 100, 500, 10, 1024, &["a", "b"]));
-        idx.add_chunk(ChunkMeta::new(key.clone(), 1000, 2000, 10, 1024, &["c"]));
+        idx.add_chunk(ChunkMeta::new(key, 1000, 2000, 10, 1024, &["c"]));
         assert_eq!(idx.chunk_count(), 2);
         idx.prune_chunks_before(800);
         assert_eq!(idx.chunk_count(), 1);

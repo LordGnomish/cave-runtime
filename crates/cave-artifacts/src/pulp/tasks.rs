@@ -328,7 +328,7 @@ mod tests {
         let queue = TaskQueue::new();
         let t1 = queue.enqueue("task-1");
         let t2 = queue.enqueue("task-2");
-        let mut running = t1.clone();
+        let mut running = t1;
         running.mark_running();
         queue.update(running);
 
@@ -343,7 +343,7 @@ mod tests {
         let queue = TaskQueue::new();
         let t1 = queue.enqueue("t1");
         let t2 = queue.enqueue("t2");
-        let mut done = t1.clone();
+        let mut done = t1;
         done.mark_running();
         done.mark_completed(vec![]);
         queue.update(done);

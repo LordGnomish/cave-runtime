@@ -209,7 +209,7 @@ mod tests {
             },
         };
         log.append(v1);
-        log.append(v2.clone());
+        log.append(v2);
         let snap = log.snapshot();
         assert_eq!(snap.topics["orders"].partition_count, 5);
         assert_eq!(snap.topics["orders"].replication_factor, 3);

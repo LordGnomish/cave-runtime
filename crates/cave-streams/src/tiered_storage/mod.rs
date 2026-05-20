@@ -308,7 +308,7 @@ impl RemoteLogManager {
         bytes: Vec<u8>,
     ) -> StreamsResult<()> {
         self.rsm.copy_log_segment(&metadata, bytes)?;
-        let mut finished = metadata.clone();
+        let mut finished = metadata;
         finished.state = RemoteLogSegmentState::CopyFinished;
         self.rmm.add_remote_log_segment(finished)
     }
@@ -481,7 +481,7 @@ mod tests {
         let rmm = InMemoryRemoteLogMetadataManager::new();
         let mut mgr = RemoteLogManager::new(Box::new(rsm), Box::new(rmm));
         let m = meta("o", 0, 0, 100);
-        mgr.copy_log_segment(m.clone(), vec![0; 100]).unwrap();
+        mgr.copy_log_segment(m, vec![0; 100]).unwrap();
         let listed: Vec<_> = mgr.list_segments(&tp("o", 0)).collect();
         assert_eq!(listed.len(), 1);
         // copy_log_segment flips state to CopyFinished.

@@ -540,7 +540,7 @@ async fn dispatch(args: &[Vec<u8>], conn: &mut Connection, state: &Arc<ServerSta
                 .and_then(|s| std::str::from_utf8(s).ok())
                 .map(|s| s.to_ascii_lowercase());
             let config = state.config.read().await;
-            server_cmds::cmd_info_response(&state, section.as_deref(), &config)
+            server_cmds::cmd_info_response(state, section.as_deref(), &config)
         }
         b"CONFIG" => {
             if args.len() < 2 {

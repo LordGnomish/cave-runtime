@@ -237,7 +237,7 @@ mod tests {
         let _tenant_id = "wf-007";
         let reg = WatchFilterRegistry::new();
         let set = WatchFilterSet::default().with_filter(WatchFilter::NoPut);
-        reg.register(7, set.clone());
+        reg.register(7, set);
         assert_eq!(reg.len(), 1);
         let got = reg.get(7).unwrap();
         assert!(got.drops_puts());

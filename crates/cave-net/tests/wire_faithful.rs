@@ -141,7 +141,7 @@ fn render_exposition_matches_prometheus_text_grammar() {
     ];
     let mut values: BTreeMap<String, (BTreeMap<String, String>, f64)> = BTreeMap::new();
     let no_labels = BTreeMap::new();
-    values.insert("cilium_agent_policy".to_string(), (no_labels.clone(), 5.0));
+    values.insert("cilium_agent_policy".to_string(), (no_labels, 5.0));
     let mut labels = BTreeMap::new();
     labels.insert("outcome".to_string(), "success".to_string());
     labels.insert("source".to_string(), "k8s".to_string());
@@ -196,7 +196,7 @@ fn cec_round_trips_real_world_listener_json() {
             }
         ]
     });
-    let spec: CecSpec = serde_json::from_value(raw.clone()).unwrap();
+    let spec: CecSpec = serde_json::from_value(raw).unwrap();
     assert_eq!(spec.services[0].name, "echo");
     assert_eq!(spec.resources[0].type_url, type_url::LISTENER);
 }

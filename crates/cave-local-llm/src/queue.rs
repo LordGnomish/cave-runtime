@@ -422,7 +422,7 @@ mod tests {
         let mut item = QueueItem::new("crate", "org/repo", "f.go", "Fn", 1);
         item.repo_path = Some(PathBuf::from("/some/repo"));
         item.branch = Some("qwen/auto-2026-W17".into());
-        q.add(item.clone()).unwrap();
+        q.add(item).unwrap();
         let found = q
             .list()
             .unwrap()

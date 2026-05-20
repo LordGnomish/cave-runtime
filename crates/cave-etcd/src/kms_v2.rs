@@ -468,7 +468,7 @@ mod tests {
     fn test_kmsv2_envelope_bad_magic() {
         // cite: envelope.go (Magic mismatch ⇒ reject)
         let env = encode_envelope("k1", &[0; NONCE_LEN], &[3; 4], &[4; 8]).unwrap();
-        let mut tampered = env.clone();
+        let mut tampered = env;
         tampered[0] = 0;
         assert_eq!(
             decode_envelope(&tampered).unwrap_err(),
@@ -480,7 +480,7 @@ mod tests {
     fn test_kmsv2_envelope_unsupported_version() {
         // cite: envelope.go (Version mismatch ⇒ reject, never silently upgrade)
         let env = encode_envelope("k1", &[0; NONCE_LEN], &[3; 4], &[4; 8]).unwrap();
-        let mut tampered = env.clone();
+        let mut tampered = env;
         tampered[2] = 0xFF;
         assert_eq!(
             decode_envelope(&tampered).unwrap_err(),

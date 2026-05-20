@@ -106,11 +106,11 @@ impl DpopProof {
             })?;
 
         if header.typ != "dpop+jwt" {
-            return Err(DpopProofError::BadTyp(header.typ.clone()));
+            return Err(DpopProofError::BadTyp(header.typ));
         }
         if !SUPPORTED_ALGS.contains(&header.alg.as_str()) {
             return Err(DpopProofError::UnsupportedAlg(
-                header.alg.clone(),
+                header.alg,
                 SUPPORTED_ALGS,
             ));
         }

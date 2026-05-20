@@ -115,7 +115,7 @@ impl AnalyticsStore {
     /// Get top N consumers (by request count) for an API.
     pub fn top_consumers(&self, api_id: &str, limit: usize) -> Vec<(String, u32)> {
         let metrics = self.metrics.read().unwrap();
-        let mut consumer_counts: DashMap<String, u32> = DashMap::new();
+        let consumer_counts: DashMap<String, u32> = DashMap::new();
 
         for m in metrics.iter().filter(|m| m.api_id == api_id) {
             if let Some(cid) = &m.consumer_id {
@@ -137,7 +137,7 @@ impl AnalyticsStore {
     /// Get top N paths (by request count) for an API.
     pub fn top_paths(&self, api_id: &str, limit: usize) -> Vec<(String, u32)> {
         let metrics = self.metrics.read().unwrap();
-        let mut path_counts: DashMap<String, u32> = DashMap::new();
+        let path_counts: DashMap<String, u32> = DashMap::new();
 
         for m in metrics.iter().filter(|m| m.api_id == api_id) {
             path_counts
@@ -157,7 +157,7 @@ impl AnalyticsStore {
     /// Get histogram of status codes for an API.
     pub fn status_code_histogram(&self, api_id: &str) -> Vec<(u16, u32)> {
         let metrics = self.metrics.read().unwrap();
-        let mut status_counts: DashMap<u16, u32> = DashMap::new();
+        let status_counts: DashMap<u16, u32> = DashMap::new();
 
         for m in metrics.iter().filter(|m| m.api_id == api_id) {
             status_counts

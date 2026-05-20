@@ -139,7 +139,7 @@ fn stopwords_filter_drops_findings_whose_match_contains_stopword() {
     let mut f2 = finding("generic-api-key", "src/x.rs", 2);
     f2.match_text = "api_key = test123".into();
     let stopwords = vec!["test123".to_string()];
-    let kept = filter_with_stopwords(vec![f1.clone(), f2.clone()], &stopwords);
+    let kept = filter_with_stopwords(vec![f1, f2], &stopwords);
     assert_eq!(kept.len(), 1);
     assert_eq!(kept[0].start_line, 1);
 }
@@ -168,7 +168,7 @@ fn baseline_loads_known_fingerprints_and_filters() {
     let baseline = BaselineFile::parse(baseline_toml).unwrap();
     let known = finding("aws-access-token", "src/main.rs", 1);
     let novel = finding("aws-access-token", "src/main.rs", 99);
-    let kept = Baseline::from(baseline).filter(vec![known.clone(), novel.clone()]);
+    let kept = Baseline::from(baseline).filter(vec![known, novel]);
     assert_eq!(kept.len(), 1, "baselined finding suppressed");
     assert_eq!(kept[0].start_line, 99);
 }
@@ -178,7 +178,7 @@ fn baseline_handles_empty_file() {
     let baseline = BaselineFile::parse("").unwrap();
     let b = Baseline::from(baseline);
     let f = finding("r", "x", 1);
-    let kept = b.filter(vec![f.clone()]);
+    let kept = b.filter(vec![f]);
     assert_eq!(kept.len(), 1);
 }
 

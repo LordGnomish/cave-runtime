@@ -221,7 +221,7 @@ mod tests {
         };
         for a in [
             AttachAction::Attach(v.clone()),
-            AttachAction::Detach(v.clone()),
+            AttachAction::Detach(v),
         ] {
             let s = serde_json::to_string(&a).unwrap();
             let back: AttachAction = serde_json::from_str(&s).unwrap();

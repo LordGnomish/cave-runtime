@@ -201,14 +201,14 @@ mod tests {
     #[test]
     fn test_catalog_create_and_get() {
         let store = CatalogStore::new();
-        let mut entry = CatalogEntry::new(
+        let entry = CatalogEntry::new(
             "UserAPI".to_string(),
             "team-a".to_string(),
             "core".to_string(),
         );
         let id = entry.id;
 
-        store.upsert(entry.clone());
+        store.upsert(entry);
         let retrieved = store.get(id);
         assert!(retrieved.is_some());
         assert_eq!(retrieved.unwrap().name, "UserAPI");

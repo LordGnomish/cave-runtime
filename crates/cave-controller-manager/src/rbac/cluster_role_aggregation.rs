@@ -167,7 +167,7 @@ mod tests {
             vec![rule(&[""], &["services"], &["get", "list"])],
             None,
         );
-        let got = aggregate_rules(&parent, &[parent.clone(), child_a.clone(), child_b.clone()]);
+        let got = aggregate_rules(&parent, &[parent.clone(), child_a, child_b]);
         assert_eq!(got.len(), 2);
         assert!(got.contains(&rule(&[""], &["pods"], &["get"])));
         assert!(got.contains(&rule(&[""], &["services"], &["get", "list"])));

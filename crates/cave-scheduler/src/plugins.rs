@@ -1732,7 +1732,7 @@ mod tests {
             label_selector: sel_legacy.clone(),
             topology_key: "zone".into(),
             namespaces: vec![],
-            selector_v2: Some(sel_v2.clone()),
+            selector_v2: Some(sel_v2),
             ..Default::default()
         });
         assert!(InterPodAffinity.filter(&p, &a, &snap).is_success());

@@ -125,7 +125,7 @@ impl TraceState {
 pub fn router(state: Arc<TraceState>) -> Router {
     let ingest_router = routes::ingest::create_router(state.clone());
     let jaeger_router = routes::jaeger::create_router(state.clone());
-    let tempo_router = routes::tempo::create_router(state.clone());
+    let tempo_router = routes::tempo::create_router(state);
 
     Router::new()
         .merge(ingest_router)

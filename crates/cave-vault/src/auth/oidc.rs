@@ -121,7 +121,7 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.oidc_store.write().await;
-    let mut role = store
+    let role = store
         .roles
         .entry(role_name.clone())
         .or_insert_with(|| OidcRole {

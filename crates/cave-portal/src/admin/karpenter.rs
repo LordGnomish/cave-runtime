@@ -202,7 +202,7 @@ mod tests {
         };
         assert!((utilisation(&over) - 1.0).abs() < 1e-9);
         let zero = NodePool {
-            tenant: t.clone(),
+            tenant: t,
             name: "z".into(),
             instance_class: "m5.large".into(),
             max_nodes: 0,
@@ -224,7 +224,7 @@ mod tests {
                 active_nodes: 9,
             },
             NodePool {
-                tenant: t.clone(),
+                tenant: t,
                 name: "b".into(),
                 instance_class: "m5.large".into(),
                 max_nodes: 10,

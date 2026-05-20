@@ -491,7 +491,7 @@ pub async fn checkpoint_container(id: Uuid, store: &ContainerStore) -> CriResult
     let manifest = criu::CheckpointManifest {
         container_id: id,
         container_name: container.spec.name.clone(),
-        image_reference: container.spec.image.clone(),
+        image_reference: container.spec.image,
         runtime_handler: None,
         created_at: chrono::Utc::now(),
         criu_version: "3.19".into(),

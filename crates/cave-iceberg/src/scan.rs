@@ -154,8 +154,8 @@ mod tests {
             partition_spec_id: 0,
             schema_id: 0,
             entries: vec![
-                ManifestEntry::added(1, df1.clone()),
-                ManifestEntry::added(1, df2.clone()),
+                ManifestEntry::added(1, df1),
+                ManifestEntry::added(1, df2),
             ],
         };
         let tasks = ScanBuilder::new(meta()).add_manifest(m).plan_files();

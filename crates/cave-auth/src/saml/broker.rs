@@ -288,7 +288,7 @@ mod tests {
         let r = Response::success(
             "https://idp.example",
             "https://sp.cave/acs",
-            Some(req_id.clone()),
+            Some(req_id),
             a,
         );
         let subj = b.process_response(r).unwrap();

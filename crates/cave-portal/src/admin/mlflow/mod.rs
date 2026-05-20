@@ -81,7 +81,7 @@ mod tests {
             .write()
             .unwrap()
             .push(MlflowExperiment {
-                tenant: acme.clone(),
+                tenant: acme,
                 experiment_id: "exp-1".into(),
                 name: "fraud-detection".into(),
                 artifact_location: "s3://artifacts/fraud".into(),

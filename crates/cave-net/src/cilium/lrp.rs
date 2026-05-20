@@ -917,7 +917,7 @@ mod tests {
         let p1 = LocalRedirectPolicy {
             name: "p1".into(),
             namespace: "ns".into(),
-            tenant: tenant.clone(),
+            tenant: tenant,
             frontend: LrpFrontend::Address {
                 ip: ip(10, 96, 0, 1),
                 ports: vec![PortMatcher {

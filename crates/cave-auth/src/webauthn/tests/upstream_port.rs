@@ -246,7 +246,7 @@ fn ceremony_2_es256_register_then_authenticate() {
                 allow_credentials: vec![cred_id.clone()],
             },
             &AssertionResponse {
-                credential_id: cred_id.clone(),
+                credential_id: cred_id,
                 client_data_json: cd_auth,
                 authenticator_data: auth_data_a,
                 signature: der.as_bytes().to_vec(),
@@ -305,7 +305,7 @@ fn ceremony_3_replay_rejected_by_sign_count() {
     let auth_mgr =
         AuthenticationManager::new(reg_mgr.store, "login.cave.dev", "https://login.cave.dev");
     // First assertion succeeds at sign_count=5.
-    let mut do_assert = |sign_count: u32| -> Result<_, _> {
+    let do_assert = |sign_count: u32| -> Result<_, _> {
         let auth_data = auth_data_assertion("login.cave.dev", AuthFlags::UP, sign_count);
         let cd = client_data("webauthn.get", b"x", "https://login.cave.dev");
         let mut hasher = Sha256::new();

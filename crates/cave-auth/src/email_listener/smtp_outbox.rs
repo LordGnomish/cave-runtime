@@ -94,7 +94,7 @@ impl OutboxTransport for TestStubTransport {
         }
         // Otherwise delegate to lettre's stub for fidelity (it actually
         // accepts the message + logs to its internal store).
-        let mut inner = self.inner.lock();
+        let inner = self.inner.lock();
         inner
             .send(msg)
             .map_err(|e| EmailError::Send(format!("stub: {e}")))?;
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn smtp_send_deadletters_on_permanent_failure() {
         let stub = Arc::new(TestStubTransport::new().with_permanent_failure());
-        let outbox = SmtpOutbox::new_with_transport(OutboxConfig::test_defaults(), stub.clone());
+        let outbox = SmtpOutbox::new_with_transport(OutboxConfig::test_defaults(), stub);
         let err = outbox
             .send_event(AuthEvent::LoginAlert, &login_payload(), "alice@example.com")
             .unwrap_err();
@@ -301,7 +301,7 @@ mod tests {
             max_retries: 2,
             initial_backoff: Duration::from_millis(1),
         };
-        let outbox = SmtpOutbox::new_with_transport(cfg, stub.clone());
+        let outbox = SmtpOutbox::new_with_transport(cfg, stub);
         let err = outbox
             .send_event(AuthEvent::LoginAlert, &login_payload(), "alice@example.com")
             .unwrap_err();
@@ -333,7 +333,7 @@ mod tests {
     #[test]
     fn smtp_send_rejects_invalid_to_address() {
         let stub = Arc::new(TestStubTransport::new());
-        let outbox = SmtpOutbox::new_with_transport(OutboxConfig::test_defaults(), stub.clone());
+        let outbox = SmtpOutbox::new_with_transport(OutboxConfig::test_defaults(), stub);
         let err = outbox
             .send_event(AuthEvent::LoginAlert, &login_payload(), "not-an-email")
             .unwrap_err();

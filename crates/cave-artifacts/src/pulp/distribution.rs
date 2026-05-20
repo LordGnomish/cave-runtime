@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn validate_distribution_no_source() {
-        let mut d = Distribution::new("dist", "path", ContentType::File);
+        let d = Distribution::new("dist", "path", ContentType::File);
         // No publication, repository, or repository_version set
         let errors = validate_distribution(&d, &[]);
         assert!(

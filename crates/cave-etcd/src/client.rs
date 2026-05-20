@@ -210,7 +210,7 @@ mod tests {
         // cite: etcd v3.6.10 client/v3/kv.go Put / Get
         let tenant_id = "cli-002";
         let store = Arc::new(KvStore::new());
-        let cli = EtcdClient::with_default_config(store.clone());
+        let cli = EtcdClient::with_default_config(store);
         cli.put(&PutRequest {
             key: dt(tenant_id, "k"),
             value: "v".into(),
@@ -227,7 +227,7 @@ mod tests {
         // cite: etcd v3.6.10 client/v3/kv.go Delete
         let tenant_id = "cli-003";
         let store = Arc::new(KvStore::new());
-        let cli = EtcdClient::with_default_config(store.clone());
+        let cli = EtcdClient::with_default_config(store);
         cli.put(&PutRequest {
             key: dt(tenant_id, "k"),
             value: "v".into(),
@@ -296,7 +296,7 @@ mod tests {
         // cite: etcd v3.6.10 client/v3 RangeRequest count_only flag
         let tenant_id = "cli-007";
         let store = Arc::new(KvStore::new());
-        let cli = EtcdClient::with_default_config(store.clone());
+        let cli = EtcdClient::with_default_config(store);
         for i in 0..3 {
             cli.put(&PutRequest {
                 key: dt(tenant_id, &format!("k{i}")),

@@ -329,7 +329,7 @@ where
 }
 
 /// Wrap a pre-encoded response body with the standard response framing:
-/// [INT32 total_length] [INT32 correlation_id] [body].
+/// `[INT32 total_length] [INT32 correlation_id] [body]`.
 pub fn frame_response(correlation_id: i32, body: Bytes) -> Bytes {
     let total_len = 4 + body.len(); // 4 bytes for correlation_id + body
     let mut out = BytesMut::with_capacity(4 + total_len);
@@ -655,7 +655,7 @@ mod tests {
     #[test]
     fn test_frame_response() {
         let body = Bytes::from_static(b"payload");
-        let framed = frame_response(42, body.clone());
+        let framed = frame_response(42, body);
         // First 4 bytes = total_len = 4 (correlation) + 7 (payload) = 11
         assert_eq!(&framed[..4], &11i32.to_be_bytes());
         // Next 4 bytes = correlation_id = 42

@@ -262,7 +262,7 @@ mod tests {
             },
         );
         let _ = a.observe(
-            k2.clone(),
+            k2,
             Counters {
                 opened: 20,
                 closed: 0,

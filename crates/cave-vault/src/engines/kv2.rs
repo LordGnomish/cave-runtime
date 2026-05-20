@@ -664,7 +664,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             })
             .delete({
                 let s = state.clone();
-                let mount = m.clone();
+                let mount = m;
                 move |headers: HeaderMap, Path(path): Path<String>| {
                     let state = s.clone();
                     let mount = mount.clone();

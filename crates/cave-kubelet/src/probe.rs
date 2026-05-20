@@ -792,7 +792,7 @@ mod tests {
         if let ProbeAction::HttpGet {
             ref mut http_headers,
             ..
-        } = ProbeSpec::http_get(80, "/h").action.clone()
+        } = ProbeSpec::http_get(80, "/h").action
         {
             http_headers.push(("X-Token".into(), "abc".into()));
             assert_eq!(http_headers.len(), 1);

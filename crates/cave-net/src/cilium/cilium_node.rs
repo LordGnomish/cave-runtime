@@ -121,7 +121,7 @@ impl CiliumNodeStore {
 
     pub fn register(&mut self, spec: CiliumNodeSpec) -> Result<(), NodeError> {
         if self.nodes.contains_key(&spec.name) {
-            return Err(NodeError::Duplicate(spec.name.clone()));
+            return Err(NodeError::Duplicate(spec.name));
         }
         let status = CiliumNodeStatus {
             state: NodeState::Joining,

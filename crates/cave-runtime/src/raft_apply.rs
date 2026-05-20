@@ -502,7 +502,7 @@ pub async fn run_apply_loop(
     source: Arc<dyn CommittedEntrySource>,
     targets: Arc<ApplyTargets>,
     metrics: Arc<ApplyMetrics>,
-    mut shutdown: tokio::sync::watch::Receiver<bool>,
+    shutdown: tokio::sync::watch::Receiver<bool>,
     interval: Duration,
 ) {
     run_apply_loop_with_notifier(source, targets, metrics, None, shutdown.clone(), interval).await

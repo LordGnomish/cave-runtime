@@ -206,7 +206,7 @@ async fn query_handler(
         Err(e) => return loki_error(StatusCode::BAD_REQUEST, format!("parse error: {}", e)),
     };
 
-    let eval = Evaluator::new(state.store.clone());
+    let eval = Evaluator::new(state.store);
     let data = match parsed {
         LogQuery::Log(lq) => {
             eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction)
@@ -262,7 +262,7 @@ async fn query_range_handler(
         Err(e) => return loki_error(StatusCode::BAD_REQUEST, format!("parse error: {}", e)),
     };
 
-    let eval = Evaluator::new(state.store.clone());
+    let eval = Evaluator::new(state.store);
     let data = match parsed {
         LogQuery::Log(lq) => {
             eval.eval_log_query(&tenant, &lq, start_ns, end_ns, limit, params.direction)
@@ -365,8 +365,8 @@ async fn tail_handler(
     ws: WebSocketUpgrade,
 ) -> Response {
     let tenant = tenant_from_headers(&headers);
-    let query = params.query.clone();
-    let store = state.store.clone();
+    let query = params.query;
+    let store = state.store;
 
     ws.on_upgrade(move |socket| handle_tail(socket, query, tenant, store))
 }

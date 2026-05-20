@@ -84,7 +84,7 @@ fn resume_token_monotonic_advancement() {
     let t2 = ResumeToken::new("AAA", 1_700_000_000, 2);
     let t3 = ResumeToken::new("AAA", 1_700_000_001, 1);
     c.record_resume_token(t1.clone()).unwrap();
-    c.record_resume_token(t2.clone()).unwrap();
+    c.record_resume_token(t2).unwrap();
     c.record_resume_token(t3.clone()).unwrap();
 
     assert_eq!(c.last_resume_token(), Some(&t3));

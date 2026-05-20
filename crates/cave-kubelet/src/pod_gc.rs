@@ -280,7 +280,7 @@ mod tests {
         let now = Utc::now();
         let p1 = pod("a", "ns", PodPhase::Failed, 600, now);
         let p2 = pod("b", "ns", PodPhase::Succeeded, 700, now);
-        let pods = vec![p1.clone(), p2.clone()];
+        let pods = vec![p1, p2];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(60),
@@ -353,7 +353,7 @@ mod tests {
         // Force fixed UIDs to make the test deterministic.
         a.uid = Uuid::from_bytes([1u8; 16]);
         b.uid = Uuid::from_bytes([2u8; 16]);
-        let pods = vec![a.clone(), b.clone()];
+        let pods = vec![a.clone(), b];
         let cfg = PodGcConfig {
             max_terminated: 1,
             min_age: Duration::seconds(10),
@@ -415,7 +415,7 @@ mod tests {
         let mut p2 = pod("p2", "ns", PodPhase::Succeeded, 900, now);
         p1.uid = Uuid::from_bytes([5u8; 16]);
         p2.uid = Uuid::from_bytes([3u8; 16]);
-        let pods = vec![p1.clone(), p2.clone()];
+        let pods = vec![p1, p2];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(10),
@@ -432,7 +432,7 @@ mod tests {
         let now = Utc::now();
         let f = pod("f", "ns", PodPhase::Failed, 1000, now);
         let s = pod("s", "ns", PodPhase::Succeeded, 1100, now);
-        let pods = vec![f.clone(), s.clone()];
+        let pods = vec![f, s];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(10),
@@ -461,7 +461,7 @@ mod tests {
     fn pending_phase_is_active_not_collected() {
         let now = Utc::now();
         let p = pod("p", "ns", PodPhase::Pending, 5000, now);
-        let pods = vec![p.clone()];
+        let pods = vec![p];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(10),
@@ -476,7 +476,7 @@ mod tests {
         let now = Utc::now();
         let active = pod("a", "ns", PodPhase::Running, 0, now);
         let evict = pod("b", "ns", PodPhase::Succeeded, 1000, now);
-        let pods = vec![active.clone(), evict.clone()];
+        let pods = vec![active, evict];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(10),
@@ -496,7 +496,7 @@ mod tests {
             min_age: Duration::seconds(60),
             per_namespace: false,
         };
-        let r = plan_gc(&pods_vec(&[p.clone()]), &cfg, now);
+        let r = plan_gc(&pods_vec(&[p]), &cfg, now);
         // exactly at threshold → eligible (>=)
         assert_eq!(r.collected.len(), 1);
     }
@@ -510,7 +510,7 @@ mod tests {
             min_age: Duration::seconds(60),
             per_namespace: false,
         };
-        let r = plan_gc(&pods_vec(&[p.clone()]), &cfg, now);
+        let r = plan_gc(&pods_vec(&[p]), &cfg, now);
         assert!(r.collected.is_empty());
     }
 
@@ -755,7 +755,7 @@ mod tests {
         let now = Utc::now();
         let p1 = pod("p1", "ns", PodPhase::Succeeded, 1000, now);
         let p2 = pod("p2", "ns", PodPhase::Succeeded, 900, now);
-        let pods = vec![p1.clone(), p2.clone()];
+        let pods = vec![p1, p2];
         let cfg = PodGcConfig {
             max_terminated: 0,
             min_age: Duration::seconds(10),

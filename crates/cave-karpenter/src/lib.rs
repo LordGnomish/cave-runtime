@@ -67,7 +67,7 @@ mod tests {
         let s = Store::new();
         let mut p = NodePool::default();
         p.name = "default".to_string();
-        s.put_pool(p.clone());
+        s.put_pool(p);
         assert_eq!(
             s.get_pool("default").map(|x| x.name),
             Some("default".to_string())

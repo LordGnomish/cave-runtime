@@ -71,7 +71,7 @@ fn run_bash(args: &Value) -> crate::error::Result<ToolResult> {
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     let code = out.status.code().unwrap_or(-1);
-    let mut combined = stdout.clone();
+    let mut combined = stdout;
     if !stderr.is_empty() {
         combined.push_str("\n---stderr---\n");
         combined.push_str(&stderr);

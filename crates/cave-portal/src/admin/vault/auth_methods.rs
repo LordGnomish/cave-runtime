@@ -154,7 +154,7 @@ mod tests {
                 enabled: true,
             },
             VaultAuthMethod {
-                tenant: tenant.clone(),
+                tenant: tenant,
                 path: "token/".into(),
                 method_type: "token".into(),
                 accessor: "t".into(),

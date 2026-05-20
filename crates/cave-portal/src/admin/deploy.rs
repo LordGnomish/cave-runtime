@@ -221,7 +221,7 @@ mod tests {
                 status: "Synced",
             },
             DeployActivity {
-                tenant: t.clone(),
+                tenant: t,
                 id: "3".into(),
                 service: "c".into(),
                 version: "v3".into(),

@@ -177,7 +177,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         let path = dir.join("test-ledger.jsonl");
 
-        let store = FileStore::new(path.clone());
+        let store = FileStore::new(path);
         store.health_check().unwrap();
 
         let e1 = LedgerEntry::new(

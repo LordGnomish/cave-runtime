@@ -666,7 +666,7 @@ mod tests {
             devices: vec!["pre".into()],
         });
         store.add_claim(c);
-        let plug = DraScheduler::new(store.clone());
+        let plug = DraScheduler::new(store);
         let cs = CycleState::new();
         let p = pod_with_claim("p", "c", "c1");
         let s = ReservePlugin::reserve(&plug, &p, "a", &cs);

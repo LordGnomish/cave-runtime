@@ -275,7 +275,7 @@ pub fn create_router(state: Arc<ResourceStore>) -> Router {
 async fn parity() -> Json<serde_json::Value> {
     match crate::calculate_parity() {
         Ok(report) => Json(serde_json::to_value(&report).unwrap_or_default()),
-        Err(e) => Json(serde_json::json!({ "error": e.to_string() })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
     }
 }
 

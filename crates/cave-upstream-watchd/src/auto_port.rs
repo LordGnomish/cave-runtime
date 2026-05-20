@@ -342,7 +342,7 @@ impl AutoPortDispatcher {
             event_id: event.event_id.clone(),
             cave_module: event.cave_module.clone(),
             backend: self.queue.backend_name().to_string(),
-            task_id: task_id.0.clone(),
+            task_id: task_id.0,
             target_branch: branch,
             status: AutoPortStatus::Dispatched,
             commit_sha: None,

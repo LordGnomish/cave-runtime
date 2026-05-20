@@ -148,7 +148,7 @@ impl TokenExchanger {
         for aud in &aud_req.audiences {
             if policy.decide(&req.client_id, aud) == PolicyDecision::Deny {
                 return Err(ExchangeError::PolicyDenied(
-                    req.client_id.clone(),
+                    req.client_id,
                     aud.clone(),
                 ));
             }
@@ -164,7 +164,7 @@ impl TokenExchanger {
         let lifespan = self.default_lifespan_seconds;
         let claims = ExchangedClaims {
             jti: Uuid::new_v4().to_string(),
-            sub: subject.subject.clone(),
+            sub: subject.subject,
             iss: self.issuer.clone(),
             aud: if !aud_req.audiences.is_empty() {
                 aud_req.audiences.clone()

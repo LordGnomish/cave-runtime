@@ -224,7 +224,7 @@ impl SchemaRegistry {
             id,
             version,
             subject: subject.to_string(),
-            schema: schema.clone(),
+            schema: schema,
             schema_type,
             references,
             created_at: Utc::now(),

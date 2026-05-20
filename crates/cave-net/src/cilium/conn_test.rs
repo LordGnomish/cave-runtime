@@ -112,7 +112,7 @@ impl ConnectivitySuite {
 
     pub fn add(&mut self, test: Test) -> Result<(), ConnTestError> {
         if self.tests.contains_key(&test.name) {
-            return Err(ConnTestError::Duplicate(test.name.clone()));
+            return Err(ConnTestError::Duplicate(test.name));
         }
         self.tests.insert(test.name.clone(), test);
         Ok(())

@@ -175,8 +175,8 @@ impl MetricRegistry {
         if matches!(f.verdict, Verdict::Dropped) {
             self.drop.add(
                 vec![
-                    ("source_namespace".into(), src_ns.clone()),
-                    ("destination_namespace".into(), dst_ns.clone()),
+                    ("source_namespace".into(), src_ns),
+                    ("destination_namespace".into(), dst_ns),
                     ("reason".into(), drop_reason_label(f.drop_reason).into()),
                 ],
                 1,

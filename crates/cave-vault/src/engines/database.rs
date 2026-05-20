@@ -360,7 +360,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
         }))
         .route(&format!("/v1/{}/creds/{{role_name}}", mount), get({
             let s = state.clone();
-            let mount = m.clone();
+            let mount = m;
             move |headers: HeaderMap, Path(role_name): Path<String>| {
                 let state = s.clone();
                 let mount = mount.clone();

@@ -174,7 +174,7 @@ mod tests {
     fn manifest_entry_lifecycle() {
         let f = DataFile::new("s3://x/a.parquet", FileFormat::Parquet);
         let added = ManifestEntry::added(1, f.clone());
-        let deleted = ManifestEntry::deleted(2, f.clone());
+        let deleted = ManifestEntry::deleted(2, f);
         assert!(added.is_live());
         assert!(!deleted.is_live());
     }
@@ -191,7 +191,7 @@ mod tests {
             schema_id: 0,
             entries: vec![
                 ManifestEntry::added(1, data.clone()),
-                ManifestEntry::deleted(2, data.clone()),
+                ManifestEntry::deleted(2, data),
                 ManifestEntry::added(3, delete_file),
             ],
         };

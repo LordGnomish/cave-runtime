@@ -73,7 +73,7 @@ impl GatewayPlugin for CorsPlugin {
         let cors_origin = if origins.contains(&"*") && !credentials {
             "*".to_string()
         } else if origin_ok && !origin.is_empty() {
-            origin.clone()
+            origin
         } else {
             "*".to_string()
         };

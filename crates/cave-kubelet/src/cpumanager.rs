@@ -475,7 +475,7 @@ mod tests {
     fn manager_construction_validates_reserved() {
         let t = topo_2s_4c_2t();
         let res = CpuManager::new(
-            t.clone(),
+            t,
             CpuManagerPolicy::Static,
             CpuSet::from_iter(vec![100]),
         );

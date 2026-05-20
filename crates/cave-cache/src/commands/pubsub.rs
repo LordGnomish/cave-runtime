@@ -86,7 +86,7 @@ pub fn cmd_publish(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Res
     Ok(Resp::Integer(count as i64))
 }
 
-/// PUBSUB CHANNELS [pattern]
+/// `PUBSUB CHANNELS [pattern]`
 pub fn cmd_pubsub_channels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let pattern = args.get(3).map(|p| p.as_slice());
     let channels: Vec<Resp> = pubsub
@@ -118,7 +118,7 @@ pub fn cmd_pubsub_numpat(pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     Ok(Resp::Integer(pubsub.patterns.len() as i64))
 }
 
-/// PUBSUB SHARDCHANNELS [pattern]
+/// `PUBSUB SHARDCHANNELS [pattern]`
 pub fn cmd_pubsub_shardchannels(args: &[Vec<u8>], pubsub: &PubSubRegistry) -> CacheResult<Resp> {
     let pattern = args.get(3).map(|p| p.as_slice());
     let channels: Vec<Resp> = pubsub

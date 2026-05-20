@@ -85,7 +85,7 @@ mod tests {
         let store = DashboardStore::new();
         let db = Dashboard::new(0, 1, "My Dashboard");
         let saved = store
-            .upsert_dashboard(1, db.clone(), None, "initial", "admin", false)
+            .upsert_dashboard(1, db, None, "initial", "admin", false)
             .unwrap();
         assert_eq!(saved.title, "My Dashboard");
         assert!(saved.id.is_some());
@@ -102,7 +102,7 @@ mod tests {
         let saved = store
             .upsert_dashboard(1, db, None, "v1", "admin", false)
             .unwrap();
-        let mut updated = saved.clone();
+        let mut updated = saved;
         updated.title = "Versioned v2".into();
         let v2 = store
             .upsert_dashboard(1, updated, None, "v2", "admin", true)
@@ -120,7 +120,7 @@ mod tests {
             .unwrap();
 
         // Simulate stale edit (wrong version)
-        let mut stale = saved.clone();
+        let mut stale = saved;
         stale.version = 0; // old version
         stale.title = "Stale".into();
         let result = store.upsert_dashboard(1, stale, None, "stale", "admin", false);
@@ -660,7 +660,7 @@ datasources:
 
     #[test]
     fn test_render_dashboard_escapes_xss() {
-        let mut db = Dashboard::new(1, 1, "<script>alert('xss')</script>");
+        let db = Dashboard::new(1, 1, "<script>alert('xss')</script>");
         let html = render_dashboard(&db);
         assert!(!html.contains("<script>alert"));
         assert!(html.contains("&lt;script&gt;"));

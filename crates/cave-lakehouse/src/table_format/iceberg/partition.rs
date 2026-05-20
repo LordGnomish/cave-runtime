@@ -25,7 +25,7 @@ pub enum Transform {
 }
 
 impl Transform {
-    /// Iceberg-spec textual form ("identity", "bucket[16]", "truncate[10]", …).
+    /// Iceberg-spec textual form (`identity`, `bucket[16]`, `truncate[10]`, …).
     pub fn spec_repr(&self) -> String {
         match self {
             Transform::Identity => "identity".to_string(),

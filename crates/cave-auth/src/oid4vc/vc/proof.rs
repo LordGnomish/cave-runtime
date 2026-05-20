@@ -338,7 +338,7 @@ mod tests {
             chrono::Utc::now(),
         )
         .unwrap();
-        let mut tampered = signed.clone();
+        let mut tampered = signed;
         tampered
             .credential_subject
             .claims

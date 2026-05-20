@@ -192,7 +192,7 @@ mod tests {
             RetentionAction::Delete
         );
         assert_eq!(
-            p.evaluate(&new, &[old.clone(), new.clone()], now),
+            p.evaluate(&new, &[old, new.clone()], now),
             RetentionAction::Keep
         );
     }

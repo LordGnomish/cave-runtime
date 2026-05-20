@@ -27,7 +27,7 @@ fn register_idempotent_per_tenant() {
         vec![format!("mailto:ops@{}.test", TENANT)],
     )
     .unwrap();
-    let acct1 = client.account_id.clone();
+    let acct1 = client.account_id;
 
     let client2 = AcmeClient::register(
         &mut server,

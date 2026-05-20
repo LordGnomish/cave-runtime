@@ -209,7 +209,7 @@ impl MirrorMaker {
                 "target cluster not registered: {target_cluster}"
             )));
         }
-        let flow = MirrorFlow::new(source_cluster.clone(), target_cluster.clone(), topics);
+        let flow = MirrorFlow::new(source_cluster, target_cluster, topics);
         let id = flow.id.clone();
         self.flows.insert(id, flow.clone());
         Ok(flow)
@@ -299,7 +299,7 @@ mod tests {
         let flow = m
             .create_flow("dc1".into(), "dc2".into(), vec!["orders.*".into()])
             .unwrap();
-        let id = flow.id.clone();
+        let id = flow.id;
         m.start_flow(&id).unwrap();
         assert_eq!(m.get_flow(&id).unwrap().state, MirrorFlowState::Running);
     }
@@ -317,7 +317,7 @@ mod tests {
         let flow = MirrorFlow::new("primary".into(), "backup".into(), vec![".*".into()]);
         assert_eq!(flow.mirror_topic("orders"), "primary.orders");
 
-        let mut identity_flow = flow.clone();
+        let mut identity_flow = flow;
         identity_flow.replication_policy = ReplicationPolicy::IdentityReplicationPolicy;
         assert_eq!(identity_flow.mirror_topic("orders"), "orders");
     }

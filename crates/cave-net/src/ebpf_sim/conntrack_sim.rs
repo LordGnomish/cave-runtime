@@ -142,7 +142,7 @@ pub fn ct_lookup(map: &mut ConntrackMap, key: &ConntrackKey, now_ns: u64) -> CtA
                 CtAction::Expired
             } else {
                 // Bump last_seen + packets.
-                let mut bumped = entry.clone();
+                let mut bumped = entry;
                 bumped.last_seen_ns = now_ns;
                 bumped.packets = bumped.packets.saturating_add(1);
                 // The earlier `lookup` already advanced LRU recency.

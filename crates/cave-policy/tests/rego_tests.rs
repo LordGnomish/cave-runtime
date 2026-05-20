@@ -439,7 +439,7 @@ fn test_builtin_aggregates() {
         Value::Json(serde_json::json!(3))
     );
     assert_eq!(
-        call("min", vec![nums.clone()]),
+        call("min", vec![nums]),
         Value::Json(serde_json::json!(1))
     );
 }
@@ -550,7 +550,7 @@ fn test_builtin_object_ops() {
 
     let removed = call(
         "object.remove",
-        vec![obj.clone(), Value::Set(vec![serde_json::json!("a")])],
+        vec![obj, Value::Set(vec![serde_json::json!("a")])],
     );
     assert!(removed.as_object().is_some());
     assert!(!removed.as_object().unwrap().contains_key("a"));

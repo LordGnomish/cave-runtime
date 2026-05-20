@@ -170,7 +170,7 @@ fn signed_envelope_round_trips_and_detects_tampering() {
     let mut bad_sig = env.signature.clone();
     bad_sig.replace_range(0..2, "00");
     let tampered = SignedAuditEnvelope {
-        json: env.json.clone(),
+        json: env.json,
         signature: bad_sig,
     };
     assert!(!log.verify_envelope(&tampered));

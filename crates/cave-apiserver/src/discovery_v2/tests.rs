@@ -151,7 +151,7 @@ fn page_groups_consume_token_for_next_page() {
         &g,
         &PageRequest {
             limit: 3,
-            continue_token: Some(p1.doc.continue_token.clone()),
+            continue_token: Some(p1.doc.continue_token),
         },
     );
     assert_eq!(p2.doc.items.len(), 3);
@@ -172,7 +172,7 @@ fn page_groups_final_page_clears_token() {
         &g,
         &PageRequest {
             limit: 3,
-            continue_token: Some(p1.doc.continue_token.clone()),
+            continue_token: Some(p1.doc.continue_token),
         },
     );
     assert!(

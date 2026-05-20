@@ -249,7 +249,7 @@ mod tests {
         let mut node = full_node("a");
         node.allocated.cpu_millicores = 4000;
         let v1 = pod_at("t", "v1", 0, 2000, 4_000_000_000);
-        let mut v1l = v1.clone();
+        let mut v1l = v1;
         v1l.spec.node_selector.insert("app".into(), "db".into());
         let v2 = pod_at("t", "v2", 0, 2000, 4_000_000_000);
         let snap = ClusterSnapshot {

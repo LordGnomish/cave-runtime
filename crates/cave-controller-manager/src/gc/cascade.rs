@@ -272,7 +272,7 @@ mod tests {
         g.add_object(oid("p2"), vec![or("rs")]);
         let plan = compute_cascade_plan(&g, &oid("rs"), DeletionPropagation::Orphan);
         assert_eq!(plan.delete, vec![oid("rs")]);
-        let mut o = plan.orphan.clone();
+        let mut o = plan.orphan;
         o.sort();
         assert_eq!(o, vec![oid("p1"), oid("p2")]);
     }

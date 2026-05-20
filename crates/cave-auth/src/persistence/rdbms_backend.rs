@@ -1568,6 +1568,6 @@ mod tests {
         assert!(parse_uid("not-a-uuid").is_err());
         assert_eq!(parse_uid_opt(None).unwrap(), None);
         assert_eq!(parse_uid_opt(Some("".into())).unwrap(), None);
-        assert_eq!(parse_uid_opt(Some(s.clone())).unwrap(), Some(id));
+        assert_eq!(parse_uid_opt(Some(s)).unwrap(), Some(id));
     }
 }

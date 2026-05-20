@@ -582,7 +582,7 @@ mod tests {
     #[test]
     fn missing_pvc_is_unresolvable() {
         let store = Arc::new(VolumeStore::new());
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "ghost");
         let s = plug.filter(&p, &node_with_labels("a", &[]), &snap());
         assert_eq!(s.code, crate::framework::Code::UnschedulableAndUnresolvable);
@@ -594,7 +594,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.tenant_id = "other".into();
         store.add_pvc(c);
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         let s = plug.filter(&p, &node_with_labels("a", &[]), &snap());
         assert_eq!(s.code, crate::framework::Code::UnschedulableAndUnresolvable);
@@ -606,7 +606,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.bound_node = Some("other".into());
         store.add_pvc(c);
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         let s = plug.filter(&p, &node_with_labels("a", &[]), &snap());
         assert!(s.is_rejected());
@@ -618,7 +618,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.bound_node = Some("a".into());
         store.add_pvc(c);
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(&p, &node_with_labels("a", &[]), &snap())
@@ -635,7 +635,7 @@ mod tests {
             allowed_topologies: vec![],
         });
         store.add_pvc(pvc("c", Some("fast")));
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         let s = plug.filter(&p, &node_with_labels("a", &[]), &snap());
         assert!(s.is_rejected());
@@ -660,7 +660,7 @@ mod tests {
         c.volume_name = Some("pv0".into());
         store.add_pvc(c);
 
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         // Wrong zone → reject.
         let s = plug.filter(
@@ -693,7 +693,7 @@ mod tests {
         });
         store.add_pvc(pvc("c", Some("wfc")));
 
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         // Allowed zone.
         assert!(plug
@@ -717,7 +717,7 @@ mod tests {
     fn wfc_no_storage_class_succeeds() {
         let store = Arc::new(VolumeStore::new());
         store.add_pvc(pvc("c", None));
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(&p, &node_with_labels("a", &[]), &snap())
@@ -772,7 +772,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.bound_node = Some("node-1".into());
         store.add_pvc(c);
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let cs = CycleState::new();
         let p = pod_with_pvc("p", "c");
         let s = ReservePlugin::reserve(&plug, &p, "node-1", &cs);
@@ -823,7 +823,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.volume_name = Some("pv0".into());
         store.add_pvc(c);
-        let plug = VolumeZone::new(store.clone());
+        let plug = VolumeZone::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(
@@ -841,7 +841,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.volume_name = Some("pv0".into());
         store.add_pvc(c);
-        let plug = VolumeZone::new(store.clone());
+        let plug = VolumeZone::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(
@@ -859,7 +859,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.volume_name = Some("pv0".into());
         store.add_pvc(c);
-        let plug = VolumeZone::new(store.clone());
+        let plug = VolumeZone::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(&p, &node_with_labels("a", &[]), &snap())
@@ -870,7 +870,7 @@ mod tests {
     fn volume_zone_skips_unbound_pvc() {
         let store = Arc::new(VolumeStore::new());
         store.add_pvc(pvc("c", None)); // no volume_name
-        let plug = VolumeZone::new(store.clone());
+        let plug = VolumeZone::new(store);
         let p = pod_with_pvc("p", "c");
         // Nothing to enforce yet.
         assert!(plug
@@ -891,7 +891,7 @@ mod tests {
         let mut c = pvc("c", None);
         c.volume_name = Some("pv0".into());
         store.add_pvc(c);
-        let plug = VolumeZone::new(store.clone());
+        let plug = VolumeZone::new(store);
         let p = pod_with_pvc("p", "c");
         // Right legacy label.
         assert!(plug
@@ -941,7 +941,7 @@ mod tests {
         // No SC → treated as no constraints (= WaitForFirstConsumer-ish).
         let store = Arc::new(VolumeStore::new());
         store.add_pvc(pvc("c", None));
-        let plug = VolumeBinding::new(store.clone());
+        let plug = VolumeBinding::new(store);
         let p = pod_with_pvc("p", "c");
         assert!(plug
             .filter(&p, &node_with_labels("a", &[]), &snap())

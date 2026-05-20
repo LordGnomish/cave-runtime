@@ -114,7 +114,7 @@ mod tests {
         let s = AdminState::seeded();
         let acme = TenantId::new("acme").expect("tenant");
         s.iceberg_tables.write().unwrap().push(IcebergTable {
-            tenant: acme.clone(),
+            tenant: acme,
             namespace: "analytics".into(),
             name: "orders".into(),
             location: "s3://lake/analytics/orders".into(),

@@ -1408,7 +1408,7 @@ fn e2e_hubble_node_aggregator_filters_cross_tenant() {
     agg.ingest(
         "node-a",
         &FlowLog {
-            tenant: tenant.clone(),
+            tenant: tenant,
             time: chrono::Utc::now(),
             source_identity: 1,
             destination_identity: 2,

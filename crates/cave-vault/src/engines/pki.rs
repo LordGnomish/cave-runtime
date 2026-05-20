@@ -741,7 +741,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
         }))
         .route(&format!("/v1/{}/crl/rotate", mount), post({
             let s = state.clone();
-            let mount = m.clone();
+            let mount = m;
             move |headers: HeaderMap| {
                 let state = s.clone();
                 let mount = mount.clone();

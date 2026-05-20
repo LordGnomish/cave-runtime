@@ -115,7 +115,7 @@ impl<'c> Spider<'c> {
             return false;
         }
         let path = url::parse(candidate)
-            .map(|u| u.path.clone())
+            .map(|u| u.path)
             .unwrap_or_else(|| candidate.to_string());
         self.disallow.iter().any(|d| path.starts_with(d))
     }

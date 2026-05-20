@@ -246,7 +246,7 @@ impl PostFilterPlugin for DefaultPreemption {
         self.stage_evictions(pod, &plan.victims, &plan.nominated_node_name);
         self.nominated.nominate(&pod.uid, &plan.nominated_node_name);
         (
-            PostFilterResult::nominate(plan.nominated_node_name.clone()),
+            PostFilterResult::nominate(plan.nominated_node_name),
             Status::success("DefaultPreemption"),
         )
     }
@@ -460,7 +460,7 @@ mod tests {
         let plug = DefaultPreemption::new(
             DefaultPreemptionArgs::default(),
             vec![],
-            nominated.clone(),
+            nominated,
             handle.clone(),
         );
         let cs = CycleState::new();
@@ -484,7 +484,7 @@ mod tests {
         let handle = Arc::new(AsyncPreemptHandle::new());
         let mut args = DefaultPreemptionArgs::default();
         args.dry_run = true;
-        let plug = DefaultPreemption::new(args, vec![], nominated.clone(), handle.clone());
+        let plug = DefaultPreemption::new(args, vec![], nominated, handle.clone());
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
         let (res, st) = plug.post_filter(&preemptor, &snap, &filtered, &cs);
@@ -507,7 +507,7 @@ mod tests {
         let handle = Arc::new(AsyncPreemptHandle::new());
         let mut args = DefaultPreemptionArgs::default();
         args.min_evictable_priority = Some(50);
-        let plug = DefaultPreemption::new(args, vec![], nominated.clone(), handle.clone());
+        let plug = DefaultPreemption::new(args, vec![], nominated, handle.clone());
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
         let (_res, st) = plug.post_filter(&preemptor, &snap, &filtered, &cs);
@@ -616,7 +616,7 @@ mod tests {
             DefaultPreemptionArgs::default(),
             vec![],
             nominated,
-            handle.clone(),
+            handle,
         );
         let cs = CycleState::new();
         let filtered = rejected_map(&["a"], crate::framework::Code::Unschedulable);
@@ -690,7 +690,7 @@ mod tests {
         let mut args = DefaultPreemptionArgs::default();
         args.min_candidate_nodes_absolute = 2;
         args.min_candidate_nodes_percentage = 0; // force absolute path
-        let plug = DefaultPreemption::new(args, vec![], nominated, handle.clone());
+        let plug = DefaultPreemption::new(args, vec![], nominated, handle);
         let cs = CycleState::new();
         let filtered = rejected_map(
             &["a", "b", "c", "d", "e"],

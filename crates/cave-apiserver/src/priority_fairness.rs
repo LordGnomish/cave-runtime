@@ -162,7 +162,7 @@ impl ApfRegistry {
             if level.kind == PriorityLevelType::Exempt {
                 let flow_key = compute_flow_key(schema.distinguisher, digest);
                 return DispatchOutcome::Admitted {
-                    level_name: level.name.clone(),
+                    level_name: level.name,
                     flow_key,
                 };
             }
@@ -171,13 +171,13 @@ impl ApfRegistry {
             let q = inner.in_flight.entry(key).or_default();
             if q.len() as u32 >= level.allowed_concurrency {
                 return DispatchOutcome::Rejected {
-                    level_name: level.name.clone(),
+                    level_name: level.name,
                     reason: "queue full",
                 };
             }
             q.push_back(flow_key.clone());
             return DispatchOutcome::Admitted {
-                level_name: level.name.clone(),
+                level_name: level.name,
                 flow_key,
             };
         }

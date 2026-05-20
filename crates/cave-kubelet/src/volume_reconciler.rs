@@ -212,7 +212,7 @@ mod tests {
         dsw.add_pod_volume(spec(k.clone(), "csi-pd"));
         let mut asw = ActualStateOfWorld::default();
         asw.record_mount(MountRecord {
-            key: k.clone(),
+            key: k,
             device_path: "/dev/x".into(),
             mount_path: "/y".into(),
             mounted_at: Utc::now(),

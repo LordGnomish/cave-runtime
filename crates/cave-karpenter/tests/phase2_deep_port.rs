@@ -211,7 +211,7 @@ fn binpack_picks_smallest_instance_that_fits() {
         zone: "us-east-1a".into(),
     };
     let pods = vec![PodSpec::with_resources("p1", 500, 512)];
-    let res = binpack(&pods, &[small.clone(), large], &[]);
+    let res = binpack(&pods, &[small, large], &[]);
     match res {
         BinpackResult::Assigned { instances } => {
             assert_eq!(instances.len(), 1);
@@ -240,7 +240,7 @@ fn binpack_spreads_across_zones_when_topology_spread_requested() {
         PodSpec::with_resources("p1", 500, 512).with_zone_spread("topology.kubernetes.io/zone"),
         PodSpec::with_resources("p2", 500, 512).with_zone_spread("topology.kubernetes.io/zone"),
     ];
-    let res = binpack(&pods, &[east_a.clone(), east_b.clone()], &[]);
+    let res = binpack(&pods, &[east_a, east_b], &[]);
     match res {
         BinpackResult::Assigned { instances } => {
             // Two instances picked, one per zone.

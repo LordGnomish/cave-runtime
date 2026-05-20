@@ -140,7 +140,7 @@ mod tests {
         let s1 = snap(1, None);
         let s2 = snap(2, Some(1));
         let s3 = snap(3, Some(2));
-        let chain = ancestors_of(&[s1.clone(), s2.clone(), s3.clone()], 3, 10).unwrap();
+        let chain = ancestors_of(&[s1, s2, s3], 3, 10).unwrap();
         assert_eq!(chain, vec![3, 2, 1]);
     }
 

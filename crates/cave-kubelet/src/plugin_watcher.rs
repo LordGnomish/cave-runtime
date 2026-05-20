@@ -119,7 +119,7 @@ impl PluginWatcher {
         Self::validate_name(&info.name)?;
         let key = (info.plugin_type, info.name.clone());
         if self.registry.contains_key(&key) {
-            return Err(PluginError::AlreadyRegistered(info.name.clone()));
+            return Err(PluginError::AlreadyRegistered(info.name));
         }
         let version =
             Self::negotiate_version(&self.kubelet_supported_versions, &info.supported_versions)?;

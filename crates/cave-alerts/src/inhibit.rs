@@ -185,7 +185,7 @@ mod tests {
             vec![Matcher::equal("severity", "warning")],
             vec!["cluster".into()],
         );
-        let kept = filter_inhibited(&[src.clone(), tgt.clone()], &[rule]);
+        let kept = filter_inhibited(&[src, tgt], &[rule]);
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].fingerprint, "fp-src");
     }

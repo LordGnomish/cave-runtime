@@ -770,7 +770,7 @@ fn zagg_store(args: &[Vec<u8>], db: &mut Db, cmd: &str, mode: AggMode) -> CacheR
 
     // Parse WEIGHTS and AGGREGATE
     let mut weights: Vec<f64> = vec![1.0; numkeys];
-    let mut agg_fn = |a: f64, b: f64| a + b; // default SUM
+    let agg_fn = |a: f64, b: f64| a + b; // default SUM
     let mut i = 0;
     while i < rest.len() {
         match rest[i].to_ascii_uppercase().as_slice() {

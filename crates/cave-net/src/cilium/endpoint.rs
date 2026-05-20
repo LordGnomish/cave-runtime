@@ -320,7 +320,7 @@ mod tests {
             "tenant-ep-dup"
         );
         let mut mgr = EndpointManager::new();
-        let ep = Endpoint::new_creating(7, tenant.clone(), "p", "default", ip(10, 0, 1, 1));
+        let ep = Endpoint::new_creating(7, tenant, "p", "default", ip(10, 0, 1, 1));
         mgr.insert(ep.clone()).unwrap();
         let err = mgr.insert(ep).unwrap_err();
         assert_eq!(err, EndpointError::DuplicateId(7));

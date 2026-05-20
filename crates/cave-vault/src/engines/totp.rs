@@ -424,7 +424,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
             })
             .post({
                 let s = state.clone();
-                let mount = m.clone();
+                let mount = m;
                 move |headers: HeaderMap,
                       Path(key_name): Path<String>,
                       Json(body): Json<ValidateCodeRequest>| {

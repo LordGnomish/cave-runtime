@@ -128,10 +128,10 @@ impl EgressManager {
 
     pub fn upsert(&mut self, policy: EgressGatewayPolicy) -> Result<(), EgressError> {
         if policy.destination_cidrs.is_empty() {
-            return Err(EgressError::NoDestinationCidrs(policy.name.clone()));
+            return Err(EgressError::NoDestinationCidrs(policy.name));
         }
         if policy.gateway_nodes.is_empty() {
-            return Err(EgressError::NoGatewayNodes(policy.name.clone()));
+            return Err(EgressError::NoGatewayNodes(policy.name));
         }
         for c in policy
             .destination_cidrs

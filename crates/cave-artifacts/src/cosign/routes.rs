@@ -146,7 +146,7 @@ async fn generate_keypair(
         .publics
         .write()
         .unwrap()
-        .insert(id.clone(), pub_handle.clone());
+        .insert(id, pub_handle.clone());
     {
         let mut c = state.counters.write().unwrap();
         match alg {

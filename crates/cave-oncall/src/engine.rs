@@ -347,7 +347,7 @@ mod tests {
     #[test]
     fn test_upcoming_shifts() {
         let mut schedule = sample_schedule();
-        let mut rotation = sample_rotation();
+        let rotation = sample_rotation();
         schedule.id = rotation.schedule_id;
 
         let shifts = upcoming_shifts(&schedule, &[rotation], 14);

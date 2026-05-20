@@ -33,7 +33,7 @@ impl Collection {
             let mut counter = self.doc_counter.lock().await;
             *counter += 1;
             let id = format!("{:024x}", *counter);
-            doc.insert("_id".to_string(), Value::String(id.clone()));
+            doc.insert("_id".to_string(), Value::String(id));
         }
 
         let id = doc

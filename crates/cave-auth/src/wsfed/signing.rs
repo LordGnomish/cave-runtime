@@ -154,7 +154,7 @@ mod tests {
     fn signature_block_inserted_into_assertion() {
         let a = Saml11Assertion::new("https://idp.example", "alice@example.com");
         let xml = a.to_xml().unwrap();
-        let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
+        let signer = Saml11SignedAssertion::new(xml, a.assertion_id);
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
         assert!(signed.contains("<ds:Signature"));
         assert!(signed.contains("<ds:SignatureValue>"));
@@ -165,7 +165,7 @@ mod tests {
     fn signature_reference_points_at_assertion_id() {
         let a = Saml11Assertion::new("https://idp.example", "alice@example.com");
         let xml = a.to_xml().unwrap();
-        let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
+        let signer = Saml11SignedAssertion::new(xml, a.assertion_id.clone());
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
         // Reference URI must be "#<AssertionID>".
         let expect = format!("URI=\"#{}\"", a.assertion_id);
@@ -176,7 +176,7 @@ mod tests {
     fn signed_assertion_round_trips_through_verify() {
         let a = Saml11Assertion::new("https://idp.example", "alice@example.com");
         let xml = a.to_xml().unwrap();
-        let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
+        let signer = Saml11SignedAssertion::new(xml, a.assertion_id);
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
         Saml11SignedAssertion::verify(&signed, &test_public_key_der()).unwrap();
     }
@@ -185,7 +185,7 @@ mod tests {
     fn tampered_assertion_fails_verify() {
         let a = Saml11Assertion::new("https://idp.example", "alice@example.com");
         let xml = a.to_xml().unwrap();
-        let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
+        let signer = Saml11SignedAssertion::new(xml, a.assertion_id);
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
         let tampered = signed.replace("alice@example.com", "mallory@example.com");
         assert!(Saml11SignedAssertion::verify(&tampered, &test_public_key_der()).is_err());
@@ -203,7 +203,7 @@ mod tests {
     fn signature_uses_rsa_sha256_alg_uri() {
         let a = Saml11Assertion::new("https://idp.example", "alice@example.com");
         let xml = a.to_xml().unwrap();
-        let signer = Saml11SignedAssertion::new(xml.clone(), a.assertion_id.clone());
+        let signer = Saml11SignedAssertion::new(xml, a.assertion_id);
         let signed = signer.sign(&test_keypair_pkcs8_der()).unwrap();
         assert!(signed.contains("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"));
     }

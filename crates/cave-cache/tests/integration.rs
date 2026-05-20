@@ -1014,7 +1014,7 @@ fn test_hash_slot() {
 #[test]
 fn test_acl_authenticate() {
     use cave_cache::acl::AclState;
-    let mut acl = AclState::new();
+    let acl = AclState::new();
     // default user with no password: always passes when no password set
     let ok = acl.authenticate("default", "");
     assert!(ok);

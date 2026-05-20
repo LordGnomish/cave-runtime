@@ -197,8 +197,8 @@ fn store_blob_dedupe_across_assets() {
     // Force fresh component IDs
     a1.component_id = Uuid::new_v4();
     a2.component_id = Uuid::new_v4();
-    store.put_asset(a1.clone(), bytes.clone()).unwrap();
-    store.put_asset(a2.clone(), bytes.clone()).unwrap();
+    store.put_asset(a1, bytes.clone()).unwrap();
+    store.put_asset(a2, bytes).unwrap();
     assert_eq!(store.blob_count(), 1, "single dedup'd blob expected");
 }
 
@@ -317,7 +317,7 @@ fn cleanup_older_than_matches_aged_assets() {
     // Backdate to 60 days ago.
     asset.created_at = Utc::now() - Duration::days(60);
     asset.last_modified = asset.created_at;
-    store.put_asset(asset.clone(), bytes).unwrap();
+    store.put_asset(asset, bytes).unwrap();
 
     let policy = CleanupPolicy {
         id: Uuid::new_v4(),

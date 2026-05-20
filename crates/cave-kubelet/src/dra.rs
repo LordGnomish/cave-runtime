@@ -177,7 +177,7 @@ impl DraManager {
         }
         let result = AllocationResult {
             claim_uid: claim.uid,
-            device_name: device_name.clone(),
+            device_name: device_name,
             driver,
             allocated_at: Utc::now(),
         };

@@ -123,10 +123,10 @@ mod tests {
         let ep1 = ep(7, 100, 1234, Ipv4::from_octets(10, 0, 0, 1));
         // 1. Insert new entry.
         lxc_map_update(&mut m, ep1.clone(), UpdateFlag::Any).unwrap();
-        assert_eq!(lxc_map_lookup(&mut m, (7, 100)), Some(ep1.clone()));
+        assert_eq!(lxc_map_lookup(&mut m, (7, 100)), Some(ep1));
         // 2. Replace identity in place.
         let ep2 = ep(7, 100, 9999, Ipv4::from_octets(10, 0, 0, 1));
-        lxc_map_update(&mut m, ep2.clone(), UpdateFlag::Any).unwrap();
+        lxc_map_update(&mut m, ep2, UpdateFlag::Any).unwrap();
         let after = lxc_map_lookup(&mut m, (7, 100)).unwrap();
         assert_eq!(after.security_identity, 9999);
         // 3. Delete.

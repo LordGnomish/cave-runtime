@@ -8,7 +8,7 @@
 //!
 //! A SortOrder declares how data files within a partition should be
 //! sorted. Each sort field references a source-column field-id, a
-//! transform (identity / bucket[N] / truncate[W] / year / month / day /
+//! transform (identity / `bucket[N]` / `truncate[W]` / year / month / day /
 //! hour / void), a direction, and a null-ordering. SortOrder #0 is
 //! the unsorted-default.
 

@@ -99,7 +99,7 @@ impl DependencyGraph {
         self.nodes.insert(
             id.clone(),
             GraphNode {
-                owners: owners.clone(),
+                owners: owners,
                 dependents: existing_dependents,
             },
         );

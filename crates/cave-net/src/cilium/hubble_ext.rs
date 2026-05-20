@@ -807,7 +807,7 @@ mod tests {
             "Observer.GetFlows",
             "tenant-hb-obs-gf"
         );
-        let mut o = Observer::new(tenant.clone(), 100, 0);
+        let mut o = Observer::new(tenant, 100, 0);
         for i in 0..5u64 {
             o.ingest(flow(
                 "tenant-hb-obs-gf",
@@ -832,7 +832,7 @@ mod tests {
             "Observer.GetFlows.Limit",
             "tenant-hb-obs-lim"
         );
-        let mut o = Observer::new(tenant.clone(), 100, 0);
+        let mut o = Observer::new(tenant, 100, 0);
         for i in 0..10u64 {
             o.ingest(flow(
                 "tenant-hb-obs-lim",
@@ -859,7 +859,7 @@ mod tests {
             "Observer.GetFlows.Filter",
             "tenant-hb-obs-flt"
         );
-        let mut o = Observer::new(tenant.clone(), 100, 0);
+        let mut o = Observer::new(tenant, 100, 0);
         o.ingest(flow(
             "tenant-hb-obs-flt",
             "ns/a",
@@ -897,7 +897,7 @@ mod tests {
             "Observer.Eviction",
             "tenant-hb-obs-evict"
         );
-        let mut o = Observer::new(tenant.clone(), 3, 0);
+        let mut o = Observer::new(tenant, 3, 0);
         for _ in 0..5 {
             o.ingest(flow(
                 "tenant-hb-obs-evict",
@@ -921,7 +921,7 @@ mod tests {
             "Observer.ServerStatus",
             "tenant-hb-obs-st"
         );
-        let mut o = Observer::new(tenant.clone(), 100, 1_000_000);
+        let mut o = Observer::new(tenant, 100, 1_000_000);
         for _ in 0..10 {
             o.ingest(flow(
                 "tenant-hb-obs-st",
@@ -948,7 +948,7 @@ mod tests {
             "Observer.Tenant",
             "tenant-hb-obs-iso"
         );
-        let mut o = Observer::new(tenant.clone(), 100, 0);
+        let mut o = Observer::new(tenant, 100, 0);
         o.ingest(flow(
             "other-tenant",
             "ns/a",
@@ -1133,7 +1133,7 @@ mod tests {
             "tenant-hb-rel-rm"
         );
         let mut r = Relay::new(tenant.clone());
-        r.add_cluster("us-east", Observer::new(tenant.clone(), 100, 0));
+        r.add_cluster("us-east", Observer::new(tenant, 100, 0));
         assert!(r.remove_cluster("us-east"));
         assert_eq!(r.cluster_count(), 0);
     }

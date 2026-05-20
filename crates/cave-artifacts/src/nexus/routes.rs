@@ -517,7 +517,7 @@ async fn upload_raw(
         id: Uuid::new_v4(),
         component_id: component.id,
         repository_id: repo.id,
-        repository_name: repo.name.clone(),
+        repository_name: repo.name,
         path: path.clone(),
         blob: BlobRef { sha256: sha, size },
         content_type: adapter.content_type(&path).to_string(),

@@ -294,7 +294,7 @@ impl DraManager {
             name: format!("{}-{}", pod_claim_name, pod_uid),
             namespace: template_namespace.to_string(),
             uid: claim_uid.clone(),
-            spec: tpl.spec_template.clone(),
+            spec: tpl.spec_template,
             allocation: None,
             phase: ClaimPhase::Pending,
             reserved_for: Vec::new(),

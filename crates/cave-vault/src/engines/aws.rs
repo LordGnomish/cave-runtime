@@ -155,7 +155,7 @@ pub async fn create_role(
 ) -> Result<VaultResponse, VaultError> {
     let _token = extract_token(&headers)?;
     let mut store = state.aws_store.write().await;
-    let mut role = store
+    let role = store
         .roles
         .entry(role_name.clone())
         .or_insert_with(|| AwsRole {
@@ -325,7 +325,7 @@ pub fn router(state: Arc<VaultState>, mount: &str) -> Router {
         }))
         .route(&format!("/v1/{}/creds/{{role_name}}", mount), get({
             let s = state.clone();
-            let mount = m.clone();
+            let mount = m;
             move |headers: HeaderMap, Path(role_name): Path<String>| {
                 let state = s.clone();
                 let mount = mount.clone();
