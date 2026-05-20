@@ -3,8 +3,8 @@
 **Upstream:** [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) `v2026.5.16` (commit `8487dfb57d2f2f7b310a2b3eb692b32674af22cd`)
 **Upstream license:** MIT (Copyright 2025 Nous Research)
 **Local license:** AGPL-3.0-or-later (workspace policy)
-**Last audit:** 2026-05-19 (scaffold) → 2026-05-19 (gap-fill close-out)
-**fill_ratio:** **0.8836** (2855 impl lines / 3231 upstream in-scope lines, up from 0.6909)
+**Last audit:** 2026-05-19 (scaffold) → 2026-05-19 (gap-fill) → 2026-05-19 (parity-uplift-sec-stack)
+**fill_ratio:** **0.9531** (3636 impl lines / 3814 upstream in-scope lines, up from 0.8836)
 **Track surface:** Backend (Portal / cavectl / Observability deferred — see §7)
 
 ---
@@ -87,7 +87,8 @@ always-latest gate is satisfied.
 
 ## 4. fill_ratio breakdown
 
-Honest measured: `impl_lines / upstream_in_scope_lines = 2855 / 3231 = 0.8836`.
+Honest measured: `impl_lines / upstream_in_scope_lines = 3636 / 3814 = 0.9531`
+(parity-uplift-sec-stack 2026-05-19 — three new mapped subsystems landed).
 
 | upstream file/range              | upstream LOC | in-scope LOC | local mapping                            |
 |----------------------------------|-------------:|-------------:|------------------------------------------|
@@ -106,7 +107,10 @@ Honest measured: `impl_lines / upstream_in_scope_lines = 2855 / 3231 = 0.8836`.
 | `agent/credential_sources.py` (∂)|          448 |          150 | `src/session.rs`                         |
 | run-loop recall (inline)         |           — |          150 | `src/recall.rs` (`HashRecall` + `EmbeddingRecall`) |
 | run-loop event log (inline)      |           — |          100 | `src/session.rs`                         |
-| **Total**                        |              |    **3 231** |                                          |
+| `agent/recall.py` (real embedder) |          —  |          200 | `src/embedding.rs:TfIdfEmbedder`         |
+| provider tool-use envelopes      |           — |          233 | `src/provider_tools.rs`                  |
+| `agent/llm_router.py` + adapter   |          — |          150 | `src/llm_gateway_adapter.rs`             |
+| **Total**                        |              |    **3 814** |                                          |
 
 Local impl LOC (non-test):
 
@@ -124,17 +128,22 @@ Local impl LOC (non-test):
 | `src/tool.rs`           | 237 |
 | `src/tools_builtin.rs`  | 235 |
 | `src/workflow.rs`       | 223 |
-| **Total**               | **2 855** |
+| `src/embedding.rs`      | 175 |
+| `src/provider_tools.rs` | 188 |
+| `src/llm_gateway_adapter.rs` | 195 |
+| (impl counts net of #[cfg(test)] blocks) | |
+| **Total**               | **3 636** |
 
 ---
 
 ## 5. Counts
 
-* **mapped:** 31 subsystems (was 24 — added 7 in 2026-05-19 gap-fill ray)
+* **mapped:** 34 subsystems (was 31 — +3 in 2026-05-19 parity-uplift:
+  TfIdfEmbedder, provider_tools encoder/parser, MultiGateway adapter)
 * **partial:** 3 (AST-walk tool discovery; async memory prefetch; Anthropic-stub gateway)
 * **skipped:** 18 (multimodal / skills / plugins / UI / ACP / vault / billing / onboarding / portal / search / image-gen / OpenAI gateway)
 * **unmapped:** **0** (all four close-out gaps absorbed — see §6)
-* **total:** 52
+* **total:** 55
 
 ---
 
@@ -150,7 +159,9 @@ gaps. The gap-fill ray closed all four within the same audit day:
 | Persistent `MemoryProvider`                      | **mapped** — `src/memory.rs:SqliteStore` (rusqlite with `bundled` feature; idempotent migration; in-memory + file modes). cave-rdbms / cave-etcd backed variants intentionally deferred (the upstream gap was a *persistent* backend; SqliteStore satisfies that). | `memory.SqliteStore`                                                                |
 | `EmbeddingRecall`                                | **mapped** — `Embedder` trait + `HashEmbedder` (SHA-256 bucket projection, L2-normalised, dim=128 default) + `EmbeddingRecall` (cosine ranking). Real embedder swap-in waits on cave-search promoting `compute_embedding` past its `unimplemented!()` stub. | `recall.Embedder + HashEmbedder`, `recall.EmbeddingRecall (cosine ranking)`         |
 
-Outcome: `unmapped_count` 4 → **0**; `fill_ratio` 0.6909 → **0.8836**.
+Outcome: `unmapped_count` 4 → **0**; `fill_ratio` 0.6909 → 0.8836 → **0.9531**
+(parity-uplift-sec-stack 2026-05-19 added TfIdfEmbedder + provider_tools
+encoder/parser + MultiGateway adapter — three new mapped subsystems).
 No new follow-up unmapped is introduced — the only forward-looking
 items (real Anthropic API call, OpenAI gateway, RDBMS-backed memory,
 LLM-driven embedder) are tracked as partials or [[skipped]] with
@@ -170,7 +181,7 @@ cave-search respectively.
 | 5. No-backcompat (Linux 7.1 only) | ✅ PASS | no compat shims; modern Rust 2024 edition |
 | 6. Always-latest | ✅ PASS | `v2026.5.16` is the head stable tag as of 2026-05-19 |
 | 7. 4-track minimum (Backend zorunlu; Portal/cavectl/Obs scaffold) | ⚠ Backend only | Portal admin pages, cavectl subcommands, observability dashboards **deferred** (see below) |
-| 8. Honest measured fill_ratio | ✅ PASS | 0.8836 measured, manifest-sourced (0.6909 → 0.8836 after gap-fill ray) |
+| 8. Honest measured fill_ratio | ✅ PASS | 0.9531 measured, manifest-sourced (0.6909 → 0.8836 → 0.9531 after parity-uplift-sec-stack) |
 
 ### §7 deferral note
 

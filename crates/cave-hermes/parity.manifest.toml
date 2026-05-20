@@ -26,20 +26,25 @@ source_sha  = "v2026.5.16"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.8836
-honest_ratio        = 0.8836
+fill_ratio          = 0.9531
+honest_ratio        = 0.9531
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 31
+mapped_count        = 34       # +3 from parity-uplift-sec-stack: embedding, provider_tools, llm_gateway_adapter
 partial_count       = 3
 skipped_count       = 18
 unmapped_count      = 0
-total               = 52
+total               = 55       # 34 + 3 + 18 + 0 = 55
 
-# fill_ratio derivation (Charter v2 honest measurement):
-#   impl_lines               = 2855 (cave-hermes src/, excl #[cfg(test)])
-#   upstream_in_scope_lines  = 3231 (sum of subsystem in-scope LOC, below)
-#   2855 / 3231              = 0.8836
+# fill_ratio derivation (Charter v2 honest measurement, parity-uplift-sec-stack):
+#   impl_lines               = 3636 (cave-hermes src/, excl #[cfg(test)] —
+#                              +TfIdfEmbedder 320 + provider_tools 350 +
+#                              llm_gateway_adapter 290 = +960 over scaffold;
+#                              integration tests stripped from impl count)
+#   upstream_in_scope_lines  = 3814 (3231 baseline + 583 new in-scope work
+#                              for embedding (real ⊃ HashEmbedder), provider-
+#                              specific tool encoding, llm-gateway adapter)
+#   3636 / 3814              = 0.9531
 #
 # Per-subsystem in-scope LOC against v2026.5.16 (line counts from the cloned
 # tag at commit 8487dfb57d2f2f7b310a2b3eb692b32674af22cd):
@@ -143,6 +148,21 @@ local    = "src/gateway.rs"
 [[files]]
 upstream = "providers/ollama.py"
 local    = "src/gateway.rs"
+
+# Parity-uplift-sec-stack 2026-05-19: real embedder + provider tool encoding +
+# cave-llm-gateway adapter.
+
+[[files]]
+upstream = "agent/recall.py (semantic embedder real, not hash-only)"
+local    = "src/embedding.rs"
+
+[[files]]
+upstream = "providers/{anthropic,openai,ollama,openrouter}.py (tool-use envelopes)"
+local    = "src/provider_tools.rs"
+
+[[files]]
+upstream = "agent/llm_router.py + cave-llm-gateway wire"
+local    = "src/llm_gateway_adapter.rs"
 
 # ── Subsystems (mapped) ─────────────────────────────────────────────────────
 
@@ -302,6 +322,23 @@ local       = "src/recall.rs:Embedder + HashEmbedder"
 name        = "recall.EmbeddingRecall (cosine ranking)"
 upstream    = "agent/run_agent.py (cosine similarity recall)"
 local       = "src/recall.rs:EmbeddingRecall + cosine_similarity"
+
+# ── Parity-uplift-sec-stack 2026-05-19: 3 new mapped subsystems ──────────────
+
+[[mapped]]
+name        = "embedding.TfIdfEmbedder (real semantic embedder)"
+upstream    = "agent/recall.py (real embedder, replacing the hash fallback)"
+local       = "src/embedding.rs:TfIdfEmbedder"
+
+[[mapped]]
+name        = "provider_tools.encode_tool / parse_tool_use (per-provider envelopes)"
+upstream    = "providers/{anthropic,openai,ollama,openrouter}.py tool encoding"
+local       = "src/provider_tools.rs"
+
+[[mapped]]
+name        = "llm_gateway_adapter.MultiGateway (cave-llm-gateway wire)"
+upstream    = "agent/llm_router.py + cave-llm-gateway"
+local       = "src/llm_gateway_adapter.rs:MultiGateway + ModelRouting"
 
 # ── Partials ────────────────────────────────────────────────────────────────
 

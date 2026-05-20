@@ -6,6 +6,8 @@
 
 pub mod cyclonedx;
 pub mod spdx;
+pub mod spdx_expression;
+pub mod vex;
 
 use crate::models::Component;
 

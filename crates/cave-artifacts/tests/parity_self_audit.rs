@@ -5,7 +5,7 @@
 //!
 //!   1. upstream version == "3.49.0" (pulpcore)
 //!   2. source_sha inline-table present (pulpcore + harbor + nexus pins)
-//!   3. fill_ratio measured, >= 0.80 (cave-artifacts Charter floor)
+//!   3. fill_ratio measured, >= 0.95 (cave-artifacts parity-uplift floor)
 //!   4. parity_ratio_source == "manifest"
 //!   5. last_audit == "2026-05-19"
 //!   6. infra_only == false
@@ -80,8 +80,8 @@ fn parity_fill_ratio_is_measured_and_at_least_floor() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.80,
-        "cave-artifacts measured floor: fill_ratio must be >= 0.80 (got {})",
+        ratio >= 0.95,
+        "cave-artifacts parity-uplift floor: fill_ratio must be >= 0.95 (got {})",
         ratio
     );
     assert!(

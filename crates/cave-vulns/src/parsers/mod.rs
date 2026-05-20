@@ -9,6 +9,7 @@
 use crate::finding::Finding;
 
 pub mod bandit;
+pub mod cyclonedx_vex;
 pub mod nuclei;
 pub mod sarif;
 pub mod semgrep;

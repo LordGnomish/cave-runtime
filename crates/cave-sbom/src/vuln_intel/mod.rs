@@ -4,6 +4,7 @@
 //
 //! Vulnerability intelligence — multi-source advisory ingestion.
 
+pub mod correlator;
 pub mod epss;
 pub mod ghsa;
 pub mod nvd;

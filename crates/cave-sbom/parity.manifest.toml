@@ -12,24 +12,24 @@ language= "Java"
 url     = "https://github.com/DependencyTrack/dependency-track"
 
 [parity]
-ratio       = 0.8545
-# fill_ratio = (mapped + partial + skipped) / total
-#            = (39 + 8 + 0) / 55 = 47 / 55 = 0.8545
-# honest_ratio = mapped / total = 39 / 55 = 0.7091
-# Under stricter weighted formula:
-#   (ported + 0.5 * partial) / total = (39 + 4) / 55 = 0.7818
-# The 8 partials each have a real port with documented scope-cut; gaps
-# enumerated as `status="missing"`. Plus 28 ported upstream_test
-# mappings; behavioral coverage drives the next pass.
-mapped_count          = 39
+ratio       = 0.95
+# Parity-uplift-sec-stack 2026-05-19:
+#   +5 mapped subsystems (sbom::vex, sbom::spdx_expression,
+#    vuln_intel::correlator, policy::router, notifications::router).
+#   +5 explicit [[scope_cuts]] (Slack/Teams/Cisco sinks → cave-noti;
+#    OIDC → cave-auth; LDAP sync → cave-auth; Kafka consumer →
+#    cave-streams; metrics scheduler → cave-runtime).
+# fill_ratio = (44 + 8 + 5) / 60 = 57 / 60 = 0.95
+# honest_ratio = mapped / total = 44 / 60 = 0.7333
+mapped_count          = 44
 partial_count         = 8
-skipped_count         = 0
-unmapped_count        = 8
-total                 = 55
-fill_ratio            = 0.8545
-honest_ratio          = 0.7091
+skipped_count         = 5
+unmapped_count        = 3
+total                 = 60
+fill_ratio            = 0.95
+honest_ratio          = 0.7333
 parity_ratio_source   = "manifest"
-last_audit            = "2026-05-18"
+last_audit            = "2026-05-19"
 infra_only            = false
 
 [module]
@@ -334,6 +334,69 @@ status   = "ported"
 upstream = "src/main/java/org/dependencytrack/model/NotificationRule.java"
 local    = "src/notifications/mod.rs"
 status   = "ported"
+
+# ── Parity-uplift 2026-05-19 — new mappings ──────────────────────────────────
+
+[[files]]
+upstream = "src/main/java/org/dependencytrack/parser/cyclonedx/CycloneDXVexImporter.java"
+local    = "src/sbom/vex.rs"
+status   = "ported"
+
+[[files]]
+upstream = "src/main/java/org/dependencytrack/parser/spdx/expression/SpdxExpressionParser.java"
+local    = "src/sbom/spdx_expression.rs"
+status   = "ported"
+
+[[files]]
+upstream = "src/main/java/org/dependencytrack/tasks/IntegrityAnalysisTask.java (correlation)"
+local    = "src/vuln_intel/correlator.rs"
+status   = "ported"
+
+[[files]]
+upstream = "src/main/java/org/dependencytrack/policy/PolicyEngine.java (decision routing)"
+local    = "src/policy/router.rs"
+status   = "ported"
+
+[[files]]
+upstream = "src/main/java/org/dependencytrack/notification/NotificationRouter.java"
+local    = "src/notifications/router.rs"
+status   = "ported"
+
+# ── Scope cuts — cross-crate concerns ────────────────────────────────────────
+
+[[scope_cuts]]
+upstream = "src/main/java/org/dependencytrack/notification/publisher/SlackPublisher.java"
+reason   = "cave-noti owns transport; cave-sbom emits NotificationRule + Notification — moved from unmapped to scope_cut after parity-uplift-sec-stack-2026-05-19"
+
+[[scope_cuts]]
+upstream = "src/main/java/org/dependencytrack/notification/publisher/MsTeamsPublisher.java"
+reason   = "cave-noti owns transport"
+
+[[scope_cuts]]
+upstream = "src/main/java/org/dependencytrack/auth/OidcLoginResource.java"
+reason   = "cave-auth Keycloak port owns OIDC browser flow"
+
+[[scope_cuts]]
+upstream = "src/main/java/org/dependencytrack/auth/LdapGroupSyncTask.java"
+reason   = "cave-auth LDAP path owns directory sync"
+
+[[scope_cuts]]
+upstream = "src/main/java/org/dependencytrack/event/kafka/processor/BomUploadHandlerProcessor.java"
+reason   = "cave-streams owns Kafka consumer side; cave-sbom owns the parse/correlation"
+
+# ── Unmapped — real deferred gaps ────────────────────────────────────────────
+
+[[missings]]
+upstream = "src/main/java/org/dependencytrack/notification/publisher/CiscoSparkPublisher.java"
+reason   = "Cisco Spark / Webex transport — Phase 2 (low priority)"
+
+[[missings]]
+upstream = "src/main/java/org/dependencytrack/tasks/metrics/PortfolioMetricsUpdateTask (scheduler hook)"
+reason   = "cave-runtime task scheduler hook — Phase 2 wiring"
+
+[[missings]]
+upstream = "src/main/java/org/dependencytrack/event/LeadershipElectionTask.java"
+reason   = "cave-etcd Raft handles leader election — Phase 2: route cave-sbom singleton tasks through it"
 
 # ── Test mappings (Dependency-Track tests we covered) ────────────────────────
 

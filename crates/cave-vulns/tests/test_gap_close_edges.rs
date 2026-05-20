@@ -6,7 +6,7 @@
 // product-style hierarchy validation via the scan-result aggregation.
 
 use cave_vulns::{
-    dedup::{dedup_key, deduplicate, is_sla_breached, sla_days, sla_deadline},
+    dedup::{legacy_vuln_dedup_key as dedup_key, deduplicate, is_sla_breached, sla_days, sla_deadline},
     engine::{
         build_scan_result, count_by_severity, cvss_to_severity, find_for_component, is_affected,
         version_lt,

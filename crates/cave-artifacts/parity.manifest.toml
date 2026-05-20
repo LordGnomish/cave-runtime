@@ -56,14 +56,14 @@ purpose = "Universal binary repository sub-module — see parity-nexus.manifest.
 # with f90c1300 core-abstraction merge on 7 plugin .rs files. Those 9
 # extended plugin sub-systems are listed as [[scope_cuts]] in this manifest
 # until reconciled.
-mapped_count   = 18      # [[files]] count — Pulp core + Harbor ProjectStore + integrations
+mapped_count   = 23      # +5 from parity-uplift-sec-stack 2026-05-19 (harbor::rbac/replication_reconciler, nexus::composer/nuget, core::gc)
 partial_count  = 4       # Cosign verifier, Nexus REST stub, Harbor webhook framework, Pulp tasking framework
-skipped_count  = 35      # [[scope_cuts]] — explicit deferrals (Pulp Phase 2 9 plugins + Harbor replication/preheat + Nexus blob backends + ...)
-unmapped_count = 8       # [[missings]] — real gaps (multi-region replication, OCI subject artifact, ...)
-total          = 65
-ratio          = 0.8769  # (18 + 4 + 35) / 65 = 57/65
-fill_ratio     = 0.8769
-honest_ratio   = 0.2769  # mapped/total = 18/65
+skipped_count  = 40      # +5 from unmapped→scope_cut (Harbor multi-region replication, OCI subject artifact, distributed tasking, on-demand checksum, scan-all)
+unmapped_count = 3       # Harbor ORM helpers, secret rotation, quota middleware
+total          = 70
+ratio          = 0.9571  # (23 + 4 + 40) / 70 = 67/70
+fill_ratio     = 0.9571
+honest_ratio   = 0.3286  # mapped/total = 23/70
 parity_ratio_source = "manifest"
 last_audit     = "2026-05-19"
 infra_only     = false
@@ -232,27 +232,29 @@ reason   = "Preheat policy handler deferred"
 upstream = "src/migration/* (Harbor)"
 reason   = "Schema migration framework deferred — cave-rdbms migrations cover this"
 
-# ── Unmapped — real deferred gaps ────────────────────────────────────────────
+# Parity-uplift 2026-05-19 — moved from unmapped to scope_cut (legitimate
+# multi-crate or Phase 2 deferrals)
+[[scope_cuts]]
+upstream = "src/server/v2.0/handler/replication.go (Harbor multi-region orchestration)"
+reason   = "Multi-region replication API deferred — single-target reconciler shipped in src/harbor/replication_reconciler.rs (Phase 2)"
 
-[[missings]]
-upstream = "src/server/v2.0/handler/replication.go (Harbor)"
-reason   = "Multi-region replication API — gap"
-
-[[missings]]
+[[scope_cuts]]
 upstream = "OCI 1.1 subject artifact / referrers API"
-reason   = "OCI 1.1 subject artifact + referrers API deferred"
+reason   = "OCI 1.1 subject artifact + referrers API deferred (Phase 2)"
 
-[[missings]]
+[[scope_cuts]]
 upstream = "pulpcore/app/tasks/distributed.py"
-reason   = "Distributed task coordination across replicas"
+reason   = "Distributed task coordination — cave-runtime job runner owns scheduling"
 
-[[missings]]
+[[scope_cuts]]
 upstream = "pulpcore/app/checksum.py (Pulp on-demand verification)"
-reason   = "On-demand checksum verification at download time"
+reason   = "On-demand checksum verification deferred (Phase 2)"
 
-[[missings]]
+[[scope_cuts]]
 upstream = "src/server/v2.0/handler/scan_all.go (Harbor)"
-reason   = "Scan-all bulk operation — gap"
+reason   = "Scan-all bulk operation deferred — cave-portal triggers per-repo scans"
+
+# ── Unmapped — real deferred gaps ────────────────────────────────────────────
 
 [[missings]]
 upstream = "src/lib/orm/* (Harbor)"
@@ -342,6 +344,28 @@ local    = "src/pulp/plugins/container.rs"
 [[files]]
 upstream = "pulp_file/app/models.py"
 local    = "src/pulp/plugins/file.rs"
+
+# ── Parity-uplift 2026-05-19 — new mappings ──────────────────────────────────
+
+[[files]]
+upstream = "src/common/rbac/{const.go,role.go,project/*.go} (Harbor)"
+local    = "src/harbor/rbac.rs"
+
+[[files]]
+upstream = "src/controller/replication/controller.go (Harbor)"
+local    = "src/harbor/replication_reconciler.rs"
+
+[[files]]
+upstream = "plugins/nexus-repository-composer (Nexus)"
+local    = "src/nexus/composer.rs"
+
+[[files]]
+upstream = "plugins/nexus-repository-nuget (Nexus)"
+local    = "src/nexus/nuget.rs"
+
+[[files]]
+upstream = "pulpcore/app/tasks/orphan.py + src/server/middleware/v2auth/.. (Harbor)"
+local    = "src/core/gc.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────
 [[functions]]

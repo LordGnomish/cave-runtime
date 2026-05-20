@@ -5,7 +5,7 @@
 //!
 //!   1. upstream version == "v4.11.6"
 //!   2. source_sha pinned to the v4.11.6 tag SHA
-//!   3. fill_ratio measured, >= 0.80 (cave-sbom Charter floor)
+//!   3. fill_ratio measured, >= 0.95 (cave-sbom parity-uplift floor)
 //!   4. parity_ratio_source == "manifest"
 //!   5. last_audit == "2026-05-18"
 //!   6. infra_only == false
@@ -80,8 +80,8 @@ fn parity_fill_ratio_is_measured_and_at_least_floor() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.80,
-        "cave-sbom measured floor: fill_ratio must be >= 0.80 (got {})",
+        ratio >= 0.95,
+        "cave-sbom parity-uplift floor: fill_ratio must be >= 0.95 (got {})",
         ratio
     );
     assert!(
@@ -106,13 +106,13 @@ fn parity_ratio_source_is_manifest() {
 }
 
 #[test]
-fn parity_last_audit_is_2026_05_18() {
+fn parity_last_audit_is_2026_05_19() {
     let m = manifest_text();
     let when = extract_after(&m, "\nlast_audit ").or_else(|| extract_after(&m, "\nlast_audit="));
     assert_eq!(
         when.as_deref(),
-        Some("2026-05-18"),
-        "[parity] last_audit must reflect the 2026-05-18 Charter v2 close-out"
+        Some("2026-05-19"),
+        "[parity] last_audit must reflect the 2026-05-19 parity-uplift close-out"
     );
 }
 

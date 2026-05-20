@@ -15,9 +15,11 @@
 //! unchanged.
 
 pub mod cleanup;
+pub mod composer;
 pub mod error;
 pub mod format;
 pub mod models;
+pub mod nuget;
 pub mod routes;
 pub mod routing;
 pub mod store;

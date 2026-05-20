@@ -26,8 +26,11 @@ use std::sync::Arc;
 
 // New first-class modules (deep DefectDojo port).
 pub mod cvss;
+pub mod engagement_scope;
 pub mod finding;
 pub mod hierarchy;
+pub mod lifecycle;
+pub mod notification_rules;
 pub mod notifications;
 pub mod parsers;
 pub mod reports;
