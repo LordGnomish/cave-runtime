@@ -5,8 +5,13 @@
 //! Compatible with: Trufflehog + gitleaks
 //! Pre-commit and CI secret scanning. Regex + entropy-based detection.
 
+pub mod archive;
+pub mod baseline;
+pub mod custom_rules;
+pub mod decoders;
 pub mod detector;
 pub mod models;
+pub mod precommit;
 pub mod routes;
 
 use axum::Router;

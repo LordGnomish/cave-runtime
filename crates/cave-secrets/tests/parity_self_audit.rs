@@ -79,8 +79,8 @@ fn parity_fill_ratio_is_measured_and_at_least_floor() {
         .parse()
         .expect("fill_ratio must parse as float");
     assert!(
-        ratio >= 0.80,
-        "cave-secrets measured floor: fill_ratio must be >= 0.80 (got {})",
+        ratio >= 0.95,
+        "cave-secrets parity-uplift floor: fill_ratio must be >= 0.95 (got {})",
         ratio
     );
     assert!(
