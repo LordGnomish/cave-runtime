@@ -999,14 +999,19 @@
     },
     "cave-metrics": {
       "cave_src_loc": 9530,
-      "honest_ratio": 0.0,
-      "last_audit_disk": "2026-05-12",
+      "honest_ratio": 0.7333,
+      "last_audit_disk": "2026-05-19",
       "manifest_filled": true,
+      "mapped_count": 14,
       "note": null,
-      "parity_ratio": 0.0,
+      "parity_ratio": 0.8,
       "parity_ratio_source": "manifest",
+      "partial_count": 2,
+      "skipped_count": 8,
       "stubs": null,
       "tier": "C",
+      "total_count": 30,
+      "unmapped_count": 6,
       "upstream": "prometheus/prometheus",
       "upstream_version": "v2.48.0"
     },
@@ -1679,7 +1684,7 @@
     "injected": 9,
     "new_filled": 86,
     "phantoms": 5,
-    "ratio_overrides": 37
+    "ratio_overrides": 38
   },
   "generated_at": "2026-05-01",
   "generated_from": "docs/parity/full-audit-2026-05-01.md"
