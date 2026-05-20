@@ -1,7 +1,7 @@
 # cave-scheduler — kube-scheduler parity report
 
 Pinned upstream: **kubernetes/kubernetes @ v1.36.0** (`source_sha = "v1.36.0"`)
-Audit landed: 2026-05-12 · batch2 imagelocality port: 2026-05-13 · Charter v2 FINALIZE: 2026-05-18
+Audit landed: 2026-05-12 · batch2 imagelocality port: 2026-05-13 · Charter v2 FINALIZE: 2026-05-18 · Parity uplift: 2026-05-19
 
 This document is the honest companion to `parity.manifest.toml`. The
 manifest proves *coverage*; this report describes *fidelity*.
@@ -13,17 +13,17 @@ manifest proves *coverage*; this report describes *fidelity*.
 | metric | value |
 |---|---|
 | upstream packages enumerated | 29 |
-| mapped | 19 |
+| mapped | 21 |
 | partial | 0 |
 | skipped (Go-toolchain / cloud-provider) | 7 |
-| unmapped (acknowledged real port gaps) | **3** |
-| `fill_ratio` (mapped + skipped) / total | **0.8966** (measured) |
-| `honest_ratio` | **0.8966** (no partials) |
-| cave-scheduler `.rs` files | 25 |
-| SPDX AGPL-3.0-or-later coverage | **25/25 (100 %)** |
+| unmapped (acknowledged real port gaps) | **1** |
+| `fill_ratio` (mapped + skipped) / total | **0.9655** (measured) |
+| `honest_ratio` | **0.9655** (no partials) |
+| cave-scheduler `.rs` files | 27 |
+| SPDX AGPL-3.0-or-later coverage | **27/27 (100 %)** |
 | `unimplemented!()` / `todo!()` / `panic!("not …")` | **0** |
 | `#[deprecated]` | **0** |
-| `#[test]` + `#[tokio::test]` | 384 |
+| `#[test]` + `#[tokio::test]` | 398 |
 | release build | clean |
 
 ---
@@ -39,7 +39,7 @@ manifest proves *coverage*; this report describes *fidelity*.
 | 5 | No back-compat | ✅ | grep count 0 |
 | 6 | Latest upstream pinned | ✅ | k8s v1.36.0 |
 | 7 | 4-track full | ✅ | see below |
-| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.8966` measured |
+| 8 | Honest measured manifest | ✅ | `fill_ratio = 0.9655` measured |
 
 All 8 gates: **PASS**.
 
@@ -58,21 +58,44 @@ All 8 gates: **PASS**.
 
 ## Unmapped surface (honest scope-cut)
 
-The 3 [[unmapped]] rows are real port gaps, not audit-doc placeholders:
+The remaining 1 [[unmapped]] row is a real port gap, not an audit-doc placeholder:
 
 | upstream package | reason | follow-up |
 |---|---|---|
-| `pkg/scheduler/framework/plugins/interpodaffinity/` | Soft-affinity weighted scoring with anti-affinity topology keys. Filter path is implemented; PreScore/Score fall back to neutral 0 — hard-affinity works, soft preferences are no-ops. | port PreScore/Score weighted formulas |
 | `pkg/scheduler/framework/preemption/recovery` | Preemption-victim restoration after API failure during the victim eviction window. cave `preempt.rs` aborts and re-queues but does not re-add the would-have-victims, so transient apiserver errors can leak victim state. | victim restoration loop |
-| `pkg/scheduler/framework/plugins/volumezone/` | Forbid pods from binding PVs in a zone that does not include the candidate node. `volume.rs` handles topology-aware provisioning but does not enforce per-zone restriction at scheduling time. | volumezone Filter plugin |
 
 ---
 
-## What changed in this FINALIZE
+## What changed in this 2026-05-19 UPLIFT
+
+  * Two [[unmapped]] → [[mapped]] (fill_ratio 0.8966 → 0.9655):
+    * `pkg/scheduler/framework/plugins/interpodaffinity/` →
+      `src/interpodaffinity_scoring.rs`. Three-step soft-affinity pipeline
+      mirroring upstream's `scoring.go`:
+      1. **PreScore** — walk the snapshot once, build a table keyed by
+         `(topology_key, topology_value)` of summed `±weight` contributions
+         from each existing pod that matches a preferred-affinity or
+         preferred-anti-affinity term.
+      2. **Score** — O(1) per candidate node: sum the precomputed table at
+         the node's value for each relevant topology key. Negative raw
+         scores are allowed at this step.
+      3. **Normalize** — linear map `[min, max] → [0, MAX_NODE_SCORE]`.
+         Flat input pins every node to `MAX_NODE_SCORE` (upstream
+         behaviour).
+    * `pkg/scheduler/framework/plugins/volumezone/` →
+      `src/volumezone_plugin.rs`. Dedicated module mirroring upstream's
+      package boundary. Filter walks the pod's PVCs, resolves each bound
+      PV through `VolumeStore`, and rejects nodes whose
+      `topology.kubernetes.io/{zone,region}` (or legacy
+      `failure-domain.beta.*`) label is absent or absent from the PV's
+      `node_affinity` allow-list. Unbound PVCs and PVs without zone
+      affinity are unconstrained.
+  * 14 new `#[test]` (6 + 8) in the new modules — all PASS.
+  * `tests/parity_self_audit.rs` floors bumped (mapped ≥ 21,
+    fill_ratio ≥ 0.95, rs_files ≥ 27).
+  * `[parity] last_audit = "2026-05-19"`.
+
+## What landed in the 2026-05-18 FINALIZE
 
   * `[upstream] source_sha = "v1.36.0"` — reproducibility pin.
-  * `[parity] last_audit = "2026-05-18"` — close-out date.
   * `tests/parity_self_audit.rs` — 9 deterministic assertions.
-
-Behavioural depth, fill_ratio, and honest_ratio remain at their
-measured 2026-05-13 batch2 baseline.
