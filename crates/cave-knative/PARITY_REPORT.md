@@ -16,15 +16,22 @@ Copyright 2026 Cave Runtime contributors
 ## 1 · Fill-ratio (honest, measured)
 
 ```
-mapped_count   = 24
+mapped_count   = 26  (+2 vs pre-wave-2)
 partial_count  = 0
 skipped_count  = 4   (queue-proxy, activator, domain-mapping, build-deprecated)
-unmapped_count = 2   (hpa-direct-integration, eventing-in-memory-channel-impl)
+unmapped_count = 0   (-2 vs pre-wave-2)
 total          = 30
-fill_ratio     = 0.9333  (mapped + partial + skipped) / total
-honest_ratio   = 0.9333
+fill_ratio     = 1.0     (mapped + partial + skipped) / total = 30/30   (+0.0667)
+honest_ratio   = 1.0
 parity_ratio_source = "manifest"
 ```
+
+### Wave-2 close-out delta (2026-05-19)
+
+| Δ | subsystem                       | provenance                          |
+|---|---------------------------------|-------------------------------------|
+| → | hpa-direct-integration          | unmapped → mapped · `src/hpa_bridge.rs` (autoscaling/v2 HPA CR renderer + class predicate) |
+| → | eventing-in-memory-channel-impl | unmapped → mapped · `src/in_memory_channel.rs` (per-sub queue + retry + DLQ + addressable URI) |
 
 Formula switched from LOC-ratio to count-ratio matching the rest of the
 workspace ((mapped + partial + skipped) / total). `docs/parity/parity-index.json`
@@ -120,12 +127,12 @@ Net: 12 → **24** mapped, 9 → **4** skipped, total 23 → **30**, fill_ratio
 | domain-mapping   | DomainMapping CRD — needs cave-dns + cave-certs integration; deferred.                 |
 | build-deprecated | Burak's explicit Out: `build (deprecate)`; upstream removed in Knative 0.8.            |
 
-## 5 · Unmapped subsystems (2 — in-scope, not yet ported)
+## 5 · Unmapped subsystems (0)
 
-| Surface                          | Reason                                                                  |
-|----------------------------------|-------------------------------------------------------------------------|
-| hpa-direct-integration           | cave-controller-manager owns HPA path; we expose Autoscaler directly.   |
-| eventing-in-memory-channel-impl  | In-memory channel transport runtime — Phase 2 with broker reconciler.   |
+Both pre-existing unmapped subsystems promoted to mapped in Wave-2 close-out 2026-05-19:
+
+* `hpa-direct-integration` → `src/hpa_bridge.rs` — `autoscaling/v2.HorizontalPodAutoscaler` renderer triggered by `autoscaling.knative.dev/class: hpa.autoscaling.knative.dev`.
+* `eventing-in-memory-channel-impl` → `src/in_memory_channel.rs` — IMC dispatcher with per-subscriber queues, exponential/linear backoff, dead-letter accumulator.
 
 ## 6 · 4-track status
 
@@ -147,7 +154,7 @@ Net: 12 → **24** mapped, 9 → **4** skipped, total 23 → **30**, fill_ratio
 | 5 | No-backcompat — no aliased re-exports or migration shims              | ✅      |
 | 6 | Always-latest — Knative v1.22.0 (latest stable as of 2026-05-19)      | ✅      |
 | 7 | 4-track — Backend GREEN; Portal/cavectl/Obs honestly deferred Phase 3 | ✅      |
-| 8 | Honest measured `fill_ratio = 0.9333` (>= 0.45 MVP floor; +0.18 over Phase 1) | ✅      |
+| 8 | Honest measured `fill_ratio = 1.0` (>= 0.45 MVP floor; +0.0667 over Wave-1) | ✅      |
 
 ## 8 · Reproducibility
 
