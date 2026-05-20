@@ -24,6 +24,7 @@ pub mod types;
 pub mod authz;
 pub mod destinationrule;
 pub mod hbone;
+pub mod l7_policy;
 pub mod svid;
 pub mod telemetry;
 pub mod virtualservice;

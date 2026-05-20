@@ -45,6 +45,7 @@ pub mod store;
 pub mod telemetry;
 pub mod traffic;
 pub mod traffic_policy;
+pub mod vm_mesh;
 
 /// Ambient-mode parity (ztunnel L4 mTLS, waypoint L7, AuthZ, VS/DR,
 /// SPIFFE SVID, telemetry). Pinned to istio/istio v1.30.0.

@@ -28,6 +28,8 @@ pub mod cert_bridge;
 pub mod configuration;
 pub mod eventing;
 pub mod eventing_transports;
+pub mod hpa_bridge;
+pub mod in_memory_channel;
 pub mod ksvc;
 pub mod meta;
 pub mod revision;

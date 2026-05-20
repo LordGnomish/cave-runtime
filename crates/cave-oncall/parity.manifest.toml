@@ -27,13 +27,13 @@ language= "Python"
 url     = "https://github.com/grafana/oncall"
 
 [parity]
-mapped_count   = 9
+mapped_count   = 12
 partial_count  = 2
 skipped_count  = 4
-unmapped_count = 3
+unmapped_count = 0
 total          = 18
-fill_ratio     = 0.8333
-honest_ratio   = 0.7222          # (mapped 9 + skipped 4) / 18 — partial excluded
+fill_ratio     = 1.0
+honest_ratio   = 0.8889          # (mapped 12 + skipped 4) / 18 — partial excluded
 parity_ratio_source = "manifest"
 source_sha     = "d7c4a3b2e5f1c8a9b6e3d7c4a3b2e5f1c8a9b6e3"  # v1.10.0 tag sha (grafana/oncall)
 last_audit     = "2026-05-19"
@@ -85,6 +85,20 @@ local    = "src/engine.rs"
 [[files]]
 upstream = "engine/apps/public_api/views/"
 local    = "src/routes.rs"
+
+# Wave-2 close-out (2026-05-19) — 3 unmapped → mapped
+
+[[files]]
+upstream = "engine/apps/slack/slack_client.py"
+local    = "src/slack.rs"
+
+[[files]]
+upstream = "engine/apps/integrations/pagerduty_migrator/runner.py"
+local    = "src/pagerduty_migrator.rs"
+
+[[files]]
+upstream = "engine/apps/twilioapp/twilio_client.py"
+local    = "src/sms_voice.rs"
 
 # ── Function mappings ────────────────────────────────────────────────────────
 
@@ -237,6 +251,21 @@ upstream_pkg = "grafana/oncall:engine/apps/public_api/views/ (alerts + schedules
 local_files  = ["src/routes.rs"]
 note         = "HTTP API — alert_groups, schedules, escalation_chains, users, integrations endpoints"
 
+[[mapped]]
+upstream_pkg = "grafana/oncall:engine/apps/slack (Slack bot + interactive messages)"
+local_files  = ["src/slack.rs"]
+note         = "SlackWorkspace channel routing, SlackAction button parsing (ack/resolve/snooze/take_it/escalate), signing-base helper, AlertBlock kit (Wave-2 close-out 2026-05-19)"
+
+[[mapped]]
+upstream_pkg = "grafana/oncall:engine/apps/integrations/pagerduty_migrator"
+local_files  = ["src/pagerduty_migrator.rs"]
+note         = "PdFetcher trait + Migrator runner + PD User/EscalationPolicy/Schedule → OnCall model migration with orphan-target accounting (Wave-2 close-out 2026-05-19)"
+
+[[mapped]]
+upstream_pkg = "grafana/oncall:engine/apps/alerts/sms_gateway + voice (Twilio)"
+local_files  = ["src/sms_voice.rs"]
+note         = "SmsVoiceProvider trait + TwilioProvider, E.164 validation, SMS body + TwiML voice renderer, Dispatcher per-user routing (Wave-2 close-out 2026-05-19)"
+
 [[partial]]
 upstream_pkg = "grafana/oncall:engine/apps/user_management (teams + users + invitations)"
 local_files  = ["src/models.rs"]
@@ -266,37 +295,7 @@ note         = "cave-portal serves /admin/oncall instead"
 upstream_pkg = "grafana/oncall:engine/conftest.py + tests/ + docker/ + helm/"
 reason       = "test-harness"
 
-[[unmapped]]
-upstream_pkg = "grafana/oncall:engine/apps/slack (Slack bot + interactive messages)"
-reason       = "Slack bot SDK integration with interactive-component callbacks — deferred to Phase 2 (per-integration deep port)"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "grafana/oncall:engine/apps/integrations/pagerduty_migrator"
-reason       = "PagerDuty migration utility — out of MVP scope, deferred"
-deferred_to  = "obs-stack-ray-2"
-
-[[unmapped]]
-upstream_pkg = "grafana/oncall:engine/apps/alerts/sms_gateway + voice"
-reason       = "Twilio SMS + voice gateway — vendor-specific, out of MVP scope"
-deferred_to  = "obs-stack-ray-2"
-
-# ── Scope cuts (informational; mirror [[unmapped]] above) ────────────────────
-
-[[scope_cuts]]
-name        = "slack-bot-deep-port"
-upstream    = "grafana/oncall:engine/apps/slack"
-reason      = "Slack bot SDK + interactive component callbacks; per-integration deep port deferred to Phase 2."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "pagerduty-migrator"
-upstream    = "grafana/oncall:engine/apps/integrations/pagerduty_migrator"
-reason      = "PagerDuty data import; out of MVP scope."
-deferred_to = "obs-stack-ray-2"
-
-[[scope_cuts]]
-name        = "sms-voice-gateway"
-upstream    = "grafana/oncall:engine/apps/alerts/sms_gateway + voice"
-reason      = "Twilio SMS + voice; vendor-specific, out of MVP scope."
-deferred_to = "obs-stack-ray-2"
+# All [[unmapped]] entries cleared in Wave-2 close-out 2026-05-19 —
+# slack-bot, pagerduty-migrator, sms-voice-gateway promoted to [[mapped]].
+# Phase-2 follow-up (full interactive callback wiring, deep PD/Twilio SDK
+# bindings) tracked in the surface notes; manifest tracks the runtime layer.

@@ -24,16 +24,21 @@ url        = "https://github.com/istio/istio"
 # pkg/wasm/ skipped entry added (was reported as unmapped, now
 # explicitly out-of-scope). Net: total 36 → 37, mapped 17 → 14,
 # partial 2 → 1, skipped 13 → 18, unmapped 4 → 4.
-mapped_count        = 14
+mapped_count        = 16
 partial_count       = 1
-skipped_count       = 18
-unmapped_count      = 4
+skipped_count       = 20
+unmapped_count      = 0
 total               = 37
-fill_ratio          = 0.8919   # (mapped + partial + skipped) / total = 33/37
-honest_ratio        = 0.8649   # (mapped + skipped) / total = 32/37 — partial excluded
+fill_ratio          = 1.0      # (mapped + partial + skipped) / total = 37/37
+honest_ratio        = 0.9730   # (mapped + skipped) / total = 36/37 — partial excluded
 parity_ratio_source = "manifest"
 last_audit          = "2026-05-19"
 infra_only          = false
+# Wave-2 close-out (2026-05-19):
+#   * VM-mesh expansion: unmapped → mapped (src/vm_mesh.rs).
+#   * Ambient L7 policy chain: unmapped → mapped (src/ambient/l7_policy.rs).
+#   * AnalyticsClient (vendor backend telemetry): unmapped → skipped.
+#   * istioctl analyze/debug (CLI tooling, cavectl absorbs): unmapped → skipped.
 
 [module]
 name        = "cave-mesh"
@@ -102,6 +107,16 @@ local    = "src/ambient/telemetry.rs"
 [[files]]
 upstream = "pilot/pkg/networking/core/cluster_traffic_policy.go"
 local    = "src/traffic_policy.rs"
+
+# Wave-2 close-out (2026-05-19) — 2 unmapped → mapped
+
+[[files]]
+upstream = "pilot/pkg/networking/serviceentry/external"
+local    = "src/vm_mesh.rs"
+
+[[files]]
+upstream = "https://github.com/istio/ztunnel/tree/release-1.29/src/state/policy"
+local    = "src/ambient/l7_policy.rs"
 
 [portal_ui]
 upstream_ui  = "Kiali (Istio)"
@@ -281,31 +296,35 @@ upstream_pkg = "istio/istio:pilot/pkg/networking/federation/"
 local_files  = ["src/federation.rs"]
 note         = "Multi-network federation control plane — MeshNetwork enrolment, EastWestGateway lifecycle + health flip, NetworkEndpoint publish/retract keyed on (service, network) with SPIFFE-id-stable slot replacement, TrustBundle rotate + bundle projection to consumers, cross_network_endpoints() pairs remote endpoints with their network's healthy east-west gateway addresses for xDS programming. Scope cut: actual data-plane forwarding stays in bound Envoy / ambient proxy; cross-mesh federation tracked separately."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/serviceentry/external/"
-note         = "VM-mesh expansion — non-k8s workloads (VirtualMachine + WorkloadEntry CRD). Not implemented."
+local_files  = ["src/vm_mesh.rs"]
+note         = "VM-mesh expansion — VM/bare-metal WorkloadEntry enrolment under a parent ServiceEntry, SPIFFE-id derivation, per-workload health probe ledger, healthy-endpoints filter feeding ambient ztunnel. Wave-2 close-out 2026-05-19."
 
 [[mapped]]
 upstream_pkg = "istio/istio:security/pkg/jwt/"
 local_files  = ["src/jwks.rs", "src/auth.rs"]
 note         = "JWT validation pipeline: JwkSet parser (RFC 7517) covering RSA / EC / oct kty, pluggable JwksTransport (production reqwest + tests StubTransport), per-issuer JwksCache with TTL refresh + force_refresh, RFC 7515 §4.1.4 single-key kid-less lookup, IssuerValidation builder that drives jsonwebtoken::Validation with audience / issuer / leeway. auth.rs already enforces RequestAuthentication/AuthorizationPolicy semantics; this module covers key resolution."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "istio/istio:telemetry/api/v1/AnalyticsClient"
-note         = "Backend analytics protocol — sends mesh usage to Istio team. Out of scope."
+reason       = "vendor-spec"
+note         = "Backend analytics protocol — sends mesh usage to Istio team. Out of cave-mesh scope; cave-metrics owns the workspace observability. Wave-2 close-out 2026-05-19: unmapped → skipped."
 
-[[unmapped]]
+[[skipped]]
 upstream_pkg = "istio/istio:istioctl/pkg/{analyze,debug}/"
-note         = "Static analysis + diagnose. Distinct from runtime mesh."
+reason       = "cli-tooling-absorbed-by-cavectl"
+note         = "Static analysis + diagnose — distinct from runtime mesh; cavectl absorbs equivalent UX. Wave-2 close-out 2026-05-19: unmapped → skipped."
 
 [[mapped]]
 upstream_pkg = "istio/istio:pilot/pkg/networking/serviceregistry/serviceentry/"
 local_files  = ["src/service_entry.rs", "src/models.rs"]
 note         = "ServiceEntry CRD manager: create / get / list / update / delete with validation (hosts/ports non-empty, Static/DNS modes require endpoints), resolve(host, port_name) under all four ServiceResolution modes (None passthrough / Static / Dns first-record / DnsRoundRobin cycle), pluggable DnsResolver trait so tests stay offline. registry.rs continues to handle auto-discovery; this module owns the operator-curated entries."
 
-[[unmapped]]
+[[mapped]]
 upstream_pkg = "ztunnel:src/state/policy/L7"
-note         = "Ambient L7 policy (waypoint proxy filter chain). waypoint.rs has the routing stub; L7 filter ordering is unmapped."
+local_files  = ["src/ambient/l7_policy.rs"]
+note         = "Ambient L7 filter-chain ordering — canonical jwt→authz→rate-limit→fault→route→telemetry sequence with L7Filter trait + L7FilterChain evaluator (short-circuit on first non-Allow). Wave-2 close-out 2026-05-19."
 
 
 # ── Upstream test cross-reference (behavioral parity) ────────────────────────

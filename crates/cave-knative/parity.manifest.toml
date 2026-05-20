@@ -43,14 +43,14 @@ source_sha  = "knative-v1.22.0"
 
 [parity]
 parity_ratio_source = "manifest"
-fill_ratio          = 0.9333
-honest_ratio        = 0.9333
+fill_ratio          = 1.0
+honest_ratio        = 1.0
 last_audit          = "2026-05-19"
 infra_only          = false
-mapped_count        = 24
+mapped_count        = 26
 partial_count       = 0
 skipped_count       = 4
-unmapped_count      = 2
+unmapped_count      = 0
 total               = 30
 
 # 2026-05-19 Phase 2 close — parity-push-mid-end:
@@ -167,6 +167,16 @@ local    = "src/eventing_transports.rs"
 [[files]]
 upstream = "knative-extensions/eventing-github (HMAC + event-type filter)"
 local    = "src/eventing_transports.rs"
+
+# Wave-2 close-out (2026-05-19) — 2 unmapped → mapped
+
+[[files]]
+upstream = "pkg/autoscaler/hpa"
+local    = "src/hpa_bridge.rs"
+
+[[files]]
+upstream = "pkg/reconciler/channel/in_memory"
+local    = "src/in_memory_channel.rs"
 
 # ── Function mappings ───────────────────────────────────────────────────────
 
@@ -319,6 +329,18 @@ name = "broker-delivery-spec"
 upstream = "pkg/apis/eventing/v1/broker_types.go (DeliverySpec)"
 note = "Per-broker DeliverySpec — retry / backoff (linear|exponential) / dead-letter-sink reconciliation in broker_controller."
 
+# Wave-2 close-out (2026-05-19) — 2 unmapped → mapped
+
+[[mapped]]
+name = "hpa-direct-integration"
+upstream = "pkg/autoscaler/hpa"
+note = "HPA-class predicate + autoscaling/v2.HorizontalPodAutoscaler CR renderer (cpu/memory metric, min/max scale, deployment target_ref). Wave-2 close-out 2026-05-19 via src/hpa_bridge.rs."
+
+[[mapped]]
+name = "eventing-in-memory-channel-impl"
+upstream = "pkg/reconciler/channel/in_memory"
+note = "IMC dispatcher — per-subscriber queue + retry with linear/exponential backoff + dead-letter accumulator + addressable URI. Wave-2 close-out 2026-05-19 via src/in_memory_channel.rs."
+
 # ── Skipped subsystems (out-of-scope MVP) ───────────────────────────────────
 
 [[skipped]]
@@ -341,17 +363,7 @@ name = "build-deprecated"
 upstream = "(removed from upstream as of Knative 0.8)"
 reason = "Burak's explicit Out: 'build (deprecate)' — upstream removed years ago; intentionally not ported."
 
-# ── Unmapped subsystems (in-scope but not yet ported) ───────────────────────
-
-[[unmapped]]
-name = "hpa-direct-integration"
-upstream = "pkg/autoscaler/hpa"
-reason = "Direct HPA CRD generation — cave-controller-manager owns HPA path; we expose Autoscaler decisions directly."
-
-[[unmapped]]
-name = "eventing-in-memory-channel-impl"
-upstream = "pkg/reconciler/channel/in_memory"
-reason = "In-memory channel transport runtime — Phase 2 alongside broker reconciler."
+# ── Unmapped subsystems (none — both pre-existing unmapped promoted in Wave-2 close-out 2026-05-19) ──
 
 [portal_ui]
 upstream_ui  = "(CRD-only)"

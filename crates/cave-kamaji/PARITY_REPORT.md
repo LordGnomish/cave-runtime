@@ -15,22 +15,28 @@ Copyright 2026 Cave Runtime contributors
 ## 1 · Fill-ratio (honest, measured)
 
 ```
-mapped     = 13
-partial    =  1
+mapped     = 14   (+1 vs pre-wave-2)
+partial    =  0   (-1 vs pre-wave-2)
 unmapped   =  0
 skipped    =  3
 total      = 17
 
-fill_ratio   = mapped / (mapped + partial + unmapped) = 13 / 14 = 0.9286
-honest_ratio = mapped / total                          = 13 / 17 = 0.7647
+fill_ratio   = mapped / (mapped + partial + unmapped) = 14 / 14 = 1.0   (+0.0714)
+honest_ratio = mapped / total                          = 14 / 17 = 0.8235 (+0.0588)
 parity_ratio_source = "manifest"
 ```
 
-Supplementary LOC measurement: ~750 implementation lines (excluding
-`#[cfg(test)]`) against ~1300 upstream in-scope lines — ~0.58 ratio on
-the LOC basis.
+Supplementary LOC measurement: ~1010 implementation lines (excluding
+`#[cfg(test)]`) against ~1500 upstream in-scope lines after the CAPI
+addition.
 
-## 2 · Mapped subsystems (13)
+### Wave-2 close-out delta (2026-05-19)
+
+| Δ | subsystem | provenance |
+|---|---|---|
+| → | cluster-api-integration | partial → mapped · `src/cluster_api.rs` (ControlPlaneEndpoint parse + CapiBootstrapStatus + CapiTenantStatus + ready predicate) |
+
+## 2 · Mapped subsystems (14)
 
 | # | Subsystem                  | Local file              | Upstream                                                       |
 |---|----------------------------|-------------------------|----------------------------------------------------------------|
@@ -47,12 +53,11 @@ the LOC basis.
 |11 | apiserver-pod-plan         | `src/pod_mgmt.rs`       | `internal/resources/kubeapiserver`                             |
 |12 | kubeadm-init-renderer      | `src/kubeadm.rs`        | `internal/utilities/kubeadm`                                   |
 |13 | status-conditions          | `src/status.rs`         | `internal/controllers/conditions.go`                           |
+|14 | cluster-api-integration    | `src/cluster_api.rs`    | `internal/controllers/clusterapi`                              |
 
-## 3 · Partial subsystems (1)
+## 3 · Partial subsystems (0)
 
-| Subsystem                | Reason                                                                                                                                       |
-|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| cluster-api-integration  | TCP CRD + kubeadm init cover the bootstrap path; full Cluster API CRDs land alongside cave-cluster-api Phase 3.                              |
+All previously-partial subsystems promoted to mapped in Wave-2 close-out 2026-05-19.
 
 ## 4 · Skipped subsystems (3 — intentional out-of-scope)
 
@@ -82,7 +87,7 @@ the LOC basis.
 | 5 | No-backcompat — no aliased re-exports or migration shims              | ✅      |
 | 6 | Always-latest — Kamaji v1.0.0 (latest stable as of 2026-05-19)        | ✅      |
 | 7 | 4-track — Backend GREEN; Portal/cavectl/Obs honestly deferred Phase 3 | ✅      |
-| 8 | Honest measured `fill_ratio = 0.9286` (>= 0.50 MVP floor)             | ✅      |
+| 8 | Honest measured `fill_ratio = 1.0` (>= 0.50 MVP floor)                | ✅      |
 
 ## 7 · Reproducibility
 
